@@ -7,7 +7,7 @@ import { z } from 'zod';
 import type { ApifyClient } from '../../apify_client.js';
 import { sendApifyApiRequest } from '../../apify_client.js';
 import { APIFY_ERROR_TYPE_PAGE_NOT_FOUND, HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
-import { isApifyApiUri, isMaxContentLengthAbort } from '../../resources/api_resources.js';
+import { isApifyApiUri, isMaxContentLengthAbort, stripUrlSigningSecretKey } from '../../resources/api_resources.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
@@ -226,7 +226,8 @@ async function addClosestPaths(error: ApifyApiError, normalizedPath: string, sig
 /**
  * A copy of a response body with the session's token replaced, since a response can echo it, as
  * `GET /v2/browser-info` echoes the request headers. A binary body is masked too: apify-client copies a
- * Buffer error body into the message.
+ * Buffer error body into the message. `maskSessionToken` (`../../resources/api_resources.ts`) applies the
+ * same Buffer rule to `resources/read`.
  */
 function maskToken(data: unknown, token: string | undefined): unknown {
     if (!token || data === undefined) return data;
@@ -294,7 +295,9 @@ export async function callApi(params: {
         }
         throw toPlainRequestError(error);
     }
-    const data = maskToken(response.data, params.token);
+    // A storage object holds its URL signing key, which lets anyone sign links to all its data
+    // (see apify/ai-team#330). Removed outside `maskToken`, which skips a session without a token.
+    const data = stripUrlSigningSecretKey(maskToken(response.data, params.token));
     if (response.status >= 300) {
         // Without the query in the path: apify-client puts the URL into the error, and a 5xx error is logged.
         const error = new ApifyApiError({ ...response, data, config: { ...response.config, url: stripQuery(url) } }, 1);

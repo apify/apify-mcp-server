@@ -60,8 +60,12 @@ export const getKeyValueStore: ToolEntry = Object.freeze({
         const bytes = (kvStore.stats as { storageBytes?: number } | undefined)?.storageBytes;
         const summary = `Key-value store '${kvStore.name ?? keyValueStoreId}'${bytes !== undefined ? ` holds ${bytes} bytes` : ''}.`;
         const nextStep = `Use ${HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET} with keyValueStoreId=${keyValueStoreId} to list keys.`;
+        // The API returns the storage's URL signing key to write-capable tokens; in the transcript it lets
+        // anyone mint non-expiring links to every record. The pre-signed *PublicUrl fields expire and stay
+        // (see apify/ai-team#330).
+        const { urlSigningSecretKey, ...metadata } = kvStore;
         return buildStorageResponse({
-            structuredContent: kvStore as unknown as Record<string, unknown>,
+            structuredContent: metadata as unknown as Record<string, unknown>,
             summary,
             nextStep,
             apifyConsoleUrl: buildConsoleKeyValueStoreUrl(linkContext, kvStore.id),

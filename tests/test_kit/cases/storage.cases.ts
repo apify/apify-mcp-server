@@ -309,6 +309,8 @@ export const storageCases: Case[] = [
             expect(text).toContain(datasetId);
             expect(text).toContain('firstNumber');
             expect(text).toContain('sum');
+            expect(text).not.toContain('urlSigningSecretKey');
+            expect(text).toContain('itemsPublicUrl');
             const sc = (result as { structuredContent?: { summary?: string; nextStep?: string } }).structuredContent;
             expect(sc?.summary).toContain('items');
             expect(sc?.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
@@ -340,6 +342,9 @@ export const storageCases: Case[] = [
             expect(result.isError).not.toBe(true);
             const { text } = (result.content as { text: string }[])[0];
             expect(text).toContain(defaultKvId);
+            expect(text).not.toContain('urlSigningSecretKey');
+            expect(text).toContain('keysPublicUrl');
+            expect(text).toContain('recordsPublicUrl');
             const sc = (result as { structuredContent?: { nextStep?: string } }).structuredContent;
             expect(sc?.nextStep).toContain(HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET);
         }),
@@ -444,6 +449,41 @@ export const storageCases: Case[] = [
             await expect(client.readResource({ uri: 'https://example.com/steal-my-token' })).rejects.toThrow(
                 /Failed to read/i,
             );
+        }),
+    },
+    {
+        name: 'removes the URL signing key via resources/read',
+        isDeploymentTest: false,
+        run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
+            const result = await client.readResource({ uri: `https://api.apify.com/v2/datasets/${datasetId}` });
+            const text = (result.contents[0] as { text?: string }).text as string;
+            expect(text).not.toContain('urlSigningSecretKey');
+            const { data } = JSON.parse(text) as { data: Record<string, unknown> };
+            expect(data).not.toHaveProperty('urlSigningSecretKey');
+            expect(data.id).toBe(datasetId);
+        }),
+    },
+    {
+        name: 'removes the URL signing key via apify-api-read',
+        isDeploymentTest: false,
+        run: withNormalModeRun({ tools: ['api'] }, async (client, { runId }) => {
+            const result = await client.callTool({
+                name: HELPER_TOOLS.API_READ,
+                arguments: { path: `/v2/actor-runs/${runId}/key-value-store` },
+            });
+            expect(result.isError).not.toBe(true);
+            const sc = (result as { structuredContent?: { data?: { data?: Record<string, unknown> } } })
+                .structuredContent;
+            expect(sc?.data?.data).toBeDefined();
+            expect(sc?.data?.data).not.toHaveProperty('urlSigningSecretKey');
+        }),
+    },
+    {
+        name: 'masks the session token via resources/read',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['storage'] }, async (client) => {
+            const result = await client.readResource({ uri: 'https://api.apify.com/v2/browser-info' });
+            expect((result.contents[0] as { text?: string }).text).toContain('Bearer [REDACTED]');
         }),
     },
     {

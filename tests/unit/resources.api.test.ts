@@ -2,12 +2,12 @@ import { Readable } from 'node:stream';
 
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError } from 'axios';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import type { ApifyClient } from '../../src/apify_client.js';
+import { ApifyClient } from '../../src/apify_client.js';
 import { MAX_INLINE_BYTES } from '../../src/const.js';
 import { InternalError, InvalidParamsError } from '../../src/mcp/errors.js';
-import { isApifyApiUri, readApiResource } from '../../src/resources/api_resources.js';
+import { isApifyApiUri, readApiResource, stripUrlSigningSecretKey } from '../../src/resources/api_resources.js';
 import { mockApifyClient } from './helpers/tool_context.js';
 
 const API = 'https://api.apify.com';
@@ -49,6 +49,8 @@ type StubOptions = {
     request?: (config: RequestConfig) => Promise<RequestResult>;
     /** Throw from getRecordPublicUrl to exercise the download-link fallback. */
     recordPublicUrlThrows?: boolean;
+    /** The session token, as apify-client exposes it on `client.token`. */
+    token?: string;
 };
 
 /** Signed public URL the stubbed getRecordPublicUrl returns for a (storeId, key) pair. */
@@ -58,6 +60,7 @@ function signedUrl(storeId: string, key: string): string {
 
 function stubApifyClient(opts: StubOptions = {}): ApifyClient {
     return mockApifyClient({
+        token: opts.token,
         keyValueStore: (storeId: string) => ({
             getRecordPublicUrl: async (key: string) => {
                 if (opts.recordPublicUrlThrows) throw new Error('boom');
@@ -112,6 +115,32 @@ describe('isApifyApiUri()', () => {
         // read would silently run unauthenticated; refuse it at the gate instead.
         expect(isApifyApiUri('https://evil.com@api.apify.com/v2/datasets/ds-1/items')).toBe(false);
         expect(isApifyApiUri('https://user:pass@api.apify.com/v2/datasets/ds-1/items')).toBe(false);
+    });
+});
+
+describe('stripUrlSigningSecretKey()', () => {
+    it('removes the key at any depth without mutating its input', () => {
+        const input = { data: { id: 'ds-1', urlSigningSecretKey: 's', items: [{ urlSigningSecretKey: 's', n: 1 }] } };
+
+        expect(stripUrlSigningSecretKey(input)).toEqual({ data: { id: 'ds-1', items: [{ n: 1 }] } });
+        expect(input).toHaveProperty('data.urlSigningSecretKey', 's');
+        expect(input.data.items[0]).toHaveProperty('urlSigningSecretKey', 's');
+    });
+
+    it.each([
+        ['a Buffer', Buffer.from('{"urlSigningSecretKey":"s"}')],
+        ['a string', '"urlSigningSecretKey": "s"'],
+        ['a number', 1],
+        ['null', null],
+        ['undefined', undefined],
+    ])('returns %s as it is', (_kind, value) => {
+        expect(stripUrlSigningSecretKey(value)).toBe(value);
+    });
+
+    it('keeps an own __proto__ key as a key', () => {
+        const result = stripUrlSigningSecretKey(JSON.parse('{"__proto__":{"x":1},"urlSigningSecretKey":"s"}'));
+
+        expect(JSON.stringify(result)).toBe('{"__proto__":{"x":1}}');
     });
 });
 
@@ -467,5 +496,329 @@ describe('readApiResource()', () => {
         expect(contents.text).toHaveLength(MAX_INLINE_BYTES);
         expect(contents.text).not.toContain('exceeds');
         expect(contents.mimeType).toBe('text/plain; charset=utf-8');
+    });
+
+    it.each([
+        ['/v2/datasets/ds-1', { id: 'ds-1', itemsPublicUrl: `${API}/v2/datasets/ds-1/items?signature=sig-1` }],
+        [
+            '/v2/actor-runs/run-1/key-value-store',
+            {
+                id: 'kv-1',
+                keysPublicUrl: `${API}/v2/key-value-stores/kv-1/keys?signature=sig-1`,
+                recordsPublicUrl: `${API}/v2/key-value-stores/kv-1/records?signature=sig-1`,
+            },
+        ],
+    ])('removes the URL signing key from the storage object read from %s', async (path, fields) => {
+        const storage = { ...fields, name: null, stats: { readCount: 1, writeCount: 2 }, generalAccess: 'RESTRICTED' };
+        const body = JSON.stringify({ data: { ...storage, urlSigningSecretKey: 'mock-signing-secret' } }, null, 2);
+        const splitAt = body.indexOf('mock-signing-secret') + 4;
+        const { request } = requestReturning(
+            streamOf(body.slice(0, splitAt), body.slice(splitAt)),
+            'application/json; charset=utf-8',
+        );
+
+        const result = await readApiResource(`${API}${path}`, stubApifyClient({ request }));
+
+        // Only the key line and the comma before it change.
+        expect(firstContent(result).text).toBe(JSON.stringify({ data: storage }, null, 2));
+        expect(firstContent(result).text).not.toContain('urlSigningSecretKey');
+        expect(firstContent(result).mimeType).toBe('application/json; charset=utf-8');
+    });
+
+    it.each([
+        ['in first position', '{"urlSigningSecretKey":"s","id":"kv-1","n":1}', '{\n  "id": "kv-1",\n  "n": 1\n}'],
+        ['in the middle', '{"id":"kv-1","urlSigningSecretKey":"s","n":1}', '{\n  "id": "kv-1",\n  "n": 1\n}'],
+        ['as the only property', '{"urlSigningSecretKey":"s"}', '{}'],
+        ['with a space before the colon', '{"urlSigningSecretKey" : "s", "n": 1}', '{\n  "n": 1\n}'],
+        ['with a line break before the colon', '{"urlSigningSecretKey"\n: "s", "n": 1}', '{\n  "n": 1\n}'],
+        ['nested in an object', '{"exported": {"urlSigningSecretKey": "s"}}', '{\n  "exported": {}\n}'],
+        [
+            'in array elements',
+            '[{"urlSigningSecretKey":"s","n":1},{"n":2}]',
+            '[\n  {\n    "n": 1\n  },\n  {\n    "n": 2\n  }\n]',
+        ],
+        [
+            'beside an integer above 2^53',
+            '{"rowId":12345678901234567890,"urlSigningSecretKey":"s","items":[{"urlSigningSecretKey":"s","n":1}]}',
+            '{\n  "rowId": 12345678901234567000,\n  "items": [\n    {\n      "n": 1\n    }\n  ]\n}',
+        ],
+        [
+            'beside \\u and \\/ escapes',
+            '{"urlSigningSecretKey":"s","name":"caf\\u00e9","url":"a\\/b"}',
+            '{\n  "name": "café",\n  "url": "a/b"\n}',
+        ],
+        [
+            'beside 1.50 and 1e3',
+            '{"urlSigningSecretKey":"s","price":1.50,"count":1e3}',
+            '{\n  "price": 1.5,\n  "count": 1000\n}',
+        ],
+        ['beside an integer-like key', '{"urlSigningSecretKey":"s","b":1,"2":2}', '{\n  "2": 2,\n  "b": 1\n}'],
+        ['beside a duplicate key', '{"urlSigningSecretKey":"s","a":1,"a":2}', '{\n  "a": 2\n}'],
+    ])('removes the URL signing key %s and re-serializes the JSON body', async (_position, body, expected) => {
+        const { request } = requestReturning(streamOf(body), 'application/json');
+
+        const result = await readApiResource(
+            `${API}/v2/key-value-stores/kv-1/records/INPUT`,
+            stubApifyClient({ request }),
+        );
+
+        expect(firstContent(result).text).toBe(expected);
+    });
+
+    it.each([
+        '[{"rowId":12345678901234567890, "f":1.50}]',
+        '[{"rowId":12345678901234567890, "note":"urlSigningSecretKey"}]',
+        '{"note" : "urlSigningSecretKey", "fields":["urlSigningSecretKey"]}',
+        '{"myurlSigningSecretKey": "s", "urlSigningSecretKeyX": "s", "name": "caf\\u00e9"}',
+    ])('returns the JSON body %s byte for byte, since no property is named urlSigningSecretKey', async (body) => {
+        const { request } = requestReturning(streamOf(body), 'application/json');
+
+        const result = await readApiResource(`${API}/v2/datasets/ds-1/items`, stubApifyClient({ request }));
+
+        expect(firstContent(result).text).toBe(body);
+    });
+
+    it.each(['text/plain', 'text/csv', 'application/xml', 'application/ld+json'])(
+        'keeps the URL signing key in a body typed %s',
+        async (contentType) => {
+            const body = '{"urlSigningSecretKey": "abc123"}';
+            const { request } = requestReturning(streamOf(body), contentType);
+
+            const result = await readApiResource(
+                `${API}/v2/key-value-stores/kv-1/records/NOTES`,
+                stubApifyClient({ request }),
+            );
+
+            expect(firstContent(result).text).toBe(body);
+        },
+    );
+
+    it('keeps the URL signing key in a binary body', async () => {
+        const body = Buffer.from('{"urlSigningSecretKey": "abc123"}');
+        const { request } = requestReturning(streamOf(body), 'application/octet-stream');
+
+        const result = await readApiResource(
+            `${API}/v2/key-value-stores/kv-1/records/ENV`,
+            stubApifyClient({ request }),
+        );
+
+        expect(firstContent(result).blob).toBe(body.toString('base64'));
+    });
+
+    it('returns a malformed JSON body as it is', async () => {
+        const body = '{"urlSigningSecretKey": "abc123",';
+        const { request } = requestReturning(streamOf(body), 'application/json');
+
+        const result = await readApiResource(
+            `${API}/v2/key-value-stores/kv-1/records/BROKEN`,
+            stubApifyClient({ request }),
+        );
+
+        expect(firstContent(result).text).toBe(body);
+        expect(firstContent(result).mimeType).toBe('application/json');
+    });
+
+    it('returns a JSON body nested too deep to process as it is', async () => {
+        const body = `${'['.repeat(100_000)}{"urlSigningSecretKey":"s"}${']'.repeat(100_000)}`;
+        const { request } = requestReturning(streamOf(body), 'application/json');
+
+        const result = await readApiResource(
+            `${API}/v2/key-value-stores/kv-1/records/DEEP`,
+            stubApifyClient({ request }),
+        );
+
+        expect(firstContent(result).text).toBe(body);
+    });
+
+    it('returns the link-out notice when the re-serialized JSON body is over the inline limit', async () => {
+        // Under the limit as sent; 2-space indentation more than triples it.
+        const body = `{"urlSigningSecretKey":"mock-signing-secret","items":[${'{"n":1},'.repeat(20_000)}{"n":1}]}`;
+        expect(Buffer.byteLength(body)).toBeLessThan(MAX_INLINE_BYTES);
+        const uri = `${API}/v2/key-value-stores/kv-1/records/EXPORT`;
+        const { request } = requestReturning(streamOf(body), 'application/json');
+        const overLimit = requestReturning(abortingStream(), 'application/json');
+
+        const result = await readApiResource(uri, stubApifyClient({ request }));
+
+        expect(result).toEqual(await readApiResource(uri, stubApifyClient({ request: overLimit.request })));
+        expect(JSON.stringify(result)).not.toContain('urlSigningSecretKey');
+        expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
+    });
+
+    it('returns the link-out notice when the re-serialized JSON body is too long for a string', async () => {
+        // A deeply nested body under the limit can pass the maximum string length once indented. V8 then
+        // throws this error, after seconds of work, so the test throws it directly.
+        const { stringify } = JSON;
+        const stringifyMock = vi.spyOn(JSON, 'stringify').mockImplementation((value, replacer, space) => {
+            if (space === 2) throw new RangeError('Invalid string length');
+            return stringify(value, replacer, space);
+        });
+        const uri = `${API}/v2/key-value-stores/kv-1/records/EXPORT`;
+        const { request } = requestReturning(
+            streamOf('{"urlSigningSecretKey":"mock-signing-secret"}'),
+            'application/json',
+        );
+        const overLimit = requestReturning(abortingStream(), 'application/json');
+
+        try {
+            const result = await readApiResource(uri, stubApifyClient({ request }));
+
+            expect(result).toEqual(await readApiResource(uri, stubApifyClient({ request: overLimit.request })));
+            expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
+        } finally {
+            stringifyMock.mockRestore();
+        }
+    });
+
+    it('masks the session token in a malformed JSON body and returns the rest as it is', async () => {
+        const { request } = requestReturning(
+            streamOf('{"urlSigningSecretKey": "abc123", "token": "test-token",'),
+            'application/json',
+        );
+
+        const result = await readApiResource(
+            `${API}/v2/key-value-stores/kv-1/records/BROKEN`,
+            stubApifyClient({ request, token: 'test-token' }),
+        );
+
+        expect(firstContent(result).text).toBe('{"urlSigningSecretKey": "abc123", "token": "[REDACTED]",');
+    });
+
+    it.each([
+        [
+            'application/json',
+            '{"urlSigningSecretKey":"s","authorization":"Bearer test-token"}',
+            '{\n  "authorization": "Bearer [REDACTED]"\n}',
+        ],
+        [
+            'application/json; charset=utf-8',
+            '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "test-token"}',
+            '{\n  "exported": {},\n  "apifyToken": "[REDACTED]"\n}',
+        ],
+        [
+            'text/plain',
+            '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "test-token"}',
+            '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "[REDACTED]"}',
+        ],
+    ])(
+        'masks the session token in a body typed %s that also holds the URL signing key',
+        async (contentType, body, expected) => {
+            const { request } = requestReturning(streamOf(body), contentType);
+
+            const result = await readApiResource(
+                `${API}/v2/key-value-stores/kv-1/records/INPUT`,
+                stubApifyClient({ request, token: 'test-token' }),
+            );
+
+            expect(firstContent(result).text).toBe(expected);
+            expect(firstContent(result).mimeType).toBe(contentType);
+        },
+    );
+
+    it.each([
+        [
+            'a JSON',
+            '/v2/browser-info',
+            'application/json; charset=utf-8',
+            '{\n  "headers": {\n    "authorization": "Bearer test-token"\n  }\n}',
+        ],
+        [
+            'a text',
+            '/v2/key-value-stores/kv-1/records/NOTE',
+            'text/plain',
+            'Authorization: Bearer test-token\nAgain: test-token',
+        ],
+        ['an XML', '/v2/key-value-stores/kv-1/records/FEED', 'application/xml', '<auth>Bearer test-token</auth>'],
+        ['a CSV', '/v2/key-value-stores/kv-1/records/CSV', 'text/csv', 'name,value\nauthorization,Bearer test-token'],
+    ])('masks the session token in %s body split across chunks', async (_kind, path, contentType, body) => {
+        const splitAt = body.indexOf('test-token') + 4;
+        const { request } = requestReturning(streamOf(body.slice(0, splitAt), body.slice(splitAt)), contentType);
+
+        const result = await readApiResource(`${API}${path}`, stubApifyClient({ request, token: 'test-token' }));
+
+        expect(firstContent(result).text).toBe(body.replaceAll('test-token', '[REDACTED]'));
+        expect(JSON.stringify(result)).not.toContain('test-token');
+    });
+
+    it('masks the session token in a binary body split across chunks and keeps every other byte', async () => {
+        const body = Buffer.concat([Buffer.from([0xff, 0x00]), Buffer.from('token=test-token'), Buffer.from([0x80])]);
+        const { request } = requestReturning(
+            streamOf(body.subarray(0, 10), body.subarray(10)),
+            'application/octet-stream',
+        );
+
+        const result = await readApiResource(
+            `${API}/v2/key-value-stores/kv-1/records/ENV`,
+            stubApifyClient({ request, token: 'test-token' }),
+        );
+
+        expect(Buffer.from(firstContent(result).blob as string, 'base64')).toEqual(
+            Buffer.concat([Buffer.from([0xff, 0x00]), Buffer.from('token=[REDACTED]'), Buffer.from([0x80])]),
+        );
+    });
+
+    it.each([
+        [
+            'a JSON',
+            'application/json',
+            '[{"rowId":12345678901234567890, "f":1.50}]',
+            { text: '[{"rowId":12345678901234567890, "f":1.50}]' },
+        ],
+        ['a binary', 'application/octet-stream', Buffer.from([0xff, 0x00, 0x80]), { blob: '/wCA' }],
+    ])('returns %s body without the session token as it is', async (_kind, contentType, body, expected) => {
+        const uri = `${API}/v2/key-value-stores/kv-1/records/DATA`;
+        const { request } = requestReturning(streamOf(body), contentType);
+
+        const result = await readApiResource(uri, stubApifyClient({ request, token: 'test-token' }));
+
+        expect(firstContent(result)).toEqual({ uri, mimeType: contentType, ...expected });
+    });
+
+    it.each([
+        [400, InvalidParamsError],
+        [500, InternalError],
+    ])('masks the session token in the API error message of an HTTP %s response', async (status, ErrorClass) => {
+        const client = stubApifyClient({
+            request: requestFailing(status, 'Status', { error: { message: 'Bearer test-token rejected' } }),
+            token: 'test-token',
+        });
+
+        const error = await expectReadError(readApiResource(`${API}/v2/datasets/ds-1`, client));
+
+        expect(error).toBeInstanceOf(ErrorClass);
+        expect(error.message).toContain(`HTTP ${status}: Bearer [REDACTED] rejected`);
+        expect(JSON.stringify({ message: error.message, data: error.data })).not.toContain('test-token');
+    });
+
+    it('masks the token the client sends in its Authorization header, not another one', async () => {
+        const client = new ApifyClient({ token: 'sent-token' });
+        // Echo the Authorization header apify-client adds, as GET /v2/browser-info does.
+        client.httpClient.axios.defaults.adapter = async (config) => ({
+            data: streamOf(`authorization: ${String(config.headers.Authorization)}; configured: other-token`),
+            status: 200,
+            statusText: 'OK',
+            headers: { 'content-type': 'text/plain' },
+            config,
+        });
+
+        const result = await readApiResource(`${API}/v2/browser-info`, client);
+
+        expect(firstContent(result).text).toBe('authorization: Bearer [REDACTED]; configured: other-token');
+    });
+
+    it('returns the link-out notice without either secret for a body over the inline limit', async () => {
+        const { request } = requestReturning(
+            abortingStream('{"urlSigningSecretKey":"mock-signing-secret","token":"test-token"'),
+            'application/json',
+        );
+
+        const result = await readApiResource(
+            `${API}/v2/datasets/ds-1`,
+            stubApifyClient({ request, token: 'test-token' }),
+        );
+
+        expect(firstContent(result).text).toContain('exceeds');
+        expect(firstContent(result).text).not.toContain('mock-signing-secret');
+        expect(firstContent(result).text).not.toContain('test-token');
     });
 });

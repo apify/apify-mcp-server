@@ -49,12 +49,16 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     are the same), sends it as written with the query added after any query string in it, and
     looks up a legacy `acts` path as `actors`, the prefix the spec lists. It asserts that the URL stays
     on the API origin, sends one request with no retries, masks the session token in the response,
-    keeps a query in the path out of the error it throws, and adds the closest spec paths to a
+    removes every `urlSigningSecretKey` property from a JSON body, keeps a query in the path out of the
+    error it throws, and adds the closest spec paths to a
     `page-not-found` 404 (a wrong path), not to a missing record.
     The one capped request (`sendApifyApiRequest`) is in `../apify_client.ts`. The origin check
-    (`isApifyApiUri`) and the detection of a body over `MAX_INLINE_BYTES` (`isMaxContentLengthAbort`)
-    are the API resource's own, imported from `../resources/api_resources.ts`
+    (`isApifyApiUri`), the detection of a body over `MAX_INLINE_BYTES` (`isMaxContentLengthAbort`) and
+    the signing-key removal (`stripUrlSigningSecretKey`) are the API resource's own, imported from
+    `../resources/api_resources.ts`
     ([`../resources/AGENTS.md`](../resources/AGENTS.md#api-resources-api_resourcests)).
+    `resources/read` masks the token with its own copy of `maskToken`'s Buffer rule (`maskSessionToken`);
+    change both together.
     The details and call tools log their arguments through `redactApiCallArgs` (`redactArgs`): an
     allowlist of path, method, query, and body, with the body and the `token`, `signature`, and
     `webhooks` query values redacted, and a query written into the path cut to `?[REDACTED]`.
