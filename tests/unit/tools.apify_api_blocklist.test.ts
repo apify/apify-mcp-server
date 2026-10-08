@@ -253,7 +253,7 @@ describe('validateApiPathBlocklist()', () => {
             refusal: `${SYNC_RUN_REFUSAL} Use ${HELPER_TOOLS.ACTOR_CALL} instead.`,
         },
         { normalizedPath: 'actor-tasks/{actorTaskId}/run-sync-get-dataset-items', refusal: SYNC_RUN_REFUSAL },
-    ])('refuses $normalizedPath, a path a rule refuses in any tool', ({ normalizedPath, refusal }) => {
+    ])('refuses $normalizedPath without a method, since a rule refuses its GET', ({ normalizedPath, refusal }) => {
         expect(validateApiPathBlocklist({ normalizedPath, loadedToolNames: [HELPER_TOOLS.ACTOR_CALL] })).toBe(refusal);
     });
 
