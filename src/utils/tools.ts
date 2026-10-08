@@ -1,5 +1,5 @@
 import type { CallDiagnostics, HelperTool, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
-import { SERVER_MODE, TOOL_TYPE } from '../types.js';
+import { TOOL_TYPE } from '../types.js';
 import { fixZodSchemaRequired } from './ajv.js';
 
 /**
@@ -59,8 +59,6 @@ export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>
 }
 
 type ToolPublicFieldOptions = {
-    mode?: SERVER_MODE;
-    filterWidgetMeta?: boolean;
     /**
      * Names served in the same tools/list response. When set, tools with a `buildDescription`
      * render their description against it, so cross-tool references to absent tools are omitted.
@@ -68,22 +66,6 @@ type ToolPublicFieldOptions = {
      */
     presentTools?: ReadonlySet<string>;
 };
-
-/**
- * Strips widget-specific metadata (openai/* and ui keys) from tool metadata.
- * Used to hide widget metadata in non-apps modes.
- */
-function stripWidgetMeta(meta?: ToolBase['_meta']) {
-    if (!meta) return meta;
-
-    const filteredEntries = Object.entries(meta).filter(
-        ([key]) => !key.startsWith('openai/') && key !== 'ui' && key !== 'ui/resourceUri',
-    );
-
-    if (filteredEntries.length === 0) return undefined;
-
-    return Object.fromEntries(filteredEntries);
-}
 
 /**
  * Zod 4's z.toJSONSchema() lists properties with `.default()` in `required`.
@@ -99,8 +81,7 @@ function fixZodInputSchemaRequired(inputSchema: ToolBase['inputSchema']): ToolBa
  * Used for the tools list request.
  */
 export function getToolPublicFieldOnly(tool: ToolBase, options: ToolPublicFieldOptions = {}) {
-    const { mode, filterWidgetMeta = false, presentTools } = options;
-    const meta = filterWidgetMeta && mode !== SERVER_MODE.APPS ? stripWidgetMeta(tool._meta) : tool._meta;
+    const { presentTools } = options;
     const description =
         tool.buildDescription && presentTools
             ? tool.buildDescription({ hasTool: (name) => presentTools.has(name) })
@@ -115,7 +96,7 @@ export function getToolPublicFieldOnly(tool: ToolBase, options: ToolPublicFieldO
         annotations: tool.annotations,
         icons: tool.icons,
         execution: tool.execution,
-        _meta: meta,
+        _meta: tool._meta,
     };
 }
 

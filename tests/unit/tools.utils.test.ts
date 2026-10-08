@@ -1098,7 +1098,7 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
             inputSchema,
         } as ToolBase;
 
-        const pub = getToolPublicFieldOnly(tool, { filterWidgetMeta: false });
+        const pub = getToolPublicFieldOnly(tool);
         const schema = pub.inputSchema as {
             required?: string[];
             properties?: Record<string, { description?: string; prefill?: unknown }>;
