@@ -82,6 +82,10 @@ export function validateApiBlocklist(
     const { method, normalizedPath, query = {}, loadedToolNames } = request;
     // Parsed as the request URL is: dot segments resolved, a backslash read as a slash, tabs and newlines dropped.
     const { pathname, searchParams } = new URL(`https://api.invalid/v2/${normalizedPath}`);
+    // A path that climbs out of /v2/ reaches no route the rules are written for.
+    if (!pathname.startsWith('/v2/')) {
+        return 'The path leaves /v2/ once its dot segments are resolved; the API tools call only paths under /v2/.';
+    }
     const queryNames = [...searchParams.keys(), ...Object.keys(query)].map(extractQueryParamName);
     const rule = rules.find(({ match }) =>
         'queryParam' in match
