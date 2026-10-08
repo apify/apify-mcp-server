@@ -820,6 +820,19 @@ describe('apify-api-write', () => {
         expect(requestMock).not.toHaveBeenCalled();
     });
 
+    it('asks for the method when a test-only operation rule blocks another write method of the path', async () => {
+        const rule: ApiBlockRule = {
+            match: { method: 'POST', path: '/v2/request-queues/{queueId}/requests/batch' },
+            reason: 'No.',
+        };
+
+        const result = await callToolWithRule(apifyApiWrite, rule, { path: 'request-queues/q/requests/batch' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe('The path matches method DELETE; specify it to call the endpoint with.');
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
     it('does not need the spec when the method is given, even for a path the spec does not list', async () => {
         requestMock.mockResolvedValue(mockResponse(201, { data: {} }));
 
