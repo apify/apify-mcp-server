@@ -334,8 +334,9 @@ async function main() {
         exitCode = 1;
     } finally {
         // In the finally: a run that crashed may already have created schedules under this id.
-        if (runId) {
-            for (const { text } of formatTeardownHint(runId)) console.log(text);
+        // Not for the pr dataset: its tool-call items create nothing.
+        if (runId && datasetName !== MCP_AGENT_PR_DATASET_NAME) {
+            for (const line of formatTeardownHint(runId)) console.log(line);
         }
 
         // Flush scores and spans before exit or the last batch is lost. Guarded

@@ -69,6 +69,11 @@ describe('validateRunId()', () => {
         expect(() => validateRunId('run 1')).toThrow(/--run-id/);
         expect(() => validateRunId('')).toThrow(/--run-id/);
     });
+
+    it('rejects an id longer than 20 characters', () => {
+        expect(() => validateRunId('a'.repeat(20))).not.toThrow();
+        expect(() => validateRunId('my-feature-branch-experiment-2026-10-07')).toThrow(/at most 20 characters, got 39/);
+    });
 });
 
 describe('parseRunIdArg()', () => {

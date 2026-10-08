@@ -5,6 +5,9 @@
 
 const RUN_ID_PATTERN = /^[a-z0-9-]+$/;
 
+/** A CI id is 13 characters; longer ids push resolved names past the platform's 63. */
+const RUN_ID_MAX_LENGTH = 20;
+
 const RUN_ID_FLAG = '--run-id';
 
 /** Id for one local run; the random tail separates two runs started in the same second. */
@@ -30,6 +33,9 @@ export function isNameFromRun(name: string, runId: string): boolean {
 export function validateRunId(value: string): void {
     if (!RUN_ID_PATTERN.test(value)) {
         throw new Error(`--run-id must be lowercase letters, digits and dashes, got "${value}"`);
+    }
+    if (value.length > RUN_ID_MAX_LENGTH) {
+        throw new Error(`--run-id must be at most ${RUN_ID_MAX_LENGTH} characters, got ${value.length}`);
     }
 }
 

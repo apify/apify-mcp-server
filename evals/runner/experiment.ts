@@ -343,10 +343,10 @@ export function formatRunSummary(summary: RunSummary, passThreshold: number, ite
  * The run's id and the command that deletes the schedules it created. The runner never deletes them
  * itself: family-specific cleanup does not belong in the runner every family shares.
  */
-export function formatTeardownHint(runId: string): RunSummaryLine[] {
+export function formatTeardownHint(runId: string): string[] {
     return [
-        { stream: 'log', text: `🧹 Run id ${runId} — delete this run's schedules:` },
-        { stream: 'log', text: `   pnpm run evals:mcp-agent:schedules-fixtures -- --run-id ${runId}` },
+        `🧹 Run id ${runId} — delete this run's schedules:`,
+        `   pnpm run evals:mcp-agent:schedules-fixtures -- --run-id ${runId}`,
     ];
 }
 

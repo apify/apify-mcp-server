@@ -175,14 +175,14 @@ reference: PASS only if create-schedule created eval-sched-add-{{uniq}}.
 ```
 
 The runner rewrites every `{{uniq}}` to `<run-id>-n<run-id length>-t<trial>` before the item reaches the agent and the
-judge. Keep the static part of the name at 35 characters or fewer: a schedule or task name is capped at
-63 and a CI run id plus the trial takes the rest.
+judge. Keep the static part of the name at 34 characters or fewer: a schedule or task name is capped at
+63, and a run id of up to 20 characters with its `-n<length>-t<trial>` tail takes the rest.
 
 Substitute both or neither — a marker in the query alone makes the judge demand a name the agent never
 used. An unmarked item keeps colliding exactly as before, so the fix is per item, not automatic.
 `metadata.expectedArgs` is never substituted.
 
-`--run-id` overrides the generated id (lowercase letters, digits and dashes); CI passes
+`--run-id` overrides the generated id (lowercase letters, digits and dashes, at most 20 characters); CI passes
 `<github.run_id>-<github.run_attempt>` to the run and to its teardown step. A run prints its id and its
 teardown command when it finishes:
 
