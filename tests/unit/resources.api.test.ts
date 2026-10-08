@@ -4,6 +4,8 @@ import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError } from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import log from '@apify/log';
+
 import { ApifyClient } from '../../src/apify_client.js';
 import { MAX_INLINE_BYTES } from '../../src/const.js';
 import { InternalError, InvalidParamsError } from '../../src/mcp/errors.js';
@@ -93,6 +95,25 @@ function requestReturning(data: Readable, contentType?: string) {
         return { data, headers: contentType ? { 'content-type': contentType } : {}, status: 200, statusText: 'OK' };
     };
     return { request, captured };
+}
+
+/** A client whose record read crosses the inline limit, so it requests the store, which answers `status`. */
+function clientWithStoreStatus(status: number): ApifyClient {
+    const client = new ApifyClient({ maxRetries: 0 });
+    client.httpClient.axios.defaults.adapter = async (config) => {
+        if (config.responseType === 'stream') {
+            return { data: abortingStream(), status: 200, statusText: 'OK', headers: {}, config };
+        }
+        const body = JSON.stringify({ error: { type: 'some-type', message: 'API said no' } });
+        return {
+            data: Buffer.from(body),
+            status,
+            statusText: '',
+            headers: { 'content-type': 'application/json' },
+            config,
+        };
+    };
+    return client;
 }
 
 /** Request stub resolving a non-2xx response (`validateStatus: null` semantics) with a body stream. */
@@ -837,5 +858,30 @@ describe('readApiResource()', () => {
         expect(firstContent(result).text).toContain(uri);
         expect(logOutput()).toContain('Failed to mint signed download URL');
         expect(logOutput()).not.toContain('test-token');
+    });
+
+    it('logs an HTTP 4xx from the signed-link request as a soft failure with its status code', async () => {
+        const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
+        const error = vi.spyOn(log, 'error').mockImplementation(() => log);
+
+        await readApiResource(`${API}/v2/key-value-stores/kv-1/records/BIG`, clientWithStoreStatus(403));
+
+        expect(softFail).toHaveBeenCalledWith(expect.stringContaining('Failed to mint signed download URL'), {
+            errMessage: 'API said no',
+            statusCode: 403,
+        });
+        expect(error).not.toHaveBeenCalled();
+    });
+
+    it('logs an HTTP 5xx from the signed-link request as an exception with the API error stack', async () => {
+        const exception = vi.spyOn(log, 'exception').mockImplementation(() => log);
+
+        await readApiResource(`${API}/v2/key-value-stores/kv-1/records/BIG`, clientWithStoreStatus(500));
+
+        expect(exception).toHaveBeenCalledWith(
+            expect.objectContaining({ name: 'ApifyApiError', stack: expect.stringContaining('statusCode: 500') }),
+            expect.stringContaining('Failed to mint signed download URL'),
+            { statusCode: 500 },
+        );
     });
 });

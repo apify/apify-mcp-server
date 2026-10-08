@@ -129,6 +129,23 @@ function getMcpErrorCode(error: unknown): number | undefined {
 }
 
 /**
+ * The error with only fields that hold no request data: an axios error holds the request config, with the
+ * Authorization header, and the request body (see apify/ai-team#330). The stack holds neither, so it stays: an
+ * `ApifyApiError` stack lists the API call, and the text log shows its `type`.
+ */
+export function toPlainError(error: unknown): Error {
+    if (!(error instanceof Error)) return new Error(String(error));
+    const { code, type } = error as { code?: unknown; type?: unknown };
+    return Object.assign(new Error(error.message), {
+        name: error.name,
+        stack: error.stack,
+        ...(typeof code === 'string' && { code }),
+        ...(typeof type === 'string' && { type }),
+        ...(error.cause !== undefined && { cause: toPlainError(error.cause) }),
+    });
+}
+
+/**
  * Logs HTTP or MCP errors at the appropriate level:
  * - Client errors (HTTP < 500, or JSON-RPC client/transient codes) → softFail (no stack).
  * - Zod validation / SchemaTooLarge / Actor run-limit → softFail (untrusted input or billing).
@@ -179,9 +196,8 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
         return;
     }
     if (statusCode !== undefined && statusCode >= 500) {
-        // HTTP server errors (>= 500) - exception with full error (includes stack trace)
-        const errorObj = error instanceof Error ? error : new Error(String(error));
-        log.exception(errorObj, message, { statusCode, ...data });
+        // HTTP server errors (>= 500) - exception with stack trace
+        log.exception(toPlainError(error), message, { statusCode, ...data });
         return;
     }
 
@@ -190,14 +206,13 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
         if (SOFT_MCP_ERROR_CODES.has(mcpErrorCode)) {
             log.softFail(message, { errMessage: softErrMessage, mcpErrorCode, ...data });
         } else {
-            const errorObj = error instanceof Error ? error : new Error(String(error));
-            log.exception(errorObj, message, { mcpErrorCode, ...data });
+            log.exception(toPlainError(error), message, { mcpErrorCode, ...data });
         }
         return;
     }
 
     // No status code available - log as error
-    log.error(message, { error, ...data });
+    log.error(message, { error: toPlainError(error), ...data });
 }
 
 const REDACTED_VALUE = '[REDACTED]';

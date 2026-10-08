@@ -29,7 +29,7 @@ identity with the platform's own URLs is the feature. Revisit when tools start e
 to the configured API origin and rejects userinfo-bearing URLs (axios drops the `Authorization`
 header for those, silently degrading to unauthenticated). The API tools' `callApi`
 (`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`, `isMaxContentLengthAbort()`,
-`redactUrlSigningSecretKey()`, `toPlainRequestError()` and `maskSessionToken()`, so a change to any of
+`redactUrlSigningSecretKey()`, `maskSessionToken()` and the `REDACTED` marker, so a change to any of
 them changes the tools too.
 
 `sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through

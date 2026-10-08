@@ -1,3 +1,4 @@
+import { AxiosError, AxiosHeaders } from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
 
@@ -157,6 +158,20 @@ describe('logHttpError', () => {
 
         expect(softFail).not.toHaveBeenCalled();
         expect(exception).toHaveBeenCalledTimes(1);
+    });
+
+    it('logs an axios failure without its request config, which holds the token', () => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const config = { headers: new AxiosHeaders({ Authorization: 'Bearer test-token' }) };
+
+        logHttpError(
+            new AxiosError('connect ECONNREFUSED 127.0.0.1:443', 'ECONNREFUSED', config),
+            'Failed to get Actor run',
+        );
+
+        const output = consoleError.mock.calls.flat().join('\n');
+        expect(output).toContain('connect ECONNREFUSED');
+        expect(output).not.toContain('test-token');
     });
 });
 

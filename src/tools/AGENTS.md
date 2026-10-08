@@ -54,10 +54,12 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `page-not-found` 404 (a wrong path), not to a missing record.
     The one capped request (`sendApifyApiRequest`) is in `../apify_client.ts`. The origin check
     (`isApifyApiUri`), the detection of a body over `MAX_INLINE_BYTES` (`isMaxContentLengthAbort`),
-    the signing-key redaction (`redactUrlSigningSecretKey`), the request failure without its axios
-    config (`toPlainRequestError`) and the token mask of a binary body (`maskSessionToken`) are the API
+    the signing-key redaction (`redactUrlSigningSecretKey`), the token mask of a binary body
+    (`maskSessionToken`) and the `REDACTED` marker, also used in the logged arguments, are the API
     resource's own, imported from `../resources/api_resources.ts`
     ([`../resources/AGENTS.md`](../resources/AGENTS.md#api-resources-api_resourcests)).
+    The request failure it throws goes through `toPlainError` (`../utils/logging.ts`), which drops the
+    axios config, the same copy `logHttpError` logs for every error.
     The details and call tools log their arguments through `redactApiCallArgs` (`redactArgs`): an
     allowlist of path, method, query, and body, with the body and the `token`, `signature`, and
     `webhooks` query values redacted, and a query written into the path cut to `?[REDACTED]`.

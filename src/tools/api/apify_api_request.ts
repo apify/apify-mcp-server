@@ -13,8 +13,8 @@ import {
     maskSessionToken,
     REDACTED,
     redactUrlSigningSecretKey,
-    toPlainRequestError,
 } from '../../resources/api_resources.js';
+import { toPlainError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
@@ -282,7 +282,7 @@ export async function callApi(params: {
                 }),
             );
         }
-        throw toPlainRequestError(error);
+        throw toPlainError(error);
     }
     const data = maskToken(response.data, params.token);
     if (response.status >= 300) {

@@ -108,10 +108,7 @@ async function fetchRecordDownloadUrl(uri: string, apifyClient: ApifyClient): Pr
         const store = apifyClient.keyValueStore(safeDecodeURIComponent(match[1]));
         return await store.getRecordPublicUrl(safeDecodeURIComponent(match[2]));
     } catch (err) {
-        logHttpError(
-            toPlainRequestError(err),
-            `Failed to mint signed download URL for ${uri}; falling back to API URL`,
-        );
+        logHttpError(err, `Failed to mint signed download URL for ${uri}; falling back to API URL`);
         return uri;
     }
 }
@@ -145,20 +142,6 @@ async function buildLinkOutResult(uri: string, apifyClient: ApifyClient): Promis
 /** The mid-consumption abort axios raises when a body crosses `maxContentLength`. */
 export function isMaxContentLengthAbort(err: unknown): boolean {
     return isAxiosError(err) && err.code === 'ERR_BAD_RESPONSE' && err.message.includes('maxContentLength');
-}
-
-/**
- * The request failure with only its message, code and status code: the axios error holds the Authorization
- * header and the request body. `logHttpError` picks the log level by the status code.
- */
-export function toPlainRequestError(error: unknown): Error {
-    if (!(error instanceof Error)) return new Error(String(error));
-    const { code, statusCode } = error as { code?: unknown; statusCode?: unknown };
-    return Object.assign(
-        new Error(error.message),
-        typeof code === 'string' ? { code } : {},
-        typeof statusCode === 'number' ? { statusCode } : {},
-    );
 }
 
 /** `charset` parameter of a Content-Type header, lowercased; `undefined` when absent. */
@@ -254,7 +237,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     try {
         response = await sendApifyApiRequest(apifyClient, { url: uri, method: 'GET', responseType: 'stream' });
     } catch (err) {
-        logHttpError(toPlainRequestError(err), `resources/read request failed`, { uri });
+        logHttpError(err, `resources/read request failed`, { uri });
         throwReadFailure(uri, getHttpStatusCode(err), err instanceof Error ? err.message : String(err));
     }
 
