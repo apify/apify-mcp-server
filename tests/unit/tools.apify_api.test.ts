@@ -345,11 +345,12 @@ describe('apify-api-details', () => {
 });
 
 describe('apify-api-read', () => {
-    it('is annotated as not read-only, since a GET can start a run', () => {
+    it('is annotated as read-only and idempotent, since it refuses the GETs that start a run or write', () => {
         expect(apifyApiRead.annotations).toMatchObject({
-            readOnlyHint: false,
+            readOnlyHint: true,
             destructiveHint: false,
-            idempotentHint: false,
+            idempotentHint: true,
+            openWorldHint: false,
         });
     });
 
