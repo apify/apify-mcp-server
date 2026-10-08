@@ -138,8 +138,7 @@ export const WEB_FETCH = 'apify/web-fetch';
 /**
  * Appended to the `apify/web-fetch` Actor tool description. Client-agnostic on purpose:
  * no references to any specific client or its built-in tools, so the same text works
- * for every MCP client. Tune only based on eval results (`merge/web-fetch/*` and
- * `merge/web-selection/*` cases in the `mcp-server-evals-merge` dataset).
+ * for every MCP client.
  */
 export const WEB_FETCH_ADDITIONAL_DESC = `Use this tool to fetch a specific http(s) URL and return its complete content (one URL per call; http and https only).
 It renders JavaScript and bypasses anti-bot protection, so it also retrieves pages where a plain HTTP fetch gets blocked, fails with an error such as 403 or 429, or returns incomplete content.
@@ -155,9 +154,9 @@ If the exact URL cannot be fetched (e.g. a non-http(s) scheme), say so rather th
 
 /**
  * Appended to the `url` parameter description of the `apify/web-fetch` tool. Lives on the
- * parameter because that is what an agent reads while writing the argument: eval agents
- * (`merge/web-fetch/unsupported-protocol` case) silently rewrote ftp:// URLs to
- * https:// instead of telling the user the scheme is unsupported.
+ * parameter because that is what an agent reads while writing the argument: agents
+ * silently rewrote ftp:// URLs to https:// instead of telling the user the scheme is
+ * unsupported.
  */
 export const WEB_FETCH_URL_SCHEME_NOTE =
     'http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.';

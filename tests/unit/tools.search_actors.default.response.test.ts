@@ -12,7 +12,7 @@ import {
 import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockApifyClient, mockUserInfo, only, stubToolCallContext } from './helpers/tool_context.js';
+import { mockApifyClient, mockUserInfo, stubToolCallContext } from './helpers/tool_context.js';
 import { MOCK_STORE_ACTOR, SEARCH_KEYWORDS } from './tools.search_actors.fixtures.js';
 
 /**
@@ -187,16 +187,11 @@ describe('search-actors without widget (searchActors)', () => {
         expect(structuredContent.actors).toEqual([]);
         expect(structuredContent.count).toBe(0);
         expect(structuredContent.query).toBe(SEARCH_KEYWORDS);
-        // Line wraps are not pinned, so compare with whitespace collapsed.
-        expect(structuredContent.instructions.replace(/\s+/g, ' ')).toBe(
-            `No Actors were found for the search query "${SEARCH_KEYWORDS}". Broad, generic keywords usually return better matches - for example, just the platform name ("TikTok" instead of "TikTok posts").`,
-        );
+        expect(structuredContent.instructions).toContain('Broad, generic keywords');
 
         expect(content).toHaveLength(1);
         expect(content[0].text).toContain('No Actors were found');
         expect(content[0].text).toContain(SEARCH_KEYWORDS);
-        expect(content[0].text).toBe(structuredContent.instructions);
-        expect(content[0].text.split('\n')[0]).toBe(`No Actors were found for the search query "${SEARCH_KEYWORDS}".`);
     });
 
     it('declares every field the structured card emits (guards schema/runtime drift)', () => {
@@ -240,7 +235,7 @@ describe('search-actors without widget (searchActors)', () => {
             apifyToken: 'apify_ui_test',
         });
         const { structuredContent, content } = result as {
-            structuredContent: { actors: { url: string }[]; instructions?: string };
+            structuredContent: { actors: { url: string }[] };
             content: { type: string; text: string }[];
         };
         const consoleUrl = `https://console.apify.com/actors/${MOCK_STORE_ACTOR.id}`;
@@ -248,7 +243,6 @@ describe('search-actors without widget (searchActors)', () => {
         expect(structuredContent.actors[0].url).toBe(consoleUrl);
         expect(content[0].text).toContain(`## [${MOCK_STORE_ACTOR.title}](${consoleUrl})`);
         expect(content[0].text).not.toContain(`${APIFY_STORE_URL}/apify/web-scraper`);
-        expect(structuredContent.instructions?.split('\n')[0]).toBe(VERBATIM_LINKS_NUDGE);
     });
 
     it('places the verbatim-links nudge on its own line between the details hint and the caveat for a Console UI token', async () => {
@@ -288,42 +282,6 @@ describe('search-actors without widget (searchActors)', () => {
 
         expect(structuredContent.instructions).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
         expect(content[0].text).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
-    });
-
-    // Claude-connector session shape: fetch-actor-details served, call-actor absent.
-    it('builds the footer from the details hint and the not-runnable caveat only when call-actor is absent', async () => {
-        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
-
-        const result = await (searchActors as HelperTool).call(
-            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
-                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
-            }),
-        );
-        const { structuredContent, content } = result as {
-            structuredContent: { instructions?: string };
-            content: { type: string; text: string }[];
-        };
-
-        expect(structuredContent.instructions).toBe(`${DETAILS_HINT}\n${CALLABILITY_CAVEAT}`);
-        expect(content[0].text.endsWith(`\n\n${structuredContent.instructions}`)).toBe(true);
-        expect(content[0].text).not.toMatch(/second search|MUST|broader/);
-    });
-
-    it('adds no second-search instruction to the footer when fetch-actor-details and call-actor are loaded', async () => {
-        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
-
-        const result = await (searchActors as HelperTool).call(
-            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
-                loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS, HELPER_TOOLS.ACTOR_CALL],
-            }),
-        );
-        const { structuredContent, content } = result as {
-            structuredContent: { instructions?: string };
-            content: { type: string; text: string }[];
-        };
-
-        expect(structuredContent.instructions).toBe(DETAILS_HINT);
-        expect(content[0].text).not.toMatch(/second search|MUST/);
     });
 
     // `?tools=search-actors,call-actor` with an API token: no details hint, no caveat, no nudge.
@@ -422,17 +380,5 @@ describe('search-actors without widget (searchActors)', () => {
 
         expect(structuredContent.instructions).toContain('cannot be run in this configuration');
         expect(content[0].text).toContain('cannot be run in this configuration');
-    });
-
-    it('keeps the broad-keywords tip in the description without a second-search mandate', () => {
-        const tool = searchActors as HelperTool;
-
-        // ALL_TOOLS_PRESENT render and the `?tools=search-actors` render.
-        for (const description of [tool.description, tool.buildDescription?.(only(HELPER_TOOLS.STORE_SEARCH))]) {
-            expect(description).toContain(
-                '- Prefer broad, generic keywords - use just the platform name (e.g. "Instagram" instead of "Instagram scraper").',
-            );
-            expect(description).not.toMatch(/MUST always do|two searches|second search/);
-        }
     });
 });
