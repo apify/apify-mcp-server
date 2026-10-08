@@ -56,7 +56,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 
 /**
  * The only method of the path in the spec, or why the agent must give one. Only a call without a
- * method needs the spec. A path whose only method is GET is sent to the read tool, never as a GET here.
+ * method needs the spec. The agent is asked only for the write methods; a GET goes to the read tool.
  */
 async function inferMethod(
     path: string,
@@ -66,21 +66,20 @@ async function inferMethod(
     if (!index) return { error: 'The API spec could not be loaded to choose the method; specify the method.' };
     const operations = findPathOperations(index, normalizeApiPath(path));
     if (operations.length === 0) return { error: 'The path is not in the API spec; specify the method.' };
-    if (operations.length > 1) {
-        const methods = formatList(
-            operations.map((operation) => operation.method),
-            'and',
-        );
-        return { error: `The path matches methods ${methods}; specify which one to call the endpoint with.` };
-    }
-    const [{ method }] = operations;
-    if (method === 'GET') {
-        const readTool = loadedToolNames.includes(HELPER_TOOLS.API_READ)
-            ? `; call it with ${HELPER_TOOLS.API_READ}`
-            : '';
+    const writeMethods = operations
+        .map((operation) => operation.method)
+        .filter((method): method is Exclude<ApiMethod, 'GET'> => method !== 'GET');
+    const readTool = loadedToolNames.includes(HELPER_TOOLS.API_READ) ? `; call it with ${HELPER_TOOLS.API_READ}` : '';
+    if (writeMethods.length === 0) {
         return { error: `The path has only the GET method, which this tool does not send${readTool}.` };
     }
-    return { method };
+    if (operations.length === 1) return { method: writeMethods[0] };
+    const prompt =
+        writeMethods.length === 1
+            ? `The path matches method ${writeMethods[0]}; specify it to call the endpoint with.`
+            : `The path matches methods ${formatList(writeMethods, 'and')}; specify which one to call the endpoint with.`;
+    const getNote = writeMethods.length < operations.length ? ` This tool does not send its GET${readTool}.` : '';
+    return { error: `${prompt}${getNote}` };
 }
 
 /**

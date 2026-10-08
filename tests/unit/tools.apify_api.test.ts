@@ -737,7 +737,6 @@ describe('apify-api-write', () => {
     });
 
     it.each([
-        ['datasets/abc', 'The path matches methods GET, PUT, and DELETE; specify which one to call the endpoint with.'],
         [
             'request-queues/q/requests/batch',
             'The path matches methods POST and DELETE; specify which one to call the endpoint with.',
@@ -749,6 +748,37 @@ describe('apify-api-write', () => {
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toBe(message);
         expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        [
+            'datasets/abc',
+            'The path matches methods PUT and DELETE; specify which one to call the endpoint with. This tool ' +
+                `does not send its GET; call it with ${HELPER_TOOLS.API_READ}.`,
+        ],
+        [
+            'webhooks',
+            'The path matches method POST; specify it to call the endpoint with. This tool does not send its ' +
+                `GET; call it with ${HELPER_TOOLS.API_READ}.`,
+        ],
+    ])('asks only for a write method of %s and sends its GET to the read tool', async (path, message) => {
+        const result = await callTool(apifyApiWrite, { path, body: { name: 'x' } }, [
+            HELPER_TOOLS.API_WRITE,
+            HELPER_TOOLS.API_READ,
+        ]);
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(message);
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('does not name the read tool for the GET of a path when the session lacks it', async () => {
+        const result = await callTool(apifyApiWrite, { path: 'datasets/abc' }, [HELPER_TOOLS.API_WRITE]);
+
+        expect(result.content[0].text).toBe(
+            'The path matches methods PUT and DELETE; specify which one to call the endpoint with. This tool ' +
+                'does not send its GET.',
+        );
     });
 
     it('sends the body as application/json through the real apify-client axios instance, a string as the value it holds', async () => {
