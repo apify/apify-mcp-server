@@ -30,7 +30,17 @@ export type ApiOperationBlockRule = ApiBlockRuleBase & {
 export type ApiBlockRule = ApiQueryParamBlockRule | ApiOperationBlockRule;
 
 /** What the API tools refuse to send. The operation index leaves the same out, so search and details never offer it. */
-export const API_BLOCK_RULES: readonly ApiBlockRule[] = [];
+export const API_BLOCK_RULES: readonly ApiBlockRule[] = [
+    {
+        // A GET with method=DELETE deletes, so the read tool could write; see apify/apify-mcp-server#1501.
+        queryParam: 'method',
+        toolNames: [HELPER_TOOLS.API_READ, HELPER_TOOLS.API_WRITE],
+        reason:
+            'The API tools do not send the method query parameter: the API would take it as the HTTP method ' +
+            'of the request.',
+        suggestedToolName: HELPER_TOOLS.API_WRITE,
+    },
+];
 
 /** The tool that sends a method: the read tool sends only a GET, and the write tool every other method. */
 export function getApiCallToolName(method: ApiMethod): ApiCallToolName {

@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
-import { validateApiBlocklist } from '../../src/tools/api/apify_api_blocklist.js';
+import { validateApiBlocklist, validateApiPathBlocklist } from '../../src/tools/api/apify_api_blocklist.js';
+
+const METHOD_PARAM_REFUSAL =
+    'The API tools do not send the method query parameter: the API would take it as the HTTP method of the request.';
 
 /** A test-only operation rule. */
 const OPERATION_RULE: ApiBlockRule = {
@@ -22,6 +25,68 @@ function validate(
 }
 
 describe('validateApiBlocklist()', () => {
+    describe('the method query parameter rule', () => {
+        it.each([
+            { normalizedPath: 'datasets/abc', query: { method: 'DELETE' } },
+            { normalizedPath: 'datasets/abc', query: { METHOD: 'delete' } },
+            { normalizedPath: 'datasets/abc', query: { '%6Dethod': 'Delete' } },
+            { normalizedPath: 'datasets/abc', query: { 'method[]': 'DELETE' } },
+            { normalizedPath: 'datasets/abc', query: { 'method[0]': 'DELETE' } },
+            { normalizedPath: 'datasets/abc', query: { 'Method[x]': 'DELETE' } },
+            // The API's query parser reads a leading bracket pair as the name.
+            { normalizedPath: 'datasets/abc', query: { '[method]': 'DELETE' } },
+            { normalizedPath: 'datasets/abc?method=DELETE' },
+            { normalizedPath: 'datasets/abc?MeThOd=delete' },
+            { normalizedPath: 'datasets/abc?limit=1&%6Dethod=DELETE' },
+            { normalizedPath: 'datasets/abc?method%5B%5D=DELETE' },
+            { normalizedPath: 'datasets/abc?method[0]=DELETE' },
+            { normalizedPath: 'datasets/abc?%5Bmethod%5D=DELETE' },
+            { normalizedPath: 'datasets/abc?[METHOD][x]=DELETE' },
+            // The URL drops a tab before it is sent.
+            { normalizedPath: 'datasets/abc?me\tthod=DELETE' },
+        ])('refuses %j in both call tools', (params) => {
+            expect(validate(params)).toBe(METHOD_PARAM_REFUSAL);
+            expect(validate({ ...params, toolName: HELPER_TOOLS.API_WRITE, method: 'PUT' })).toBe(METHOD_PARAM_REFUSAL);
+        });
+
+        it.each([
+            { normalizedPath: 'datasets/abc?methods=a&limit=1', query: { methodName: 'b' } },
+            { normalizedPath: 'datasets/abc', query: { 'filter[method]': 'b', 'me thod': 'c' } },
+            { normalizedPath: 'datasets/abc?x=method', query: { x: 'method' } },
+            // A fragment is not sent.
+            { normalizedPath: 'datasets/abc#?method=DELETE' },
+        ])('does not refuse %j', (params) => {
+            expect(validate(params)).toBeUndefined();
+        });
+
+        it('checks the query names without the method, before the write tool chooses one', () => {
+            expect(
+                validate({
+                    toolName: HELPER_TOOLS.API_WRITE,
+                    method: undefined,
+                    normalizedPath: 'datasets/abc?method=PUT',
+                }),
+            ).toBe(METHOD_PARAM_REFUSAL);
+        });
+    });
+
+    it('names the suggested tool only when the session has it and it is not the refusing tool', () => {
+        const params = { normalizedPath: 'datasets/abc', query: { method: 'DELETE' } };
+
+        expect(validate({ ...params, loadedToolNames: [HELPER_TOOLS.API_READ, HELPER_TOOLS.API_WRITE] })).toBe(
+            `${METHOD_PARAM_REFUSAL} Use ${HELPER_TOOLS.API_WRITE} instead.`,
+        );
+        expect(validate({ ...params, loadedToolNames: [HELPER_TOOLS.API_READ] })).toBe(METHOD_PARAM_REFUSAL);
+        expect(
+            validate({
+                ...params,
+                toolName: HELPER_TOOLS.API_WRITE,
+                method: 'PUT',
+                loadedToolNames: [HELPER_TOOLS.API_READ, HELPER_TOOLS.API_WRITE],
+            }),
+        ).toBe(METHOD_PARAM_REFUSAL);
+    });
+
     describe('an operation rule', () => {
         it.each([
             'actors/abc/run-now',
@@ -92,5 +157,14 @@ describe('validateApiBlocklist()', () => {
             );
             expect(validate({ normalizedPath }, [rule])).toBe('No run-now.');
         });
+    });
+});
+
+describe('validateApiPathBlocklist()', () => {
+    it('checks only the operation rules', () => {
+        expect(validateApiPathBlocklist({ normalizedPath: 'actors/abc/runs', loadedToolNames: [] })).toBeUndefined();
+        expect(
+            validateApiPathBlocklist({ normalizedPath: 'not-in-spec?method=DELETE', loadedToolNames: [] }),
+        ).toBeUndefined();
     });
 });

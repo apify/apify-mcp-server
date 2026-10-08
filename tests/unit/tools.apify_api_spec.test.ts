@@ -37,6 +37,29 @@ describe('buildApiOperationIndex()', () => {
         ]);
     });
 
+    it('drops the method query parameter, which the API takes as the HTTP method, from every operation', () => {
+        const spec = {
+            paths: {
+                '/v2/things/{thingId}': {
+                    get: {
+                        operationId: 'thing_get',
+                        parameters: [
+                            { name: 'thingId', in: 'path', required: true },
+                            { name: 'method', in: 'query' },
+                            { name: 'limit', in: 'query' },
+                        ],
+                    },
+                    post: { operationId: 'thing_post', parameters: [{ name: 'Method[]', in: 'query' }] },
+                },
+            },
+        };
+
+        const thingIndex = buildApiOperationIndex(spec);
+
+        expect(thingIndex.get('thing_get')?.parameters.map(({ name }) => name)).toEqual(['thingId', 'limit']);
+        expect(thingIndex.get('thing_post')?.parameters).toEqual([]);
+    });
+
     it('drops a query parameter only from the operations of the tools its rule names', () => {
         const rules: ApiBlockRule[] = [
             { queryParam: 'limit', toolNames: [HELPER_TOOLS.API_WRITE], reason: 'Refused.' },

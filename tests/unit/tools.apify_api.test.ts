@@ -78,6 +78,9 @@ afterEach(() => {
     vi.unstubAllEnvs();
 });
 
+const METHOD_PARAM_REFUSAL =
+    'The API tools do not send the method query parameter: the API would take it as the HTTP method of the request.';
+
 /** The URL axios sends for the last request, with the query parameters added. */
 function readSentUrl(): string {
     const [config] = requestMock.mock.lastCall as [{ url: string; params?: Record<string, unknown> }];
@@ -318,6 +321,48 @@ describe('apify-api-read', () => {
         expect(withCallActor).toContain(`${paidRun} Run an Actor with ${HELPER_TOOLS.ACTOR_CALL}.`);
         expect(withoutCallActor).toContain(paidRun);
         expect(withoutCallActor).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+    });
+
+    it.each([
+        { path: 'datasets/abc', query: { method: 'DELETE' } },
+        { path: 'datasets/abc', query: { METHOD: 'delete' } },
+        { path: 'datasets/abc', query: { '%6Dethod': 'Delete' } },
+        { path: 'datasets/abc', query: { 'method[]': 'DELETE' } },
+        { path: 'datasets/abc', query: { 'method[0]': 'POST' } },
+        { path: 'datasets/abc', query: { 'Method[x]': 'POST' } },
+        // The API's query parser reads a leading bracket pair as the name.
+        { path: 'datasets/abc', query: { '[method]': 'DELETE' } },
+        { path: 'datasets/abc?method=delete' },
+        { path: 'datasets/abc?METHOD=DELETE' },
+        // The API decodes the names in the query string before it reads them.
+        { path: 'datasets/abc?limit=1&%6Dethod=DELETE' },
+        { path: 'datasets/abc?method%5B%5D=DELETE' },
+        { path: 'datasets/abc?method[0]=DELETE' },
+        { path: 'datasets/abc?%5Bmethod%5D=DELETE' },
+        // The URL drops a tab before it is sent.
+        { path: 'datasets/abc?me\tthod=DELETE' },
+    ])('refuses the method query parameter in %j without a request', async (args) => {
+        const result = await callTool(apifyApiRead, args);
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(`${METHOD_PARAM_REFUSAL} Use ${HELPER_TOOLS.API_WRITE} instead.`);
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('names the write tool in the refusal of the method query parameter only when the session has it', async () => {
+        const result = await callTool(apifyApiRead, { path: 'datasets/abc?method=DELETE' }, [HELPER_TOOLS.API_READ]);
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(METHOD_PARAM_REFUSAL);
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('sends a query parameter whose name only starts with method', async () => {
+        requestMock.mockResolvedValue(mockResponse(200, { data: {} }));
+
+        await callTool(apifyApiRead, { path: 'datasets/abc?methods=a', query: { methodName: 'b' } });
+
+        expect(readSentUrl()).toBe(`${BASE_URL}/datasets/abc?methods=a&methodName=b`);
     });
 
     it('sends one GET to the path and returns the body as the API sends it', async () => {
@@ -730,6 +775,20 @@ describe('apify-api-write', () => {
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toBe(message);
         expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        { path: 'datasets/abc', method: 'PUT', query: { method: 'DELETE' }, body: { name: 'x' } },
+        { path: 'datasets/abc', method: 'PUT', query: { '[METHOD]': 'DELETE' }, body: { name: 'x' } },
+        { path: 'datasets/abc?method=DELETE', body: { name: 'x' } },
+        { path: 'datasets/abc?%6Dethod%5B%5D=delete', method: 'PUT', body: { name: 'x' } },
+    ])('refuses the method query parameter in %j without a request or the spec', async (args) => {
+        const result = await callTool(apifyApiWrite, args);
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(METHOD_PARAM_REFUSAL);
+        expect(requestMock).not.toHaveBeenCalled();
+        expect(fetchApiOperationIndex).not.toHaveBeenCalled();
     });
 
     it('does not need the spec when the method is given, even for a path the spec does not list', async () => {

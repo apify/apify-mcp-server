@@ -147,7 +147,7 @@ function parseRequestBody(rawRequestBody: unknown, spec: unknown): ApiOperation[
  * Builds the operation index from an OpenAPI document. Deprecated operations, HEAD operations, and anything
  * outside `/v2/` are left out; malformed entries are skipped rather than failing the whole spec. So are the
  * operations and query parameters a rule refuses to the tool that sends the method (`applyApiBlocklist`),
- * so no tool that reads the index offers them.
+ * such as the `method` query parameter, so no tool that reads the index offers them.
  * It throws when the spec lists no operation.
  */
 export function buildApiOperationIndex(
