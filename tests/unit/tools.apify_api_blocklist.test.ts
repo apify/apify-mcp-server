@@ -170,9 +170,9 @@ describe('validateApiBlocklist()', () => {
             'actors/abc/run-sync?timeout=300&token=x',
             normalizeApiPath('/v2/actors/abc/run-sync'),
             normalizeApiPath('v2/actor-tasks/abc/run-sync'),
-        ])('refuses a GET to %j in the read tool, not a POST in the write tool', (normalizedPath) => {
+        ])('refuses a GET to %j, not a POST', (normalizedPath) => {
             expect(validate({ normalizedPath })).toBe(SYNC_RUN_REFUSAL);
-            expect(validate({ normalizedPath, toolName: HELPER_TOOLS.API_WRITE, method: 'POST' })).toBeUndefined();
+            expect(validate({ normalizedPath, method: 'POST' })).toBeUndefined();
         });
 
         it.each([
@@ -186,19 +186,9 @@ describe('validateApiBlocklist()', () => {
             'actors/run-sync',
             'actors/apify/hello-world/run-sync',
             'datasets/run-sync',
-        ])('does not refuse %j', (normalizedPath) => {
+        ])('does not refuse a GET or a POST to %j', (normalizedPath) => {
             expect(validate({ normalizedPath })).toBeUndefined();
-            expect(validate({ normalizedPath, toolName: HELPER_TOOLS.API_WRITE, method: 'POST' })).toBeUndefined();
-        });
-
-        it('does not refuse the write tool without a method, since it never sends the GET', () => {
-            expect(
-                validate({
-                    normalizedPath: 'actors/abc/run-sync',
-                    toolName: HELPER_TOOLS.API_WRITE,
-                    method: undefined,
-                }),
-            ).toBeUndefined();
+            expect(validate({ normalizedPath, method: 'POST' })).toBeUndefined();
         });
 
         it.each([
@@ -256,5 +246,15 @@ describe('isApiOperationBlocked()', () => {
         const rules: ApiBlockRule[] = [{ match: { queryParam: 'method' }, reason: 'No.' }];
 
         expect(isApiOperationBlocked('GET', '/v2/datasets/{datasetId}', rules)).toBe(false);
+    });
+
+    it.each([
+        '/v2/actors/{actorId}/run-sync',
+        '/v2/actors/{actorId}/run-sync-get-dataset-items',
+        '/v2/actor-tasks/{actorTaskId}/run-sync',
+        '/v2/actor-tasks/{actorTaskId}/run-sync-get-dataset-items',
+    ])('blocks the GET of the synchronous run endpoint %s, not the POST', (path) => {
+        expect(isApiOperationBlocked('GET', path)).toBe(true);
+        expect(isApiOperationBlocked('POST', path)).toBe(false);
     });
 });

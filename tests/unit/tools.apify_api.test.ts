@@ -279,15 +279,14 @@ describe('apify-api-details', () => {
     });
 
     it.each(['/v2/actors/{actorId}/run-sync', 'acts/john~my-actor/run-sync-get-dataset-items', 'actors/abc/run-sync'])(
-        'refuses the GET of the synchronous run endpoint %s and says why, without the spec',
+        'says the synchronous run endpoint %s has no GET operation, only the POST',
         async (path) => {
             const result = await callTool(apifyApiDetails, { path, method: 'GET' });
 
             expectSoftFailInvalidInput(result);
             expect(result.content[0].text).toBe(
-                `${SYNC_RUN_REFUSAL} Use ${HELPER_TOOLS.ACTOR_CALL} or ${HELPER_TOOLS.API_WRITE} instead.`,
+                `The path /v2/${normalizeApiPath(path)} has no GET operation; it matches method POST.`,
             );
-            expect(fetchApiOperationIndex).not.toHaveBeenCalled();
         },
     );
 
@@ -305,23 +304,6 @@ describe('apify-api-details', () => {
         expect(result.content[1].text).toBe(summary);
     });
 
-    it.each(['actors/abc/run-sync/', 'actors//abc/run-sync', 'actors/abc/RUN-SYNC'])(
-        'says the POST of %s, a synchronous run endpoint the lookup misses, is not in the spec, not that its GET is refused',
-        async (path) => {
-            const result = await callTool(apifyApiDetails, { path, method: 'POST' });
-
-            expectSoftFailInvalidInput(result);
-            expect(result.content[0].text).toContain(`The path /v2/${path} is not in the API spec.`);
-        },
-    );
-
-    it("names the write tool, not call-actor, which runs an Actor, in the refusal of a task's synchronous run GET", async () => {
-        const result = await callTool(apifyApiDetails, { path: 'actor-tasks/abc/run-sync', method: 'GET' });
-
-        expectSoftFailInvalidInput(result);
-        expect(result.content[0].text).toBe(`${SYNC_RUN_REFUSAL} Use ${HELPER_TOOLS.API_WRITE} instead.`);
-    });
-
     it('returns only the methods a test-only operation rule does not match', async () => {
         const rule: ApiBlockRule = { match: { method: 'GET', path: '/v2/datasets/{datasetId}' }, reason: 'No.' };
 
@@ -335,14 +317,6 @@ describe('apify-api-details', () => {
         );
         expect(allowed.content[1].text).toBe('/v2/datasets/{datasetId}: PUT.');
         expect(withoutMethod.content[1].text).toBe('/v2/datasets/{datasetId}: PUT, DELETE.');
-    });
-
-    it('names call-actor and the write tool in the refusal of a synchronous run GET only when the session has them', async () => {
-        const result = await callTool(apifyApiDetails, { path: 'actors/abc/run-sync', method: 'GET' }, [
-            HELPER_TOOLS.API_DETAILS,
-        ]);
-
-        expect(result.content[0].text).toBe(SYNC_RUN_REFUSAL);
     });
 
     it('names the search tool on a path not in the spec only when the session has it', async () => {
