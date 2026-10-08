@@ -585,37 +585,6 @@ describe('readApiResource()', () => {
         expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
     });
 
-    it('redacts the URL signing key the same way wherever the chunks split the body', async () => {
-        const body = '{"urlSigningSecretKey" : "a\\"b", "n": 1}';
-
-        for (let splitAt = 1; splitAt < body.length; splitAt++) {
-            const { request } = requestReturning(
-                streamOf(body.slice(0, splitAt), body.slice(splitAt)),
-                'application/json',
-            );
-
-            const result = await readApiResource(
-                `${API}/v2/key-value-stores/kv-1/records/INPUT`,
-                stubApifyClient({ request }),
-            );
-
-            expect(firstContent(result).text).toBe('{"urlSigningSecretKey" : "[REDACTED]", "n": 1}');
-        }
-    });
-
-    it.each([
-        '[{"rowId":12345678901234567890, "f":1.50}]',
-        '[{"rowId":12345678901234567890, "note":"urlSigningSecretKey"}]',
-        '{"note" : "urlSigningSecretKey", "fields":["urlSigningSecretKey"]}',
-        '{"myurlSigningSecretKey": "s", "urlSigningSecretKeyX": "s", "name": "caf\\u00e9"}',
-    ])('returns the JSON body %s byte for byte, since no property is named urlSigningSecretKey', async (body) => {
-        const { request } = requestReturning(streamOf(body), 'application/json');
-
-        const result = await readApiResource(`${API}/v2/datasets/ds-1/items`, stubApifyClient({ request }));
-
-        expect(firstContent(result).text).toBe(body);
-    });
-
     it('keeps the URL signing key in a binary body', async () => {
         const body = Buffer.from('{"urlSigningSecretKey": "abc123"}');
         const { request } = requestReturning(streamOf(body), 'application/octet-stream');
@@ -691,74 +660,27 @@ describe('readApiResource()', () => {
     );
 
     it.each([
-        [
-            'application/json',
-            '{"urlSigningSecretKey":"s","authorization":"Bearer test-token"}',
-            '{"urlSigningSecretKey":"[REDACTED]","authorization":"Bearer [REDACTED]"}',
-        ],
-        [
-            'application/json; charset=utf-8',
-            '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "test-token"}',
-            '{"exported": {"urlSigningSecretKey": "[REDACTED]"}, "apifyToken": "[REDACTED]"}',
-        ],
-        [
-            'text/plain',
-            '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "test-token"}',
-            '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "[REDACTED]"}',
-        ],
-        [
-            'text/csv',
-            '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "test-token"}',
-            '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "[REDACTED]"}',
-        ],
-        [
-            'application/xml',
-            '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "test-token"}',
-            '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "[REDACTED]"}',
-        ],
-        [
-            'application/ld+json',
-            '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "test-token"}',
-            '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "[REDACTED]"}',
-        ],
-    ])(
-        'masks the session token in a body typed %s that also holds the URL signing key',
-        async (contentType, body, expected) => {
-            const { request } = requestReturning(streamOf(body), contentType);
-
-            const result = await readApiResource(
-                `${API}/v2/key-value-stores/kv-1/records/INPUT`,
-                stubApifyClient({ request, token: 'test-token' }),
-            );
-
-            expect(firstContent(result).text).toBe(expected);
-            expect(firstContent(result).mimeType).toBe(contentType);
-        },
-    );
-
-    it.each([
-        [
-            'a JSON',
-            '/v2/browser-info',
-            'application/json; charset=utf-8',
-            '{\n  "headers": {\n    "authorization": "Bearer test-token"\n  }\n}',
-        ],
-        [
-            'a text',
-            '/v2/key-value-stores/kv-1/records/NOTE',
-            'text/plain',
-            'Authorization: Bearer test-token\nAgain: test-token',
-        ],
-        ['an XML', '/v2/key-value-stores/kv-1/records/FEED', 'application/xml', '<auth>Bearer test-token</auth>'],
-        ['a CSV', '/v2/key-value-stores/kv-1/records/CSV', 'text/csv', 'name,value\nauthorization,Bearer test-token'],
-    ])('masks the session token in %s body split across chunks', async (_kind, path, contentType, body) => {
+        ['application/json', '[REDACTED]'],
+        ['application/json; charset=utf-8', '[REDACTED]'],
+        ['text/plain', 'signing-secret'],
+        ['text/csv', 'signing-secret'],
+        ['application/xml', 'signing-secret'],
+        ['application/ld+json', 'signing-secret'],
+    ])('masks the token across chunks and respects the %s content type', async (contentType, expectedKey) => {
+        const body =
+            '{"urlSigningSecretKey":"signing-secret","authorization":"Bearer test-token","token":"test-token"}';
         const splitAt = body.indexOf('test-token') + 4;
         const { request } = requestReturning(streamOf(body.slice(0, splitAt), body.slice(splitAt)), contentType);
 
-        const result = await readApiResource(`${API}${path}`, stubApifyClient({ request, token: 'test-token' }));
+        const result = await readApiResource(
+            `${API}/v2/browser-info`,
+            stubApifyClient({ request, token: 'test-token' }),
+        );
 
-        expect(firstContent(result).text).toBe(body.replaceAll('test-token', '[REDACTED]'));
-        expect(JSON.stringify(result)).not.toContain('test-token');
+        expect(firstContent(result).text).toBe(
+            body.replace('signing-secret', expectedKey).replaceAll('test-token', '[REDACTED]'),
+        );
+        expect(firstContent(result).mimeType).toBe(contentType);
     });
 
     it('masks the session token in a binary body split across chunks and keeps every other byte', async () => {

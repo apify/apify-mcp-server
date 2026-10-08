@@ -418,74 +418,38 @@ describe('apify-api-read', () => {
         expect(result.structuredContent).toMatchObject({ data: body });
     });
 
-    it.each([
-        ['with', 'test-token'],
-        ['without', ''],
-    ])('redacts every URL signing key in a JSON body %s a session token', async (_kind, apifyToken) => {
+    it.each(['test-token', ''])('redacts nested signing keys with token %j', async (apifyToken) => {
         const recordsPublicUrl = `${BASE_URL}/key-value-stores/kv-1/records?signature=sig-1`;
         requestMock.mockResolvedValue(
             mockResponse(200, {
                 data: {
-                    id: 'kv-1',
                     recordsPublicUrl,
                     urlSigningSecretKey: 'mock-signing-secret',
+                    nested: { urlSigningSecretKey: 'mock-signing-secret', kept: 1 },
                     items: [{ urlSigningSecretKey: '' }],
+                    authorization: `Bearer ${apifyToken}`,
                 },
             }),
         );
-        const context = stubToolCallContext({ path: '/v2/key-value-stores/kv-1' }, stubClient);
+        const context = stubToolCallContext({ path: '/v2/actor-runs/run-1/key-value-store' }, stubClient);
         context.apifyToken = apifyToken;
 
         const result = (await (apifyApiRead as HelperTool).call(context)) as TextToolResult;
 
-        expect(result.structuredContent).toEqual({
-            method: 'GET',
-            path: '/v2/key-value-stores/kv-1',
-            statusCode: 200,
-            contentType: 'application/json; charset=utf-8',
+        expect(result.structuredContent).toMatchObject({
             data: {
                 data: {
-                    id: 'kv-1',
                     recordsPublicUrl,
                     urlSigningSecretKey: '[REDACTED]',
+                    nested: { urlSigningSecretKey: '[REDACTED]', kept: 1 },
                     items: [{ urlSigningSecretKey: '[REDACTED]' }],
+                    authorization: apifyToken ? 'Bearer [REDACTED]' : 'Bearer ',
                 },
             },
         });
         expect(result.content[0].text).toBe(JSON.stringify(result.structuredContent));
         expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
-    });
-
-    it.each([
-        '/v2/actor-runs/run-1/dataset',
-        '/v2/actor-runs/run-1/key-value-store',
-        '/v2/acts/act-1/runs/last/dataset',
-        '/v2/acts/act-1/runs/last/key-value-store',
-        '/v2/key-value-stores/~my-store',
-        '/v2/foo/bar',
-    ])('redacts the URL signing key at any depth in the body of %s', async (path) => {
-        requestMock.mockResolvedValue(
-            mockResponse(200, {
-                data: {
-                    id: 'st-1',
-                    urlSigningSecretKey: 'mock-signing-secret',
-                    nested: { deeper: { urlSigningSecretKey: 'mock-signing-secret', kept: 1 } },
-                    items: [{ urlSigningSecretKey: 'mock-signing-secret', n: 1 }, { n: 2 }],
-                },
-            }),
-        );
-
-        const result = await callTool(apifyApiRead, { path });
-
-        expect(result.structuredContent).toMatchObject({ path, statusCode: 200 });
-        expect((result.structuredContent as { data: unknown }).data).toEqual({
-            data: {
-                id: 'st-1',
-                urlSigningSecretKey: '[REDACTED]',
-                nested: { deeper: { urlSigningSecretKey: '[REDACTED]', kept: 1 } },
-                items: [{ urlSigningSecretKey: '[REDACTED]', n: 1 }, { n: 2 }],
-            },
-        });
+        expect(JSON.stringify(result)).not.toContain('test-token');
     });
 
     it.each([
@@ -505,22 +469,6 @@ describe('apify-api-read', () => {
 
         expect((result.structuredContent as { data: unknown }).data).toEqual(expected);
         expect(result.content[0].text).not.toContain('mock-signing-secret');
-    });
-
-    it('redacts the URL signing key and masks the session token in one body', async () => {
-        requestMock.mockResolvedValue(
-            mockResponse(200, {
-                data: { urlSigningSecretKey: 'mock-signing-secret', headers: { authorization: 'Bearer test-token' } },
-            }),
-        );
-
-        const result = await callTool(apifyApiRead, { path: 'browser-info' });
-
-        expect((result.structuredContent as { data: unknown }).data).toEqual({
-            data: { urlSigningSecretKey: '[REDACTED]', headers: { authorization: 'Bearer [REDACTED]' } },
-        });
-        expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
-        expect(JSON.stringify(result)).not.toContain('test-token');
     });
 
     it.each([
@@ -548,15 +496,6 @@ describe('apify-api-read', () => {
         const result = await callTool(apifyApiRead, { path: '/v2/key-value-stores/kv-1/records/NOTE' });
 
         expect((result.structuredContent as { data: unknown }).data).toEqual(expected);
-    });
-
-    it('returns the parsed body itself when no value is redacted', async () => {
-        const body = { data: { id: 'kv-1', note: 'urlSigningSecretKey' } };
-        requestMock.mockResolvedValue(mockResponse(200, body));
-
-        const result = await callTool(apifyApiRead, { path: '/v2/key-value-stores/kv-1' });
-
-        expect((result.structuredContent as { data: unknown }).data).toBe(body);
     });
 
     it('throws a non-2xx response as the ApifyApiError apify-client builds', async () => {

@@ -179,20 +179,14 @@ export function maskSessionToken(body: Buffer, token: string | undefined): Buffe
 }
 
 /**
- * The quote after the name is unescaped, so it ends a string, and the colon makes that string a key: the
- * name inside a string value does not match. The two value branches never match the same character, so the
- * scan is linear.
+ * The unescaped closing quote and colon distinguish keys from string contents.
+ * Disjoint value branches keep the scan linear.
  */
 const URL_SIGNING_SECRET_KEY_VALUE_RE = /("urlSigningSecretKey"\s*:\s*)"(?:[^"\\]|\\[\s\S])*"/g;
 
 /**
- * In the transcript, a storage's URL signing key lets anyone mint non-expiring links to every item and record
- * (see apify/ai-team#330). This works on the text, so a `null` value or a name spelled with `\u` escapes is
- * left as it is, and so is every other byte.
- *
- * It redacts instead of removing the property: removal needs comma handling or a parse and re-serialize, which
- * loses the API's formatting and big-number precision (indenting a crafted, deeply nested body cost seconds and
- * about 1 GB per read).
+ * Hide storage signing keys without parsing JSON, preserving formatting and large integers (apify/ai-team#330).
+ * Parsing and re-indenting deeply nested bodies can exhaust memory. Null values and escaped key names stay as is.
  */
 export function redactUrlSigningSecretKey(json: string): string {
     return json.replace(URL_SIGNING_SECRET_KEY_VALUE_RE, `$1"${REDACTED}"`);

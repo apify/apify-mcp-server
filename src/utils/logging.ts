@@ -129,12 +129,9 @@ function getMcpErrorCode(error: unknown): number | undefined {
 }
 
 /**
- * The error with only fields that hold no request data: an axios error holds the request config, with the
- * Authorization header, and the request body (see apify/ai-team#330). The stack holds neither, so it stays: an
- * `ApifyApiError` stack lists the API call, and the text log shows its `type`. An `Error` cause is copied down to
- * `causeDepth` levels: a chain can be cyclic, and `@apify/log` prints no deeper. A string, number or boolean cause is
- * kept as text; any other cause is dropped, since an object can hold a config.
- * A non-Error value gets no stack: one made here would point at this function, not at the throw.
+ * Drop request config and bodies, which can carry credentials (apify/ai-team#330).
+ * Keep the original stack and API error type for diagnosis. Bound cause chains like @apify/log does,
+ * and drop object causes that could carry config. Non-Errors have no original stack to preserve.
  */
 export function toPlainError(error: unknown, causeDepth = 3): Error {
     if (!(error instanceof Error)) return Object.assign(new Error(String(error)), { stack: undefined });

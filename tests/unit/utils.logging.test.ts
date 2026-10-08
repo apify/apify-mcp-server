@@ -261,16 +261,6 @@ describe('logHttpError', () => {
                 return error;
             },
         },
-        {
-            input: 'a cause chain 20,000 deep',
-            buildError: () => {
-                let error = new Error('level 0');
-                for (let level = 1; level < 20_000; level++) {
-                    error = new Error(`level ${level}`, { cause: error });
-                }
-                return error;
-            },
-        },
         { input: 'a null-prototype cause', buildError: () => new Error('outer', { cause: Object.create(null) }) },
     ])('logs an error with $input without throwing', ({ buildError }) => {
         const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});

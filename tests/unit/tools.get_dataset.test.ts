@@ -27,29 +27,6 @@ const MOCK_DATASET = {
     fields: ['title', 'url'],
 };
 
-const SIGNING_SECRET = 'mock-signing-secret';
-
-/** A RESTRICTED dataset as `GET /v2/datasets/{id}` returns it to a token with write access. */
-const MOCK_RESTRICTED_DATASET = {
-    id: 'ds-1',
-    name: 'my-dataset',
-    userId: 'user-1',
-    createdAt: '2026-05-20T10:00:00.000Z',
-    modifiedAt: '2026-05-20T10:05:00.000Z',
-    accessedAt: '2026-05-20T10:05:00.000Z',
-    itemCount: 42,
-    cleanItemCount: 42,
-    actId: 'act-1',
-    actRunId: 'run-1',
-    schema: null,
-    stats: { readCount: 1, writeCount: 42, storageBytes: 2048 },
-    fields: ['title', 'url'],
-    consoleUrl: 'https://console.apify.com/view/datasets/ds-1',
-    itemsPublicUrl: 'https://api.apify.com/v2/datasets/ds-1/items?signature=sig-1',
-    generalAccess: 'RESTRICTED',
-    urlSigningSecretKey: SIGNING_SECRET,
-};
-
 function stubApifyClient(dataset: unknown): InternalToolArgs['apifyClient'] {
     return mockApifyClient({
         dataset: (_id: string) => ({ get: async () => dataset }),
@@ -81,43 +58,30 @@ describe('get-dataset', () => {
         expect(content[1].text).toBe(`${summary}\n${nextStep}`);
     });
 
-    it('returns a restricted dataset without its URL signing key in either channel', async () => {
+    it.each([
+        ['RESTRICTED', 'mock-signing-secret'],
+        ['ANYONE_WITH_ID_CAN_READ', 'mock-signing-secret'],
+        ['RESTRICTED', null],
+    ])('omits the signing key and keeps public URLs for %s access (%s)', async (generalAccess, urlSigningSecretKey) => {
+        const metadata = {
+            ...MOCK_DATASET,
+            generalAccess,
+            itemsPublicUrl: 'https://api.apify.com/v2/datasets/ds-1/items?signature=sig-1',
+        };
         const result = await (getDataset as HelperTool).call(
-            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient(MOCK_RESTRICTED_DATASET)),
+            stubToolCallContext({ datasetId: MOCK_DATASET.id }, stubApifyClient({ ...metadata, urlSigningSecretKey })),
         );
         const { content, structuredContent } = result as TextToolResult & {
             structuredContent: Record<string, unknown>;
         };
-        const { schema, urlSigningSecretKey, ...expected } = MOCK_RESTRICTED_DATASET;
         const { summary, nextStep, ...data } = structuredContent;
 
         expectSchemaConformingStructuredContent(result, datasetMetadataOutputSchema);
-        expect(data).toEqual(expected);
-        expect(JSON.parse(content[0].text)).toEqual(expected);
+        expect(data).toEqual(metadata);
+        expect(JSON.parse(content[0].text)).toEqual(metadata);
         expect(JSON.stringify(result)).not.toContain('urlSigningSecretKey');
-        expect(JSON.stringify(result)).not.toContain(SIGNING_SECRET);
+        expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
     });
-
-    it.each([
-        ['null', 'RESTRICTED', null],
-        ['a string', 'ANYONE_WITH_ID_CAN_READ', SIGNING_SECRET],
-    ])(
-        'returns no urlSigningSecretKey property when the key is %s and access is %s',
-        async (_kind, generalAccess, urlSigningSecretKey) => {
-            const result = await (getDataset as HelperTool).call(
-                stubToolCallContext(
-                    { datasetId: 'ds-1' },
-                    stubApifyClient({ ...MOCK_DATASET, generalAccess, urlSigningSecretKey }),
-                ),
-            );
-            const { content, structuredContent } = result as TextToolResult & {
-                structuredContent: Record<string, unknown>;
-            };
-
-            expect(structuredContent).not.toHaveProperty('urlSigningSecretKey');
-            expect(content[0].text).not.toContain('urlSigningSecretKey');
-        },
-    );
 
     it('steers nextStep away from fetching when the dataset is large', async () => {
         const result = await (getDataset as HelperTool).call(

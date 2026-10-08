@@ -21,8 +21,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         A GET can start a paid Actor run, as the synchronous run endpoints do.${runActor}
         ${API_CALL_DESCRIPTION}${findPath}${getParameters}
         Returns the parsed response body, JSON with its data wrapper included: integers above 2^53 can
-        lose precision, and a storage's URL signing key is redacted. A body over ${MAX_INLINE_BYTES} bytes
-        is not returned.
+        lose precision. A body over ${MAX_INLINE_BYTES} bytes is not returned.
 
         Example call: {"path": "/v2/webhook-dispatches", "query": {"limit": 10, "desc": true}}
 
