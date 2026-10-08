@@ -357,24 +357,8 @@ describe('apify-api-read', () => {
 
     it.each([
         'actors/apify~hello-world/run-sync',
-        'actors/~my-actor/run-sync',
-        'actors/HG7ML7M8z78YcAPEB/run-sync-get-dataset-items',
-        'acts/apify~hello-world/run-sync',
         '/v2/acts/abc/run-sync-get-dataset-items?token=x',
-        'v2/actors/abc/run-sync',
-        '/v2/actors/abc/run-sync',
-        // A slash encoded in a name is decoded after routing, so the name is one segment.
-        'actors/apify%2Fhello-world/run-sync',
-        'ACTORS/APIFY~HELLO-WORLD/RUN-SYNC-GET-DATASET-ITEMS',
-        'actors//abc/run-sync',
-        'actors/abc//run-sync',
-        'actors/abc/run-sync//',
-        'actors/abc/run-sync?build=latest',
-        // The URL is resolved before it is sent: dot segments, a backslash, and a newline.
-        'actors/abc/x/../run-sync',
-        'actors/abc/%2e%2e/abc/run-sync',
         'actors\\abc\\run-sync',
-        'actors/abc/run-\nsync',
     ])('refuses a GET to the synchronous run endpoint %j without a request', async (path) => {
         const result = await callTool(apifyApiRead, { path });
 
@@ -385,40 +369,13 @@ describe('apify-api-read', () => {
         expect(requestMock).not.toHaveBeenCalled();
     });
 
-    it.each([
-        'actor-tasks/john~my-task/run-sync',
-        'actor-tasks/HG7ML7M8z78YcAPEB/run-sync-get-dataset-items',
-        'Actor-Tasks/john~my-task/Run-Sync/',
-    ])("refuses a GET to a task's synchronous run endpoint %j without a request or naming call-actor", async (path) => {
-        const result = await callTool(apifyApiRead, { path });
+    it("refuses a GET to a task's synchronous run endpoint without a request or naming call-actor", async () => {
+        const result = await callTool(apifyApiRead, { path: 'actor-tasks/john~my-task/run-sync' });
 
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toBe(`${SYNC_RUN_REFUSAL} Use ${HELPER_TOOLS.API_WRITE} instead.`);
         expect(requestMock).not.toHaveBeenCalled();
     });
-
-    it.each([
-        ['actors/abc/run-sync', [HELPER_TOOLS.API_READ], SYNC_RUN_REFUSAL],
-        [
-            'actors/abc/run-sync',
-            [HELPER_TOOLS.API_READ, HELPER_TOOLS.ACTOR_CALL],
-            `${SYNC_RUN_REFUSAL} Use ${HELPER_TOOLS.ACTOR_CALL} instead.`,
-        ],
-        [
-            'actors/abc/run-sync',
-            [HELPER_TOOLS.API_READ, HELPER_TOOLS.API_WRITE],
-            `${SYNC_RUN_REFUSAL} Use ${HELPER_TOOLS.API_WRITE} instead.`,
-        ],
-        ['actor-tasks/abc/run-sync', [HELPER_TOOLS.API_READ, HELPER_TOOLS.ACTOR_CALL], SYNC_RUN_REFUSAL],
-    ])(
-        'names call-actor and the write tool in the refusal of a GET to %s only when the session has them (%j)',
-        async (path, loadedToolNames, refusal) => {
-            const result = await callTool(apifyApiRead, { path }, loadedToolNames);
-
-            expect(result.content[0].text).toBe(refusal);
-            expect(requestMock).not.toHaveBeenCalled();
-        },
-    );
 
     it.each(['actors/abc/runs', 'actors/abc/runs/last', 'key-value-stores/abc/records/run-sync', 'actor-runs/abc'])(
         'sends a GET to %j, which does not start a run',

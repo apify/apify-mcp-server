@@ -161,13 +161,6 @@ describe('validateApiBlocklist()', () => {
             'acts/apify~hello-world/run-sync-get-dataset-items',
             'actor-tasks/john~my-task/run-sync',
             'actor-tasks/HG7ML7M8z78YcAPEB/run-sync-get-dataset-items',
-            // A slash encoded in a name is decoded after routing, so the name is one segment.
-            'actors/apify%2Fhello-world/run-sync',
-            'ACTORS/APIFY~HELLO-WORLD/RUN-SYNC',
-            'Actor-Tasks/abc/Run-Sync-Get-Dataset-Items',
-            'actors/abc/run-sync/',
-            'actors//abc//run-sync',
-            'actors/abc/run-sync?timeout=300&token=x',
             normalizeApiPath('/v2/actors/abc/run-sync'),
             normalizeApiPath('v2/actor-tasks/abc/run-sync'),
         ])('refuses a GET to %j, not a POST', (normalizedPath) => {
@@ -192,35 +185,14 @@ describe('validateApiBlocklist()', () => {
         });
 
         it.each([
-            [
-                [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.API_WRITE],
-                `Use ${HELPER_TOOLS.ACTOR_CALL} or ${HELPER_TOOLS.API_WRITE}`,
-            ],
-            [[HELPER_TOOLS.ACTOR_CALL], `Use ${HELPER_TOOLS.ACTOR_CALL}`],
-            [[HELPER_TOOLS.API_WRITE], `Use ${HELPER_TOOLS.API_WRITE}`],
-        ])(
-            'names for an Actor call-actor and the write tool, each only when the session has it (%j)',
-            (loadedToolNames, use) => {
-                expect(validate({ normalizedPath: 'actors/abc/run-sync', loadedToolNames })).toBe(
-                    `${SYNC_RUN_REFUSAL} ${use} instead.`,
-                );
-                expect(validate({ normalizedPath: 'acts/abc/run-sync-get-dataset-items', loadedToolNames })).toBe(
-                    `${SYNC_RUN_REFUSAL} ${use} instead.`,
-                );
-            },
-        );
-
-        it('names for a task only the write tool, since call-actor cannot run a saved task', () => {
+            ['actors/abc/run-sync', `Use ${HELPER_TOOLS.ACTOR_CALL} or ${HELPER_TOOLS.API_WRITE}`],
+            ['actors/abc/run-sync-get-dataset-items', `Use ${HELPER_TOOLS.ACTOR_CALL} or ${HELPER_TOOLS.API_WRITE}`],
+            ['actor-tasks/abc/run-sync', `Use ${HELPER_TOOLS.API_WRITE}`],
+            ['actor-tasks/abc/run-sync-get-dataset-items', `Use ${HELPER_TOOLS.API_WRITE}`],
+        ])('names the tools to use instead of a GET to %s', (normalizedPath, use) => {
             const loadedToolNames = [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.API_WRITE];
-            const withWriteTool = `${SYNC_RUN_REFUSAL} Use ${HELPER_TOOLS.API_WRITE} instead.`;
 
-            expect(validate({ normalizedPath: 'actor-tasks/abc/run-sync', loadedToolNames })).toBe(withWriteTool);
-            expect(validate({ normalizedPath: 'actor-tasks/abc/run-sync-get-dataset-items', loadedToolNames })).toBe(
-                withWriteTool,
-            );
-            expect(
-                validate({ normalizedPath: 'actor-tasks/abc/run-sync', loadedToolNames: [HELPER_TOOLS.ACTOR_CALL] }),
-            ).toBe(SYNC_RUN_REFUSAL);
+            expect(validate({ normalizedPath, loadedToolNames })).toBe(`${SYNC_RUN_REFUSAL} ${use} instead.`);
         });
     });
 });

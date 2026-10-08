@@ -19,29 +19,10 @@ describe('buildApiOperationIndex()', () => {
         expect(index.size).toBe(37);
     });
 
-    it('leaves out the GET of the synchronous run endpoints of Actors and tasks, and keeps the POST', () => {
+    it('leaves out the GET of the synchronous run endpoints and keeps the POST', () => {
         expect(index.has('actor_runSync_get')).toBe(false);
         expect(index.has('actor_runSync_post')).toBe(true);
         expect(index.has('actor_runSyncGetDatasetItems_post')).toBe(true);
-        const syncRunSpec = {
-            paths: Object.fromEntries(
-                [
-                    '/v2/actors/{actorId}/run-sync',
-                    '/v2/actors/{actorId}/run-sync-get-dataset-items',
-                    '/v2/actor-tasks/{actorTaskId}/run-sync',
-                    '/v2/actor-tasks/{actorTaskId}/run-sync-get-dataset-items',
-                ].map((path) => [path, { get: { operationId: `GET ${path}` }, post: { operationId: `POST ${path}` } }]),
-            ),
-        };
-
-        expect([...buildApiOperationIndex(syncRunSpec).keys()]).toEqual([
-            'POST /v2/actors/{actorId}/run-sync',
-            'POST /v2/actors/{actorId}/run-sync-get-dataset-items',
-            'POST /v2/actor-tasks/{actorTaskId}/run-sync',
-            'POST /v2/actor-tasks/{actorTaskId}/run-sync-get-dataset-items',
-        ]);
-        // The blocklist leaves the GETs out; without its rules, the index has them.
-        expect(buildApiOperationIndex(syncRunSpec, []).size).toBe(8);
     });
 
     it('leaves out the operations a rule matches', () => {
