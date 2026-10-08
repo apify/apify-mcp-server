@@ -1,0 +1,339 @@
+[
+  {
+    "id": "merge/api/webhooks-list-easy",
+    "category": "apify-api-read",
+    "kind": "agent",
+    "query": "which webhooks are set up on my apify account, and what url does each one call?",
+    "reference": "The account has a permanent fixture webhook that calls https://example.com/eval-api/run-failed when a run of the Actor eval-api-actor fails. Other webhooks may exist, and other eval items create and delete eval-api webhooks while this one runs, so a longer list is expected. A read counts when it is a GET through apify-api-read (the path in any form: webhooks, v2/webhooks, or /v2/webhooks, with or without query parameters) or through the server's API resource (ReadMcpResourceTool with an https://api.apify.com/v2/webhooks URI) when the client offers it. PASS only if the account's webhook list was read with a GET of /v2/webhooks and the final answer lists the webhook that calls https://example.com/eval-api/run-failed. Finding the path with apify-api-search or apify-api-details first is fine. FAIL if the agent says webhooks cannot be listed, reports that there are none, gives that webhook a different URL, or answers without a successful read.",
+    "maxTurns": 8,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "expectedErrors": [
+      "fetch-actor-details"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/api/monthly-spend-easy",
+    "category": "apify-api-read",
+    "kind": "agent",
+    "query": "how much has my apify account spent so far in the current billing period?",
+    "reference": "No dedicated tool reads billing. A read counts when it is a GET of either accepted path below, in any form (users/me/usage/monthly or users/me/limits, with or without a v2/ or /v2/ prefix, with or without query parameters), through apify-api-read or through the server's API resource (ReadMcpResourceTool with the https://api.apify.com/v2/... URI of that path) when the client offers it. PASS only if the agent read the current period's spend (GET /v2/users/me/usage/monthly, or GET /v2/users/me/limits, whose current.monthlyUsageUsd holds this period's spend) and the final answer states the amount spent so far in USD (any amount, including 0). The judge cannot see the response, so do not fail a specific amount as unverifiable. FAIL if the agent says it has no access to billing, sends the user to Apify Console instead of reading it, or states an amount without a successful read.",
+    "maxTurns": 8,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/api/webhook-fields-easy",
+    "category": "apify-api-details",
+    "kind": "agent",
+    "query": "before i set anything up: what does apify need from me to create a webhook through the api, and which run events can it listen to? don't create anything",
+    "reference": "Nothing may be created. PASS only if the agent looked up the webhook create operation (apify-api-details on /v2/webhooks (with method POST, or with no method), possibly after apify-api-search, or the Apify docs tools) and the final answer names the three required fields eventTypes, condition (the Actor, task, or run it watches), and requestUrl, and lists run events such as ACTOR.RUN.SUCCEEDED and ACTOR.RUN.FAILED. Mentioning optional fields (payloadTemplate, headersTemplate, description, idempotencyKey, and others) is fine. FAIL if apify-api-write was called, if the answer leaves out one of the three required fields, or if it calls an optional field required.",
+    "maxTurns": 8,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api",
+      "apify-api-write"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/api/webhooks-raw-json-easy",
+    "category": "apify-api-read",
+    "kind": "agent",
+    "query": "show me exactly what the apify api returns for my account's webhook list, as raw json",
+    "reference": "This item runs with the client's built-in tools, so the server's API resource (ReadMcpResourceTool with https://api.apify.com/v2/webhooks) is available next to apify-api-read; either route is correct. The account has a fixture webhook that calls https://example.com/eval-api/run-failed. PASS only if the webhook list was read through one of the two (a GET of /v2/webhooks, query parameters allowed) and the final answer shows the JSON body (the data wrapper with its items, shortened with a clear note if long), including the webhook that calls https://example.com/eval-api/run-failed. A Bash call (curl, or the apify CLI) using the environment's token is neither route: FAIL when the JSON shown comes from it, even though it is the true body; FAIL as well for any command that prints the token. FAIL if the agent reports a response from a generic web fetch, which carries no Apify token, as the account's webhooks, if the answer contains an Apify API token (a string starting with apify_api_), or if the JSON is invented.",
+    "maxTurns": 8,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ]
+  },
+  {
+    "id": "merge/api/env-vars-list-medium",
+    "category": "apify-api-read",
+    "kind": "agent",
+    "query": "list the environment variables on my actor eval-api-actor with their values. for the secret ones just tell me they're secret",
+    "reference": "The fixture Actor eval-api-actor, owned by the eval account, has one version, 0.0, with two variables: EVAL_REGION, a plain variable set to eu-central-1, and EVAL_API_KEY, a secret. The API returns plain values and never returns secret ones. A read counts when it is a GET of an accepted read below, in any form (with or without a v2/ or /v2/ prefix, with or without query parameters, and with the legacy acts/ prefix in place of actors/, which reaches the same endpoint), through apify-api-read or through the server's API resource (ReadMcpResourceTool with the https://api.apify.com/v2/... URI of that path) when the client offers it. PASS only if the agent found the version (from the Actor object or its version list; trying 0.0 directly is fine when the read succeeds) and read the variables (the version's env-vars list (/v2/actors/{actor}/versions/0.0/env-vars), or the version list, the version, or the Actor object (/v2/actors/{actor}/versions, /v2/actors/{actor}/versions/0.0, or /v2/actors/{actor}), which carry envVars with the plain values; in the version list and the Actor object, envVars sits inside each version) and the final answer reports EVAL_REGION = eu-central-1 and EVAL_API_KEY as a secret whose value is not shown. The Actor may be addressed by its ID, as ~eval-api-actor, or as username~eval-api-actor. FAIL if the answer gives a value for EVAL_API_KEY, leaves out either variable, invents one, or if anything was changed.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "expectedErrors": [
+      "fetch-actor-details"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/api/webhook-lifecycle-medium",
+    "category": "apify-api-write",
+    "kind": "agent",
+    "query": "whenever my actor eval-api-actor-scratch has a failed run, POST to https://example.com/eval-api/scratch-failed. make sure that's in place, then remove it - i'm only checking the setup works",
+    "reference": "No dedicated tool manages webhooks. PASS only if, through apify-api-write: (1) a POST to /v2/webhooks created a webhook with requestUrl https://example.com/eval-api/scratch-failed, eventTypes containing ACTOR.RUN.FAILED (adding ACTOR.RUN.TIMED_OUT or ACTOR.RUN.ABORTED is acceptable; ACTOR.RUN.SUCCEEDED or ACTOR.RUN.CREATED is not), and condition.actorId set to an Actor ID (a 17-character ID, not the name eval-api-actor-scratch), sent after a read that returns that Actor's ID: the Actor itself or the account's Actor list, through apify-api-read or the server's API resource, or fetch-actor-details; (2) the registration was confirmed: the create response, which returns the webhook with its ID, counts, and so does a later GET of the webhook or of the list; (3) a DELETE of /v2/webhooks/{id} with the created webhook's ID succeeded; and the final answer reports both the creation and the deletion. fetch-actor-details fails on eval-api-actor-scratch, which is never built; that failed call is why fetch-actor-details is in expectedErrors. A read of the webhook after the delete answers 404, which confirms the delete; that failed read is why apify-api-read is in expectedErrors too. FAIL if the webhook calls a different URL, condition.actorId holds a name instead of an ID, no read that returns eval-api-actor-scratch's ID came before the create, more than one webhook was created, the webhook is left in place, or a step is claimed without its successful call.",
+    "maxTurns": 14,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api",
+      "apify-api-write"
+    ],
+    "expectedErrors": [
+      "fetch-actor-details",
+      "apify-api-read"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/api/dataset-rename-medium",
+    "category": "apify-api-write",
+    "kind": "agent",
+    "query": "create an empty dataset called eval-api-contacts, rename it to eval-api-contacts-q4, check the new name stuck, then delete it",
+    "reference": "No dedicated tool creates, renames, or deletes datasets. PASS only if, through apify-api-write: a POST to /v2/datasets created the dataset with the name eval-api-contacts (the API reads the name from the name query parameter, given in query or in the path's query string); a PUT to that same dataset (/v2/datasets/{id}, /v2/datasets/~eval-api-contacts, or /v2/datasets/username~eval-api-contacts) with the body name eval-api-contacts-q4 renamed it; the new name was confirmed (the PUT response returns the updated dataset, which counts, and so does a later read through apify-api-read or get-dataset); a DELETE of the dataset succeeded; and the final answer reports each step. A read of the dataset after the delete, through apify-api-read or get-dataset, answers 404, which confirms the delete; that failed read is why both are in expectedErrors. FAIL if a second dataset was created under the new name instead of renaming the first, the dataset is left behind, or a step is claimed without its successful call.",
+    "maxTurns": 14,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api",
+      "apify-api-write"
+    ],
+    "expectedErrors": [
+      "apify-api-read",
+      "get-dataset"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/api/webhook-test-medium",
+    "category": "apify-api-write",
+    "kind": "agent",
+    "query": "send a test delivery to the webhook that watches my actor eval-api-actor, so i can see whether its endpoint gets it. tell me how the delivery went",
+    "reference": "The account has one fixture webhook on eval-api-actor, calling https://example.com/eval-api/run-failed. Other webhooks may exist while this item runs, including one on eval-api-actor-scratch that another item creates and deletes. A test delivery is POST /v2/webhooks/{webhookId}/test. PASS only if the agent identified that webhook from a read (the account's webhook list, or /v2/actors/{actor}/webhooks, through apify-api-read or the server's API resource), sent POST /v2/webhooks/{id}/test through apify-api-write, and the final answer identifies the tested webhook by its URL, https://example.com/eval-api/run-failed, and reports the outcome the API returned, whatever it is: example.com may reject the delivery, and a truthfully reported failed or pending delivery is a PASS. Finding the operation with apify-api-search or apify-api-details first is expected but not required, and so is reading the dispatch afterwards. FAIL if the agent creates, changes, or deletes a webhook, if the final answer does not name the tested webhook's URL or names another one, or if it reports a delivery result without a successful test call.",
+    "maxTurns": 14,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api",
+      "apify-api-write"
+    ],
+    "expectedErrors": [
+      "fetch-actor-details"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/api/webhook-deliveries-medium",
+    "category": "apify-api-read",
+    "kind": "agent",
+    "query": "did apify manage to deliver my last few webhook calls? just the three most recent ones",
+    "reference": "Delivery results are webhook dispatches. The fixtures create no deliveries, though test deliveries from other items or earlier runs may exist, so any count is correct, zero included. A read counts when it is a GET of an accepted path below, in any form (with or without a v2/ or /v2/ prefix, with or without query parameters), through apify-api-read or through the server's API resource (ReadMcpResourceTool with the https://api.apify.com/v2/... URI of that path) when the client offers it. PASS only if the agent read the account's webhook dispatches (GET /v2/webhook-dispatches, or the dispatches of each webhook at /v2/webhooks/{id}/dispatches, plus GET /v2/webhook-dispatches/{id} for a dispatch's calls when a list leaves them out) and the final answer states how many it found, counting at most the three newest (zero, one, two, or three), and reports the status of each of those, with the HTTP response code where the dispatch has one. The judge cannot see the response, so do not fail a count or a status as unverifiable. Asking for them newest first with limit 3 and desc, as query parameters or in the path's query string, is the expected call; reading more and reporting only the newest three is acceptable. FAIL if the agent builds its answer only from the webhook list's lastDispatch, which is at most one delivery per webhook, not the three newest; if it answers without a successful read; if it invents deliveries, listing more than the count it states; or if it skips one it read, listing fewer than the count it states, or reporting fewer than three while leaving out a dispatch it fetched by ID (GET /v2/webhook-dispatches/{id}).",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/api/browser-info-medium",
+    "category": "apify-api-read",
+    "kind": "agent",
+    "query": "what ip address and request headers does the apify api see when my requests reach it?",
+    "reference": "The API answers this with GET /v2/browser-info, a path most agents have to look up. A read counts when it is a GET through apify-api-read (the path in any form: browser-info, v2/browser-info, or /v2/browser-info, with or without query parameters) or through the server's API resource (ReadMcpResourceTool with an https://api.apify.com/v2/browser-info URI) when the client offers it. PASS only if a GET of /v2/browser-info succeeded and the final answer reports the client IP address and some of the request headers. apify-api-read masks the session's token in the response, so an Authorization header shown as [REDACTED], or left out, is correct. The resource returns the body as it is, token included, so on that route the agent must leave the token out itself. FAIL if the final answer contains an Apify API token (a string starting with apify_api_), if the agent reports an IP address from another service (an IP echo website, or an Actor run) as what the Apify API sees, or if it answers without the read.",
+    "maxTurns": 10,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/api/budget-vague-hard",
+    "category": "apify-api-read",
+    "kind": "agent",
+    "query": "am i about to blow through my apify budget this month?",
+    "reference": "No tool or term is named; the account's limits answer it. A read counts when it is a GET of any of the three accepted paths below, in any form (users/me/limits, users/me/usage/monthly, or users/me, with or without a v2/ or /v2/ prefix, with or without query parameters), through apify-api-read or through the server's API resource (ReadMcpResourceTool with the https://api.apify.com/v2/... URI of that path) when the client offers it. PASS only if the agent read the account's monthly limit and current spend (GET /v2/users/me/limits, with limits.maxMonthlyUsageUsd and current.monthlyUsageUsd), or read the spend (GET /v2/users/me/usage/monthly) together with a limit or the plan's included usage (GET /v2/users/me/limits or /v2/users/me), and the final answer compares the current spend with that limit or allowance, both in USD, and gives a plain verdict. The judge cannot see the figures, so do not fail plausible amounts as unverifiable. FAIL if the agent asks the user for their budget without first reading the account's limits, says it cannot see billing, or gives a verdict without both figures coming from successful reads.",
+    "maxTurns": 10,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/api/old-path-404-hard",
+    "category": "apify-api-read",
+    "kind": "agent",
+    "query": "my old billing script calls GET https://api.apify.com/v2/users/me/usage and now gets a 404. what should it call instead, and what's my usage total for this month?",
+    "reference": "The path /v2/users/me/usage does not exist; the monthly usage is at /v2/users/me/usage/monthly. A read counts when it is a GET through apify-api-read (the path in any form: users/me/usage/monthly, v2/users/me/usage/monthly, or /v2/users/me/usage/monthly, with or without query parameters) or through the server's API resource (ReadMcpResourceTool with an https://api.apify.com/v2/users/me/usage/monthly URI) when the client offers it. PASS only if apify-api-read (or the resource) was called with users/me/usage/monthly, after the call to the old path when the agent made one, and the final answer names that path (as the path or the full https://api.apify.com/v2/users/me/usage/monthly URL) as the replacement and states this period's usage total in USD. Reproducing the 404 on the old path first is acceptable, and so is skipping it; so is asking apify-api-details about the old path, which answers that it is not in the API spec. Those two failures are why apify-api-read and apify-api-details are in expectedErrors. The 404 lists the closest paths in the API spec; following that list or searching with apify-api-search are both fine. FAIL if the agent stops at the 404, says usage can no longer be read, names a replacement it never called, or if the final answer says the read of users/me/usage/monthly failed and still gives a total.",
+    "maxTurns": 10,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "expectedErrors": [
+      "apify-api-read",
+      "apify-api-details",
+      "fetch-apify-docs"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/api/env-var-missing-hard",
+    "category": "apify-api-read",
+    "kind": "agent",
+    "query": "what's EVAL_TIMEZONE set to on my actor eval-api-actor?",
+    "reference": "The fixture Actor eval-api-actor (version 0.0) has only EVAL_REGION and EVAL_API_KEY; EVAL_TIMEZONE does not exist. Reading it directly (GET /v2/actors/{actor}/versions/0.0/env-vars/EVAL_TIMEZONE) returns a 404 whose message may also list the closest paths in the API spec; such a list does not mean the path is wrong. A read counts when it is a GET of an accepted read below, in any form (with or without a v2/ or /v2/ prefix, with or without query parameters, and with the legacy acts/ prefix in place of actors/, which reaches the same endpoint), through apify-api-read or through the server's API resource (ReadMcpResourceTool with the https://api.apify.com/v2/... URI of that path) when the client offers it. The accepted reads are the single variable (/v2/actors/{actor}/versions/0.0/env-vars/EVAL_TIMEZONE, even when that read is answered with the 404), the version's env-vars list (/v2/actors/{actor}/versions/0.0/env-vars), and the version list, the version, or the Actor object (/v2/actors/{actor}/versions, /v2/actors/{actor}/versions/0.0, or /v2/actors/{actor}), which carry envVars; in the version list and the Actor object, envVars sits inside each version. {actor} must address the Actor by its ID, as ~eval-api-actor, or as username~eval-api-actor: the API reads a bare eval-api-actor as an ID and answers 404 because the Actor is not found, not because the variable is missing. PASS only if the agent made an accepted read with such an address and the final answer says plainly that eval-api-actor has no EVAL_TIMEZONE variable, without inventing a value; naming the variables it does have is fine. The failed single-variable read is why apify-api-read is in expectedErrors. FAIL if every read uses a bare actors/eval-api-actor/... path, if the agent reports a value, creates the variable, blames a wrong path instead of the missing variable, or answers without a read.",
+    "maxTurns": 10,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api"
+    ],
+    "expectedErrors": [
+      "apify-api-read",
+      "fetch-actor-details"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/api/secret-env-var-hard",
+    "category": "apify-api-write",
+    "kind": "agent",
+    "query": "my actor eval-api-actor-scratch needs a signing secret: EVAL_SIGNING_SECRET, value eval-only-7c41. it has to be stored so nobody can read it back later, not even me in console. check it's stored that way, then remove it - this is only a dry run",
+    "reference": "The Actor's only version, 0.0, also has a plain variable EVAL_MODE=scratch that must survive. The Actor may be addressed by its ID, as ~eval-api-actor-scratch, or as username~eval-api-actor-scratch, and the legacy acts/ prefix in place of actors/ reaches the same endpoint. PASS only if: (1) the variable was created on version 0.0 of eval-api-actor-scratch with the name EVAL_SIGNING_SECRET, the value eval-only-7c41, and isSecret true in the same call, by either POST /v2/actors/{actor}/versions/0.0/env-vars through apify-api-write or a PUT of /v2/actors/{actor}/versions/0.0 through apify-api-write whose envVars keeps EVAL_MODE with the value scratch as a plain variable and adds the secret; (2) the secret setting was confirmed: the create response, which returns isSecret true and no value, counts, and so does a later read of the variable, the list, or the version; (3) the variable was then deleted: DELETE .../env-vars/EVAL_SIGNING_SECRET, or a second version PUT whose envVars keeps EVAL_MODE=scratch as a plain variable and leaves the secret out; and the final answer reports that it was stored as a secret and then removed. The API never returns a secret's value, so an agent saying the value is hidden is right; do not expect it to read the value back. fetch-actor-details fails on eval-api-actor-scratch, which is never built; that failed call is why fetch-actor-details is in expectedErrors. A read of the webhook after the delete answers 404, which confirms the delete; that failed read is why apify-api-read is in expectedErrors too. FAIL if the variable was ever written without isSecret true, even if fixed afterwards, since the value was readable in between; if EVAL_MODE or another variable was removed or changed, for example by a version PUT whose envVars leaves EVAL_MODE out, changes its value, or makes it secret; if the agent claims to have read the secret value back; or if EVAL_SIGNING_SECRET is left in place.",
+    "maxTurns": 14,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api",
+      "apify-api-write"
+    ],
+    "expectedErrors": [
+      "fetch-actor-details"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/api/dataset-access-method-hard",
+    "category": "apify-api-write",
+    "kind": "agent",
+    "query": "make my dataset eval-api-shared viewable by anyone i send the link to, without them needing an apify account. don't change anything else about it",
+    "reference": "The fixture dataset eval-api-shared starts RESTRICTED. Its path has the methods GET, PUT, and DELETE, so the agent must choose PUT. PASS only if apify-api-write sent a PUT to the dataset, addressed by its ID, as ~eval-api-shared, or as username~eval-api-shared (/v2/datasets/{id}, /v2/datasets/~eval-api-shared, or /v2/datasets/username~eval-api-shared), whose body sets generalAccess to ANYONE_WITH_ID_CAN_READ or ANYONE_WITH_NAME_CAN_READ and does not rename it, and the final answer confirms the new access level (the PUT response returns the updated dataset; a later read is fine too). The API reads a bare /v2/datasets/eval-api-shared as an ID and answers 404, so a PUT there does not count. One refusal on the way is acceptable, and is why apify-api-details is in expectedErrors: an apify-api-details call for a method the path does not have. apify-api-write is not exempt: its method parameter says to omit the method only when the path has one, so a write without a method here is refused and fails the item's error gate. FAIL if a DELETE or POST was sent to the dataset, the body renamed it, the dataset ends up deleted, or the change is claimed without a PUT.",
+    "maxTurns": 10,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "builds",
+      "dev",
+      "api",
+      "apify-api-write"
+    ],
+    "expectedErrors": [
+      "apify-api-details"
+    ],
+    "mcpToolsOnly": true
+  }
+]

@@ -57,6 +57,25 @@ should trigger — `limit`, `offset`, `desc`, `fields`, `unnamed`, `status`, `li
 `callOptions.maxTotalChargeUsd`. Not all 95 groups: pinning every one costs a case each and most
 are not reachable from natural user language.
 
+### Apify API tools (not in the datasets yet)
+
+The four opt-in `api` tools from #1444 and #1445 have their own cases, promoted in two batches
+after those PRs merge (see `API_TOOLS.md`): `eval_cases_review/api_tools_pr_cases.json` (26) and
+`eval_cases_review/api_tools_merge_cases.json` (15). They are uncalibrated, and they load `builds`
+and `api` in place of the two Actor tools. Counts as above:
+
+| Tool | pr | Tool | pr |
+|---|---|---|---|
+| `apify-api-search` | 13 | `apify-api-read` | 11 |
+| `apify-api-details` | 13 | `apify-api-write` | 6 |
+
+The search and details counts are high because the positive cases accept a lookup as the first
+call; no case requires either tool. 13 more `pr` cases check routing: a dedicated tool must win over
+an API tool.
+
+`merge` family: api 15 (read 9, write 5, details 1). Argument groups, design, fixtures, and staging:
+[`eval_cases_review/API_TOOLS.md`](./eval_cases_review/API_TOOLS.md).
+
 ## Findings from building it
 
 1. **Two cases in the live `pr` dataset are dead.** `pr/get-actor-log/debug-failed-run` and
