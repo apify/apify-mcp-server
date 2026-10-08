@@ -10,6 +10,7 @@ import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as ApifyClientModule from '../../src/apify_client.js';
+import { APIFY_AI_CLIENT_NAME } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { getRequestHandler, getTaskStore, makeRecorderTool } from './helpers/mcp_server.js';
 
@@ -52,7 +53,7 @@ describe('ActorsMcpServer resources/read — request-origin tagging', () => {
         });
         try {
             await getRequestHandler(server, 'initialize')(
-                makeInitializeRequest('apify-ai') as unknown as Record<string, unknown>,
+                makeInitializeRequest(APIFY_AI_CLIENT_NAME) as unknown as Record<string, unknown>,
                 {},
             );
 
@@ -102,7 +103,7 @@ describe('ActorsMcpServer tools/call — request-origin tagging', () => {
             setupSigintHandler: false,
             telemetry: { enabled: false },
             token: 'test-token',
-            initializeRequestData: makeInitializeRequest('apify-ai'),
+            initializeRequestData: makeInitializeRequest(APIFY_AI_CLIENT_NAME),
         });
         try {
             const { tool } = makeRecorderTool(toolName, {

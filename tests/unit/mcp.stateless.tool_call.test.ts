@@ -6,7 +6,7 @@ import log from '@apify/log';
 
 import type * as ApifyClientModule from '../../src/apify_client.js';
 import { REQUEST_ORIGIN } from '../../src/apify_client.js';
-import { HELPER_TOOLS } from '../../src/const.js';
+import { APIFY_AI_CLIENT_NAME, HELPER_TOOLS } from '../../src/const.js';
 import * as mcpClient from '../../src/mcp/client.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import { X402PaymentProvider } from '../../src/payments/x402.js';
@@ -271,7 +271,7 @@ describe('createStatelessServer() tools/call', () => {
             const { tool } = makeArgsRecorderTool();
             await loadSource(server, [tool]);
 
-            await call('tools/call', { name: tool.name, arguments: {} }, { client: { name: 'apify-ai' } });
+            await call('tools/call', { name: tool.name, arguments: {} }, { client: { name: APIFY_AI_CLIENT_NAME } });
 
             expect(capturedClientOptions.map((options) => options.requestOrigin)).toContain(REQUEST_ORIGIN.APIFY_AI);
         });
