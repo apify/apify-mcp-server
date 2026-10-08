@@ -47,8 +47,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     which the API takes as the HTTP method, and a GET to the synchronous run endpoints of Actors and tasks,
     which starts a paid run (the write tool still sends the POST). So the read tool is annotated read-only.
     `callApi` checks every call (`validateApiBlocklist`), fail-closed, as the API reads the request URL, and
-    the index leaves out each operation a rule matches (`isApiOperationBlocked`), so search, details, the
-    closest-path hints, and the write tool's method choice never offer it.
+    refuses a path whose dot segments climb out of `/v2/`; the index leaves out each operation a rule matches
+    (`isApiOperationBlocked`), so search, details, the closest-path hints, and the write tool's method
+    choice never offer it.
     `apify_api_spec.ts` builds the operation index from the spec (cached for a day); search and
     details use it, the write tool uses it to choose a method that was not given, and a call uses it
     otherwise only for hints, waiting at most a few seconds, so a failed download does not stop a

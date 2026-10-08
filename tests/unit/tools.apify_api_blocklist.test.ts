@@ -195,6 +195,22 @@ describe('validateApiBlocklist()', () => {
             expect(validate({ normalizedPath, loadedToolNames })).toBe(`${SYNC_RUN_REFUSAL} ${use} instead.`);
         });
     });
+
+    describe('a path outside /v2/', () => {
+        const OUTSIDE_V2_REFUSAL =
+            'The path leaves /v2/ once its dot segments are resolved; the API tools call only paths under /v2/.';
+
+        it.each(['../acts/abc/run-sync', '..', 'x/../../v-experimental/runs', '%2e%2e/health', '..\\ping'])(
+            'refuses %s, whatever the rules',
+            (normalizedPath) => {
+                expect(validate({ normalizedPath }, [])).toBe(OUTSIDE_V2_REFUSAL);
+            },
+        );
+
+        it.each(['actors/abc/../abc/runs', 'x/..', 'datasets/abc', ''])('lets %s through', (normalizedPath) => {
+            expect(validate({ normalizedPath }, [])).toBeUndefined();
+        });
+    });
 });
 
 describe('isApiOperationBlocked()', () => {
