@@ -131,8 +131,8 @@ status message telling the agent to add `raw`; `ftp://` fails with "Unsupported 
 The web-selection family (`merge/web-selection/*`, 9 items: 7 proper + 2 with `expectedErrors`) covers
 the clash between the default web tools: web search by query (`apify/rag-web-browser`) vs
 single-URL verbatim fetch (`apify/web-fetch`) vs Actor discovery (`search-actors`) vs a
-specialized Actor for structured platform data, plus rag→web-fetch escalation when a page
-blocks rag's crawler (reddit) and coexistence with a client's built-in, summarizing fetch. Also
+specialized Actor for structured platform data, plus coexistence with a client's built-in,
+summarizing fetch. Also
 stateless — no fixtures script. Known residual (2026-08-21): on `merge/web-fetch/unsupported-protocol`,
 claude-haiku-4-5 reproducibly rewrites the ftp:// URL to https:// without telling the user,
 despite the scheme note in both the tool description and the `url` parameter — a model-level

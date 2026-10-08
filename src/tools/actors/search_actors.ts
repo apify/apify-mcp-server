@@ -229,8 +229,8 @@ export const searchActors: ToolEntry = Object.freeze({
             ...(footer && { instructions: footer }),
         };
 
-        // Only the header uses `dedent`; `actorCardText` is joined after it, not interpolated
-        // — Actor cards may contain tab-indented lines (pay-per-event pricing) that would
+        // The header is built with `dedent`; `actorCardText` is joined after it, not interpolated.
+        // Card lines are flush-left or indented (two spaces for pay-per-event pricing), which would
         // corrupt `dedent`'s indent detection if interpolated into the template.
         const header = dedent`
             # Search results:

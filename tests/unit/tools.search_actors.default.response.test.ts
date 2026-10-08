@@ -345,12 +345,10 @@ describe('search-actors without widget (searchActors)', () => {
             simplifyPricingForUserTier: true,
         });
 
-        expect('instructions' in structuredContent).toBe(false);
         expect(Object.keys(structuredContent).sort()).toEqual(['actors', 'count', 'query', 'userTier']);
         expect(content[0].text).toBe(
             `# Search results:\n- **Search query:** ${SEARCH_KEYWORDS}\n- **Number of Actors found:** 1\n\n# Actors:\n\n${cardText}`,
         );
-        expect(content[0].text).toBe(content[0].text.trimEnd());
     });
 
     it('adds the not-runnable caveat to text and structured content when call-actor is absent', async () => {
