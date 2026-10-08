@@ -55,7 +55,7 @@ export const apifyApiRead: ToolEntry = Object.freeze({
         idempotentHint: true,
         openWorldHint: false,
     },
-    // A storage signature would otherwise be logged.
+    // A storage signature, or the webhooks of a synchronous run, would otherwise be logged.
     redactArgs: redactApiCallArgs,
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = apifyApiReadArgs.parse(toolArgs.args);
