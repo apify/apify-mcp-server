@@ -30,8 +30,9 @@ function decodeEscapes(text: string): string {
 }
 
 /**
- * A query parameter name as the API's query parser (qs, run by Express) reads it, decoded and in lowercase:
- * qs reads `method[]`, `method[0]`, and `[method]` all as `method`.
+ * A query parameter name, decoded and in lowercase (both fail-closed, beyond what the API reads), without the
+ * brackets the API's query parser (qs, run by Express) reads through: qs reads `method[]`, `method[0]`, and
+ * `[method]` all as `method`.
  */
 function extractQueryParamName(name: string): string {
     const decodedName = decodeEscapes(name).toLowerCase();
@@ -39,8 +40,8 @@ function extractQueryParamName(name: string): string {
 }
 
 /**
- * A path's segments as the API's router compares them: in lowercase, without the empty segments of a trailing
- * or doubled slash, and with the legacy `acts` prefix read as `actors`. Split before decoding, as the router
+ * A path's segments, matched fail-closed: in lowercase, each decoded, without empty segments (a trailing or
+ * doubled slash), and with the legacy `acts` prefix read as `actors`. Split before decoding, as the API's router
  * does, so the escaped slash in `apify%2Fhello-world` stays in its segment.
  */
 function splitRoutePath(path: string): string[] {
