@@ -7,6 +7,7 @@ import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondUserError } from '../../utils/mcp.js';
 import { apifyApiCallOutputSchema } from '../structured_output_schemas.js';
+import { isApiOperationBlocked } from './apify_api_blocklist.js';
 import {
     API_CALL_DESCRIPTION,
     apiCallArgsShape,
@@ -17,7 +18,7 @@ import {
     redactApiCallArgs,
 } from './apify_api_request.js';
 import type { ApiMethod } from './apify_api_spec.js';
-import { fetchApiOperationIndex } from './apify_api_spec.js';
+import { API_METHODS, fetchApiOperationIndex } from './apify_api_spec.js';
 
 const apifyApiWriteArgs = z.object({
     path: apiCallArgsShape.path,
@@ -73,7 +74,11 @@ async function inferMethod(
     if (writeMethods.length === 0) {
         return { error: `The path has only the GET method, which this tool does not send${readTool}.` };
     }
-    if (operations.length === 1) return { method: writeMethods[0] };
+    // The index leaves out a blocked operation, so the one operation left may not be the path's only write method.
+    const hasBlockedWriteMethod = API_METHODS.some(
+        (method) => method !== 'GET' && isApiOperationBlocked(method, operations[0].path),
+    );
+    if (operations.length === 1 && !hasBlockedWriteMethod) return { method: writeMethods[0] };
     const prompt =
         writeMethods.length === 1
             ? `The path matches method ${writeMethods[0]}; specify it to call the endpoint with.`

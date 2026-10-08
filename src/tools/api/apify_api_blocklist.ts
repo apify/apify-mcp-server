@@ -56,8 +56,9 @@ function decodeEscapes(text: string): string {
 }
 
 /**
- * A query parameter name as the API's query parser (qs, run by Express) reads it, decoded and in lowercase:
- * qs reads `method[]`, `method[0]`, and `[method]` all as `method`.
+ * A query parameter name, decoded and in lowercase (both fail-closed, beyond what the API reads), without the
+ * brackets the API's query parser (qs, run by Express) reads through: qs reads `method[]`, `method[0]`, and
+ * `[method]` all as `method`.
  */
 function extractQueryParamName(name: string): string {
     const decodedName = decodeEscapes(name).toLowerCase();
@@ -65,8 +66,8 @@ function extractQueryParamName(name: string): string {
 }
 
 /**
- * A path's segments as the API's router compares them: in lowercase, without the empty segments of a trailing
- * or doubled slash, and with the legacy `acts` prefix read as `actors`. Split before decoding, as the router
+ * A path's segments, matched fail-closed: in lowercase, each decoded, without empty segments (a trailing or
+ * doubled slash), and with the legacy `acts` prefix read as `actors`. Split before decoding, as the API's router
  * does, so the escaped slash in `apify%2Fhello-world` stays in its segment.
  */
 function splitRoutePath(path: string): string[] {
@@ -79,8 +80,8 @@ function splitRoutePath(path: string): string[] {
 }
 
 /** Whether an operation rule matches a method and a path, with values or a spec template. */
-function isOperationMatch(match: ApiBlockRule['match'], method: ApiMethod, path: string): boolean {
-    if (!('path' in match) || match.method !== method) return false;
+function isOperationMatch(match: { method: ApiMethod; path: string }, method: ApiMethod, path: string): boolean {
+    if (match.method !== method) return false;
     const segments = splitRoutePath(path);
     const templateSegments = splitRoutePath(match.path);
     return (
@@ -124,5 +125,5 @@ export function validateApiBlocklist(
 
 /** Whether a rule matches an operation of the spec, given by its method and path template. */
 export function isApiOperationBlocked(method: ApiMethod, path: string, rules = API_BLOCK_RULES): boolean {
-    return rules.some(({ match }) => isOperationMatch(match, method, path));
+    return rules.some(({ match }) => 'path' in match && isOperationMatch(match, method, path));
 }

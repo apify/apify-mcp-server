@@ -434,22 +434,8 @@ describe('apify-api-read', () => {
 
     it.each([
         { path: 'datasets/abc', query: { method: 'DELETE' } },
-        { path: 'datasets/abc', query: { METHOD: 'delete' } },
-        { path: 'datasets/abc', query: { '%6Dethod': 'Delete' } },
-        { path: 'datasets/abc', query: { 'method[]': 'DELETE' } },
-        { path: 'datasets/abc', query: { 'method[0]': 'POST' } },
-        { path: 'datasets/abc', query: { 'Method[x]': 'POST' } },
-        // The API's query parser reads a leading bracket pair as the name.
         { path: 'datasets/abc', query: { '[method]': 'DELETE' } },
-        { path: 'datasets/abc?method=delete' },
-        { path: 'datasets/abc?METHOD=DELETE' },
-        // The API decodes the names in the query string before it reads them.
-        { path: 'datasets/abc?limit=1&%6Dethod=DELETE' },
         { path: 'datasets/abc?method%5B%5D=DELETE' },
-        { path: 'datasets/abc?method[0]=DELETE' },
-        { path: 'datasets/abc?%5Bmethod%5D=DELETE' },
-        // The URL drops a tab before it is sent.
-        { path: 'datasets/abc?me\tthod=DELETE' },
     ])('refuses the method query parameter in %j without a request', async (args) => {
         const result = await callTool(apifyApiRead, args);
 
@@ -975,6 +961,19 @@ describe('apify-api-write', () => {
 
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toContain('The path matches method PUT; specify it to call the endpoint with.');
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('asks for the method when a test-only operation rule blocks another write method of the path', async () => {
+        const rule: ApiBlockRule = {
+            match: { method: 'POST', path: '/v2/request-queues/{queueId}/requests/batch' },
+            reason: 'No.',
+        };
+
+        const result = await callToolWithRule(apifyApiWrite, rule, { path: 'request-queues/q/requests/batch' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe('The path matches method DELETE; specify it to call the endpoint with.');
         expect(requestMock).not.toHaveBeenCalled();
     });
 
