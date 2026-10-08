@@ -41,12 +41,16 @@ describe('getRequestOriginForClient()', () => {
         expect(getRequestOriginForClient(clientContext(clientName))).toBe('MCP');
     });
 
-    it.each(['apify-ai-v2', 'Apify-AI', 'apify', 'apify-console-ai-chat'])(
+    it.each(['apify-ai-v2', 'Apify-AI', 'apify'])(
         'maps the near-miss client "%s" to MCP (exact match only)',
         (clientName) => {
             expect(getRequestOriginForClient(clientContext(clientName))).toBe('MCP');
         },
     );
+
+    it('maps the retired Console AI chat name to MCP', () => {
+        expect(getRequestOriginForClient(clientContext('apify-console-ai-chat'))).toBe('MCP');
+    });
 
     it('maps a missing initialize request to MCP', () => {
         expect(getRequestOriginForClient(undefined)).toBe('MCP');
