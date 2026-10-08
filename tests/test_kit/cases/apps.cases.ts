@@ -217,7 +217,9 @@ export const appsCases: Case[] = [
 
                 expect(resource, `missing widget resource ${uri}`).toBeDefined();
                 expect(resource?.mimeType).toBe(RESOURCE_MIME_TYPE);
-                expect((resource?._meta as { ui?: { resourceUri?: string } } | undefined)?.ui?.resourceUri).toBe(uri);
+                // csp/prefersBorder are resource metadata; resourceUri belongs only on the tool.
+                expect(resource?._meta?.ui).toMatchObject({ prefersBorder: true, csp: expect.any(Object) });
+                expect(resource?._meta?.ui).not.toHaveProperty('resourceUri');
                 // Omitted on purpose: alongside `ui.resourceUri` it makes MCP Jam's detectUIType()
                 // pick the legacy ChatGPT renderer, which does not speak JSON-RPC. See widgets.ts.
                 expect(resource?._meta).not.toHaveProperty('openai/outputTemplate');
@@ -243,14 +245,15 @@ export const appsCases: Case[] = [
             const contents = result.contents[0] as {
                 mimeType?: string;
                 text?: string;
-                _meta?: { ui?: { resourceUri?: string } };
+                _meta?: { ui?: unknown };
             };
 
             // A missing widget JS file still resolves, as `text/plain` carrying "is not available".
             // The mimeType assert is what separates a real widget from that placeholder.
             expect(contents.mimeType).toBe(RESOURCE_MIME_TYPE);
             expect(contents.text).toContain('<!DOCTYPE html>');
-            expect(contents._meta?.ui?.resourceUri).toBe(uri);
+            expect(contents._meta?.ui).toMatchObject({ prefersBorder: true, csp: expect.any(Object) });
+            expect(contents._meta?.ui).not.toHaveProperty('resourceUri');
         }),
     },
 ];
