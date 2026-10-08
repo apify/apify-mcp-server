@@ -53,8 +53,8 @@ function splitRoutePath(path: string): string[] {
 }
 
 /** Whether an operation rule matches a method and a path, with values or a spec template. */
-function isOperationMatch(match: ApiBlockRule['match'], method: ApiMethod, path: string): boolean {
-    if (!('path' in match) || match.method !== method) return false;
+function isOperationMatch(match: { method: ApiMethod; path: string }, method: ApiMethod, path: string): boolean {
+    if (match.method !== method) return false;
     const segments = splitRoutePath(path);
     const templateSegments = splitRoutePath(match.path);
     return (
@@ -98,5 +98,5 @@ export function validateApiBlocklist(
 
 /** Whether a rule matches an operation of the spec, given by its method and path template. */
 export function isApiOperationBlocked(method: ApiMethod, path: string, rules = API_BLOCK_RULES): boolean {
-    return rules.some(({ match }) => isOperationMatch(match, method, path));
+    return rules.some(({ match }) => 'path' in match && isOperationMatch(match, method, path));
 }
