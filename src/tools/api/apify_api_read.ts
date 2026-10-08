@@ -17,7 +17,8 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         : '';
     const runActor = hasTool(HELPER_TOOLS.ACTOR_CALL) ? ` Run an Actor with ${HELPER_TOOLS.ACTOR_CALL}.` : '';
     return dedent`
-        Send a GET request to the Apify API at a path, such as /v2/actor-runs/abc.${runActor}
+        Send a GET request to the Apify API at a path, such as /v2/actor-runs/abc.
+        A GET to the synchronous run endpoints is refused: it starts a paid run.${runActor}
         ${API_CALL_DESCRIPTION}${findPath}${getParameters}
         Returns the response body as the API sends it, JSON with its data wrapper included; a body over
         ${MAX_INLINE_BYTES} bytes is not returned.

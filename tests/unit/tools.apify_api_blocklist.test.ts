@@ -9,8 +9,7 @@ const METHOD_PARAM_REFUSAL =
     'The API tools do not send the method query parameter: the API would take it as the HTTP method of the request.';
 
 const SYNC_RUN_REFUSAL =
-    'The API tools do not call the synchronous run endpoints, whose runs can outlast the tool-call timeout. ' +
-    'Start an asynchronous run with POST /v2/actors/{actorId}/runs or /v2/actor-tasks/{actorTaskId}/runs.';
+    'A GET to the synchronous run endpoints starts a paid run, as a POST does, so the API tools do not send it.';
 
 /** A test-only operation rule. */
 const OPERATION_RULE: ApiBlockRule = {
@@ -154,7 +153,7 @@ describe('validateApiBlocklist()', () => {
         });
 
         it('names the suggested tool only when the session has it', () => {
-            const rule: ApiBlockRule = { ...OPERATION_RULE, suggestedToolName: HELPER_TOOLS.ACTOR_CALL };
+            const rule: ApiBlockRule = { ...OPERATION_RULE, suggestedToolNames: [HELPER_TOOLS.ACTOR_CALL] };
             const normalizedPath = 'actors/abc/run-now';
 
             expect(validate({ normalizedPath, loadedToolNames: [HELPER_TOOLS.ACTOR_CALL] }, [rule])).toBe(
@@ -182,11 +181,9 @@ describe('validateApiBlocklist()', () => {
             'actors/abc/run-sync?timeout=300&token=x',
             normalizeApiPath('/v2/actors/abc/run-sync'),
             normalizeApiPath('v2/actor-tasks/abc/run-sync'),
-        ])('refuses a GET to %j in the read tool and a POST in the write tool', (normalizedPath) => {
+        ])('refuses a GET to %j in the read tool, not a POST in the write tool', (normalizedPath) => {
             expect(validate({ normalizedPath })).toBe(SYNC_RUN_REFUSAL);
-            expect(validate({ normalizedPath, toolName: HELPER_TOOLS.API_WRITE, method: 'POST' })).toBe(
-                SYNC_RUN_REFUSAL,
-            );
+            expect(validate({ normalizedPath, toolName: HELPER_TOOLS.API_WRITE, method: 'POST' })).toBeUndefined();
         });
 
         it.each([
@@ -205,28 +202,46 @@ describe('validateApiBlocklist()', () => {
             expect(validate({ normalizedPath, toolName: HELPER_TOOLS.API_WRITE, method: 'POST' })).toBeUndefined();
         });
 
-        it('refuses the write tool without a method, before it chooses one', () => {
+        it('does not refuse the write tool without a method, since it never sends the GET', () => {
             expect(
                 validate({
                     normalizedPath: 'actors/abc/run-sync',
                     toolName: HELPER_TOOLS.API_WRITE,
                     method: undefined,
                 }),
-            ).toBe(SYNC_RUN_REFUSAL);
+            ).toBeUndefined();
         });
 
-        it('names call-actor only for an Actor and only when the session has it', () => {
-            const loadedToolNames = [HELPER_TOOLS.ACTOR_CALL];
-            const withCallActor = `${SYNC_RUN_REFUSAL} Use ${HELPER_TOOLS.ACTOR_CALL} instead.`;
+        it.each([
+            [
+                [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.API_WRITE],
+                `Use ${HELPER_TOOLS.ACTOR_CALL} or ${HELPER_TOOLS.API_WRITE}`,
+            ],
+            [[HELPER_TOOLS.ACTOR_CALL], `Use ${HELPER_TOOLS.ACTOR_CALL}`],
+            [[HELPER_TOOLS.API_WRITE], `Use ${HELPER_TOOLS.API_WRITE}`],
+        ])(
+            'names for an Actor call-actor and the write tool, each only when the session has it (%j)',
+            (loadedToolNames, use) => {
+                expect(validate({ normalizedPath: 'actors/abc/run-sync', loadedToolNames })).toBe(
+                    `${SYNC_RUN_REFUSAL} ${use} instead.`,
+                );
+                expect(validate({ normalizedPath: 'acts/abc/run-sync-get-dataset-items', loadedToolNames })).toBe(
+                    `${SYNC_RUN_REFUSAL} ${use} instead.`,
+                );
+            },
+        );
 
-            expect(validate({ normalizedPath: 'actors/abc/run-sync', loadedToolNames })).toBe(withCallActor);
-            expect(validate({ normalizedPath: 'acts/abc/run-sync-get-dataset-items', loadedToolNames })).toBe(
-                withCallActor,
-            );
-            expect(validate({ normalizedPath: 'actor-tasks/abc/run-sync', loadedToolNames })).toBe(SYNC_RUN_REFUSAL);
+        it('names for a task only the write tool, since call-actor cannot run a saved task', () => {
+            const loadedToolNames = [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.API_WRITE];
+            const withWriteTool = `${SYNC_RUN_REFUSAL} Use ${HELPER_TOOLS.API_WRITE} instead.`;
+
+            expect(validate({ normalizedPath: 'actor-tasks/abc/run-sync', loadedToolNames })).toBe(withWriteTool);
             expect(validate({ normalizedPath: 'actor-tasks/abc/run-sync-get-dataset-items', loadedToolNames })).toBe(
-                SYNC_RUN_REFUSAL,
+                withWriteTool,
             );
+            expect(
+                validate({ normalizedPath: 'actor-tasks/abc/run-sync', loadedToolNames: [HELPER_TOOLS.ACTOR_CALL] }),
+            ).toBe(SYNC_RUN_REFUSAL);
         });
     });
 });
@@ -245,10 +260,8 @@ describe('validateApiPathBlocklist()', () => {
     it('refuses only the methods a rule names when a method is given', () => {
         const normalizedPath = 'actors/abc/run-sync';
 
-        expect(validateApiPathBlocklist({ normalizedPath, method: 'POST', loadedToolNames: [] })).toBe(
-            SYNC_RUN_REFUSAL,
-        );
-        expect(validateApiPathBlocklist({ normalizedPath, method: 'PUT', loadedToolNames: [] })).toBeUndefined();
+        expect(validateApiPathBlocklist({ normalizedPath, method: 'GET', loadedToolNames: [] })).toBe(SYNC_RUN_REFUSAL);
+        expect(validateApiPathBlocklist({ normalizedPath, method: 'POST', loadedToolNames: [] })).toBeUndefined();
     });
 
     it('checks only the operation rules', () => {

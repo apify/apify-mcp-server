@@ -44,23 +44,24 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     no category (`UNCATEGORIZED_TOOLS`): `tools=api` serves the other three, and a session gets the write
     tool only by naming it. The call tools are proxies to the API, like `apify api` in the Apify CLI.
     They refuse what the blocklist in `apify_api_blocklist.ts` lists (`API_BLOCK_RULES`). Each rule names
-    what it matches, the reason shown to the agent, and optionally a tool to suggest, named only when the
-    session has it. A query parameter rule matches a parameter by name in the call tools it names. An
+    what it matches, the reason shown to the agent, and optionally tools to suggest, each named only when
+    the session has it. A query parameter rule matches a parameter by name in the call tools it names. An
     operation rule matches methods and a spec path template, and each method is refused in the tool that
     sends it (GET: the read tool; any other: the write tool). The rules: the `method` query parameter, which
     the API takes as the HTTP method, so the read tool sends only a GET and the write tool only the method
-    it names; and the synchronous run endpoints of Actors and tasks (GET and POST), since a run there is
-    paid and can outlast the tool-call timeout. So the read tool neither writes nor starts a run, and is
-    annotated read-only. `callApi` checks every call against the list (`validateApiBlocklist`) as the API
+    it names; and a GET to the synchronous run endpoints of Actors and tasks, which starts a paid run as a
+    POST does (the write tool still sends the POST). So the read tool neither writes nor starts a run, and
+    is annotated read-only. `callApi` checks every call against the list (`validateApiBlocklist`) as the API
     reads the request URL, and fail-closed: a path in any letter case, decoded segment by segment, with a
     trailing or doubled slash, and `acts` read as `actors`; a query name decoded, in any letter case, and
     with brackets. The write tool checks before it chooses a method too; without a method, an operation
     rule with a method the write tool sends refuses the path. `applyApiBlocklist` leaves out of the index
     each operation a rule names and each query parameter a rule refuses to the tool that sends the
     operation's method. So search, details, the closest-path hints, and the write tool's method choice
-    never offer them. Details checks the path, and the method when given, before it looks the path up
-    (`validateApiPathBlocklist`), so it refuses with the rule's reason and never answers with a path next
-    to a refused one.
+    never offer them. Details checks the method, when given, before it looks the path up, and drops from
+    the lookup each method refused on the path (`validateApiPathBlocklist`), so it refuses with the rule's
+    reason, lists only the POST of a synchronous run endpoint, and never answers with a path next to a
+    refused one.
     `apify_api_spec.ts` builds the operation index from the spec (cached for a day); search and
     details use it, the write tool uses it to choose a method that was not given, and a call uses it
     otherwise only for hints, waiting at most a few seconds, so a failed download does not stop a

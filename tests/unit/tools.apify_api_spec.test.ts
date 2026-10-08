@@ -17,29 +17,32 @@ describe('buildApiOperationIndex()', () => {
         expect(index.has('dataset_items_head')).toBe(false);
         expect(index.has('outside_get')).toBe(false);
         expect([...index.values()].every((operation) => operation.operationId)).toBe(true);
-        expect(index.size).toBe(35);
+        expect(index.size).toBe(37);
     });
 
-    it('leaves out the synchronous run operations of Actors and tasks', () => {
+    it('leaves out the GET of the synchronous run endpoints of Actors and tasks, and keeps the POST', () => {
         expect(index.has('actor_runSync_get')).toBe(false);
-        expect(index.has('actor_runSync_post')).toBe(false);
-        expect(index.has('actor_runSyncGetDatasetItems_post')).toBe(false);
-        const taskSpec = {
-            paths: {
-                '/v2/actor-tasks/{actorTaskId}/run-sync': {
-                    get: { operationId: 'actorTask_runSync_get' },
-                    post: { operationId: 'actorTask_runSync_post' },
-                },
-                '/v2/actor-tasks/{actorTaskId}/run-sync-get-dataset-items': {
-                    post: { operationId: 'actorTask_runSyncGetDatasetItems_post' },
-                },
-                '/v2/actor-tasks/{actorTaskId}/runs': { post: { operationId: 'actorTask_runs_post' } },
-            },
+        expect(index.has('actor_runSync_post')).toBe(true);
+        expect(index.has('actor_runSyncGetDatasetItems_post')).toBe(true);
+        const syncRunSpec = {
+            paths: Object.fromEntries(
+                [
+                    '/v2/actors/{actorId}/run-sync',
+                    '/v2/actors/{actorId}/run-sync-get-dataset-items',
+                    '/v2/actor-tasks/{actorTaskId}/run-sync',
+                    '/v2/actor-tasks/{actorTaskId}/run-sync-get-dataset-items',
+                ].map((path) => [path, { get: { operationId: `GET ${path}` }, post: { operationId: `POST ${path}` } }]),
+            ),
         };
 
-        expect([...buildApiOperationIndex(taskSpec).keys()]).toEqual(['actorTask_runs_post']);
-        // The blocklist leaves them out; without its rules, the index has them.
-        expect(buildApiOperationIndex(taskSpec, []).size).toBe(4);
+        expect([...buildApiOperationIndex(syncRunSpec).keys()]).toEqual([
+            'POST /v2/actors/{actorId}/run-sync',
+            'POST /v2/actors/{actorId}/run-sync-get-dataset-items',
+            'POST /v2/actor-tasks/{actorTaskId}/run-sync',
+            'POST /v2/actor-tasks/{actorTaskId}/run-sync-get-dataset-items',
+        ]);
+        // The blocklist leaves the GETs out; without its rules, the index has them.
+        expect(buildApiOperationIndex(syncRunSpec, []).size).toBe(8);
     });
 
     it('leaves out the operations a rule names', () => {
@@ -161,8 +164,8 @@ describe('searchApiOperations()', () => {
     }
 
     it('matches word prefixes and ignores stop words', () => {
-        // Without the stop words, "in" would also match "Store items in last run's dataset".
-        expect(searchIds('webhook in')).toEqual(['webhooks_get', 'webhooks_post', 'actor_webhooks_get']);
+        // Without the stop words, "with" would also match "Run Actor synchronously with input and return output".
+        expect(searchIds('webhook with')).toEqual(['webhooks_get', 'webhooks_post', 'actor_webhooks_get']);
     });
 
     it('matches a plural to its singular and drops one-letter terms', () => {
@@ -176,11 +179,12 @@ describe('searchApiOperations()', () => {
         expect(searchIds('rename')).toEqual([]);
     });
 
-    it("ranks a storage's own operation above a run's copy of it", () => {
-        // The run's copy names the dataset in its summary; the storage's own operation does not.
+    it("ranks a storage's own operation above a run's copy of it and above a synchronous run", () => {
+        // Both competitors name the dataset in their summary; the storage's own operation does not.
         const ids = searchIds('add items to a dataset');
         expect(ids[0]).toBe('dataset_items_post');
         expect(ids.indexOf('actor_runs_last_dataset_items_post')).toBeGreaterThan(0);
+        expect(ids.indexOf('actor_runSyncGetDatasetItems_post')).toBeGreaterThan(0);
     });
 
     it("keeps a run's copy first when the query is about runs", () => {

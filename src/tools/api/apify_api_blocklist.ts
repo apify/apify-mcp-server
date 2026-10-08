@@ -8,8 +8,8 @@ export type ApiCallToolName = typeof HELPER_TOOLS.API_READ | typeof HELPER_TOOLS
 type ApiBlockRuleBase = {
     /** Why the call is refused, shown to the agent. */
     reason: string;
-    /** A tool to call instead, named only when the session has it and it is not the refusing tool. */
-    suggestedToolName?: HelperToolName;
+    /** Tools to call instead, each named only when the session has it and it is not the refusing tool. */
+    suggestedToolNames?: readonly HelperToolName[];
 };
 
 /** Matches a query parameter, in `query` or in a query string written into the path, by name. */
@@ -41,9 +41,8 @@ const TASK_SYNC_RUN_PATHS = [
     '/v2/actor-tasks/{actorTaskId}/run-sync-get-dataset-items',
 ] as const;
 
-const SYNC_RUN_REASON =
-    'The API tools do not call the synchronous run endpoints, whose runs can outlast the tool-call timeout. ' +
-    'Start an asynchronous run with POST /v2/actors/{actorId}/runs or /v2/actor-tasks/{actorTaskId}/runs.';
+const SYNC_RUN_GET_REASON =
+    'A GET to the synchronous run endpoints starts a paid run, as a POST does, so the API tools do not send it.';
 
 /** What the API tools refuse to send. The operation index leaves the same out, so search and details never offer it. */
 export const API_BLOCK_RULES: readonly ApiBlockRule[] = [
@@ -54,20 +53,24 @@ export const API_BLOCK_RULES: readonly ApiBlockRule[] = [
         reason:
             'The API tools do not send the method query parameter: the API would take it as the HTTP method ' +
             'of the request.',
-        suggestedToolName: HELPER_TOOLS.API_WRITE,
+        suggestedToolNames: [HELPER_TOOLS.API_WRITE],
     },
-    // A GET or a POST there starts a paid run, which can outlast the tool-call timeout. The API takes no other
-    // method there but HEAD, which the tools never send. See apify/apify-mcp-server#1502.
+    // A GET there starts a paid run, as a POST does, so the read tool refuses it to stay read-only. The POST stays
+    // with the write tool, which a session gets only by naming it. See apify/apify-mcp-server#1502.
     ...ACTOR_SYNC_RUN_PATHS.map(
         (path): ApiOperationBlockRule => ({
-            operation: { methods: ['GET', 'POST'], path },
-            reason: SYNC_RUN_REASON,
-            suggestedToolName: HELPER_TOOLS.ACTOR_CALL,
+            operation: { methods: ['GET'], path },
+            reason: SYNC_RUN_GET_REASON,
+            suggestedToolNames: [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.API_WRITE],
         }),
     ),
-    // call-actor runs an Actor, not a saved task, so these suggest no tool.
+    // call-actor runs an Actor, not a saved task, so these suggest only the write tool, for the POST.
     ...TASK_SYNC_RUN_PATHS.map(
-        (path): ApiOperationBlockRule => ({ operation: { methods: ['GET', 'POST'], path }, reason: SYNC_RUN_REASON }),
+        (path): ApiOperationBlockRule => ({
+            operation: { methods: ['GET'], path },
+            reason: SYNC_RUN_GET_REASON,
+            suggestedToolNames: [HELPER_TOOLS.API_WRITE],
+        }),
     ),
 ];
 
@@ -137,17 +140,14 @@ function parseRequestUrl(normalizedPath: string): URL {
     return new URL(`https://api.invalid/v2/${normalizedPath}`);
 }
 
-/** The reason of a rule, with the tool it suggests when the session has it and it is not the refusing tool. */
+/** The reason of a rule, with each tool it suggests that the session has and that is not the refusing tool. */
 function formatRefusal(
-    { reason, suggestedToolName }: ApiBlockRule,
+    { reason, suggestedToolNames = [] }: ApiBlockRule,
     toolName: ApiCallToolName | undefined,
     loadedToolNames: readonly string[],
 ): string {
-    const canSuggest =
-        suggestedToolName !== undefined &&
-        suggestedToolName !== toolName &&
-        loadedToolNames.includes(suggestedToolName);
-    return canSuggest ? `${reason} Use ${suggestedToolName} instead.` : reason;
+    const suggested = suggestedToolNames.filter((name) => name !== toolName && loadedToolNames.includes(name));
+    return suggested.length > 0 ? `${reason} Use ${suggested.join(' or ')} instead.` : reason;
 }
 
 /**

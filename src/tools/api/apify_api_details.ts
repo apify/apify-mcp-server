@@ -15,6 +15,7 @@ import {
     normalizeApiPath,
     redactApiCallArgs,
 } from './apify_api_request.js';
+import type { ApiMethod } from './apify_api_spec.js';
 import { API_METHODS, fetchApiOperationIndex } from './apify_api_spec.js';
 
 const apifyApiDetailsArgs = z.object({
@@ -71,18 +72,20 @@ export const apifyApiDetails: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = apifyApiDetailsArgs.parse(toolArgs.args);
         const normalizedPath = normalizeApiPath(parsed.path);
-        // Before the lookup: the index leaves out the operations the call tools refuse, so the lookup could
-        // match a path next to a refused one or say a refused method is missing.
-        const refusal = validateApiPathBlocklist({
-            normalizedPath,
-            method: parsed.method,
-            loadedToolNames: toolArgs.loadedToolNames,
-        });
+        const findRefusal = (method?: ApiMethod) =>
+            validateApiPathBlocklist({ normalizedPath, method, loadedToolNames: toolArgs.loadedToolNames });
+        // Before the lookup: the index leaves out the operations the call tools refuse, so the lookup would say
+        // a refused method is missing.
+        const refusal = parsed.method && findRefusal(parsed.method);
         if (refusal) return respondUserError(refusal);
         const index = await fetchApiOperationIndex();
         const path = formatApiPath(normalizedPath);
-        const matched = findPathOperations(index, normalizedPath);
+        // Without the methods refused on the path: with a refused operation left out, the lookup can match the
+        // path next to it.
+        const matched = findPathOperations(index, normalizedPath).filter((operation) => !findRefusal(operation.method));
         if (matched.length === 0) {
+            const pathRefusal = findRefusal();
+            if (pathRefusal) return respondUserError(pathRefusal);
             const next = toolArgs.loadedToolNames.includes(HELPER_TOOLS.API_SEARCH)
                 ? ` Find the path with ${HELPER_TOOLS.API_SEARCH}.`
                 : '';

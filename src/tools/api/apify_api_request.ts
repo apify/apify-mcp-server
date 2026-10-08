@@ -36,8 +36,8 @@ export const apiCallArgsShape = {
 export const API_CALL_DESCRIPTION = `A proxy to the Apify API, like apify api in the Apify CLI; the server adds the host and the API token.
 Write the path as actors, v2/actors, or /v2/actors, with its values in it.
 A name is written username~name, or ~name for one you own, as in /v2/actors/~my-actor.
-The synchronous run endpoints are refused: a run can outlast the usual 60-second tool-call timeout.
-For the same reason, keep waitForFinish at or below ${WAIT_SECS_MAX} seconds.`;
+Synchronous runs, and waitForFinish above ${WAIT_SECS_MAX} seconds, outlast the usual 60-second tool-call timeout,
+so prefer asynchronous runs.`;
 
 /** Query parameters whose values grant access or carry secrets; `webhooks` can hold webhook headers. */
 const SECRET_QUERY_PARAMS: readonly string[] = ['token', 'signature', 'webhooks'];
