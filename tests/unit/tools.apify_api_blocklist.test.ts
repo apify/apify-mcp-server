@@ -2,26 +2,24 @@ import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
-import { validateApiBlocklist, validateApiPathBlocklist } from '../../src/tools/api/apify_api_blocklist.js';
+import { isApiOperationBlocked, validateApiBlocklist } from '../../src/tools/api/apify_api_blocklist.js';
+import { API_METHODS } from '../../src/tools/api/apify_api_spec.js';
 
 const METHOD_PARAM_REFUSAL =
     'The API tools do not send the method query parameter: the API would take it as the HTTP method of the request.';
 
 /** A test-only operation rule. */
-const OPERATION_RULE: ApiBlockRule = {
-    operation: { methods: ['GET'], path: '/v2/actors/{actorId}/run-now' },
+const RUN_NOW_RULE: ApiBlockRule = {
+    match: { method: 'GET', path: '/v2/actors/{actorId}/run-now' },
     reason: 'No run-now.',
 };
 
-/** Validates a GET from the read tool in a session with no other tools, unless the params say otherwise. */
+/** Validates a GET in a session with no tools, unless the params say otherwise. */
 function validate(
     params: Partial<Parameters<typeof validateApiBlocklist>[0]> & { normalizedPath: string },
     rules?: readonly ApiBlockRule[],
 ): string | undefined {
-    return validateApiBlocklist(
-        { toolName: HELPER_TOOLS.API_READ, method: 'GET', loadedToolNames: [], ...params },
-        rules,
-    );
+    return validateApiBlocklist({ method: 'GET', loadedToolNames: [], ...params }, rules);
 }
 
 describe('validateApiBlocklist()', () => {
@@ -44,9 +42,8 @@ describe('validateApiBlocklist()', () => {
             { normalizedPath: 'datasets/abc?[METHOD][x]=DELETE' },
             // The URL drops a tab before it is sent.
             { normalizedPath: 'datasets/abc?me\tthod=DELETE' },
-        ])('refuses %j in both call tools', (params) => {
-            expect(validate(params)).toBe(METHOD_PARAM_REFUSAL);
-            expect(validate({ ...params, toolName: HELPER_TOOLS.API_WRITE, method: 'PUT' })).toBe(METHOD_PARAM_REFUSAL);
+        ])('refuses %j in every method', (params) => {
+            for (const method of API_METHODS) expect(validate({ ...params, method })).toBe(METHOD_PARAM_REFUSAL);
         });
 
         it.each([
@@ -59,32 +56,27 @@ describe('validateApiBlocklist()', () => {
             expect(validate(params)).toBeUndefined();
         });
 
-        it('checks the query names without the method, before the write tool chooses one', () => {
-            expect(
-                validate({
-                    toolName: HELPER_TOOLS.API_WRITE,
-                    method: undefined,
-                    normalizedPath: 'datasets/abc?method=PUT',
-                }),
-            ).toBe(METHOD_PARAM_REFUSAL);
-        });
-    });
-
-    it('names the suggested tool only when the session has it and it is not the refusing tool', () => {
-        const params = { normalizedPath: 'datasets/abc', query: { method: 'DELETE' } };
-
-        expect(validate({ ...params, loadedToolNames: [HELPER_TOOLS.API_READ, HELPER_TOOLS.API_WRITE] })).toBe(
-            `${METHOD_PARAM_REFUSAL} Use ${HELPER_TOOLS.API_WRITE} instead.`,
-        );
-        expect(validate({ ...params, loadedToolNames: [HELPER_TOOLS.API_READ] })).toBe(METHOD_PARAM_REFUSAL);
-        expect(
-            validate({
-                ...params,
-                toolName: HELPER_TOOLS.API_WRITE,
+        it.each([
+            {
+                method: 'GET',
+                loadedToolNames: [HELPER_TOOLS.API_READ, HELPER_TOOLS.API_WRITE],
+                refusal: `${METHOD_PARAM_REFUSAL} Use ${HELPER_TOOLS.API_WRITE} instead.`,
+            },
+            { method: 'GET', loadedToolNames: [HELPER_TOOLS.API_READ], refusal: METHOD_PARAM_REFUSAL },
+            // The write tool sends the PUT, so it is the refusing tool.
+            {
                 method: 'PUT',
                 loadedToolNames: [HELPER_TOOLS.API_READ, HELPER_TOOLS.API_WRITE],
-            }),
-        ).toBe(METHOD_PARAM_REFUSAL);
+                refusal: METHOD_PARAM_REFUSAL,
+            },
+        ] as const)(
+            'names the write tool only when the session has it and it does not send $method ($loadedToolNames)',
+            ({ method, loadedToolNames, refusal }) => {
+                expect(validate({ normalizedPath: 'datasets/abc?method=DELETE', method, loadedToolNames })).toBe(
+                    refusal,
+                );
+            },
+        );
     });
 
     describe('an operation rule', () => {
@@ -109,8 +101,8 @@ describe('validateApiBlocklist()', () => {
             // Empty segments are ignored, in case anything before the router merges doubled slashes.
             'actors//abc//run-now',
             'actors/abc/run-now//',
-        ])('refuses the method and path template it names for %j', (normalizedPath) => {
-            expect(validate({ normalizedPath }, [OPERATION_RULE])).toBe('No run-now.');
+        ])('refuses a GET to %j', (normalizedPath) => {
+            expect(validate({ normalizedPath }, [RUN_NOW_RULE])).toBe('No run-now.');
         });
 
         it.each([
@@ -121,50 +113,62 @@ describe('validateApiBlocklist()', () => {
             'actor-runs/abc/run-now',
             'actsx/abc/run-now',
             'actors/abc/run-now/x',
-        ])('does not refuse %j', (normalizedPath) => {
-            expect(validate({ normalizedPath }, [OPERATION_RULE])).toBeUndefined();
+        ])('does not refuse a GET to %j', (normalizedPath) => {
+            expect(validate({ normalizedPath }, [RUN_NOW_RULE])).toBeUndefined();
         });
 
-        it('refuses each method it names in the tool that sends that method, and no other method', () => {
+        it.each(['POST', 'PUT', 'PATCH', 'DELETE'] as const)(
+            'does not refuse %s, a method it does not name',
+            (method) => {
+                expect(validate({ normalizedPath: 'actors/abc/run-now', method }, [RUN_NOW_RULE])).toBeUndefined();
+            },
+        );
+
+        it('refuses a write method it names', () => {
+            const rule: ApiBlockRule = { match: { method: 'DELETE', path: '/v2/actors/{actorId}' }, reason: 'No.' };
+
+            expect(validate({ normalizedPath: 'actors/abc', method: 'DELETE' }, [rule])).toBe('No.');
+            expect(validate({ normalizedPath: 'actors/abc', method: 'GET' }, [rule])).toBeUndefined();
+        });
+
+        it.each([
+            [
+                [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.API_WRITE],
+                `No run-now. Use ${HELPER_TOOLS.ACTOR_CALL} or ${HELPER_TOOLS.API_WRITE} instead.`,
+            ],
+            [[HELPER_TOOLS.API_WRITE], `No run-now. Use ${HELPER_TOOLS.API_WRITE} instead.`],
+            [[], 'No run-now.'],
+        ])('names each suggested tool only when the session has it (%j)', (loadedToolNames, refusal) => {
             const rule: ApiBlockRule = {
-                operation: { methods: ['GET', 'DELETE'], path: '/v2/actors/{actorId}/run-now' },
-                reason: 'No run-now.',
+                ...RUN_NOW_RULE,
+                suggestedToolNames: [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.API_WRITE],
             };
-            const normalizedPath = 'actors/abc/run-now';
-            const write = { normalizedPath, toolName: HELPER_TOOLS.API_WRITE };
 
-            expect(validate({ normalizedPath }, [rule])).toBe('No run-now.');
-            expect(validate({ ...write, method: 'DELETE' }, [rule])).toBe('No run-now.');
-            expect(validate({ ...write, method: 'POST' }, [rule])).toBeUndefined();
-        });
-
-        it('refuses the path in any method when the method is not chosen yet, in a tool that sends one it names', () => {
-            const normalizedPath = 'actors/abc/run-now';
-
-            expect(validate({ normalizedPath, method: undefined }, [OPERATION_RULE])).toBe('No run-now.');
-            // The write tool never sends the rule's GET.
-            expect(
-                validate({ normalizedPath, toolName: HELPER_TOOLS.API_WRITE, method: undefined }, [OPERATION_RULE]),
-            ).toBeUndefined();
-        });
-
-        it('names the suggested tool only when the session has it', () => {
-            const rule: ApiBlockRule = { ...OPERATION_RULE, suggestedToolName: HELPER_TOOLS.ACTOR_CALL };
-            const normalizedPath = 'actors/abc/run-now';
-
-            expect(validate({ normalizedPath, loadedToolNames: [HELPER_TOOLS.ACTOR_CALL] }, [rule])).toBe(
-                `No run-now. Use ${HELPER_TOOLS.ACTOR_CALL} instead.`,
-            );
-            expect(validate({ normalizedPath }, [rule])).toBe('No run-now.');
+            expect(validate({ normalizedPath: 'actors/abc/run-now', loadedToolNames }, [rule])).toBe(refusal);
         });
     });
 });
 
-describe('validateApiPathBlocklist()', () => {
-    it('checks only the operation rules', () => {
-        expect(validateApiPathBlocklist({ normalizedPath: 'actors/abc/runs', loadedToolNames: [] })).toBeUndefined();
-        expect(
-            validateApiPathBlocklist({ normalizedPath: 'not-in-spec?method=DELETE', loadedToolNames: [] }),
-        ).toBeUndefined();
+describe('isApiOperationBlocked()', () => {
+    it.each([
+        { method: 'GET', path: '/v2/actors/{actorId}/run-now', isBlocked: true },
+        { method: 'POST', path: '/v2/actors/{actorId}/run-now', isBlocked: false },
+        { method: 'GET', path: '/v2/actors/{actorId}/runs', isBlocked: false },
+        { method: 'GET', path: '/v2/actors/{actorId}', isBlocked: false },
+    ] as const)('returns $isBlocked for $method $path', ({ method, path, isBlocked }) => {
+        expect(isApiOperationBlocked(method, path, [RUN_NOW_RULE])).toBe(isBlocked);
+    });
+
+    it('matches a literal segment of a rule only to that literal, not to a parameter of the spec', () => {
+        const rules: ApiBlockRule[] = [{ match: { method: 'GET', path: '/v2/users/me' }, reason: 'No.' }];
+
+        expect(isApiOperationBlocked('GET', '/v2/users/me', rules)).toBe(true);
+        expect(isApiOperationBlocked('GET', '/v2/users/{userId}', rules)).toBe(false);
+    });
+
+    it('returns false for a query parameter rule', () => {
+        const rules: ApiBlockRule[] = [{ match: { queryParam: 'method' }, reason: 'No.' }];
+
+        expect(isApiOperationBlocked('GET', '/v2/datasets/{datasetId}', rules)).toBe(false);
     });
 });

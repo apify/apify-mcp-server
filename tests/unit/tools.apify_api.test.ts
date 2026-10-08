@@ -263,29 +263,19 @@ describe('apify-api-details', () => {
         }
     });
 
-    describe('with a test-only rule in the published list', () => {
-        it('refuses a literal path a rule names, not the parameter path next to it', async () => {
-            const rule: ApiBlockRule = { operation: { methods: ['GET'], path: '/v2/users/me' }, reason: 'No.' };
+    it('returns only the methods a test-only operation rule does not match', async () => {
+        const rule: ApiBlockRule = { match: { method: 'GET', path: '/v2/datasets/{datasetId}' }, reason: 'No.' };
 
-            const result = await callToolWithRule(apifyApiDetails, rule, { path: 'users/me' });
+        const refused = await callToolWithRule(apifyApiDetails, rule, { path: 'datasets/abc', method: 'GET' });
+        const allowed = await callToolWithRule(apifyApiDetails, rule, { path: 'datasets/abc', method: 'PUT' });
+        const withoutMethod = await callToolWithRule(apifyApiDetails, rule, { path: 'datasets/abc' });
 
-            expectSoftFailInvalidInput(result);
-            expect(result.content[0].text).toBe('No.');
-        });
-
-        it('refuses a method a rule names and returns the methods it does not name', async () => {
-            const rule: ApiBlockRule = {
-                operation: { methods: ['GET'], path: '/v2/datasets/{datasetId}' },
-                reason: 'No.',
-            };
-
-            const refused = await callToolWithRule(apifyApiDetails, rule, { path: 'datasets/abc', method: 'GET' });
-            const allowed = await callToolWithRule(apifyApiDetails, rule, { path: 'datasets/abc', method: 'PUT' });
-
-            expectSoftFailInvalidInput(refused);
-            expect(refused.content[0].text).toBe('No.');
-            expect(allowed.content[1].text).toBe('/v2/datasets/{datasetId}: PUT.');
-        });
+        expectSoftFailInvalidInput(refused);
+        expect(refused.content[0].text).toBe(
+            'The path /v2/datasets/abc has no GET operation; it matches methods PUT and DELETE.',
+        );
+        expect(allowed.content[1].text).toBe('/v2/datasets/{datasetId}: PUT.');
+        expect(withoutMethod.content[1].text).toBe('/v2/datasets/{datasetId}: PUT, DELETE.');
     });
 
     it('names the search tool on a path not in the spec only when the session has it', async () => {
@@ -358,7 +348,7 @@ describe('apify-api-read', () => {
     });
 
     it('refuses a path a test-only operation rule names, written with the /v2 prefix, without a request', async () => {
-        const rule: ApiBlockRule = { operation: { methods: ['GET'], path: '/v2/datasets/{datasetId}' }, reason: 'No.' };
+        const rule: ApiBlockRule = { match: { method: 'GET', path: '/v2/datasets/{datasetId}' }, reason: 'No.' };
 
         const result = await callToolWithRule(apifyApiRead, rule, { path: '/v2/datasets/abc' });
 
@@ -790,7 +780,7 @@ describe('apify-api-write', () => {
     it.each([
         { path: 'datasets/abc', method: 'PUT', query: { method: 'DELETE' }, body: { name: 'x' } },
         { path: 'datasets/abc', method: 'PUT', query: { '[METHOD]': 'DELETE' }, body: { name: 'x' } },
-        { path: 'datasets/abc?method=DELETE', body: { name: 'x' } },
+        { path: 'datasets/abc?method=DELETE', method: 'PUT', body: { name: 'x' } },
         { path: 'datasets/abc?%6Dethod%5B%5D=delete', method: 'PUT', body: { name: 'x' } },
     ])('refuses the method query parameter in %j without a request or the spec', async (args) => {
         const result = await callTool(apifyApiWrite, args);
@@ -801,18 +791,33 @@ describe('apify-api-write', () => {
         expect(fetchApiOperationIndex).not.toHaveBeenCalled();
     });
 
-    it('refuses a path a test-only operation rule names before it chooses a method, without a request or the spec', async () => {
-        const rule: ApiBlockRule = {
-            operation: { methods: ['DELETE'], path: '/v2/datasets/{datasetId}' },
-            reason: 'No.',
-        };
+    it('refuses the method query parameter after it chooses the method, without a request', async () => {
+        const result = await callTool(apifyApiWrite, { path: 'actor-runs/abc/abort?method=DELETE' });
 
-        const result = await callToolWithRule(apifyApiWrite, rule, { path: '/v2/datasets/abc' });
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(METHOD_PARAM_REFUSAL);
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('refuses a method a test-only operation rule names, without a request or the spec', async () => {
+        const rule: ApiBlockRule = { match: { method: 'DELETE', path: '/v2/datasets/{datasetId}' }, reason: 'No.' };
+
+        const result = await callToolWithRule(apifyApiWrite, rule, { path: '/v2/datasets/abc', method: 'DELETE' });
 
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toBe('No.');
         expect(requestMock).not.toHaveBeenCalled();
         expect(fetchApiOperationIndex).not.toHaveBeenCalled();
+    });
+
+    it('asks only for a write method a test-only operation rule does not match', async () => {
+        const rule: ApiBlockRule = { match: { method: 'DELETE', path: '/v2/datasets/{datasetId}' }, reason: 'No.' };
+
+        const result = await callToolWithRule(apifyApiWrite, rule, { path: '/v2/datasets/abc' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toContain('The path matches method PUT; specify it to call the endpoint with.');
+        expect(requestMock).not.toHaveBeenCalled();
     });
 
     it('does not need the spec when the method is given, even for a path the spec does not list', async () => {
