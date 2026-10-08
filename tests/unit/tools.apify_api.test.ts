@@ -305,6 +305,16 @@ describe('apify-api-details', () => {
         expect(result.content[1].text).toBe(summary);
     });
 
+    it.each(['actors/abc/run-sync/', 'actors//abc/run-sync', 'actors/abc/RUN-SYNC'])(
+        'says the POST of %s, a synchronous run endpoint the lookup misses, is not in the spec, not that its GET is refused',
+        async (path) => {
+            const result = await callTool(apifyApiDetails, { path, method: 'POST' });
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toContain(`The path /v2/${path} is not in the API spec.`);
+        },
+    );
+
     it("names the write tool, not call-actor, which runs an Actor, in the refusal of a task's synchronous run GET", async () => {
         const result = await callTool(apifyApiDetails, { path: 'actor-tasks/abc/run-sync', method: 'GET' });
 

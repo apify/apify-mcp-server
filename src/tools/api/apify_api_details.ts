@@ -84,7 +84,7 @@ export const apifyApiDetails: ToolEntry = Object.freeze({
         // path next to it.
         const matched = findPathOperations(index, normalizedPath).filter((operation) => !findRefusal(operation.method));
         if (matched.length === 0) {
-            const pathRefusal = findRefusal();
+            const pathRefusal = findRefusal(parsed.method);
             if (pathRefusal) return respondUserError(pathRefusal);
             const next = toolArgs.loadedToolNames.includes(HELPER_TOOLS.API_SEARCH)
                 ? ` Find the path with ${HELPER_TOOLS.API_SEARCH}.`
