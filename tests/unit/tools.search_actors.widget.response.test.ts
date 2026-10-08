@@ -111,6 +111,11 @@ describe('search-actors-widget response', () => {
         expect(structuredContent.widgetActors).toEqual([]);
         expect(content).toHaveLength(1);
         expect(content[0].text).toContain('No Actors were found');
+        // Line wraps are not pinned, so compare with whitespace collapsed.
+        expect(content[0].text.replace(/\s+/g, ' ')).toBe(
+            `No Actors were found for the search query "${SEARCH_KEYWORDS}". Broad, generic keywords usually return better matches - for example, just the platform name ("TikTok" instead of "TikTok posts").`,
+        );
+        expect('instructions' in structuredContent).toBe(false);
         expect(_meta).toBeUndefined();
     });
 

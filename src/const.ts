@@ -132,8 +132,7 @@ Examples of when to use:
 - User has time indicators like "today", "current", "latest", "recent", "now"
 
 This is for general web scraping and immediate data needs. For repeated/scheduled scraping of specific platforms (e-commerce, social media), consider suggesting a specialized Actor from the Store for better performance and reliability.
-When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated apify/web-fetch tool when it is available - this tool is for searching and scraping by query.
-If a scraped page comes back blocked or empty (e.g. the crawl reports a 403 or the page text is missing), do not give up: retry that URL with the apify/web-fetch tool when it is available - its anti-bot fetching gets through blocks this tool cannot.`;
+When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated apify/web-fetch tool when it is available - this tool is for searching and scraping by query.`;
 
 export const WEB_FETCH = 'apify/web-fetch';
 /**

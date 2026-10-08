@@ -10,7 +10,12 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { ALLOWED_TASK_TOOL_EXECUTION_MODES, HELPER_TOOLS, type HelperToolName } from '../../src/const.js';
+import {
+    ALLOWED_TASK_TOOL_EXECUTION_MODES,
+    HELPER_TOOLS,
+    type HelperToolName,
+    RAG_WEB_BROWSER,
+} from '../../src/const.js';
 import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
 import { searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors.js';
@@ -21,6 +26,7 @@ import type { ActorInfo, Input, ToolBase, ToolEntry } from '../../src/types.js';
 import { SERVER_MODES, SERVER_MODE } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
 import { getToolsForServerMode } from '../../src/utils/tools_loader.js';
+import { only } from './helpers/tool_context.js';
 
 /** Fabricated Actor definition — enough for `getNormalActorsAsTools` to build a real tool entry, no network. */
 function buildFixtureActorInfo(actorFullName: string): ActorInfo {
@@ -249,6 +255,20 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
 
             expect(description).toContain('do not construct a plausible-looking name');
             expect(description).not.toContain(HELPER_TOOLS.STORE_SEARCH);
+        });
+    });
+
+    describe('rag-web-browser Actor tool description', () => {
+        it('ends with the web-fetch URL guidance and no retry instruction', async () => {
+            const [ragTool] = await getNormalActorsAsTools([buildFixtureActorInfo(RAG_WEB_BROWSER)]);
+            const urlGuidance =
+                "When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated apify/web-fetch tool when it is available - this tool is for searching and scraping by query.";
+
+            // ALL_TOOLS_PRESENT render and a render with no other tool served.
+            for (const description of [ragTool.description, ragTool.buildDescription?.(only())]) {
+                expect(description?.split('\n').at(-1)).toBe(urlGuidance);
+                expect(description).not.toMatch(/retry|do not give up|anti-bot|blocked or empty/);
+            }
         });
     });
 
