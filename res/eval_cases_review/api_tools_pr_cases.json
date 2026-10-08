@@ -135,7 +135,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -161,7 +162,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -186,7 +188,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -211,7 +214,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -236,7 +240,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -261,7 +266,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -286,7 +292,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -310,7 +317,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -331,7 +339,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -353,7 +362,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -374,7 +384,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -396,7 +407,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -419,7 +431,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -441,7 +454,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -463,7 +477,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -485,7 +500,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -507,7 +523,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -529,7 +546,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -551,7 +569,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -572,7 +591,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   },
@@ -594,7 +614,8 @@
       "schedules",
       "builds",
       "dev",
-      "api"
+      "api",
+      "apify-api-write"
     ],
     "mcpToolsOnly": true
   }

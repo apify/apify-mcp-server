@@ -1,9 +1,9 @@
 # Apify API tool eval cases
 
-Review material for the eval cases of the four opt-in `api` tools: `apify-api-search`, `apify-api-details`,
-`apify-api-read` (all three from #1444), and `apify-api-write` (#1445). They sit next to the rebuilt cases of #1421 but
-are promoted on their own schedule, in two batches as those two PRs merge. Delete once they are promoted into the
-live datasets.
+Review material for the eval cases of the four Apify API tools: `apify-api-search`, `apify-api-details`, and
+`apify-api-read` (the opt-in `api` category, from #1444), and `apify-api-write` (#1445), which is in no category: a
+session gets it only by naming it in `tools`. They sit next to the rebuilt cases of #1421 but are promoted on their own
+schedule, in two batches as those two PRs merge. Delete once they are promoted into the live datasets.
 
 **The cases are uncalibrated.** Nothing here has run against the live Apify API or Langfuse. Expect case fixes during
 calibration.
@@ -34,7 +34,7 @@ Checked offline:
 - Every case converts with `toMcpAgentTestCase()` (`evals/langfuse/dataset.ts`) and converts back to the same flat case.
 - The 41 ids are unique and none matches an id in #1421's case files.
 - Every tool in `expectedTools` and `expectedErrors` exists on master, #1444 (`5c1a53c8`), or #1445 (`330c8bca`). Every
-  `tools` selector is a category on #1445.
+  `tools` selector is a category on #1445, except `apify-api-write`, a tool name.
 - `evals/scripts/api_fixtures.ts` passes type-check, lint, and format on this branch. It has not run.
 - Search ranking, methods per path, and closest-path suggestions were checked by running the server's own
   `searchApiOperations`, `findPathOperations`, and `findClosestApiPaths` on the apify-docs OpenAPI source from
@@ -57,6 +57,11 @@ Every case loads `actors, docs, runs, storage, tasks, schedules, builds, dev, ap
 (for the build routing case) and `api` added, and with `apify/rag-web-browser` and `apify/web-fetch` left out. The
 server fetches those two Actors' input schemas at startup, #1421 measured that this races the agent at concurrency 2
 and above, and CI runs at the runner default of 8.
+
+The `api` category serves search, details, and read. `apify-api-write` is served only when named, so 27 cases also
+name it: every case that asks for a write, every routing case (the dedicated tool must win over the whole API family),
+and the three where a write is the wrong move (`webhook-ever-fired`, `webhook-create-fields`, and
+`merge/api/webhook-fields-easy`). The 14 cases that only read leave it out.
 
 ## Design choices
 
@@ -414,13 +419,16 @@ staging datasets under burned ids and promoted under the final ids:
 4. **Batch A, after #1444 is on master** and the fixtures have run once on the CI account: the 16 pr cases and 10 merge
    cases that need only search, details, and read. That is every case except the ones in Batch B. The three
    `pr/call-actor/api-loaded-*` cases are here because a `run-sync` GET through `apify-api-read` already starts a run.
-   If pinned dataset versions (#1395) have landed by then, promotion is the upsert plus a pin bump in #1444 itself, so
-   the cases go live exactly when the tools merge; otherwise the upsert follows the merge.
+   Upsert Batch A without `apify-api-write` in `tools`: a server without the write tool reads that name as an Actor and
+   fetches it at startup, the race the two default Actors are left out for. If pinned dataset versions (#1395) have
+   landed by then, promotion is the upsert plus a pin bump in #1444 itself, so the cases go live exactly when the
+   tools merge; otherwise the upsert follows the merge.
 5. **Batch B, after #1445 is on master:** the 10 write-dependent pr cases and the merge cases `webhook-lifecycle-medium`,
    `dataset-rename-medium`, `webhook-test-medium`, `secret-env-var-hard`, and `dataset-access-method-hard`. The 10 pr
    cases are the four `pr/apify-api-write/*` cases, `resurrect-run` and `sign-json` (which ask for writes), and the
    four routing cases where only `apify-api-write` competes: `api-loaded-build`, `api-loaded-schedule`,
-   `api-loaded-task-input`, and `api-loaded-schedule-time`.
+   `api-loaded-task-input`, and `api-loaded-schedule-time`. Upsert again the 12 Batch A cases that name
+   `apify-api-write`, now with it.
 6. Archive the staging items and abandon the two staging datasets.
 
 Why two staging datasets of their own rather than #1411's `-v2` staging datasets: those are still in use for the
@@ -470,10 +478,16 @@ pnpm run evals:mcp-agent -- --dataset mcp-server-evals-pr-api-staging \
 fixtures && pnpm run evals:mcp-agent -- --dataset mcp-server-evals-merge-api-staging --id 'easy$' \
     --agent-model claude-opus-5 --subscription --claude-judge --concurrency 1   # then 'medium$', then 'hard$'
 
-# Promote Batch A, then Batch B (drop the "| not" from both selects).
+# Promote Batch A, without apify-api-write in tools.
 cd /tmp
-to_items mcp-server-evals-pr "$R/api_tools_pr_cases.json" | jq -c --arg b "$B_PR" 'select(.id | test($b) | not)' | upsert
-to_items mcp-server-evals-merge "$R/api_tools_merge_cases.json" | jq -c --arg b "$B_MERGE" 'select(.id | test($b) | not)' | upsert
+A_SELECT='select(.id | test($b) | not) | .metadata.tools -= ["apify-api-write"]'
+to_items mcp-server-evals-pr "$R/api_tools_pr_cases.json" | jq -c --arg b "$B_PR" "$A_SELECT" | upsert
+to_items mcp-server-evals-merge "$R/api_tools_merge_cases.json" | jq -c --arg b "$B_MERGE" "$A_SELECT" | upsert
+
+# Promote Batch B: every case that names apify-api-write, the 12 Batch A ones among them.
+B_SELECT='select(.metadata.tools | index("apify-api-write"))'
+to_items mcp-server-evals-pr "$R/api_tools_pr_cases.json" | jq -c "$B_SELECT" | upsert
+to_items mcp-server-evals-merge "$R/api_tools_merge_cases.json" | jq -c "$B_SELECT" | upsert
 
 # Archive the staging items.
 to_items mcp-server-evals-pr-api-staging "$R/api_tools_pr_cases.json" \
@@ -510,15 +524,19 @@ and correct any fact the probes disprove:
 ```markdown
 The API family (26 `pr` items: 13 `pr/apify-api-*/*` and 13 routing items `pr/*/api-loaded-*` in
 category `apify-api-routing`; and `merge/api/*`, 15 items: 6 proper + 9 with `expectedErrors`)
-covers the opt-in `api` tools: `apify-api-search`, `apify-api-details`, `apify-api-read`, and
-`apify-api-write`. A routing item's id names the dedicated tool that must win, as the rest of the
-`pr` ids name the tool they assert. Every item loads the same wide tool set,
-`actors,docs,runs,storage,tasks,schedules,builds,dev,api`, and all but one set `mcpToolsOnly: true`.
-The two default Actor tools are left out: the server fetches their input schemas at startup, which
-races the agent at CI's concurrency. The set is wide because what the family measures is routing: a
-task no dedicated tool does (webhooks, billing usage and limits, an Actor's environment variables
-and default memory, renaming a dataset) must go to the API tools, and a task a dedicated tool does
-(running an Actor, an Actor's last run, dataset items, starting a build, creating or changing a
+covers the API tools: `apify-api-search`, `apify-api-details`, and `apify-api-read` from the opt-in
+`api` category, and `apify-api-write`, which a session gets only by naming it. A routing item's id
+names the dedicated tool that must win, as the rest of the `pr` ids name the tool they assert. Every
+item loads the same wide tool set, `actors,docs,runs,storage,tasks,schedules,builds,dev,api`, and
+all but one set `mcpToolsOnly: true`. The two default Actor tools are left out: the server fetches
+their input schemas at startup, which races the agent at CI's concurrency. The items that ask for
+a write, every routing item, and the three where a write is the wrong move
+(`pr/apify-api-read/webhook-ever-fired`, `pr/apify-api-details/webhook-create-fields`, and
+`merge/api/webhook-fields-easy`) also name `apify-api-write`; the items that only read leave it
+out. The set is wide because what the family measures is routing: a task no dedicated tool does
+(webhooks, billing usage and limits, an Actor's environment variables and default memory, renaming
+a dataset) must go to the API tools, and a task a dedicated tool does (running an Actor, an Actor's
+last run, dataset items, starting a build, creating or changing a
 schedule) must not. `apify-api-read` refuses no path, and a GET of `run-sync` or
 `run-sync-get-dataset-items` starts a paid run, so the three `pr/call-actor/api-loaded-*` items
 check that a run goes to `call-actor`. The positive `pr` items accept an API lookup
