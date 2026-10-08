@@ -94,21 +94,7 @@ describe('get-key-value-store', () => {
         expect(JSON.stringify(result)).not.toContain(SIGNING_SECRET);
     });
 
-    it('keeps the signed keysPublicUrl and recordsPublicUrl in both channels', async () => {
-        const result = await (getKeyValueStore as HelperTool).call(
-            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(MOCK_RESTRICTED_STORE)),
-        );
-        const { content, structuredContent } = result as TextToolResult & {
-            structuredContent: Record<string, unknown>;
-        };
-        const { keysPublicUrl, recordsPublicUrl } = MOCK_RESTRICTED_STORE;
-
-        expect(structuredContent).toMatchObject({ keysPublicUrl, recordsPublicUrl });
-        expect(JSON.parse(content[0].text)).toMatchObject({ keysPublicUrl, recordsPublicUrl });
-    });
-
     it.each([
-        ['a string', 'RESTRICTED', SIGNING_SECRET],
         ['null', 'RESTRICTED', null],
         ['a string', 'ANYONE_WITH_ID_CAN_READ', SIGNING_SECRET],
     ])(

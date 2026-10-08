@@ -421,7 +421,7 @@ describe('apify-api-read', () => {
     it.each([
         ['with', 'test-token'],
         ['without', ''],
-    ])('removes every URL signing key from a JSON body %s a session token', async (_kind, apifyToken) => {
+    ])('redacts every URL signing key in a JSON body %s a session token', async (_kind, apifyToken) => {
         const recordsPublicUrl = `${BASE_URL}/key-value-stores/kv-1/records?signature=sig-1`;
         requestMock.mockResolvedValue(
             mockResponse(200, {
@@ -429,7 +429,7 @@ describe('apify-api-read', () => {
                     id: 'kv-1',
                     recordsPublicUrl,
                     urlSigningSecretKey: 'mock-signing-secret',
-                    items: [{ urlSigningSecretKey: 'mock-signing-secret' }],
+                    items: [{ urlSigningSecretKey: '' }],
                 },
             }),
         );
@@ -443,12 +443,17 @@ describe('apify-api-read', () => {
             path: '/v2/key-value-stores/kv-1',
             statusCode: 200,
             contentType: 'application/json; charset=utf-8',
-            data: { data: { id: 'kv-1', recordsPublicUrl, items: [{}] } },
+            data: {
+                data: {
+                    id: 'kv-1',
+                    recordsPublicUrl,
+                    urlSigningSecretKey: '[REDACTED]',
+                    items: [{ urlSigningSecretKey: '[REDACTED]' }],
+                },
+            },
         });
         expect(result.content[0].text).toBe(JSON.stringify(result.structuredContent));
-        expect(JSON.stringify(result)).not.toContain('urlSigningSecretKey');
         expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
-        expect(JSON.stringify(result)).not.toContain('[REDACTED]');
     });
 
     it.each([
@@ -458,7 +463,7 @@ describe('apify-api-read', () => {
         '/v2/acts/act-1/runs/last/key-value-store',
         '/v2/key-value-stores/~my-store',
         '/v2/foo/bar',
-    ])('removes the URL signing key at any depth from the body of %s', async (path) => {
+    ])('redacts the URL signing key at any depth in the body of %s', async (path) => {
         requestMock.mockResolvedValue(
             mockResponse(200, {
                 data: {
@@ -474,17 +479,22 @@ describe('apify-api-read', () => {
 
         expect(result.structuredContent).toMatchObject({ path, statusCode: 200 });
         expect((result.structuredContent as { data: unknown }).data).toEqual({
-            data: { id: 'st-1', nested: { deeper: { kept: 1 } }, items: [{ n: 1 }, { n: 2 }] },
+            data: {
+                id: 'st-1',
+                urlSigningSecretKey: '[REDACTED]',
+                nested: { deeper: { urlSigningSecretKey: '[REDACTED]', kept: 1 } },
+                items: [{ urlSigningSecretKey: '[REDACTED]', n: 1 }, { n: 2 }],
+            },
         });
     });
 
     it.each([
         ['objects', (inner: unknown) => ({ a: inner })],
         ['arrays', (inner: unknown) => [inner]],
-    ])('removes the URL signing key from a body of %s nested 3000 levels deep', async (_kind, wrap) => {
-        // JSON.stringify handles about 4000 levels, so the tool returns this body, and the removal must not fail on it.
+    ])('redacts the URL signing key in a body of %s nested 3000 levels deep', async (_kind, wrap) => {
+        // JSON.stringify handles about 4000 levels, so the tool returns this body, and the redaction must not fail on it.
         let body: unknown = { urlSigningSecretKey: 'mock-signing-secret', n: 1 };
-        let expected: unknown = { n: 1 };
+        let expected: unknown = { urlSigningSecretKey: '[REDACTED]', n: 1 };
         for (let level = 0; level < 3000; level++) {
             body = wrap(body);
             expected = wrap(expected);
@@ -493,12 +503,11 @@ describe('apify-api-read', () => {
 
         const result = await callTool(apifyApiRead, { path: '/v2/key-value-stores/kv-1/records/DEEP' });
 
-        // Compared as JSON text: a deep equality check this deep would overflow the stack itself.
-        expect(JSON.stringify((result.structuredContent as { data: unknown }).data)).toBe(JSON.stringify(expected));
-        expect(result.content[0].text).not.toContain('urlSigningSecretKey');
+        expect((result.structuredContent as { data: unknown }).data).toEqual(expected);
+        expect(result.content[0].text).not.toContain('mock-signing-secret');
     });
 
-    it('removes the URL signing key and masks the session token in one body', async () => {
+    it('redacts the URL signing key and masks the session token in one body', async () => {
         requestMock.mockResolvedValue(
             mockResponse(200, {
                 data: { urlSigningSecretKey: 'mock-signing-secret', headers: { authorization: 'Bearer test-token' } },
@@ -508,9 +517,9 @@ describe('apify-api-read', () => {
         const result = await callTool(apifyApiRead, { path: 'browser-info' });
 
         expect((result.structuredContent as { data: unknown }).data).toEqual({
-            data: { headers: { authorization: 'Bearer [REDACTED]' } },
+            data: { urlSigningSecretKey: '[REDACTED]', headers: { authorization: 'Bearer [REDACTED]' } },
         });
-        expect(JSON.stringify(result)).not.toContain('urlSigningSecretKey');
+        expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
         expect(JSON.stringify(result)).not.toContain('test-token');
     });
 
@@ -520,12 +529,35 @@ describe('apify-api-read', () => {
         ['null', null, 'application/json', null],
         ['an array of primitives', [1, 'urlSigningSecretKey'], 'application/json', [1, 'urlSigningSecretKey']],
         ['an empty body', undefined, 'application/json', null],
+        ['a null value', { urlSigningSecretKey: null }, 'application/json', { urlSigningSecretKey: null }],
+        [
+            'a number or object value',
+            { urlSigningSecretKey: 1, o: { urlSigningSecretKey: { a: 'b' } } },
+            'application/json',
+            { urlSigningSecretKey: 1, o: { urlSigningSecretKey: { a: 'b' } } },
+        ],
+        [
+            'the name as a value',
+            { note: 'urlSigningSecretKey', fields: ['urlSigningSecretKey'] },
+            'application/json',
+            { note: 'urlSigningSecretKey', fields: ['urlSigningSecretKey'] },
+        ],
     ])('returns %s as it is', async (_kind, body, contentType, expected) => {
         requestMock.mockResolvedValue(mockResponse(200, body, contentType));
 
         const result = await callTool(apifyApiRead, { path: '/v2/key-value-stores/kv-1/records/NOTE' });
 
         expect((result.structuredContent as { data: unknown }).data).toEqual(expected);
+    });
+
+    it('returns the parsed body itself when no value is redacted', async () => {
+        const body = { data: { id: 'kv-1', note: 'urlSigningSecretKey' } };
+        requestMock.mockResolvedValue(mockResponse(200, body));
+
+        const result = await callTool(apifyApiRead, { path: '/v2/key-value-stores/kv-1' });
+
+        // The redacted text is parsed back only when a value changed.
+        expect((result.structuredContent as { data: unknown }).data).toBe(body);
     });
 
     it('throws a non-2xx response as the ApifyApiError apify-client builds', async () => {

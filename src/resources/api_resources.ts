@@ -15,7 +15,7 @@ import { getHttpErrorHint } from '../utils/mcp.js';
 
 const TEXT_MIME_TYPE = 'text/plain';
 
-/** Stands in for the session token in a returned body. */
+/** Stands in for a secret in a returned body. */
 const REDACTED = '[REDACTED]';
 
 /** Textual base MIME types (returned as `text`); everything else becomes a base64 `blob`. */
@@ -183,63 +183,24 @@ function maskSessionToken(body: Buffer, token: string | undefined): Buffer {
     return bytes.includes(token) ? Buffer.from(bytes.replaceAll(token, REDACTED), 'latin1') : body;
 }
 
-/** An empty array or object to copy `value` into, or `undefined` when it is neither an array nor a plain object. */
-function buildEmptyCopy(value: unknown): object | undefined {
-    if (Array.isArray(value)) return [];
-    if (typeof value === 'object' && value !== null && Object.getPrototypeOf(value) === Object.prototype) return {};
-    return undefined;
-}
+/**
+ * A `urlSigningSecretKey` property and its string value. The quote that closes the name is not escaped, so it
+ * ends a string, and the colon after it makes that string a key. The value follows JSON's string grammar.
+ */
+const URL_SIGNING_SECRET_KEY_VALUE_RE = /("urlSigningSecretKey"\s*:\s*)"(?:[^"\\]|\\.)*"/g;
 
 /**
- * A copy of a JSON value without any `urlSigningSecretKey` property, at any depth. The API returns a
- * storage's URL signing key to write-capable tokens, and in the transcript it lets anyone mint non-expiring
- * links to every item and record (apify/ai-team#330). Arrays and plain objects are copied; anything else,
- * a Buffer included, is returned as it is. An own `__proto__` key stays a key.
+ * JSON text with the string value of every `urlSigningSecretKey` property replaced by `"[REDACTED]"`, and
+ * every other byte unchanged. The API returns a storage's URL signing key to write-capable tokens, and in
+ * the transcript it lets anyone mint non-expiring links to every item and record (see apify/ai-team#330).
+ * It works on the text, without parsing, so a `null` value or a name spelled with `\u` escapes is left as it is.
+ *
+ * It redacts instead of removing the property: removing it from JSON text needs comma handling or a parse
+ * and re-serialize. Re-serializing loses the API's formatting and the precision of big numbers, and
+ * indenting a crafted, deeply nested body cost seconds and about 1 GB per read. A replace is one linear pass.
  */
-export function stripUrlSigningSecretKey(value: unknown): unknown {
-    const root = buildEmptyCopy(value);
-    if (!root) return value;
-    // A stack instead of recursion, so the call stack does not limit the depth.
-    const stack: [source: object, copy: object][] = [[value as object, root]];
-    for (let next = stack.pop(); next; next = stack.pop()) {
-        const [source, copy] = next;
-        for (const [key, item] of Object.entries(source)) {
-            if (key === 'urlSigningSecretKey') continue;
-            const itemCopy = buildEmptyCopy(item);
-            if (itemCopy) stack.push([item, itemCopy]);
-            // Defined, not assigned, so an own `__proto__` key does not become the prototype.
-            Object.defineProperty(copy, key, {
-                value: itemCopy ?? item,
-                writable: true,
-                enumerable: true,
-                configurable: true,
-            });
-        }
-    }
-    return root;
-}
-
-/** The quoted name followed by a colon: in valid JSON, only a property key matches, not a string value. */
-const URL_SIGNING_SECRET_KEY_PROPERTY_RE = /"urlSigningSecretKey"\s*:/;
-
-/**
- * A JSON body without its `urlSigningSecretKey` properties, or `undefined` when that body is over
- * `MAX_INLINE_BYTES`. Only a body with the name in a key position is parsed, and it is re-serialized with
- * 2-space indentation, as the API indents. Any other body, or one that fails to parse or is nested too deep
- * to serialize, is returned as it is, so a read never fails here.
- */
-function stripUrlSigningSecretKeyFromJson(json: string): string | undefined {
-    if (!URL_SIGNING_SECRET_KEY_PROPERTY_RE.test(json)) return json;
-    try {
-        const text = JSON.stringify(stripUrlSigningSecretKey(JSON.parse(json)), null, 2);
-        // Indentation can grow a deeply nested body many times over.
-        return Buffer.byteLength(text) > MAX_INLINE_BYTES ? undefined : text;
-    } catch (error) {
-        // The output would be too long for a string, so it is over the limit too.
-        if (error instanceof RangeError && error.message === 'Invalid string length') return undefined;
-        // Malformed JSON, or nesting too deep for JSON.stringify.
-        return json;
-    }
+export function redactUrlSigningSecretKey(json: string): string {
+    return json.replace(URL_SIGNING_SECRET_KEY_VALUE_RE, `$1"${REDACTED}"`);
 }
 
 /**
@@ -247,17 +208,17 @@ function stripUrlSigningSecretKeyFromJson(json: string): string | undefined {
  *
  * A thin streaming proxy: the apify-client injects the session token (and the MCP-origin header),
  * the body streams in and is returned by its declared Content-Type — textual types
- * (text/*, JSON, XML) as `text`, anything else as a base64 `blob`. JSON primitives, formatting, and
- * bytes round-trip exactly, with two exceptions: the session token's bytes are masked in any body (so a
- * UTF-16 body is not masked), and an `application/json` body with a `urlSigningSecretKey` property is
- * re-serialized without it (`stripUrlSigningSecretKey`).
+ * (text/*, JSON, XML) as `text`, anything else as a base64 `blob`. The body is never parsed, so
+ * JSON primitives, formatting, and bytes round-trip exactly, with two exceptions: the session token's
+ * bytes are masked in any body (`maskSessionToken`; a UTF-16 body is not masked), and in an
+ * `application/json` body the string value of every `urlSigningSecretKey` property becomes `"[REDACTED]"`
+ * (`redactUrlSigningSecretKey`).
  *
  * Genuine failures (no token, bad origin, a missing resource, a bad token, a 5xx, a network error)
  * throw a domain error (`InvalidParamsError`/`InternalError`) that the protocol adapters
  * (`legacy_server.ts`, `stateless_server.ts`) map to a JSON-RPC error, so the SDK returns an error
  * rather than success-shaped content for an unreadable resource (see SEP-2164). A body over
- * `MAX_INLINE_BYTES`, as sent or once re-serialized, is NOT a failure — it is a successful read
- * returning a download pointer.
+ * `MAX_INLINE_BYTES` is NOT a failure — it is a successful read returning a download pointer.
  *
  * It makes one attempt through `sendApifyApiRequest` (`../apify_client.ts`), which says why it skips
  * `httpClient.call()`.
@@ -335,11 +296,13 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     // Content-Type — charset included — rides along on the text result.
     if (isTextualMimeType(baseMimeType) && Buffer.isEncoding(charset)) {
         const text = body.toString(charset);
-        // A storage's URL signing key lets anyone sign links to all its data (see apify/ai-team#330). Only
-        // `application/json` qualifies, the type apify-client parses, so both proxies remove it from the same bodies.
-        const result = baseMimeType === 'application/json' ? stripUrlSigningSecretKeyFromJson(text) : text;
-        if (result === undefined) return buildLinkOutResult(uri, apifyClient);
-        return buildTextResult(uri, result, contentType);
+        // The API sends storage objects as `application/json`, the only type apify-client parses, so both
+        // proxies redact the URL signing key in the same bodies (see apify/ai-team#330).
+        return buildTextResult(
+            uri,
+            baseMimeType === 'application/json' ? redactUrlSigningSecretKey(text) : text,
+            contentType,
+        );
     }
     // Binary or undecodable text: base MIME type only (parameters are meaningless for a blob).
     return {

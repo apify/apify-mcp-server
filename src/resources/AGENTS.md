@@ -29,7 +29,7 @@ identity with the platform's own URLs is the feature. Revisit when tools start e
 to the configured API origin and rejects userinfo-bearing URLs (axios drops the `Authorization`
 header for those, silently degrading to unauthenticated). The API tools' `callApi`
 (`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`, `isMaxContentLengthAbort()` and
-`stripUrlSigningSecretKey()`, so a change to any of them changes the tools too. `maskSessionToken()`
+`redactUrlSigningSecretKey()`, so a change to any of them changes the tools too. `maskSessionToken()`
 copies the Buffer rule of `callApi`'s `maskToken()`; change both together.
 
 `sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through
@@ -39,14 +39,17 @@ on the declared Content-Type: textual base types (text/*, JSON, XML) as `text` w
 header, decoded with the declared charset (default utf-8; a charset Node cannot decode falls
 through to blob — lossless beats mangled text, same rule as apify-client's body_parser);
 everything else (including no Content-Type) as a base64 `blob` with the base MIME type; empty body
-as empty text preserving the Content-Type. Bytes round-trip exactly, with two exceptions. Every
-occurrence of the session token's bytes (`apifyClient.token`) is replaced with `[REDACTED]`, since
-`/v2/browser-info` echoes the `Authorization` header; a UTF-16 body is not masked. An
-`application/json` body with a `urlSigningSecretKey` property is parsed, the property is removed at
-any depth (`stripUrlSigningSecretKey()`), and the body is re-serialized with 2-space indentation,
-since a storage's URL signing key lets anyone sign links to all its data. A body that fails to parse
-is returned as it is. If re-serializing takes a body over `MAX_INLINE_BYTES`, the proxy links out, as
-on a trip below. axios enforces `MAX_INLINE_BYTES` (256 KB) mid-consumption on streamed
+as empty text preserving the Content-Type. The body is never parsed. Bytes round-trip exactly, with
+two exceptions. Every occurrence of the session token's bytes (`apifyClient.token`) is replaced with
+`[REDACTED]` (`maskSessionToken()`), since `/v2/browser-info` echoes the `Authorization` header; a
+UTF-16 body is not masked. In an `application/json` body, the string value of every
+`"urlSigningSecretKey"` property is replaced with `"[REDACTED]"` by one regular expression over the
+text (`redactUrlSigningSecretKey()`), since a storage's URL signing key lets anyone sign links to all
+its data. The name stays, and a `null` value or a name spelled with `\u` escapes is left as it is. It
+redacts instead of removing the property: removal needs comma handling or a parse and re-serialize,
+which loses the API's formatting and big-number precision, and indenting a crafted, deeply nested
+body cost seconds and about 1 GB per read.
+axios enforces `MAX_INLINE_BYTES` (256 KB) mid-consumption on streamed
 responses (axios ≥1.16: byte-counting wrapper throws `ERR_BAD_RESPONSE`, counting decoded bytes) —
 after the request resolves, outside any retry wrapper. On trip, the proxy links out: a `text/plain`
 block carrying the store's signed `recordPublicUrl` for a KVS record, else the token-gated API URL,

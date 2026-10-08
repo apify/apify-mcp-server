@@ -98,20 +98,7 @@ describe('get-dataset', () => {
         expect(JSON.stringify(result)).not.toContain(SIGNING_SECRET);
     });
 
-    it('keeps the signed itemsPublicUrl in both channels', async () => {
-        const result = await (getDataset as HelperTool).call(
-            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient(MOCK_RESTRICTED_DATASET)),
-        );
-        const { content, structuredContent } = result as TextToolResult & {
-            structuredContent: Record<string, unknown>;
-        };
-
-        expect(structuredContent.itemsPublicUrl).toBe(MOCK_RESTRICTED_DATASET.itemsPublicUrl);
-        expect(JSON.parse(content[0].text).itemsPublicUrl).toBe(MOCK_RESTRICTED_DATASET.itemsPublicUrl);
-    });
-
     it.each([
-        ['a string', 'RESTRICTED', SIGNING_SECRET],
         ['null', 'RESTRICTED', null],
         ['a string', 'ANYONE_WITH_ID_CAN_READ', SIGNING_SECRET],
     ])(

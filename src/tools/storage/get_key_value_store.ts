@@ -65,7 +65,7 @@ export const getKeyValueStore: ToolEntry = Object.freeze({
         // (see apify/ai-team#330).
         const { urlSigningSecretKey, ...metadata } = kvStore;
         return buildStorageResponse({
-            structuredContent: metadata as unknown as Record<string, unknown>,
+            structuredContent: metadata,
             summary,
             nextStep,
             apifyConsoleUrl: buildConsoleKeyValueStoreUrl(linkContext, kvStore.id),

@@ -2,12 +2,12 @@ import { Readable } from 'node:stream';
 
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError } from 'axios';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { MAX_INLINE_BYTES } from '../../src/const.js';
 import { InternalError, InvalidParamsError } from '../../src/mcp/errors.js';
-import { isApifyApiUri, readApiResource, stripUrlSigningSecretKey } from '../../src/resources/api_resources.js';
+import { isApifyApiUri, readApiResource, redactUrlSigningSecretKey } from '../../src/resources/api_resources.js';
 import { mockApifyClient } from './helpers/tool_context.js';
 
 const API = 'https://api.apify.com';
@@ -118,29 +118,52 @@ describe('isApifyApiUri()', () => {
     });
 });
 
-describe('stripUrlSigningSecretKey()', () => {
-    it('removes the key at any depth without mutating its input', () => {
-        const input = { data: { id: 'ds-1', urlSigningSecretKey: 's', items: [{ urlSigningSecretKey: 's', n: 1 }] } };
-
-        expect(stripUrlSigningSecretKey(input)).toEqual({ data: { id: 'ds-1', items: [{ n: 1 }] } });
-        expect(input).toHaveProperty('data.urlSigningSecretKey', 's');
-        expect(input.data.items[0]).toHaveProperty('urlSigningSecretKey', 's');
+describe('redactUrlSigningSecretKey()', () => {
+    it.each([
+        [
+            'in pretty-printed JSON',
+            JSON.stringify({ data: { id: 'ds-1', urlSigningSecretKey: 'Xq9abc' } }, null, 2),
+            JSON.stringify({ data: { id: 'ds-1', urlSigningSecretKey: '[REDACTED]' } }, null, 2),
+        ],
+        [
+            'in compact JSON, at depth and in arrays, with a space before the colon',
+            '[{"urlSigningSecretKey":"s","items":[{"urlSigningSecretKey" : "t"}]}]',
+            '[{"urlSigningSecretKey":"[REDACTED]","items":[{"urlSigningSecretKey" : "[REDACTED]"}]}]',
+        ],
+        [
+            'with an escaped quote and backslash in the value',
+            '{"urlSigningSecretKey":"a\\"b\\\\","n":1}',
+            '{"urlSigningSecretKey":"[REDACTED]","n":1}',
+        ],
+        [
+            'beside an integer above 2^53',
+            '{"rowId":12345678901234567890,"urlSigningSecretKey":"a\\"b","items":[{"urlSigningSecretKey" : "c"}]}',
+            '{"rowId":12345678901234567890,"urlSigningSecretKey":"[REDACTED]","items":[{"urlSigningSecretKey" : "[REDACTED]"}]}',
+        ],
+        ['when it is empty', '{"urlSigningSecretKey":""}', '{"urlSigningSecretKey":"[REDACTED]"}'],
+        [
+            'with line breaks around the colon',
+            '{"urlSigningSecretKey"\n:\n"s"}',
+            '{"urlSigningSecretKey"\n:\n"[REDACTED]"}',
+        ],
+        [
+            'of a key that ends in an escaped quote and the name',
+            '{"\\"urlSigningSecretKey": "s"}',
+            '{"\\"urlSigningSecretKey": "[REDACTED]"}',
+        ],
+    ])('redacts the value %s', (_kind, json, expected) => {
+        expect(redactUrlSigningSecretKey(json)).toBe(expected);
     });
 
     it.each([
-        ['a Buffer', Buffer.from('{"urlSigningSecretKey":"s"}')],
-        ['a string', '"urlSigningSecretKey": "s"'],
-        ['a number', 1],
-        ['null', null],
-        ['undefined', undefined],
-    ])('returns %s as it is', (_kind, value) => {
-        expect(stripUrlSigningSecretKey(value)).toBe(value);
-    });
-
-    it('keeps an own __proto__ key as a key', () => {
-        const result = stripUrlSigningSecretKey(JSON.parse('{"__proto__":{"x":1},"urlSigningSecretKey":"s"}'));
-
-        expect(JSON.stringify(result)).toBe('{"__proto__":{"x":1}}');
+        ['a null value', '{"urlSigningSecretKey":null}'],
+        ['the name as a value', '{"note":"urlSigningSecretKey","fields":["urlSigningSecretKey"]}'],
+        ['a number or object value', '{"urlSigningSecretKey":1,"o":{"urlSigningSecretKey":{"a":"b"}}}'],
+        ['a longer name', '{"myurlSigningSecretKey":"s","urlSigningSecretKeyX":"s"}'],
+        ['the name spelled with \\u escapes', '{"urlSigningSecretKe\\u0079":"s"}'],
+        ['the name inside a string value', '{"note":"\\"urlSigningSecretKey\\": \\"s\\""}'],
+    ])('returns JSON with %s as it is', (_kind, json) => {
+        expect(redactUrlSigningSecretKey(json)).toBe(json);
     });
 });
 
@@ -508,10 +531,11 @@ describe('readApiResource()', () => {
                 recordsPublicUrl: `${API}/v2/key-value-stores/kv-1/records?signature=sig-1`,
             },
         ],
-    ])('removes the URL signing key from the storage object read from %s', async (path, fields) => {
+    ])('redacts the URL signing key in the storage object read from %s', async (path, fields) => {
         const storage = { ...fields, name: null, stats: { readCount: 1, writeCount: 2 }, generalAccess: 'RESTRICTED' };
         const body = JSON.stringify({ data: { ...storage, urlSigningSecretKey: 'mock-signing-secret' } }, null, 2);
-        const splitAt = body.indexOf('mock-signing-secret') + 4;
+        // Split inside the name, so the text is redacted only after the chunks are joined.
+        const splitAt = body.indexOf('urlSigning') + 'urlSigning'.length;
         const { request } = requestReturning(
             streamOf(body.slice(0, splitAt), body.slice(splitAt)),
             'application/json; charset=utf-8',
@@ -519,50 +543,27 @@ describe('readApiResource()', () => {
 
         const result = await readApiResource(`${API}${path}`, stubApifyClient({ request }));
 
-        // Only the key line and the comma before it change.
-        expect(firstContent(result).text).toBe(JSON.stringify({ data: storage }, null, 2));
-        expect(firstContent(result).text).not.toContain('urlSigningSecretKey');
+        expect(firstContent(result).text).toBe(body.replace('"mock-signing-secret"', '"[REDACTED]"'));
         expect(firstContent(result).mimeType).toBe('application/json; charset=utf-8');
+        expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
     });
 
-    it.each([
-        ['in first position', '{"urlSigningSecretKey":"s","id":"kv-1","n":1}', '{\n  "id": "kv-1",\n  "n": 1\n}'],
-        ['in the middle', '{"id":"kv-1","urlSigningSecretKey":"s","n":1}', '{\n  "id": "kv-1",\n  "n": 1\n}'],
-        ['as the only property', '{"urlSigningSecretKey":"s"}', '{}'],
-        ['with a space before the colon', '{"urlSigningSecretKey" : "s", "n": 1}', '{\n  "n": 1\n}'],
-        ['with a line break before the colon', '{"urlSigningSecretKey"\n: "s", "n": 1}', '{\n  "n": 1\n}'],
-        ['nested in an object', '{"exported": {"urlSigningSecretKey": "s"}}', '{\n  "exported": {}\n}'],
-        [
-            'in array elements',
-            '[{"urlSigningSecretKey":"s","n":1},{"n":2}]',
-            '[\n  {\n    "n": 1\n  },\n  {\n    "n": 2\n  }\n]',
-        ],
-        [
-            'beside an integer above 2^53',
-            '{"rowId":12345678901234567890,"urlSigningSecretKey":"s","items":[{"urlSigningSecretKey":"s","n":1}]}',
-            '{\n  "rowId": 12345678901234567000,\n  "items": [\n    {\n      "n": 1\n    }\n  ]\n}',
-        ],
-        [
-            'beside \\u and \\/ escapes',
-            '{"urlSigningSecretKey":"s","name":"caf\\u00e9","url":"a\\/b"}',
-            '{\n  "name": "café",\n  "url": "a/b"\n}',
-        ],
-        [
-            'beside 1.50 and 1e3',
-            '{"urlSigningSecretKey":"s","price":1.50,"count":1e3}',
-            '{\n  "price": 1.5,\n  "count": 1000\n}',
-        ],
-        ['beside an integer-like key', '{"urlSigningSecretKey":"s","b":1,"2":2}', '{\n  "2": 2,\n  "b": 1\n}'],
-        ['beside a duplicate key', '{"urlSigningSecretKey":"s","a":1,"a":2}', '{\n  "a": 2\n}'],
-    ])('removes the URL signing key %s and re-serializes the JSON body', async (_position, body, expected) => {
-        const { request } = requestReturning(streamOf(body), 'application/json');
+    it('redacts the URL signing key the same way wherever the chunks split the body', async () => {
+        const body = '{"urlSigningSecretKey" : "a\\"b", "n": 1}';
 
-        const result = await readApiResource(
-            `${API}/v2/key-value-stores/kv-1/records/INPUT`,
-            stubApifyClient({ request }),
-        );
+        for (let splitAt = 1; splitAt < body.length; splitAt++) {
+            const { request } = requestReturning(
+                streamOf(body.slice(0, splitAt), body.slice(splitAt)),
+                'application/json',
+            );
 
-        expect(firstContent(result).text).toBe(expected);
+            const result = await readApiResource(
+                `${API}/v2/key-value-stores/kv-1/records/INPUT`,
+                stubApifyClient({ request }),
+            );
+
+            expect(firstContent(result).text).toBe('{"urlSigningSecretKey" : "[REDACTED]", "n": 1}');
+        }
     });
 
     it.each([
@@ -578,21 +579,6 @@ describe('readApiResource()', () => {
         expect(firstContent(result).text).toBe(body);
     });
 
-    it.each(['text/plain', 'text/csv', 'application/xml', 'application/ld+json'])(
-        'keeps the URL signing key in a body typed %s',
-        async (contentType) => {
-            const body = '{"urlSigningSecretKey": "abc123"}';
-            const { request } = requestReturning(streamOf(body), contentType);
-
-            const result = await readApiResource(
-                `${API}/v2/key-value-stores/kv-1/records/NOTES`,
-                stubApifyClient({ request }),
-            );
-
-            expect(firstContent(result).text).toBe(body);
-        },
-    );
-
     it('keeps the URL signing key in a binary body', async () => {
         const body = Buffer.from('{"urlSigningSecretKey": "abc123"}');
         const { request } = requestReturning(streamOf(body), 'application/octet-stream');
@@ -605,20 +591,23 @@ describe('readApiResource()', () => {
         expect(firstContent(result).blob).toBe(body.toString('base64'));
     });
 
-    it('returns a malformed JSON body as it is', async () => {
-        const body = '{"urlSigningSecretKey": "abc123",';
-        const { request } = requestReturning(streamOf(body), 'application/json');
-
-        const result = await readApiResource(
-            `${API}/v2/key-value-stores/kv-1/records/BROKEN`,
-            stubApifyClient({ request }),
+    it('redacts the URL signing key and masks the session token in a malformed JSON body', async () => {
+        const uri = `${API}/v2/key-value-stores/kv-1/records/BROKEN`;
+        const { request } = requestReturning(
+            streamOf('{"urlSigningSecretKey": "abc123", "token": "test-token",'),
+            'application/json',
         );
 
-        expect(firstContent(result).text).toBe(body);
-        expect(firstContent(result).mimeType).toBe('application/json');
+        const result = await readApiResource(uri, stubApifyClient({ request, token: 'test-token' }));
+
+        expect(firstContent(result)).toEqual({
+            uri,
+            mimeType: 'application/json',
+            text: '{"urlSigningSecretKey": "[REDACTED]", "token": "[REDACTED]",',
+        });
     });
 
-    it('returns a JSON body nested too deep to process as it is', async () => {
+    it('redacts the URL signing key in a JSON body nested 100,000 levels deep', async () => {
         const body = `${'['.repeat(100_000)}{"urlSigningSecretKey":"s"}${']'.repeat(100_000)}`;
         const { request } = requestReturning(streamOf(body), 'application/json');
 
@@ -627,76 +616,71 @@ describe('readApiResource()', () => {
             stubApifyClient({ request }),
         );
 
-        expect(firstContent(result).text).toBe(body);
+        expect(firstContent(result).text).toBe(body.replace('"s"', '"[REDACTED]"'));
     });
 
-    it('returns the link-out notice when the re-serialized JSON body is over the inline limit', async () => {
-        // Under the limit as sent; 2-space indentation more than triples it.
-        const body = `{"urlSigningSecretKey":"mock-signing-secret","items":[${'{"n":1},'.repeat(20_000)}{"n":1}]}`;
-        expect(Buffer.byteLength(body)).toBeLessThan(MAX_INLINE_BYTES);
-        const uri = `${API}/v2/key-value-stores/kv-1/records/EXPORT`;
+    it('returns a body that redaction grows past the inline limit as text', async () => {
+        // The limit caps the download, not the returned text.
+        const body = `{${Array(10_485).fill('"urlSigningSecretKey":""').join(',')}}`;
+        expect(Buffer.byteLength(body)).toBeLessThanOrEqual(MAX_INLINE_BYTES);
         const { request } = requestReturning(streamOf(body), 'application/json');
-        const overLimit = requestReturning(abortingStream(), 'application/json');
-
-        const result = await readApiResource(uri, stubApifyClient({ request }));
-
-        expect(result).toEqual(await readApiResource(uri, stubApifyClient({ request: overLimit.request })));
-        expect(JSON.stringify(result)).not.toContain('urlSigningSecretKey');
-        expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
-    });
-
-    it('returns the link-out notice when the re-serialized JSON body is too long for a string', async () => {
-        // A deeply nested body under the limit can pass the maximum string length once indented. V8 then
-        // throws this error, after seconds of work, so the test throws it directly.
-        const { stringify } = JSON;
-        const stringifyMock = vi.spyOn(JSON, 'stringify').mockImplementation((value, replacer, space) => {
-            if (space === 2) throw new RangeError('Invalid string length');
-            return stringify(value, replacer, space);
-        });
-        const uri = `${API}/v2/key-value-stores/kv-1/records/EXPORT`;
-        const { request } = requestReturning(
-            streamOf('{"urlSigningSecretKey":"mock-signing-secret"}'),
-            'application/json',
-        );
-        const overLimit = requestReturning(abortingStream(), 'application/json');
-
-        try {
-            const result = await readApiResource(uri, stubApifyClient({ request }));
-
-            expect(result).toEqual(await readApiResource(uri, stubApifyClient({ request: overLimit.request })));
-            expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
-        } finally {
-            stringifyMock.mockRestore();
-        }
-    });
-
-    it('masks the session token in a malformed JSON body and returns the rest as it is', async () => {
-        const { request } = requestReturning(
-            streamOf('{"urlSigningSecretKey": "abc123", "token": "test-token",'),
-            'application/json',
-        );
 
         const result = await readApiResource(
-            `${API}/v2/key-value-stores/kv-1/records/BROKEN`,
-            stubApifyClient({ request, token: 'test-token' }),
+            `${API}/v2/key-value-stores/kv-1/records/EXPORT`,
+            stubApifyClient({ request }),
         );
 
-        expect(firstContent(result).text).toBe('{"urlSigningSecretKey": "abc123", "token": "[REDACTED]",');
+        const { text } = firstContent(result);
+        expect(text).toBe(body.replaceAll('""', '"[REDACTED]"'));
+        expect(Buffer.byteLength(text as string)).toBeGreaterThan(MAX_INLINE_BYTES);
     });
+
+    it.each([
+        ['an unterminated value', '"urlSigningSecretKey":"'.padEnd(MAX_INLINE_BYTES, 'a')],
+        ['a long whitespace run after the name', '"urlSigningSecretKey"'.padEnd(MAX_INLINE_BYTES, ' ')],
+    ])(
+        'returns a JSON body of %s as it is, in under a second',
+        async (_kind, body) => {
+            const { request } = requestReturning(streamOf(body), 'application/json');
+
+            const result = await readApiResource(
+                `${API}/v2/key-value-stores/kv-1/records/EXPORT`,
+                stubApifyClient({ request }),
+            );
+
+            expect(firstContent(result).text).toBe(body);
+        },
+        1000,
+    );
 
     it.each([
         [
             'application/json',
             '{"urlSigningSecretKey":"s","authorization":"Bearer test-token"}',
-            '{\n  "authorization": "Bearer [REDACTED]"\n}',
+            '{"urlSigningSecretKey":"[REDACTED]","authorization":"Bearer [REDACTED]"}',
         ],
         [
             'application/json; charset=utf-8',
             '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "test-token"}',
-            '{\n  "exported": {},\n  "apifyToken": "[REDACTED]"\n}',
+            '{"exported": {"urlSigningSecretKey": "[REDACTED]"}, "apifyToken": "[REDACTED]"}',
         ],
         [
             'text/plain',
+            '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "test-token"}',
+            '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "[REDACTED]"}',
+        ],
+        [
+            'text/csv',
+            '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "test-token"}',
+            '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "[REDACTED]"}',
+        ],
+        [
+            'application/xml',
+            '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "test-token"}',
+            '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "[REDACTED]"}',
+        ],
+        [
+            'application/ld+json',
             '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "test-token"}',
             '{"exported": {"urlSigningSecretKey": "abc123"}, "apifyToken": "[REDACTED]"}',
         ],
@@ -804,21 +788,5 @@ describe('readApiResource()', () => {
         const result = await readApiResource(`${API}/v2/browser-info`, client);
 
         expect(firstContent(result).text).toBe('authorization: Bearer [REDACTED]; configured: other-token');
-    });
-
-    it('returns the link-out notice without either secret for a body over the inline limit', async () => {
-        const { request } = requestReturning(
-            abortingStream('{"urlSigningSecretKey":"mock-signing-secret","token":"test-token"'),
-            'application/json',
-        );
-
-        const result = await readApiResource(
-            `${API}/v2/datasets/ds-1`,
-            stubApifyClient({ request, token: 'test-token' }),
-        );
-
-        expect(firstContent(result).text).toContain('exceeds');
-        expect(firstContent(result).text).not.toContain('mock-signing-secret');
-        expect(firstContent(result).text).not.toContain('test-token');
     });
 });
