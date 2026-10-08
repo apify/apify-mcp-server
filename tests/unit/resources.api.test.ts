@@ -2,7 +2,7 @@ import { Readable } from 'node:stream';
 
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError } from 'axios';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { MAX_INLINE_BYTES } from '../../src/const.js';
@@ -22,6 +22,16 @@ async function expectReadError(promise: Promise<unknown>): Promise<InvalidParams
     const error = await promise.catch((e: unknown) => e);
     expect(error).toBeInstanceOf(Error);
     return error as InvalidParamsError | InternalError;
+}
+
+/** Everything the logger prints, captured from the console methods it writes with. */
+function captureLogOutput(): () => string {
+    const spies = [
+        vi.spyOn(console, 'log').mockImplementation(() => {}),
+        vi.spyOn(console, 'warn').mockImplementation(() => {}),
+        vi.spyOn(console, 'error').mockImplementation(() => {}),
+    ];
+    return () => spies.flatMap((spy) => spy.mock.calls.flat()).join('\n');
 }
 
 /** Body stream the stubbed request returns; chunked to prove multi-chunk reassembly. */
@@ -49,7 +59,6 @@ type StubOptions = {
     request?: (config: RequestConfig) => Promise<RequestResult>;
     /** Throw from getRecordPublicUrl to exercise the download-link fallback. */
     recordPublicUrlThrows?: boolean;
-    /** The session token, as apify-client exposes it on `client.token`. */
     token?: string;
 };
 
@@ -151,6 +160,11 @@ describe('redactUrlSigningSecretKey()', () => {
             '{"\\"urlSigningSecretKey": "s"}',
             '{"\\"urlSigningSecretKey": "[REDACTED]"}',
         ],
+        [
+            'with a backslash before a line break, which is not valid JSON',
+            '{"urlSigningSecretKey":"ab\\\ncd"}',
+            '{"urlSigningSecretKey":"[REDACTED]"}',
+        ],
     ])('redacts the value %s', (_kind, json, expected) => {
         expect(redactUrlSigningSecretKey(json)).toBe(expected);
     });
@@ -168,6 +182,8 @@ describe('redactUrlSigningSecretKey()', () => {
 });
 
 describe('readApiResource()', () => {
+    afterEach(() => vi.restoreAllMocks());
+
     it('throws InvalidParams when there is no token', async () => {
         const error = await expectReadError(readApiResource(`${API}/v2/datasets/ds-1/items`, undefined));
 
@@ -788,5 +804,38 @@ describe('readApiResource()', () => {
         const result = await readApiResource(`${API}/v2/browser-info`, client);
 
         expect(firstContent(result).text).toBe('authorization: Bearer [REDACTED]; configured: other-token');
+    });
+
+    it('logs a failed request without the session token', async () => {
+        const client = new ApifyClient({ token: 'test-token' });
+        // axios rejects a connection failure with the request config, which holds the Authorization header.
+        client.httpClient.axios.defaults.adapter = async (config) => {
+            throw new AxiosError('connect ECONNREFUSED 127.0.0.1:443', 'ECONNREFUSED', config);
+        };
+        const logOutput = captureLogOutput();
+
+        await expectReadError(readApiResource(`${API}/v2/datasets/ds-1`, client));
+
+        expect(logOutput()).toContain('resources/read request failed');
+        expect(logOutput()).not.toContain('test-token');
+    });
+
+    it('logs a failed signed-link request without the session token', async () => {
+        const uri = `${API}/v2/key-value-stores/kv-1/records/BIG`;
+        const client = new ApifyClient({ token: 'test-token', maxRetries: 0 });
+        // The record crosses the inline limit, then the store request for its signing key fails to connect.
+        client.httpClient.axios.defaults.adapter = async (config) => {
+            if (config.responseType === 'stream') {
+                return { data: abortingStream(), status: 200, statusText: 'OK', headers: {}, config };
+            }
+            throw new AxiosError('connect ECONNREFUSED 127.0.0.1:443', 'ECONNREFUSED', config);
+        };
+        const logOutput = captureLogOutput();
+
+        const result = await readApiResource(uri, client);
+
+        expect(firstContent(result).text).toContain(uri);
+        expect(logOutput()).toContain('Failed to mint signed download URL');
+        expect(logOutput()).not.toContain('test-token');
     });
 });

@@ -15,8 +15,7 @@ import { getHttpErrorHint } from '../utils/mcp.js';
 
 const TEXT_MIME_TYPE = 'text/plain';
 
-/** Stands in for a secret in a returned body. */
-const REDACTED = '[REDACTED]';
+export const REDACTED = '[REDACTED]';
 
 /** Textual base MIME types (returned as `text`); everything else becomes a base64 `blob`. */
 function isTextualMimeType(baseMimeType: string | undefined): boolean {
@@ -109,7 +108,10 @@ async function fetchRecordDownloadUrl(uri: string, apifyClient: ApifyClient): Pr
         const store = apifyClient.keyValueStore(safeDecodeURIComponent(match[1]));
         return await store.getRecordPublicUrl(safeDecodeURIComponent(match[2]));
     } catch (err) {
-        logHttpError(err, `Failed to mint signed download URL for ${uri}; falling back to API URL`);
+        logHttpError(
+            toPlainRequestError(err),
+            `Failed to mint signed download URL for ${uri}; falling back to API URL`,
+        );
         return uri;
     }
 }
@@ -145,6 +147,20 @@ export function isMaxContentLengthAbort(err: unknown): boolean {
     return isAxiosError(err) && err.code === 'ERR_BAD_RESPONSE' && err.message.includes('maxContentLength');
 }
 
+/**
+ * The request failure with only its message, code and status code: the axios error holds the Authorization
+ * header and the request body. `logHttpError` picks the log level by the status code.
+ */
+export function toPlainRequestError(error: unknown): Error {
+    if (!(error instanceof Error)) return new Error(String(error));
+    const { code, statusCode } = error as { code?: unknown; statusCode?: unknown };
+    return Object.assign(
+        new Error(error.message),
+        typeof code === 'string' ? { code } : {},
+        typeof statusCode === 'number' ? { statusCode } : {},
+    );
+}
+
 /** `charset` parameter of a Content-Type header, lowercased; `undefined` when absent. */
 function parseCharset(contentType: string | undefined): string | undefined {
     const match = /;\s*charset\s*=\s*"?([^";]+)"?/i.exec(contentType ?? '');
@@ -171,12 +187,8 @@ function parseApiErrorMessage(body: Buffer | undefined): string | undefined {
     }
 }
 
-/**
- * A copy of a response body with the session's token replaced, since a response can echo it, as
- * `GET /v2/browser-info` echoes the request headers. It copies the Buffer rule of `maskToken`
- * (`../tools/api/apify_api_request.ts`); change both together.
- */
-function maskSessionToken(body: Buffer, token: string | undefined): Buffer {
+/** A response can echo the session token, as `GET /v2/browser-info` echoes the request headers. */
+export function maskSessionToken(body: Buffer, token: string | undefined): Buffer {
     if (!token) return body;
     // The token is ASCII, so a latin1 round trip keeps every other byte as it is.
     const bytes = body.toString('latin1');
@@ -184,20 +196,20 @@ function maskSessionToken(body: Buffer, token: string | undefined): Buffer {
 }
 
 /**
- * A `urlSigningSecretKey` property and its string value. The quote that closes the name is not escaped, so it
- * ends a string, and the colon after it makes that string a key. The value follows JSON's string grammar.
+ * The quote after the name is unescaped, so it ends a string, and the colon makes that string a key: the
+ * name inside a string value does not match. The two value branches never match the same character, so the
+ * scan is linear.
  */
-const URL_SIGNING_SECRET_KEY_VALUE_RE = /("urlSigningSecretKey"\s*:\s*)"(?:[^"\\]|\\.)*"/g;
+const URL_SIGNING_SECRET_KEY_VALUE_RE = /("urlSigningSecretKey"\s*:\s*)"(?:[^"\\]|\\[\s\S])*"/g;
 
 /**
- * JSON text with the string value of every `urlSigningSecretKey` property replaced by `"[REDACTED]"`, and
- * every other byte unchanged. The API returns a storage's URL signing key to write-capable tokens, and in
- * the transcript it lets anyone mint non-expiring links to every item and record (see apify/ai-team#330).
- * It works on the text, without parsing, so a `null` value or a name spelled with `\u` escapes is left as it is.
+ * In the transcript, a storage's URL signing key lets anyone mint non-expiring links to every item and record
+ * (see apify/ai-team#330). This works on the text, so a `null` value or a name spelled with `\u` escapes is
+ * left as it is, and so is every other byte.
  *
- * It redacts instead of removing the property: removing it from JSON text needs comma handling or a parse
- * and re-serialize. Re-serializing loses the API's formatting and the precision of big numbers, and
- * indenting a crafted, deeply nested body cost seconds and about 1 GB per read. A replace is one linear pass.
+ * It redacts instead of removing the property: removal needs comma handling or a parse and re-serialize, which
+ * loses the API's formatting and big-number precision (indenting a crafted, deeply nested body cost seconds and
+ * about 1 GB per read).
  */
 export function redactUrlSigningSecretKey(json: string): string {
     return json.replace(URL_SIGNING_SECRET_KEY_VALUE_RE, `$1"${REDACTED}"`);
@@ -211,8 +223,10 @@ export function redactUrlSigningSecretKey(json: string): string {
  * (text/*, JSON, XML) as `text`, anything else as a base64 `blob`. The body is never parsed, so
  * JSON primitives, formatting, and bytes round-trip exactly, with two exceptions: the session token's
  * bytes are masked in any body (`maskSessionToken`; a UTF-16 body is not masked), and in an
- * `application/json` body the string value of every `urlSigningSecretKey` property becomes `"[REDACTED]"`
- * (`redactUrlSigningSecretKey`).
+ * `application/json` body decoded as text with its declared charset, the string value of every
+ * `urlSigningSecretKey` property becomes `"[REDACTED]"` (`redactUrlSigningSecretKey`). A body Node cannot
+ * decode is returned as a blob and keeps the key, and a wrong declared charset can hide the key from the
+ * redaction.
  *
  * Genuine failures (no token, bad origin, a missing resource, a bad token, a 5xx, a network error)
  * throw a domain error (`InvalidParamsError`/`InternalError`) that the protocol adapters
@@ -240,15 +254,15 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     try {
         response = await sendApifyApiRequest(apifyClient, { url: uri, method: 'GET', responseType: 'stream' });
     } catch (err) {
-        logHttpError(err, `resources/read request failed`, { uri });
+        logHttpError(toPlainRequestError(err), `resources/read request failed`, { uri });
         throwReadFailure(uri, getHttpStatusCode(err), err instanceof Error ? err.message : String(err));
     }
 
     let body: Buffer | undefined;
     let overLimit = false;
     try {
-        // A body can echo the session token, as `/v2/browser-info` echoes the Authorization header. Masked
-        // here, before every use below: the error message, the text, and the blob (see apify/ai-team#330).
+        // The token is masked before every use below: the error message, the text, and the blob
+        // (see apify/ai-team#330).
         body = maskSessionToken(await collectStream(response.data), apifyClient.token);
     } catch (err) {
         if (isMaxContentLengthAbort(err)) {

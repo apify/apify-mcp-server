@@ -7,7 +7,14 @@ import { z } from 'zod';
 import type { ApifyClient } from '../../apify_client.js';
 import { sendApifyApiRequest } from '../../apify_client.js';
 import { APIFY_ERROR_TYPE_PAGE_NOT_FOUND, HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
-import { isApifyApiUri, isMaxContentLengthAbort, redactUrlSigningSecretKey } from '../../resources/api_resources.js';
+import {
+    isApifyApiUri,
+    isMaxContentLengthAbort,
+    maskSessionToken,
+    REDACTED,
+    redactUrlSigningSecretKey,
+    toPlainRequestError,
+} from '../../resources/api_resources.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
@@ -39,9 +46,6 @@ so prefer asynchronous runs.`;
 
 /** Query parameters whose values grant access or carry secrets; `webhooks` can hold webhook headers. */
 const SECRET_QUERY_PARAMS: readonly string[] = ['token', 'signature', 'webhooks'];
-
-/** Stands in for a logged or returned value that may carry a secret. */
-const REDACTED = '[REDACTED]';
 
 /**
  * The logged copy of an API tool call's arguments (`redactArgs`), built as an allowlist. Secret query
@@ -226,30 +230,15 @@ async function addClosestPaths(error: ApifyApiError, normalizedPath: string, sig
 /**
  * A copy of a response body with the session's token replaced, since a response can echo it, as
  * `GET /v2/browser-info` echoes the request headers. A binary body is masked too: apify-client copies a
- * Buffer error body into the message. `maskSessionToken` (`../../resources/api_resources.ts`) applies the
- * same Buffer rule to `resources/read`.
+ * Buffer error body into the message.
  */
 function maskToken(data: unknown, token: string | undefined): unknown {
     if (!token || data === undefined) return data;
-    if (Buffer.isBuffer(data)) {
-        // The token is ASCII, so a latin1 round trip keeps every other byte as it is.
-        const bytes = data.toString('latin1');
-        return bytes.includes(token) ? Buffer.from(bytes.replaceAll(token, REDACTED), 'latin1') : data;
-    }
+    if (Buffer.isBuffer(data)) return maskSessionToken(data, token);
     const text = JSON.stringify(data);
     // The token as it appears inside a JSON string.
     const escapedToken = JSON.stringify(token).slice(1, -1);
     return text.includes(escapedToken) ? JSON.parse(text.replaceAll(escapedToken, REDACTED)) : data;
-}
-
-/**
- * The request failure as a plain error with only its message and code: the axios error holds the
- * Authorization header and the request body, and the tool error log prints the whole error.
- */
-function toPlainRequestError(error: unknown): Error {
-    if (!(error instanceof Error)) return new Error(String(error));
-    const { code } = error as { code?: unknown };
-    return Object.assign(new Error(error.message), typeof code === 'string' ? { code } : {});
 }
 
 /**
@@ -318,8 +307,8 @@ export async function callApi(params: {
         ? `${method} ${path} returned HTTP ${response.status} with a binary body ` +
           `(${contentType ?? 'no Content-Type'}, ${(data as Buffer).length} bytes), which is not shown.`
         : `${method} ${path} returned HTTP ${response.status}.`;
-    // A storage object holds its URL signing key, which lets anyone sign links to all its data
-    // (see apify/ai-team#330). A text body is a JSON string here, with its quotes escaped, so it never matches.
+    // A storage object holds its URL signing key (see apify/ai-team#330). A text body is a JSON string here,
+    // with its quotes escaped, so it never matches.
     const json = JSON.stringify(structuredContent);
     const text = redactUrlSigningSecretKey(json);
     return respondOk([text, summary], { structuredContent: text === json ? structuredContent : JSON.parse(text) });

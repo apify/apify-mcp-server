@@ -492,7 +492,7 @@ describe('apify-api-read', () => {
         ['objects', (inner: unknown) => ({ a: inner })],
         ['arrays', (inner: unknown) => [inner]],
     ])('redacts the URL signing key in a body of %s nested 3000 levels deep', async (_kind, wrap) => {
-        // JSON.stringify handles about 4000 levels, so the tool returns this body, and the redaction must not fail on it.
+        // Under JSON.stringify's limit of about 4000 levels, so the tool still returns this body.
         let body: unknown = { urlSigningSecretKey: 'mock-signing-secret', n: 1 };
         let expected: unknown = { urlSigningSecretKey: '[REDACTED]', n: 1 };
         for (let level = 0; level < 3000; level++) {
@@ -556,7 +556,6 @@ describe('apify-api-read', () => {
 
         const result = await callTool(apifyApiRead, { path: '/v2/key-value-stores/kv-1' });
 
-        // The redacted text is parsed back only when a value changed.
         expect((result.structuredContent as { data: unknown }).data).toBe(body);
     });
 

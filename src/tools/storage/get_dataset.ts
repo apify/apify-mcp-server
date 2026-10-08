@@ -74,9 +74,8 @@ export const getDataset: ToolEntry = Object.freeze({
         // The API also returns a raw `schema` (untyped in apify-client). It is 93–95% of the
         // response bytes on top store Actors and declares fields that may be absent from the
         // data, so drop it — get-dataset-schema infers a compact schema from real items (#882).
-        // The API returns the storage's URL signing key to write-capable tokens; in the transcript it lets
-        // anyone mint non-expiring links to every item. The pre-signed *PublicUrl fields expire and stay
-        // (see apify/ai-team#330).
+        // The URL signing key lets anyone mint non-expiring links to every item; the pre-signed *PublicUrl
+        // fields expire, so they stay (see apify/ai-team#330).
         const { schema, urlSigningSecretKey, ...metadata } = dataset as typeof dataset & { schema?: unknown };
         // Apify returns `fields` slash-separated AND with array indices expanded
         // (e.g. `latestComments/0/owner/username`). For a real Instagram-scraper
@@ -95,7 +94,7 @@ export const getDataset: ToolEntry = Object.freeze({
         const summary = `Dataset '${normalized.name ?? datasetId}' has ${normalized.itemCount ?? 0} items${fieldCount !== undefined ? `, ${fieldCount} fields` : ''}.`;
         const nextStep = `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}`;
         return buildStorageResponse({
-            structuredContent: normalized as unknown as Record<string, unknown>,
+            structuredContent: normalized,
             summary,
             nextStep,
             apifyConsoleUrl: buildConsoleDatasetUrl(linkContext, dataset.id),
