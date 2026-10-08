@@ -46,8 +46,9 @@ Routing. A task no dedicated tool does (webhooks, billing usage and limits, an A
 memory, renaming a dataset) must go to the API tools. A task a dedicated tool does (running an Actor, an Actor's last
 run, dataset items, starting a build, creating or changing a schedule) must not.
 
-`apify-api-read` and `apify-api-write` refuse no path, and four GET operations start a paid run: `run-sync` and
-`run-sync-get-dataset-items`, for Actors and for tasks. So routing is what keeps an agent off them. The pr cases check
+Four GET operations start a paid run: `run-sync` and `run-sync-get-dataset-items`, for Actors and for tasks. On #1444
+and #1445 `apify-api-read` sends them, so routing is what keeps an agent off them; #1502 makes the read tool refuse them
+and leaves them out of search and details, while a POST there through `apify-api-write` still runs. The pr cases check
 the choice between an API tool and the tools next to it: a run goes to `call-actor`, never to either API tool
 (`api-loaded-run-actor`, `api-loaded-hello-world`, `api-loaded-run-and-wait`); a read stays a read when a write is close
 (`webhook-ever-fired`, where a test delivery is the write); a setting change goes to `apify-api-write`, not to a run
