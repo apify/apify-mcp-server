@@ -159,8 +159,8 @@ export const API_SPEC_FIXTURE = {
                 parameters: [{ $ref: '#/components/parameters/actorId' }],
             },
         },
-        // A run's copy of the dataset operation, and a synchronous run, both of which name the dataset
-        // in their summary: search must still rank the storage's own operation first.
+        // A run's copy of the dataset operation, which names the dataset in its summary: search must
+        // still rank the storage's own operation first.
         '/v2/actors/{actorId}/runs/last/dataset/items': {
             post: {
                 operationId: 'actor_runs_last_dataset_items_post',
@@ -170,6 +170,7 @@ export const API_SPEC_FIXTURE = {
                 requestBody: { required: true, content: { 'application/json': { schema: { type: 'array' } } } },
             },
         },
+        // A synchronous run, which the index leaves out.
         '/v2/actors/{actorId}/run-sync-get-dataset-items': {
             post: {
                 operationId: 'actor_runSyncGetDatasetItems_post',

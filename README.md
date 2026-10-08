@@ -300,8 +300,8 @@ Legend for the **Enabled by default** column:
 | `get-actor-version` | source | Get an Actor version's file listing with hashes and the content of the files you ask for. |  |
 | `apify-api-search` | api | Search the Apify API reference for operations by keywords. Returns each one's method, path, and docs page. |  |
 | `apify-api-details` | api | Get the parameters and request body schema of the Apify API operations on a path. |  |
-| `apify-api-read` | api | Send a GET request to any Apify API path, such as `actor-runs` or `/v2/actor-runs`, like `apify api` in the Apify CLI. It refuses the `method` query parameter. |  |
-| `apify-api-write` | none (select by name: `tools=apify-api-write`) | Send a POST, PUT, PATCH, or DELETE request to any Apify API path, with a JSON body, like `apify api` in the Apify CLI. It refuses the `method` query parameter. |  |
+| `apify-api-read` | api | Send a GET request to an Apify API path, such as `actor-runs` or `/v2/actor-runs`, like `apify api` in the Apify CLI. It refuses the synchronous run endpoints and the `method` query parameter. |  |
+| `apify-api-write` | none (select by name: `tools=apify-api-write`) | Send a POST, PUT, PATCH, or DELETE request to an Apify API path, with a JSON body, like `apify api` in the Apify CLI. It refuses the synchronous run endpoints and the `method` query parameter. |  |
 
 > **Note:**
 >

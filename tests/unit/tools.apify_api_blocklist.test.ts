@@ -3,9 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { HELPER_TOOLS } from '../../src/const.js';
 import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
 import { validateApiBlocklist, validateApiPathBlocklist } from '../../src/tools/api/apify_api_blocklist.js';
+import { normalizeApiPath } from '../../src/tools/api/apify_api_request.js';
 
 const METHOD_PARAM_REFUSAL =
     'The API tools do not send the method query parameter: the API would take it as the HTTP method of the request.';
+
+const SYNC_RUN_REFUSAL =
+    'The API tools do not call the synchronous run endpoints, whose runs can outlast the tool-call timeout. ' +
+    'Start an asynchronous run with POST /v2/actors/{actorId}/runs or /v2/actor-tasks/{actorTaskId}/runs.';
 
 /** A test-only operation rule. */
 const OPERATION_RULE: ApiBlockRule = {
@@ -158,9 +163,94 @@ describe('validateApiBlocklist()', () => {
             expect(validate({ normalizedPath }, [rule])).toBe('No run-now.');
         });
     });
+
+    describe('the synchronous run rules', () => {
+        it.each([
+            'actors/apify~hello-world/run-sync',
+            'actors/~my-actor/run-sync-get-dataset-items',
+            'actors/HG7ML7M8z78YcAPEB/run-sync',
+            'acts/apify~hello-world/run-sync',
+            'acts/apify~hello-world/run-sync-get-dataset-items',
+            'actor-tasks/john~my-task/run-sync',
+            'actor-tasks/HG7ML7M8z78YcAPEB/run-sync-get-dataset-items',
+            // A slash encoded in a name is decoded after routing, so the name is one segment.
+            'actors/apify%2Fhello-world/run-sync',
+            'ACTORS/APIFY~HELLO-WORLD/RUN-SYNC',
+            'Actor-Tasks/abc/Run-Sync-Get-Dataset-Items',
+            'actors/abc/run-sync/',
+            'actors//abc//run-sync',
+            'actors/abc/run-sync?timeout=300&token=x',
+            normalizeApiPath('/v2/actors/abc/run-sync'),
+            normalizeApiPath('v2/actor-tasks/abc/run-sync'),
+        ])('refuses a GET to %j in the read tool and a POST in the write tool', (normalizedPath) => {
+            expect(validate({ normalizedPath })).toBe(SYNC_RUN_REFUSAL);
+            expect(validate({ normalizedPath, toolName: HELPER_TOOLS.API_WRITE, method: 'POST' })).toBe(
+                SYNC_RUN_REFUSAL,
+            );
+        });
+
+        it.each([
+            'actors/abc/runs',
+            'actors/abc/runs/last',
+            'actor-tasks/abc/runs',
+            'key-value-stores/abc/records/run-sync',
+            'actor-runs/abc',
+            'actor-runs/abc/run-sync',
+            'actors/abc/run-sync-x',
+            'actors/run-sync',
+            'actors/apify/hello-world/run-sync',
+            'datasets/run-sync',
+        ])('does not refuse %j', (normalizedPath) => {
+            expect(validate({ normalizedPath })).toBeUndefined();
+            expect(validate({ normalizedPath, toolName: HELPER_TOOLS.API_WRITE, method: 'POST' })).toBeUndefined();
+        });
+
+        it('refuses the write tool without a method, before it chooses one', () => {
+            expect(
+                validate({
+                    normalizedPath: 'actors/abc/run-sync',
+                    toolName: HELPER_TOOLS.API_WRITE,
+                    method: undefined,
+                }),
+            ).toBe(SYNC_RUN_REFUSAL);
+        });
+
+        it('names call-actor only for an Actor and only when the session has it', () => {
+            const loadedToolNames = [HELPER_TOOLS.ACTOR_CALL];
+            const withCallActor = `${SYNC_RUN_REFUSAL} Use ${HELPER_TOOLS.ACTOR_CALL} instead.`;
+
+            expect(validate({ normalizedPath: 'actors/abc/run-sync', loadedToolNames })).toBe(withCallActor);
+            expect(validate({ normalizedPath: 'acts/abc/run-sync-get-dataset-items', loadedToolNames })).toBe(
+                withCallActor,
+            );
+            expect(validate({ normalizedPath: 'actor-tasks/abc/run-sync', loadedToolNames })).toBe(SYNC_RUN_REFUSAL);
+            expect(validate({ normalizedPath: 'actor-tasks/abc/run-sync-get-dataset-items', loadedToolNames })).toBe(
+                SYNC_RUN_REFUSAL,
+            );
+        });
+    });
 });
 
 describe('validateApiPathBlocklist()', () => {
+    it.each([
+        {
+            normalizedPath: 'actors/abc/run-sync',
+            refusal: `${SYNC_RUN_REFUSAL} Use ${HELPER_TOOLS.ACTOR_CALL} instead.`,
+        },
+        { normalizedPath: 'actor-tasks/{actorTaskId}/run-sync-get-dataset-items', refusal: SYNC_RUN_REFUSAL },
+    ])('refuses $normalizedPath, a path a rule refuses in any tool', ({ normalizedPath, refusal }) => {
+        expect(validateApiPathBlocklist({ normalizedPath, loadedToolNames: [HELPER_TOOLS.ACTOR_CALL] })).toBe(refusal);
+    });
+
+    it('refuses only the methods a rule names when a method is given', () => {
+        const normalizedPath = 'actors/abc/run-sync';
+
+        expect(validateApiPathBlocklist({ normalizedPath, method: 'POST', loadedToolNames: [] })).toBe(
+            SYNC_RUN_REFUSAL,
+        );
+        expect(validateApiPathBlocklist({ normalizedPath, method: 'PUT', loadedToolNames: [] })).toBeUndefined();
+    });
+
     it('checks only the operation rules', () => {
         expect(validateApiPathBlocklist({ normalizedPath: 'actors/abc/runs', loadedToolNames: [] })).toBeUndefined();
         expect(

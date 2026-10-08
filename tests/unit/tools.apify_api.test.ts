@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
+import { WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
 import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
 import { API_BLOCK_RULES } from '../../src/tools/api/apify_api_blocklist.js';
 import { apifyApiDetails } from '../../src/tools/api/apify_api_details.js';
@@ -77,6 +78,10 @@ beforeEach(() => {
 afterEach(() => {
     vi.unstubAllEnvs();
 });
+
+const SYNC_RUN_REFUSAL =
+    'The API tools do not call the synchronous run endpoints, whose runs can outlast the tool-call timeout. ' +
+    'Start an asynchronous run with POST /v2/actors/{actorId}/runs or /v2/actor-tasks/{actorTaskId}/runs.';
 
 const METHOD_PARAM_REFUSAL =
     'The API tools do not send the method query parameter: the API would take it as the HTTP method of the request.';
@@ -176,6 +181,17 @@ describe('apify-api-search', () => {
         });
     });
 
+    it.each(['run actor synchronously', 'run sync get dataset items'])(
+        'does not offer the synchronous run endpoints for %j',
+        async (query) => {
+            const result = await callTool(apifyApiSearch, { query });
+
+            const { operations } = result.structuredContent as { operations: { path: string }[] };
+            expect(operations.length).toBeGreaterThan(0);
+            expect(operations.map(({ path }) => path)).not.toContainEqual(expect.stringContaining('run-sync'));
+        },
+    );
+
     it('says so when nothing matches', async () => {
         const result = await callTool(apifyApiSearch, { query: 'zebra' });
 
@@ -252,6 +268,25 @@ describe('apify-api-details', () => {
         }
     });
 
+    it.each([
+        { path: '/v2/actors/{actorId}/run-sync' },
+        { path: 'acts/john~my-actor/run-sync-get-dataset-items' },
+        { path: 'actors/abc/run-sync', method: 'POST' },
+    ])('lists no operation on the synchronous run endpoint $path and says why, without the spec', async (args) => {
+        const result = await callTool(apifyApiDetails, args);
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(`${SYNC_RUN_REFUSAL} Use ${HELPER_TOOLS.ACTOR_CALL} instead.`);
+        expect(fetchApiOperationIndex).not.toHaveBeenCalled();
+    });
+
+    it("does not name call-actor, which runs an Actor, in the refusal of a task's synchronous run endpoint", async () => {
+        const result = await callTool(apifyApiDetails, { path: 'actor-tasks/abc/run-sync', method: 'GET' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(SYNC_RUN_REFUSAL);
+    });
+
     describe('with a test-only rule in the published list', () => {
         /** Calls the tool while the rule is in the list, so the index the tool loads leaves out what it names. */
         async function callDetailsWithRule(rule: ApiBlockRule, args: Record<string, unknown>) {
@@ -288,6 +323,12 @@ describe('apify-api-details', () => {
         });
     });
 
+    it('names call-actor in the refusal of a synchronous run endpoint only when the session has it', async () => {
+        const result = await callTool(apifyApiDetails, { path: 'actors/abc/run-sync' }, [HELPER_TOOLS.API_DETAILS]);
+
+        expect(result.content[0].text).toBe(SYNC_RUN_REFUSAL);
+    });
+
     it('names the search tool on a path not in the spec only when the session has it', async () => {
         const withSearch = await callTool(apifyApiDetails, { path: 'acts/john/my-actor' });
         const withoutSearch = await callTool(apifyApiDetails, { path: 'acts/john/my-actor' }, [
@@ -312,16 +353,77 @@ describe('apify-api-read', () => {
         });
     });
 
-    it('says a GET can start a paid run and names call-actor only when the session has it', () => {
+    it('says the synchronous run endpoints are refused and names call-actor only when the session has it', () => {
         const withCallActor = apifyApiRead.buildDescription!(ALL_TOOLS_PRESENT);
         const withoutCallActor = apifyApiRead.buildDescription!(only(HELPER_TOOLS.API_READ));
-        const paidRun = 'A GET can start a paid Actor run, as the synchronous run endpoints do.';
+        const refused = 'The synchronous run endpoints are refused';
 
         expect(apifyApiRead.description).toBe(withCallActor);
-        expect(withCallActor).toContain(`${paidRun} Run an Actor with ${HELPER_TOOLS.ACTOR_CALL}.`);
-        expect(withoutCallActor).toContain(paidRun);
+        expect(withCallActor).toContain(`/v2/actor-runs/abc. Run an Actor with ${HELPER_TOOLS.ACTOR_CALL}.`);
+        expect(withCallActor).toContain(refused);
+        expect(withoutCallActor).toContain(refused);
         expect(withoutCallActor).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+        expect(withCallActor).not.toContain('A GET can start');
+        expect(withCallActor).toContain(`keep waitForFinish at or below ${WAIT_SECS_MAX} seconds.`);
     });
+
+    it.each([
+        'actors/apify~hello-world/run-sync',
+        'actors/~my-actor/run-sync',
+        'actors/HG7ML7M8z78YcAPEB/run-sync-get-dataset-items',
+        'acts/apify~hello-world/run-sync',
+        '/v2/acts/abc/run-sync-get-dataset-items?token=x',
+        'v2/actors/abc/run-sync',
+        '/v2/actors/abc/run-sync',
+        // A slash encoded in a name is decoded after routing, so the name is one segment.
+        'actors/apify%2Fhello-world/run-sync',
+        'ACTORS/APIFY~HELLO-WORLD/RUN-SYNC-GET-DATASET-ITEMS',
+        'actors//abc/run-sync',
+        'actors/abc//run-sync',
+        'actors/abc/run-sync//',
+        'actors/abc/run-sync?build=latest',
+        // The URL is resolved before it is sent: dot segments, a backslash, and a newline.
+        'actors/abc/x/../run-sync',
+        'actors/abc/%2e%2e/abc/run-sync',
+        'actors\\abc\\run-sync',
+        'actors/abc/run-\nsync',
+    ])('refuses the synchronous run endpoint %j without a request', async (path) => {
+        const result = await callTool(apifyApiRead, { path });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(`${SYNC_RUN_REFUSAL} Use ${HELPER_TOOLS.ACTOR_CALL} instead.`);
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        'actor-tasks/john~my-task/run-sync',
+        'actor-tasks/HG7ML7M8z78YcAPEB/run-sync-get-dataset-items',
+        'Actor-Tasks/john~my-task/Run-Sync/',
+    ])("refuses a task's synchronous run endpoint %j without a request or naming call-actor", async (path) => {
+        const result = await callTool(apifyApiRead, { path });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(SYNC_RUN_REFUSAL);
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('names call-actor in the refusal of a synchronous run only when the session has it', async () => {
+        const result = await callTool(apifyApiRead, { path: 'actors/abc/run-sync' }, [HELPER_TOOLS.API_READ]);
+
+        expect(result.content[0].text).toBe(SYNC_RUN_REFUSAL);
+    });
+
+    it.each(['actors/abc/runs', 'actors/abc/runs/last', 'key-value-stores/abc/records/run-sync', 'actor-runs/abc'])(
+        'sends a GET to %j, which does not start a run',
+        async (path) => {
+            requestMock.mockResolvedValue(mockResponse(200, { data: {} }));
+
+            await callTool(apifyApiRead, { path });
+
+            expect(requestMock).toHaveBeenCalledTimes(1);
+            expect(readSentUrl()).toBe(`${BASE_URL}/${path}`);
+        },
+    );
 
     it.each([
         { path: 'datasets/abc', query: { method: 'DELETE' } },
@@ -538,6 +640,17 @@ describe('apify-api-read', () => {
             type: 'page-not-found',
             message: `Page not found. The closest paths in the API spec: ${findClosestApiPaths(INDEX, 'datasets/abc/itemz').join(', ')}`,
         });
+    });
+
+    it('does not name a synchronous run endpoint among the closest paths of a 404', async () => {
+        requestMock.mockResolvedValue(
+            mockResponse(404, { error: { type: 'page-not-found', message: 'Page not found.' } }),
+        );
+
+        const error = await callTool(apifyApiRead, { path: 'actors/abc/run-syncs' }).catch((thrown: unknown) => thrown);
+
+        expect(error).toMatchObject({ statusCode: 404, message: expect.stringContaining('The closest paths') });
+        expect((error as Error).message).not.toContain('run-sync');
     });
 
     it.each([
@@ -775,6 +888,37 @@ describe('apify-api-write', () => {
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toBe(message);
         expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        { path: 'actors/apify~hello-world/run-sync', method: 'POST', body: {} },
+        { path: 'acts/abc/run-sync-get-dataset-items', method: 'POST', body: {} },
+        { path: 'actors//abc/RUN-SYNC/', method: 'POST', body: {} },
+    ])('refuses the synchronous run endpoint $path without a request or the spec', async (args) => {
+        const result = await callTool(apifyApiWrite, args);
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(`${SYNC_RUN_REFUSAL} Use ${HELPER_TOOLS.ACTOR_CALL} instead.`);
+        expect(requestMock).not.toHaveBeenCalled();
+        expect(fetchApiOperationIndex).not.toHaveBeenCalled();
+    });
+
+    it("refuses a task's synchronous run endpoint without a request, the spec, or naming call-actor", async () => {
+        const result = await callTool(apifyApiWrite, { path: 'actor-tasks/abc/run-sync-get-dataset-items', body: {} });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(SYNC_RUN_REFUSAL);
+        expect(requestMock).not.toHaveBeenCalled();
+        expect(fetchApiOperationIndex).not.toHaveBeenCalled();
+    });
+
+    it('sends a POST to the asynchronous run endpoint', async () => {
+        requestMock.mockResolvedValue(mockResponse(201, { data: { id: 'run-1' } }));
+
+        await callTool(apifyApiWrite, { path: 'actors/apify~hello-world/runs', method: 'POST', body: {} });
+
+        expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST' }));
+        expect(readSentUrl()).toBe(`${BASE_URL}/actors/apify~hello-world/runs`);
     });
 
     it.each([

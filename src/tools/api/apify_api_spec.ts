@@ -147,7 +147,7 @@ function parseRequestBody(rawRequestBody: unknown, spec: unknown): ApiOperation[
  * Builds the operation index from an OpenAPI document. Deprecated operations, HEAD operations, and anything
  * outside `/v2/` are left out; malformed entries are skipped rather than failing the whole spec. So are the
  * operations and query parameters a rule refuses to the tool that sends the method (`applyApiBlocklist`),
- * such as the `method` query parameter, so no tool that reads the index offers them.
+ * such as the synchronous run endpoints, so no tool that reads the index offers them.
  * It throws when the spec lists no operation.
  */
 export function buildApiOperationIndex(
@@ -284,11 +284,11 @@ function hasWholeWord(term: string, words: string[]): boolean {
 
 /**
  * Paths that reach a run's own copy of a resource: the default storages and actions of a run or of the
- * last run, and the synchronous runs. A plain ask such as "add items to a dataset" means the storage
- * itself, so these rank lower unless the query is about runs or tasks.
+ * last run. A plain ask such as "add items to a dataset" means the storage itself, so these rank lower
+ * unless the query is about runs or tasks.
  */
-const RUN_SCOPED_PATH_REGEX = /^\/v2\/actor-runs\/\{runId\}\/|\/runs\/last\/|\/run-sync/;
-const RUN_SCOPE_TERMS: ReadonlySet<string> = new Set(['run', 'runs', 'last', 'task', 'tasks', 'sync']);
+const RUN_SCOPED_PATH_REGEX = /^\/v2\/actor-runs\/\{runId\}\/|\/runs\/last\//;
+const RUN_SCOPE_TERMS: ReadonlySet<string> = new Set(['run', 'runs', 'last', 'task', 'tasks']);
 const RUN_SCOPED_PENALTY = 2;
 
 /**

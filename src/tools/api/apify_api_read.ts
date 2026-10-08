@@ -17,8 +17,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         : '';
     const runActor = hasTool(HELPER_TOOLS.ACTOR_CALL) ? ` Run an Actor with ${HELPER_TOOLS.ACTOR_CALL}.` : '';
     return dedent`
-        Send a GET request to the Apify API at a path, such as /v2/actor-runs/abc.
-        A GET can start a paid Actor run, as the synchronous run endpoints do.${runActor}
+        Send a GET request to the Apify API at a path, such as /v2/actor-runs/abc.${runActor}
         ${API_CALL_DESCRIPTION}${findPath}${getParameters}
         Returns the response body as the API sends it, JSON with its data wrapper included; a body over
         ${MAX_INLINE_BYTES} bytes is not returned.
@@ -54,7 +53,7 @@ export const apifyApiRead: ToolEntry = Object.freeze({
         idempotentHint: false,
         openWorldHint: false,
     },
-    // A storage signature, or the webhooks of a synchronous run, would otherwise be logged.
+    // A storage signature would otherwise be logged.
     redactArgs: redactApiCallArgs,
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = apifyApiReadArgs.parse(toolArgs.args);

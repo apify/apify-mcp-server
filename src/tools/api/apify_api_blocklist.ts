@@ -29,6 +29,22 @@ export type ApiOperationBlockRule = ApiBlockRuleBase & {
 
 export type ApiBlockRule = ApiQueryParamBlockRule | ApiOperationBlockRule;
 
+/** The synchronous run endpoints of an Actor, also under the legacy `acts` prefix. */
+const ACTOR_SYNC_RUN_PATHS = [
+    '/v2/actors/{actorId}/run-sync',
+    '/v2/actors/{actorId}/run-sync-get-dataset-items',
+] as const;
+
+/** The synchronous run endpoints of a task. */
+const TASK_SYNC_RUN_PATHS = [
+    '/v2/actor-tasks/{actorTaskId}/run-sync',
+    '/v2/actor-tasks/{actorTaskId}/run-sync-get-dataset-items',
+] as const;
+
+const SYNC_RUN_REASON =
+    'The API tools do not call the synchronous run endpoints, whose runs can outlast the tool-call timeout. ' +
+    'Start an asynchronous run with POST /v2/actors/{actorId}/runs or /v2/actor-tasks/{actorTaskId}/runs.';
+
 /** What the API tools refuse to send. The operation index leaves the same out, so search and details never offer it. */
 export const API_BLOCK_RULES: readonly ApiBlockRule[] = [
     {
@@ -40,6 +56,19 @@ export const API_BLOCK_RULES: readonly ApiBlockRule[] = [
             'of the request.',
         suggestedToolName: HELPER_TOOLS.API_WRITE,
     },
+    // A GET or a POST there starts a paid run, which can outlast the tool-call timeout. The API takes no other
+    // method there but HEAD, which the tools never send. See apify/apify-mcp-server#1502.
+    ...ACTOR_SYNC_RUN_PATHS.map(
+        (path): ApiOperationBlockRule => ({
+            operation: { methods: ['GET', 'POST'], path },
+            reason: SYNC_RUN_REASON,
+            suggestedToolName: HELPER_TOOLS.ACTOR_CALL,
+        }),
+    ),
+    // call-actor runs an Actor, not a saved task, so these suggest no tool.
+    ...TASK_SYNC_RUN_PATHS.map(
+        (path): ApiOperationBlockRule => ({ operation: { methods: ['GET', 'POST'], path }, reason: SYNC_RUN_REASON }),
+    ),
 ];
 
 /** The tool that sends a method: the read tool sends only a GET, and the write tool every other method. */
