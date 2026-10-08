@@ -59,7 +59,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     resource's own, imported from `../resources/api_resources.ts`
     ([`../resources/AGENTS.md`](../resources/AGENTS.md#api-resources-api_resourcests)).
     The request failure it throws goes through `toPlainError` (`../utils/logging.ts`), which drops the
-    axios config, the same copy `logHttpError` logs for every error.
+    axios config, the same copy `logHttpError` logs.
     The details and call tools log their arguments through `redactApiCallArgs` (`redactArgs`): an
     allowlist of path, method, query, and body, with the body and the `token`, `signature`, and
     `webhooks` query values redacted, and a query written into the path cut to `?[REDACTED]`.

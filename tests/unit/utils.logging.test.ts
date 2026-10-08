@@ -1,8 +1,9 @@
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError, AxiosHeaders } from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
 
-import log from '@apify/log';
+import log, { LoggerJson } from '@apify/log';
 
 import { SchemaTooLargeError } from '../../src/errors.js';
 import { MAX_UNTRUSTED_SCHEMA_BYTES } from '../../src/tools/actor_input_schema.js';
@@ -172,6 +173,99 @@ describe('logHttpError', () => {
         const output = consoleError.mock.calls.flat().join('\n');
         expect(output).toContain('connect ECONNREFUSED');
         expect(output).not.toContain('test-token');
+    });
+
+    const requestConfig = { headers: new AxiosHeaders({ Authorization: 'Bearer test-token' }) };
+    const buildAxiosFailure = () => new AxiosError('connect ECONNREFUSED 127.0.0.1:443', 'ECONNREFUSED', requestConfig);
+    const loggedAxiosFailure = {
+        name: 'AxiosError',
+        message: 'connect ECONNREFUSED 127.0.0.1:443',
+        stack: expect.any(String),
+        code: 'ECONNREFUSED',
+    };
+
+    // The text format prints only the stack, `type` and cause of a logged error; JSON prints every field.
+    function logHttpErrorAsJson(error: unknown): Record<string, unknown> {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { logger } = log.getOptions();
+        log.setOptions({ logger: new LoggerJson() });
+        try {
+            logHttpError(error, 'Failed to get Actor run');
+        } finally {
+            log.setOptions({ logger });
+        }
+        return JSON.parse(consoleError.mock.calls[0][0]);
+    }
+
+    it.each([
+        {
+            input: 'an HTTP 5xx axios failure',
+            error: Object.assign(buildAxiosFailure(), { statusCode: 500 }),
+            field: 'exception',
+            logged: loggedAxiosFailure,
+        },
+        {
+            input: 'an HTTP 5xx API error',
+            error: Object.assign(new Error('API said no'), { statusCode: 500, type: 'some-type' }),
+            field: 'exception',
+            logged: { name: 'Error', message: 'API said no', stack: expect.any(String), type: 'some-type' },
+        },
+        {
+            input: 'an MCP server error caused by an axios failure',
+            error: Object.assign(new McpError(ErrorCode.InternalError, 'boom'), { cause: buildAxiosFailure() }),
+            field: 'exception',
+            logged: {
+                name: 'McpError',
+                message: 'MCP error -32603: boom',
+                stack: expect.any(String),
+                cause: loggedAxiosFailure,
+            },
+        },
+        {
+            input: 'an HTTP 5xx error with a non-Error cause',
+            error: Object.assign(new Error('outer', { cause: { config: requestConfig } }), { statusCode: 500 }),
+            field: 'exception',
+            logged: { name: 'Error', message: 'outer', stack: expect.any(String) },
+        },
+        { input: 'a string', error: 'a string', field: 'error', logged: { name: 'Error', message: 'a string' } },
+        {
+            input: 'a plain object',
+            error: { message: 'object message', config: requestConfig },
+            field: 'error',
+            logged: { name: 'Error', message: '[object Object]' },
+        },
+    ])('keeps the request config out when logging $input', ({ error, field, logged }) => {
+        const line = logHttpErrorAsJson(error);
+
+        expect(JSON.stringify(line)).not.toContain('test-token');
+        expect(line[field]).toEqual(logged);
+    });
+
+    it.each([
+        {
+            input: 'a cyclic cause chain',
+            buildError: () => {
+                const error = new Error('cyclic');
+                error.cause = error;
+                return error;
+            },
+        },
+        {
+            input: 'a cause chain 20,000 deep',
+            buildError: () => {
+                let error = new Error('level 0');
+                for (let level = 1; level < 20_000; level++) {
+                    error = new Error(`level ${level}`, { cause: error });
+                }
+                return error;
+            },
+        },
+        { input: 'a null-prototype cause', buildError: () => new Error('outer', { cause: Object.create(null) }) },
+    ])('logs an error with $input without throwing', ({ buildError }) => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        expect(() => logHttpError(buildError(), 'Failed to get Actor run')).not.toThrow();
+        expect(consoleError).toHaveBeenCalledTimes(1);
     });
 });
 
