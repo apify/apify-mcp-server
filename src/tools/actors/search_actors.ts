@@ -229,10 +229,9 @@ export const searchActors: ToolEntry = Object.freeze({
             ...(footer && { instructions: footer }),
         };
 
-        // Build header and footer with separate `dedent` calls and concatenate around
-        // `actorCardText` — Actor cards may contain tab-indented lines (pay-per-event
-        // pricing) that would corrupt `dedent`'s indent detection if interpolated into
-        // the surrounding template.
+        // Only the header uses `dedent`; `actorCardText` is joined after it, not interpolated
+        // — Actor cards may contain tab-indented lines (pay-per-event pricing) that would
+        // corrupt `dedent`'s indent detection if interpolated into the template.
         const header = dedent`
             # Search results:
             - **Search query:** ${parsed.keywords}
