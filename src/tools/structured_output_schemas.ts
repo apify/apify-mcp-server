@@ -727,8 +727,7 @@ export const actorRunOutputSchema = {
                 },
                 recommendedActorId: {
                     type: 'string',
-                    description:
-                        'Apify Actor ID the tip recommends running next, when it names one — pass directly as `actor` to call-actor or fetch-actor-details',
+                    description: 'Apify Actor ID the tip recommends, when it names one',
                 },
             },
             required: ['message'],

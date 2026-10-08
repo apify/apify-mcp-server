@@ -130,19 +130,21 @@ export function buildNoActorsFoundInstructions(keywords: string): string {
     `;
 }
 
+/** Told when the session cannot run an Actor it surfaces (search results, a run's tip). */
+export const ACTOR_CALLABILITY_CAVEAT = dedent`
+    This session can run only Actors already exposed as dedicated tools. Other Actors found
+    here are informational and cannot be run in this configuration. To use another Actor, open
+    its Apify page or configure it separately.
+`;
+
 /** Caveat for the whole result list — appended only when at least one result lacks a run path. */
 export function buildActorCallabilityCaveat(
     actorIds: readonly string[],
     loadedToolNames: readonly string[],
     loadedActorIds: ReadonlySet<string>,
 ): string {
-    const anyResultCannotRun = actorIds.some((id) => !canRunActor(id, loadedToolNames, loadedActorIds));
-    if (!anyResultCannotRun) return '';
-    return dedent`
-        This session can run only Actors already exposed as dedicated tools. Other Actors found
-        here are informational and cannot be run in this configuration. To use another Actor, open
-        its Apify page or configure it separately.
-    `;
+    const canRunAllActors = actorIds.every((id) => canRunActor(id, loadedToolNames, loadedActorIds));
+    return canRunAllActors ? '' : ACTOR_CALLABILITY_CAVEAT;
 }
 
 /**

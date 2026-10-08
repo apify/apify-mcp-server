@@ -16,6 +16,7 @@ import {
     WAIT_SECS_MAX,
     WIDGET_NO_POLL_NEXT_STEP,
 } from '../actors/actor_run_response.js';
+import { ACTOR_CALLABILITY_CAVEAT } from '../actors/search_actors.js';
 import { actorRunOutputSchema } from '../structured_output_schemas.js';
 
 /** Default `waitSecs` for `get-actor-run`. Intentionally non-zero so polling callers wait briefly by default. */
@@ -62,15 +63,18 @@ export function buildGetActorRunError(runId: string, error: unknown): ToolRespon
 /**
  * Build the success response. `content[0]` is the JSON-stringified `structuredContent`
  * mirror (per MCP spec); `content[1]` carries an LLM-readable narrative of `summary` + `nextStep`.
+ * Without `hasCallActorTool`, the tip is followed by the callability caveat.
  */
 export function buildGetActorRunResponse(
-    params: FetchActorRunResult & { linkContext?: ConsoleLinkContext },
+    params: FetchActorRunResult & { linkContext?: ConsoleLinkContext; hasCallActorTool?: boolean },
 ): ToolResponse {
-    const { run, structuredContent, linkContext } = params;
+    const { run, structuredContent, linkContext, hasCallActorTool = true } = params;
+    const { tip } = structuredContent;
 
     // Mints the `apifyConsoleUrl` fields onto structuredContent and returns the narrative suffix in one pass.
     const consoleLinks = applyConsoleLinks(structuredContent, linkContext);
-    const tipText = structuredContent.tip ? `\nTip from Actor:\n\`\`\`\n${structuredContent.tip.message}\n\`\`\`` : '';
+    const tipCaveat = hasCallActorTool ? '' : `\n${ACTOR_CALLABILITY_CAVEAT}`;
+    const tipText = tip ? `\nTip from Actor:\n\`\`\`\n${tip.message}\n\`\`\`${tipCaveat}` : '';
     return respondOk(
         [
             JSON.stringify(structuredContent),
@@ -126,7 +130,15 @@ export const getActorRun: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, apifyToken, progressTracker, mcpSessionId, signal } = toolArgs;
+        const {
+            args,
+            apifyClient: client,
+            apifyToken,
+            progressTracker,
+            mcpSessionId,
+            signal,
+            loadedToolNames,
+        } = toolArgs;
         const parsed = getActorRunArgs.parse(args);
 
         try {
@@ -147,6 +159,7 @@ export const getActorRun: ToolEntry = Object.freeze({
             return buildGetActorRunResponse({
                 ...fetchResult.result,
                 linkContext: await getConsoleLinkContext(apifyToken, client),
+                hasCallActorTool: loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL),
             });
         } catch (error) {
             logHttpError(error, 'Failed to get Actor run', { runId: parsed.runId });
