@@ -7,6 +7,7 @@ import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondUserError } from '../../utils/mcp.js';
 import { apifyApiCallOutputSchema } from '../structured_output_schemas.js';
+import { validateApiBlocklist } from './apify_api_blocklist.js';
 import {
     API_CALL_DESCRIPTION,
     apiCallArgsShape,
@@ -120,6 +121,16 @@ export const apifyApiWrite: ToolEntry = Object.freeze({
     redactArgs: redactApiCallArgs,
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = apifyApiWriteArgs.parse(toolArgs.args);
+        // Before the method is inferred: the spec leaves a refused path out, so inference would ask for a method.
+        // callApi checks again, with the method.
+        const refusal = validateApiBlocklist({
+            toolName: HELPER_TOOLS.API_WRITE,
+            method: parsed.method,
+            normalizedPath: normalizeApiPath(parsed.path),
+            query: parsed.query,
+            loadedToolNames: toolArgs.loadedToolNames,
+        });
+        if (refusal) return respondUserError(refusal);
         const body = parseBody(parsed.body);
         if ('error' in body) return respondUserError(body.error);
         const resolved = parsed.method

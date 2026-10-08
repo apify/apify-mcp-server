@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { HELPER_TOOLS } from '../../src/const.js';
+import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
 import {
     APIFY_API_OPENAPI_URL,
     buildApiOperationIndex,
@@ -16,6 +18,43 @@ describe('buildApiOperationIndex()', () => {
         expect(index.has('outside_get')).toBe(false);
         expect([...index.values()].every((operation) => operation.operationId)).toBe(true);
         expect(index.size).toBe(38);
+    });
+
+    it('leaves out the operations a rule names', () => {
+        const rules: ApiBlockRule[] = [
+            { operation: { methods: ['GET'], path: '/v2/datasets/{datasetId}' }, reason: 'No.' },
+            { operation: { methods: ['DELETE'], path: '/v2/actors/{actorId}' }, reason: 'No.' },
+            // A literal segment matches only itself, not a parameter of the spec.
+            { operation: { methods: ['GET'], path: '/v2/users/me' }, reason: 'No.' },
+        ];
+
+        const blockedIndex = buildApiOperationIndex(API_SPEC_FIXTURE, rules);
+
+        expect([...index.keys()].filter((operationId) => !blockedIndex.has(operationId))).toEqual([
+            'dataset_get',
+            'actor_delete',
+            'users_me_get',
+        ]);
+    });
+
+    it('drops a query parameter only from the operations of the tools its rule names', () => {
+        const rules: ApiBlockRule[] = [
+            { queryParam: 'limit', toolNames: [HELPER_TOOLS.API_WRITE], reason: 'Refused.' },
+        ];
+        const parameters = [{ name: 'limit', in: 'query' }];
+        const spec = {
+            paths: {
+                '/v2/things': {
+                    get: { operationId: 'things_get', parameters },
+                    post: { operationId: 'things_post', parameters },
+                },
+            },
+        };
+
+        const thingIndex = buildApiOperationIndex(spec, rules);
+
+        expect(thingIndex.get('things_get')?.parameters.map(({ name }) => name)).toEqual(['limit']);
+        expect(thingIndex.get('things_post')?.parameters).toEqual([]);
     });
 
     it('indexes a PATCH operation, which the published spec does not have yet', () => {

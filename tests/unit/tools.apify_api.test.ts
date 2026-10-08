@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
+import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
+import { API_BLOCK_RULES } from '../../src/tools/api/apify_api_blocklist.js';
 import { apifyApiDetails } from '../../src/tools/api/apify_api_details.js';
 import { apifyApiRead } from '../../src/tools/api/apify_api_read.js';
 import {
@@ -245,6 +247,42 @@ describe('apify-api-details', () => {
             expect(logged.path).toBe(`${path.slice(0, path.indexOf('?'))}?[REDACTED]`);
             expect(JSON.stringify(logged)).not.toContain('secret');
         }
+    });
+
+    describe('with a test-only rule in the published list', () => {
+        /** Calls the tool while the rule is in the list, so the index the tool loads leaves out what it names. */
+        async function callDetailsWithRule(rule: ApiBlockRule, args: Record<string, unknown>) {
+            const rules = API_BLOCK_RULES as ApiBlockRule[];
+            rules.push(rule);
+            try {
+                return await callTool(apifyApiDetails, args);
+            } finally {
+                rules.pop();
+            }
+        }
+
+        it('refuses a literal path a rule names, not the parameter path next to it', async () => {
+            const rule: ApiBlockRule = { operation: { methods: ['GET'], path: '/v2/users/me' }, reason: 'No.' };
+
+            const result = await callDetailsWithRule(rule, { path: 'users/me' });
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toBe('No.');
+        });
+
+        it('refuses a method a rule names and returns the methods it does not name', async () => {
+            const rule: ApiBlockRule = {
+                operation: { methods: ['GET'], path: '/v2/datasets/{datasetId}' },
+                reason: 'No.',
+            };
+
+            const refused = await callDetailsWithRule(rule, { path: 'datasets/abc', method: 'GET' });
+            const allowed = await callDetailsWithRule(rule, { path: 'datasets/abc', method: 'PUT' });
+
+            expectSoftFailInvalidInput(refused);
+            expect(refused.content[0].text).toBe('No.');
+            expect(allowed.content[1].text).toBe('/v2/datasets/{datasetId}: PUT.');
+        });
     });
 
     it('names the search tool on a path not in the spec only when the session has it', async () => {

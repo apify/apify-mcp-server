@@ -12,6 +12,7 @@ import { isApifyApiUri, isMaxContentLengthAbort } from '../../resources/api_reso
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
+import { getApiCallToolName, PATH_PARAMETER_SEGMENT_REGEX, validateApiBlocklist } from './apify_api_blocklist.js';
 import type { ApiMethod, ApiOperation } from './apify_api_spec.js';
 import { fetchApiOperationIndex, isRecord } from './apify_api_spec.js';
 
@@ -91,8 +92,6 @@ function stripQuery(path: string): string {
 function toSpecPath(normalizedPath: string): string {
     return stripQuery(normalizedPath).replace(/^acts(?=\/|$)/, 'actors');
 }
-
-const PATH_PARAMETER_SEGMENT_REGEX = /^\{[^{}]+\}$/;
 
 /** How many literal segments of the template match the path segments, or `undefined` when it does not match. */
 function countMatchingLiterals(template: string, segments: string[]): number | undefined {
@@ -283,6 +282,14 @@ export async function callApi(params: {
 }): Promise<ToolResponse> {
     const { client, method } = params;
     const normalizedPath = normalizeApiPath(params.path);
+    const refusal = validateApiBlocklist({
+        toolName: getApiCallToolName(method),
+        method,
+        normalizedPath,
+        query: params.query,
+        loadedToolNames: params.loadedToolNames,
+    });
+    if (refusal) return respondUserError(refusal);
     const path = formatApiPath(normalizedPath);
     // `client.baseUrl` already ends with /v2.
     const url = `${client.baseUrl}/${normalizedPath}`;

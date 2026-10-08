@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 import { apifyApiOperationsCache } from '../../state.js';
+import type { ApiBlockRule } from './apify_api_blocklist.js';
+import { API_BLOCK_RULES, applyApiBlocklist } from './apify_api_blocklist.js';
 
 export const APIFY_API_OPENAPI_URL = 'https://docs.apify.com/api/openapi.json';
 
@@ -142,11 +144,16 @@ function parseRequestBody(rawRequestBody: unknown, spec: unknown): ApiOperation[
 }
 
 /**
- * Builds the operation index from an OpenAPI document. Deprecated operations, HEAD operations,
- * and anything outside `/v2/` are left out; malformed entries are skipped rather than failing the whole spec.
+ * Builds the operation index from an OpenAPI document. Deprecated operations, HEAD operations, and anything
+ * outside `/v2/` are left out; malformed entries are skipped rather than failing the whole spec. So are the
+ * operations and query parameters a rule refuses to the tool that sends the method (`applyApiBlocklist`),
+ * so no tool that reads the index offers them.
  * It throws when the spec lists no operation.
  */
-export function buildApiOperationIndex(spec: unknown): Map<string, ApiOperation> {
+export function buildApiOperationIndex(
+    spec: unknown,
+    rules: readonly ApiBlockRule[] = API_BLOCK_RULES,
+): Map<string, ApiOperation> {
     const index = new Map<string, ApiOperation>();
     const paths = isRecord(spec) && isRecord(spec.paths) ? spec.paths : {};
     for (const [path, pathItem] of Object.entries(paths)) {
@@ -156,17 +163,21 @@ export function buildApiOperationIndex(spec: unknown): Map<string, ApiOperation>
             if (!parsed.success || parsed.data.deprecated) continue;
             const { operationId, summary, description, tags, parameters, requestBody } = parsed.data;
             const body = parseRequestBody(requestBody, spec);
-            index.set(operationId, {
-                operationId,
-                method,
-                path,
-                summary: summary ?? '',
-                description: description ?? '',
-                docsUrl: `${API_DOCS_BASE_URL}/${splitWords(operationId).join('-')}`,
-                tags: tags ?? [],
-                parameters: parseParameters(parameters, spec),
-                ...(body && { requestBody: body }),
-            });
+            const operation = applyApiBlocklist(
+                {
+                    operationId,
+                    method,
+                    path,
+                    summary: summary ?? '',
+                    description: description ?? '',
+                    docsUrl: `${API_DOCS_BASE_URL}/${splitWords(operationId).join('-')}`,
+                    tags: tags ?? [],
+                    parameters: parseParameters(parameters, spec),
+                    ...(body && { requestBody: body }),
+                },
+                rules,
+            );
+            if (operation) index.set(operationId, operation);
         }
     }
     if (index.size === 0) throw new Error('the spec lists no /v2/ operations.');

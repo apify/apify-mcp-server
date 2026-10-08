@@ -7,6 +7,7 @@ import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { apifyApiDetailsOutputSchema } from '../structured_output_schemas.js';
+import { validateApiPathBlocklist } from './apify_api_blocklist.js';
 import {
     findPathOperations,
     formatApiPath,
@@ -69,8 +70,16 @@ export const apifyApiDetails: ToolEntry = Object.freeze({
     redactArgs: redactApiCallArgs,
     call: async (toolArgs: InternalToolArgs) => {
         const parsed = apifyApiDetailsArgs.parse(toolArgs.args);
-        const index = await fetchApiOperationIndex();
         const normalizedPath = normalizeApiPath(parsed.path);
+        // Before the lookup: the index leaves out the operations the call tools refuse, so the lookup could
+        // match a path next to a refused one or say a refused method is missing.
+        const refusal = validateApiPathBlocklist({
+            normalizedPath,
+            method: parsed.method,
+            loadedToolNames: toolArgs.loadedToolNames,
+        });
+        if (refusal) return respondUserError(refusal);
+        const index = await fetchApiOperationIndex();
         const path = formatApiPath(normalizedPath);
         const matched = findPathOperations(index, normalizedPath);
         if (matched.length === 0) {
