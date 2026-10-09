@@ -15,6 +15,8 @@ import { getHttpErrorHint } from '../utils/mcp.js';
 
 const TEXT_MIME_TYPE = 'text/plain';
 
+export const REDACTED = '[REDACTED]';
+
 /** Textual base MIME types (returned as `text`); everything else becomes a base64 `blob`. */
 function isTextualMimeType(baseMimeType: string | undefined): boolean {
     if (!baseMimeType) return false;
@@ -168,13 +170,36 @@ function parseApiErrorMessage(body: Buffer | undefined): string | undefined {
     }
 }
 
+/** A response can echo the session token, as `GET /v2/browser-info` echoes the request headers. */
+export function maskSessionToken(body: Buffer, token: string | undefined): Buffer {
+    if (!token) return body;
+    // The token is ASCII, so a latin1 round trip keeps every other byte as it is.
+    const bytes = body.toString('latin1');
+    return bytes.includes(token) ? Buffer.from(bytes.replaceAll(token, REDACTED), 'latin1') : body;
+}
+
+/**
+ * The unescaped closing quote and colon distinguish keys from string contents.
+ * Disjoint value branches keep the scan linear.
+ */
+const URL_SIGNING_SECRET_KEY_VALUE_RE = /("urlSigningSecretKey"\s*:\s*)"(?:[^"\\]|\\[\s\S])*"/g;
+
+/**
+ * Hide storage signing keys without parsing JSON, preserving formatting and large integers (apify/ai-team#330).
+ * Parsing and re-indenting deeply nested bodies can exhaust memory. Null values and escaped key names stay as is.
+ */
+export function redactUrlSigningSecretKey(json: string): string {
+    return json.replace(URL_SIGNING_SECRET_KEY_VALUE_RE, `$1"${REDACTED}"`);
+}
+
 /**
  * Read any Apify API GET endpoint as an MCP resource.
  *
  * A thin streaming proxy: the apify-client injects the session token (and the MCP-origin header),
- * the body streams in verbatim and is returned by its declared Content-Type — textual types
+ * the body streams in and is returned by its declared Content-Type — textual types
  * (text/*, JSON, XML) as `text`, anything else as a base64 `blob`. The body is never parsed, so
- * JSON primitives, formatting, and bytes round-trip exactly.
+ * JSON primitives, formatting, and bytes round-trip exactly, except that the session token and
+ * `urlSigningSecretKey` values in JSON become `[REDACTED]`.
  *
  * Genuine failures (no token, bad origin, a missing resource, a bad token, a 5xx, a network error)
  * throw a domain error (`InvalidParamsError`/`InternalError`) that the protocol adapters
@@ -209,7 +234,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     let body: Buffer | undefined;
     let overLimit = false;
     try {
-        body = await collectStream(response.data);
+        body = maskSessionToken(await collectStream(response.data), apifyClient.token);
     } catch (err) {
         if (isMaxContentLengthAbort(err)) {
             overLimit = true;
@@ -255,7 +280,13 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     // base64 beats text in a wrong encoding), the same rule as apify-client's body_parser. The full
     // Content-Type — charset included — rides along on the text result.
     if (isTextualMimeType(baseMimeType) && Buffer.isEncoding(charset)) {
-        return buildTextResult(uri, body.toString(charset), contentType);
+        const text = body.toString(charset);
+        // apify-client parses only `application/json`, so both proxies redact the same bodies.
+        return buildTextResult(
+            uri,
+            baseMimeType === 'application/json' ? redactUrlSigningSecretKey(text) : text,
+            contentType,
+        );
     }
     // Binary or undecodable text: base MIME type only (parameters are meaningless for a blob).
     return {

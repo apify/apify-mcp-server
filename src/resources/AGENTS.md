@@ -28,17 +28,23 @@ identity with the platform's own URLs is the feature. Revisit when tools start e
 `resource_link`s, where clients may fetch `https://` URIs directly. `isApifyApiUri()` gates reads
 to the configured API origin and rejects userinfo-bearing URLs (axios drops the `Authorization`
 header for those, silently degrading to unauthenticated). The API tools' `callApi`
-(`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()` and `isMaxContentLengthAbort()`, so
-a change to either changes the tools too.
+(`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`, `isMaxContentLengthAbort()`,
+`maskSessionToken()`, `redactUrlSigningSecretKey()` and `REDACTED`, so a change to any changes the
+tools too.
 
 `sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through
 `httpClient.axios.request` with `maxContentLength: MAX_INLINE_BYTES`. `readApiResource()` sends
-`{ method: 'GET', responseType: 'stream' }` through it, streams the body verbatim, and branches
+`{ method: 'GET', responseType: 'stream' }` through it, streams the body, and branches
 on the declared Content-Type: textual base types (text/*, JSON, XML) as `text` with the full
 header, decoded with the declared charset (default utf-8; a charset Node cannot decode falls
 through to blob — lossless beats mangled text, same rule as apify-client's body_parser);
 everything else (including no Content-Type) as a base64 `blob` with the base MIME type; empty body
-as empty text preserving the Content-Type. The body is never parsed, so bytes round-trip exactly. axios enforces `MAX_INLINE_BYTES` (256 KB) mid-consumption on streamed
+as empty text preserving the Content-Type. The body is never parsed, so bytes round-trip exactly,
+except: the session token becomes `[REDACTED]` (`maskSessionToken()`; `/v2/browser-info` echoes the
+`Authorization` header), and so does the `urlSigningSecretKey` value in an `application/json` body
+(`redactUrlSigningSecretKey()`). The key is redacted, not removed: removal means re-serializing, which
+loses formatting and big-number precision and cost about 1 GB on a crafted deep body.
+axios enforces `MAX_INLINE_BYTES` (256 KB) mid-consumption on streamed
 responses (axios ≥1.16: byte-counting wrapper throws `ERR_BAD_RESPONSE`, counting decoded bytes) —
 after the request resolves, outside any retry wrapper. On trip, the proxy links out: a `text/plain`
 block carrying the store's signed `recordPublicUrl` for a KVS record, else the token-gated API URL,

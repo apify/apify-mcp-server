@@ -7,7 +7,14 @@ import { z } from 'zod';
 import type { ApifyClient } from '../../apify_client.js';
 import { sendApifyApiRequest } from '../../apify_client.js';
 import { APIFY_ERROR_TYPE_PAGE_NOT_FOUND, HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
-import { isApifyApiUri, isMaxContentLengthAbort } from '../../resources/api_resources.js';
+import {
+    isApifyApiUri,
+    isMaxContentLengthAbort,
+    maskSessionToken,
+    REDACTED,
+    redactUrlSigningSecretKey,
+} from '../../resources/api_resources.js';
+import { toPlainError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
@@ -39,9 +46,6 @@ so prefer asynchronous runs.`;
 
 /** Query parameters whose values grant access or carry secrets; `webhooks` can hold webhook headers. */
 const SECRET_QUERY_PARAMS: readonly string[] = ['token', 'signature', 'webhooks'];
-
-/** Stands in for a logged or returned value that may carry a secret. */
-const REDACTED = '[REDACTED]';
 
 /**
  * The logged copy of an API tool call's arguments (`redactArgs`), built as an allowlist. Secret query
@@ -230,25 +234,11 @@ async function addClosestPaths(error: ApifyApiError, normalizedPath: string, sig
  */
 function maskToken(data: unknown, token: string | undefined): unknown {
     if (!token || data === undefined) return data;
-    if (Buffer.isBuffer(data)) {
-        // The token is ASCII, so a latin1 round trip keeps every other byte as it is.
-        const bytes = data.toString('latin1');
-        return bytes.includes(token) ? Buffer.from(bytes.replaceAll(token, REDACTED), 'latin1') : data;
-    }
+    if (Buffer.isBuffer(data)) return maskSessionToken(data, token);
     const text = JSON.stringify(data);
     // The token as it appears inside a JSON string.
     const escapedToken = JSON.stringify(token).slice(1, -1);
     return text.includes(escapedToken) ? JSON.parse(text.replaceAll(escapedToken, REDACTED)) : data;
-}
-
-/**
- * The request failure as a plain error with only its message and code: the axios error holds the
- * Authorization header and the request body, and the tool error log prints the whole error.
- */
-function toPlainRequestError(error: unknown): Error {
-    if (!(error instanceof Error)) return new Error(String(error));
-    const { code } = error as { code?: unknown };
-    return Object.assign(new Error(error.message), typeof code === 'string' ? { code } : {});
 }
 
 /**
@@ -292,7 +282,7 @@ export async function callApi(params: {
                 }),
             );
         }
-        throw toPlainRequestError(error);
+        throw toPlainError(error);
     }
     const data = maskToken(response.data, params.token);
     if (response.status >= 300) {
@@ -317,5 +307,8 @@ export async function callApi(params: {
         ? `${method} ${path} returned HTTP ${response.status} with a binary body ` +
           `(${contentType ?? 'no Content-Type'}, ${(data as Buffer).length} bytes), which is not shown.`
         : `${method} ${path} returned HTTP ${response.status}.`;
-    return respondOk([JSON.stringify(structuredContent), summary], { structuredContent });
+    // A text body is an escaped JSON string here, so it never matches.
+    const json = JSON.stringify(structuredContent);
+    const text = redactUrlSigningSecretKey(json);
+    return respondOk([text, summary], { structuredContent: text === json ? structuredContent : JSON.parse(text) });
 }

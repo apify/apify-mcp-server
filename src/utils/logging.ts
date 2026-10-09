@@ -129,6 +129,24 @@ function getMcpErrorCode(error: unknown): number | undefined {
 }
 
 /**
+ * Drop request config and bodies, which can carry credentials (apify/ai-team#330).
+ * Keep the original stack and API error type for diagnosis. Bound cause chains like @apify/log does,
+ * and drop object causes that could carry config. Non-Errors have no original stack to preserve.
+ */
+export function toPlainError(error: unknown, causeDepth = 3): Error {
+    if (!(error instanceof Error)) return Object.assign(new Error(String(error)), { stack: undefined });
+    const { code, type } = error as { code?: unknown; type?: unknown };
+    return Object.assign(new Error(error.message), {
+        name: error.name,
+        stack: error.stack,
+        ...(typeof code === 'string' && { code }),
+        ...(typeof type === 'string' && { type }),
+        ...(error.cause instanceof Error && causeDepth > 0 && { cause: toPlainError(error.cause, causeDepth - 1) }),
+        ...(['string', 'number', 'boolean'].includes(typeof error.cause) && { cause: String(error.cause) }),
+    });
+}
+
+/**
  * Logs HTTP or MCP errors at the appropriate level:
  * - Client errors (HTTP < 500, or JSON-RPC client/transient codes) → softFail (no stack).
  * - Zod validation / SchemaTooLarge / Actor run-limit → softFail (untrusted input or billing).
@@ -179,9 +197,8 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
         return;
     }
     if (statusCode !== undefined && statusCode >= 500) {
-        // HTTP server errors (>= 500) - exception with full error (includes stack trace)
-        const errorObj = error instanceof Error ? error : new Error(String(error));
-        log.exception(errorObj, message, { statusCode, ...data });
+        // HTTP server errors (>= 500) - exception with stack trace
+        log.exception(toPlainError(error), message, { statusCode, ...data });
         return;
     }
 
@@ -190,14 +207,13 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
         if (SOFT_MCP_ERROR_CODES.has(mcpErrorCode)) {
             log.softFail(message, { errMessage: softErrMessage, mcpErrorCode, ...data });
         } else {
-            const errorObj = error instanceof Error ? error : new Error(String(error));
-            log.exception(errorObj, message, { mcpErrorCode, ...data });
+            log.exception(toPlainError(error), message, { mcpErrorCode, ...data });
         }
         return;
     }
 
     // No status code available - log as error
-    log.error(message, { error, ...data });
+    log.error(message, { error: toPlainError(error), ...data });
 }
 
 const REDACTED_VALUE = '[REDACTED]';
