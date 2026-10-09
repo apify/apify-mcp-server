@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
-import { isApiOperationBlocked, validateApiBlocklist } from '../../src/tools/api/apify_api_blocklist.js';
+import { isEndpointBlocked, isQueryBlocked, validateApiBlocklist } from '../../src/tools/api/apify_api_blocklist.js';
 import { normalizeApiPath } from '../../src/tools/api/apify_api_request.js';
 import { API_METHODS } from '../../src/tools/api/apify_api_spec.js';
 
@@ -12,11 +12,60 @@ const METHOD_PARAM_REFUSAL =
 const SYNC_RUN_REFUSAL =
     'A GET to the synchronous run endpoints starts a paid run, as a POST does, so the API tools do not send it.';
 
-/** A test-only operation rule. */
+/** A test-only endpoint rule. */
 const RUN_NOW_RULE: ApiBlockRule = {
     match: { method: 'GET', path: '/v2/actors/{actorId}/run-now' },
     reason: 'No run-now.',
 };
+
+/** The same rule with its path written without /v2. */
+const RUN_NOW_RULE_WITHOUT_V2: ApiBlockRule = {
+    ...RUN_NOW_RULE,
+    match: { method: 'GET', path: 'actors/{actorId}/run-now' },
+};
+
+/** Normalized paths whose GET the run-now rule refuses. */
+const RUN_NOW_PATHS = [
+    'actors/abc/run-now',
+    'actors/abc/run-now?limit=1',
+    // The API routes paths case-insensitively and ignores a trailing slash.
+    'Actors/ABC/Run-Now',
+    'actors/abc/run-now/',
+    // The API routes the legacy acts prefix like actors.
+    'acts/john~my-actor/run-now',
+    'ACTS/abc/run-now',
+    // A slash encoded in a name is decoded after routing, so the name is one segment.
+    'actors/apify%2Fhello-world/run-now',
+    // The URL is resolved before it is sent: dot segments, a backslash, and a newline.
+    'actors/abc/x/../run-now',
+    'actors/abc/%2e%2e/abc/run-now',
+    'actors\\abc\\run-now',
+    'actors/abc/run-\nnow',
+    // Escapes in a literal segment are decoded, in case anything before the router decodes them.
+    'actors/abc/run%2Dnow',
+    // Empty segments are ignored, in case anything before the router merges doubled slashes.
+    'actors//abc//run-now',
+    'actors/abc/run-now//',
+];
+
+/** Normalized paths whose GET the run-now rule lets through. */
+const NOT_RUN_NOW_PATHS = [
+    'actors/abc/run-now-x',
+    'actors/run-now',
+    'actors//run-now',
+    'actors/apify/hello-world/run-now',
+    'actor-runs/abc/run-now',
+    'actsx/abc/run-now',
+    'actors/abc/run-now/x',
+];
+
+/** Spec endpoints, each with whether the run-now rule blocks it. */
+const RUN_NOW_TEMPLATE_CASES = [
+    { method: 'GET', path: '/v2/actors/{actorId}/run-now', isBlocked: true },
+    { method: 'POST', path: '/v2/actors/{actorId}/run-now', isBlocked: false },
+    { method: 'GET', path: '/v2/actors/{actorId}/runs', isBlocked: false },
+    { method: 'GET', path: '/v2/actors/{actorId}', isBlocked: false },
+] as const;
 
 /** Validates a GET in a session with no tools, unless the params say otherwise. */
 function validate(
@@ -83,41 +132,12 @@ describe('validateApiBlocklist()', () => {
         );
     });
 
-    describe('an operation rule', () => {
-        it.each([
-            'actors/abc/run-now',
-            'actors/abc/run-now?limit=1',
-            // The API routes paths case-insensitively and ignores a trailing slash.
-            'Actors/ABC/Run-Now',
-            'actors/abc/run-now/',
-            // The API routes the legacy acts prefix like actors.
-            'acts/john~my-actor/run-now',
-            'ACTS/abc/run-now',
-            // A slash encoded in a name is decoded after routing, so the name is one segment.
-            'actors/apify%2Fhello-world/run-now',
-            // The URL is resolved before it is sent: dot segments, a backslash, and a newline.
-            'actors/abc/x/../run-now',
-            'actors/abc/%2e%2e/abc/run-now',
-            'actors\\abc\\run-now',
-            'actors/abc/run-\nnow',
-            // Escapes in a literal segment are decoded, in case anything before the router decodes them.
-            'actors/abc/run%2Dnow',
-            // Empty segments are ignored, in case anything before the router merges doubled slashes.
-            'actors//abc//run-now',
-            'actors/abc/run-now//',
-        ])('refuses a GET to %j', (normalizedPath) => {
+    describe('an endpoint rule', () => {
+        it.each(RUN_NOW_PATHS)('refuses a GET to %j', (normalizedPath) => {
             expect(validate({ normalizedPath }, [RUN_NOW_RULE])).toBe('No run-now.');
         });
 
-        it.each([
-            'actors/abc/run-now-x',
-            'actors/run-now',
-            'actors//run-now',
-            'actors/apify/hello-world/run-now',
-            'actor-runs/abc/run-now',
-            'actsx/abc/run-now',
-            'actors/abc/run-now/x',
-        ])('does not refuse a GET to %j', (normalizedPath) => {
+        it.each(NOT_RUN_NOW_PATHS)('does not refuse a GET to %j', (normalizedPath) => {
             expect(validate({ normalizedPath }, [RUN_NOW_RULE])).toBeUndefined();
         });
 
@@ -149,6 +169,16 @@ describe('validateApiBlocklist()', () => {
             };
 
             expect(validate({ normalizedPath: 'actors/abc/run-now', loadedToolNames }, [rule])).toBe(refusal);
+        });
+    });
+
+    describe('an endpoint rule with its path written without /v2', () => {
+        it.each(RUN_NOW_PATHS)('refuses a GET to %j', (normalizedPath) => {
+            expect(validate({ normalizedPath }, [RUN_NOW_RULE_WITHOUT_V2])).toBe('No run-now.');
+        });
+
+        it.each(NOT_RUN_NOW_PATHS)('does not refuse a GET to %j', (normalizedPath) => {
+            expect(validate({ normalizedPath }, [RUN_NOW_RULE_WITHOUT_V2])).toBeUndefined();
         });
     });
 
@@ -218,27 +248,29 @@ describe('validateApiBlocklist()', () => {
     });
 });
 
-describe('isApiOperationBlocked()', () => {
-    it.each([
-        { method: 'GET', path: '/v2/actors/{actorId}/run-now', isBlocked: true },
-        { method: 'POST', path: '/v2/actors/{actorId}/run-now', isBlocked: false },
-        { method: 'GET', path: '/v2/actors/{actorId}/runs', isBlocked: false },
-        { method: 'GET', path: '/v2/actors/{actorId}', isBlocked: false },
-    ] as const)('returns $isBlocked for $method $path', ({ method, path, isBlocked }) => {
-        expect(isApiOperationBlocked(method, path, [RUN_NOW_RULE])).toBe(isBlocked);
+describe('isEndpointBlocked()', () => {
+    it.each(RUN_NOW_TEMPLATE_CASES)('returns $isBlocked for $method $path', ({ method, path, isBlocked }) => {
+        expect(isEndpointBlocked(method, path, [RUN_NOW_RULE])).toBe(isBlocked);
     });
+
+    it.each(RUN_NOW_TEMPLATE_CASES)(
+        'returns $isBlocked for $method $path when the rule path is written without /v2',
+        ({ method, path, isBlocked }) => {
+            expect(isEndpointBlocked(method, path, [RUN_NOW_RULE_WITHOUT_V2])).toBe(isBlocked);
+        },
+    );
 
     it('matches a literal segment of a rule only to that literal, not to a parameter of the spec', () => {
         const rules: ApiBlockRule[] = [{ match: { method: 'GET', path: '/v2/users/me' }, reason: 'No.' }];
 
-        expect(isApiOperationBlocked('GET', '/v2/users/me', rules)).toBe(true);
-        expect(isApiOperationBlocked('GET', '/v2/users/{userId}', rules)).toBe(false);
+        expect(isEndpointBlocked('GET', '/v2/users/me', rules)).toBe(true);
+        expect(isEndpointBlocked('GET', '/v2/users/{userId}', rules)).toBe(false);
     });
 
-    it('returns false for a query parameter rule', () => {
+    it('returns false for a query rule', () => {
         const rules: ApiBlockRule[] = [{ match: { queryParam: 'method' }, reason: 'No.' }];
 
-        expect(isApiOperationBlocked('GET', '/v2/datasets/{datasetId}', rules)).toBe(false);
+        expect(isEndpointBlocked('GET', '/v2/datasets/{datasetId}', rules)).toBe(false);
     });
 
     it.each([
@@ -247,7 +279,33 @@ describe('isApiOperationBlocked()', () => {
         '/v2/actor-tasks/{actorTaskId}/run-sync',
         '/v2/actor-tasks/{actorTaskId}/run-sync-get-dataset-items',
     ])('blocks the GET of the synchronous run endpoint %s, not the POST', (path) => {
-        expect(isApiOperationBlocked('GET', path)).toBe(true);
-        expect(isApiOperationBlocked('POST', path)).toBe(false);
+        expect(isEndpointBlocked('GET', path)).toBe(true);
+        expect(isEndpointBlocked('POST', path)).toBe(false);
+    });
+});
+
+describe('isQueryBlocked()', () => {
+    it.each([
+        { queryNames: ['method'] },
+        { queryNames: ['METHOD'] },
+        { queryNames: ['%6Dethod'] },
+        { queryNames: ['method[]'] },
+        { queryNames: ['[method]'] },
+        { queryNames: ['limit', 'method'] },
+    ])('returns true for $queryNames', ({ queryNames }) => {
+        expect(isQueryBlocked(queryNames)).toBe(true);
+    });
+
+    it.each([
+        { queryNames: [] },
+        { queryNames: ['methods'] },
+        { queryNames: ['methodName'] },
+        { queryNames: ['filter[method]'] },
+    ])('returns false for $queryNames', ({ queryNames }) => {
+        expect(isQueryBlocked(queryNames)).toBe(false);
+    });
+
+    it('returns false for an endpoint rule', () => {
+        expect(isQueryBlocked(['method'], [RUN_NOW_RULE])).toBe(false);
     });
 });
