@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { HELPER_TOOLS } from '../../src/const.js';
 import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
 import { isEndpointBlocked, isQueryBlocked, validateApiBlocklist } from '../../src/tools/api/apify_api_blocklist.js';
-import { normalizeApiPath } from '../../src/tools/api/apify_api_request.js';
+import { normalizeApiPath } from '../../src/tools/api/apify_api_path.js';
 import { API_METHODS } from '../../src/tools/api/apify_api_spec.js';
 
 const METHOD_PARAM_REFUSAL =
