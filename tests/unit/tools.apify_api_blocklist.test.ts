@@ -14,6 +14,55 @@ const RUN_NOW_RULE: ApiBlockRule = {
     reason: 'No run-now.',
 };
 
+/** The same rule with its path written without /v2. */
+const RUN_NOW_RULE_WITHOUT_V2: ApiBlockRule = {
+    ...RUN_NOW_RULE,
+    match: { method: 'GET', path: 'actors/{actorId}/run-now' },
+};
+
+/** Normalized paths whose GET the run-now rule refuses. */
+const RUN_NOW_PATHS = [
+    'actors/abc/run-now',
+    'actors/abc/run-now?limit=1',
+    // The API routes paths case-insensitively and ignores a trailing slash.
+    'Actors/ABC/Run-Now',
+    'actors/abc/run-now/',
+    // The API routes the legacy acts prefix like actors.
+    'acts/john~my-actor/run-now',
+    'ACTS/abc/run-now',
+    // A slash encoded in a name is decoded after routing, so the name is one segment.
+    'actors/apify%2Fhello-world/run-now',
+    // The URL is resolved before it is sent: dot segments, a backslash, and a newline.
+    'actors/abc/x/../run-now',
+    'actors/abc/%2e%2e/abc/run-now',
+    'actors\\abc\\run-now',
+    'actors/abc/run-\nnow',
+    // Escapes in a literal segment are decoded, in case anything before the router decodes them.
+    'actors/abc/run%2Dnow',
+    // Empty segments are ignored, in case anything before the router merges doubled slashes.
+    'actors//abc//run-now',
+    'actors/abc/run-now//',
+];
+
+/** Normalized paths whose GET the run-now rule lets through. */
+const NOT_RUN_NOW_PATHS = [
+    'actors/abc/run-now-x',
+    'actors/run-now',
+    'actors//run-now',
+    'actors/apify/hello-world/run-now',
+    'actor-runs/abc/run-now',
+    'actsx/abc/run-now',
+    'actors/abc/run-now/x',
+];
+
+/** Spec endpoints, each with whether the run-now rule blocks it. */
+const RUN_NOW_TEMPLATE_CASES = [
+    { method: 'GET', path: '/v2/actors/{actorId}/run-now', isBlocked: true },
+    { method: 'POST', path: '/v2/actors/{actorId}/run-now', isBlocked: false },
+    { method: 'GET', path: '/v2/actors/{actorId}/runs', isBlocked: false },
+    { method: 'GET', path: '/v2/actors/{actorId}', isBlocked: false },
+] as const;
+
 /** Validates a GET in a session with no tools, unless the params say otherwise. */
 function validate(
     params: Partial<Parameters<typeof validateApiBlocklist>[0]> & { normalizedPath: string },
@@ -80,40 +129,11 @@ describe('validateApiBlocklist()', () => {
     });
 
     describe('an endpoint rule', () => {
-        it.each([
-            'actors/abc/run-now',
-            'actors/abc/run-now?limit=1',
-            // The API routes paths case-insensitively and ignores a trailing slash.
-            'Actors/ABC/Run-Now',
-            'actors/abc/run-now/',
-            // The API routes the legacy acts prefix like actors.
-            'acts/john~my-actor/run-now',
-            'ACTS/abc/run-now',
-            // A slash encoded in a name is decoded after routing, so the name is one segment.
-            'actors/apify%2Fhello-world/run-now',
-            // The URL is resolved before it is sent: dot segments, a backslash, and a newline.
-            'actors/abc/x/../run-now',
-            'actors/abc/%2e%2e/abc/run-now',
-            'actors\\abc\\run-now',
-            'actors/abc/run-\nnow',
-            // Escapes in a literal segment are decoded, in case anything before the router decodes them.
-            'actors/abc/run%2Dnow',
-            // Empty segments are ignored, in case anything before the router merges doubled slashes.
-            'actors//abc//run-now',
-            'actors/abc/run-now//',
-        ])('refuses a GET to %j', (normalizedPath) => {
+        it.each(RUN_NOW_PATHS)('refuses a GET to %j', (normalizedPath) => {
             expect(validate({ normalizedPath }, [RUN_NOW_RULE])).toBe('No run-now.');
         });
 
-        it.each([
-            'actors/abc/run-now-x',
-            'actors/run-now',
-            'actors//run-now',
-            'actors/apify/hello-world/run-now',
-            'actor-runs/abc/run-now',
-            'actsx/abc/run-now',
-            'actors/abc/run-now/x',
-        ])('does not refuse a GET to %j', (normalizedPath) => {
+        it.each(NOT_RUN_NOW_PATHS)('does not refuse a GET to %j', (normalizedPath) => {
             expect(validate({ normalizedPath }, [RUN_NOW_RULE])).toBeUndefined();
         });
 
@@ -147,6 +167,17 @@ describe('validateApiBlocklist()', () => {
             expect(validate({ normalizedPath: 'actors/abc/run-now', loadedToolNames }, [rule])).toBe(refusal);
         });
     });
+
+    describe('an endpoint rule with its path written without /v2', () => {
+        it.each(RUN_NOW_PATHS)('refuses a GET to %j', (normalizedPath) => {
+            expect(validate({ normalizedPath }, [RUN_NOW_RULE_WITHOUT_V2])).toBe('No run-now.');
+        });
+
+        it.each(NOT_RUN_NOW_PATHS)('does not refuse a GET to %j', (normalizedPath) => {
+            expect(validate({ normalizedPath }, [RUN_NOW_RULE_WITHOUT_V2])).toBeUndefined();
+        });
+    });
+
     describe('a path outside /v2/', () => {
         const OUTSIDE_V2_REFUSAL =
             'The path leaves /v2/ once its dot segments are resolved; the API tools call only paths under /v2/.';
@@ -170,14 +201,16 @@ describe('validateApiBlocklist()', () => {
 });
 
 describe('isEndpointBlocked()', () => {
-    it.each([
-        { method: 'GET', path: '/v2/actors/{actorId}/run-now', isBlocked: true },
-        { method: 'POST', path: '/v2/actors/{actorId}/run-now', isBlocked: false },
-        { method: 'GET', path: '/v2/actors/{actorId}/runs', isBlocked: false },
-        { method: 'GET', path: '/v2/actors/{actorId}', isBlocked: false },
-    ] as const)('returns $isBlocked for $method $path', ({ method, path, isBlocked }) => {
+    it.each(RUN_NOW_TEMPLATE_CASES)('returns $isBlocked for $method $path', ({ method, path, isBlocked }) => {
         expect(isEndpointBlocked(method, path, [RUN_NOW_RULE])).toBe(isBlocked);
     });
+
+    it.each(RUN_NOW_TEMPLATE_CASES)(
+        'returns $isBlocked for $method $path when the rule path is written without /v2',
+        ({ method, path, isBlocked }) => {
+            expect(isEndpointBlocked(method, path, [RUN_NOW_RULE_WITHOUT_V2])).toBe(isBlocked);
+        },
+    );
 
     it('matches a literal segment of a rule only to that literal, not to a parameter of the spec', () => {
         const rules: ApiBlockRule[] = [{ match: { method: 'GET', path: '/v2/users/me' }, reason: 'No.' }];
