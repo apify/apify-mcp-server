@@ -5,7 +5,7 @@ import dedent from 'dedent';
 import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
-import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { actorExecutor } from '../tools/actors/actor_executor.js';
 import type { ActorStore, CallDiagnostics, ToolEntry, ToolStatus } from '../types.js';
@@ -260,6 +260,7 @@ export async function dispatchToolCall(params: {
                     mcpSessionId,
                     datasetItemsSchema: tool.datasetItemsSchema,
                     taskMode,
+                    hasCallActorTool: tools.has(HELPER_TOOLS.ACTOR_CALL),
                 });
 
                 if (!executorResult) {

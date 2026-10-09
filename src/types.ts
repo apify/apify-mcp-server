@@ -534,6 +534,8 @@ export type ActorExecutionParams = {
      * task mode would let the task complete before the Actor has produced output.
      */
     taskMode?: boolean;
+    /** Whether the session serves call-actor; without it, an Actor's tip gets the callability caveat. */
+    hasCallActorTool?: boolean;
 };
 
 /**
