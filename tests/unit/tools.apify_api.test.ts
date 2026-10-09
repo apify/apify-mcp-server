@@ -1121,17 +1121,23 @@ describe('apify-api-write', () => {
         );
     });
 
-    it('reports a failed write whose error body is over the inline limit with its status', async () => {
-        requestMock.mockRejectedValue(buildOversizeError(400));
+    it.each([
+        { statusCode: 400, hint: '' },
+        { statusCode: 429, hint: ' Rate limit exceeded, wait before retrying.' },
+    ])(
+        'reports a failed write whose error body is over the inline limit with its status $statusCode',
+        async ({ statusCode, hint }) => {
+            requestMock.mockRejectedValue(buildOversizeError(statusCode));
 
-        const result = await callTool(apifyApiWrite, { path: 'datasets/abc', method: 'PUT', body: { name: 'x' } });
+            const result = await callTool(apifyApiWrite, { path: 'datasets/abc', method: 'PUT', body: { name: 'x' } });
 
-        expectSoftFailInvalidInput(result);
-        expect(result.content[0].text).toBe(
-            `PUT /v2/datasets/abc failed with HTTP 400. Its error body is larger than ${MAX_INLINE_BYTES} bytes, ` +
-                'so it is not returned.',
-        );
-    });
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toBe(
+                `PUT /v2/datasets/abc failed with HTTP ${statusCode}. Its error body is larger than ` +
+                    `${MAX_INLINE_BYTES} bytes, so it is not returned.${hint}`,
+            );
+        },
+    );
 
     it('says the request was sent when an oversize response has no status', async () => {
         requestMock.mockRejectedValue(buildOversizeError());
