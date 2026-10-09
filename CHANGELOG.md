@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Hint for 429 and 5xx errors ([#1456](https://github.com/apify/apify-mcp-server/pull/1456)) ([ced3f1d](https://github.com/apify/apify-mcp-server/commit/ced3f1dd0d67e080aa865e320c93777418241b00)) by [@jsimecek](https://github.com/jsimecek), closes [#1115](https://github.com/apify/apify-mcp-server/issues/1115)
 - Attribute runs from the Apify AI agent to the APIFY_AI origin ([#1498](https://github.com/apify/apify-mcp-server/pull/1498)) ([3b37cba](https://github.com/apify/apify-mcp-server/commit/3b37cba32253e005351ed6f4d9d853a11a814036)) by [@vojtechj-apify](https://github.com/vojtechj-apify), closes [#1495](https://github.com/apify/apify-mcp-server/issues/1495)
 - Remove instructions that force extra tool calls ([#1504](https://github.com/apify/apify-mcp-server/pull/1504)) ([cb02e17](https://github.com/apify/apify-mcp-server/commit/cb02e17cb8dfac73d14c35333d20f06fd61a4112)) by [@jirispilka](https://github.com/jirispilka), closes [#331](https://github.com/apify/apify-mcp-server/issues/331)
+- Keep URL signing key and API token out of responses and logs ([#1508](https://github.com/apify/apify-mcp-server/pull/1508)) ([ce7098c](https://github.com/apify/apify-mcp-server/commit/ce7098c4664d0be30f6527f12a15f9fe46240871)) by [@jirispilka](https://github.com/jirispilka), closes [#330](https://github.com/apify/apify-mcp-server/issues/330)
 
 
 <!-- git-cliff-unreleased-end -->
