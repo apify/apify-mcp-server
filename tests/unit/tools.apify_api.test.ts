@@ -824,6 +824,16 @@ describe('apify-api-write', () => {
         expect(requestMock).not.toHaveBeenCalled();
     });
 
+    it("uses the path's only write method when a test-only operation rule blocks its GET", async () => {
+        const rule: ApiBlockRule = { match: { method: 'GET', path: '/v2/actors/{actorId}/run-sync' }, reason: 'No.' };
+        requestMock.mockResolvedValue(mockResponse(201, { data: {} }));
+
+        await callToolWithRule(apifyApiWrite, rule, { path: 'actors/apify~hello-world/run-sync' });
+
+        expect(requestMock).toHaveBeenCalledTimes(1);
+        expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST' }));
+    });
+
     it('does not need the spec when the method is given, even for a path the spec does not list', async () => {
         requestMock.mockResolvedValue(mockResponse(201, { data: {} }));
 
