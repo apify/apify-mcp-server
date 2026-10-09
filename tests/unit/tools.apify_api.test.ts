@@ -263,7 +263,7 @@ describe('apify-api-details', () => {
         }
     });
 
-    it('returns only the methods a test-only operation rule does not match', async () => {
+    it('returns only the methods a test-only endpoint rule does not match', async () => {
         const rule: ApiBlockRule = { match: { method: 'GET', path: '/v2/datasets/{datasetId}' }, reason: 'No.' };
 
         const refused = await callToolWithRule(apifyApiDetails, rule, { path: 'datasets/abc', method: 'GET' });
@@ -333,7 +333,7 @@ describe('apify-api-read', () => {
         expect(requestMock).not.toHaveBeenCalled();
     });
 
-    it('refuses a path a test-only operation rule names, written with the /v2 prefix, without a request', async () => {
+    it('refuses a path a test-only endpoint rule names, written with the /v2 prefix, without a request', async () => {
         const rule: ApiBlockRule = { match: { method: 'GET', path: '/v2/datasets/{datasetId}' }, reason: 'No.' };
 
         const result = await callToolWithRule(apifyApiRead, rule, { path: '/v2/datasets/abc' });
@@ -790,7 +790,7 @@ describe('apify-api-write', () => {
         expect(requestMock).not.toHaveBeenCalled();
     });
 
-    it('refuses a method a test-only operation rule names, without a request or the spec', async () => {
+    it('refuses a method a test-only endpoint rule names, without a request or the spec', async () => {
         const rule: ApiBlockRule = { match: { method: 'DELETE', path: '/v2/datasets/{datasetId}' }, reason: 'No.' };
 
         const result = await callToolWithRule(apifyApiWrite, rule, { path: '/v2/datasets/abc', method: 'DELETE' });
@@ -801,7 +801,7 @@ describe('apify-api-write', () => {
         expect(fetchApiOperationIndex).not.toHaveBeenCalled();
     });
 
-    it('asks only for a write method a test-only operation rule does not match', async () => {
+    it('asks only for a write method a test-only endpoint rule does not match', async () => {
         const rule: ApiBlockRule = { match: { method: 'DELETE', path: '/v2/datasets/{datasetId}' }, reason: 'No.' };
 
         const result = await callToolWithRule(apifyApiWrite, rule, { path: '/v2/datasets/abc' });
@@ -811,7 +811,7 @@ describe('apify-api-write', () => {
         expect(requestMock).not.toHaveBeenCalled();
     });
 
-    it('asks for the method when a test-only operation rule blocks another write method of the path', async () => {
+    it('asks for the method when a test-only endpoint rule blocks another write method of the path', async () => {
         const rule: ApiBlockRule = {
             match: { method: 'POST', path: '/v2/request-queues/{queueId}/requests/batch' },
             reason: 'No.',
@@ -824,7 +824,7 @@ describe('apify-api-write', () => {
         expect(requestMock).not.toHaveBeenCalled();
     });
 
-    it("uses the path's only write method when a test-only operation rule blocks its GET", async () => {
+    it("uses the path's only write method when a test-only endpoint rule blocks its GET", async () => {
         const rule: ApiBlockRule = { match: { method: 'GET', path: '/v2/actors/{actorId}/run-sync' }, reason: 'No.' };
         requestMock.mockResolvedValue(mockResponse(201, { data: {} }));
 

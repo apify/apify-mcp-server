@@ -48,7 +48,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     which the API takes as the HTTP method. `callApi` checks every call (`validateApiBlocklist`),
     fail-closed, as the API reads the request URL, and refuses a path whose dot segments climb out of `/v2/`;
     the index leaves out each operation a rule matches
-    (`isApiOperationBlocked`), so search, details, the closest-path hints, and the write tool's method
+    (`isEndpointBlocked`), so search, details, the closest-path hints, and the write tool's method
     choice never offer it.
     `apify_api_spec.ts` builds the operation index from the spec (cached for a day); search and
     details use it, the write tool uses it to choose a method that was not given, and a call uses it

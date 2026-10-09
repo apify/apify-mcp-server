@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
-import { isApiOperationBlocked, validateApiBlocklist } from '../../src/tools/api/apify_api_blocklist.js';
+import { isEndpointBlocked, validateApiBlocklist } from '../../src/tools/api/apify_api_blocklist.js';
 import { API_METHODS } from '../../src/tools/api/apify_api_spec.js';
 
 const METHOD_PARAM_REFUSAL =
     'The API tools do not send the method query parameter: the API would take it as the HTTP method of the request.';
 
-/** A test-only operation rule. */
+/** A test-only endpoint rule. */
 const RUN_NOW_RULE: ApiBlockRule = {
     match: { method: 'GET', path: '/v2/actors/{actorId}/run-now' },
     reason: 'No run-now.',
@@ -79,7 +79,7 @@ describe('validateApiBlocklist()', () => {
         );
     });
 
-    describe('an operation rule', () => {
+    describe('an endpoint rule', () => {
         it.each([
             'actors/abc/run-now',
             'actors/abc/run-now?limit=1',
@@ -169,26 +169,26 @@ describe('validateApiBlocklist()', () => {
     });
 });
 
-describe('isApiOperationBlocked()', () => {
+describe('isEndpointBlocked()', () => {
     it.each([
         { method: 'GET', path: '/v2/actors/{actorId}/run-now', isBlocked: true },
         { method: 'POST', path: '/v2/actors/{actorId}/run-now', isBlocked: false },
         { method: 'GET', path: '/v2/actors/{actorId}/runs', isBlocked: false },
         { method: 'GET', path: '/v2/actors/{actorId}', isBlocked: false },
     ] as const)('returns $isBlocked for $method $path', ({ method, path, isBlocked }) => {
-        expect(isApiOperationBlocked(method, path, [RUN_NOW_RULE])).toBe(isBlocked);
+        expect(isEndpointBlocked(method, path, [RUN_NOW_RULE])).toBe(isBlocked);
     });
 
     it('matches a literal segment of a rule only to that literal, not to a parameter of the spec', () => {
         const rules: ApiBlockRule[] = [{ match: { method: 'GET', path: '/v2/users/me' }, reason: 'No.' }];
 
-        expect(isApiOperationBlocked('GET', '/v2/users/me', rules)).toBe(true);
-        expect(isApiOperationBlocked('GET', '/v2/users/{userId}', rules)).toBe(false);
+        expect(isEndpointBlocked('GET', '/v2/users/me', rules)).toBe(true);
+        expect(isEndpointBlocked('GET', '/v2/users/{userId}', rules)).toBe(false);
     });
 
-    it('returns false for a query parameter rule', () => {
+    it('returns false for a query rule', () => {
         const rules: ApiBlockRule[] = [{ match: { queryParam: 'method' }, reason: 'No.' }];
 
-        expect(isApiOperationBlocked('GET', '/v2/datasets/{datasetId}', rules)).toBe(false);
+        expect(isEndpointBlocked('GET', '/v2/datasets/{datasetId}', rules)).toBe(false);
     });
 });

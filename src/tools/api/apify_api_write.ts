@@ -7,7 +7,7 @@ import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondUserError } from '../../utils/mcp.js';
 import { apifyApiCallOutputSchema } from '../structured_output_schemas.js';
-import { isApiOperationBlocked } from './apify_api_blocklist.js';
+import { isEndpointBlocked } from './apify_api_blocklist.js';
 import {
     API_CALL_DESCRIPTION,
     apiCallArgsShape,
@@ -76,7 +76,7 @@ async function inferMethod(
     }
     // The index leaves out a blocked operation, so the one operation left may not be the path's only write method.
     const hasBlockedWriteMethod = API_METHODS.some(
-        (method) => method !== 'GET' && isApiOperationBlocked(method, operations[0].path),
+        (method) => method !== 'GET' && isEndpointBlocked(method, operations[0].path),
     );
     if (operations.length === 1 && !hasBlockedWriteMethod) return { method: writeMethods[0] };
     const prompt =

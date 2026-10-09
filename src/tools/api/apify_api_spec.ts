@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { apifyApiOperationsCache } from '../../state.js';
 import type { ApiBlockRule } from './apify_api_blocklist.js';
-import { isApiOperationBlocked } from './apify_api_blocklist.js';
+import { isEndpointBlocked } from './apify_api_blocklist.js';
 
 export const APIFY_API_OPENAPI_URL = 'https://docs.apify.com/api/openapi.json';
 
@@ -156,7 +156,7 @@ export function buildApiOperationIndex(spec: unknown, rules?: readonly ApiBlockR
         if (!path.startsWith('/v2/') || !isRecord(pathItem)) continue;
         for (const method of API_METHODS) {
             const parsed = openApiOperationValidator.safeParse(pathItem[method.toLowerCase()]);
-            if (!parsed.success || parsed.data.deprecated || isApiOperationBlocked(method, path, rules)) continue;
+            if (!parsed.success || parsed.data.deprecated || isEndpointBlocked(method, path, rules)) continue;
             const { operationId, summary, description, tags, parameters, requestBody } = parsed.data;
             const body = parseRequestBody(requestBody, spec);
             index.set(operationId, {

@@ -1,11 +1,17 @@
 import type { HelperToolName } from '../../const.js';
 import { HELPER_TOOLS } from '../../const.js';
+import { normalizeApiPath } from './apify_api_request.js';
 import type { ApiMethod } from './apify_api_spec.js';
+
+/** A method and a spec path template, written with or without the `/v2` prefix. */
+export type ApiEndpointRule = { method: ApiMethod; path: string };
+
+/** A query parameter name, refused in every call. */
+export type ApiQueryRule = { queryParam: string };
 
 /** A request the API tools refuse to send. */
 export type ApiBlockRule = {
-    /** A query parameter, refused in every call, or one operation: a method and a spec path template. */
-    match: { queryParam: string } | { method: ApiMethod; path: `/v2/${string}` };
+    match: ApiEndpointRule | ApiQueryRule;
     /** Why the call is refused, shown to the agent. */
     reason: string;
     /** Tools to use instead, each named only when the session has it and it is not the refusing tool. */
@@ -40,28 +46,44 @@ function extractQueryParamName(name: string): string {
 }
 
 /**
- * A path's segments, matched fail-closed: in lowercase, each decoded, without empty segments (a trailing or
- * doubled slash), and with the legacy `acts` prefix read as `actors`. Split before decoding, as the API's router
- * does, so the escaped slash in `apify%2Fhello-world` stays in its segment.
+ * A path's segments, matched fail-closed: without the leading slash and `v2/` prefix (`normalizeApiPath`), in
+ * lowercase, each decoded, without empty segments (a trailing or doubled slash), and with the legacy `acts` prefix
+ * read as `actors`. Split before decoding, as the API's router does, so the escaped slash in `apify%2Fhello-world`
+ * stays in its segment.
  */
 function splitRoutePath(path: string): string[] {
-    const segments = path
+    const segments = normalizeApiPath(path)
         .split('/')
         .filter(Boolean)
         .map((segment) => decodeEscapes(segment).toLowerCase());
-    if (segments[0] === 'v2' && segments[1] === 'acts') segments[1] = 'actors';
+    if (segments[0] === 'acts') segments[0] = 'actors';
     return segments;
 }
 
-/** Whether an operation rule matches a method and a path, with values or a spec template. */
-function isOperationMatch(match: { method: ApiMethod; path: string }, method: ApiMethod, path: string): boolean {
-    if (match.method !== method) return false;
+/** Whether an endpoint rule matches a method and a path, with values or a spec template. */
+function isEndpointMatch(rule: ApiEndpointRule, method: ApiMethod, path: string): boolean {
+    if (rule.method !== method) return false;
     const segments = splitRoutePath(path);
-    const templateSegments = splitRoutePath(match.path);
+    const templateSegments = splitRoutePath(rule.path);
     return (
         segments.length === templateSegments.length &&
         templateSegments.every((segment, position) => segment.startsWith('{') || segment === segments[position])
     );
+}
+
+/** Whether a query rule matches one of the query parameter names, as `extractQueryParamName` returns them. */
+function isQueryMatch(rule: ApiQueryRule, queryNames: readonly string[]): boolean {
+    return queryNames.includes(rule.queryParam.toLowerCase());
+}
+
+/** Whether a rule matches a request: an endpoint rule by its method and path, a query rule by its query names. */
+function isRuleMatch(
+    { match }: ApiBlockRule,
+    request: { method: ApiMethod; path: string; queryNames: readonly string[] },
+): boolean {
+    return 'queryParam' in match
+        ? isQueryMatch(match, request.queryNames)
+        : isEndpointMatch(match, request.method, request.path);
 }
 
 /**
@@ -87,11 +109,7 @@ export function validateApiBlocklist(
         return 'The path leaves /v2/ once its dot segments are resolved; the API tools call only paths under /v2/.';
     }
     const queryNames = [...searchParams.keys(), ...Object.keys(query)].map(extractQueryParamName);
-    const rule = rules.find(({ match }) =>
-        'queryParam' in match
-            ? queryNames.includes(match.queryParam.toLowerCase())
-            : isOperationMatch(match, method, pathname),
-    );
+    const rule = rules.find((candidate) => isRuleMatch(candidate, { method, path: pathname, queryNames }));
     if (!rule) return undefined;
     // The read tool sends a GET, and the write tool every other method.
     const refusingToolName = method === 'GET' ? HELPER_TOOLS.API_READ : HELPER_TOOLS.API_WRITE;
@@ -101,7 +119,10 @@ export function validateApiBlocklist(
     return toolNames.length > 0 ? `${rule.reason} Use ${toolNames.join(' or ')} instead.` : rule.reason;
 }
 
-/** Whether a rule matches an operation of the spec, given by its method and path template. */
-export function isApiOperationBlocked(method: ApiMethod, path: string, rules = API_BLOCK_RULES): boolean {
-    return rules.some(({ match }) => 'path' in match && isOperationMatch(match, method, path));
+/**
+ * Whether a rule matches an endpoint of the spec, given by its method and path template. The spec gives no query
+ * values, so no query rule matches.
+ */
+export function isEndpointBlocked(method: ApiMethod, path: string, rules = API_BLOCK_RULES): boolean {
+    return rules.some((rule) => isRuleMatch(rule, { method, path, queryNames: [] }));
 }
