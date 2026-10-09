@@ -10,7 +10,7 @@ import { sendApifyApiRequest } from '../../apify_client.js';
 import { APIFY_ERROR_TYPE_PAGE_NOT_FOUND, HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
 import { isApifyApiUri, isMaxContentLengthAbort } from '../../resources/api_resources.js';
 import type { ToolResponse } from '../../utils/mcp.js';
-import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
+import { getHttpErrorHint, respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import type { ApiMethod, ApiOperation } from './apify_api_spec.js';
 import { fetchApiOperationIndex, isRecord } from './apify_api_spec.js';
@@ -317,9 +317,10 @@ export async function callApi(params: {
             }
             // The status says the write failed; the generic message would say it may have applied.
             if (statusCode !== undefined) {
+                const hint = getHttpErrorHint(statusCode);
                 return respondUserError(
                     `${method} ${path} failed with HTTP ${statusCode}. Its error body is larger than ` +
-                        `${MAX_INLINE_BYTES} bytes, so it is not returned.`,
+                        `${MAX_INLINE_BYTES} bytes, so it is not returned.${hint ? ` ${hint}` : ''}`,
                 );
             }
             return respondUserError(
