@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.17.2",
+  "version": "0.17.5",
   "type": "module",
   "description": "Apify MCP Server",
   "mcpName": "com.apify/apify-mcp-server",
@@ -132,10 +132,6 @@
     "test:integration:streamable": "pnpm run build && vitest run tests/integration/actor.server_streamable.test.ts",
     "test:integration:stateless": "pnpm run build && vitest run tests/integration/actor.server_stateless.test.ts",
     "test:conformance": "bash scripts/test_conformance.sh",
-    "test:e2e": "pnpm run build && vitest run --project e2e",
-    "//test:e2e": "TEMPORARY, AI-GENERATED, NOT HUMAN-MAINTAINED: v1 behavior pin for #1128. Delete with tests/e2e/. Never add to CI.",
-    "test:e2e:remote": "E2E_HTTP_ONLY=1 E2E_HTTP_BASE=${E2E_HTTP_BASE:-https://mcp.apify.com/} vitest run --project e2e",
-    "//test:e2e:remote": "Same case table against a deployed server. Bills real Actor runs to APIFY_TOKEN.",
     "inspector:stdio": "npx @modelcontextprotocol/inspector -e APIFY_TOKEN=$APIFY_TOKEN -- node dist/stdio.js",
     "evals:mcp-agent": "pnpm run build && tsx evals/runner/run.ts",
     "evals:mcp-agent:export-dataset": "tsx evals/scripts/export_dataset.ts",

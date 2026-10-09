@@ -5,7 +5,6 @@
  * - Each mode produces the expected set of tools per category
  * - Mode-variant tools share identical inputSchema (same args accepted)
  * - Tool definitions are frozen (immutable)
- * - _meta stripping works for non-apps modes
  */
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -443,66 +442,9 @@ describe('taskSupport contract across tool categories', () => {
     }
 });
 
-describe('getToolPublicFieldOnly _meta filtering', () => {
-    const toolWithOpenAiMeta = {
-        name: 'test-tool',
-        description: 'Test',
-        inputSchema: { type: 'object' as const, properties: {} },
-        ajvValidate: (() => true) as never,
-        _meta: {
-            'openai/widget': { type: 'test' },
-            'openai/config': { key: 'value' },
-            ui: { resourceUri: 'ui://widget/test.html' },
-            'regular-key': { data: 123 },
-        },
-    };
-
-    it('strips openai/ and ui _meta keys when filterWidgetMeta is true and not in apps mode', () => {
-        const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
-            filterWidgetMeta: true,
-            mode: 'default',
-        });
-        expect(result._meta).toBeDefined();
-        expect(result._meta).toEqual({ 'regular-key': { data: 123 } });
-        expect(result._meta).not.toHaveProperty('openai/widget');
-        expect(result._meta).not.toHaveProperty('openai/config');
-        expect(result._meta).not.toHaveProperty('ui');
-    });
-
-    it('preserves all _meta keys in apps mode', () => {
-        const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
-            filterWidgetMeta: true,
-            mode: 'apps',
-        });
-        expect(result._meta).toEqual(toolWithOpenAiMeta._meta);
-    });
-
-    it('preserves all _meta keys when filterWidgetMeta is false', () => {
-        const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
-            filterWidgetMeta: false,
-        });
-        expect(result._meta).toEqual(toolWithOpenAiMeta._meta);
-    });
-
-    it('returns undefined _meta when all keys are widget-specific and mode is not apps', () => {
-        const toolWithOnlyWidgetMeta = {
-            ...toolWithOpenAiMeta,
-            _meta: {
-                'openai/widget': { type: 'test' },
-                ui: { resourceUri: 'ui://widget/test.html' },
-            },
-        };
-        const result = getToolPublicFieldOnly(toolWithOnlyWidgetMeta, {
-            filterWidgetMeta: true,
-            mode: 'default',
-        });
-        expect(result._meta).toBeUndefined();
-    });
-});
-
 describe('getToolPublicFieldOnly inputSchema normalization', () => {
     it('does not expose Zod-defaulted fields as JSON Schema required (search-apify-docs)', () => {
-        const { inputSchema } = getToolPublicFieldOnly(searchApifyDocs, { filterWidgetMeta: false });
+        const { inputSchema } = getToolPublicFieldOnly(searchApifyDocs);
         const schema = inputSchema as { required?: string[]; properties?: Record<string, { default?: unknown }> };
 
         expect(schema.required).toEqual(['query']);
@@ -526,7 +468,7 @@ describe('getToolPublicFieldOnly inputSchema normalization', () => {
             },
         } as unknown as ToolBase;
 
-        const { inputSchema } = getToolPublicFieldOnly(actorShapeTool, { filterWidgetMeta: false });
+        const { inputSchema } = getToolPublicFieldOnly(actorShapeTool);
         const schema = inputSchema as { required?: string[] };
 
         expect(schema.required).toEqual(['query']);
