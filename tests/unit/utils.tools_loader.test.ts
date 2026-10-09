@@ -118,6 +118,12 @@ describe('toolNamesToInput', () => {
         });
     });
 
+    it('classifies delete-actor (in no category) as an internal tool, not an actor ID', () => {
+        expect(toolNamesToInput([HELPER_TOOLS.ACTOR_DELETE])).toEqual({
+            tools: [HELPER_TOOLS.ACTOR_DELETE],
+        });
+    });
+
     it('classifies apify-api-write (in no category) as an internal tool, not an actor ID', () => {
         expect(toolNamesToInput([HELPER_TOOLS.API_WRITE])).toEqual({
             tools: [HELPER_TOOLS.API_WRITE],
@@ -260,6 +266,39 @@ describe('get-actor-list selection (in no category)', () => {
             const searchActorsTool = tools.find((t) => t.name === HELPER_TOOLS.STORE_SEARCH);
             const { description } = getToolPublicFieldOnly(searchActorsTool!, { presentTools: new Set(toolNames) });
             expect(description).toContain(`Use ${HELPER_TOOLS.ACTOR_LIST_GET} for those.`);
+        },
+    );
+});
+
+// It deletes Actors permanently, so a session gets it only by naming it.
+describe('delete-actor selection (in no category)', () => {
+    it('does not treat tools=delete-actor as an Actor name', () => {
+        expect(resolveActorsToLoad({ tools: [HELPER_TOOLS.ACTOR_DELETE] })).toEqual([]);
+    });
+
+    it.each(['default', 'apps'] as const)('serves only delete-actor for tools=delete-actor in %s mode', (mode) => {
+        const toolNames = getToolsForServerMode({ tools: [HELPER_TOOLS.ACTOR_DELETE] }, [], mode).map((t) => t.name);
+        expect(toolNames).toEqual([HELPER_TOOLS.ACTOR_DELETE]);
+    });
+
+    it.each(['default', 'apps'] as const)(
+        'excludes delete-actor from the default set and the actors category in %s mode',
+        (mode) => {
+            expect(getToolsForServerMode({}, [], mode).map((t) => t.name)).not.toContain(HELPER_TOOLS.ACTOR_DELETE);
+            expect(getToolsForServerMode({ tools: ['actors'] }, [], mode).map((t) => t.name)).not.toContain(
+                HELPER_TOOLS.ACTOR_DELETE,
+            );
+        },
+    );
+
+    it.each(['default', 'apps'] as const)(
+        'serves the actors tools and delete-actor for tools=actors,delete-actor in %s mode',
+        (mode) => {
+            const toolNames = getToolsForServerMode({ tools: ['actors', HELPER_TOOLS.ACTOR_DELETE] }, [], mode).map(
+                (t) => t.name,
+            );
+            const actorsToolNames = getToolsForServerMode({ tools: ['actors'] }, [], mode).map((t) => t.name);
+            expect(toolNames).toEqual(expect.arrayContaining([...actorsToolNames, HELPER_TOOLS.ACTOR_DELETE]));
         },
     );
 });

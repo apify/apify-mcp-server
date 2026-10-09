@@ -16,9 +16,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   output across tools.
 - `utils.ts` — shared tool helpers (schema property shaping, AJV compile).
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
-  - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), the
-    actor-tools factory, the direct actor-tool executor (`actor_executor.ts`), `actor_definition.ts` (fetches and
-    prunes an Actor's definition, `getActorDefinition`), and `actor_run_response.ts` —
+  - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), delete
+    (`delete_actor.ts`), the actor-tools factory, the direct actor-tool executor (`actor_executor.ts`),
+    `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`), and
+    `actor_run_response.ts` —
     the one canonical run shape `call-actor` and `get-actor-run` share across sync, task
     and wait-timeout modes: storage IDs plus a `summary` (past) / `nextStep` (one primary
     action) pair, never inline dataset items or KV bodies — except the reserved `TIP` key,

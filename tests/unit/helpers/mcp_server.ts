@@ -15,6 +15,7 @@ import type { ALLOWED_TASK_TOOL_EXECUTION_MODES } from '../../../src/const.js';
 import { APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED } from '../../../src/const.js';
 import { ActorsMcpServer } from '../../../src/mcp/server.js';
 import { createStatelessServer } from '../../../src/mcp/stateless_server.js';
+import type { PaymentProvider, PaymentProviderId } from '../../../src/payments/types.js';
 import { RESOURCE_MIME_TYPE } from '../../../src/resources/widgets.js';
 import type { ActorsMcpServerOptions, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../../src/types.js';
 import { TOOL_TYPE } from '../../../src/types.js';
@@ -273,6 +274,43 @@ export function makeThrowingTool(
     };
 }
 
+/**
+ * A task-capable tool that parks inside `call()` until the test releases it. The park is the only
+ * way to reach the cancel-during-execution guards: every other synthetic tool here settles before
+ * `tasks/cancel` could land.
+ */
+export function makeBlockingTool(): {
+    tool: ToolEntry;
+    /** Resolves once the server has entered `call()`, so the task is provably past `working`. */
+    started: Promise<void>;
+    /** Releases the parked call: throws `error` when given one, otherwise returns a success result. */
+    release: (outcome?: { error: unknown }) => void;
+} {
+    let markStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+        markStarted = resolve;
+    });
+    let release!: (outcome?: { error: unknown }) => void;
+    const released = new Promise<{ error: unknown } | undefined>((resolve) => {
+        release = resolve;
+    });
+    const tool: ToolEntry = {
+        type: TOOL_TYPE.INTERNAL,
+        name: 'test-blocking-tool',
+        description: 'blocks until the test releases it',
+        inputSchema: { type: 'object', properties: {} } as ToolInputSchema,
+        ajvValidate: compileSchema({ type: 'object', properties: {} }),
+        execution: { taskSupport: 'optional' },
+        call: async () => {
+            markStarted();
+            const outcome = await released;
+            if (outcome) throw outcome.error;
+            return respondRaw({ content: [{ type: 'text', text: 'ok' }] });
+        },
+    };
+    return { tool, started, release };
+}
+
 /** A synthetic internal tool that records the plain values the server threaded into it. */
 export function makeArgsRecorderTool(name = 'recorder-tool'): {
     tool: ToolEntry;
@@ -327,4 +365,22 @@ export function makeRecorderTool(
         },
     } as ToolEntry;
     return { tool, received };
+}
+
+/** Provider that reads `skyfire-pay-id` whatever its `id`; only `id` varies. Its 402 data is `X402_PAYMENT_DATA`. */
+export function makePaymentProvider(id: PaymentProviderId = 'skyfire'): PaymentProvider {
+    return {
+        id,
+        allowsUnauthenticated: true,
+        decorateToolSchema: (tool) => tool,
+        validatePayment: (args) => (args['skyfire-pay-id'] ? null : 'Missing skyfire-pay-id'),
+        getPaymentRequiredData: () => X402_PAYMENT_DATA,
+        getPaymentHeaders: (args): Record<string, string> =>
+            args['skyfire-pay-id'] ? { 'skyfire-pay-id': args['skyfire-pay-id'] as string } : {},
+        removePaymentFields: (args) => {
+            const { 'skyfire-pay-id': _removed, ...rest } = args;
+            return rest;
+        },
+        redactForLogging: (args) => ({ ...(args as Record<string, unknown>), 'skyfire-pay-id': '[REDACTED]' }),
+    };
 }

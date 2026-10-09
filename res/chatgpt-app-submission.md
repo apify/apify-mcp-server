@@ -130,4 +130,3 @@ Watch out for these during testing:
 - Server card: SEP-1649 compliant
 - Widget metadata: MCP Apps standard (SEP-1865)
 - ChatGPT connects with `ui=apps` server mode (`ui=openai` is a deprecated alias, still accepted)
-- `stripWidgetMeta()` removes `openai/*` and `ui` keys in non-OpenAI mode

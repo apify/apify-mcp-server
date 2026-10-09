@@ -13,7 +13,7 @@ import type z from 'zod';
 
 import type { ApifyClient } from './apify_client.js';
 import type { FAILURE_CATEGORY, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
-import type { PaymentProvider } from './payments/types.js';
+import type { PaymentProvider, PaymentProviderId } from './payments/types.js';
 import type { CATEGORY_NAMES } from './tools/registry.js';
 import type { ToolResponse } from './utils/mcp.js';
 import type { PricingTier, StructuredPricingInfo } from './utils/pricing_info.js';
@@ -377,6 +377,8 @@ export type ToolCallTelemetryProperties = {
     transport_type: string;
     /** Raw `?client=` URL query-param value, when the connecting request carried one. */
     mcp_url_client: string;
+    /** Payment provider the connection was opened with (`?payment=`), absent without one. Marks the mode, not that this call was paid. */
+    payment_provider?: PaymentProviderId;
     tool_name: string;
     tool_status: ToolStatus;
     tool_exec_time_ms: number;

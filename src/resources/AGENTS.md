@@ -11,8 +11,9 @@ Three files serving the MCP `resources/*` surface:
   payment-only session (x402/Skyfire) gets no client and every read fails with `InvalidParamsError`.
   Routes every http(s) URI to `readApiResource()`, which owns the single origin gate; non-http
   schemes fall through to widgets/usage-guide/fallback. Throws protocol-neutral domain errors
-  (`InvalidParamsError`/`InternalError` from `src/mcp/errors.ts`), never `McpError` — the `server.ts`
-  boundary maps them 1:1 to `McpError` before serialization.
+  (`InvalidParamsError`/`InternalError` from `src/mcp/errors.ts`), never `McpError`. The protocol
+  adapters map them 1:1 before serialization: `legacy_server.ts` to v1 `McpError`,
+  `stateless_server.ts` to v2 `ProtocolError`.
 - `api_resources.ts` — a thin streaming MCP-resource proxy: any Apify API GET endpoint is
   readable as a resource, identified by its real API URL.
 - `widgets.ts` — the registry of UI widgets; the widgets themselves are built in
@@ -47,8 +48,8 @@ directly, not `httpClient.call()`: with a stream body, `call()` hands non-2xx re
 error body is read here to surface the API's message.
 
 Genuine failures **throw** a domain error carrying `data: { uri }` (SEP-2164 / draft spec: the
-`server.ts` boundary turns it into a JSON-RPC error, never success-shaped content): 3xx/4xx except
-429 → `InvalidParamsError`; 429, 5xx, no status (network, mid-stream drop) → `InternalError`. 401/403
+protocol adapters turn it into a JSON-RPC error, never success-shaped content): 3xx/4xx except
+429 → `InvalidParamsError`; 429, 5xx, no status (network, mid-stream drop) → `InternalError`. 401/403/429/5xx
 append a hint via `getHttpErrorHint()`
 (shared with `tools/call`); failures are logged via `logHttpError` (5xx → exception). Size
 link-outs are **successful** reads returning a download pointer, not failures. Discovery is the
