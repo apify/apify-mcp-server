@@ -126,3 +126,9 @@ export function validateApiBlocklist(
 export function isEndpointBlocked(method: ApiMethod, path: string, rules = API_BLOCK_RULES): boolean {
     return rules.some((rule) => isRuleMatch(rule, { method, path, queryNames: [] }));
 }
+
+/** Whether a query rule matches one of the query parameter names, each read as `validateApiBlocklist` reads it. */
+export function isQueryBlocked(queryNames: readonly string[], rules = API_BLOCK_RULES): boolean {
+    const extractedNames = queryNames.map(extractQueryParamName);
+    return rules.some(({ match }) => 'queryParam' in match && isQueryMatch(match, extractedNames));
+}

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
-import { isEndpointBlocked, validateApiBlocklist } from '../../src/tools/api/apify_api_blocklist.js';
+import { isEndpointBlocked, isQueryBlocked, validateApiBlocklist } from '../../src/tools/api/apify_api_blocklist.js';
 import { API_METHODS } from '../../src/tools/api/apify_api_spec.js';
 
 const METHOD_PARAM_REFUSAL =
@@ -223,5 +223,31 @@ describe('isEndpointBlocked()', () => {
         const rules: ApiBlockRule[] = [{ match: { queryParam: 'method' }, reason: 'No.' }];
 
         expect(isEndpointBlocked('GET', '/v2/datasets/{datasetId}', rules)).toBe(false);
+    });
+});
+
+describe('isQueryBlocked()', () => {
+    it.each([
+        { queryNames: ['method'] },
+        { queryNames: ['METHOD'] },
+        { queryNames: ['%6Dethod'] },
+        { queryNames: ['method[]'] },
+        { queryNames: ['[method]'] },
+        { queryNames: ['limit', 'method'] },
+    ])('returns true for $queryNames', ({ queryNames }) => {
+        expect(isQueryBlocked(queryNames)).toBe(true);
+    });
+
+    it.each([
+        { queryNames: [] },
+        { queryNames: ['methods'] },
+        { queryNames: ['methodName'] },
+        { queryNames: ['filter[method]'] },
+    ])('returns false for $queryNames', ({ queryNames }) => {
+        expect(isQueryBlocked(queryNames)).toBe(false);
+    });
+
+    it('returns false for an endpoint rule', () => {
+        expect(isQueryBlocked(['method'], [RUN_NOW_RULE])).toBe(false);
     });
 });
