@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 import { apifyApiOperationsCache } from '../../state.js';
+import type { ApiBlockRule } from './apify_api_blocklist.js';
+import { isEndpointBlocked } from './apify_api_blocklist.js';
 
 export const APIFY_API_OPENAPI_URL = 'https://docs.apify.com/api/openapi.json';
 
@@ -142,18 +144,19 @@ function parseRequestBody(rawRequestBody: unknown, spec: unknown): ApiOperation[
 }
 
 /**
- * Builds the operation index from an OpenAPI document. Deprecated operations, HEAD operations,
- * and anything outside `/v2/` are left out; malformed entries are skipped rather than failing the whole spec.
+ * Builds the operation index from an OpenAPI document. Deprecated operations, HEAD operations, operations a
+ * blocklist rule matches (`API_BLOCK_RULES`), and anything outside `/v2/` are left out, so no tool that reads
+ * the index offers them; malformed entries are skipped rather than failing the whole spec.
  * It throws when the spec lists no operation.
  */
-export function buildApiOperationIndex(spec: unknown): Map<string, ApiOperation> {
+export function buildApiOperationIndex(spec: unknown, rules?: readonly ApiBlockRule[]): Map<string, ApiOperation> {
     const index = new Map<string, ApiOperation>();
     const paths = isRecord(spec) && isRecord(spec.paths) ? spec.paths : {};
     for (const [path, pathItem] of Object.entries(paths)) {
         if (!path.startsWith('/v2/') || !isRecord(pathItem)) continue;
         for (const method of API_METHODS) {
             const parsed = openApiOperationValidator.safeParse(pathItem[method.toLowerCase()]);
-            if (!parsed.success || parsed.data.deprecated) continue;
+            if (!parsed.success || parsed.data.deprecated || isEndpointBlocked(method, path, rules)) continue;
             const { operationId, summary, description, tags, parameters, requestBody } = parsed.data;
             const body = parseRequestBody(requestBody, spec);
             index.set(operationId, {

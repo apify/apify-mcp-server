@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
 import {
     APIFY_API_OPENAPI_URL,
     buildApiOperationIndex,
@@ -16,6 +17,24 @@ describe('buildApiOperationIndex()', () => {
         expect(index.has('outside_get')).toBe(false);
         expect([...index.values()].every((operation) => operation.operationId)).toBe(true);
         expect(index.size).toBe(38);
+    });
+
+    it('leaves out the operations a rule matches', () => {
+        const rules: ApiBlockRule[] = [
+            { match: { method: 'GET', path: '/v2/datasets/{datasetId}' }, reason: 'No.' },
+            { match: { method: 'DELETE', path: '/v2/actors/{actorId}' }, reason: 'No.' },
+            // A literal segment matches only itself, not a parameter of the spec.
+            { match: { method: 'GET', path: '/v2/users/me' }, reason: 'No.' },
+            { match: { queryParam: 'limit' }, reason: 'No.' },
+        ];
+
+        const blockedIndex = buildApiOperationIndex(API_SPEC_FIXTURE, rules);
+
+        expect([...index.keys()].filter((operationId) => !blockedIndex.has(operationId))).toEqual([
+            'dataset_get',
+            'actor_delete',
+            'users_me_get',
+        ]);
     });
 
     it('indexes a PATCH operation, which the published spec does not have yet', () => {
