@@ -250,7 +250,7 @@ Here are some special MCP operations and how the Apify MCP Server supports them:
 - **Schedules**: Create, inspect, update, and delete schedules that run your Actors and tasks automatically.
 - **Builds**: Build an Actor version, list builds, check the status of a build, and retrieve its build log.
 - **Actor source**: Read an Actor version's files, with a hash for each file and a revision for the whole set.
-- **Apify API**: Search the Apify API reference, inspect an operation, and send GET requests to the API.
+- **Apify API**: Search the Apify API reference, inspect an operation, and send requests to the API to read or change data.
 
 ### Overview of available tools
 
@@ -302,6 +302,7 @@ Legend for the **Enabled by default** column:
 | `apify-api-search` | api | Search the Apify API reference for operations by keywords. Returns each one's method, path, and docs page. |  |
 | `apify-api-details` | api | Get the parameters and request body schema of the Apify API operations on a path. |  |
 | `apify-api-read` | api | Send a GET request to any Apify API path, such as `actor-runs` or `/v2/actor-runs`, like `apify api` in the Apify CLI. |  |
+| `apify-api-write` | none (select by name: `tools=apify-api-write`) | Send a POST, PUT, PATCH, or DELETE request to any Apify API path, with a JSON body, like `apify api` in the Apify CLI. |  |
 
 > **Note:**
 >

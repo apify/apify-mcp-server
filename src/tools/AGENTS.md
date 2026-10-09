@@ -41,16 +41,19 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     revision rules, and the text-or-base64 detection. Versions not stored as files (Git repository,
     gist, or zip) are refused.
   - `api/` — the generic Apify API tools: search the operations of the published OpenAPI spec, get the
-    operations on a path, and send a GET to a path. The call tool is a proxy to the API, like
-    `apify api` in the Apify CLI: it refuses nothing the API accepts. `apify_api_spec.ts` builds the
-    operation index from the spec (cached for a day); search and details use it, and a call uses it
-    only for hints, waiting at most a few seconds, so a failed download does not stop a call.
-    `apify_api_request.ts` normalizes the path as the CLI does (`actors`, `v2/actors`, and `/v2/actors`
-    are the same), sends it as written with the query added after any query string in it, and
-    looks up a legacy `acts` path as `actors`, the prefix the spec lists. It asserts that the URL stays
-    on the API origin, sends one request with no retries, masks the session token in the response,
-    keeps a query in the path out of the error it throws, and adds the closest spec paths to a
-    `page-not-found` 404 (a wrong path), not to a missing record.
+    operations on a path, and send a GET, or a POST, PUT, PATCH, or DELETE, to a path. The write tool is in
+    no category (`UNCATEGORIZED_TOOLS`): `tools=api` serves the other three, and a session gets the write
+    tool only by naming it. The call tools are proxies to the API, like `apify api` in the Apify CLI:
+    they refuse nothing the API accepts.
+    `apify_api_spec.ts` builds the operation index from the spec (cached for a day); search and
+    details use it, the write tool uses it to choose a method that was not given, and a call uses it
+    otherwise only for hints, waiting at most a few seconds, so a failed download does not stop a
+    call. `apify_api_request.ts` normalizes the path as the CLI does (`actors`, `v2/actors`, and
+    `/v2/actors` are the same), sends it as written with the query added after any query string in
+    it, and looks up a legacy `acts` path as `actors`, the prefix the spec lists. It asserts that the
+    URL stays on the API origin, sends one request with no retries, masks the session token in the
+    response, keeps a query in the path out of the error it throws, and adds the closest spec paths
+    to a `page-not-found` 404 (a wrong path), not to a missing record.
     The one capped request (`sendApifyApiRequest`) is in `../apify_client.ts`. The origin check
     (`isApifyApiUri`) and the detection of a body over `MAX_INLINE_BYTES` (`isMaxContentLengthAbort`)
     are the API resource's own, imported from `../resources/api_resources.ts`

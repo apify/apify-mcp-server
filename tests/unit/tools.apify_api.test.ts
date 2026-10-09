@@ -2,6 +2,7 @@ import { ApifyApiError } from 'apify-client';
 import axios, { AxiosError, AxiosHeaders, CanceledError } from 'axios';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ApifyClient } from '../../src/apify_client.js';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { apifyApiDetails } from '../../src/tools/api/apify_api_details.js';
 import { apifyApiRead } from '../../src/tools/api/apify_api_read.js';
@@ -14,6 +15,7 @@ import {
 import { apifyApiSearch } from '../../src/tools/api/apify_api_search.js';
 import type * as ApifyApiSpecModule from '../../src/tools/api/apify_api_spec.js';
 import { buildApiOperationIndex, fetchApiOperationIndex } from '../../src/tools/api/apify_api_spec.js';
+import { apifyApiWrite } from '../../src/tools/api/apify_api_write.js';
 import {
     apifyApiCallOutputSchema,
     apifyApiDetailsOutputSchema,
@@ -617,5 +619,328 @@ describe('apify-api-read', () => {
             expect(JSON.stringify(logged)).not.toContain('secret');
             expect(JSON.stringify(logged)).toContain('[REDACTED]');
         }
+    });
+});
+
+describe('apify-api-write', () => {
+    const REQUEST_BASE = { params: undefined, maxContentLength: MAX_INLINE_BYTES, signal: expect.any(AbortSignal) };
+
+    it('is annotated as destructive and open-world, since it starts runs and creates webhooks to any URL', () => {
+        expect(apifyApiWrite.annotations).toMatchObject({
+            readOnlyHint: false,
+            destructiveHint: true,
+            idempotentHint: false,
+            openWorldHint: true,
+        });
+    });
+
+    it('sends one request with the body serialized as JSON and returns the response', async () => {
+        const body = { data: { id: 'abc', name: 'leads-2026' } };
+        requestMock.mockResolvedValue(mockResponse(200, body));
+
+        const result = await callTool(apifyApiWrite, {
+            path: 'datasets/abc',
+            method: 'PUT',
+            body: { name: 'leads-2026' },
+        });
+
+        expect(requestMock).toHaveBeenCalledTimes(1);
+        expect(requestMock).toHaveBeenCalledWith({
+            ...REQUEST_BASE,
+            url: `${BASE_URL}/datasets/abc`,
+            method: 'PUT',
+            data: '{"name":"leads-2026"}',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        expectSchemaConformingStructuredContent(result, apifyApiCallOutputSchema);
+        expect(result.structuredContent).toMatchObject({ method: 'PUT', path: '/v2/datasets/abc', data: body });
+    });
+
+    it('sends any body field the API takes, such as isPublic', async () => {
+        requestMock.mockResolvedValue(mockResponse(200, { data: {} }));
+
+        await callTool(apifyApiWrite, { path: 'acts/john~my-actor', method: 'PUT', body: { isPublic: true } });
+
+        expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ data: '{"isPublic":true}' }));
+    });
+
+    it('sends a DELETE', async () => {
+        requestMock.mockResolvedValue(mockResponse(204, undefined, ''));
+
+        const result = await callTool(apifyApiWrite, { path: '/v2/datasets/abc', method: 'DELETE' });
+
+        expect(requestMock).toHaveBeenCalledWith({
+            ...REQUEST_BASE,
+            url: `${BASE_URL}/datasets/abc`,
+            method: 'DELETE',
+        });
+        expect(result.structuredContent).toMatchObject({ method: 'DELETE', statusCode: 204, data: null });
+    });
+
+    it('sends a PATCH', async () => {
+        requestMock.mockResolvedValue(mockResponse(200, { data: {} }));
+
+        await callTool(apifyApiWrite, { path: 'datasets/abc', method: 'PATCH', body: { name: 'leads' } });
+
+        expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ method: 'PATCH' }));
+    });
+
+    it.each([
+        [
+            [HELPER_TOOLS.API_WRITE, HELPER_TOOLS.API_READ],
+            `The path has only the GET method, which this tool does not send; call it with ${HELPER_TOOLS.API_READ}.`,
+        ],
+        [[HELPER_TOOLS.API_WRITE], 'The path has only the GET method, which this tool does not send.'],
+    ])('never sends a GET for a path whose only method is GET (session %j)', async (loadedToolNames, message) => {
+        const result = await callTool(apifyApiWrite, { path: 'users/me' }, loadedToolNames);
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(message);
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('does not need the spec when the method is given, even for a path the spec does not list', async () => {
+        requestMock.mockResolvedValue(mockResponse(201, { data: {} }));
+
+        await callTool(apifyApiWrite, { path: 'not-in-spec', method: 'POST', body: {} });
+
+        expect(readSentUrl()).toBe(`${BASE_URL}/not-in-spec`);
+        expect(fetchApiOperationIndex).not.toHaveBeenCalled();
+    });
+
+    it("uses the path's only method in the spec when none is given, and sends no body when none is given", async () => {
+        requestMock.mockResolvedValue(mockResponse(200, { data: { id: 'run-1', status: 'ABORTING' } }));
+
+        await callTool(apifyApiWrite, { path: 'actor-runs/run-1/abort' });
+
+        expect(requestMock).toHaveBeenCalledWith({
+            ...REQUEST_BASE,
+            url: `${BASE_URL}/actor-runs/run-1/abort`,
+            method: 'POST',
+        });
+    });
+
+    it('uses the method of the actors path for a legacy acts path', async () => {
+        requestMock.mockResolvedValue(mockResponse(201, { data: {} }));
+
+        await callTool(apifyApiWrite, { path: 'acts/john~my-actor/runs/last/dataset/items', body: [] });
+
+        expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST' }));
+        expect(readSentUrl()).toBe(`${BASE_URL}/acts/john~my-actor/runs/last/dataset/items`);
+    });
+
+    it('asks for the method when the spec cannot be loaded to choose it', async () => {
+        vi.mocked(fetchApiOperationIndex).mockRejectedValueOnce(new Error('Failed to load the Apify API operations'));
+
+        const result = await callTool(apifyApiWrite, { path: 'actor-runs/run-1/abort' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(
+            'The API spec could not be loaded to choose the method; specify the method.',
+        );
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        [
+            'request-queues/q/requests/batch',
+            'The path matches methods POST and DELETE; specify which one to call the endpoint with.',
+        ],
+        ['not-in-spec/abc', 'The path is not in the API spec; specify the method.'],
+    ])('asks for the method of %s without a request', async (path, message) => {
+        const result = await callTool(apifyApiWrite, { path, body: { name: 'x' } });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(message);
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        [
+            'datasets/abc',
+            'The path matches methods PUT and DELETE; specify which one to call the endpoint with. This tool ' +
+                `does not send its GET; call it with ${HELPER_TOOLS.API_READ}.`,
+        ],
+        [
+            'webhooks',
+            'The path matches method POST; specify it to call the endpoint with. This tool does not send its ' +
+                `GET; call it with ${HELPER_TOOLS.API_READ}.`,
+        ],
+    ])('asks only for a write method of %s and sends its GET to the read tool', async (path, message) => {
+        const result = await callTool(apifyApiWrite, { path, body: { name: 'x' } }, [
+            HELPER_TOOLS.API_WRITE,
+            HELPER_TOOLS.API_READ,
+        ]);
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(message);
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('does not name the read tool for the GET of a path when the session lacks it', async () => {
+        const result = await callTool(apifyApiWrite, { path: 'datasets/abc' }, [HELPER_TOOLS.API_WRITE]);
+
+        expect(result.content[0].text).toBe(
+            'The path matches methods PUT and DELETE; specify which one to call the endpoint with. This tool ' +
+                'does not send its GET.',
+        );
+    });
+
+    it('sends the body as application/json through the real apify-client axios instance, a string as the value it holds', async () => {
+        const client = new ApifyClient({ token: 'test-token', baseUrl: 'https://api.apify.com' });
+        const sent: { url?: string; data?: unknown; contentType?: unknown }[] = [];
+        client.httpClient.axios.defaults.adapter = async (config) => {
+            sent.push({ url: config.url, data: config.data, contentType: config.headers.get('Content-Type') });
+            return {
+                status: 201,
+                statusText: 'Created',
+                headers: { 'content-type': 'application/json' },
+                data: Buffer.from('{"data":{}}'),
+                config,
+                request: {},
+            };
+        };
+        const call = async (body: unknown) => {
+            const context = stubToolCallContext(
+                { path: '/v2/key-value-stores/s/records/a%2FK', method: 'PUT', body },
+                client,
+            );
+            return (await (apifyApiWrite as HelperTool).call(context)) as TextToolResult;
+        };
+
+        const results = [
+            await call({ name: 'x' }),
+            await call(42),
+            await call('{"name":"x"}'),
+            await call(' [{"key":"a"}] '),
+            await call('"text"'),
+        ];
+
+        expect(results.map((result) => result.structuredContent)).toEqual(
+            Array(5).fill(expect.objectContaining({ statusCode: 201, data: { data: {} } })),
+        );
+        const url = 'https://api.apify.com/v2/key-value-stores/s/records/a%2FK';
+        expect(sent).toEqual([
+            { url, data: '{"name":"x"}', contentType: 'application/json' },
+            { url, data: '42', contentType: 'application/json' },
+            { url, data: '{"name":"x"}', contentType: 'application/json' },
+            { url, data: '[{"key":"a"}]', contentType: 'application/json' },
+            { url, data: '"text"', contentType: 'application/json' },
+        ]);
+    });
+
+    it.each(['text', '', '{"name":'])(
+        'refuses the string body %j, which is not JSON, without a request',
+        async (body) => {
+            const result = await callTool(apifyApiWrite, { path: 'datasets/abc', method: 'PUT', body });
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toBe(
+                'The body is a string that is not valid JSON; give it as a JSON object or array.',
+            );
+            expect(requestMock).not.toHaveBeenCalled();
+        },
+    );
+
+    /** The abort axios throws for a body over `maxContentLength`, with the status Node's request keeps. */
+    function buildOversizeError(statusCode?: number) {
+        return new AxiosError(
+            `maxContentLength size of ${MAX_INLINE_BYTES} exceeded`,
+            'ERR_BAD_RESPONSE',
+            undefined,
+            statusCode === undefined ? undefined : { res: { statusCode } },
+        );
+    }
+
+    it('reports a write whose response is over the inline limit as done, not failed', async () => {
+        requestMock.mockRejectedValue(buildOversizeError(200));
+
+        const result = await callTool(apifyApiWrite, { path: 'datasets/abc', method: 'PUT', body: { name: 'x' } });
+
+        expect(result.isError).toBe(false);
+        expectSchemaConformingStructuredContent(result, apifyApiCallOutputSchema);
+        expect(result.structuredContent).toEqual({
+            method: 'PUT',
+            path: '/v2/datasets/abc',
+            statusCode: 200,
+            data: null,
+        });
+        expect(result.content[1].text).toBe(
+            `PUT /v2/datasets/abc returned HTTP 200. The response is larger than ${MAX_INLINE_BYTES} bytes, so ` +
+                'it is not returned; check the result with a GET.',
+        );
+    });
+
+    it.each([
+        { statusCode: 400, hint: '' },
+        { statusCode: 429, hint: ' Rate limit exceeded, wait before retrying.' },
+    ])(
+        'reports a failed write whose error body is over the inline limit with its status $statusCode',
+        async ({ statusCode, hint }) => {
+            requestMock.mockRejectedValue(buildOversizeError(statusCode));
+
+            const result = await callTool(apifyApiWrite, { path: 'datasets/abc', method: 'PUT', body: { name: 'x' } });
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toBe(
+                `PUT /v2/datasets/abc failed with HTTP ${statusCode}. Its error body is larger than ` +
+                    `${MAX_INLINE_BYTES} bytes, so it is not returned.${hint}`,
+            );
+        },
+    );
+
+    it('says the request was sent when an oversize response has no status', async () => {
+        requestMock.mockRejectedValue(buildOversizeError());
+
+        const result = await callTool(apifyApiWrite, { path: 'datasets/abc', method: 'PUT', body: { name: 'x' } });
+
+        expect(result.content[0].text).toBe(
+            `The response of PUT /v2/datasets/abc is larger than ${MAX_INLINE_BYTES} bytes, so it is not returned. ` +
+                'The request itself was sent; check its effect with a GET.',
+        );
+    });
+
+    describe('redactArgs()', () => {
+        const { redactArgs } = apifyApiWrite as HelperTool;
+
+        it('shares the read tool redactor, so a token is redacted too', () => {
+            const args = { path: '/v2/datasets/abc', method: 'PUT', query: { token: 'secret' } };
+
+            expect(redactArgs).toBe(redactApiCallArgs);
+            expect(JSON.stringify(redactArgs?.(args))).not.toContain('secret');
+        });
+
+        it('redacts the body in the logged copy without changing the arguments', () => {
+            const path = '/v2/acts/john~my-actor/versions/0.1/env-vars/API_KEY';
+            const args = { path, method: 'PUT', body: { value: 'secret' } };
+
+            expect(redactArgs?.(args)).toEqual({ path, method: 'PUT', body: '[REDACTED]' });
+            expect(args.body).toEqual({ value: 'secret' });
+        });
+
+        it('redacts a body given as a JSON string', () => {
+            const args = { path: '/v2/datasets/abc', method: 'PUT', body: '{"value":"secret"}' };
+
+            expect(redactArgs?.(args)).toEqual({ path: '/v2/datasets/abc', method: 'PUT', body: '[REDACTED]' });
+        });
+
+        it('logs only the declared arguments, so a body under another key is left out', () => {
+            const args = { path: '/v2/datasets/abc', requestBody: { value: 'secret' } };
+
+            expect(JSON.stringify(redactArgs?.(args))).not.toContain('secret');
+        });
+
+        it('redacts the webhooks query parameter, whose webhooks carry headers', () => {
+            const args = {
+                path: '/v2/acts/john~my-actor/runs',
+                query: { memory: 1024, webhooks: 'W3siaGVhZGVyc1RlbXBsYXRlIjoic2VjcmV0In1d' },
+            };
+
+            expect(redactArgs?.(args)).toEqual({
+                path: '/v2/acts/john~my-actor/runs',
+                query: { memory: 1024, webhooks: '[REDACTED]' },
+            });
+            expect(args.query.webhooks).not.toBe('[REDACTED]');
+        });
     });
 });

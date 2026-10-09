@@ -1085,7 +1085,7 @@ export const apifyApiDetailsOutputSchema = {
 };
 
 /**
- * Schema for the response of an API call (apify-api-read).
+ * Schema for the response of an API call (apify-api-read, apify-api-write).
  */
 export const apifyApiCallOutputSchema = {
     type: 'object' as const,
@@ -1094,7 +1094,11 @@ export const apifyApiCallOutputSchema = {
         path: { type: 'string', description: 'Request path as it was sent' },
         statusCode: { type: 'integer', description: 'HTTP status code' },
         contentType: { type: 'string', description: 'Content-Type of the response' },
-        data: { description: 'Response body: parsed JSON, text, or null for an empty or binary body' },
+        data: {
+            description:
+                'Response body: parsed JSON, text, or null for an empty or binary body, or for a write response ' +
+                'over the inline limit',
+        },
     },
     required: ['method', 'path', 'statusCode', 'data'],
 };
