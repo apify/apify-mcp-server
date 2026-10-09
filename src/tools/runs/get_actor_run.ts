@@ -63,17 +63,20 @@ export function buildGetActorRunError(runId: string, error: unknown): ToolRespon
 /**
  * Build the success response. `content[0]` is the JSON-stringified `structuredContent`
  * mirror (per MCP spec); `content[1]` carries an LLM-readable narrative of `summary` + `nextStep`.
- * Without `hasCallActorTool`, the tip is followed by the callability caveat.
+ * Without `hasCallActorTool`, `tip.caveat` carries the callability caveat, also printed after the tip.
  */
 export function buildGetActorRunResponse(
     params: FetchActorRunResult & { linkContext?: ConsoleLinkContext; hasCallActorTool?: boolean },
 ): ToolResponse {
     const { run, structuredContent, linkContext, hasCallActorTool = true } = params;
+    if (structuredContent.tip && !hasCallActorTool) {
+        structuredContent.tip = { ...structuredContent.tip, caveat: ACTOR_CALLABILITY_CAVEAT };
+    }
     const { tip } = structuredContent;
 
     // Mints the `apifyConsoleUrl` fields onto structuredContent and returns the narrative suffix in one pass.
     const consoleLinks = applyConsoleLinks(structuredContent, linkContext);
-    const tipCaveat = hasCallActorTool ? '' : `\n${ACTOR_CALLABILITY_CAVEAT}`;
+    const tipCaveat = tip?.caveat ? `\n${tip.caveat}` : '';
     const tipText = tip ? `\nTip from Actor:\n\`\`\`\n${tip.message}\n\`\`\`${tipCaveat}` : '';
     return respondOk(
         [

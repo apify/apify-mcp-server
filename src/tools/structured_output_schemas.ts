@@ -729,6 +729,10 @@ export const actorRunOutputSchema = {
                     type: 'string',
                     description: 'Apify Actor ID the tip recommends, when it names one',
                 },
+                caveat: {
+                    type: 'string',
+                    description: 'Present when this session cannot run the Actor the tip recommends',
+                },
             },
             required: ['message'],
         },

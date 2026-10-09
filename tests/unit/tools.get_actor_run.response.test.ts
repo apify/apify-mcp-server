@@ -800,8 +800,12 @@ describe('get-actor-run default response', () => {
                 loadedToolNames: [HELPER_TOOLS.ACTOR_RUNS_GET],
             }),
         );
-        const { content } = result as { content: { type: string; text: string }[] };
+        const { content, structuredContent } = result as {
+            content: { type: string; text: string }[];
+            structuredContent: RunResponse;
+        };
 
+        expect(structuredContent.tip?.caveat).toBe(ACTOR_CALLABILITY_CAVEAT);
         expect(content[1].text).toContain(`Use a different Actor.\n\`\`\`\n${ACTOR_CALLABILITY_CAVEAT}`);
     });
 

@@ -155,7 +155,7 @@ export type RunResponse = {
     };
     storages: RunStorages;
     /** Advisory guidance an Actor wrote under the reserved {@link TIP_KVS_KEY}, if any. */
-    tip?: { message: string; level?: 'info' | 'warning'; recommendedActorId?: string };
+    tip?: { message: string; level?: 'info' | 'warning'; recommendedActorId?: string; caveat?: string };
     summary: string;
     nextStep: string;
 };
