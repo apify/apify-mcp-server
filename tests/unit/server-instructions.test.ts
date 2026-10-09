@@ -5,7 +5,7 @@ import { parseInputParamsFromUrl } from '../../src/mcp/utils.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../src/types.js';
 import { getServerInstructions } from '../../src/utils/server-instructions/index.js';
-import { getToolsForServerMode } from '../../src/utils/tools_loader.js';
+import { AUTO_INJECTED_TOOLS, getToolsForServerMode } from '../../src/utils/tools_loader.js';
 import { CLAUDE_CONNECTOR_TOOLS } from './helpers/claude_connector_tools.js';
 import { only } from './helpers/tool_context.js';
 
@@ -278,19 +278,28 @@ describe('getServerInstructions()', () => {
 
 /** Pins the Claude-connector tool surface (no call-actor); offline, no network or fixture. */
 describe('Claude-connector tool surface (no call-actor)', () => {
-    const url = `https://mcp.apify.com/?tools=${CLAUDE_CONNECTOR_TOOLS.join(',')}`;
+    const listedUrl = `https://mcp.apify.com/?tools=${CLAUDE_CONNECTOR_TOOLS.join(',')}&client=claude`;
 
     // Actor-tool selectors (contain '/') need a live fetch to resolve; checks the internal-tool subset only.
     const expectedInternalToolNames = CLAUDE_CONNECTOR_TOOLS.filter((tool) => !tool.includes('/'));
 
+    const resolveToolNames = (url: string) =>
+        getToolsForServerMode(parseInputParamsFromUrl(url), [], SERVER_MODE.APPS).map((tool) => tool.name);
+
     it('resolves to exactly the expected internal tools, no call-actor, and instructions mention it nowhere', () => {
-        const resolved = new Set(
-            getToolsForServerMode(parseInputParamsFromUrl(url), [], SERVER_MODE.APPS).map((tool) => tool.name),
-        );
+        const resolved = new Set(resolveToolNames(listedUrl));
         expect(resolved).toEqual(new Set(expectedInternalToolNames));
         expect(resolved.has(HELPER_TOOLS.ACTOR_CALL)).toBe(false);
 
         const instructions = getServerInstructions(SERVER_MODE.APPS, { hasTool: (name) => resolved.has(name) });
         expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+    });
+
+    it('names every auto-injected tool explicitly, so the listed URL shows the whole served surface', () => {
+        for (const tool of AUTO_INJECTED_TOOLS) expect(CLAUDE_CONNECTOR_TOOLS).toContain(tool.name);
+    });
+
+    it('serves the same tools with and without ?client=claude', () => {
+        expect(resolveToolNames(listedUrl)).toEqual(resolveToolNames(listedUrl.replace('&client=claude', '')));
     });
 });
