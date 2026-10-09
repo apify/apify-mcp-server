@@ -9,7 +9,7 @@ import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildUsageMeta, respondAborted, respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
-import { ACTOR_CALLABILITY_CAVEAT } from '../actor_tool_naming.js';
+import { ACTOR_TIP_CAVEAT } from '../actor_tool_naming.js';
 import {
     applyConsoleLinks,
     type FetchActorRunResult,
@@ -63,14 +63,14 @@ export function buildGetActorRunError(runId: string, error: unknown): ToolRespon
 /**
  * Build the success response. `content[0]` is the JSON-stringified `structuredContent`
  * mirror (per MCP spec); `content[1]` carries an LLM-readable narrative of `summary` + `nextStep`.
- * Without `hasCallActorTool`, `tip.caveat` carries the callability caveat, also printed after the tip.
+ * Without `hasCallActorTool`, `tip.caveat` says the session cannot run the recommended Actor; it is also printed after the tip.
  */
 export function buildGetActorRunResponse(
     params: FetchActorRunResult & { linkContext?: ConsoleLinkContext; hasCallActorTool?: boolean },
 ): ToolResponse {
     const { run, structuredContent, linkContext, hasCallActorTool = true } = params;
     if (structuredContent.tip && !hasCallActorTool) {
-        structuredContent.tip = { ...structuredContent.tip, caveat: ACTOR_CALLABILITY_CAVEAT };
+        structuredContent.tip = { ...structuredContent.tip, caveat: ACTOR_TIP_CAVEAT };
     }
     const { tip } = structuredContent;
 
