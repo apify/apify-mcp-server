@@ -18,7 +18,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
     const runActor = hasTool(HELPER_TOOLS.ACTOR_CALL) ? ` Run an Actor with ${HELPER_TOOLS.ACTOR_CALL}.` : '';
     return dedent`
         Send a GET request to the Apify API at a path, such as /v2/actor-runs/abc.
-        A GET can start a paid Actor run, as the synchronous run endpoints do.${runActor}
+        A GET to the synchronous run endpoints is refused.${runActor}
         ${API_CALL_DESCRIPTION}${findPath}${getParameters}
         Returns the response body as the API sends it, JSON with its data wrapper included; a body over
         ${MAX_INLINE_BYTES} bytes is not returned.
@@ -48,11 +48,12 @@ export const apifyApiRead: ToolEntry = Object.freeze({
     ajvValidate: compileSchema(z.toJSONSchema(apifyApiReadArgs)),
     annotations: {
         title: 'Read Apify API',
-        // A GET can start a run, such as a synchronous run of an Actor or task.
-        readOnlyHint: false,
+        // The blocklist refuses the GETs that would write or start a run: the method query parameter and the
+        // synchronous run endpoints. With no Actor run, the tool reaches nothing outside the Apify platform.
+        readOnlyHint: true,
         destructiveHint: false,
-        idempotentHint: false,
-        openWorldHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
     },
     // A storage signature, or the webhooks of a synchronous run, would otherwise be logged.
     redactArgs: redactApiCallArgs,

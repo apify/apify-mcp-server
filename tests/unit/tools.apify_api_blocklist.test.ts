@@ -3,10 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { HELPER_TOOLS } from '../../src/const.js';
 import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
 import { isEndpointBlocked, isQueryBlocked, validateApiBlocklist } from '../../src/tools/api/apify_api_blocklist.js';
+import { normalizeApiPath } from '../../src/tools/api/apify_api_path.js';
 import { API_METHODS } from '../../src/tools/api/apify_api_spec.js';
 
 const METHOD_PARAM_REFUSAL =
     'The API tools do not send the method query parameter: the API would take it as the HTTP method of the request.';
+
+const SYNC_RUN_REFUSAL =
+    'A GET to the synchronous run endpoints starts a paid run, as a POST does, so the API tools do not send it.';
 
 /** A test-only endpoint rule. */
 const RUN_NOW_RULE: ApiBlockRule = {
@@ -191,6 +195,50 @@ describe('validateApiBlocklist()', () => {
         });
     });
 
+    describe('the synchronous run rules', () => {
+        it.each([
+            'actors/apify~hello-world/run-sync',
+            'actors/~my-actor/run-sync-get-dataset-items',
+            'actors/HG7ML7M8z78YcAPEB/run-sync',
+            'acts/apify~hello-world/run-sync',
+            'acts/apify~hello-world/run-sync-get-dataset-items',
+            'actor-tasks/john~my-task/run-sync',
+            'actor-tasks/HG7ML7M8z78YcAPEB/run-sync-get-dataset-items',
+            normalizeApiPath('/v2/actors/abc/run-sync'),
+            normalizeApiPath('v2/actor-tasks/abc/run-sync'),
+        ])('refuses a GET to %j, not a POST', (normalizedPath) => {
+            expect(validate({ normalizedPath })).toBe(SYNC_RUN_REFUSAL);
+            expect(validate({ normalizedPath, method: 'POST' })).toBeUndefined();
+        });
+
+        it.each([
+            'actors/abc/runs',
+            'actors/abc/runs/last',
+            'actor-tasks/abc/runs',
+            'key-value-stores/abc/records/run-sync',
+            'actor-runs/abc',
+            'actor-runs/abc/run-sync',
+            'actors/abc/run-sync-x',
+            'actors/run-sync',
+            'actors/apify/hello-world/run-sync',
+            'datasets/run-sync',
+        ])('does not refuse a GET or a POST to %j', (normalizedPath) => {
+            expect(validate({ normalizedPath })).toBeUndefined();
+            expect(validate({ normalizedPath, method: 'POST' })).toBeUndefined();
+        });
+
+        it.each([
+            ['actors/abc/run-sync', `Use ${HELPER_TOOLS.ACTOR_CALL} or ${HELPER_TOOLS.API_WRITE}`],
+            ['actors/abc/run-sync-get-dataset-items', `Use ${HELPER_TOOLS.ACTOR_CALL} or ${HELPER_TOOLS.API_WRITE}`],
+            ['actor-tasks/abc/run-sync', `Use ${HELPER_TOOLS.API_WRITE}`],
+            ['actor-tasks/abc/run-sync-get-dataset-items', `Use ${HELPER_TOOLS.API_WRITE}`],
+        ])('names the tools to use instead of a GET to %s', (normalizedPath, use) => {
+            const loadedToolNames = [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.API_WRITE];
+
+            expect(validate({ normalizedPath, loadedToolNames })).toBe(`${SYNC_RUN_REFUSAL} ${use} instead.`);
+        });
+    });
+
     describe('a path outside /v2/', () => {
         const OUTSIDE_V2_REFUSAL =
             'The path leaves /v2/ once its dot segments are resolved; the API tools call only paths under /v2/.';
@@ -236,6 +284,16 @@ describe('isEndpointBlocked()', () => {
         const rules: ApiBlockRule[] = [{ match: { queryParam: 'method' }, reason: 'No.' }];
 
         expect(isEndpointBlocked('GET', '/v2/datasets/{datasetId}', rules)).toBe(false);
+    });
+
+    it.each([
+        '/v2/actors/{actorId}/run-sync',
+        '/v2/actors/{actorId}/run-sync-get-dataset-items',
+        '/v2/actor-tasks/{actorTaskId}/run-sync',
+        '/v2/actor-tasks/{actorTaskId}/run-sync-get-dataset-items',
+    ])('blocks the GET of the synchronous run endpoint %s, not the POST', (path) => {
+        expect(isEndpointBlocked('GET', path)).toBe(true);
+        expect(isEndpointBlocked('POST', path)).toBe(false);
     });
 });
 
