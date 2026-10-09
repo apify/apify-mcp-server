@@ -442,10 +442,15 @@ describe('apify-api-read', () => {
         expect((error as Error).stack).not.toContain('sig-secret');
     });
 
-    it('adds the closest paths of the spec to a page-not-found 404', async () => {
-        requestMock.mockResolvedValue(
-            mockResponse(404, { error: { type: 'page-not-found', message: 'Page not found.' } }),
-        );
+    it.each([
+        ['Page not found.', 'Page not found.'],
+        [
+            'We have bad news: there is no API endpoint at this URL. Did you specify it correctly?',
+            'We have bad news: there is no API endpoint at this URL. Did you specify it correctly?',
+        ],
+        ['Page not found', 'Page not found.'],
+    ])('adds the closest paths of the spec to a page-not-found 404: %s', async (apiMessage, sentence) => {
+        requestMock.mockResolvedValue(mockResponse(404, { error: { type: 'page-not-found', message: apiMessage } }));
 
         const call = callTool(apifyApiRead, { path: 'datasets/abc/itemz' });
 
@@ -453,7 +458,7 @@ describe('apify-api-read', () => {
         await expect(call).rejects.toMatchObject({
             statusCode: 404,
             type: 'page-not-found',
-            message: `Page not found. The closest paths in the API spec: ${findClosestApiPaths(INDEX, 'datasets/abc/itemz').join(', ')}`,
+            message: `${sentence} The closest paths in the API spec: ${findClosestApiPaths(INDEX, 'datasets/abc/itemz').join(', ')}`,
         });
     });
 

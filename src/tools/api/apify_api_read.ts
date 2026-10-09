@@ -52,7 +52,7 @@ export const apifyApiRead: ToolEntry = Object.freeze({
         readOnlyHint: false,
         destructiveHint: false,
         idempotentHint: false,
-        openWorldHint: false,
+        openWorldHint: true,
     },
     // A storage signature, or the webhooks of a synchronous run, would otherwise be logged.
     redactArgs: redactApiCallArgs,

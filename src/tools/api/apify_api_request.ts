@@ -229,7 +229,7 @@ async function addClosestPaths(error: ApifyApiError, normalizedPath: string, sig
     const index = await fetchApiOperationIndexIfAvailable(signal);
     const paths = index ? findClosestApiPaths(index, normalizedPath) : [];
     if (paths.length === 0) return;
-    error.message = `${error.message.replace(/\.$/, '')}. The closest paths in the API spec: ${paths.join(', ')}`;
+    error.message = `${error.message.replace(/([^.!?])$/, '$1.')} The closest paths in the API spec: ${paths.join(', ')}`;
 }
 
 /**
