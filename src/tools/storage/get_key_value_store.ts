@@ -60,8 +60,7 @@ export const getKeyValueStore: ToolEntry = Object.freeze({
         const bytes = (kvStore.stats as { storageBytes?: number } | undefined)?.storageBytes;
         const summary = `Key-value store '${kvStore.name ?? keyValueStoreId}'${bytes !== undefined ? ` holds ${bytes} bytes` : ''}.`;
         const nextStep = `Use ${HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET} with keyValueStoreId=${keyValueStoreId} to list keys.`;
-        // The URL signing key lets anyone mint non-expiring links to every record; the pre-signed *PublicUrl
-        // fields expire, so they stay (see apify/ai-team#330).
+        // The URL signing key mints non-expiring links; the *PublicUrl fields expire, so they stay (apify/ai-team#330).
         const { urlSigningSecretKey, ...metadata } = kvStore;
         return buildStorageResponse({
             structuredContent: metadata,

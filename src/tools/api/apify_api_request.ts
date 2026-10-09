@@ -307,8 +307,7 @@ export async function callApi(params: {
         ? `${method} ${path} returned HTTP ${response.status} with a binary body ` +
           `(${contentType ?? 'no Content-Type'}, ${(data as Buffer).length} bytes), which is not shown.`
         : `${method} ${path} returned HTTP ${response.status}.`;
-    // A storage object holds its URL signing key (see apify/ai-team#330). A text body is a JSON string here,
-    // with its quotes escaped, so it never matches.
+    // A text body is an escaped JSON string here, so it never matches.
     const json = JSON.stringify(structuredContent);
     const text = redactUrlSigningSecretKey(json);
     return respondOk([text, summary], { structuredContent: text === json ? structuredContent : JSON.parse(text) });

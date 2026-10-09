@@ -198,12 +198,8 @@ export function redactUrlSigningSecretKey(json: string): string {
  * A thin streaming proxy: the apify-client injects the session token (and the MCP-origin header),
  * the body streams in and is returned by its declared Content-Type — textual types
  * (text/*, JSON, XML) as `text`, anything else as a base64 `blob`. The body is never parsed, so
- * JSON primitives, formatting, and bytes round-trip exactly, with two exceptions: the session token's
- * bytes are masked in any body (`maskSessionToken`; a UTF-16 body is not masked), and in an
- * `application/json` body decoded as text with its declared charset, the string value of every
- * `urlSigningSecretKey` property becomes `"[REDACTED]"` (`redactUrlSigningSecretKey`). A body Node cannot
- * decode is returned as a blob and keeps the key, and a wrong declared charset can hide the key from the
- * redaction.
+ * JSON primitives, formatting, and bytes round-trip exactly, except that the session token and
+ * `urlSigningSecretKey` values in JSON become `[REDACTED]`.
  *
  * Genuine failures (no token, bad origin, a missing resource, a bad token, a 5xx, a network error)
  * throw a domain error (`InvalidParamsError`/`InternalError`) that the protocol adapters
@@ -238,8 +234,6 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     let body: Buffer | undefined;
     let overLimit = false;
     try {
-        // The token is masked before every use below: the error message, the text, and the blob
-        // (see apify/ai-team#330).
         body = maskSessionToken(await collectStream(response.data), apifyClient.token);
     } catch (err) {
         if (isMaxContentLengthAbort(err)) {
@@ -287,8 +281,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     // Content-Type — charset included — rides along on the text result.
     if (isTextualMimeType(baseMimeType) && Buffer.isEncoding(charset)) {
         const text = body.toString(charset);
-        // The API sends storage objects as `application/json`, the only type apify-client parses, so both
-        // proxies redact the URL signing key in the same bodies (see apify/ai-team#330).
+        // apify-client parses only `application/json`, so both proxies redact the same bodies.
         return buildTextResult(
             uri,
             baseMimeType === 'application/json' ? redactUrlSigningSecretKey(text) : text,

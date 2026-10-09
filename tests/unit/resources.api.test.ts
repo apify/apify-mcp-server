@@ -24,7 +24,7 @@ async function expectReadError(promise: Promise<unknown>): Promise<InvalidParams
     return error as InvalidParamsError | InternalError;
 }
 
-/** Everything the logger prints, captured from the console methods it writes with. */
+/** Captures what the logger prints. */
 function captureLogOutput(): () => string {
     const spies = [
         vi.spyOn(console, 'log').mockImplementation(() => {}),

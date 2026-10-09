@@ -29,8 +29,8 @@ identity with the platform's own URLs is the feature. Revisit when tools start e
 to the configured API origin and rejects userinfo-bearing URLs (axios drops the `Authorization`
 header for those, silently degrading to unauthenticated). The API tools' `callApi`
 (`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`, `isMaxContentLengthAbort()`,
-`redactUrlSigningSecretKey()`, `maskSessionToken()` and the `REDACTED` marker, so a change to any of
-them changes the tools too.
+`maskSessionToken()`, `redactUrlSigningSecretKey()` and `REDACTED`, so a change to any changes the
+tools too.
 
 `sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through
 `httpClient.axios.request` with `maxContentLength: MAX_INLINE_BYTES`. `readApiResource()` sends
@@ -39,17 +39,11 @@ on the declared Content-Type: textual base types (text/*, JSON, XML) as `text` w
 header, decoded with the declared charset (default utf-8; a charset Node cannot decode falls
 through to blob — lossless beats mangled text, same rule as apify-client's body_parser);
 everything else (including no Content-Type) as a base64 `blob` with the base MIME type; empty body
-as empty text preserving the Content-Type. The body is never parsed, and bytes round-trip exactly
-with two exceptions. The session token's bytes (`apifyClient.token`) become `[REDACTED]`
-(`maskSessionToken()`), since `/v2/browser-info` echoes the `Authorization` header; a UTF-16 body is
-not masked. In an `application/json` body decoded as text with its declared charset, one regular
-expression (`redactUrlSigningSecretKey()`) replaces the string value of every `"urlSigningSecretKey"`
-property with `"[REDACTED]"`, since the key lets anyone sign links to all of a storage's data. A
-`null` value or a name spelled with `\u` escapes is left as it is. A body Node cannot decode is
-returned as a blob and keeps the key, and a wrong declared charset can hide the key from the
-redaction. It redacts instead of removing the property: removal needs comma handling or a parse and
-re-serialize, which loses the API's formatting and big-number precision (indenting a crafted, deeply
-nested body cost seconds and about 1 GB per read).
+as empty text preserving the Content-Type. The body is never parsed, so bytes round-trip exactly,
+except: the session token becomes `[REDACTED]` (`maskSessionToken()`; `/v2/browser-info` echoes the
+`Authorization` header), and so does the `urlSigningSecretKey` value in an `application/json` body
+(`redactUrlSigningSecretKey()`). The key is redacted, not removed: removal means re-serializing, which
+loses formatting and big-number precision and cost about 1 GB on a crafted deep body.
 axios enforces `MAX_INLINE_BYTES` (256 KB) mid-consumption on streamed
 responses (axios ≥1.16: byte-counting wrapper throws `ERR_BAD_RESPONSE`, counting decoded bytes) —
 after the request resolves, outside any retry wrapper. On trip, the proxy links out: a `text/plain`
