@@ -4,8 +4,8 @@ export function normalizeApiPath(path: string): string {
 }
 
 /**
- * Legacy first path segments the API routes to the same handlers as another, keyed by the legacy one. The spec
- * lists only the other: apify-client and the CLI still send `acts`, which the API serves as `actors`. A `Map`,
- * so a segment such as `constructor` never matches an inherited object property.
+ * Legacy names of top-level API resources, mapped to the name the spec lists. The API serves `acts`, which
+ * apify-client and the CLI still send, as `actors`. A `Map`, so a name such as `constructor` never matches an
+ * inherited object property.
  */
-export const API_PATH_PREFIX_ALIASES: ReadonlyMap<string, string> = new Map([['acts', 'actors']]);
+export const API_RESOURCE_ALIASES: ReadonlyMap<string, string> = new Map([['acts', 'actors']]);
