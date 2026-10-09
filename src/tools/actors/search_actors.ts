@@ -20,7 +20,7 @@ import { getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console
 import { respondOk } from '../../utils/mcp.js';
 import type { PricingTier } from '../../utils/pricing_info.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import { canRunActor } from '../actor_tool_naming.js';
+import { ACTOR_CALLABILITY_CAVEAT, canRunActor } from '../actor_tool_naming.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 
 /**
@@ -130,13 +130,6 @@ export function buildNoActorsFoundInstructions(keywords: string): string {
     `;
 }
 
-/** Told when the session cannot run an Actor it surfaces (search results, a run's tip). */
-export const ACTOR_CALLABILITY_CAVEAT = dedent`
-    This session can run only Actors already exposed as dedicated tools. Other Actors found
-    here are informational and cannot be run in this configuration. To use another Actor, open
-    its Apify page or configure it separately.
-`;
-
 /** Caveat for the whole result list — appended only when at least one result lacks a run path. */
 export function buildActorCallabilityCaveat(
     actorIds: readonly string[],
@@ -146,6 +139,11 @@ export function buildActorCallabilityCaveat(
     const canRunAllActors = actorIds.every((id) => canRunActor(id, loadedToolNames, loadedActorIds));
     return canRunAllActors ? '' : ACTOR_CALLABILITY_CAVEAT;
 }
+
+/** Footer line pointing to fetch-actor-details; added only when the session serves that tool. */
+export const ACTOR_DETAILS_HINT = `If you need more detailed information about any of these Actors, including their input
+schemas and usage instructions, use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool with the
+specific Actor name.`;
 
 /**
  * Builds the footer/instructions guidance for successful search results.
@@ -163,13 +161,7 @@ export function buildSearchActorsFooter(
     loadedToolNames: readonly string[],
     loadedActorIds: ReadonlySet<string>,
 ): string {
-    const detailsHint = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)
-        ? dedent`
-            If you need more detailed information about any of these Actors, including their input
-            schemas and usage instructions, use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool with the
-            specific Actor name.
-        `
-        : '';
+    const detailsHint = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS) ? ACTOR_DETAILS_HINT : '';
     const callabilityCaveat = buildActorCallabilityCaveat(actorIds, loadedToolNames, loadedActorIds);
     return [detailsHint, verbatimLinksNudge, callabilityCaveat].filter(Boolean).join('\n');
 }

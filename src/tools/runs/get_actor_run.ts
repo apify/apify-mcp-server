@@ -9,6 +9,7 @@ import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildUsageMeta, respondAborted, respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
+import { ACTOR_CALLABILITY_CAVEAT } from '../actor_tool_naming.js';
 import {
     applyConsoleLinks,
     type FetchActorRunResult,
@@ -16,7 +17,6 @@ import {
     WAIT_SECS_MAX,
     WIDGET_NO_POLL_NEXT_STEP,
 } from '../actors/actor_run_response.js';
-import { ACTOR_CALLABILITY_CAVEAT } from '../actors/search_actors.js';
 import { actorRunOutputSchema } from '../structured_output_schemas.js';
 
 /** Default `waitSecs` for `get-actor-run`. Intentionally non-zero so polling callers wait briefly by default. */

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { APIFY_STORE_URL, HELPER_TOOLS, MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../../src/const.js';
-import { searchActors } from '../../src/tools/actors/search_actors.js';
+import { ACTOR_CALLABILITY_CAVEAT } from '../../src/tools/actor_tool_naming.js';
+import { ACTOR_DETAILS_HINT, searchActors } from '../../src/tools/actors/search_actors.js';
 import { actorInfoSchema } from '../../src/tools/structured_output_schemas.js';
 import type { ActorStoreInputSchema, ActorStoreList, HelperTool } from '../../src/types.js';
 import {
@@ -39,13 +40,6 @@ function buildInputSchema(fieldCount: number): ActorStoreInputSchema {
         required: Object.keys(properties),
     };
 }
-
-const DETAILS_HINT = `If you need more detailed information about any of these Actors, including their input
-schemas and usage instructions, use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool with the
-specific Actor name.`;
-const CALLABILITY_CAVEAT = `This session can run only Actors already exposed as dedicated tools. Other Actors found
-here are informational and cannot be run in this configuration. To use another Actor, open
-its Apify page or configure it separately.`;
 
 describe('search-actors without widget (searchActors)', () => {
     beforeEach(() => {
@@ -260,7 +254,9 @@ describe('search-actors without widget (searchActors)', () => {
             content: { type: string; text: string }[];
         };
 
-        expect(structuredContent.instructions).toBe(`${DETAILS_HINT}\n${VERBATIM_LINKS_NUDGE}\n${CALLABILITY_CAVEAT}`);
+        expect(structuredContent.instructions).toBe(
+            `${ACTOR_DETAILS_HINT}\n${VERBATIM_LINKS_NUDGE}\n${ACTOR_CALLABILITY_CAVEAT}`,
+        );
         expect(content[0].text.endsWith(`\n\n${structuredContent.instructions}`)).toBe(true);
         expect(content[0].text.split(VERBATIM_LINKS_NUDGE)).toHaveLength(2);
     });

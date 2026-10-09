@@ -82,6 +82,11 @@ export function getToolSchemaID(actorName: string): string {
     return `https://apify.com/mcp/${actorNameToToolName(actorName)}/schema.json`;
 }
 
+/** Told when the session cannot run an Actor it surfaces (search results, a run's tip). */
+export const ACTOR_CALLABILITY_CAVEAT = `This session can run only Actors already exposed as dedicated tools. Other Actors found
+here are informational and cannot be run in this configuration. To use another Actor, open
+its Apify page or configure it separately.`;
+
 /** Whether this session can run this Actor (call-actor, or the Actor's own tool, loaded); soft check for a guidance hint, not a hard gate. */
 export function canRunActor(
     actorId: string,

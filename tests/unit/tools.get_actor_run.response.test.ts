@@ -2,6 +2,7 @@ import type { ActorRun } from 'apify-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS, KV_KEYS_LIMIT, TIP_MESSAGE_LIMIT } from '../../src/const.js';
+import { ACTOR_CALLABILITY_CAVEAT } from '../../src/tools/actor_tool_naming.js';
 import {
     buildStartRunResponse,
     buildStartRunWidgetResponse,
@@ -801,9 +802,7 @@ describe('get-actor-run default response', () => {
         );
         const { content } = result as { content: { type: string; text: string }[] };
 
-        expect(content[1].text).toContain(
-            'Use a different Actor.\n```\nThis session can run only Actors already exposed as dedicated tools.',
-        );
+        expect(content[1].text).toContain(`Use a different Actor.\n\`\`\`\n${ACTOR_CALLABILITY_CAVEAT}`);
     });
 
     it('renders the tip in a fenced code block in the text response', async () => {
