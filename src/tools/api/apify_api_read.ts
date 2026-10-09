@@ -49,11 +49,11 @@ export const apifyApiRead: ToolEntry = Object.freeze({
     annotations: {
         title: 'Read Apify API',
         // The blocklist refuses the GETs that would write or start a run: the method query parameter and the
-        // synchronous run endpoints.
+        // synchronous run endpoints. With no Actor run, the tool reaches nothing outside the Apify platform.
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
-        openWorldHint: true,
+        openWorldHint: false,
     },
     // A storage signature, or the webhooks of a synchronous run, would otherwise be logged.
     redactArgs: redactApiCallArgs,
