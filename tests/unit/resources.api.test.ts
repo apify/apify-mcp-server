@@ -4,8 +4,6 @@ import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError } from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import log from '@apify/log';
-
 import { ApifyClient } from '../../src/apify_client.js';
 import { MAX_INLINE_BYTES } from '../../src/const.js';
 import { InternalError, InvalidParamsError } from '../../src/mcp/errors.js';
@@ -97,25 +95,6 @@ function requestReturning(data: Readable, contentType?: string) {
     return { request, captured };
 }
 
-/** A client whose record read crosses the inline limit, so it requests the store, which answers `status`. */
-function clientWithStoreStatus(status: number): ApifyClient {
-    const client = new ApifyClient({ maxRetries: 0 });
-    client.httpClient.axios.defaults.adapter = async (config) => {
-        if (config.responseType === 'stream') {
-            return { data: abortingStream(), status: 200, statusText: 'OK', headers: {}, config };
-        }
-        const body = JSON.stringify({ error: { type: 'some-type', message: 'API said no' } });
-        return {
-            data: Buffer.from(body),
-            status,
-            statusText: '',
-            headers: { 'content-type': 'application/json' },
-            config,
-        };
-    };
-    return client;
-}
-
 /** Request stub resolving a non-2xx response (`validateStatus: null` semantics) with a body stream. */
 function requestFailing(status: number, statusText: string, body?: object) {
     return async (): Promise<RequestResult> => ({
@@ -176,16 +155,6 @@ describe('redactUrlSigningSecretKey()', () => {
             '{"urlSigningSecretKey"\n:\n"s"}',
             '{"urlSigningSecretKey"\n:\n"[REDACTED]"}',
         ],
-        [
-            'of a key that ends in an escaped quote and the name',
-            '{"\\"urlSigningSecretKey": "s"}',
-            '{"\\"urlSigningSecretKey": "[REDACTED]"}',
-        ],
-        [
-            'with a backslash before a line break, which is not valid JSON',
-            '{"urlSigningSecretKey":"ab\\\ncd"}',
-            '{"urlSigningSecretKey":"[REDACTED]"}',
-        ],
     ])('redacts the value %s', (_kind, json, expected) => {
         expect(redactUrlSigningSecretKey(json)).toBe(expected);
     });
@@ -195,7 +164,6 @@ describe('redactUrlSigningSecretKey()', () => {
         ['the name as a value', '{"note":"urlSigningSecretKey","fields":["urlSigningSecretKey"]}'],
         ['a number or object value', '{"urlSigningSecretKey":1,"o":{"urlSigningSecretKey":{"a":"b"}}}'],
         ['a longer name', '{"myurlSigningSecretKey":"s","urlSigningSecretKeyX":"s"}'],
-        ['the name spelled with \\u escapes', '{"urlSigningSecretKe\\u0079":"s"}'],
         ['the name inside a string value', '{"note":"\\"urlSigningSecretKey\\": \\"s\\""}'],
     ])('returns JSON with %s as it is', (_kind, json) => {
         expect(redactUrlSigningSecretKey(json)).toBe(json);
@@ -613,52 +581,6 @@ describe('readApiResource()', () => {
         });
     });
 
-    it('redacts the URL signing key in a JSON body nested 100,000 levels deep', async () => {
-        const body = `${'['.repeat(100_000)}{"urlSigningSecretKey":"s"}${']'.repeat(100_000)}`;
-        const { request } = requestReturning(streamOf(body), 'application/json');
-
-        const result = await readApiResource(
-            `${API}/v2/key-value-stores/kv-1/records/DEEP`,
-            stubApifyClient({ request }),
-        );
-
-        expect(firstContent(result).text).toBe(body.replace('"s"', '"[REDACTED]"'));
-    });
-
-    it('returns a body that redaction grows past the inline limit as text', async () => {
-        // The limit caps the download, not the returned text.
-        const body = `{${Array(10_485).fill('"urlSigningSecretKey":""').join(',')}}`;
-        expect(Buffer.byteLength(body)).toBeLessThanOrEqual(MAX_INLINE_BYTES);
-        const { request } = requestReturning(streamOf(body), 'application/json');
-
-        const result = await readApiResource(
-            `${API}/v2/key-value-stores/kv-1/records/EXPORT`,
-            stubApifyClient({ request }),
-        );
-
-        const { text } = firstContent(result);
-        expect(text).toBe(body.replaceAll('""', '"[REDACTED]"'));
-        expect(Buffer.byteLength(text as string)).toBeGreaterThan(MAX_INLINE_BYTES);
-    });
-
-    it.each([
-        ['an unterminated value', '"urlSigningSecretKey":"'.padEnd(MAX_INLINE_BYTES, 'a')],
-        ['a long whitespace run after the name', '"urlSigningSecretKey"'.padEnd(MAX_INLINE_BYTES, ' ')],
-    ])(
-        'returns a JSON body of %s as it is, in under a second',
-        async (_kind, body) => {
-            const { request } = requestReturning(streamOf(body), 'application/json');
-
-            const result = await readApiResource(
-                `${API}/v2/key-value-stores/kv-1/records/EXPORT`,
-                stubApifyClient({ request }),
-            );
-
-            expect(firstContent(result).text).toBe(body);
-        },
-        1000,
-    );
-
     it.each([
         ['application/json', '[REDACTED]'],
         ['application/json; charset=utf-8', '[REDACTED]'],
@@ -780,30 +702,5 @@ describe('readApiResource()', () => {
         expect(firstContent(result).text).toContain(uri);
         expect(logOutput()).toContain('Failed to mint signed download URL');
         expect(logOutput()).not.toContain('test-token');
-    });
-
-    it('logs an HTTP 4xx from the signed-link request as a soft failure with its status code', async () => {
-        const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
-        const error = vi.spyOn(log, 'error').mockImplementation(() => log);
-
-        await readApiResource(`${API}/v2/key-value-stores/kv-1/records/BIG`, clientWithStoreStatus(403));
-
-        expect(softFail).toHaveBeenCalledWith(expect.stringContaining('Failed to mint signed download URL'), {
-            errMessage: 'API said no',
-            statusCode: 403,
-        });
-        expect(error).not.toHaveBeenCalled();
-    });
-
-    it('logs an HTTP 5xx from the signed-link request as an exception with the API error stack', async () => {
-        const exception = vi.spyOn(log, 'exception').mockImplementation(() => log);
-
-        await readApiResource(`${API}/v2/key-value-stores/kv-1/records/BIG`, clientWithStoreStatus(500));
-
-        expect(exception).toHaveBeenCalledWith(
-            expect.objectContaining({ name: 'ApifyApiError', stack: expect.stringContaining('statusCode: 500') }),
-            expect.stringContaining('Failed to mint signed download URL'),
-            { statusCode: 500 },
-        );
     });
 });

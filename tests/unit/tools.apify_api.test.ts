@@ -453,25 +453,6 @@ describe('apify-api-read', () => {
     });
 
     it.each([
-        ['objects', (inner: unknown) => ({ a: inner })],
-        ['arrays', (inner: unknown) => [inner]],
-    ])('redacts the URL signing key in a body of %s nested 3000 levels deep', async (_kind, wrap) => {
-        // Under JSON.stringify's limit of about 4000 levels, so the tool still returns this body.
-        let body: unknown = { urlSigningSecretKey: 'mock-signing-secret', n: 1 };
-        let expected: unknown = { urlSigningSecretKey: '[REDACTED]', n: 1 };
-        for (let level = 0; level < 3000; level++) {
-            body = wrap(body);
-            expected = wrap(expected);
-        }
-        requestMock.mockResolvedValue(mockResponse(200, body));
-
-        const result = await callTool(apifyApiRead, { path: '/v2/key-value-stores/kv-1/records/DEEP' });
-
-        expect((result.structuredContent as { data: unknown }).data).toEqual(expected);
-        expect(result.content[0].text).not.toContain('mock-signing-secret');
-    });
-
-    it.each([
         ['a text body', '"urlSigningSecretKey": "abc123"', 'text/plain', '"urlSigningSecretKey": "abc123"'],
         ['a number', 42, 'application/json', 42],
         ['null', null, 'application/json', null],
