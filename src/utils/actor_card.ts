@@ -314,9 +314,10 @@ export type WidgetActor = {
  * Formats Actor for widget UI components.
  * Used only in OpenAI (widget) mode — search results and Actor details widgets.
  *
- * Always uses simplified tier-aware pricing so the widget's top-level
- * `pricePerUnit` / `events[0].priceUsd` (which is what the widget UI renders)
- * matches the tier-filtered prices shown in the LLM text and structured output.
+ * Uses simplified pricing: the server resolves the user's tier and adds the Store page's "from"
+ * price (`paidPlanPriceUsd` / `paidPlanPricePerUnit`) when a paid plan is cheaper, so the widget
+ * badge only renders — the pricing rule lives in one place (src/utils/pricing_info.ts).
+ * See apify/apify-mcp-server#905.
  */
 export function formatActorForWidget(actor: Actor | ActorStoreList, userTier: PricingTier): WidgetActor {
     const fullName = `${actor.username}/${actor.name}`;
