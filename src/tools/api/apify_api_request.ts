@@ -13,7 +13,7 @@ import type { ToolResponse } from '../../utils/mcp.js';
 import { getHttpErrorHint, respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import { validateApiBlocklist } from './apify_api_blocklist.js';
-import { API_PATH_PREFIX_ALIASES, normalizeApiPath } from './apify_api_path.js';
+import { API_RESOURCE_ALIASES, normalizeApiPath } from './apify_api_path.js';
 import type { ApiMethod, ApiOperation } from './apify_api_spec.js';
 import { fetchApiOperationIndex, isRecord } from './apify_api_spec.js';
 
@@ -81,10 +81,10 @@ function stripQuery(path: string): string {
     return path.replace(/[?#][\s\S]*$/, '');
 }
 
-/** A normalized path as the spec lists it: without its query, and with a legacy first segment replaced. */
+/** A normalized path as the spec lists it: without its query, and with a legacy resource name replaced. */
 function toSpecPath(normalizedPath: string): string {
-    const [prefix, ...rest] = stripQuery(normalizedPath).split('/');
-    return [API_PATH_PREFIX_ALIASES.get(prefix) ?? prefix, ...rest].join('/');
+    const [resource, ...rest] = stripQuery(normalizedPath).split('/');
+    return [API_RESOURCE_ALIASES.get(resource) ?? resource, ...rest].join('/');
 }
 
 const PATH_PARAMETER_SEGMENT_REGEX = /^\{[^{}]+\}$/;

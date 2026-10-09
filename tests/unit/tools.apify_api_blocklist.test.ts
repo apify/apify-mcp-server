@@ -129,7 +129,7 @@ describe('validateApiBlocklist()', () => {
     });
 
     describe('an endpoint rule', () => {
-        it('reads a first segment that is not an alias as it is, even one named like an object property', () => {
+        it('reads a resource name that is not an alias as it is, even one named like an object property', () => {
             const rule: ApiBlockRule = { match: { method: 'GET', path: '/v2/constructor/{id}' }, reason: 'No.' };
 
             expect(validate({ normalizedPath: 'constructor/abc' }, [rule])).toBe('No.');
