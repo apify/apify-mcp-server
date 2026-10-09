@@ -129,6 +129,13 @@ describe('validateApiBlocklist()', () => {
     });
 
     describe('an endpoint rule', () => {
+        it('reads a first segment that is not an alias as it is, even one named like an object property', () => {
+            const rule: ApiBlockRule = { match: { method: 'GET', path: '/v2/constructor/{id}' }, reason: 'No.' };
+
+            expect(validate({ normalizedPath: 'constructor/abc' }, [rule])).toBe('No.');
+            expect(isEndpointBlocked('GET', '/v2/constructor/{id}', [rule])).toBe(true);
+        });
+
         it.each(RUN_NOW_PATHS)('refuses a GET to %j', (normalizedPath) => {
             expect(validate({ normalizedPath }, [RUN_NOW_RULE])).toBe('No run-now.');
         });
