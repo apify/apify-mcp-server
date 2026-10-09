@@ -180,6 +180,12 @@ describe('validateApiBlocklist()', () => {
         it.each(NOT_RUN_NOW_PATHS)('does not refuse a GET to %j', (normalizedPath) => {
             expect(validate({ normalizedPath }, [RUN_NOW_RULE_WITHOUT_V2])).toBeUndefined();
         });
+
+        it('reads a rule path written with acts as actors', () => {
+            const rule: ApiBlockRule = { ...RUN_NOW_RULE, match: { method: 'GET', path: 'acts/{actorId}/run-now' } };
+
+            expect(validate({ normalizedPath: 'actors/abc/run-now' }, [rule])).toBe('No run-now.');
+        });
     });
 
     describe('the synchronous run rules', () => {

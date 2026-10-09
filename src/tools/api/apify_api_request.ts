@@ -13,6 +13,7 @@ import type { ToolResponse } from '../../utils/mcp.js';
 import { getHttpErrorHint, respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
 import { validateApiBlocklist } from './apify_api_blocklist.js';
+import { normalizeApiPath } from './apify_api_path.js';
 import type { ApiMethod, ApiOperation } from './apify_api_spec.js';
 import { fetchApiOperationIndex, isRecord } from './apify_api_spec.js';
 
@@ -68,11 +69,6 @@ export function redactApiCallArgs({ path, method, query, body }: Record<string, 
         query: loggedQuery,
         ...(body !== undefined && { body: REDACTED }),
     };
-}
-
-/** A path without its leading slash and `v2/` prefix, as `apify api` takes it: `/v2/actors` becomes `actors`. */
-export function normalizeApiPath(path: string): string {
-    return path.replace(/^\//, '').replace(/^v2\//i, '');
 }
 
 /** A normalized path as the tools report it, with the `/v2/` prefix. */
