@@ -52,6 +52,7 @@ export const HELPER_TOOLS = {
     ACTOR_BUILD_LIST_GET: 'get-actor-build-list',
     ACTOR_CALL: 'call-actor',
     ACTOR_CALL_WIDGET: 'call-actor-widget',
+    ACTOR_DELETE: 'delete-actor',
     ACTOR_GET_DETAILS: 'fetch-actor-details',
     ACTOR_GET_DETAILS_WIDGET: 'fetch-actor-details-widget',
     ACTOR_LIST_GET: 'get-actor-list',
@@ -116,10 +117,10 @@ export const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set([
 export const REPORT_PROBLEM_BLOCKED_CLIENTS: string[] = ['claude', 'anthropic', 'local-agent-mode-apify'];
 
 /**
- * `clientInfo.name` sent by the Apify Console AI chat backend during the MCP initialize handshake.
- * Runs started by this client are attributed to the APIFY_AI request origin.
+ * `clientInfo.name` sent by the Apify AI agent service (apify/apify-ai-agent) during the MCP
+ * initialize handshake. Runs started by this client are attributed to the APIFY_AI request origin.
  */
-export const APIFY_AI_CLIENT_NAME = 'apify-console-ai-chat';
+export const APIFY_AI_CLIENT_NAME = 'apify-ai';
 
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
 export const RAG_WEB_BROWSER_WHITELISTED_FIELDS = ['query', 'maxResults', 'outputFormats'];

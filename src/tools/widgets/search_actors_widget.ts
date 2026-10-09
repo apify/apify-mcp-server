@@ -47,7 +47,6 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
     inputSchema: z.toJSONSchema(searchActorsWidgetArgsSchema) as ToolInputSchema,
     outputSchema: actorSearchWidgetOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(searchActorsWidgetArgsSchema)),
-    // Tool-level widget meta; only registered in apps mode so stripWidgetMeta is a no-op here.
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS)?.meta,
     },

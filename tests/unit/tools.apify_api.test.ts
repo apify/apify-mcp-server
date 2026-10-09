@@ -340,7 +340,7 @@ describe('apify-api-read', () => {
             readOnlyHint: true,
             destructiveHint: false,
             idempotentHint: true,
-            openWorldHint: false,
+            openWorldHint: true,
         });
     });
 
@@ -587,10 +587,15 @@ describe('apify-api-read', () => {
         expect((error as Error).stack).not.toContain('sig-secret');
     });
 
-    it('adds the closest paths of the spec to a page-not-found 404', async () => {
-        requestMock.mockResolvedValue(
-            mockResponse(404, { error: { type: 'page-not-found', message: 'Page not found.' } }),
-        );
+    it.each([
+        ['Page not found.', 'Page not found.'],
+        [
+            'We have bad news: there is no API endpoint at this URL. Did you specify it correctly?',
+            'We have bad news: there is no API endpoint at this URL. Did you specify it correctly?',
+        ],
+        ['Page not found', 'Page not found.'],
+    ])('adds the closest paths of the spec to a page-not-found 404: %s', async (apiMessage, sentence) => {
+        requestMock.mockResolvedValue(mockResponse(404, { error: { type: 'page-not-found', message: apiMessage } }));
 
         const call = callTool(apifyApiRead, { path: 'datasets/abc/itemz' });
 
@@ -598,7 +603,7 @@ describe('apify-api-read', () => {
         await expect(call).rejects.toMatchObject({
             statusCode: 404,
             type: 'page-not-found',
-            message: `Page not found. The closest paths in the API spec: ${findClosestApiPaths(INDEX, 'datasets/abc/itemz').join(', ')}`,
+            message: `${sentence} The closest paths in the API spec: ${findClosestApiPaths(INDEX, 'datasets/abc/itemz').join(', ')}`,
         });
     });
 
@@ -932,6 +937,16 @@ describe('apify-api-write', () => {
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toBe('The path matches method DELETE; specify it to call the endpoint with.');
         expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it("uses the path's only write method when a test-only operation rule blocks its GET", async () => {
+        const rule: ApiBlockRule = { match: { method: 'GET', path: '/v2/actors/{actorId}/run-sync' }, reason: 'No.' };
+        requestMock.mockResolvedValue(mockResponse(201, { data: {} }));
+
+        await callToolWithRule(apifyApiWrite, rule, { path: 'actors/apify~hello-world/run-sync' });
+
+        expect(requestMock).toHaveBeenCalledTimes(1);
+        expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST' }));
     });
 
     it('does not need the spec when the method is given, even for a path the spec does not list', async () => {
