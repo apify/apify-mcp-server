@@ -347,7 +347,7 @@ describe('apify-api-read', () => {
     it('says a GET to the synchronous run endpoints is refused and names call-actor only when the session has it', () => {
         const withCallActor = apifyApiRead.buildDescription!(ALL_TOOLS_PRESENT);
         const withoutCallActor = apifyApiRead.buildDescription!(only(HELPER_TOOLS.API_READ));
-        const refused = 'A GET to the synchronous run endpoints is refused: it starts a paid run.';
+        const refused = 'A GET to the synchronous run endpoints is refused.';
 
         expect(apifyApiRead.description).toBe(withCallActor);
         expect(withCallActor).toContain(`${refused} Run an Actor with ${HELPER_TOOLS.ACTOR_CALL}.`);
