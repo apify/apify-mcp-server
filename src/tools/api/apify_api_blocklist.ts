@@ -1,6 +1,6 @@
 import type { HelperToolName } from '../../const.js';
 import { HELPER_TOOLS } from '../../const.js';
-import { normalizeApiPath } from './apify_api_path.js';
+import { API_PATH_PREFIX_ALIASES, normalizeApiPath } from './apify_api_path.js';
 import type { ApiMethod } from './apify_api_spec.js';
 
 /** A method and a spec path template, written with or without the `/v2` prefix. */
@@ -72,8 +72,8 @@ function extractQueryParamName(name: string): string {
 
 /**
  * A path's segments, matched fail-closed: without the leading slash and `v2/` prefix (`normalizeApiPath`), in
- * lowercase, each decoded, without empty segments (a trailing or doubled slash), and with the legacy `acts` prefix
- * read as `actors`. Split before decoding, as the API's router does, so the escaped slash in `apify%2Fhello-world`
+ * lowercase, each decoded, without empty segments (a trailing or doubled slash), and with a legacy first segment
+ * read as the one the spec lists (`API_PATH_PREFIX_ALIASES`). Split before decoding, as the API's router does, so the escaped slash in `apify%2Fhello-world`
  * stays in its segment.
  */
 function splitRoutePath(path: string): string[] {
@@ -81,7 +81,7 @@ function splitRoutePath(path: string): string[] {
         .split('/')
         .filter(Boolean)
         .map((segment) => decodeEscapes(segment).toLowerCase());
-    if (segments[0] === 'acts') segments[0] = 'actors';
+    segments[0] = API_PATH_PREFIX_ALIASES.get(segments[0]) ?? segments[0];
     return segments;
 }
 
