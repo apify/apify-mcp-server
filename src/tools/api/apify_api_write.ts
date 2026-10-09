@@ -8,13 +8,13 @@ import { compileSchema } from '../../utils/ajv.js';
 import { respondUserError } from '../../utils/mcp.js';
 import { apifyApiCallOutputSchema } from '../structured_output_schemas.js';
 import { isEndpointBlocked } from './apify_api_blocklist.js';
+import { normalizeApiPath } from './apify_api_path.js';
 import {
     API_CALL_DESCRIPTION,
     apiCallArgsShape,
     callApi,
     findPathOperations,
     formatList,
-    normalizeApiPath,
     redactApiCallArgs,
 } from './apify_api_request.js';
 import type { ApiMethod } from './apify_api_spec.js';

@@ -1,6 +1,6 @@
 import type { HelperToolName } from '../../const.js';
 import { HELPER_TOOLS } from '../../const.js';
-import { normalizeApiPath } from './apify_api_request.js';
+import { normalizeApiPath } from './apify_api_path.js';
 import type { ApiMethod } from './apify_api_spec.js';
 
 /** A method and a spec path template, written with or without the `/v2` prefix. */

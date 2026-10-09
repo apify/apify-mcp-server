@@ -7,13 +7,9 @@ import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
 import { API_BLOCK_RULES } from '../../src/tools/api/apify_api_blocklist.js';
 import { apifyApiDetails } from '../../src/tools/api/apify_api_details.js';
+import { normalizeApiPath } from '../../src/tools/api/apify_api_path.js';
 import { apifyApiRead } from '../../src/tools/api/apify_api_read.js';
-import {
-    findClosestApiPaths,
-    findPathOperations,
-    normalizeApiPath,
-    redactApiCallArgs,
-} from '../../src/tools/api/apify_api_request.js';
+import { findClosestApiPaths, findPathOperations, redactApiCallArgs } from '../../src/tools/api/apify_api_request.js';
 import { apifyApiSearch } from '../../src/tools/api/apify_api_search.js';
 import type * as ApifyApiSpecModule from '../../src/tools/api/apify_api_spec.js';
 import { buildApiOperationIndex, fetchApiOperationIndex } from '../../src/tools/api/apify_api_spec.js';
