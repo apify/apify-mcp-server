@@ -10,6 +10,7 @@
 import type { ApifyClient } from '../apify_client.js';
 import type { PaymentProvider } from '../payments/types.js';
 import type { ActorStoreList } from '../types.js';
+import { isUnstableStoreSearchEnabled, searchActorsViaUnstableEndpoint } from './store_unstable.js';
 
 export type SearchActorsByKeywordsOptions = {
     search: string;
@@ -48,6 +49,16 @@ export async function searchActorsByKeywords(options: SearchActorsByKeywordsOpti
  */
 export async function searchAgentSafeActors(options: SearchAgentSafeActorsOptions): Promise<ActorStoreList[]> {
     const { keywords, apifyClient, limit, offset, paymentProvider } = options;
+
+    if (isUnstableStoreSearchEnabled()) {
+        return searchActorsViaUnstableEndpoint({
+            search: keywords,
+            apifyClient,
+            limit,
+            offset,
+            allowsAgenticUsers: paymentProvider ? true : undefined,
+        });
+    }
 
     return searchActorsByKeywords({
         search: keywords,
