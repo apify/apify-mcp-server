@@ -597,11 +597,15 @@ describe('expandIterations()', () => {
 });
 
 describe('formatTeardownHint()', () => {
-    it("prints the run id and the command that deletes this run's schedules", () => {
+    it("prints the run id and the commands that delete this run's schedules and tasks", () => {
         const lines = formatTeardownHint('r3k9f2qa7c');
 
         expect(lines.join('\n')).toContain('r3k9f2qa7c');
         expect(lines).toContain('   pnpm run evals:mcp-agent:schedules-fixtures -- --run-id r3k9f2qa7c');
+        expect(lines).toContain('   pnpm run evals:mcp-agent:tasks-fixtures -- --run-id r3k9f2qa7c');
+        expect(lines.findIndex((line) => line.includes('schedules-fixtures'))).toBeLessThan(
+            lines.findIndex((line) => line.includes('tasks-fixtures')),
+        );
     });
 });
 

@@ -67,12 +67,13 @@ One caveat when reading a failure: a transient agent failure is retried once, an
 whole prompt, so a fixed-name create case can hit a name collision the second time round and fail the
 gate on it. The console prints a `retrying once` line for those items.
 
-The tasks family (`merge/tasks/*`, 10 items: 7 proper + 3 with `expectedErrors`) uses fixed `eval-*`
-task names, which are unique per account, and the create cases never clean up — so every run
-leaves debris that collides on the next one. Run `pnpm run evals:mcp-agent:tasks-fixtures`
-before every run: it deletes leftover `eval-*` tasks and seeds the permanent fixture task. It
-deletes on whatever account `APIFY_TOKEN` points at and prints that account first; pass
-`--dry-run` to see what it would delete before it does. Three cases (`publish-discovery`,
+The tasks family (`merge/tasks/*`, 10 items: 7 proper + 3 with `expectedErrors`) ends every task name
+it creates with `-{{uniq}}` in the query and in the reference (see "Unique resource names" below), so its
+trials and any concurrent run work on separate tasks. Run `pnpm run evals:mcp-agent:tasks-fixtures`
+before every run: it seeds the permanent fixture task and deletes `eval-*` tasks older than 6 hours;
+with `--run-id <id>` it deletes only that run's tasks instead. It deletes on whatever account
+`APIFY_TOKEN` points at and prints that account first; pass `--dry-run` to see what it would delete
+before it does. Three cases (`publish-discovery`,
 `publish-medium-1`, `chain-hard-1`) publish task examples on `apify/normal-mode-test-actor`, and
 publishing needs write access to the Actor, so only those three depend on an account that has it.
 
@@ -105,18 +106,20 @@ point at it and no case may modify it. It stays disabled on purpose; an enabled 
 the eval account every night.
 
 Run `pnpm run evals:mcp-agent:tasks-fixtures && pnpm run evals:mcp-agent:schedules-fixtures` before a
-run: the second script resets the fixture (disabled, `0 3 * * *` UTC, one task action) and deletes
-`eval-*` schedules older than 6 hours, on whatever account `APIFY_TOKEN` points at. Pass `--dry-run` to
-see what it would delete.
+run: the scripts reset the task fixture and the schedule fixture (disabled, `0 3 * * *` UTC, one task
+action) and delete `eval-*` tasks and schedules older than 6 hours, on whatever account `APIFY_TOKEN`
+points at. Pass `--dry-run` to see what they would delete.
 
-**After** a run, delete the schedules that run created, with the command it printed:
+**After** a run, delete the schedules and tasks that run created, with the commands it printed:
 
 ```bash
 pnpm run evals:mcp-agent:schedules-fixtures -- --run-id <the run id from the summary>
+pnpm run evals:mcp-agent:tasks-fixtures -- --run-id <the run id from the summary>
 ```
 
 `--run-id` deletes only that run's names at any age. Without it, the next seed sweep deletes
-`eval-*` schedules older than 6 hours. CI tears down its own run in an `always()` step.
+`eval-*` schedules and tasks older than 6 hours. CI tears down its own run's schedules and tasks in
+`always()` steps.
 
 The deterministic platform facts the judge used to score here live in
 `tests/test_kit/cases/schedules.cases.ts` instead, asserted against the live API. Those cases name their
@@ -162,7 +165,7 @@ The harness uses `canUseTool` instead of root-incompatible permission bypass fla
 
 ### `--iterations` on stateful agent items
 
-`--iterations N` repeats each item in one experiment and reports `pass@k` and `pass^k`. It is safe for tool-call and stateless agent items, and for agent items that name their resources with `{{uniq}}` (below). Stateful cases without the marker, such as `merge/tasks/*`, can collide with their own leftovers.
+`--iterations N` repeats each item in one experiment and reports `pass@k` and `pass^k`. It is safe for tool-call and stateless agent items, and for agent items that name their resources with `{{uniq}}` (below). Stateful cases without the marker can collide with their own leftovers.
 
 ### Unique resource names: `{{uniq}}` and `--run-id`
 
@@ -183,12 +186,13 @@ used. An unmarked item keeps colliding exactly as before, so the fix is per item
 `metadata.expectedArgs` is never substituted.
 
 `--run-id` overrides the generated id (lowercase letters, digits and dashes, at most 20 characters); CI passes
-`<github.run_id>-<github.run_attempt>` to the run and to its teardown step. A run prints its id and its
-teardown command when it finishes:
+`<github.run_id>-<github.run_attempt>` to the run and to its teardown steps. A run prints its id and its
+teardown commands when it finishes:
 
 ```
-🧹 Run id r3k9f2qa7c — delete this run's schedules:
+🧹 Run id r3k9f2qa7c — delete this run's schedules and tasks:
    pnpm run evals:mcp-agent:schedules-fixtures -- --run-id r3k9f2qa7c
+   pnpm run evals:mcp-agent:tasks-fixtures -- --run-id r3k9f2qa7c
 ```
 
 **Exit codes:**
@@ -332,6 +336,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `scripts/tasks_fixtures.ts` - Task-suite fixture CLI entry (`pnpm run evals:mcp-agent:tasks-fixtures`)
 - `scripts/schedules_fixtures.ts` - Schedule-suite fixture CLI entry (`pnpm run evals:mcp-agent:schedules-fixtures`)
 - `scripts/schedules_sweep.ts` - The teardown's delete rule; side-effect free, so a unit test can import it
+- `scripts/tasks_sweep.ts` - The task fixtures' delete rule; side-effect free, so a unit test can import it
 - `dataset_snapshot_<dataset>.json` - Local export of a dataset, not read at runtime and gitignored
 
 ## Configuration

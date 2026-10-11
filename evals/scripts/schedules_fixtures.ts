@@ -6,8 +6,6 @@
  * Deletes the schedules a run left behind (delete rules in `schedules_sweep.ts`) and resets the one
  * permanent read-only fixture, creating it if missing.
  *
- * `tasks_fixtures.ts` still sweeps by prefix alone; see #1394.
- *
  * The fixture schedule runs the task fixture from `tasks_fixtures.ts`, so run that first:
  *   pnpm run evals:mcp-agent:tasks-fixtures && pnpm run evals:mcp-agent:schedules-fixtures [--run-id <id>] [--dry-run]
  */
