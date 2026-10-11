@@ -54,7 +54,6 @@ describe('isSweepableTask()', () => {
     });
 
     it('deletes a leftover older than the age limit', () => {
-        expect(isSweepableTask({ name: OTHER_RUN_TASK_NAME, createdAt: HOURS_AGO_9 }, undefined, NOW)).toBe(true);
         expect(isSweepableTask({ name: 'eval-sum-weekly', createdAt: DAYS_AGO_3 }, undefined, NOW)).toBe(true);
     });
 

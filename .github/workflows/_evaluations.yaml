@@ -107,7 +107,7 @@ jobs:
                 env:
                     APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
 
-            # Tasks never fire, but without this a run's tasks stay on the account until a seed 6 h later.
+            # Tasks never fire, but without this a run's tasks stay on the account until a seed at least 6 h later.
             -   name: Tear down task fixtures (merge tier only)
                 if: always() && inputs.tier == 'merge'
                 run: >
