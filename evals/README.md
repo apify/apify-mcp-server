@@ -429,7 +429,7 @@ emits `init` and starts the first turn. A slower server, common on a loaded mach
 `--concurrency` on few CPUs), is reported as `pending` and its tools are missing from the first
 turn's prompt. Without a check the agent would read a "still connecting" notice and fall back to a
 built-in tool.<br>
-**Solution:** Automatic: the run aborts at `init` before any model turn and the item is retried once.
+**Solution:** Automatic: the run aborts at `init` before any model turn. `pending` and `failed` are retried once; other statuses fail the item immediately.
 A repeat failure is a harness failure (decision 4), not a verdict on the tools. If it recurs, lower `--concurrency`.
 
 ### Agent answers from memory or shells out instead of using our tools
@@ -462,7 +462,7 @@ Fork PRs cannot run evals because GitHub withholds repository secrets. Push the 
 
 Both tiers need `ANTHROPIC_API_KEY`, the three `LANGFUSE_*` keys, and `APIFY_TOKEN` (mapped from the `APIFY_TEST_USER_API_TOKEN` repository secret). `OPENROUTER_API_KEY` is required only by the merge judge. The three publish cases also need write access to `apify/normal-mode-test-actor`.
 
-The pr tier has run on a hosted runner in 4m31s, inside its ten-minute target; the merge tier's threshold and 90-minute timeout are still provisional. Transient network and provider failures retry once, and so does an MCP server not connected at init (see Common issues); if that retry fails too, the item fails as a harness failure.
+The pr tier has run on a hosted runner in 4m31s, inside its ten-minute target; the merge tier's threshold and 90-minute timeout are still provisional. Transient network and provider failures retry once, and so does an MCP server `pending` or `failed` at init (see Common issues); other statuses, or a failed retry, fail the item as a harness failure.
 
 ## Writing tool descriptions
 
