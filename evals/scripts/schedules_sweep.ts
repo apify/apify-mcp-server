@@ -13,7 +13,7 @@ export const FIXTURE_SCHEDULE_NAME = 'eval-nightly-sum';
 
 /**
  * How old an `eval-*` schedule or task must be before the seed sweep deletes it. Four times the
- * workflow's 90-minute timeout, so a run in flight never loses a schedule it is asserting on.
+ * workflow's 90-minute timeout, so a run in flight never loses a schedule or task it is asserting on.
  */
 export const LEFTOVER_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
