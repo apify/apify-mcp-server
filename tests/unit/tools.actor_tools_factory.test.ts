@@ -57,24 +57,34 @@ describe('getNormalActorsAsTools()', () => {
             },
         );
 
-        it.each<[string | undefined, string[], boolean]>([
-            ['dataset', ['READ'], true],
-            ['dataset', ['READ', 'WRITE'], false],
-            ['keyValueStore', ['READ', 'WRITE'], false],
-            ['requestQueue', ['READ', 'WRITE'], false],
-            [undefined, ['WRITE'], true],
-        ])(
-            'marks %s input with %j permissions read-only: %s',
-            async (resourceType, resourcePermissions, isReadOnly) => {
-                const annotations = await getAnnotations(
-                    createMockActorInfo('apify/web-fetch', {
-                        ...LIMITED,
-                        inputProperties: { storageId: { type: 'string', resourceType, resourcePermissions } },
-                    }),
-                );
-                expect(annotations).toMatchObject({ readOnlyHint: isReadOnly, destructiveHint: !isReadOnly });
-            },
-        );
+        it.each<[string, Partial<SchemaProperties>, boolean]>([
+            ['a read-only dataset input', { resourceType: 'dataset', resourcePermissions: ['READ'] }, true],
+            ['a writable dataset input', { resourceType: 'dataset', resourcePermissions: ['READ', 'WRITE'] }, false],
+            [
+                'a writable key-value store input',
+                { resourceType: 'keyValueStore', resourcePermissions: ['READ', 'WRITE'] },
+                false,
+            ],
+            [
+                'a writable request queue input',
+                { resourceType: 'requestQueue', resourcePermissions: ['READ', 'WRITE'] },
+                false,
+            ],
+            ['WRITE on a non-storage input', { resourcePermissions: ['WRITE'] }, true],
+            ['a secret input', { isSecret: true }, false],
+            ['an MCP connector input', { resourceType: 'mcpConnector' }, false],
+            ['a JavaScript input', { editor: 'javascript' }, false],
+            ['a Python input', { editor: 'python' }, false],
+        ])('marks an Actor with %s read-only: %s', async (_, property, isReadOnly) => {
+            const actorInfo = createMockActorInfo('apify/web-fetch', {
+                ...LIMITED,
+                inputProperties: { field: { type: 'string', ...property } },
+            });
+            expect(await getAnnotations(actorInfo)).toMatchObject({
+                readOnlyHint: isReadOnly,
+                destructiveHint: !isReadOnly,
+            });
+        });
 
         it.each([
             ['a community Actor', createMockActorInfo('someone/web-fetch', LIMITED)],
@@ -83,34 +93,6 @@ describe('getNormalActorsAsTools()', () => {
                 createMockActorInfo('apify/web-scraper', { actorPermissionLevel: 'FULL_PERMISSIONS' }),
             ],
             ['an Actor with unknown permissions', createMockActorInfo('apify/web-fetch')],
-            [
-                'an Actor with a secret input',
-                createMockActorInfo('apify/web-fetch', {
-                    ...LIMITED,
-                    inputProperties: { cookies: { type: 'array', isSecret: true } },
-                }),
-            ],
-            [
-                'an Actor with an MCP connector input',
-                createMockActorInfo('apify/web-fetch', {
-                    ...LIMITED,
-                    inputProperties: { outputConnector: { type: 'string', resourceType: 'mcpConnector' } },
-                }),
-            ],
-            [
-                'an Actor with a JavaScript input',
-                createMockActorInfo('apify/web-fetch', {
-                    ...LIMITED,
-                    inputProperties: { pageFunction: { type: 'string', editor: 'javascript' } },
-                }),
-            ],
-            [
-                'an Actor with a Python input',
-                createMockActorInfo('apify/web-fetch', {
-                    ...LIMITED,
-                    inputProperties: { code: { type: 'string', editor: 'python' } },
-                }),
-            ],
             ['an Apify-maintained Actor that sends email', createMockActorInfo('apify/send-mail', LIMITED)],
         ])('keeps %s destructive', async (_, actorInfo) => {
             expect(await getAnnotations(actorInfo)).toMatchObject({
