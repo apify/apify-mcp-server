@@ -227,7 +227,7 @@ const UNIQ_MARKER_PATTERN = /\{\{uniq\}\}/g;
  * Function replacer, as in judge.ts: `$&` and `` $` `` in a reference would otherwise be read as
  * replacement patterns.
  */
-export function substituteUniqMarker<TItem extends McpAgentItem>(item: TItem, suffix: string): TItem {
+export function substituteUniqMarker(item: McpAgentItem, suffix: string): McpAgentItem {
     const substitute = (text: string): string => text.replace(UNIQ_MARKER_PATTERN, () => suffix);
     // `expectedOutput` is absent on `kind: "tool-call"` items; `input.query` never is.
     return {
@@ -241,6 +241,7 @@ export function substituteUniqMarker<TItem extends McpAgentItem>(item: TItem, su
  * Repeats items in one experiment, tagging each copy with its one-based iteration because
  * Langfuse has no native iteration field. The `{{uniq}}` marker stays in place: the task resolves
  * it per attempt (see `runAgentWithRetry`), so a retried trial never reuses its first attempt's name.
+ * The Langfuse item input therefore shows the raw marker; the resolved prompt is on the agent span.
  */
 export function expandIterations(items: DatasetItem[], iterations: number): DatasetItem[] {
     return items.flatMap((item) => Array.from({ length: iterations }, (_, index) => withIteration(item, index + 1)));
@@ -386,18 +387,15 @@ export type McpAgentTaskOptions = {
 };
 
 /**
- * Run the agent once, retrying on a transient failure. The retry replays the whole prompt, so
- * tool calls that already succeeded run again. Each attempt resolves the item's `{{uniq}}` to
- * its own suffix (`r<attempt>`), so a create that succeeded before the failure does not collide
- * with its replay; an unmarked fixed-name case still can, and fails the zero-tool-error gate on
- * it. That cost only buys something for a transient failure, so anything else is rethrown
- * unretried.
+ * Run the agent, retrying once on a transient failure only: the replay re-runs tool calls that
+ * already succeeded. Each attempt resolves `{{uniq}}` to its own suffix (`r<attempt>`), so a
+ * marked create does not collide with its replay.
  */
-async function runAgentWithRetry<TItem extends McpAgentItem>(
-    item: TItem,
+async function runAgentWithRetry(
+    item: McpAgentItem,
     runId: string,
-    buildRunOptions: (resolved: TItem) => AgentRunOptions,
-): Promise<{ adapted: AgentRunResult; startedAt: number; resolved: TItem }> {
+    buildRunOptions: (resolved: McpAgentItem) => AgentRunOptions,
+): Promise<{ adapted: AgentRunResult; startedAt: number; resolved: McpAgentItem }> {
     const resolveAttempt = (attempt: number) =>
         substituteUniqMarker(item, buildRunSuffix(runId, item.metadata.iteration ?? 1, attempt));
 
@@ -525,29 +523,24 @@ async function runAgentItem(
 ): Promise<McpAgentTaskOutput> {
     const { agentModel, apifyToken, toolTimeout, mcpToolsOnly, judgeModel, llmClient, runId } = options;
 
+    const { adapted, startedAt, resolved } = await runAgentWithRetry(item, runId, (attemptItem) => ({
+        prompt: attemptItem.input.query,
+        model: agentModel,
+        apifyToken,
+        tools: attemptItem.metadata.tools,
+        failTools: attemptItem.metadata.failTools,
+        maxTurns: attemptItem.metadata.maxTurns,
+        toolTimeoutSeconds: toolTimeout,
+        mcpToolsOnly,
+    }));
+    emitTrace(item.id, resolved.input.query, agentModel, mcpToolsOnly, adapted, startedAt);
+
     // Guaranteed by parseMcpAgentItem's kind/expectedOutput cross-check for kind:
     // "agent" items; this task only runs those in this branch, so a missing
     // expectedOutput here is a caller bug.
-    if (item.expectedOutput === undefined) {
+    if (resolved.expectedOutput === undefined) {
         throw new Error('kind "agent" item has no expectedOutput; this task only runs agent items');
     }
-
-    // Spread with the narrowed `expectedOutput`, so the resolved item the judge reads keeps it typed.
-    const { adapted, startedAt, resolved } = await runAgentWithRetry(
-        { ...item, expectedOutput: item.expectedOutput },
-        runId,
-        (attemptItem) => ({
-            prompt: attemptItem.input.query,
-            model: agentModel,
-            apifyToken,
-            tools: attemptItem.metadata.tools,
-            failTools: attemptItem.metadata.failTools,
-            maxTurns: attemptItem.metadata.maxTurns,
-            toolTimeoutSeconds: toolTimeout,
-            mcpToolsOnly,
-        }),
-    );
-    emitTrace(item.id, resolved.input.query, agentModel, mcpToolsOnly, adapted, startedAt);
 
     const { conversation, transcript } = adapted;
     const judgeResult = await evaluateConversation(resolved.expectedOutput, conversation, llmClient, judgeModel);

@@ -580,31 +580,33 @@ describe('substituteUniqMarker()', () => {
             'PASS only if create-schedule created eval-sched-add-{{uniq}}.',
         ) as unknown as { input: { query: string }; expectedOutput: string };
 
-        const resolved = substituteUniqMarker(item as never, 'r3k9f2qa7c-t2') as unknown as {
+        const resolved = substituteUniqMarker(item as never, 'r3k9f2qa7c-n10-t2r1') as unknown as {
             input: { query: string };
             expectedOutput: string;
         };
 
         expect(resolved.input.query).toBe(
-            'Create eval-sched-add-r3k9f2qa7c-t2, then rename it to eval-sched-add-r3k9f2qa7c-t2',
+            'Create eval-sched-add-r3k9f2qa7c-n10-t2r1, then rename it to eval-sched-add-r3k9f2qa7c-n10-t2r1',
         );
-        expect(resolved.expectedOutput).toBe('PASS only if create-schedule created eval-sched-add-r3k9f2qa7c-t2.');
+        expect(resolved.expectedOutput).toBe(
+            'PASS only if create-schedule created eval-sched-add-r3k9f2qa7c-n10-t2r1.',
+        );
     });
 
     it('returns an item without the marker unchanged, metadata and all', () => {
         const item = makeItem('Pause my schedule eval-nightly-sum', 'PASS only if update-schedule was called.');
 
-        expect(substituteUniqMarker(item, 'r3k9f2qa7c-t1')).toEqual(item);
+        expect(substituteUniqMarker(item, 'r3k9f2qa7c-n10-t1r1')).toEqual(item);
     });
 
     it('keeps a reference containing $& and backtick-$ intact', () => {
         const reference = 'PASS only if the agent runs `echo $&` and reports $` verbatim for {{uniq}}.';
         const item = makeItem('Run it', reference);
 
-        const resolved = substituteUniqMarker(item, 'r3k9f2qa7c-t1') as unknown as { expectedOutput: string };
+        const resolved = substituteUniqMarker(item, 'r3k9f2qa7c-n10-t1r1') as unknown as { expectedOutput: string };
 
         expect(resolved.expectedOutput).toBe(
-            'PASS only if the agent runs `echo $&` and reports $` verbatim for r3k9f2qa7c-t1.',
+            'PASS only if the agent runs `echo $&` and reports $` verbatim for r3k9f2qa7c-n10-t1r1.',
         );
     });
 
@@ -615,7 +617,7 @@ describe('substituteUniqMarker()', () => {
             metadata: { category: 'create', kind: 'tool-call', expectedArgs: { name: 'eval-sched-{{uniq}}' } },
         } as unknown as Parameters<typeof substituteUniqMarker>[0];
 
-        const resolved = substituteUniqMarker(item, 'r3k9f2qa7c-t1') as unknown as {
+        const resolved = substituteUniqMarker(item, 'r3k9f2qa7c-n10-t1r1') as unknown as {
             metadata: { expectedArgs: { name: string } };
         };
 
