@@ -74,6 +74,58 @@ const CLAUDE_CONNECTOR_CLIENT_OPTIONS: SuiteClientOptions = {
     telemetry: { enabled: true },
 };
 
+// Apify AI `?tools=` selection: `MCP_TOOLS` in apify/apify-ai-agent src/mastra/token-toolsets.ts. It names
+// categories, so a tool added to one of them would reach Apify AI untested; the expected names pin what it
+// serves. Duplicated in tests/unit/helpers/apify_ai_tools.ts — test_kit cannot import outside itself.
+const APIFY_AI_TOOLS = [
+    'actors',
+    'docs',
+    'runs',
+    'storage',
+    'tasks',
+    'schedules',
+    'apify/rag-web-browser',
+    'apify/web-fetch',
+    'report-problem',
+];
+const APIFY_AI_EXPECTED_TOOL_NAMES = [
+    'search-actors',
+    'fetch-actor-details',
+    'call-actor',
+    'search-apify-docs',
+    'fetch-apify-docs',
+    'get-actor-run',
+    'get-actor-run-list',
+    'get-actor-run-log',
+    'abort-actor-run',
+    'get-dataset',
+    'get-dataset-items',
+    'get-dataset-schema',
+    'get-dataset-list',
+    'get-key-value-store',
+    'get-key-value-store-keys',
+    'get-key-value-store-record',
+    'get-key-value-store-list',
+    'create-actor-task',
+    'get-actor-task',
+    'update-actor-task',
+    'publish-actor-task',
+    'unpublish-actor-task',
+    'create-schedule',
+    'get-schedule',
+    'update-schedule',
+    'delete-schedule',
+    'report-problem',
+    actorNameToToolName('apify/rag-web-browser'),
+    actorNameToToolName('apify/web-fetch'),
+];
+// clientName: the Apify AI handshake name. telemetry: true as on the deployed target Apify AI calls.
+const APIFY_AI_CLIENT_OPTIONS: SuiteClientOptions = {
+    tools: APIFY_AI_TOOLS,
+    clientName: 'apify-ai',
+    telemetry: { enabled: true },
+};
+
 /** Tool/Actor selection, categories, env loading, auto-inject, server mode. */
 export const registrationCases: Case[] = [
     {
@@ -139,6 +191,16 @@ export const registrationCases: Case[] = [
                 expect(url.search.endsWith('client=claude')).toBe(true);
             },
         ),
+    },
+    {
+        name: 'Apify AI: pinned tool surface serves exactly the expected tools',
+        // Not a deployment test: an exact set needs both pinned Actors on the target API (see the Claude connector case).
+        isDeploymentTest: false,
+        run: withClient(APIFY_AI_CLIENT_OPTIONS, async (client) => {
+            const names = getToolNames(await client.listTools());
+            // Exact set, not superset: a tool joining or leaving these categories must fail here.
+            expect(new Set(names)).toEqual(new Set(APIFY_AI_EXPECTED_TOOL_NAMES));
+        }),
     },
     {
         // isDeploymentTest: default tool/Actor set.
