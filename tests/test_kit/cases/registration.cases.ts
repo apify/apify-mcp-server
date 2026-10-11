@@ -73,6 +73,58 @@ const CLAUDE_CONNECTOR_CLIENT_OPTIONS: SuiteClientOptions = {
     telemetry: { enabled: true },
 };
 
+// Apify AI `?tools=` selection: `MCP_TOOLS` in apify/apify-ai-agent src/mastra/token-toolsets.ts. It names
+// categories, so a tool added to one of them would reach Apify AI untested; the expected names pin what it
+// serves. Duplicated in tests/unit/helpers/apify_ai_tools.ts — test_kit cannot import outside itself.
+const APIFY_AI_TOOLS = [
+    'actors',
+    'docs',
+    'runs',
+    'storage',
+    'tasks',
+    'schedules',
+    'apify/rag-web-browser',
+    'apify/web-fetch',
+    HELPER_TOOLS.PROBLEM_REPORT,
+];
+const APIFY_AI_EXPECTED_TOOL_NAMES = [
+    HELPER_TOOLS.STORE_SEARCH,
+    HELPER_TOOLS.ACTOR_GET_DETAILS,
+    HELPER_TOOLS.ACTOR_CALL,
+    HELPER_TOOLS.DOCS_SEARCH,
+    HELPER_TOOLS.DOCS_FETCH,
+    HELPER_TOOLS.ACTOR_RUNS_GET,
+    HELPER_TOOLS.ACTOR_RUN_LIST_GET,
+    HELPER_TOOLS.ACTOR_RUNS_LOG,
+    HELPER_TOOLS.ACTOR_RUNS_ABORT,
+    HELPER_TOOLS.DATASET_GET,
+    HELPER_TOOLS.DATASET_GET_ITEMS,
+    HELPER_TOOLS.DATASET_SCHEMA_GET,
+    HELPER_TOOLS.DATASET_LIST_GET,
+    HELPER_TOOLS.KEY_VALUE_STORE_GET,
+    HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
+    HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
+    HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
+    HELPER_TOOLS.ACTOR_TASK_CREATE,
+    HELPER_TOOLS.ACTOR_TASK_GET,
+    HELPER_TOOLS.ACTOR_TASK_UPDATE,
+    HELPER_TOOLS.ACTOR_TASK_PUBLISH,
+    HELPER_TOOLS.ACTOR_TASK_UNPUBLISH,
+    HELPER_TOOLS.SCHEDULE_CREATE,
+    HELPER_TOOLS.SCHEDULE_GET,
+    HELPER_TOOLS.SCHEDULE_UPDATE,
+    HELPER_TOOLS.SCHEDULE_DELETE,
+    HELPER_TOOLS.PROBLEM_REPORT,
+    actorNameToToolName('apify/rag-web-browser'),
+    actorNameToToolName('apify/web-fetch'),
+];
+// clientName: the Apify AI handshake name. telemetry: true as on the deployed target Apify AI calls.
+const APIFY_AI_CLIENT_OPTIONS: SuiteClientOptions = {
+    tools: APIFY_AI_TOOLS,
+    clientName: 'apify-ai',
+    telemetry: { enabled: true },
+};
+
 /** Tool/Actor selection, categories, env loading, auto-inject, server mode. */
 export const registrationCases: Case[] = [
     {
@@ -137,6 +189,15 @@ export const registrationCases: Case[] = [
                 expect(url.search.endsWith('client=claude+connector')).toBe(true);
             },
         ),
+    },
+    {
+        name: 'Apify AI: pinned tool surface serves exactly the expected tools',
+        isDeploymentTest: true,
+        run: withClient(APIFY_AI_CLIENT_OPTIONS, async (client) => {
+            const names = getToolNames(await client.listTools());
+            // Exact set, not superset: a tool joining or leaving these categories must fail here.
+            expect(new Set(names)).toEqual(new Set(APIFY_AI_EXPECTED_TOOL_NAMES));
+        }),
     },
     {
         // isDeploymentTest: default tool/Actor set.
