@@ -1,12 +1,12 @@
 /**
- * Name grammar for a run's eval resources: `<static>-<runId>-n<runId length>-t<trial>`.
+ * Name grammar for a run's eval resources: `<static>-<runId>-n<runId length>-t<trial>r<attempt>`.
  * The runner builds the suffix and the fixtures scripts match it, so the two cannot drift.
  */
 
 const RUN_ID_PATTERN = /^[a-z0-9-]+$/;
 
 /** A CI id is 13 characters; longer ids push resolved names past the platform's 63. */
-const RUN_ID_MAX_LENGTH = 20;
+export const RUN_ID_MAX_LENGTH = 18;
 
 const RUN_ID_FLAG = '--run-id';
 
@@ -17,13 +17,13 @@ export function createRunId(): string {
     return `${seconds}${random}`;
 }
 
-/** Name suffix for one trial of one item; `trial` is 1-based. */
-export function buildRunSuffix(runId: string, trial: number): string {
-    return `${runId}-n${runId.length}-t${trial}`;
+/** Name suffix for one attempt of one trial of one item; `trial` and `attempt` are 1-based. */
+export function buildRunSuffix(runId: string, trial: number, attempt: number): string {
+    return `${runId}-n${runId.length}-t${trial}r${attempt}`;
 }
 
 /**
- * The length after the id distinguishes `a-1` from `1` as well as attempt 12 from attempt 1.
+ * The length after the id distinguishes `a-1` from `1` as well as CI run attempt 12 from 1.
  */
 export function isNameFromRun(name: string, runId: string): boolean {
     return name.includes(`-${runId}-n${runId.length}-t`);

@@ -2,7 +2,7 @@
 
 import type { Evaluation } from '@langfuse/client';
 
-import type { AgentRunResult } from '../agent/claude_agent.js';
+import type { AgentRunOptions, AgentRunResult } from '../agent/claude_agent.js';
 import { runAgentConversation } from '../agent/claude_agent.js';
 import type { TranscriptEntry } from '../agent/conversation_adapter.js';
 import type { JudgeClient } from '../judge/client.js';
@@ -227,28 +227,23 @@ const UNIQ_MARKER_PATTERN = /\{\{uniq\}\}/g;
  * Function replacer, as in judge.ts: `$&` and `` $` `` in a reference would otherwise be read as
  * replacement patterns.
  */
-export function substituteUniqMarker(item: DatasetItem, suffix: string): DatasetItem {
+export function substituteUniqMarker<TItem extends McpAgentItem>(item: TItem, suffix: string): TItem {
     const substitute = (text: string): string => text.replace(UNIQ_MARKER_PATTERN, () => suffix);
     // `expectedOutput` is absent on `kind: "tool-call"` items; `input.query` never is.
-    const input = item.input as { query: string };
     return {
         ...item,
-        input: { ...input, query: substitute(input.query) },
-        ...(typeof item.expectedOutput === 'string' && { expectedOutput: substitute(item.expectedOutput) }),
+        input: { ...item.input, query: substitute(item.input.query) },
+        ...(item.expectedOutput !== undefined && { expectedOutput: substitute(item.expectedOutput) }),
     };
 }
 
 /**
  * Repeats items in one experiment, tagging each copy with its one-based iteration because
- * Langfuse has no native iteration field, and resolving each copy's `{{uniq}}` marker so two
- * trials never name the same resource.
+ * Langfuse has no native iteration field. The `{{uniq}}` marker stays in place: the task resolves
+ * it per attempt (see `runAgentWithRetry`), so a retried trial never reuses its first attempt's name.
  */
-export function expandIterations(items: DatasetItem[], iterations: number, runId: string): DatasetItem[] {
-    return items.flatMap((item) =>
-        Array.from({ length: iterations }, (_, index) =>
-            substituteUniqMarker(withIteration(item, index + 1), buildRunSuffix(runId, index + 1)),
-        ),
-    );
+export function expandIterations(items: DatasetItem[], iterations: number): DatasetItem[] {
+    return items.flatMap((item) => Array.from({ length: iterations }, (_, index) => withIteration(item, index + 1)));
 }
 
 export function validateIterations(value: number): void {
@@ -386,29 +381,39 @@ export type McpAgentTaskOptions = {
     mcpToolsOnly: boolean;
     /** Requested items x iterations, for the per-item progress line. */
     totalTrials: number;
+    /** Names the resources this run creates; see `evals/run_id.ts`. */
+    runId: string;
 };
 
 /**
- * Run the agent once, retrying on a transient failure. The retry replays the whole prompt,
- * so tool calls that already succeeded run again: a case with fixed-name fixtures can hit a
- * name collision the second time round and fail the zero-tool-error gate. That cost only
- * buys something for a transient failure, so anything else is rethrown unretried.
+ * Run the agent once, retrying on a transient failure. The retry replays the whole prompt, so
+ * tool calls that already succeeded run again. Each attempt resolves the item's `{{uniq}}` to
+ * its own suffix (`r<attempt>`), so a create that succeeded before the failure does not collide
+ * with its replay; an unmarked fixed-name case still can, and fails the zero-tool-error gate on
+ * it. That cost only buys something for a transient failure, so anything else is rethrown
+ * unretried.
  */
-async function runAgentWithRetry(
-    itemId: string,
-    runOptions: Parameters<typeof runAgentConversation>[0],
-): Promise<{ adapted: AgentRunResult; startedAt: number }> {
+async function runAgentWithRetry<TItem extends McpAgentItem>(
+    item: TItem,
+    runId: string,
+    buildRunOptions: (resolved: TItem) => AgentRunOptions,
+): Promise<{ adapted: AgentRunResult; startedAt: number; resolved: TItem }> {
+    const resolveAttempt = (attempt: number) =>
+        substituteUniqMarker(item, buildRunSuffix(runId, item.metadata.iteration ?? 1, attempt));
+
+    let resolved = resolveAttempt(1);
     let startedAt = Date.now();
     try {
-        return { adapted: await runAgentConversation(runOptions), startedAt };
+        return { adapted: await runAgentConversation(buildRunOptions(resolved)), startedAt, resolved };
     } catch (error) {
         if (!isTransientAgentError(error)) throw error;
         // eslint-disable-next-line no-console
         console.error(
-            `⚠️ Item "${itemId}": agent run failed (${error instanceof Error ? error.message : String(error)}), retrying once`,
+            `⚠️ Item "${item.id}": agent run failed (${error instanceof Error ? error.message : String(error)}), retrying once`,
         );
+        resolved = resolveAttempt(2);
         startedAt = Date.now();
-        return { adapted: await runAgentConversation(runOptions), startedAt };
+        return { adapted: await runAgentConversation(buildRunOptions(resolved)), startedAt, resolved };
     }
 }
 
@@ -447,7 +452,7 @@ function emitTrace(
  * Errors are prefixed with the item id because the SDK's own log line carries none.
  */
 export function createExperimentTask(options: McpAgentTaskOptions) {
-    const { llmClient, apifyToken, agentModel, judgeModel, toolTimeout, mcpToolsOnly, totalTrials } = options;
+    const { llmClient, apifyToken, agentModel, judgeModel, toolTimeout, mcpToolsOnly, totalTrials, runId } = options;
 
     // Progress, one line per finished trial. The scored verdict comes later from the
     // evaluators; this reads the task output, which carries the same pass/fail signal.
@@ -486,6 +491,7 @@ export function createExperimentTask(options: McpAgentTaskOptions) {
                 apifyToken,
                 toolTimeout,
                 mcpToolsOnly: itemMcpToolsOnly,
+                runId,
             });
         }
 
@@ -496,6 +502,7 @@ export function createExperimentTask(options: McpAgentTaskOptions) {
             mcpToolsOnly: itemMcpToolsOnly,
             judgeModel,
             llmClient,
+            runId,
         });
     }
 }
@@ -513,9 +520,10 @@ async function runAgentItem(
         mcpToolsOnly: boolean;
         judgeModel: string;
         llmClient: JudgeClient;
+        runId: string;
     },
 ): Promise<McpAgentTaskOutput> {
-    const { agentModel, apifyToken, toolTimeout, mcpToolsOnly, judgeModel, llmClient } = options;
+    const { agentModel, apifyToken, toolTimeout, mcpToolsOnly, judgeModel, llmClient, runId } = options;
 
     // Guaranteed by parseMcpAgentItem's kind/expectedOutput cross-check for kind:
     // "agent" items; this task only runs those in this branch, so a missing
@@ -524,21 +532,25 @@ async function runAgentItem(
         throw new Error('kind "agent" item has no expectedOutput; this task only runs agent items');
     }
 
-    const runOptions = {
-        prompt: item.input.query,
-        model: agentModel,
-        apifyToken,
-        tools: item.metadata.tools,
-        failTools: item.metadata.failTools,
-        maxTurns: item.metadata.maxTurns,
-        toolTimeoutSeconds: toolTimeout,
-        mcpToolsOnly,
-    };
-    const { adapted, startedAt } = await runAgentWithRetry(item.id, runOptions);
-    emitTrace(item.id, item.input.query, agentModel, mcpToolsOnly, adapted, startedAt);
+    // Spread with the narrowed `expectedOutput`, so the resolved item the judge reads keeps it typed.
+    const { adapted, startedAt, resolved } = await runAgentWithRetry(
+        { ...item, expectedOutput: item.expectedOutput },
+        runId,
+        (attemptItem) => ({
+            prompt: attemptItem.input.query,
+            model: agentModel,
+            apifyToken,
+            tools: attemptItem.metadata.tools,
+            failTools: attemptItem.metadata.failTools,
+            maxTurns: attemptItem.metadata.maxTurns,
+            toolTimeoutSeconds: toolTimeout,
+            mcpToolsOnly,
+        }),
+    );
+    emitTrace(item.id, resolved.input.query, agentModel, mcpToolsOnly, adapted, startedAt);
 
     const { conversation, transcript } = adapted;
-    const judgeResult = await evaluateConversation(item.expectedOutput, conversation, llmClient, judgeModel);
+    const judgeResult = await evaluateConversation(resolved.expectedOutput, conversation, llmClient, judgeModel);
 
     // Server tools only: a failed Claude Code built-in (Bash, WebFetch) says nothing
     // about the server under test. Failures of tools the harness force-failed itself
@@ -573,20 +585,19 @@ async function runAgentItem(
  */
 async function runToolCallItem(
     item: McpAgentItem,
-    options: { agentModel: string; apifyToken: string; toolTimeout: number; mcpToolsOnly: boolean },
+    options: { agentModel: string; apifyToken: string; toolTimeout: number; mcpToolsOnly: boolean; runId: string },
 ): Promise<McpAgentTaskOutput> {
-    const { agentModel, apifyToken, toolTimeout, mcpToolsOnly } = options;
-    const runOptions = {
-        prompt: item.input.query,
+    const { agentModel, apifyToken, toolTimeout, mcpToolsOnly, runId } = options;
+    const { adapted, startedAt, resolved } = await runAgentWithRetry(item, runId, (attemptItem) => ({
+        prompt: attemptItem.input.query,
         model: agentModel,
         apifyToken,
-        tools: item.metadata.tools,
+        tools: attemptItem.metadata.tools,
         toolTimeoutSeconds: toolTimeout,
         mcpToolsOnly,
         isToolCallMode: true,
-    };
-    const { adapted, startedAt } = await runAgentWithRetry(item.id, runOptions);
-    emitTrace(item.id, item.input.query, agentModel, mcpToolsOnly, adapted, startedAt);
+    }));
+    emitTrace(item.id, resolved.input.query, agentModel, mcpToolsOnly, adapted, startedAt);
 
     const firstToolMatch = resolveFirstToolMatch(
         adapted.attemptedCalls,
