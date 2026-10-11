@@ -601,6 +601,7 @@ describe('formatTeardownHint()', () => {
         const lines = formatTeardownHint('r3k9f2qa7c');
 
         expect(lines.join('\n')).toContain('r3k9f2qa7c');
+        expect(lines[0]).toBe("🧹 Run id r3k9f2qa7c — delete this run's schedules and tasks:");
         expect(lines).toContain('   pnpm run evals:mcp-agent:schedules-fixtures -- --run-id r3k9f2qa7c');
         expect(lines).toContain('   pnpm run evals:mcp-agent:tasks-fixtures -- --run-id r3k9f2qa7c');
         expect(lines.findIndex((line) => line.includes('schedules-fixtures'))).toBeLessThan(
