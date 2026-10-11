@@ -327,7 +327,7 @@ Use comments to guide reviewers:
     * **Input validation**: Always validate tool inputs with Zod before processing.
     * **Caching**: Use TTL-based caching for Actor schemas and details (see `src/utils/ttl_lru.ts`).
     * **Constants and tool names**: Always use constants and never hardcoded values. When referring to tools, ALWAYS use the `HELPER_TOOLS` `as const` object.
-        * Exception: Integration tests (`tests/integration/`) must use hardcoded strings for tool names. This ensures tests fail if a tool is renamed, preventing accidental breaking changes.
+        * Exception: the integration suite (`tests/integration/` and the shared `tests/test_kit/` cases and helpers) must use hardcoded strings for tool names. This ensures tests fail if a tool is renamed, preventing accidental breaking changes.
 
 *   **Anti-patterns:**
     * Don't call Apify API directly — always use the Apify client utilities.
