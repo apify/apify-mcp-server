@@ -358,6 +358,8 @@ export function formatTeardownHint(runId: string): string[] {
  * status. Deliberately narrow: retrying a deterministic failure (a bad prompt, a missing
  * binary, a tool timeout) only doubles the spend and, for a case with fixed-name fixtures,
  * turns the replay itself into a name collision that fails the zero-tool-error gate.
+ * An MCP server not connected at init is retried once, whatever its status: no turn has run,
+ * so the replay costs no turns and leaves no fixtures. Only `pending` or `failed` can recover.
  */
 const TRANSIENT_AGENT_ERROR_PATTERNS = [
     /connection error/i,
@@ -368,6 +370,7 @@ const TRANSIENT_AGENT_ERROR_PATTERNS = [
     /\b(408|429|500|502|503|504)\b/,
     /overloaded/i,
     /rate.?limit/i,
+    /MCP server ".+" not connected at init/,
 ];
 
 /** Whether an agent-run failure is transient, so replaying the prompt could recover it. */

@@ -243,7 +243,7 @@ rationale in `runner/run.ts`). `requestedTrials = requestedIds.length * iteratio
 - A calibrated suite gates on an aggregate rate instead of one flaky item blocking every PR; `--pass-threshold 1.0` restores strict all-pass
 - The trial count matters as much as the scores: the Langfuse SDK drops an item whose task throws, so gating on the results it returns would report `7/7 passed` on a run where three trials never executed
 
-Harness failures (MCP spawn, OpenRouter, judge) are therefore left to throw rather than being converted into a `FAIL` verdict. A broken harness shows up as a shortfall, not as a failing eval.
+Harness failures (MCP spawn, an MCP server not connected at init, OpenRouter, judge) are therefore left to throw rather than being converted into a `FAIL` verdict. A broken harness shows up as a shortfall, not as a failing eval.
 
 **Location:** `runner/experiment.ts` (`buildRunSummary`, `resolveExitCode`)
 
@@ -421,13 +421,16 @@ above). The snapshot holds the same fields flattened, one object per case, in th
 **Symptom:** Test 2 fails after Test 1, passes alone.<br>
 **Solution:** ✅ Isolated agent + MCP instance per test.
 
-### Agent claims the Apify MCP server is "still connecting" (remote/sandboxed environments)
-**Symptom:** A transcript shows the agent reading a system notice that MCP servers are still
-connecting, concluding the Apify tools are unavailable, and falling back to a built-in tool.<br>
-**Cause:** In sandboxed remote Claude Code environments the MCP handshake can race the first
-turn; a fast model sometimes doesn't wait or retry. On a local machine the CLI completes the
-handshake before the first turn, so this doesn't reproduce there.<br>
-**Solution:** Retry the item once; a repeat failure on a local machine is real.
+### Apify MCP server "still connecting" / not connected at init
+**Symptom:** The console prints `retrying once` with `MCP server "apify" not connected at init (status: pending)`.
+If the retry fails too, the item shows `🔥` and counts as a failed trial.<br>
+**Cause:** The Claude Code CLI waits up to 5 s (`MCP_CONNECT_TIMEOUT_MS`) for the server before it
+emits `init` and starts the first turn. A slower server, common on a loaded machine (high
+`--concurrency` on few CPUs), is reported as `pending` and its tools are missing from the first
+turn's prompt. Without a check the agent would read a "still connecting" notice and fall back to a
+built-in tool.<br>
+**Solution:** Automatic: the run aborts at `init` before any model turn and the item is retried once.
+A repeat failure is a harness failure (decision 4), not a verdict on the tools. If it recurs, lower `--concurrency`.
 
 ### Agent answers from memory or shells out instead of using our tools
 **Symptom:** The judge reports the agent used `Bash`, `WebSearch`, or its own knowledge.<br>
@@ -459,7 +462,7 @@ Fork PRs cannot run evals because GitHub withholds repository secrets. Push the 
 
 Both tiers need `ANTHROPIC_API_KEY`, the three `LANGFUSE_*` keys, and `APIFY_TOKEN` (mapped from the `APIFY_TEST_USER_API_TOKEN` repository secret). `OPENROUTER_API_KEY` is required only by the merge judge. The three publish cases also need write access to `apify/normal-mode-test-actor`.
 
-The pr tier has run on a hosted runner in 4m31s, inside its ten-minute target; the merge tier's threshold and 90-minute timeout are still provisional. Transient network and provider failures retry once; the handshake race above does not, because it produces a wrong answer rather than an error.
+The pr tier has run on a hosted runner in 4m31s, inside its ten-minute target; the merge tier's threshold and 90-minute timeout are still provisional. Transient network and provider failures retry once, and so does an MCP server not connected at init (see Common issues); if that retry fails too, the item fails as a harness failure.
 
 ## Writing tool descriptions
 

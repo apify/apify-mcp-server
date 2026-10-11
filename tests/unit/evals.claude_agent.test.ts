@@ -2,6 +2,7 @@ import type * as ClaudeAgentSdk from '@anthropic-ai/claude-agent-sdk';
 import type { Options, PreToolUseHookInput, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { isTransientAgentError } from '../../evals/runner/experiment.js';
 import { TOOL_CALL_DENY_REASON, TOOL_CALL_MAX_TURNS } from '../../evals/runner/tool_call_mode.js';
 import { REPORT_PROBLEM_NUDGE } from '../../src/tools/dev/report_problem.js';
 
@@ -37,6 +38,24 @@ function resultMessage(overrides: Record<string, unknown> = {}): SDKMessage {
         duration_ms: 10,
         usage: { input_tokens: 1, output_tokens: 1 },
         ...overrides,
+    } as unknown as SDKMessage;
+}
+
+/** The SDK `init` message; only the fields the run and the adapter read. */
+function initMessage(mcpServers: { name: string; status: string }[]): SDKMessage {
+    return {
+        type: 'system',
+        subtype: 'init',
+        claude_code_version: '2.1.206',
+        mcp_servers: mcpServers,
+    } as unknown as SDKMessage;
+}
+
+function assistantMessage(text: string): SDKMessage {
+    return {
+        type: 'assistant',
+        message: { id: 'msg-1', content: [{ type: 'text', text }] },
+        parent_tool_use_id: null,
     } as unknown as SDKMessage;
 }
 
@@ -194,5 +213,82 @@ describe('runAgentConversation()', () => {
         });
 
         await expect(runAgentConversation(baseOptions())).rejects.toBe(originalError);
+    });
+
+    describe('with an init message', () => {
+        let isPastInit: boolean;
+
+        /** Yields init with the given servers, then records whether the run read any further. */
+        function mockInitStream(mcpServers: { name: string; status: string }[]) {
+            isPastInit = false;
+            mocks.query.mockImplementation(({ options }: { options: Options }) => {
+                capturedOptions = options;
+                return (async function* () {
+                    yield initMessage(mcpServers);
+                    isPastInit = true;
+                    yield assistantMessage('done');
+                    yield resultMessage();
+                })();
+            });
+        }
+
+        it.each(['pending', 'failed', 'needs-auth', 'disabled'])(
+            'throws when the MCP server is %s at init',
+            async (status) => {
+                mockInitStream([{ name: 'apify', status }]);
+
+                await expect(runAgentConversation(baseOptions())).rejects.toThrow(
+                    `MCP server "apify" not connected at init (status: ${status})`,
+                );
+                expect(isPastInit).toBe(false);
+                expect(capturedOptions?.abortController?.signal.aborted).toBe(true);
+            },
+        );
+
+        it('throws when the MCP server is missing from init', async () => {
+            mockInitStream([]);
+
+            await expect(runAgentConversation(baseOptions())).rejects.toThrow(
+                'MCP server "apify" not connected at init (status: missing)',
+            );
+            expect(isPastInit).toBe(false);
+        });
+
+        it('runs to completion when the MCP server is connected at init', async () => {
+            mockInitStream([{ name: 'apify', status: 'connected' }]);
+
+            const run = await runAgentConversation(baseOptions());
+
+            expect(isPastInit).toBe(true);
+            expect(run.claudeCodeVersion).toBe('2.1.206');
+            expect(run.conversation.turns.at(-1)?.finalResponse).toBe('done');
+        });
+
+        it('marks the not-connected error as transient', async () => {
+            mockInitStream([{ name: 'apify', status: 'pending' }]);
+
+            const error = await runAgentConversation(baseOptions()).catch((caught: unknown) => caught);
+
+            expect(error).toBeInstanceOf(Error);
+            expect(isTransientAgentError(error)).toBe(true);
+        });
+
+        it('keeps the not-connected error transient when stderr is appended', async () => {
+            const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            mocks.query.mockImplementation(({ options }: { options: Options }) => {
+                return (async function* () {
+                    options.stderr?.('some line\n');
+                    yield initMessage([{ name: 'apify', status: 'pending' }]);
+                })();
+            });
+
+            const error = await runAgentConversation(baseOptions()).catch((caught: unknown) => caught);
+
+            const message = error instanceof Error ? error.message : String(error);
+            expect(message).toContain('MCP server "apify" not connected at init (status: pending)');
+            expect(message).toContain('\n  [claude-stderr] some line');
+            expect(isTransientAgentError(error)).toBe(true);
+            errorSpy.mockRestore();
+        });
     });
 });
