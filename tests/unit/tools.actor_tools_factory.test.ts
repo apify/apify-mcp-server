@@ -124,7 +124,7 @@ describe('getNormalActorsAsTools()', () => {
             expect(tool.buildDescription?.({ hasTool: () => false })).toBe(
                 `${buildBaseDescription(actorFullName, false)}\n\n${WEBSITE_CONTENT_CRAWLER_ADDITIONAL_DESC}`,
             );
-            for (const fragment of ['{ "glob":', '0 = start URLs only', '1 = also the pages they link to', '9999999']) {
+            for (const fragment of ['{ "glob":', '9999999']) {
                 expect(WEBSITE_CONTENT_CRAWLER_ADDITIONAL_DESC).toContain(fragment);
             }
         });

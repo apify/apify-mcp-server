@@ -164,12 +164,11 @@ export const WEB_FETCH_URL_SCHEME_NOTE =
 
 export const WEBSITE_CONTENT_CRAWLER = 'apify/website-content-crawler';
 /**
- * Appended to the `apify/website-content-crawler` Actor tool description. Facts come from the Actor's input
- * schema (`startUrls` scope sentence, `includeUrlGlobs` item shape, `maxCrawlDepth` semantics, `maxCrawlPages` default).
+ * Appended to the `apify/website-content-crawler` Actor tool description: the two facts the Actor's own
+ * description leaves out (default crawl scope, unbounded `maxCrawlPages`). Facts come from its input schema.
  */
-export const WEBSITE_CONTENT_CRAWLER_ADDITIONAL_DESC = `By default the crawler follows only links under the start URL's path: for start URL https://example.com/blog it crawls https://example.com/blog/post but not https://example.com/docs.
-To follow links elsewhere on the site, set \`includeUrlGlobs\`, e.g. \`[{ "glob": "https://example.com/**" }]\`. \`maxCrawlDepth\` limits how many links deep it goes (0 = start URLs only, 1 = also the pages they link to).
-\`maxCrawlPages\` defaults to 9999999, so an uncapped run can crawl a whole site and costs more with every page; set it to the number of pages you need.`;
+export const WEBSITE_CONTENT_CRAWLER_ADDITIONAL_DESC = `By default the crawler follows only links under the start URL's path: for start URL https://example.com/blog it crawls https://example.com/blog/post but not https://example.com/docs. To follow links elsewhere on the site, set \`includeUrlGlobs\`, e.g. \`[{ "glob": "https://example.com/**" }]\`.
+\`maxCrawlPages\` defaults to 9999999, so an uncapped run can crawl a whole site; set it to the number of pages you need.`;
 
 export const defaults = {
     actors: [RAG_WEB_BROWSER, WEB_FETCH],
