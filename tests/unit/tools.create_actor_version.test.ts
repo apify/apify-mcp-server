@@ -11,13 +11,19 @@ import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
 import { buildFilesRevision } from '../../src/tools/source/source_files.js';
 import { createActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
+    mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
     type ToolTelemetrySnapshot,
 } from './helpers/tool_context.js';
+
+vi.mock('../../src/utils/userid_cache.js', () => ({
+    getUserInfoCached: vi.fn(),
+}));
 
 const actorGetMock = vi.fn();
 const versionsCreateMock = vi.fn();
@@ -745,6 +751,30 @@ describe('create-actor-version', () => {
             const result = await callTool({ copyFromVersion: '0.1', autoBuild: true }, controller.signal);
 
             expect(result).toEqual({});
+            expect(versionsCreateMock).toHaveBeenCalledTimes(1);
+            expectNoOtherWrite();
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+
+        it('keeps the version and starts no build when the request is cancelled during the Console link lookup', async () => {
+            const controller = new AbortController();
+            vi.mocked(getUserInfoCached).mockImplementationOnce(async () => {
+                controller.abort();
+                return mockUserInfo();
+            });
+
+            const result = await (createActorVersion as HelperTool).call({
+                ...stubToolCallContext(
+                    { actor: 'john/my-actor', versionNumber: '0.2', copyFromVersion: '0.1', autoBuild: true },
+                    stubClient,
+                ),
+                // A Console session's UI token is what makes the call look up the Console link.
+                apifyToken: 'apify_ui_test',
+                signal: controller.signal,
+            });
+
+            expect(result).toEqual({});
+            expect(getUserInfoCached).toHaveBeenCalledTimes(1);
             expect(versionsCreateMock).toHaveBeenCalledTimes(1);
             expectNoOtherWrite();
             expect(buildMock).not.toHaveBeenCalled();
