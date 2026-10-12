@@ -56,9 +56,9 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 }
 
 /**
- * Called only when the method is omitted. When the path has exactly one operation in the spec, it uses
- * that operation's write method; otherwise it asks the caller to choose. The caller is asked only for
- * the write methods; a GET goes to the read tool.
+ * Called only when the method is omitted. When the path has exactly one operation in the spec and no
+ * blocked write method, it uses that operation's write method; otherwise it asks the caller to choose.
+ * The caller is asked only for the write methods; a GET goes to the read tool.
  */
 async function inferWriteMethod(
     path: string,
