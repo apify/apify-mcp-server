@@ -598,6 +598,16 @@ describe('create-actor-version', () => {
             expect(buildMock).not.toHaveBeenCalled();
         });
 
+        it('checks 20,000 files for repeated and colliding paths within a second', async () => {
+            const files = Array.from({ length: 20_000 }, (_, i) => ({ path: `src/d${i % 50}/f${i}.js`, content: 'x' }));
+
+            const startedAt = performance.now();
+            await callTool({ files });
+
+            expect(performance.now() - startedAt).toBeLessThan(1000);
+            expect(getPostBody().sourceFiles).toHaveLength(20_000);
+        });
+
         it('refuses a call with neither files nor copyFromVersion before any request', async () => {
             expect(await callToolExpectingUserError({})).toBe('Give either files or copyFromVersion.');
             expect(actorMock).not.toHaveBeenCalled();
