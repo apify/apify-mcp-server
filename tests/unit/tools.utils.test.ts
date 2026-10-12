@@ -795,7 +795,8 @@ describe('transformActorInputSchemaProperties', () => {
         expect(result.enumString.enum).toEqual(['A', 'B', 'C']);
         expect(result.enumString.description).not.toContain('Possible values:');
         expect(result.enumString.description).toContain('Example values:');
-        expect(result.enumString.description).toContain('**REQUIRED**');
+        // Has a default, so the platform fills it in.
+        expect(result.enumString.description).not.toContain('**REQUIRED**');
 
         // Array of Strings
         expect(result.arrayOfStrings).toBeDefined();
@@ -1108,6 +1109,106 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
         expect(schema.properties?.query?.description).toMatch(/^\*\*REQUIRED\*\*/);
         expect(schema.properties?.maxResults?.description).not.toMatch(/^\*\*REQUIRED\*\*/);
         expect(schema.properties?.query?.prefill).toBe('web browser for RAG pipelines');
+    });
+
+    // Regression: #1513 — a required property with a default was still required by the Actor tool's validator.
+    describe('required properties with a default', () => {
+        const upstream: ActorInputSchema = {
+            type: 'object',
+            properties: {
+                url: { type: 'string', title: 'URL', description: 'Page URL.' },
+                zeroDefault: { type: 'integer', title: 'Delay', description: 'Delay.', default: 0 },
+                falseDefault: { type: 'boolean', title: 'Flag', description: 'Flag.', default: false },
+                nullDefault: { type: 'string', title: 'Null', description: 'Null.', default: null },
+                emptyDefault: { type: 'string', title: 'Empty', description: 'Empty.', default: '' },
+                proxy: {
+                    type: 'object',
+                    title: 'Proxy',
+                    description: 'Proxy.',
+                    editor: 'proxy',
+                    default: { useApifyProxy: true },
+                },
+                mode: { type: 'string', title: 'Mode', description: 'Mode.', enum: ['a', 'b'], default: 'a' },
+                prefillOnly: { type: 'string', title: 'Prefill', description: 'Prefill.', prefill: 'x' },
+                undefinedDefault: { type: 'string', title: 'Undef', description: 'Undef.', default: undefined },
+                optional: { type: 'string', title: 'Optional', description: 'Optional.' },
+            },
+            required: [
+                'url',
+                'zeroDefault',
+                'falseDefault',
+                'nullDefault',
+                'emptyDefault',
+                'proxy',
+                'mode',
+                'prefillOnly',
+                'undefinedDefault',
+            ],
+        };
+        const genuinelyRequired = ['url', 'prefillOnly', 'undefinedDefault'];
+        const supplied = { url: 'https://example.com', prefillOnly: 'x', undefinedDefault: 'y' };
+
+        it('keeps only properties without a defined default in required and REQUIRED marking', () => {
+            const { inputSchema } = buildActorInputSchema('someone/some-actor', upstream, false);
+            const properties = inputSchema.properties as Record<string, SchemaProperties>;
+
+            expect(inputSchema.required).toEqual(genuinelyRequired);
+            for (const [name, property] of Object.entries(properties)) {
+                expect(property.description.startsWith('**REQUIRED**')).toBe(genuinelyRequired.includes(name));
+            }
+        });
+
+        it('compiles a validator that accepts omitted defaulted properties and agrees with tools/list', () => {
+            const { inputSchema } = buildActorInputSchema('someone/some-actor', upstream, false);
+            const validate = fixedAjvCompile(ajv, inputSchema);
+            const pub = getToolPublicFieldOnly({ name: 'someone--some-actor', description: '', inputSchema } as ToolBase);
+
+            expect(validate({ ...supplied })).toBe(true);
+            expect((pub.inputSchema as { required?: string[] }).required).toEqual(inputSchema.required);
+            for (const name of genuinelyRequired) {
+                const { [name]: _omitted, ...rest } = supplied;
+                expect(validate(rest)).toBe(false);
+            }
+        });
+
+        it('still rejects a supplied value of the wrong type or outside the enum', () => {
+            const { inputSchema } = buildActorInputSchema('someone/some-actor', upstream, false);
+            const validate = fixedAjvCompile(ajv, inputSchema);
+
+            expect(validate({ ...supplied, mode: 'c' })).toBe(false);
+            expect(validate({ ...supplied, proxy: 'not-an-object' })).toBe(false);
+        });
+
+        it('does not change the upstream schema', () => {
+            const upstreamCopy = structuredClone(upstream);
+            buildActorInputSchema('someone/some-actor', upstream, false);
+            expect(upstream).toEqual(upstreamCopy);
+        });
+
+        it('keeps the RAG Web Browser query required through the builder, tools/list and validator', () => {
+            const ragUpstream: ActorInputSchema = {
+                type: 'object',
+                properties: {
+                    query: { type: 'string', title: 'Query', description: 'Search term or URL.', prefill: 'apify' },
+                    maxResults: { type: 'integer', title: 'Max', description: 'Max results.', default: 3 },
+                    outputFormats: {
+                        type: 'array',
+                        title: 'Formats',
+                        description: 'Formats.',
+                        default: ['markdown'],
+                    },
+                },
+                required: ['query', 'maxResults', 'outputFormats'],
+            };
+            const { inputSchema } = buildActorInputSchema('apify/rag-web-browser', ragUpstream, true);
+            const pub = getToolPublicFieldOnly({ name: 'apify--rag-web-browser', description: '', inputSchema } as ToolBase);
+            const validate = fixedAjvCompile(ajv, inputSchema);
+
+            expect(inputSchema.required).toEqual(['query']);
+            expect((pub.inputSchema as { required?: string[] }).required).toEqual(['query']);
+            expect(validate({})).toBe(false);
+            expect(validate({ query: 'apify' })).toBe(true);
+        });
     });
 
     // An oversized enum is dropped entirely (not partially truncated), one schema for both display and AJV.

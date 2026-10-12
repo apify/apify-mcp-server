@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import type { ActorInfo, SchemaProperties } from '../../src/types.js';
+import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
 
 type MockActorOptions = {
     actorPermissionLevel?: string;
     inputProperties?: Record<string, Pick<SchemaProperties, 'type'> & Partial<SchemaProperties>>;
+    inputRequired?: string[];
 };
 
 function buildInputProperties(inputProperties: MockActorOptions['inputProperties'] = {}) {
@@ -15,7 +17,7 @@ function buildInputProperties(inputProperties: MockActorOptions['inputProperties
 }
 
 function createMockActorInfo(actorFullName: string, options: MockActorOptions = {}): ActorInfo {
-    const { actorPermissionLevel, inputProperties } = options;
+    const { actorPermissionLevel, inputProperties, inputRequired } = options;
     const [username, name] = actorFullName.split('/');
     return {
         webServerMcpPath: null,
@@ -31,6 +33,7 @@ function createMockActorInfo(actorFullName: string, options: MockActorOptions = 
                     url: { type: 'string', title: 'URL', description: 'The URL to process' },
                     ...buildInputProperties(inputProperties),
                 },
+                required: inputRequired,
             },
         },
         actor: { id: 'test-actor-id', name, username, actorPermissionLevel } as ActorInfo['actor'],
@@ -100,6 +103,38 @@ describe('getNormalActorsAsTools()', () => {
                 destructiveHint: true,
                 openWorldHint: true,
             });
+        });
+    });
+
+    // Regression: #1513 — the validator required a property the platform fills from its default.
+    describe('input validation', () => {
+        const actorInfo = createMockActorInfo('apify/screenshot-url', {
+            inputProperties: {
+                delay: { type: 'integer', default: 0 },
+                waitUntil: { type: 'string', enum: ['load', 'networkidle2'] },
+            },
+            inputRequired: ['url', 'delay', 'waitUntil'],
+        });
+
+        it('accepts a call that omits a required property with a default', async () => {
+            const [tool] = await getNormalActorsAsTools([actorInfo]);
+
+            expect(tool.ajvValidate({ url: 'https://example.com', waitUntil: 'load' })).toBe(true);
+            expect(tool.inputSchema.required).toEqual(['url', 'waitUntil']);
+            expect(getToolPublicFieldOnly(tool).inputSchema.required).toEqual(tool.inputSchema.required);
+        });
+
+        it('rejects a call that omits a required property without a default', async () => {
+            const [tool] = await getNormalActorsAsTools([actorInfo]);
+
+            expect(tool.ajvValidate({ url: 'https://example.com' })).toBe(false);
+            expect(tool.ajvValidate({ waitUntil: 'load' })).toBe(false);
+        });
+
+        it('rejects a supplied defaulted property of the wrong type', async () => {
+            const [tool] = await getNormalActorsAsTools([actorInfo]);
+
+            expect(tool.ajvValidate({ url: 'https://example.com', waitUntil: 'load', delay: 'soon' })).toBe(false);
         });
     });
 });
