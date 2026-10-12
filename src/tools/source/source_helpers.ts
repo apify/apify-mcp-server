@@ -274,23 +274,42 @@ export function validateNewFilePath(
     throw new UserInputError(`${label} collides with ${collision}; one path cannot be both a file and a folder.`);
 }
 
+/** The folders above a file, outermost first: `a` and `a/b` for `a/b/c.js`. */
+function listFolders(path: string): string[] {
+    const segments = path.split('/');
+    return segments.slice(1).map((_, index) => segments.slice(0, index + 1).join('/'));
+}
+
 /**
  * The entries to send, one per file; throws `UserInputError` for a path no file can be written at, for content the
  * stored file would not hold as sent, and for a path given twice, which leaves the version with two entries where the
- * build uses the last.
+ * build uses the last. Paths are checked through a set and a map, since comparing each file with every earlier one
+ * took 8 s for 20,000.
  */
 export function buildSourceFileEntries(files: readonly z.infer<typeof sourceFileArgs>[]): ActorVersionSourceFile[] {
     const entries: ActorVersionSourceFile[] = [];
+    const filePaths = new Set<string>();
+    const firstFileByFolder = new Map<string, string>();
     for (const [index, file] of files.entries()) {
         validatePathCharacters(file.path, `files[${index}]`);
         const entry = buildSourceFileEntry(file);
         const label = `files[${index}] (${file.path})`;
         validateFilePath(entry.name, label);
         validateFileContent(entry, label);
-        if (entries.some(({ name }) => name === entry.name)) {
+        if (filePaths.has(entry.name)) {
             throw new UserInputError(`${label} repeats the path ${entry.name}; send each file once.`);
         }
-        validateNewFilePath(entry.name, { filePaths: entries.map(({ name }) => name), folderPaths: [] }, label);
+        const folders = listFolders(entry.name);
+        const collision = folders.find((folder) => filePaths.has(folder)) ?? firstFileByFolder.get(entry.name);
+        if (collision !== undefined) {
+            throw new UserInputError(
+                `${label} collides with ${collision}; one path cannot be both a file and a folder.`,
+            );
+        }
+        filePaths.add(entry.name);
+        for (const folder of folders) {
+            if (!firstFileByFolder.has(folder)) firstFileByFolder.set(folder, entry.name);
+        }
         entries.push(entry);
     }
     return entries;

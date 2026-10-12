@@ -528,12 +528,43 @@ describe('create-actor', () => {
             [MAIN_JS, { path: 'src', content: 'x' }],
             'files[1] (src) collides with src/main.js',
         ],
+        [
+            'a file two folders under another file',
+            [
+                { path: 'src', content: 'x' },
+                { path: 'src/lib/util.js', content: 'x' },
+            ],
+            'files[1] (src/lib/util.js) collides with src',
+        ],
+        [
+            'a file at a folder two levels above another file',
+            [
+                { path: 'src/lib/util.js', content: 'x' },
+                { path: 'src', content: 'x' },
+            ],
+            'files[1] (src) collides with src/lib/util.js',
+        ],
+        [
+            'a file at a nested folder of an earlier file',
+            [MAIN_JS, { path: 'src/lib/util.js', content: 'x' }, { path: 'src/lib', content: 'x' }],
+            'files[2] (src/lib) collides with src/lib/util.js',
+        ],
     ])('refuses %s, since a path cannot be both a file and a folder, and creates nothing', async (_, files, prefix) => {
         const result = await callTool({ files });
 
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toBe(`${prefix}; one path cannot be both a file and a folder.`);
         expect(actorsCreateMock).not.toHaveBeenCalled();
+    });
+
+    it('checks 20,000 files for repeated and colliding paths within a second', async () => {
+        const files = Array.from({ length: 20_000 }, (_, i) => ({ path: `src/d${i % 50}/f${i}.js`, content: 'x' }));
+
+        const startedAt = performance.now();
+        await callTool({ files });
+
+        expect(performance.now() - startedAt).toBeLessThan(1000);
+        expect(getSentVersion().sourceFiles).toHaveLength(20_000);
     });
 
     it.each([
