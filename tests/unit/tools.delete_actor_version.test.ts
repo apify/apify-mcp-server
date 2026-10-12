@@ -169,6 +169,43 @@ describe('delete-actor-version', () => {
         },
     );
 
+    it('says to build once per tag when several tags point to builds of the deleted version', async () => {
+        actorGetMock.mockResolvedValue(
+            mockActor({
+                taggedBuilds: {
+                    latest: { buildId: 'build-1', buildNumber: '0.1.3' },
+                    stable: { buildId: 'build-2', buildNumber: '0.2.1' },
+                    beta: { buildId: 'build-3', buildNumber: '0.1.4' },
+                },
+            }),
+        );
+
+        const result = await callTool({ versionNumber: '0.1' });
+
+        // build-actor takes one tag, so each tag needs its own build.
+        expect(result.content[1].text).toBe(
+            'Deleted version 0.1 of john/my-actor.\n' +
+                "Runs with tag latest, beta still use the deleted version's build; to have them run another version, " +
+                'build that version with build-actor and tag latest, then again with tag beta.',
+        );
+    });
+
+    it('takes no tag of version 0.10 for one of version 0.1', async () => {
+        actorGetMock.mockResolvedValue(
+            mockActor({
+                versions: [
+                    { versionNumber: '0.1', sourceType: 'SOURCE_FILES' },
+                    { versionNumber: '0.10', sourceType: 'SOURCE_FILES' },
+                ],
+                taggedBuilds: { latest: { buildId: 'build-2', buildNumber: '0.10.1' } },
+            }),
+        );
+
+        const result = await callTool({ versionNumber: '0.1' });
+
+        expect(result.content[1].text).toBe('Deleted version 0.1 of john/my-actor.');
+    });
+
     it('names build-actor in the next step about the build tag only when the session has it', async () => {
         const loadedToolNames = Object.values(HELPER_TOOLS).filter((name) => name !== HELPER_TOOLS.ACTOR_BUILD);
         const context = stubToolCallContext({ actor: 'john/my-actor', versionNumber: '0.1' }, stubClient, {

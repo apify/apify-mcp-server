@@ -70,10 +70,12 @@ export const deleteActorVersion: ToolEntry = Object.freeze({
             const tags = Object.entries(actor.taggedBuilds ?? {})
                 .filter(([, { buildNumber }]) => buildNumber?.startsWith(`${versionNumber}.`))
                 .map(([tag]) => tag);
+            // build-actor takes one tag, so the next step builds once per tag.
             const text =
                 tags.length > 0
                     ? `${summary}\nRuns with tag ${tags.join(', ')} still use the deleted version's build; to have them ` +
-                      `run another version, build that version with ${buildTool}tag ${tags.join(', ')}.`
+                      `run another version, build that version with ${buildTool}` +
+                      `tag ${tags.join(', then again with tag ')}.`
                     : summary;
             return respondOk([JSON.stringify(structuredContent), text], { structuredContent });
         } catch (error) {
