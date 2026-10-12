@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - Keep URL signing key and API token out of responses and logs ([#1508](https://github.com/apify/apify-mcp-server/pull/1508)) ([ce7098c](https://github.com/apify/apify-mcp-server/commit/ce7098c4664d0be30f6527f12a15f9fe46240871)) by [@jirispilka](https://github.com/jirispilka), closes [#330](https://github.com/apify/apify-mcp-server/issues/330)
 - **evals:** Make schedule eval runs safe to run in parallel ([#1423](https://github.com/apify/apify-mcp-server/pull/1423)) ([a781d6a](https://github.com/apify/apify-mcp-server/commit/a781d6a23d798334252c6b83f55fbe05b3f3f16f)) by [@jirispilka](https://github.com/jirispilka), closes [#1394](https://github.com/apify/apify-mcp-server/issues/1394)
 - Refuse the method query parameter in the API tools ([#1506](https://github.com/apify/apify-mcp-server/pull/1506)) ([22aa888](https://github.com/apify/apify-mcp-server/commit/22aa888e4a87b8176f98919ebaa9eaec7d944af8)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1501](https://github.com/apify/apify-mcp-server/issues/1501)
+- Refuse the run-sync GETs in apify-api-read ([#1507](https://github.com/apify/apify-mcp-server/pull/1507)) ([20fef3b](https://github.com/apify/apify-mcp-server/commit/20fef3b4a57f5087a6337cc7be246768aab45591)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1502](https://github.com/apify/apify-mcp-server/issues/1502)
 
 
 <!-- git-cliff-unreleased-end -->
