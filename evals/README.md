@@ -185,8 +185,8 @@ used. An unmarked item keeps colliding exactly as before, so the fix is per item
 `metadata.expectedArgs` is never substituted.
 
 `--run-id` overrides the generated id (lowercase letters, digits and dashes, at most 18 characters); CI passes
-`<github.run_id>-<github.run_attempt>` to the run and to its teardown steps. A run prints its id and its
-teardown commands when it finishes:
+`<github.run_id>-<github.run_attempt>` to the run and to its teardown step. A run prints its id and its
+teardown command when it finishes:
 
 ```
 🧹 Run id r3k9f2qa7c — delete this run's schedules and tasks:

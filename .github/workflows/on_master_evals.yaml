@@ -38,7 +38,7 @@ jobs:
 
     evaluations_merge:
         name: MCP agent evaluations (merge)
-        # Not serialized: the fixtures scripts delete only this run's eval-* names or leftovers older than 6 h.
+        # Not serialized: the fixtures script deletes only this run's eval-* names or leftovers older than 6 h.
         uses: ./.github/workflows/_evaluations.yaml
         with:
             tier: merge
