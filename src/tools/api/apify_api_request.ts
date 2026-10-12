@@ -295,24 +295,9 @@ export async function callApi(params: {
     } catch (error) {
         // A cancelled call is not a tool error.
         if (params.signal?.aborted) return respondAborted();
-        if (isMaxContentLengthAbort(error)) {
-            // A write has applied by the time its response arrives, so a large response is not a failure.
-            const statusCode = method === 'GET' ? undefined : readAbortedResponseStatus(error);
-            if (statusCode !== undefined && statusCode < 300) {
-                const structuredContent = { method, path, statusCode, data: null };
-                const summary =
-                    `${method} ${path} returned HTTP ${statusCode}. The response is larger than ` +
-                    `${MAX_INLINE_BYTES} bytes, so it is not returned; check the result with a GET.`;
-                return respondOk([JSON.stringify(structuredContent), summary], { structuredContent });
-            }
-            // The status says the write failed; the generic message would say it may have applied.
-            if (statusCode !== undefined) {
-                const hint = getHttpErrorHint(statusCode);
-                return respondUserError(
-                    `${method} ${path} failed with HTTP ${statusCode}. Its error body is larger than ` +
-                        `${MAX_INLINE_BYTES} bytes, so it is not returned.${hint ? ` ${hint}` : ''}`,
-                );
-            }
+        if (!isMaxContentLengthAbort(error)) throw toPlainError(error);
+        const statusCode = method === 'GET' ? undefined : readAbortedResponseStatus(error);
+        if (statusCode === undefined) {
             return respondUserError(
                 await formatOversizeMessage({
                     method,
@@ -322,7 +307,20 @@ export async function callApi(params: {
                 }),
             );
         }
-        throw toPlainError(error);
+        // A write has applied by the time its response arrives, so a large response is not a failure.
+        if (statusCode < 300) {
+            const structuredContent = { method, path, statusCode, data: null };
+            const summary =
+                `${method} ${path} returned HTTP ${statusCode}. The response is larger than ` +
+                `${MAX_INLINE_BYTES} bytes, so it is not returned; check the result with a GET.`;
+            return respondOk([JSON.stringify(structuredContent), summary], { structuredContent });
+        }
+        // The status says the write failed; the generic message would say it may have applied.
+        const hint = getHttpErrorHint(statusCode);
+        return respondUserError(
+            `${method} ${path} failed with HTTP ${statusCode}. Its error body is larger than ` +
+                `${MAX_INLINE_BYTES} bytes, so it is not returned.${hint ? ` ${hint}` : ''}`,
+        );
     }
     const data = maskToken(response.data, params.token);
     if (response.status >= 300) {
