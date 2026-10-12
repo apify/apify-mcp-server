@@ -235,9 +235,18 @@ describe('getHttpErrorHint()', () => {
         expect(hint).not.toContain('—');
     });
 
+    it('returns the rate-limit hint for 429', () => {
+        expect(getHttpErrorHint(429)).toContain('Rate limit exceeded');
+    });
+
+    it('returns the server-error hint for 5xx', () => {
+        for (const status of [500, 503, 599]) {
+            expect(getHttpErrorHint(status)).toContain('server failed');
+        }
+    });
+
     it('returns undefined for statuses without a specific remedy', () => {
         expect(getHttpErrorHint(404)).toBeUndefined();
-        expect(getHttpErrorHint(500)).toBeUndefined();
         expect(getHttpErrorHint(undefined)).toBeUndefined();
     });
 });
@@ -256,6 +265,20 @@ describe('getToolCallErrorUserText()', () => {
         const text = getToolCallErrorUserText('apify/instagram-scraper', error);
         expect(text).toContain('check APIFY_TOKEN');
         expect(text).not.toContain('—');
+    });
+
+    it('replaces the input hint with the rate-limit hint for 429', () => {
+        const error = Object.assign(new Error('Too Many Requests'), { statusCode: 429 });
+        const text = getToolCallErrorUserText('apify/instagram-scraper', error);
+        expect(text).toContain('Rate limit exceeded');
+        expect(text).not.toContain('Verify the tool name');
+    });
+
+    it('replaces the input hint with the server-error hint for 5xx', () => {
+        const error = Object.assign(new Error('Service Unavailable'), { statusCode: 503 });
+        const text = getToolCallErrorUserText('apify/instagram-scraper', error);
+        expect(text).toContain('server failed');
+        expect(text).not.toContain('Verify the tool name');
     });
 
     it('names the API error type so the model can report the exact failure', () => {

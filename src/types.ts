@@ -33,6 +33,9 @@ export type SchemaProperties = {
     items?: SchemaProperties;
     editor?: string;
     examples?: unknown[];
+    isSecret?: boolean;
+    resourceType?: string;
+    resourcePermissions?: string[];
 
     properties?: Record<string, SchemaProperties>;
     required?: string[];
@@ -205,6 +208,12 @@ export type HelperTool = ToolBase & {
      * @returns Promise resolving to the tool's output
      */
     call: (toolArgs: InternalToolArgs) => Promise<ToolResponse>;
+    /**
+     * Returns the copy of the arguments that is logged, for a tool whose arguments carry secrets. It runs in
+     * `prepareToolCallContext`, before AJV validation, so it must accept any shape and not mutate the
+     * arguments; it also sees undeclared keys, so build the copy as an allowlist.
+     */
+    redactArgs?: (args: Record<string, unknown>) => Record<string, unknown>;
 };
 
 /**
@@ -528,6 +537,8 @@ export type ActorExecutionParams = {
      * task mode would let the task complete before the Actor has produced output.
      */
     taskMode?: boolean;
+    /** Whether the session serves call-actor; without it, an Actor's tip gets the callability caveat. */
+    hasCallActorTool?: boolean;
 };
 
 /**

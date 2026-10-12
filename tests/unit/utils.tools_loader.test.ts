@@ -123,6 +123,12 @@ describe('toolNamesToInput', () => {
             tools: [HELPER_TOOLS.ACTOR_DELETE],
         });
     });
+
+    it('classifies apify-api-write (in no category) as an internal tool, not an actor ID', () => {
+        expect(toolNamesToInput([HELPER_TOOLS.API_WRITE])).toEqual({
+            tools: [HELPER_TOOLS.API_WRITE],
+        });
+    });
 });
 
 describe('storage tool auto-injection', () => {
@@ -293,6 +299,45 @@ describe('delete-actor selection (in no category)', () => {
             );
             const actorsToolNames = getToolsForServerMode({ tools: ['actors'] }, [], mode).map((t) => t.name);
             expect(toolNames).toEqual(expect.arrayContaining([...actorsToolNames, HELPER_TOOLS.ACTOR_DELETE]));
+        },
+    );
+});
+
+// It changes or deletes data at any API path, so a session gets it only by naming it.
+describe('apify-api-write selection (in no category)', () => {
+    const API_CATEGORY_TOOL_NAMES = [HELPER_TOOLS.API_SEARCH, HELPER_TOOLS.API_DETAILS, HELPER_TOOLS.API_READ];
+
+    it('does not treat tools=apify-api-write as an Actor name', () => {
+        expect(resolveActorsToLoad({ tools: [HELPER_TOOLS.API_WRITE] })).toEqual([]);
+    });
+
+    it.each(['default', 'apps'] as const)(
+        'serves only apify-api-write for tools=apify-api-write in %s mode',
+        (mode) => {
+            const toolNames = getToolsForServerMode({ tools: [HELPER_TOOLS.API_WRITE] }, [], mode).map((t) => t.name);
+            expect(toolNames).toEqual([HELPER_TOOLS.API_WRITE]);
+        },
+    );
+
+    it.each(['default', 'apps'] as const)(
+        'serves search, details, and read without apify-api-write for tools=api in %s mode',
+        (mode) => {
+            const toolNames = getToolsForServerMode({ tools: ['api'] }, [], mode).map((t) => t.name);
+            expect(toolNames).toEqual(API_CATEGORY_TOOL_NAMES);
+            expect(getToolsForServerMode({}, [], mode).map((t) => t.name)).not.toContain(HELPER_TOOLS.API_WRITE);
+        },
+    );
+
+    it.each(['default', 'apps'] as const)(
+        'serves the api tools and apify-api-write for tools=api,apify-api-write in %s mode',
+        (mode) => {
+            const tools = getToolsForServerMode({ tools: ['api', HELPER_TOOLS.API_WRITE] }, [], mode);
+            const toolNames = tools.map((t) => t.name);
+            expect(toolNames).toEqual([...API_CATEGORY_TOOL_NAMES, HELPER_TOOLS.API_WRITE]);
+
+            const searchTool = tools.find((t) => t.name === HELPER_TOOLS.API_SEARCH);
+            const { description } = getToolPublicFieldOnly(searchTool!, { presentTools: new Set(toolNames) });
+            expect(description).toContain(`${HELPER_TOOLS.API_WRITE} for a POST, PUT, PATCH, or DELETE`);
         },
     );
 });

@@ -1,6 +1,8 @@
 import type { ApifyClientOptions } from 'apify-client';
 import { ApifyClient as _ApifyClient } from 'apify-client';
+import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 
+import { MAX_INLINE_BYTES } from './const.js';
 import type { PaymentHeaders } from './payments/types.js';
 
 // Appended to the client's User-Agent via apify-client's userAgentSuffix option.
@@ -59,4 +61,19 @@ export class ApifyClient extends _ApifyClient {
             requestInterceptors: [(config) => ({ ...config, headers: { ...config.headers, ...staticHeaders } })],
         });
     }
+}
+
+/**
+ * Sends one request, with no retries, through apify-client's axios instance, which adds the token and the
+ * request-origin and payment headers. Check the URL with `isApifyApiUri` (`resources/api_resources.ts`)
+ * first and the status after: a non-2xx response resolves. It skips `httpClient.call()`, which retries (a
+ * write could apply twice, and a body over the size cap is downloaded again) and turns a streamed error
+ * body into a junk message; that also skips its `HTTPS_PROXY` support and User-Agent. axios aborts a body
+ * over `MAX_INLINE_BYTES` mid-stream (checked in axios 1.16.1), so it is never buffered whole.
+ */
+export async function sendApifyApiRequest(
+    apifyClient: ApifyClient,
+    config: Pick<AxiosRequestConfig, 'url' | 'method' | 'params' | 'data' | 'headers' | 'responseType' | 'signal'>,
+): Promise<AxiosResponse<unknown>> {
+    return apifyClient.httpClient.axios.request<unknown>({ ...config, maxContentLength: MAX_INLINE_BYTES });
 }

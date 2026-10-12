@@ -73,6 +73,7 @@ describe('getCategoryTools', () => {
             'schedules',
             'builds',
             'source',
+            'api',
             'dev',
         ];
         for (const cat of modeIndependentCategories) {

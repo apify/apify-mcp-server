@@ -18,6 +18,7 @@ export { actorsCases } from './cases/actors.cases.js';
 export { appsCases } from './cases/apps.cases.js';
 export { paymentsCases } from './cases/payments.cases.js';
 export { registrationCases } from './cases/registration.cases.js';
+export { schedulesCases } from './cases/schedules.cases.js';
 export { sourceCases } from './cases/source.cases.js';
 export { storageCases } from './cases/storage.cases.js';
 export { tasksCases } from './cases/tasks.cases.js';
@@ -27,6 +28,7 @@ import { actorsCases } from './cases/actors.cases.js';
 import { appsCases } from './cases/apps.cases.js';
 import { paymentsCases } from './cases/payments.cases.js';
 import { registrationCases } from './cases/registration.cases.js';
+import { schedulesCases } from './cases/schedules.cases.js';
 import { sourceCases } from './cases/source.cases.js';
 import { storageCases } from './cases/storage.cases.js';
 import { tasksCases } from './cases/tasks.cases.js';
@@ -41,6 +43,7 @@ export const allCases: Case[] = [
     ...appsCases,
     ...tasksCases,
     ...storageCases,
+    ...schedulesCases,
     ...sourceCases,
     ...paymentsCases,
 ];
