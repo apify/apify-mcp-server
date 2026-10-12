@@ -19,6 +19,8 @@ import { toPlainError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { getHttpErrorHint, respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
 import { WAIT_SECS_MAX } from '../actors/actor_run_response.js';
+import { validateApiBlocklist } from './apify_api_blocklist.js';
+import { API_RESOURCE_ALIASES, normalizeApiPath } from './apify_api_path.js';
 import type { ApiMethod, ApiOperation } from './apify_api_spec.js';
 import { fetchApiOperationIndex, isRecord } from './apify_api_spec.js';
 
@@ -73,11 +75,6 @@ export function redactApiCallArgs({ path, method, query, body }: Record<string, 
     };
 }
 
-/** A path without its leading slash and `v2/` prefix, as `apify api` takes it: `/v2/actors` becomes `actors`. */
-export function normalizeApiPath(path: string): string {
-    return path.replace(/^\//, '').replace(/^v2\//i, '');
-}
-
 /** A normalized path as the tools report it, with the `/v2/` prefix. */
 export function formatApiPath(normalizedPath: string): string {
     return `/v2/${normalizedPath}`;
@@ -88,12 +85,10 @@ function stripQuery(path: string): string {
     return path.replace(/[?#][\s\S]*$/, '');
 }
 
-/**
- * A normalized path as the spec lists it, without its query. The API routes the legacy `acts` prefix,
- * which apify-client and the CLI send, to the same handler as `actors`, the only prefix the spec lists.
- */
+/** A normalized path as the spec lists it: without its query, and with a legacy resource name replaced. */
 function toSpecPath(normalizedPath: string): string {
-    return stripQuery(normalizedPath).replace(/^acts(?=\/|$)/, 'actors');
+    const [resource, ...rest] = stripQuery(normalizedPath).split('/');
+    return [API_RESOURCE_ALIASES.get(resource) ?? resource, ...rest].join('/');
 }
 
 const PATH_PARAMETER_SEGMENT_REGEX = /^\{[^{}]+\}$/;
@@ -268,11 +263,18 @@ export async function callApi(params: {
     body?: unknown;
     /** Aborts the request when the client cancels the tool call. */
     signal?: AbortSignal;
-    /** The session's tools, to name a dedicated log tool when a log is too large. */
+    /** The session's tools, so a refusal or a too-large log names only tools the session has. */
     loadedToolNames: readonly string[];
 }): Promise<ToolResponse> {
     const { client, method } = params;
     const normalizedPath = normalizeApiPath(params.path);
+    const refusal = validateApiBlocklist({
+        method,
+        normalizedPath,
+        query: params.query,
+        loadedToolNames: params.loadedToolNames,
+    });
+    if (refusal) return respondUserError(refusal);
     const path = formatApiPath(normalizedPath);
     // `client.baseUrl` already ends with /v2.
     const url = `${client.baseUrl}/${normalizedPath}`;

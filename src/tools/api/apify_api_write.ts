@@ -7,17 +7,18 @@ import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondUserError } from '../../utils/mcp.js';
 import { apifyApiCallOutputSchema } from '../structured_output_schemas.js';
+import { isEndpointBlocked } from './apify_api_blocklist.js';
+import { normalizeApiPath } from './apify_api_path.js';
 import {
     API_CALL_DESCRIPTION,
     apiCallArgsShape,
     callApi,
     findPathOperations,
     formatList,
-    normalizeApiPath,
     redactApiCallArgs,
 } from './apify_api_request.js';
 import type { ApiMethod } from './apify_api_spec.js';
-import { fetchApiOperationIndex } from './apify_api_spec.js';
+import { API_METHODS, fetchApiOperationIndex } from './apify_api_spec.js';
 
 const apifyApiWriteArgs = z.object({
     path: apiCallArgsShape.path,
@@ -56,9 +57,9 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 }
 
 /**
- * The method of a call that omits it: the path's only operation in the spec, when that is a write;
- * otherwise why the caller must give one. The caller is asked only for the write methods; a GET goes
- * to the read tool.
+ * The method of a call that omits it: the path's only operation in the spec, when that is a write and
+ * the path has no blocked write method; otherwise why the caller must give one. The caller is asked
+ * only for the write methods; a GET goes to the read tool.
  */
 async function inferWriteMethod(
     path: string,
@@ -75,7 +76,11 @@ async function inferWriteMethod(
     if (writeMethods.length === 0) {
         return { error: `The path has only the GET method, which this tool does not send${readTool}.` };
     }
-    if (operations.length === 1) return { method: writeMethods[0] };
+    // The index leaves out a blocked operation, so the one operation left may not be the path's only write method.
+    const hasBlockedWriteMethod = API_METHODS.some(
+        (method) => method !== 'GET' && isEndpointBlocked(method, operations[0].path),
+    );
+    if (operations.length === 1 && !hasBlockedWriteMethod) return { method: writeMethods[0] };
     const getNote = writeMethods.length < operations.length ? ` This tool does not send its GET${readTool}.` : '';
     return { error: `Specify a method for this path: ${formatList(writeMethods, 'or')}.${getNote}` };
 }
