@@ -127,9 +127,9 @@ export const createActorVersion: ToolEntry = Object.freeze({
         let secretNames: (string | undefined)[] = [];
         try {
             const { actor, fullName } = await fetchActor(client, parsed.actor);
-            // TODO: A copy takes every file of the other version from the Actor GET and sends them all back in the POST
-            // below: the Apify API cannot copy a version or apply atomic changes to an Actor's source. Once it can, let
-            // the platform make the copy.
+            // TODO: The Apify API has no endpoint that copies a version, so a copy reads every file of the other version
+            // from the Actor GET and sends them all back in the POST below. Once the API has one, let the platform make
+            // the copy.
             const copied =
                 copyFromVersion === undefined ? undefined : resolveVersion(actor, copyFromVersion, parsed.actor);
             const sourceFiles = copied
