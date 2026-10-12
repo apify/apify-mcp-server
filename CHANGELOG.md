@@ -8,11 +8,15 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Add Apify API search, details, and read tools ([#1444](https://github.com/apify/apify-mcp-server/pull/1444)) ([682a540](https://github.com/apify/apify-mcp-server/commit/682a540b2750b0fda3712f85e5262e9c6bee7155)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1443](https://github.com/apify/apify-mcp-server/issues/1443)
+- Mark read-only Apify-maintained Actors with limited permissions ([#1451](https://github.com/apify/apify-mcp-server/pull/1451)) ([c7d503c](https://github.com/apify/apify-mcp-server/commit/c7d503c7a3077cbe107df710e9496a0a478d1369)) by [@jirispilka](https://github.com/jirispilka), closes [#973](https://github.com/apify/apify-mcp-server/issues/973)
 
 ### 🐛 Bug Fixes
 
 - Hint for 429 and 5xx errors ([#1456](https://github.com/apify/apify-mcp-server/pull/1456)) ([ced3f1d](https://github.com/apify/apify-mcp-server/commit/ced3f1dd0d67e080aa865e320c93777418241b00)) by [@jsimecek](https://github.com/jsimecek), closes [#1115](https://github.com/apify/apify-mcp-server/issues/1115)
 - Attribute runs from the Apify AI agent to the APIFY_AI origin ([#1498](https://github.com/apify/apify-mcp-server/pull/1498)) ([3b37cba](https://github.com/apify/apify-mcp-server/commit/3b37cba32253e005351ed6f4d9d853a11a814036)) by [@vojtechj-apify](https://github.com/vojtechj-apify), closes [#1495](https://github.com/apify/apify-mcp-server/issues/1495)
+- Remove instructions that force extra tool calls ([#1504](https://github.com/apify/apify-mcp-server/pull/1504)) ([cb02e17](https://github.com/apify/apify-mcp-server/commit/cb02e17cb8dfac73d14c35333d20f06fd61a4112)) by [@jirispilka](https://github.com/jirispilka), closes [#331](https://github.com/apify/apify-mcp-server/issues/331)
+- Keep URL signing key and API token out of responses and logs ([#1508](https://github.com/apify/apify-mcp-server/pull/1508)) ([ce7098c](https://github.com/apify/apify-mcp-server/commit/ce7098c4664d0be30f6527f12a15f9fe46240871)) by [@jirispilka](https://github.com/jirispilka), closes [#330](https://github.com/apify/apify-mcp-server/issues/330)
+- **evals:** Make schedule eval runs safe to run in parallel ([#1423](https://github.com/apify/apify-mcp-server/pull/1423)) ([a781d6a](https://github.com/apify/apify-mcp-server/commit/a781d6a23d798334252c6b83f55fbe05b3f3f16f)) by [@jirispilka](https://github.com/jirispilka), closes [#1394](https://github.com/apify/apify-mcp-server/issues/1394)
 
 
 <!-- git-cliff-unreleased-end -->
