@@ -125,6 +125,9 @@ describe('search-actors-widget response', () => {
         const { content } = result as { content: { type: string; text: string }[] };
 
         expect(content.at(-1)?.text).toContain('cannot be run in this configuration');
+        expect(content.at(-1)?.text.replace(/\s+/g, ' ')).toContain(
+            'If a dedicated tool in this session serves the same request, you may use that tool instead, but tell the user it is a substitute for the Actor they asked for.',
+        );
     });
 
     it('omits the not-runnable caveat when call-actor is loaded', async () => {

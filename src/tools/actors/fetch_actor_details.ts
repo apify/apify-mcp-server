@@ -160,7 +160,9 @@ export function buildActorNotRunnableGuidance(
     if (canRunActor(actorId, loadedToolNames, loadedActorIds)) return '';
     return dedent`
         This Actor is not exposed as a tool and cannot be run in this configuration. Open its
-        Apify page or configure it separately to use it.
+        Apify page or configure it separately to use it. If a dedicated tool in this session serves the
+        same request, you may use that tool instead, but tell the user it is a substitute for the Actor
+        they asked for.
     `;
 }
 

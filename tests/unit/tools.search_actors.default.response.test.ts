@@ -322,6 +322,33 @@ describe('search-actors without widget (searchActors)', () => {
         expect(content[0].text).toContain('cannot be run in this configuration');
     });
 
+    it('allows a disclosed substitute after the remedy when call-actor is absent', async () => {
+        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+
+        const result = await (searchActors as HelperTool).call(
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
+                loadedToolNames: [],
+            }),
+        );
+        const { structuredContent, content } = result as {
+            structuredContent: { instructions?: string };
+            content: { type: string; text: string }[];
+        };
+        const sentence =
+            'If a dedicated tool in this session serves the same request, you may use that tool instead, but tell the user it is a substitute for the Actor they asked for.';
+
+        const collapsedTexts = [structuredContent.instructions ?? '', content[0].text].map((t) =>
+            t.replace(/\s+/g, ' '),
+        );
+
+        for (const collapsed of collapsedTexts) {
+            expect(collapsed).toContain(`open its Apify page or configure it separately. ${sentence}`);
+            expect(collapsed.endsWith(sentence)).toBe(true);
+            expect(collapsed.split(sentence)).toHaveLength(2);
+            expect(collapsed).not.toContain('MUST');
+        }
+    });
+
     it('omits the not-runnable caveat when call-actor is loaded', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 

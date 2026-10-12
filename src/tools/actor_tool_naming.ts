@@ -85,7 +85,9 @@ export function getToolSchemaID(actorName: string): string {
 /** Told under search results when the session cannot run some of the Actors listed. */
 export const ACTOR_CALLABILITY_CAVEAT = `This session can run only Actors already exposed as dedicated tools. Other Actors found
 here are informational and cannot be run in this configuration. To use another Actor, open
-its Apify page or configure it separately.`;
+its Apify page or configure it separately. If a dedicated tool in this session serves the same
+request, you may use that tool instead, but tell the user it is a substitute for the Actor
+they asked for.`;
 
 /** Told after an Actor's tip when the session cannot run the Actor the tip recommends. */
 export const ACTOR_TIP_CAVEAT =

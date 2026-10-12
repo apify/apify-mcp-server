@@ -168,6 +168,9 @@ describe('fetch-actor-details-widget response', () => {
         const text = ((result.content ?? []) as { text: string }[]).map((c) => c.text).join('\n');
 
         expect(text).toContain('cannot be run in this configuration');
+        expect(text.replace(/\s+/g, ' ')).toContain(
+            'If a dedicated tool in this session serves the same request, you may use that tool instead, but tell the user it is a substitute for the Actor they asked for.',
+        );
     });
 
     it('omits not-runnable guidance when call-actor is loaded', async () => {

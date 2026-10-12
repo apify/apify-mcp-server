@@ -257,6 +257,23 @@ describe('buildFetchActorDetailsResult()', () => {
         expect(text).toContain('This Actor is not exposed as a tool and cannot be run in this configuration.');
     });
 
+    it('ends the response with the disclosed-substitute sentence when neither is loaded', async () => {
+        const result = await buildFetchActorDetailsResult(
+            stubToolCallContext(
+                { actor: 'apify/example-mcp-server', output: { inputSchema: true } },
+                mockApifyClient(),
+                { loadedToolNames: [] },
+            ),
+        );
+        const lastText = (result.content ?? []).map(textOf).at(-1) ?? '';
+        const collapsed = lastText.replace(/\s+/g, ' ');
+        const sentence =
+            'If a dedicated tool in this session serves the same request, you may use that tool instead, but tell the user it is a substitute for the Actor they asked for.';
+
+        expect(collapsed.endsWith(sentence)).toBe(true);
+        expect(collapsed.split(sentence)).toHaveLength(2);
+    });
+
     it('omits not-runnable guidance when call-actor is loaded', async () => {
         const result = await buildFetchActorDetailsResult(
             stubToolCallContext(
@@ -289,9 +306,23 @@ describe('buildActorNotRunnableGuidance()', () => {
         expect(buildActorNotRunnableGuidance('actor-id-1', [HELPER_TOOLS.ACTOR_CALL], new Set())).toBe('');
     });
 
-    it('names no tool, only states the Actor cannot run, when neither is loaded', () => {
+    it('names no tool when neither is loaded', () => {
         const text = buildActorNotRunnableGuidance('actor-id-1', [], new Set());
         expect(text).toContain('cannot be run in this configuration');
+        for (const toolName of Object.values(HELPER_TOOLS)) {
+            expect(text).not.toContain(toolName);
+        }
+    });
+
+    it('allows a disclosed substitute after the remedy when neither is loaded', () => {
+        const collapsed = buildActorNotRunnableGuidance('actor-id-1', [], new Set()).replace(/\s+/g, ' ');
+        const sentence =
+            'If a dedicated tool in this session serves the same request, you may use that tool instead, but tell the user it is a substitute for the Actor they asked for.';
+
+        expect(collapsed).toContain(`configure it separately to use it. ${sentence}`);
+        expect(collapsed.endsWith(sentence)).toBe(true);
+        expect(collapsed.split(sentence)).toHaveLength(2);
+        expect(collapsed).not.toContain('MUST');
     });
 });
 
