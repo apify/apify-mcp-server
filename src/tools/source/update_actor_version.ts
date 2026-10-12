@@ -147,6 +147,46 @@ function convertToCrlf(text: string): string {
     return text.replace(/(?<!\r)\n/g, '\r\n');
 }
 
+// V8's indexOf keeps its Boyer-Moore shift tables for the last 250 characters of a pattern (kBMMaxShift in
+// https://github.com/v8/v8/blob/main/src/strings/string-search.h). For a longer pattern its time grows with the text
+// length times the pattern length: over 4 s for a 10,001-character pattern in 3 MiB.
+const MAX_INDEX_OF_PATTERN_LENGTH = 250;
+
+/**
+ * The offsets of the first two matches of `pattern` in `text`, counting two matches that overlap as two. A pattern
+ * longer than MAX_INDEX_OF_PATTERN_LENGTH is searched with Knuth-Morris-Pratt, which reads each text character once:
+ * https://en.wikipedia.org/wiki/Knuth%E2%80%93Morris%E2%80%93Pratt_algorithm
+ */
+function findMatchOffsets(text: string, pattern: string): [] | [number] | [number, number] {
+    if (pattern.length <= MAX_INDEX_OF_PATTERN_LENGTH) {
+        const offset = text.indexOf(pattern);
+        if (offset === -1) return [];
+        // From the next character, so two matches that overlap count as two.
+        const nextOffset = text.indexOf(pattern, offset + 1);
+        return nextOffset === -1 ? [offset] : [offset, nextOffset];
+    }
+    // fallback[i]: the length of the longest proper prefix of pattern[0..i] that is also its suffix.
+    const fallback = new Int32Array(pattern.length);
+    for (let i = 1, matched = 0; i < pattern.length; i++) {
+        while (matched > 0 && pattern.charCodeAt(i) !== pattern.charCodeAt(matched)) matched = fallback[matched - 1];
+        if (pattern.charCodeAt(i) === pattern.charCodeAt(matched)) matched++;
+        fallback[i] = matched;
+    }
+    let firstOffset: number | undefined;
+    for (let i = 0, matched = 0; i < text.length; i++) {
+        const charCode = text.charCodeAt(i);
+        while (matched > 0 && charCode !== pattern.charCodeAt(matched)) matched = fallback[matched - 1];
+        if (charCode === pattern.charCodeAt(matched)) matched++;
+        if (matched === pattern.length) {
+            const offset = i - matched + 1;
+            if (firstOffset !== undefined) return [firstOffset, offset];
+            firstOffset = offset;
+            matched = fallback[matched - 1];
+        }
+    }
+    return firstOffset === undefined ? [] : [firstOffset];
+}
+
 /**
  * The text after the edits, each applied to the text the previous ones left. Each oldText must match exactly once,
  * byte for byte. The one exception: in a file with only CRLF line breaks, LF in oldText and newText is taken as CRLF,
@@ -164,13 +204,12 @@ function applyTextEdits(originalText: string, edits: readonly TextEdit[], label:
         }
         const oldText = isCrlfFile ? convertToCrlf(edit.oldText) : edit.oldText;
         const newText = isCrlfFile ? convertToCrlf(edit.newText) : edit.newText;
-        const offset = text.indexOf(oldText);
-        if (offset === -1) {
+        const [offset, nextOffset] = findMatchOffsets(text, oldText);
+        if (offset === undefined) {
             const detail = `oldText of edits[${editIndex}] is not in the file.`;
             throw buildPreconditionError(label, PRECONDITION_REASON.NO_MATCH, detail);
         }
-        // From the next character, so two matches that overlap count as two.
-        if (text.includes(oldText, offset + 1)) {
+        if (nextOffset !== undefined) {
             const detail = `oldText of edits[${editIndex}] matches more than once; add surrounding lines so it matches once.`;
             throw buildPreconditionError(label, PRECONDITION_REASON.MULTIPLE_MATCHES, detail);
         }

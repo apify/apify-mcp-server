@@ -342,6 +342,21 @@ describe('update-actor-version', () => {
             expect(actorGetMock).not.toHaveBeenCalled();
             expect(buildMock).not.toHaveBeenCalled();
         });
+
+        it('searches a file of almost 3 MiB for a 10,001-character oldText within a second (NO_MATCH)', async () => {
+            mockFiles({ name: 'src/big.txt', format: 'TEXT', content: 'a'.repeat(3 * 1024 * 1024 - 20_000) });
+            const oldText = `${'a'.repeat(5000)}b${'a'.repeat(5000)}`;
+
+            const startedAt = performance.now();
+            const text = await callToolExpectingUserError({
+                operations: [edit('src/big.txt', { oldText, newText: '' })],
+            });
+
+            expect(performance.now() - startedAt).toBeLessThan(1000);
+            expect(text).toBe(
+                `${failedWith(0, 'edit', 'src/big.txt', 'NO_MATCH')} oldText of edits[0] is not in the file.`,
+            );
+        });
     });
 
     describe('logged arguments', () => {
@@ -1097,6 +1112,29 @@ describe('update-actor-version', () => {
                 `${failedWith(0, 'edit', 'src/main.js', 'MULTIPLE_MATCHES')} ` +
                     'oldText of edits[0] matches more than once; add surrounding lines so it matches once.',
             );
+        });
+
+        it('reports an oldText longer than 250 characters whose matches overlap (MULTIPLE_MATCHES)', async () => {
+            mockFiles({ name: 'src/main.js', format: 'TEXT', content: 'x'.repeat(301) });
+
+            const text = await callToolExpectingUserError({
+                operations: [edit('src/main.js', { oldText: 'x'.repeat(300), newText: '' })],
+            });
+
+            expect(text).toBe(
+                `${failedWith(0, 'edit', 'src/main.js', 'MULTIPLE_MATCHES')} ` +
+                    'oldText of edits[0] matches more than once; add surrounding lines so it matches once.',
+            );
+        });
+
+        it('applies an oldText longer than 250 characters that matches once, after partial matches', async () => {
+            mockFiles({ name: 'src/main.js', format: 'TEXT', content: `${'ab'.repeat(500)}c` });
+
+            await callTool({ operations: [edit('src/main.js', { oldText: `${'ab'.repeat(200)}c`, newText: 'X' })] });
+
+            expect(getPutFiles()).toStrictEqual([
+                { name: 'src/main.js', format: 'TEXT', content: `${'ab'.repeat(300)}X` },
+            ]);
         });
 
         it('reports an oldText that the edits before it made match twice (MULTIPLE_MATCHES)', async () => {
