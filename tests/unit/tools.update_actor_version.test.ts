@@ -278,6 +278,67 @@ describe('update-actor-version', () => {
         });
     });
 
+    describe('limits', () => {
+        const writes = (count: number) => Array.from({ length: count }, (_, index) => write(`src/f${index}.js`, 'x'));
+        // Each line matches only its own oldText, so every edit applies.
+        const LINES_JS = {
+            name: 'src/lines.js',
+            format: 'TEXT',
+            content: Array.from({ length: 101 }, (_, index) => `line ${index};\n`).join(''),
+        };
+        const renameLines = (from: number, to: number) =>
+            edit(
+                'src/lines.js',
+                ...Array.from({ length: to - from }, (_, offset) => ({
+                    oldText: `line ${from + offset};`,
+                    newText: `row ${from + offset};`,
+                })),
+            );
+
+        it('takes 100 operations', async () => {
+            const operations = writes(100);
+
+            expect((updateActorVersion as HelperTool).ajvValidate({ actor: 'a', operations })).toBe(true);
+            await callTool({ operations });
+            expect(getPutFiles()).toHaveLength(104);
+        });
+
+        it('refuses 101 operations without reading or writing the version', async () => {
+            const operations = writes(101);
+
+            expect((updateActorVersion as HelperTool).ajvValidate({ actor: 'a', operations })).toBe(false);
+            await expect(callTool({ operations })).rejects.toThrow();
+            expect(actorGetMock).not.toHaveBeenCalled();
+            expect(versionUpdateMock).not.toHaveBeenCalled();
+        });
+
+        it('takes 100 edits in total across the edit operations', async () => {
+            mockFiles(LINES_JS);
+
+            await callTool({ operations: [renameLines(0, 50), renameLines(50, 100)] });
+
+            const [saved] = getPutFiles() as { content: string }[];
+            expect(saved.content).toContain('row 99;\nline 100;\n');
+            expect(saved.content).not.toContain('line 99;');
+        });
+
+        it('refuses 101 edits in total across the edit operations without reading or writing the version', async () => {
+            mockFiles(LINES_JS);
+
+            const text = await callToolExpectingUserError({
+                autoBuild: true,
+                operations: [renameLines(0, 50), write('src/new.js', 'x'), renameLines(50, 101)],
+            });
+
+            expect(text).toBe(
+                'Nothing was written: the operations have 101 edits in total, and one call takes at most 100. ' +
+                    'Split them across calls.',
+            );
+            expect(actorGetMock).not.toHaveBeenCalled();
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+    });
+
     it('reports the revision get-actor-version returns after the write', async () => {
         const revisionBefore = await readRevision();
         const result = await callTool({

@@ -9,7 +9,7 @@ import { UserInputError } from '../../errors.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
-import { respondAborted } from '../../utils/mcp.js';
+import { respondAborted, respondUserError } from '../../utils/mcp.js';
 import { updateActorVersionToolOutputSchema } from '../structured_output_schemas.js';
 import type { SourceFile } from './source_files.js';
 import {
@@ -43,6 +43,10 @@ const PRECONDITION_REASON = {
     REVISION_MISMATCH: 'REVISION_MISMATCH',
 } as const;
 type PRECONDITION_REASON = (typeof PRECONDITION_REASON)[keyof typeof PRECONDITION_REASON];
+
+// Each operation and edit works on the whole file text, which can be close to 3 MiB, and the work blocks the event loop.
+const MAX_OPERATIONS_PER_CALL = 100;
+const MAX_EDITS_PER_CALL = 100;
 
 // One flat object with an explicit `type`: AJV's `removeAdditional` drops the fields of all but one branch of a
 // union, so the field each type needs is checked in code.
@@ -95,6 +99,7 @@ const updateActorVersionArgs = z.object({
         ),
     operations: z
         .array(operationArgs)
+        .max(MAX_OPERATIONS_PER_CALL)
         .describe(
             'File changes, applied in order to the current files. They are saved together, or none is saved when any fails.',
         ),
@@ -257,6 +262,7 @@ export const updateActorVersion: ToolEntry = Object.freeze({
         - write {path, content, encoding?}: creates a file, or replaces one given its expectedHash.
         - edit {path, edits: [{oldText, newText}], expectedHash?}: replaces text in a UTF-8 file. Each oldText must match exactly once, byte for byte.
         - delete {path, expectedHash}: removes a file. To rename a file, delete it and write it at the new path.
+        A call takes at most ${MAX_OPERATIONS_PER_CALL} operations and at most ${MAX_EDITS_PER_CALL} edits in total across its edit operations.
         expectedHash and expectedRevision take the hash and revision from the version listing. A failed check names the operation, the file, and one of FILE_EXISTS, FILE_NOT_FOUND, HASH_MISMATCH, NO_MATCH, MULTIPLE_MATCHES, NOT_TEXT, or REVISION_MISMATCH; read the file again and retry.
         Binary files take base64 content with encoding base64; files with a binary extension such as .png default to it.
         Only versions stored as files can be changed. Env vars and the build tag are never changed.
@@ -283,6 +289,14 @@ export const updateActorVersion: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client, signal } = toolArgs;
         const parsed = updateActorVersionArgs.parse(args);
+        const editCount = parsed.operations
+            .filter(({ type }) => type === 'edit')
+            .reduce((count, { edits = [] }) => count + edits.length, 0);
+        if (editCount > MAX_EDITS_PER_CALL) {
+            return respondUserError(
+                `Nothing was written: the operations have ${editCount} edits in total, and one call takes at most ${MAX_EDITS_PER_CALL}. Split them across calls.`,
+            );
+        }
         try {
             // TODO: The Apify API has no way to read or change single files of an Actor's source, so even a one-line
             // edit reads the whole version here and writes all its files back with the PUT below. That read and write
