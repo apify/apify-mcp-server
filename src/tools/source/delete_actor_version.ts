@@ -34,7 +34,7 @@ export const deleteActorVersion: ToolEntry = Object.freeze({
     title: 'Delete Actor version',
     description: dedent`
         Delete one version of an Actor, with its source and environment variables; a deleted version cannot be restored. The platform refuses to delete an Actor's last version.
-        The version's builds stay, and so do the tags that point to them: a run with such a tag still uses that build.
+        The version's builds stay, and so do the tags that point to them: a run with such a tag still uses that build. A build of the version that is still running keeps running, and takes its tag if it succeeds.
 
         USAGE:
         - Use only when the user explicitly wants the version removed.

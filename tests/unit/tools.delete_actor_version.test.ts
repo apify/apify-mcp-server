@@ -100,6 +100,13 @@ describe('delete-actor-version', () => {
         );
     });
 
+    it('says in its description that a running build of the version still takes its tag', () => {
+        // The delete stops no build, and a build that succeeds takes its tag whether or not its version still exists.
+        expect(deleteActorVersion.description).toContain(
+            'A build of the version that is still running keeps running, and takes its tag if it succeeds.',
+        );
+    });
+
     it('requires the actor and versionNumber, so it never picks a version itself', () => {
         const tool = deleteActorVersion as HelperTool;
 
