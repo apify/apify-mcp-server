@@ -263,7 +263,6 @@ async function main() {
         const data = expandIterations(
             selected.map((mcpAgentCase) => mcpAgentCase.item),
             iterations,
-            runId,
         );
 
         initTracing();
@@ -295,6 +294,7 @@ async function main() {
                 toolTimeout: argv.toolTimeout,
                 mcpToolsOnly: argv.mcpToolsOnly,
                 totalTrials: requestedIds.length * iterations,
+                runId,
             }),
             evaluators: EVALUATORS,
             runEvaluators: [

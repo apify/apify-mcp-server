@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
     runAgentConversation: vi.fn(async (): Promise<unknown> => {
         throw new Error('spawn ENOENT');
     }),
+    buildAgentObservations: vi.fn(() => ({})),
     emitObservations: vi.fn(),
     evaluateConversation: vi.fn(async () => ({ verdict: 'PASS', reason: 'looks good', rawResponse: '' })),
 }));
@@ -32,7 +33,7 @@ vi.mock('../../evals/agent/claude_agent.js', () => ({
 }));
 
 vi.mock('../../evals/langfuse/observations.js', () => ({
-    buildAgentObservations: () => ({}),
+    buildAgentObservations: mocks.buildAgentObservations,
     emitObservations: mocks.emitObservations,
 }));
 
@@ -218,6 +219,7 @@ describe('createExperimentTask()', () => {
             toolTimeout: 1,
             mcpToolsOnly: false,
             totalTrials: 1,
+            runId: 'r3k9f2qa7c',
         });
 
     beforeEach(() => {
@@ -354,6 +356,7 @@ describe('createExperimentTask()', () => {
             toolTimeout: 1,
             mcpToolsOnly: true,
             totalTrials: 1,
+            runId: 'r3k9f2qa7c',
         });
 
         await task(makeToolCallItem());
@@ -365,6 +368,69 @@ describe('createExperimentTask()', () => {
         const item = makeItem({ metadata: { category: 'search', kind: 'agent', iteration: 2 } });
 
         await expect(makeMcpAgentTask()(item)).resolves.toMatchObject({ iteration: 2 });
+    });
+
+    it('resolves {{uniq}} to the run, trial and attempt before the agent and the judge see the item', async () => {
+        mocks.runAgentConversation.mockResolvedValue(makeAgentRun());
+        const item = makeItem({
+            input: { query: 'Create eval-sched-{{uniq}}' },
+            expectedOutput: 'PASS only if eval-sched-{{uniq}} was created.',
+            metadata: { category: 'create', kind: 'agent', iteration: 2 },
+        });
+
+        await makeMcpAgentTask()(item);
+
+        expect(mocks.runAgentConversation).toHaveBeenCalledWith(
+            expect.objectContaining({ prompt: 'Create eval-sched-r3k9f2qa7c-n10-t2r1' }),
+        );
+        expect(mocks.evaluateConversation).toHaveBeenCalledWith(
+            'PASS only if eval-sched-r3k9f2qa7c-n10-t2r1 was created.',
+            expect.anything(),
+            expect.anything(),
+            'judge',
+        );
+    });
+
+    it('resolves {{uniq}} to a fresh name on the retry attempt of the same trial', async () => {
+        mocks.runAgentConversation
+            .mockRejectedValueOnce(new Error('Connection error.'))
+            .mockResolvedValueOnce(makeAgentRun());
+        const item = makeItem({
+            input: { query: 'Create eval-sched-{{uniq}}' },
+            expectedOutput: 'eval-sched-{{uniq}}',
+        });
+
+        await makeMcpAgentTask()(item);
+
+        expect(mocks.runAgentConversation).toHaveBeenNthCalledWith(
+            1,
+            expect.objectContaining({ prompt: 'Create eval-sched-r3k9f2qa7c-n10-t1r1' }),
+        );
+        expect(mocks.runAgentConversation).toHaveBeenNthCalledWith(
+            2,
+            expect.objectContaining({ prompt: 'Create eval-sched-r3k9f2qa7c-n10-t1r2' }),
+        );
+        // The judge and the trace both read the name the attempt that ran actually used.
+        expect(mocks.evaluateConversation).toHaveBeenCalledWith(
+            'eval-sched-r3k9f2qa7c-n10-t1r2',
+            expect.anything(),
+            expect.anything(),
+            'judge',
+        );
+        expect(mocks.buildAgentObservations).toHaveBeenCalledWith(
+            expect.objectContaining({ prompt: 'Create eval-sched-r3k9f2qa7c-n10-t1r2' }),
+        );
+    });
+
+    it('resolves {{uniq}} in a tool-call item the same way', async () => {
+        mocks.runAgentConversation.mockResolvedValue(makeAgentRun());
+        const item = makeToolCallItem({ input: { query: 'Create eval-sched-{{uniq}}' } });
+
+        await makeMcpAgentTask()(item);
+
+        expect(mocks.runAgentConversation).toHaveBeenCalledWith(
+            expect.objectContaining({ prompt: 'Create eval-sched-r3k9f2qa7c-n10-t1r1' }),
+        );
     });
 });
 
@@ -514,31 +580,33 @@ describe('substituteUniqMarker()', () => {
             'PASS only if create-schedule created eval-sched-add-{{uniq}}.',
         ) as unknown as { input: { query: string }; expectedOutput: string };
 
-        const resolved = substituteUniqMarker(item as never, 'r3k9f2qa7c-t2') as unknown as {
+        const resolved = substituteUniqMarker(item as never, 'r3k9f2qa7c-n10-t2r1') as unknown as {
             input: { query: string };
             expectedOutput: string;
         };
 
         expect(resolved.input.query).toBe(
-            'Create eval-sched-add-r3k9f2qa7c-t2, then rename it to eval-sched-add-r3k9f2qa7c-t2',
+            'Create eval-sched-add-r3k9f2qa7c-n10-t2r1, then rename it to eval-sched-add-r3k9f2qa7c-n10-t2r1',
         );
-        expect(resolved.expectedOutput).toBe('PASS only if create-schedule created eval-sched-add-r3k9f2qa7c-t2.');
+        expect(resolved.expectedOutput).toBe(
+            'PASS only if create-schedule created eval-sched-add-r3k9f2qa7c-n10-t2r1.',
+        );
     });
 
     it('returns an item without the marker unchanged, metadata and all', () => {
         const item = makeItem('Pause my schedule eval-nightly-sum', 'PASS only if update-schedule was called.');
 
-        expect(substituteUniqMarker(item, 'r3k9f2qa7c-t1')).toEqual(item);
+        expect(substituteUniqMarker(item, 'r3k9f2qa7c-n10-t1r1')).toEqual(item);
     });
 
     it('keeps a reference containing $& and backtick-$ intact', () => {
         const reference = 'PASS only if the agent runs `echo $&` and reports $` verbatim for {{uniq}}.';
         const item = makeItem('Run it', reference);
 
-        const resolved = substituteUniqMarker(item, 'r3k9f2qa7c-t1') as unknown as { expectedOutput: string };
+        const resolved = substituteUniqMarker(item, 'r3k9f2qa7c-n10-t1r1') as unknown as { expectedOutput: string };
 
         expect(resolved.expectedOutput).toBe(
-            'PASS only if the agent runs `echo $&` and reports $` verbatim for r3k9f2qa7c-t1.',
+            'PASS only if the agent runs `echo $&` and reports $` verbatim for r3k9f2qa7c-n10-t1r1.',
         );
     });
 
@@ -549,7 +617,7 @@ describe('substituteUniqMarker()', () => {
             metadata: { category: 'create', kind: 'tool-call', expectedArgs: { name: 'eval-sched-{{uniq}}' } },
         } as unknown as Parameters<typeof substituteUniqMarker>[0];
 
-        const resolved = substituteUniqMarker(item, 'r3k9f2qa7c-t1') as unknown as {
+        const resolved = substituteUniqMarker(item, 'r3k9f2qa7c-n10-t1r1') as unknown as {
             metadata: { expectedArgs: { name: string } };
         };
 
@@ -564,7 +632,7 @@ describe('expandIterations()', () => {
             { id: 'b', input: { query: 'List my tasks' }, metadata: { category: 'y' } },
         ] as unknown as Parameters<typeof expandIterations>[0];
 
-        const data = expandIterations(items, 3, 'r3k9f2qa7c') as unknown as {
+        const data = expandIterations(items, 3) as unknown as {
             id: string;
             metadata: { iteration: number };
         }[];
@@ -578,21 +646,18 @@ describe('expandIterations()', () => {
         expect(items[0].metadata).toEqual({ category: 'x' });
     });
 
-    it('resolves each trial marker to its own run-and-trial value', () => {
+    it('leaves the {{uniq}} marker in place for the task to resolve per attempt', () => {
         const items = [
             { id: 'a', input: { query: 'Create eval-sched-{{uniq}}' }, expectedOutput: 'eval-sched-{{uniq}}' },
         ] as unknown as Parameters<typeof expandIterations>[0];
 
-        const data = expandIterations(items, 2, 'r3k9f2qa7c') as unknown as {
+        const data = expandIterations(items, 2) as unknown as {
             input: { query: string };
             expectedOutput: string;
         }[];
 
-        expect(data[0].input.query).toBe('Create eval-sched-r3k9f2qa7c-n10-t1');
-        expect(data[0].expectedOutput).toBe('eval-sched-r3k9f2qa7c-n10-t1');
-        expect(data[1].input.query).toBe('Create eval-sched-r3k9f2qa7c-n10-t2');
-        const otherRun = expandIterations(items, 1, 'r8m1p4bz2q') as unknown as { input: { query: string } }[];
-        expect(otherRun[0].input.query).not.toBe(data[0].input.query);
+        expect(data[0].input.query).toBe('Create eval-sched-{{uniq}}');
+        expect(data[1].expectedOutput).toBe('eval-sched-{{uniq}}');
     });
 });
 
