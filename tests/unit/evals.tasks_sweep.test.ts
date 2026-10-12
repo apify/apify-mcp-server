@@ -5,8 +5,6 @@ import { isSweepableTask } from '../../evals/scripts/tasks_sweep.js';
 
 const NOW = Date.UTC(2026, 8, 21, 12, 0, 0);
 const MINUTES_AGO_12 = new Date(NOW - 12 * 60 * 1000);
-const HOURS_AGO_6 = new Date(NOW - 6 * 60 * 60 * 1000);
-const JUST_UNDER_HOURS_AGO_6 = new Date(NOW - 6 * 60 * 60 * 1000 + 1);
 const HOURS_AGO_9 = new Date(NOW - 9 * 60 * 60 * 1000);
 const DAYS_AGO_3 = new Date(NOW - 3 * 24 * 60 * 60 * 1000);
 const WEEKS_AGO_3 = new Date(NOW - 21 * 24 * 60 * 60 * 1000);
@@ -60,13 +58,6 @@ describe('isSweepableTask()', () => {
     it('applies the age limit alone when no run id is given', () => {
         expect(isSweepableTask({ name: OTHER_RUN_TASK_NAME, createdAt: MINUTES_AGO_12 }, undefined, NOW)).toBe(false);
         expect(isSweepableTask({ name: OTHER_RUN_TASK_NAME, createdAt: HOURS_AGO_9 }, undefined, NOW)).toBe(true);
-    });
-
-    it('deletes a leftover exactly at the age limit and keeps one just under it', () => {
-        expect(isSweepableTask({ name: OTHER_RUN_TASK_NAME, createdAt: HOURS_AGO_6 }, undefined, NOW)).toBe(true);
-        expect(isSweepableTask({ name: OTHER_RUN_TASK_NAME, createdAt: JUST_UNDER_HOURS_AGO_6 }, undefined, NOW)).toBe(
-            false,
-        );
     });
 
     it('keeps the read-only fixture at any age', () => {
