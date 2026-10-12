@@ -92,10 +92,8 @@ function isRuleMatch(
 }
 
 /**
- * Why the API tools refuse a request, or `undefined` when they send it: a path that leaves `/v2/` once resolved,
- * whatever the rules, or a request a rule matches. Rules match fail-closed: a path in any letter case, decoded
- * segment by segment, and with trailing or doubled slashes; a query parameter name decoded, in any letter case,
- * and with brackets.
+ * Returns why a request must not be sent, or `undefined` if it can be sent.
+ * A request is refused when its path resolves outside `/v2/`, or when a rule in `API_BLOCK_RULES` matches it.
  */
 export function validateApiBlocklist(
     request: {
