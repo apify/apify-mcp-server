@@ -40,8 +40,9 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
     return dedent`
         Send a POST, PUT, PATCH, or DELETE request to the Apify API at a path, such as /v2/datasets/abc.
         ${API_CALL_DESCRIPTION}${findPath}${getParameters}
-        The request is sent once and applies at once. Returns the response body as the API sends it; a body
-        over ${MAX_INLINE_BYTES} bytes is not returned.
+        The request is sent once and applies at once.
+        Returns the parsed response body, JSON with its data wrapper included: integers above 2^53 can
+        lose precision. A body over ${MAX_INLINE_BYTES} bytes is not returned.
 
         Example call: {"path": "/v2/datasets/abc", "method": "PUT", "body": {"name": "leads-2026"}}
 
@@ -56,9 +57,9 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 }
 
 /**
- * Called only when the method is omitted. When the path has exactly one operation in the spec and no
- * blocked write method, it uses that operation's write method; otherwise it asks the caller to choose.
- * The caller is asked only for the write methods; a GET goes to the read tool.
+ * The method of a call that omits it: the path's only operation in the spec, when that is a write and
+ * the path has no blocked write method; otherwise why the caller must give one. The caller is asked
+ * only for the write methods; a GET goes to the read tool.
  */
 async function inferWriteMethod(
     path: string,
