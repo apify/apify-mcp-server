@@ -13,6 +13,8 @@ import {
     RAG_WEB_BROWSER_ADDITIONAL_DESC,
     WEB_FETCH,
     WEB_FETCH_ADDITIONAL_DESC,
+    WEBSITE_CONTENT_CRAWLER,
+    WEBSITE_CONTENT_CRAWLER_ADDITIONAL_DESC,
 } from '../../const.js';
 import { ActorLoadError } from '../../errors.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
@@ -147,6 +149,7 @@ export async function getNormalActorsAsTools(
         const isReadOnly = isReadOnlyActor(actorInfo);
         const isRag = actorFullName === RAG_WEB_BROWSER;
         const isWebFetch = actorFullName === WEB_FETCH;
+        const isWebsiteContentCrawler = actorFullName === WEBSITE_CONTENT_CRAWLER;
         const { inputSchema } = buildActorInputSchema(definition.actorFullName, definition.input, isRag);
 
         // Inject the MCP-only `waitSecs` opt-in before AJV compile so the LLM can cap the wait.
@@ -164,6 +167,8 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
                 description += `\n\n${RAG_WEB_BROWSER_ADDITIONAL_DESC}`;
             } else if (isWebFetch) {
                 description += `\n\n${WEB_FETCH_ADDITIONAL_DESC}`;
+            } else if (isWebsiteContentCrawler) {
+                description += `\n\n${WEBSITE_CONTENT_CRAWLER_ADDITIONAL_DESC}`;
             }
             return description;
         };
