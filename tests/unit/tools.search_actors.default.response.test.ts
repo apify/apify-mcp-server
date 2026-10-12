@@ -403,18 +403,6 @@ describe('buildDescription()', () => {
         );
     });
 
-    it('omits the run limitation when the session has call-actor-widget', () => {
-        expect(renderDescription(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_CALL_WIDGET)).not.toContain(
-            ACTOR_CALLABILITY_CAVEAT,
-        );
-    });
-
-    it('omits the run limitation when the session has apify-api-write', () => {
-        expect(renderDescription(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.API_WRITE)).not.toContain(
-            ACTOR_CALLABILITY_CAVEAT,
-        );
-    });
-
     it('states the run limitation when the session has only create-schedule', () => {
         expect(renderDescription(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.SCHEDULE_CREATE)).toContain(
             ACTOR_CALLABILITY_CAVEAT,

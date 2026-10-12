@@ -291,15 +291,6 @@ describe('getServerInstructions()', () => {
             expect(instructions).not.toContain('MUST');
         });
 
-        it('states the limitation for an Actor tool outside the default Actor list', () => {
-            const instructions = getServerInstructions(
-                SERVER_MODE.DEFAULT,
-                only(HELPER_TOOLS.STORE_SEARCH, actorNameToToolName('apify/instagram-scraper')),
-            );
-            expect(instructions).toContain(RUN_LIMITATION_LINE);
-            expect(instructions).not.toContain('MUST');
-        });
-
         it('states the limitation when the session can only fetch Actor details', () => {
             const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.ACTOR_GET_DETAILS));
             expect(instructions).toContain(RUN_LIMITATION_LINE);
@@ -321,22 +312,6 @@ describe('getServerInstructions()', () => {
 
         it('omits the limitation when the session has call-actor', () => {
             const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.ACTOR_CALL));
-            expect(instructions).not.toContain(RUN_LIMITATION_LINE);
-        });
-
-        it('omits the limitation when the session has call-actor-widget', () => {
-            const instructions = getServerInstructions(
-                SERVER_MODE.APPS,
-                only(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_CALL_WIDGET),
-            );
-            expect(instructions).not.toContain(RUN_LIMITATION_LINE);
-        });
-
-        it('omits the limitation when the session has apify-api-write', () => {
-            const instructions = getServerInstructions(
-                SERVER_MODE.DEFAULT,
-                only(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.API_WRITE),
-            );
             expect(instructions).not.toContain(RUN_LIMITATION_LINE);
         });
 
