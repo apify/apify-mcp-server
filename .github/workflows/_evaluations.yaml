@@ -50,15 +50,9 @@ jobs:
             -   name: Install pnpm and dependencies
                 uses: apify/actions/pnpm-install@v1.1.2
 
-            -   name: Seed task fixtures (merge tier only)
+            -   name: Seed fixtures (merge tier only)
                 if: inputs.tier == 'merge'
-                run: pnpm run evals:mcp-agent:tasks-fixtures
-                env:
-                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
-
-            -   name: Seed schedule fixtures (merge tier only)
-                if: inputs.tier == 'merge'
-                run: pnpm run evals:mcp-agent:schedules-fixtures
+                run: pnpm run evals:mcp-agent:fixtures
                 env:
                     APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
 
@@ -97,21 +91,12 @@ jobs:
 
             # The schedule cases leave enabled schedules behind, and an enabled schedule keeps firing
             # on the eval account until something deletes it. Seeding at the start of the next run is
-            # too late, so tear them down here — `always()` so a failed or cancelled run still cleans up.
+            # too late, so tear down here — `always()` so a failed or cancelled run still cleans up.
             # Same run id as the run step, so this deletes only what this run created.
-            -   name: Tear down schedule fixtures (merge tier only)
+            -   name: Tear down fixtures (merge tier only)
                 if: always() && inputs.tier == 'merge'
                 run: >
-                    pnpm run evals:mcp-agent:schedules-fixtures --
-                    --run-id ${{ github.run_id }}-${{ github.run_attempt }}
-                env:
-                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
-
-            # Tasks never fire, but without this a run's tasks stay on the account until a seed at least 6 h later.
-            -   name: Tear down task fixtures (merge tier only)
-                if: always() && inputs.tier == 'merge'
-                run: >
-                    pnpm run evals:mcp-agent:tasks-fixtures --
+                    pnpm run evals:mcp-agent:fixtures --
                     --run-id ${{ github.run_id }}-${{ github.run_attempt }}
                 env:
                     APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}

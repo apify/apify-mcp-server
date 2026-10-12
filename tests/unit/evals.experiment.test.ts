@@ -662,11 +662,10 @@ describe('expandIterations()', () => {
 });
 
 describe('formatTeardownHint()', () => {
-    it("prints the run id and the commands that delete this run's schedules and tasks, schedules first", () => {
+    it("prints the run id and the command that deletes this run's schedules and tasks", () => {
         expect(formatTeardownHint('r3k9f2qa7c')).toEqual([
             "🧹 Run id r3k9f2qa7c — delete this run's schedules and tasks:",
-            '   pnpm run evals:mcp-agent:schedules-fixtures -- --run-id r3k9f2qa7c',
-            '   pnpm run evals:mcp-agent:tasks-fixtures -- --run-id r3k9f2qa7c',
+            '   pnpm run evals:mcp-agent:fixtures -- --run-id r3k9f2qa7c',
         ]);
     });
 });

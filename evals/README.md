@@ -71,11 +71,8 @@ those items.
 
 The tasks family (`merge/tasks/*`, 10 items: 7 proper + 3 with `expectedErrors`) ends every task name
 it creates with `-{{uniq}}` in the query and in the reference (see "Unique resource names" below), so its
-trials and any concurrent run work on separate tasks. Run `pnpm run evals:mcp-agent:tasks-fixtures`
-before every run: it seeds the permanent fixture task and deletes `eval-*` tasks older than 6 hours;
-with `--run-id <id>` it deletes only that run's tasks instead. It deletes on whatever account
-`APIFY_TOKEN` points at and prints that account first; pass `--dry-run` to see what it would delete
-before it does. Three cases (`publish-discovery`,
+trials and any concurrent run work on separate tasks. Run `pnpm run evals:mcp-agent:fixtures` before
+every run (see the schedules family below for what it does). Three cases (`publish-discovery`,
 `publish-medium-1`, `chain-hard-1`) publish task examples on `apify/normal-mode-test-actor`, and
 publishing needs write access to the Actor, so only those three depend on an account that has it.
 
@@ -107,21 +104,20 @@ separate schedules and `--iterations N` is safe. One permanent, disabled fixture
 point at it and no case may modify it. It stays disabled on purpose; an enabled one would start a run on
 the eval account every night.
 
-Run `pnpm run evals:mcp-agent:tasks-fixtures && pnpm run evals:mcp-agent:schedules-fixtures` before a
-run: the scripts reset the task fixture and the schedule fixture (disabled, `0 3 * * *` UTC, one task
-action) and delete `eval-*` tasks and schedules older than 6 hours, on whatever account `APIFY_TOKEN`
-points at. Pass `--dry-run` to see what they would delete.
+Run `pnpm run evals:mcp-agent:fixtures` before a run: it deletes `eval-*` schedules and tasks older
+than 6 hours, then resets the task fixture and the schedule fixture (disabled, `0 3 * * *` UTC, one
+task action), creating them if missing. It deletes on whatever account `APIFY_TOKEN` points at and
+prints that account first; pass `--dry-run` to see what it would delete before it does.
 
-**After** a run, delete the schedules and tasks that run created, with the commands it printed:
+**After** a run, delete the schedules and tasks that run created, with the command it printed:
 
 ```bash
-pnpm run evals:mcp-agent:schedules-fixtures -- --run-id <the run id from the summary>
-pnpm run evals:mcp-agent:tasks-fixtures -- --run-id <the run id from the summary>
+pnpm run evals:mcp-agent:fixtures -- --run-id <the run id from the summary>
 ```
 
 `--run-id` deletes only that run's names at any age. Without it, the next seed sweep deletes
 `eval-*` schedules and tasks older than 6 hours. CI tears down its own run's schedules and tasks in
-`always()` steps.
+an `always()` step.
 
 The deterministic platform facts the judge used to score here live in
 `tests/test_kit/cases/schedules.cases.ts` instead, asserted against the live API. Those cases name their
@@ -194,8 +190,7 @@ teardown commands when it finishes:
 
 ```
 🧹 Run id r3k9f2qa7c — delete this run's schedules and tasks:
-   pnpm run evals:mcp-agent:schedules-fixtures -- --run-id r3k9f2qa7c
-   pnpm run evals:mcp-agent:tasks-fixtures -- --run-id r3k9f2qa7c
+   pnpm run evals:mcp-agent:fixtures -- --run-id r3k9f2qa7c
 ```
 
 **Exit codes:**
@@ -321,7 +316,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 
 - `config.ts` - Models and the MCP tool-name prefix, shared across responsibilities
 - `environment.ts` - Env var sanitization and missing-var reporting
-- `run_id.ts` - The `<static>-<runId>-n<runId length>-t<trial>r<attempt>` name grammar and `--run-id` parsing, shared by the runner and the fixtures scripts
+- `run_id.ts` - The `<static>-<runId>-n<runId length>-t<trial>r<attempt>` name grammar and `--run-id` parsing, shared by the runner and the fixtures script
 - `runner/run.ts` - Main CLI entry, runner defaults
 - `runner/experiment.ts` - Experiment task (agent + tool-call dispatch), `EVALUATORS`, run summary, exit gate
 - `runner/filters.ts` - Test case filtering by category and id
@@ -336,10 +331,8 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `langfuse/observations.ts` - Builds and emits the item's span tree (agent, usage, tool calls)
 - `langfuse/tracing.ts` - OpenTelemetry span processor init/shutdown
 - `scripts/export_dataset.ts` - Snapshot CLI entry (`pnpm run evals:mcp-agent:export-dataset`)
-- `scripts/tasks_fixtures.ts` - Task-suite fixture CLI entry (`pnpm run evals:mcp-agent:tasks-fixtures`)
-- `scripts/schedules_fixtures.ts` - Schedule-suite fixture CLI entry (`pnpm run evals:mcp-agent:schedules-fixtures`)
-- `scripts/schedules_sweep.ts` - The teardown's delete rule; side-effect free, so a unit test can import it
-- `scripts/tasks_sweep.ts` - The task fixtures' delete rule; side-effect free, so a unit test can import it
+- `scripts/fixtures.ts` - Task and schedule fixture CLI entry (`pnpm run evals:mcp-agent:fixtures`)
+- `scripts/sweep.ts` - The fixtures' delete rule; side-effect free, so a unit test can import it
 - `dataset_snapshot_<dataset>.json` - Local export of a dataset, not read at runtime and gitignored
 
 ## Configuration
