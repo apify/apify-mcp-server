@@ -358,8 +358,7 @@ export function formatTeardownHint(runId: string): string[] {
  * status. Deliberately narrow: retrying a deterministic failure (a bad prompt, a missing
  * binary, a tool timeout) only doubles the spend and, for a case with fixed-name fixtures,
  * turns the replay itself into a name collision that fails the zero-tool-error gate.
- * An MCP server `pending` or `failed` at init is retried once: no turn has run, so the replay is
- * free and a slow start can recover. Other statuses are configuration errors and fail at once.
+ * An MCP server `pending` or `failed` at init is replayed once; other statuses are configuration errors.
  */
 const TRANSIENT_AGENT_ERROR_PATTERNS = [
     /connection error/i,

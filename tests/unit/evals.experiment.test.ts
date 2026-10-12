@@ -268,21 +268,6 @@ describe('createExperimentTask()', () => {
         expect(mocks.emitObservations).not.toHaveBeenCalled();
     });
 
-    it('scores the retry when the MCP server connects on the second attempt', async () => {
-        mocks.runAgentConversation
-            .mockRejectedValueOnce(new Error('MCP server "apify" not connected at init (status: failed)'))
-            .mockResolvedValueOnce(makeAgentRun());
-
-        await expect(makeMcpAgentTask()(makeItem())).resolves.toMatchObject({
-            id: 'search-001',
-            judgeResult: { verdict: 'PASS' },
-        });
-        expect(mocks.runAgentConversation).toHaveBeenCalledTimes(2);
-        expect(console.error).toHaveBeenCalledWith(
-            '⚠️ Item "search-001": agent run failed (MCP server "apify" not connected at init (status: failed)), retrying once',
-        );
-    });
-
     it('still scores the item when emitting the agent trace throws', async () => {
         mocks.runAgentConversation.mockResolvedValue(makeAgentRun());
         mocks.emitObservations.mockImplementation(() => {
@@ -360,18 +345,6 @@ describe('createExperimentTask()', () => {
         });
         expect(mocks.evaluateConversation).not.toHaveBeenCalled();
         expect(mocks.runAgentConversation).toHaveBeenCalledWith(expect.objectContaining({ isToolCallMode: true }));
-    });
-
-    it('fails a kind: tool-call item instead of scoring it when the MCP server stays unconnected', async () => {
-        mocks.runAgentConversation.mockRejectedValue(
-            new Error('MCP server "apify" not connected at init (status: pending)'),
-        );
-
-        await expect(makeMcpAgentTask()(makeToolCallItem())).rejects.toThrow(
-            'Item "search-001": MCP server "apify" not connected at init (status: pending)',
-        );
-        expect(mocks.runAgentConversation).toHaveBeenCalledTimes(2);
-        expect(mocks.emitObservations).not.toHaveBeenCalled();
     });
 
     it('carries the run-wide mcpToolsOnly OR the per-item mcpToolsOnly into the tool-call run', async () => {

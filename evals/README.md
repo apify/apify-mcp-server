@@ -421,16 +421,10 @@ above). The snapshot holds the same fields flattened, one object per case, in th
 **Symptom:** Test 2 fails after Test 1, passes alone.<br>
 **Solution:** ✅ Isolated agent + MCP instance per test.
 
-### Apify MCP server "still connecting" / not connected at init
-**Symptom:** The console prints `retrying once` with `MCP server "apify" not connected at init (status: pending)`.
-If the retry fails too, the item shows `🔥` and counts as a failed trial.<br>
-**Cause:** The Claude Code CLI waits up to 5 s (`MCP_CONNECT_TIMEOUT_MS`) for the server before it
-emits `init` and starts the first turn. A slower server, common on a loaded machine (high
-`--concurrency` on few CPUs), is reported as `pending` and its tools are missing from the first
-turn's prompt. Without a check the agent would read a "still connecting" notice and fall back to a
-built-in tool.<br>
-**Solution:** Automatic: the run aborts at `init` before any model turn. `pending` and `failed` are retried once; other statuses fail the item immediately.
-A repeat failure is a harness failure (decision 4), not a verdict on the tools. If it recurs, lower `--concurrency`.
+### Apify MCP server not connected at init
+**Symptom:** `MCP server "apify" not connected at init (status: pending)`, then `retrying once`; a failed retry shows `🔥` and counts as a failed trial.<br>
+**Cause:** The CLI waits 5 s (`MCP_CONNECT_TIMEOUT_MS`) for the server, then emits `init` with it `pending` and runs the first turn without its tools. Common on a loaded machine (high `--concurrency`, few CPUs).<br>
+**Solution:** Automatic: the run aborts at `init`; `pending`/`failed` retry once, other statuses fail at once. If it recurs, lower `--concurrency`.
 
 ### Agent answers from memory or shells out instead of using our tools
 **Symptom:** The judge reports the agent used `Bash`, `WebSearch`, or its own knowledge.<br>
@@ -462,7 +456,7 @@ Fork PRs cannot run evals because GitHub withholds repository secrets. Push the 
 
 Both tiers need `ANTHROPIC_API_KEY`, the three `LANGFUSE_*` keys, and `APIFY_TOKEN` (mapped from the `APIFY_TEST_USER_API_TOKEN` repository secret). `OPENROUTER_API_KEY` is required only by the merge judge. The three publish cases also need write access to `apify/normal-mode-test-actor`.
 
-The pr tier has run on a hosted runner in 4m31s, inside its ten-minute target; the merge tier's threshold and 90-minute timeout are still provisional. Transient network and provider failures retry once, and so does an MCP server `pending` or `failed` at init (see Common issues); other statuses, or a failed retry, fail the item as a harness failure.
+The pr tier has run on a hosted runner in 4m31s, inside its ten-minute target; the merge tier's threshold and 90-minute timeout are still provisional. Transient network and provider failures retry once, as does an MCP server `pending` or `failed` at init (see Common issues).
 
 ## Writing tool descriptions
 

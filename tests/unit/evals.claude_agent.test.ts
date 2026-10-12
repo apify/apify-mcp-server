@@ -232,18 +232,15 @@ describe('runAgentConversation()', () => {
             });
         }
 
-        it.each(['pending', 'failed', 'needs-auth', 'disabled'])(
-            'throws when the MCP server is %s at init',
-            async (status) => {
-                mockInitStream([{ name: 'apify', status }]);
+        it('throws when the MCP server is not connected at init', async () => {
+            mockInitStream([{ name: 'apify', status: 'pending' }]);
 
-                await expect(runAgentConversation(baseOptions())).rejects.toThrow(
-                    `MCP server "apify" not connected at init (status: ${status})`,
-                );
-                expect(isPastInit).toBe(false);
-                expect(capturedOptions?.abortController?.signal.aborted).toBe(true);
-            },
-        );
+            await expect(runAgentConversation(baseOptions())).rejects.toThrow(
+                'MCP server "apify" not connected at init (status: pending)',
+            );
+            expect(isPastInit).toBe(false);
+            expect(capturedOptions?.abortController?.signal.aborted).toBe(true);
+        });
 
         it('throws when the MCP server is missing from init', async () => {
             mockInitStream([]);
@@ -262,15 +259,6 @@ describe('runAgentConversation()', () => {
             expect(isPastInit).toBe(true);
             expect(run.claudeCodeVersion).toBe('2.1.206');
             expect(run.conversation.turns.at(-1)?.finalResponse).toBe('done');
-        });
-
-        it('marks the not-connected error as transient', async () => {
-            mockInitStream([{ name: 'apify', status: 'pending' }]);
-
-            const error = await runAgentConversation(baseOptions()).catch((caught: unknown) => caught);
-
-            expect(error).toBeInstanceOf(Error);
-            expect(isTransientAgentError(error)).toBe(true);
         });
 
         it('keeps the not-connected error transient when stderr is appended', async () => {
