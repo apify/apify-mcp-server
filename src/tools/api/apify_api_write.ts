@@ -39,8 +39,9 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
     return dedent`
         Send a POST, PUT, PATCH, or DELETE request to the Apify API at a path, such as /v2/datasets/abc.
         ${API_CALL_DESCRIPTION}${findPath}${getParameters}
-        The request is sent once and applies at once. Returns the response body as the API sends it; a body
-        over ${MAX_INLINE_BYTES} bytes is not returned.
+        The request is sent once and applies at once.
+        Returns the parsed response body, JSON with its data wrapper included: integers above 2^53 can
+        lose precision. A body over ${MAX_INLINE_BYTES} bytes is not returned.
 
         Example call: {"path": "/v2/datasets/abc", "method": "PUT", "body": {"name": "leads-2026"}}
 
