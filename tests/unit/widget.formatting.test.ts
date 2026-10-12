@@ -138,6 +138,10 @@ describe('formatPricing()', () => {
         expect(formatPricing(formatActorForWidget(actor, 'FREE').currentPricingInfo)).toBe(
             '$4.00 / 1,000 scraped places · from $2.10 on paid plans',
         );
+        // A Business user already pays the advertised price: same event, no hint. Not "Pay per event".
+        expect(formatPricing(formatActorForWidget(actor, 'GOLD').currentPricingInfo)).toBe(
+            '$2.10 / 1,000 scraped places',
+        );
     });
 
     it('falls back to Pay per event without a primary event, events, or a price', () => {

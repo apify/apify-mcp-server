@@ -53,7 +53,8 @@ const pricingEventsSchema = {
             tieredPricing: eventTieredPricingSchema,
             isPrimaryEvent: {
                 type: 'boolean',
-                description: 'Whether this is the primary event shown on the public Store pricing badge',
+                description:
+                    'Whether this is the event whose price the public Store pricing badge shows (the primary event, else the only tiered event)',
             },
             isOneTimeEvent: {
                 type: 'boolean',

@@ -168,10 +168,6 @@ const freeActor = { pricingModel: ACTOR_PRICING_MODEL.FREE } as PricingInfo;
 
 // A Business (GOLD) user already pays the Store's advertised price, so the note carries no "from" clause.
 const NOTE_GOLD = 'Prices shown are for the Business plan. Use fetch-actor-details for the full pricing table.';
-// A Free user sees the Store's advertised price (GOLD, else the cheapest Starter/Scale tier) as the "from" clause.
-const NOTE_FREE =
-    'Prices shown are for the Free plan. Paid plans from $4.00 / 1,000 results. ' +
-    'Use fetch-actor-details for the full pricing table.';
 const EVENT_DESCRIPTIONS_OMITTED_NOTE =
     'Event descriptions were omitted because this actor has many pricing events. ' +
     'Use fetch-actor-details for full pricing details.';
@@ -337,6 +333,8 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
                 {
                     title: 'Scraped place',
                     description: 'A Google Maps place scraped',
+                    // The only tiered event is the advertised one; flagged so the badge is the same for every plan.
+                    isPrimaryEvent: true,
                     priceUsd: 0.0021,
                 },
                 {
@@ -395,7 +393,7 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
         expect(out.events?.map((event) => event.paidPlanPriceUsd)).toEqual([undefined, 0.00025]);
     });
 
-    it('E3: user on DIAMOND, actor offers only FREE and BRONZE — resolves to the FREE price, hints BRONZE', () => {
+    it('E3: user on DIAMOND, actor offers only FREE and BRONZE — shows the FREE price, never hints the top tier', () => {
         const info = {
             pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
             pricePerUnitUsd: 0.005,
@@ -409,9 +407,12 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
             model: 'PRICE_PER_DATASET_ITEM',
             pricePerUnit: 0.005,
             unitName: 'result',
-            paidPlanPricePerUnit: 0.004,
-            pricingNote: NOTE_FREE,
+            pricingNote: 'Prices shown are for the Free plan. Use fetch-actor-details for the full pricing table.',
         });
+        expect(pricingInfoToSimplifiedString(info, 'DIAMOND')).toBe(
+            'This Actor costs $5.00 / 1,000 results. Prices shown are for the Free plan. ' +
+                'Use fetch-actor-details for the full pricing table.',
+        );
     });
 
     it('resolves to the first entry when neither user tier nor FREE exist; omits the tieredPricing array', () => {
@@ -424,7 +425,7 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
                 SILVER: { tieredPricePerUnitUsd: 0.003 },
             },
         } as unknown as PricingInfo;
-        const out = pricingInfoToSimplifiedStructured(info, 'DIAMOND');
+        const out = pricingInfoToSimplifiedStructured(info, 'GOLD');
         expect(out.pricePerUnit).toBe(0.004);
         expect(out.paidPlanPricePerUnit).toBe(0.003);
         expect(out.pricingNote).toBe(
@@ -561,6 +562,34 @@ describe('pricingNote edge cases', () => {
         expect(out.pricePerUnit).toBe(0.002);
         expect(out.paidPlanPricePerUnit).toBeUndefined();
         expect(out.pricingNote).toBeUndefined();
+    });
+
+    it('marks the only tiered event as primary in simplified output, so every plan gets the same badge event', () => {
+        const info = {
+            pricingModel: ACTOR_PRICING_MODEL.PAY_PER_EVENT,
+            pricingPerEvent: {
+                actorChargeEvents: {
+                    place: {
+                        eventTitle: 'Scraped place',
+                        eventDescription: '',
+                        eventTieredPricingUsd: {
+                            FREE: { tieredEventPriceUsd: 0.004 },
+                            GOLD: { tieredEventPriceUsd: 0.0021 },
+                        },
+                    },
+                    start: {
+                        eventTitle: 'Actor start',
+                        eventDescription: '',
+                        eventPriceUsd: 0.00005,
+                        isOneTimeEvent: true,
+                    },
+                },
+            },
+        } as unknown as PricingInfo;
+        expect(pricingInfoToSimplifiedStructured(info, 'GOLD').events).toEqual([
+            { title: 'Scraped place', description: '', isPrimaryEvent: true, priceUsd: 0.0021 },
+            { title: 'Actor start', description: '', isOneTimeEvent: true, priceUsd: 0.00005 },
+        ]);
     });
 
     it('omits the event title from the note when the Actor has a single event', () => {
