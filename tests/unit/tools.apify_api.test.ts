@@ -485,6 +485,67 @@ describe('apify-api-read', () => {
         expect(result.structuredContent).toMatchObject({ data: body });
     });
 
+    it.each(['test-token', ''])('redacts nested signing keys with token %j', async (apifyToken) => {
+        const recordsPublicUrl = `${BASE_URL}/key-value-stores/kv-1/records?signature=sig-1`;
+        requestMock.mockResolvedValue(
+            mockResponse(200, {
+                data: {
+                    recordsPublicUrl,
+                    urlSigningSecretKey: 'mock-signing-secret',
+                    nested: { urlSigningSecretKey: 'mock-signing-secret', kept: 1 },
+                    items: [{ urlSigningSecretKey: '' }],
+                    authorization: `Bearer ${apifyToken}`,
+                },
+            }),
+        );
+        const context = stubToolCallContext({ path: '/v2/actor-runs/run-1/key-value-store' }, stubClient);
+        context.apifyToken = apifyToken;
+
+        const result = (await (apifyApiRead as HelperTool).call(context)) as TextToolResult;
+
+        expect(result.structuredContent).toMatchObject({
+            data: {
+                data: {
+                    recordsPublicUrl,
+                    urlSigningSecretKey: '[REDACTED]',
+                    nested: { urlSigningSecretKey: '[REDACTED]', kept: 1 },
+                    items: [{ urlSigningSecretKey: '[REDACTED]' }],
+                    authorization: apifyToken ? 'Bearer [REDACTED]' : 'Bearer ',
+                },
+            },
+        });
+        expect(result.content[0].text).toBe(JSON.stringify(result.structuredContent));
+        expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
+        expect(JSON.stringify(result)).not.toContain('test-token');
+    });
+
+    it.each([
+        ['a text body', '"urlSigningSecretKey": "abc123"', 'text/plain', '"urlSigningSecretKey": "abc123"'],
+        ['a number', 42, 'application/json', 42],
+        ['null', null, 'application/json', null],
+        ['an array of primitives', [1, 'urlSigningSecretKey'], 'application/json', [1, 'urlSigningSecretKey']],
+        ['an empty body', undefined, 'application/json', null],
+        ['a null value', { urlSigningSecretKey: null }, 'application/json', { urlSigningSecretKey: null }],
+        [
+            'a number or object value',
+            { urlSigningSecretKey: 1, o: { urlSigningSecretKey: { a: 'b' } } },
+            'application/json',
+            { urlSigningSecretKey: 1, o: { urlSigningSecretKey: { a: 'b' } } },
+        ],
+        [
+            'the name as a value',
+            { note: 'urlSigningSecretKey', fields: ['urlSigningSecretKey'] },
+            'application/json',
+            { note: 'urlSigningSecretKey', fields: ['urlSigningSecretKey'] },
+        ],
+    ])('returns %s as it is', async (_kind, body, contentType, expected) => {
+        requestMock.mockResolvedValue(mockResponse(200, body, contentType));
+
+        const result = await callTool(apifyApiRead, { path: '/v2/key-value-stores/kv-1/records/NOTE' });
+
+        expect((result.structuredContent as { data: unknown }).data).toEqual(expected);
+    });
+
     it('throws a non-2xx response as the ApifyApiError apify-client builds', async () => {
         requestMock.mockResolvedValue(
             mockResponse(400, { error: { type: 'invalid-input', message: 'Invalid limit' } }),
@@ -873,10 +934,7 @@ describe('apify-api-write', () => {
     });
 
     it.each([
-        [
-            'request-queues/q/requests/batch',
-            'The path matches methods POST and DELETE; specify which one to call the endpoint with.',
-        ],
+        ['request-queues/q/requests/batch', 'Specify a method for this path: POST or DELETE.'],
         ['not-in-spec/abc', 'The path is not in the API spec; specify the method.'],
     ])('asks for the method of %s without a request', async (path, message) => {
         const result = await callTool(apifyApiWrite, { path, body: { name: 'x' } });
@@ -889,13 +947,12 @@ describe('apify-api-write', () => {
     it.each([
         [
             'datasets/abc',
-            'The path matches methods PUT and DELETE; specify which one to call the endpoint with. This tool ' +
-                `does not send its GET; call it with ${HELPER_TOOLS.API_READ}.`,
+            'Specify a method for this path: PUT or DELETE. This tool does not send its GET; call it with ' +
+                `${HELPER_TOOLS.API_READ}.`,
         ],
         [
             'webhooks',
-            'The path matches method POST; specify it to call the endpoint with. This tool does not send its ' +
-                `GET; call it with ${HELPER_TOOLS.API_READ}.`,
+            `Specify a method for this path: POST. This tool does not send its GET; call it with ${HELPER_TOOLS.API_READ}.`,
         ],
     ])('asks only for a write method of %s and sends its GET to the read tool', async (path, message) => {
         const result = await callTool(apifyApiWrite, { path, body: { name: 'x' } }, [
@@ -912,8 +969,7 @@ describe('apify-api-write', () => {
         const result = await callTool(apifyApiWrite, { path: 'datasets/abc' }, [HELPER_TOOLS.API_WRITE]);
 
         expect(result.content[0].text).toBe(
-            'The path matches methods PUT and DELETE; specify which one to call the endpoint with. This tool ' +
-                'does not send its GET.',
+            'Specify a method for this path: PUT or DELETE. This tool does not send its GET.',
         );
     });
 

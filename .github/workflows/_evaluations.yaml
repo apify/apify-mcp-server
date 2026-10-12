@@ -86,6 +86,7 @@ jobs:
                     pnpm run evals:mcp-agent -- --dataset mcp-server-evals-merge
                     --pass-threshold 0.6
                     --agent-model claude-haiku-4-5
+                    --run-id ${{ github.run_id }}-${{ github.run_attempt }}
                 env:
                     ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
                     LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
@@ -97,8 +98,11 @@ jobs:
             # The schedule cases leave enabled schedules behind, and an enabled schedule keeps firing
             # on the eval account until something deletes it. Seeding at the start of the next run is
             # too late, so tear them down here — `always()` so a failed or cancelled run still cleans up.
+            # Same run id as the run step, so this deletes only what this run created.
             -   name: Tear down schedule fixtures (merge tier only)
                 if: always() && inputs.tier == 'merge'
-                run: pnpm run evals:mcp-agent:schedules-fixtures
+                run: >
+                    pnpm run evals:mcp-agent:schedules-fixtures --
+                    --run-id ${{ github.run_id }}-${{ github.run_attempt }}
                 env:
                     APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
