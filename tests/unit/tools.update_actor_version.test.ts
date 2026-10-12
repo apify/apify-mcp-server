@@ -1602,6 +1602,51 @@ describe('update-actor-version', () => {
             },
         );
 
+        it.each([
+            ['U+0000', 'src/a\0.js'],
+            ['U+000A', 'src/\nmain.js'],
+            ['U+0009', 'src/a\tb.js'],
+            ['U+001F', 'src/a\u001f.js'],
+            ['U+007F', 'src/a\u007f.js'],
+        ])(
+            'refuses a path with the control character %s in any operation, before any request',
+            async (character, path) => {
+                const text = await callToolExpectingUserError({
+                    autoBuild: true,
+                    operations: [
+                        write('src/ok.js', 'x'),
+                        edit(path, { oldText: 'a', newText: 'b' }),
+                        remove(path, MAIN_JS_HASH),
+                        write(path, 'x'),
+                    ],
+                });
+
+                expect(text).toBe(
+                    `operations[1] has the control character ${character} in its path; ` +
+                        'a path cannot hold characters U+0000 to U+001F or U+007F.',
+                );
+                expect(actorGetMock).not.toHaveBeenCalled();
+                expect(buildMock).not.toHaveBeenCalled();
+            },
+        );
+
+        it('refuses the delete, delete, and write whose file sets once gave one revision, before any request', async () => {
+            // Joined as path, NUL, hash, and a line break per file, the files before and after read the same, so the
+            // call reported changes and sent no PUT.
+            mockFiles({ name: 'a', format: 'TEXT', content: 'A' }, { name: 'b', format: 'TEXT', content: 'B' });
+            const path = `a\0${sha256Prefix('A')}\nb`;
+
+            const text = await callToolExpectingUserError({
+                operations: [remove('a', sha256Prefix('A')), remove('b', sha256Prefix('B')), write(path, 'B')],
+            });
+
+            expect(text).toBe(
+                'operations[2] has the control character U+0000 in its path; ' +
+                    'a path cannot hold characters U+0000 to U+001F or U+007F.',
+            );
+            expect(actorGetMock).not.toHaveBeenCalled();
+        });
+
         it.each(['.', './', 'src/', 'src//', 'src/..'])('refuses a write to %s, which names a folder', async (path) => {
             const text = await callToolExpectingUserError({ autoBuild: true, operations: [write(path, 'x')] });
 

@@ -228,6 +228,19 @@ export function validateFileContent({ format, content }: ActorVersionSourceFile,
 }
 
 /**
+ * Throws `UserInputError` for a path with a control character, U+0000 to U+001F or U+007F. The build writes the files
+ * to disk, where a file name cannot hold NUL.
+ */
+export function validatePathCharacters(path: string, label: string): void {
+    const character = [...path].find((char) => char <= '\u001f' || char === '\u007f');
+    if (character === undefined) return;
+    const codePoint = `U+${character.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`;
+    throw new UserInputError(
+        `${label} has the control character ${codePoint} in its path; a path cannot hold characters U+0000 to U+001F or U+007F.`,
+    );
+}
+
+/**
  * Throws `UserInputError` for a normalized path no file can be written at. The build worker refuses a version with a
  * path outside the Actor root, so every build of it would fail; `.` and a path ending in a slash name a folder.
  */

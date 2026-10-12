@@ -23,6 +23,7 @@ import {
     validateFileContent,
     validateFilePath,
     validateNewFilePath,
+    validatePathCharacters,
 } from './source_helpers.js';
 
 const createActorArgs = z.object({
@@ -50,6 +51,7 @@ const createActorArgs = z.object({
 function buildSourceFileEntries(files: readonly z.infer<typeof sourceFileArgs>[]): ActorVersionSourceFile[] {
     const entries: ActorVersionSourceFile[] = [];
     for (const [index, file] of files.entries()) {
+        validatePathCharacters(file.path, `files[${index}]`);
         const entry = buildSourceFileEntry(file);
         const label = `files[${index}] (${file.path})`;
         validateFilePath(entry.name, label);

@@ -31,6 +31,7 @@ import {
     validateFileContent,
     validateFilePath,
     validateNewFilePath,
+    validatePathCharacters,
 } from './source_helpers.js';
 
 /** Why an operation or the revision check failed; the caller reads the code to decide how to recover. */
@@ -305,6 +306,9 @@ export const updateActorVersion: ToolEntry = Object.freeze({
             );
         }
         try {
+            for (const [index, { path }] of parsed.operations.entries()) {
+                validatePathCharacters(path, `operations[${index}]`);
+            }
             // TODO: The Apify API has no way to read or change single files of an Actor's source, so even a one-line
             // edit reads the whole version here and writes all its files back with the PUT below. That read and write
             // is also what leaves a save landing between them undetected. Once the API can apply atomic changes to an

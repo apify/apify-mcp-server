@@ -488,6 +488,24 @@ describe('create-actor', () => {
         },
     );
 
+    it.each([
+        ['U+0000', 'src/a\0.js'],
+        ['U+000A', 'src/\nmain.js'],
+        ['U+0009', 'src/a\tb.js'],
+        ['U+001F', 'src/a\u001f.js'],
+        ['U+007F', 'src/a\u007f.js'],
+    ])('refuses a path with the control character %s, and creates nothing', async (character, path) => {
+        const result = await callTool({ autoBuild: true, files: [MAIN_JS, { path, content: 'x' }] });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(
+            `files[1] has the control character ${character} in its path; ` +
+                'a path cannot hold characters U+0000 to U+001F or U+007F.',
+        );
+        expect(actorsCreateMock).not.toHaveBeenCalled();
+        expect(buildMock).not.toHaveBeenCalled();
+    });
+
     it.each(['.', 'src/', 'src/..'])(
         'refuses a file at %s, which names a folder, and creates nothing',
         async (path) => {

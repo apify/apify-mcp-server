@@ -95,14 +95,14 @@ export function compareSourcePaths(a: string, b: string): number {
 }
 
 /**
- * Identifies the file set: one `path\0hash\n` line per regular file, sorted by path. The stored format does not go
- * in, so a file stored as TEXT or as BASE64 gives the same revision.
+ * Identifies the file set: the JSON array of `[path, hash]` pairs of its regular files, sorted by path. JSON quotes
+ * each path and escapes quotes and control characters in it, so two different file sets never give the same text, as
+ * a stored name with NUL and a line break once did. The stored format does not go in, so a file stored as TEXT or as
+ * BASE64 gives the same revision.
  */
 export function buildFilesRevision(files: readonly Pick<SourceFile, 'path' | 'hash'>[]): string {
-    const lines = [...files]
-        .sort((a, b) => compareSourcePaths(a.path, b.path))
-        .map(({ path, hash }) => `${path}\0${hash}\n`);
-    return getSha256Prefix(lines.join(''));
+    const pairs = [...files].sort((a, b) => compareSourcePaths(a.path, b.path)).map(({ path, hash }) => [path, hash]);
+    return getSha256Prefix(JSON.stringify(pairs));
 }
 
 /**
