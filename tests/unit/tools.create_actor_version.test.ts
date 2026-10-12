@@ -794,17 +794,20 @@ describe('create-actor-version', () => {
             expect(buildMock).not.toHaveBeenCalled();
         });
 
-        it('keeps the version and starts no build when the request is cancelled during the POST', async () => {
-            const controller = new AbortController();
-            versionsCreateMock.mockImplementation(async () => controller.abort());
+        it.each([true, false])(
+            'keeps the version and starts no build when the request is cancelled during the POST, with autoBuild %s',
+            async (autoBuild) => {
+                const controller = new AbortController();
+                versionsCreateMock.mockImplementation(async () => controller.abort());
 
-            const result = await callTool({ copyFromVersion: '0.1', autoBuild: true }, controller.signal);
+                const result = await callTool({ copyFromVersion: '0.1', autoBuild }, controller.signal);
 
-            expect(result).toEqual({});
-            expect(versionsCreateMock).toHaveBeenCalledTimes(1);
-            expectNoOtherWrite();
-            expect(buildMock).not.toHaveBeenCalled();
-        });
+                expect(result).toEqual({});
+                expect(versionsCreateMock).toHaveBeenCalledTimes(1);
+                expectNoOtherWrite();
+                expect(buildMock).not.toHaveBeenCalled();
+            },
+        );
 
         it('keeps the version and starts no build when the request is cancelled during the Console link lookup', async () => {
             const controller = new AbortController();
