@@ -99,9 +99,13 @@ async function callTool(args: Record<string, unknown>, signal?: AbortSignal): Pr
 }
 
 /** A call from an Apify Console session, whose UI token gets Console links. */
-async function callToolInConsole(args: Record<string, unknown>): Promise<UpdateResult> {
+async function callToolInConsole(args: Record<string, unknown>, signal?: AbortSignal): Promise<UpdateResult> {
     const context = stubToolCallContext({ actor: 'john/my-actor', ...args }, stubClient);
-    return (await (updateActorVersion as HelperTool).call({ ...context, apifyToken: 'apify_ui_test' })) as UpdateResult;
+    const withSignal = signal === undefined ? context : { ...context, signal };
+    return (await (updateActorVersion as HelperTool).call({
+        ...withSignal,
+        apifyToken: 'apify_ui_test',
+    })) as UpdateResult;
 }
 
 async function callToolExpectingUserError(args: Record<string, unknown>) {
@@ -2177,6 +2181,24 @@ describe('update-actor-version', () => {
             const result = await callTool({ autoBuild: true, operations: [write('b.js', 'b')] }, controller.signal);
 
             expect(result).toEqual({});
+            expect(versionUpdateMock).toHaveBeenCalledTimes(1);
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+
+        it('keeps the write and starts no build when the request is cancelled during the Console link lookup', async () => {
+            const controller = new AbortController();
+            vi.mocked(getUserInfoCached).mockImplementationOnce(async () => {
+                controller.abort();
+                return mockUserInfo();
+            });
+
+            const result = await callToolInConsole(
+                { autoBuild: true, operations: [write('b.js', 'b')] },
+                controller.signal,
+            );
+
+            expect(result).toEqual({});
+            expect(getUserInfoCached).toHaveBeenCalledTimes(1);
             expect(versionUpdateMock).toHaveBeenCalledTimes(1);
             expect(buildMock).not.toHaveBeenCalled();
         });

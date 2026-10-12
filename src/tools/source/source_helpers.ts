@@ -283,17 +283,18 @@ export function buildEmptyFilesWarnings(paths: readonly string[]): { warnings?: 
 /**
  * The response to a committed write. With autoBuild, a build of the version starts first, with no tag so the version's
  * buildTag applies, and is not waited for. The write stands either way, so a failed start goes to `buildError` rather
- * than being thrown: a caller told the call failed would retry writes that were saved.
+ * than being thrown: a caller told the call failed would retry writes that were saved. A cancel that arrives before
+ * the start gets the cancelled-call response and starts no build.
  */
 export async function respondAfterWrite(params: {
-    toolArgs: Pick<InternalToolArgs, 'apifyClient' | 'apifyToken' | 'loadedToolNames'>;
+    toolArgs: Pick<InternalToolArgs, 'apifyClient' | 'apifyToken' | 'loadedToolNames' | 'signal'>;
     autoBuild: boolean;
     target: { actorId: string; versionNumber: string };
     structuredContent: Record<string, unknown>;
     summary: string;
 }): Promise<ToolResponse> {
     const { toolArgs, autoBuild, target, structuredContent, summary } = params;
-    const { apifyClient: client, apifyToken, loadedToolNames } = toolArgs;
+    const { apifyClient: client, apifyToken, loadedToolNames, signal } = toolArgs;
     if (!autoBuild) {
         return respondWithBuild({
             structuredContent,
@@ -306,7 +307,10 @@ export async function respondAfterWrite(params: {
     try {
         // Resolved before the start, so a failed lookup leaves no build behind.
         linkContext = await getConsoleLinkContext(apifyToken, client);
-        // No signal is passed: a committed write never aborts the build it started.
+        // Per the MCP spec a cancelled request gets no response; the write stands.
+        if (signal?.aborted) return respondAborted();
+        // The signal is not passed on: startBuild aborts the build it started when the signal fires during the start,
+        // and a committed write never aborts the build it started.
         build = await startBuild(client, target.actorId, target.versionNumber, { useCache: true, waitSecs: 0 });
     } catch (error) {
         // The API's refusal is the caller's to read; anything else, such as a network failure, is logged too.

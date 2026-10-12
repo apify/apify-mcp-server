@@ -612,6 +612,43 @@ describe('create-actor', () => {
         expect(buildMock).not.toHaveBeenCalled();
     });
 
+    it('keeps the Actor and starts no build when the request is cancelled during the Console link lookup', async () => {
+        const controller = new AbortController();
+        vi.mocked(getUserInfoCached).mockImplementationOnce(async () => {
+            controller.abort();
+            return mockUserInfo();
+        });
+
+        const result = await (createActor as HelperTool).call({
+            ...stubToolCallContext({ name: 'my-actor', autoBuild: true, files: [ACTOR_JSON] }, stubClient),
+            apifyToken: 'apify_ui_test',
+            signal: controller.signal,
+        });
+
+        expect(result).toEqual({});
+        expect(getUserInfoCached).toHaveBeenCalledTimes(1);
+        expect(actorsCreateMock).toHaveBeenCalledTimes(1);
+        expect(buildMock).not.toHaveBeenCalled();
+    });
+
+    it('keeps the build it started when the request is cancelled during the build start', async () => {
+        const controller = new AbortController();
+        buildMock.mockImplementationOnce(async () => {
+            controller.abort();
+            return { id: 'build-1', actId: 'actor-9', buildNumber: '0.0.1', status: 'RUNNING' };
+        });
+        // The build client is what aborts a build.
+        const abortMock = vi.fn(async () => ({}));
+        buildClientMock.mockReturnValueOnce({ abort: abortMock });
+
+        const result = await callTool({ autoBuild: true, files: [ACTOR_JSON] }, controller.signal);
+
+        expect(buildMock).toHaveBeenCalledTimes(1);
+        expect(buildClientMock).not.toHaveBeenCalled();
+        expect(abortMock).not.toHaveBeenCalled();
+        expect(result.structuredContent.build).toEqual(expect.objectContaining({ id: 'build-1', status: 'RUNNING' }));
+    });
+
     it('lets an API error through unchanged, such as a name already taken, with no other call', async () => {
         const error = apiError(409, 'Some other Actor already has this name.', 'actor-name-not-unique');
         actorsCreateMock.mockRejectedValue(error);
