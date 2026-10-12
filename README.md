@@ -250,6 +250,7 @@ Here are some special MCP operations and how the Apify MCP Server supports them:
 - **Schedules**: Create, inspect, update, and delete schedules that run your Actors and tasks automatically.
 - **Builds**: Build an Actor version, list builds, check the status of a build, and retrieve its build log.
 - **Actor source**: Read an Actor version's files with a hash for each file and a revision for the whole set, create an Actor from files, change a version's files with checks that catch changes made since your last read, add a version from files or as a copy of another version, and delete a version.
+- **Apify API**: Search the Apify API reference, inspect an operation, and send requests to the API to read or change data.
 
 ### Overview of available tools
 
@@ -302,6 +303,10 @@ Legend for the **Enabled by default** column:
 | `update-actor-version` | source | Write, edit, or delete files of an Actor version in one all-or-nothing write. |  |
 | `create-actor-version` | source | Add a version to an Actor, from files or as a copy of another version, optionally starting a build. |  |
 | `delete-actor-version` | source | Delete an Actor version; its builds and their tags stay. |  |
+| `apify-api-search` | api | Search the Apify API reference for operations by keywords. Returns each one's method, path, and docs page. |  |
+| `apify-api-details` | api | Get the parameters and request body schema of the Apify API operations on a path. |  |
+| `apify-api-read` | api | Send a GET request to any Apify API path, such as `actor-runs` or `/v2/actor-runs`, like `apify api` in the Apify CLI. |  |
+| `apify-api-write` | none (select by name: `tools=apify-api-write`) | Send a POST, PUT, PATCH, or DELETE request to any Apify API path, with a JSON body, like `apify api` in the Apify CLI. |  |
 
 > **Note:**
 >
@@ -314,7 +319,7 @@ Legend for the **Enabled by default** column:
 All tools include metadata annotations to help MCP clients and LLMs understand tool behavior:
 
 - **`title`**: Short display name for the tool (e.g., "Search Actors", "Call Actor", "apify/rag-web-browser")
-- **`readOnlyHint`**: `true` for tools that only read data without modifying state (e.g., `get-dataset`, `fetch-actor-details`)
+- **`readOnlyHint`**: `true` for tools that only read data without modifying state (e.g., `get-dataset`, `fetch-actor-details`). Actor tools get it only for Apify-maintained Actors with limited permissions and no secret, writable storage, MCP connector, or code input (e.g., `apify--web-fetch`); other Actor tools are marked destructive.
 - **`openWorldHint`**: `true` for tools that access external resources outside the Apify platform (e.g., `call-actor` executes external Actors). Tools that interact only with the Apify platform (like `search-actors` or `fetch-apify-docs`) do not have this hint.
 
 ### Tools configuration
@@ -538,7 +543,7 @@ Upon launching, the Inspector will display a URL that you can open in your brows
 ## Unauthenticated access
 
 When the `tools` query parameter includes only tools explicitly enabled for unauthenticated use, the hosted server allows access without an API token.
-Currently allowed tools: `search-actors`, `fetch-actor-details`, `search-apify-docs`, `fetch-apify-docs`.
+Currently allowed tools: `search-actors`, `fetch-actor-details`, `search-apify-docs`, `fetch-apify-docs`, `apify-api-search`, `apify-api-details`.
 Example: `https://mcp.apify.com?tools=search-actors`.
 
 ## 🐦 Canary PR releases

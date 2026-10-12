@@ -81,6 +81,10 @@ export function getServerInstructions(
         ? buildWidgetWorkflowSection({ hasCall, hasRunsGet, hasCallWidget, hasRunsGetWidget })
         : '';
 
+    const apiReadLine = hasTool(HELPER_TOOLS.API_READ)
+        ? `- Use \`${HELPER_TOOLS.API_READ}\` for API GETs. If your client can read resources, \`resources/read\` also returns binary records, such as key-value store files, which \`${HELPER_TOOLS.API_READ}\` does not.\n`
+        : '';
+
     const toolDependencies = hasCall
         ? `### Tool dependencies
 - \`${HELPER_TOOLS.ACTOR_CALL}\`:
@@ -225,7 +229,7 @@ These tools are called **Actors**. They enable you to extract structured data fr
 - Actor and tool results return storage IDs, not resource URLs — build the URL from the ID (e.g. a \`datasetId\` becomes \`${apiBaseUrl}/v2/datasets/{datasetId}/items\`) and read it via \`resources/read\`.
 - Reads inline up to ~256 KB; a larger response is not downloaded — it returns a short notice with a download URL instead of the body, so page large datasets/lists with \`limit\` and \`offset\` to stay under the cap.
 - Examples: \`${apiBaseUrl}/v2/datasets/{datasetId}/items?clean=true&format=json&limit=100\`, \`${apiBaseUrl}/v2/key-value-stores/{storeId}/records/{recordKey}\`. \`resources/templates/list\` enumerates the common shapes with their paging parameters.
-${widgetWorkflowSection}${dependenciesAndDisambiguation}${
+${apiReadLine}${widgetWorkflowSection}${dependenciesAndDisambiguation}${
         hasTool(HELPER_TOOLS.PROBLEM_REPORT)
             ? `
 If a tool or Actor fails and you cannot resolve it, you can report it with \`${HELPER_TOOLS.PROBLEM_REPORT}\`.

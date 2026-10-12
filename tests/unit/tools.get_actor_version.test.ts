@@ -223,7 +223,7 @@ describe('get-actor-version', () => {
             },
         );
 
-        it('sorts the manifest in plain string order and computes the revision over sorted path and hash lines', async () => {
+        it('sorts the manifest in plain string order and computes the revision over the sorted path and hash pairs', async () => {
             // Locale order would put package.json before README.md; plain order puts the emoji, a UTF-16 surrogate pair,
             // before the fullwidth z.
             const names = ['\u{1F600}.txt', 'package.json', 'src/main.js', '\uFF5A.txt', 'README.md', 'Dockerfile'];
@@ -240,8 +240,8 @@ describe('get-actor-version', () => {
             const { structuredContent } = await callTool({});
 
             expect(structuredContent.files.map(({ path }) => path)).toEqual(sortedNames);
-            const lines = sortedNames.map((name) => `${name}\0${sha256Prefix(`${name}\n`)}\n`).join('');
-            expect(structuredContent.revision).toBe(sha256Prefix(lines));
+            const pairs = sortedNames.map((name) => [name, sha256Prefix(`${name}\n`)]);
+            expect(structuredContent.revision).toBe(sha256Prefix(JSON.stringify(pairs)));
         });
 
         it('gives the same revision whatever order the files are stored in, and a new one when a file changes', async () => {
@@ -255,6 +255,23 @@ describe('get-actor-version', () => {
 
             expect(reordered.structuredContent.revision).toBe(first.structuredContent.revision);
             expect(changed.structuredContent.revision).not.toBe(first.structuredContent.revision);
+        });
+
+        it('gives a version whose stored name holds NUL and a line break a revision of its own', async () => {
+            // Joined as path, NUL, hash, and a line break per file, the one file read the same as the two.
+            mockVersionRead({
+                sourceFiles: [
+                    { name: 'a', format: 'TEXT', content: 'A' },
+                    { name: 'b', format: 'TEXT', content: 'B' },
+                ],
+            });
+            const twoFiles = await callTool({});
+            const name = `a\0${sha256Prefix('A')}\nb`;
+            mockVersionRead({ sourceFiles: [{ name, format: 'TEXT', content: 'B' }] });
+            const oneFile = await callTool({});
+
+            expect(oneFile.structuredContent.files).toEqual([{ path: name, sizeBytes: 1, hash: sha256Prefix('B') }]);
+            expect(oneFile.structuredContent.revision).not.toBe(twoFiles.structuredContent.revision);
         });
 
         it('gives a new revision when a file is added, removed, or renamed', async () => {
@@ -604,7 +621,7 @@ describe('get-actor-version', () => {
                 actorId: 'actor-1',
                 fullName: 'john/my-actor',
                 versionNumber: '0.1',
-                revision: sha256Prefix(''),
+                revision: sha256Prefix('[]'),
                 files: [],
                 contents: [],
             });
@@ -1026,12 +1043,33 @@ describe('compareSourcePaths()', () => {
 });
 
 describe('buildFilesRevision()', () => {
+    it.each<[string, { path: string; hash: string }[], { path: string; hash: string }[]]>([
+        [
+            'a path that holds NUL, a hash, and a line break',
+            [
+                { path: 'a', hash: 'hash-a' },
+                { path: 'b', hash: 'hash-b' },
+            ],
+            [{ path: 'a\0hash-a\nb', hash: 'hash-b' }],
+        ],
+        [
+            'a path that holds a quote and a comma',
+            [
+                { path: 'a', hash: 'hash-a' },
+                { path: 'b', hash: 'hash-b' },
+            ],
+            [{ path: 'a","hash-a"],["b', hash: 'hash-b' }],
+        ],
+    ])('tells apart two file sets when %s', (_, files, otherFiles) => {
+        expect(buildFilesRevision(otherFiles)).not.toBe(buildFilesRevision(files));
+    });
+
     it('sorts the files by path itself, so callers can pass them in any order', () => {
         const revision = buildFilesRevision([
             { path: 'b', hash: 'hash-b' },
             { path: 'a', hash: 'hash-a' },
         ]);
 
-        expect(revision).toBe(sha256Prefix('a\0hash-a\nb\0hash-b\n'));
+        expect(revision).toBe(sha256Prefix('[["a","hash-a"],["b","hash-b"]]'));
     });
 });

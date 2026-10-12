@@ -283,12 +283,16 @@ export function computeToolResponseBytes(result: unknown): {
 
 /**
  * Actionable hint for an HTTP failure status, or `undefined` when the status carries no specific
- * remedy. Shared by the tool-call and resources/read error paths so both differentiate auth failures
- * the same way (the model's only lever is the text it gets back).
+ * remedy. Shared by the tool-call and resources/read error paths so both differentiate auth, rate-limit
+ * and server failures the same way (the model's only lever is the text it gets back).
  */
 export function getHttpErrorHint(status: number | undefined): string | undefined {
     if (status === 403) return 'The resource may be private or your token may lack access.';
     if (status === 401) return 'Authentication failed, check APIFY_TOKEN is set and valid.';
+    if (status === 429) return 'Rate limit exceeded, wait before retrying.';
+    if (status !== undefined && status >= 500 && status < 600) {
+        return 'The server failed to process the request, likely a temporary issue. Retry later.';
+    }
     return undefined;
 }
 

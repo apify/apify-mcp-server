@@ -5,6 +5,7 @@ import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
+import { prepareToolCallContext } from '../../src/payments/helpers.js';
 import { createActor } from '../../src/tools/source/create_actor.js';
 import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
 import { buildFilesRevision } from '../../src/tools/source/source_files.js';
@@ -182,6 +183,62 @@ describe('create-actor', () => {
 
         it('accepts one empty file', () => {
             expect(validate({ name: 'x', files: [{ path: 'a.js', content: '' }] })).toBe(true);
+        });
+    });
+
+    describe('logged arguments', () => {
+        const SECRET = 'synthetic-secret-4f2a';
+        const getLoggedArgs = (args: Record<string, unknown>) =>
+            prepareToolCallContext({ provider: undefined, tool: createActor, args, apifyToken: 'test-token' })
+                .toolArgsRedacted;
+
+        it('keep the paths and other metadata, and replace file content with a marker', () => {
+            const args = {
+                name: 'my-actor',
+                title: 'My Actor',
+                description: 'Scrapes pages',
+                versionNumber: '1.0',
+                buildTag: 'beta',
+                autoBuild: true,
+                files: [
+                    { path: 'src/config.js', content: `export const key = '${SECRET}';\n`, encoding: 'utf8' },
+                    { path: 'assets/key.bin', content: Buffer.from(SECRET).toString('base64'), extra: SECRET },
+                ],
+                undeclared: SECRET,
+            };
+            const argsBefore = structuredClone(args);
+
+            const logged = getLoggedArgs(args);
+
+            expect(JSON.stringify(logged)).not.toContain(SECRET);
+            expect(JSON.stringify(logged)).not.toContain(Buffer.from(SECRET).toString('base64'));
+            expect(logged).toStrictEqual({
+                name: 'my-actor',
+                title: 'My Actor',
+                description: 'Scrapes pages',
+                versionNumber: '1.0',
+                buildTag: 'beta',
+                autoBuild: true,
+                files: [
+                    { path: 'src/config.js', encoding: 'utf8', content: '[REDACTED]' },
+                    { path: 'assets/key.bin', content: '[REDACTED]' },
+                ],
+            });
+            expect(args).toStrictEqual(argsBefore);
+        });
+
+        it.each<[string, Record<string, unknown>]>([
+            ['no arguments', {}],
+            ['files that are not a list', { files: SECRET }],
+            ['files that are not objects', { files: [SECRET, null, 1, [SECRET]] }],
+            ['a path that is not a string', { files: [{ path: { text: SECRET }, content: 'x' }] }],
+            ['content that is not a string', { files: [{ path: 'a.js', content: { text: SECRET } }] }],
+            ['a name that is not a string', { name: [SECRET], files: [] }],
+        ])('accept %s without throwing or logging their values', (_, args) => {
+            const argsBefore = structuredClone(args);
+
+            expect(JSON.stringify(getLoggedArgs(args))).not.toContain(SECRET);
+            expect(args).toStrictEqual(argsBefore);
         });
     });
 
@@ -431,6 +488,24 @@ describe('create-actor', () => {
         },
     );
 
+    it.each([
+        ['U+0000', 'src/a\0.js'],
+        ['U+000A', 'src/\nmain.js'],
+        ['U+0009', 'src/a\tb.js'],
+        ['U+001F', 'src/a\u001f.js'],
+        ['U+007F', 'src/a\u007f.js'],
+    ])('refuses a path with the control character %s, and creates nothing', async (character, path) => {
+        const result = await callTool({ autoBuild: true, files: [MAIN_JS, { path, content: 'x' }] });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(
+            `files[1] has the control character ${character} in its path; ` +
+                'a path cannot hold characters U+0000 to U+001F or U+007F.',
+        );
+        expect(actorsCreateMock).not.toHaveBeenCalled();
+        expect(buildMock).not.toHaveBeenCalled();
+    });
+
     it.each(['.', 'src/', 'src/..'])(
         'refuses a file at %s, which names a folder, and creates nothing',
         async (path) => {
@@ -535,6 +610,43 @@ describe('create-actor', () => {
         expect(actorsCreateMock).toHaveBeenCalledTimes(1);
         expect(actorMock).not.toHaveBeenCalled();
         expect(buildMock).not.toHaveBeenCalled();
+    });
+
+    it('keeps the Actor and starts no build when the request is cancelled during the Console link lookup', async () => {
+        const controller = new AbortController();
+        vi.mocked(getUserInfoCached).mockImplementationOnce(async () => {
+            controller.abort();
+            return mockUserInfo();
+        });
+
+        const result = await (createActor as HelperTool).call({
+            ...stubToolCallContext({ name: 'my-actor', autoBuild: true, files: [ACTOR_JSON] }, stubClient),
+            apifyToken: 'apify_ui_test',
+            signal: controller.signal,
+        });
+
+        expect(result).toEqual({});
+        expect(getUserInfoCached).toHaveBeenCalledTimes(1);
+        expect(actorsCreateMock).toHaveBeenCalledTimes(1);
+        expect(buildMock).not.toHaveBeenCalled();
+    });
+
+    it('keeps the build it started when the request is cancelled during the build start', async () => {
+        const controller = new AbortController();
+        buildMock.mockImplementationOnce(async () => {
+            controller.abort();
+            return { id: 'build-1', actId: 'actor-9', buildNumber: '0.0.1', status: 'RUNNING' };
+        });
+        // The build client is what aborts a build.
+        const abortMock = vi.fn(async () => ({}));
+        buildClientMock.mockReturnValueOnce({ abort: abortMock });
+
+        const result = await callTool({ autoBuild: true, files: [ACTOR_JSON] }, controller.signal);
+
+        expect(buildMock).toHaveBeenCalledTimes(1);
+        expect(buildClientMock).not.toHaveBeenCalled();
+        expect(abortMock).not.toHaveBeenCalled();
+        expect(result.structuredContent.build).toEqual(expect.objectContaining({ id: 'build-1', status: 'RUNNING' }));
     });
 
     it('lets an API error through unchanged, such as a name already taken, with no other call', async () => {

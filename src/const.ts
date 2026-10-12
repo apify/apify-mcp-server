@@ -87,6 +87,10 @@ export const HELPER_TOOLS = {
     STORE_SEARCH_WIDGET: 'search-actors-widget',
     DOCS_SEARCH: 'search-apify-docs',
     DOCS_FETCH: 'fetch-apify-docs',
+    API_SEARCH: 'apify-api-search',
+    API_DETAILS: 'apify-api-details',
+    API_READ: 'apify-api-read',
+    API_WRITE: 'apify-api-write',
     PROBLEM_REPORT: 'report-problem',
 } as const;
 export type HelperToolName = (typeof HELPER_TOOLS)[keyof typeof HELPER_TOOLS];
@@ -117,10 +121,10 @@ export const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set([
 export const REPORT_PROBLEM_BLOCKED_CLIENTS: string[] = ['claude', 'anthropic', 'local-agent-mode-apify'];
 
 /**
- * `clientInfo.name` sent by the Apify Console AI chat backend during the MCP initialize handshake.
- * Runs started by this client are attributed to the APIFY_AI request origin.
+ * `clientInfo.name` sent by the Apify AI agent service (apify/apify-ai-agent) during the MCP
+ * initialize handshake. Runs started by this client are attributed to the APIFY_AI request origin.
  */
-export const APIFY_AI_CLIENT_NAME = 'apify-console-ai-chat';
+export const APIFY_AI_CLIENT_NAME = 'apify-ai';
 
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
 export const RAG_WEB_BROWSER_WHITELISTED_FIELDS = ['query', 'maxResults', 'outputFormats'];
@@ -133,14 +137,13 @@ Examples of when to use:
 - User has time indicators like "today", "current", "latest", "recent", "now"
 
 This is for general web scraping and immediate data needs. For repeated/scheduled scraping of specific platforms (e-commerce, social media), consider suggesting a specialized Actor from the Store for better performance and reliability.
-When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated apify/web-fetch tool when it is available - this tool is for searching and scraping by query.
-If a scraped page comes back blocked or empty (e.g. the crawl reports a 403 or the page text is missing), do not give up: retry that URL with the apify/web-fetch tool when it is available - its anti-bot fetching gets through blocks this tool cannot.`;
+When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated apify/web-fetch tool when it is available - this tool is for searching and scraping by query.`;
 
 export const WEB_FETCH = 'apify/web-fetch';
 /**
  * Appended to the `apify/web-fetch` Actor tool description. Client-agnostic on purpose:
  * no references to any specific client or its built-in tools, so the same text works
- * for every MCP client. Tune only based on eval results (`web-fetch-evals` dataset).
+ * for every MCP client.
  */
 export const WEB_FETCH_ADDITIONAL_DESC = `Use this tool to fetch a specific http(s) URL and return its complete content (one URL per call; http and https only).
 It renders JavaScript and bypasses anti-bot protection, so it also retrieves pages where a plain HTTP fetch gets blocked, fails with an error such as 403 or 429, or returns incomplete content.
@@ -156,9 +159,9 @@ If the exact URL cannot be fetched (e.g. a non-http(s) scheme), say so rather th
 
 /**
  * Appended to the `url` parameter description of the `apify/web-fetch` tool. Lives on the
- * parameter because that is what an agent reads while writing the argument: eval agents
- * (web-fetch-evals-errors, unsupported-protocol case) silently rewrote ftp:// URLs to
- * https:// instead of telling the user the scheme is unsupported.
+ * parameter because that is what an agent reads while writing the argument: agents
+ * silently rewrote ftp:// URLs to https:// instead of telling the user the scheme is
+ * unsupported.
  */
 export const WEB_FETCH_URL_SCHEME_NOTE =
     'http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.';
@@ -258,6 +261,17 @@ export const OFFICIAL_APIFY_USERNAMES: ReadonlySet<string> = new Set([
     'voyager',
 ]);
 
+/**
+ * Official Apify Actors that pass the input checks in `isReadOnlyActor` but still act outside
+ * their run storages, so their tools keep the destructive hints.
+ */
+export const OFFICIAL_ACTORS_WITH_SIDE_EFFECTS: ReadonlySet<string> = new Set([
+    'apify/send-mail', // Sends email.
+    'apify/actor-light-fixture', // Controls a physical light.
+    'apifyatevents/wishlist-raffle', // Submits a raffle entry with terms and marketing consent.
+    'tri_angle/sitemap-change-orchestrator', // Keeps a snapshot between runs and starts other Actor runs.
+]);
+
 export const APIFY_STORE_URL = 'https://apify.com';
 /** Apify Console origin (production). */
 export const CONSOLE_BASE_URL = 'https://console.apify.com';
@@ -307,6 +321,7 @@ export const APIFY_ERROR_TYPE_INVALID_INPUT = 'invalid-input';
 export const APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE = 'actor-name-not-unique';
 export const APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS = 'version-already-exists';
 export const APIFY_ERROR_TYPE_TOO_FEW_VERSIONS = 'too-few-versions';
+export const APIFY_ERROR_TYPE_PAGE_NOT_FOUND = 'page-not-found';
 
 // HTTP status codes
 export const HTTP_UNAUTHORIZED = 401;

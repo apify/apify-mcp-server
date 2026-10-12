@@ -55,7 +55,6 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
     inputSchema: z.toJSONSchema(fetchActorDetailsWidgetArgsSchema) as ToolInputSchema,
     outputSchema: actorDetailsWidgetOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(fetchActorDetailsWidgetArgsSchema)),
-    // Tool-level widget meta; only registered in apps mode so stripWidgetMeta is a no-op here.
     _meta: {
         ...widgetConfig?.meta,
     },

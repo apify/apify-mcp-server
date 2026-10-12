@@ -7,6 +7,7 @@ import {
     paymentsCases,
     registerCases,
     registrationCases,
+    schedulesCases,
     sourceCases,
     storageCases,
     tasksCases,
@@ -57,6 +58,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             registerCases('apps', appsCases, ctx);
             registerCases('tasks', tasksCases, ctx);
             registerCases('storage', storageCases, ctx);
+            registerCases('schedules', schedulesCases, ctx);
             registerCases('source', sourceCases, ctx);
             registerCases('payments', paymentsCases, ctx);
         },

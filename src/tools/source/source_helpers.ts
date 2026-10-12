@@ -7,12 +7,14 @@ import { z } from 'zod';
 import type { ApifyClient } from '../../apify_client.js';
 import { APIFY_ERROR_TYPE_TOO_FEW_VERSIONS, APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS } from '../../const.js';
 import { UserInputError } from '../../errors.js';
+import { REDACTED } from '../../resources/api_resources.js';
 import type { ConsoleLinkContext, InternalToolArgs } from '../../types.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondUserError } from '../../utils/mcp.js';
 import { ABORT } from '../actors/actor_run_response.js';
+import { isRecord } from '../api/apify_api_spec.js';
 import {
     buildNextStepForBuild,
     listVersionNumbers,
@@ -33,6 +35,54 @@ export const sourceFileArgs = z.object({
             'utf8 for text, base64 for binary files. Defaults to base64 for binary extensions such as .png and to utf8 otherwise.',
         ),
 });
+
+/** `keys` of `record` that are set: a string, number, or boolean as is, any other value as `REDACTED`. */
+function pickLoggedValues(record: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+    return Object.fromEntries(
+        keys.flatMap((key) => {
+            const value = record[key];
+            if (value === undefined) return [];
+            return [[key, ['string', 'number', 'boolean'].includes(typeof value) ? value : REDACTED]];
+        }),
+    );
+}
+
+/** `keys` of `record` that are set, each as `REDACTED`. */
+function maskLoggedValues(record: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+    return Object.fromEntries(keys.filter((key) => record[key] !== undefined).map((key) => [key, REDACTED]));
+}
+
+/**
+ * The logged copy of a source tool's arguments (`redactArgs`), built as an allowlist: `keys`, and each entry of the
+ * list under `listKey` with its `entryKeys`, and with its content and its edits' oldText and newText as `REDACTED`.
+ * File content can hold secrets, such as an API key written into the code.
+ */
+export function redactSourceToolArgs(
+    args: Record<string, unknown>,
+    fields: { keys: readonly string[]; listKey: string; entryKeys: readonly string[] },
+): Record<string, unknown> {
+    const { keys, listKey, entryKeys } = fields;
+    const redactEntry = (entry: unknown) => {
+        if (!isRecord(entry)) return REDACTED;
+        const { edits } = entry;
+        return {
+            ...pickLoggedValues(entry, entryKeys),
+            ...maskLoggedValues(entry, ['content']),
+            ...(edits !== undefined && {
+                edits: Array.isArray(edits)
+                    ? edits.map((textEdit) =>
+                          isRecord(textEdit) ? maskLoggedValues(textEdit, ['oldText', 'newText']) : REDACTED,
+                      )
+                    : REDACTED,
+            }),
+        };
+    };
+    const list = args[listKey];
+    return {
+        ...pickLoggedValues(args, keys),
+        ...(list !== undefined && { [listKey]: Array.isArray(list) ? list.map(redactEntry) : REDACTED }),
+    };
+}
 
 /**
  * The Actor by its ID or full name, `username/name` or `username~name` (apify-client turns username/name into the
@@ -179,6 +229,19 @@ export function validateFileContent({ format, content }: ActorVersionSourceFile,
 }
 
 /**
+ * Throws `UserInputError` for a path with a control character, U+0000 to U+001F or U+007F. The build writes the files
+ * to disk, where a file name cannot hold NUL.
+ */
+export function validatePathCharacters(path: string, label: string): void {
+    const character = [...path].find((char) => char <= '\u001f' || char === '\u007f');
+    if (character === undefined) return;
+    const codePoint = `U+${character.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`;
+    throw new UserInputError(
+        `${label} has the control character ${codePoint} in its path; a path cannot hold characters U+0000 to U+001F or U+007F.`,
+    );
+}
+
+/**
  * Throws `UserInputError` for a normalized path no file can be written at. The build worker refuses a version with a
  * path outside the Actor root, so every build of it would fail; `.` and a path ending in a slash name a folder.
  */
@@ -219,6 +282,7 @@ export function validateNewFilePath(
 export function buildSourceFileEntries(files: readonly z.infer<typeof sourceFileArgs>[]): ActorVersionSourceFile[] {
     const entries: ActorVersionSourceFile[] = [];
     for (const [index, file] of files.entries()) {
+        validatePathCharacters(file.path, `files[${index}]`);
         const entry = buildSourceFileEntry(file);
         const label = `files[${index}] (${file.path})`;
         validateFilePath(entry.name, label);
@@ -242,17 +306,18 @@ export function buildEmptyFilesWarnings(paths: readonly string[]): { warnings?: 
 /**
  * The response to a committed write. With autoBuild, a build of the version starts first, with no tag so the version's
  * buildTag applies, and is not waited for. The write stands either way, so a failed start goes to `buildError` rather
- * than being thrown: a caller told the call failed would retry writes that were saved.
+ * than being thrown: a caller told the call failed would retry writes that were saved. A cancel that arrives before
+ * the start gets the cancelled-call response and starts no build.
  */
 export async function respondAfterWrite(params: {
-    toolArgs: Pick<InternalToolArgs, 'apifyClient' | 'apifyToken' | 'loadedToolNames'>;
+    toolArgs: Pick<InternalToolArgs, 'apifyClient' | 'apifyToken' | 'loadedToolNames' | 'signal'>;
     autoBuild: boolean;
     target: { actorId: string; versionNumber: string };
     structuredContent: Record<string, unknown>;
     summary: string;
 }): Promise<ToolResponse> {
     const { toolArgs, autoBuild, target, structuredContent, summary } = params;
-    const { apifyClient: client, apifyToken, loadedToolNames } = toolArgs;
+    const { apifyClient: client, apifyToken, loadedToolNames, signal } = toolArgs;
     if (!autoBuild) {
         return respondWithBuild({
             structuredContent,
@@ -265,7 +330,10 @@ export async function respondAfterWrite(params: {
     try {
         // Resolved before the start, so a failed lookup leaves no build behind.
         linkContext = await getConsoleLinkContext(apifyToken, client);
-        // No signal is passed: a committed write never aborts the build it started.
+        // Per the MCP spec a cancelled request gets no response; the write stands.
+        if (signal?.aborted) return respondAborted();
+        // The signal is not passed on: startBuild aborts the build it started when the signal fires during the start,
+        // and a committed write never aborts the build it started.
         build = await startBuild(client, target.actorId, target.versionNumber, { useCache: true, waitSecs: 0 });
     } catch (error) {
         // The API's refusal is the caller's to read; anything else, such as a network failure, is logged too.

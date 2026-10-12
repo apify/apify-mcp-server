@@ -5,6 +5,7 @@ import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
+import { prepareToolCallContext } from '../../src/payments/helpers.js';
 import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
 import { buildFilesRevision } from '../../src/tools/source/source_files.js';
 import { updateActorVersion } from '../../src/tools/source/update_actor_version.js';
@@ -98,9 +99,13 @@ async function callTool(args: Record<string, unknown>, signal?: AbortSignal): Pr
 }
 
 /** A call from an Apify Console session, whose UI token gets Console links. */
-async function callToolInConsole(args: Record<string, unknown>): Promise<UpdateResult> {
+async function callToolInConsole(args: Record<string, unknown>, signal?: AbortSignal): Promise<UpdateResult> {
     const context = stubToolCallContext({ actor: 'john/my-actor', ...args }, stubClient);
-    return (await (updateActorVersion as HelperTool).call({ ...context, apifyToken: 'apify_ui_test' })) as UpdateResult;
+    const withSignal = signal === undefined ? context : { ...context, signal };
+    return (await (updateActorVersion as HelperTool).call({
+        ...withSignal,
+        apifyToken: 'apify_ui_test',
+    })) as UpdateResult;
 }
 
 async function callToolExpectingUserError(args: Record<string, unknown>) {
@@ -275,6 +280,130 @@ describe('update-actor-version', () => {
                     operations: [{ type: 'edit', path: 'a.js', edits: [{ oldText: 'a', newText: '' }] }],
                 }),
             ).toBe(true);
+        });
+    });
+
+    describe('limits', () => {
+        const writes = (count: number) => Array.from({ length: count }, (_, index) => write(`src/f${index}.js`, 'x'));
+        // Each line matches only its own oldText, so every edit applies.
+        const LINES_JS = {
+            name: 'src/lines.js',
+            format: 'TEXT',
+            content: Array.from({ length: 101 }, (_, index) => `line ${index};\n`).join(''),
+        };
+        const renameLines = (from: number, to: number) =>
+            edit(
+                'src/lines.js',
+                ...Array.from({ length: to - from }, (_, offset) => ({
+                    oldText: `line ${from + offset};`,
+                    newText: `row ${from + offset};`,
+                })),
+            );
+
+        it('takes 100 operations', async () => {
+            const operations = writes(100);
+
+            expect((updateActorVersion as HelperTool).ajvValidate({ actor: 'a', operations })).toBe(true);
+            await callTool({ operations });
+            expect(getPutFiles()).toHaveLength(104);
+        });
+
+        it('refuses 101 operations without reading or writing the version', async () => {
+            const operations = writes(101);
+
+            expect((updateActorVersion as HelperTool).ajvValidate({ actor: 'a', operations })).toBe(false);
+            await expect(callTool({ operations })).rejects.toThrow();
+            expect(actorGetMock).not.toHaveBeenCalled();
+            expect(versionUpdateMock).not.toHaveBeenCalled();
+        });
+
+        it('takes 100 edits in total across the edit operations', async () => {
+            mockFiles(LINES_JS);
+
+            await callTool({ operations: [renameLines(0, 50), renameLines(50, 100)] });
+
+            const [saved] = getPutFiles() as { content: string }[];
+            expect(saved.content).toContain('row 99;\nline 100;\n');
+            expect(saved.content).not.toContain('line 99;');
+        });
+
+        it('refuses 101 edits in total across the edit operations without reading or writing the version', async () => {
+            mockFiles(LINES_JS);
+
+            const text = await callToolExpectingUserError({
+                autoBuild: true,
+                operations: [renameLines(0, 50), write('src/new.js', 'x'), renameLines(50, 101)],
+            });
+
+            expect(text).toBe(
+                'Nothing was written: the operations have 101 edits in total, and one call takes at most 100. ' +
+                    'Split them across calls.',
+            );
+            expect(actorGetMock).not.toHaveBeenCalled();
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('logged arguments', () => {
+        const SECRET = 'synthetic-secret-4f2a';
+        const getLoggedArgs = (args: Record<string, unknown>) =>
+            prepareToolCallContext({ provider: undefined, tool: updateActorVersion, args, apifyToken: 'test-token' })
+                .toolArgsRedacted;
+
+        it('keep the paths, operation types, and hashes, and replace content and edit texts with a marker', () => {
+            const args = {
+                actor: 'john/my-actor',
+                versionNumber: '0.1',
+                expectedRevision: 'abc',
+                autoBuild: true,
+                operations: [
+                    write('src/config.js', `export const key = '${SECRET}';\n`, { encoding: 'utf8' }),
+                    {
+                        ...edit('src/main.js', { oldText: `'${SECRET}'`, newText: `process.env.KEY ?? '${SECRET}'` }),
+                        expectedHash: MAIN_JS_HASH,
+                    },
+                    remove('src/old.js', MAIN_JS_HASH),
+                ],
+                undeclared: SECRET,
+            };
+            const argsBefore = structuredClone(args);
+
+            const logged = getLoggedArgs(args);
+
+            expect(JSON.stringify(logged)).not.toContain(SECRET);
+            expect(logged).toStrictEqual({
+                actor: 'john/my-actor',
+                versionNumber: '0.1',
+                expectedRevision: 'abc',
+                autoBuild: true,
+                operations: [
+                    { type: 'write', path: 'src/config.js', encoding: 'utf8', content: '[REDACTED]' },
+                    {
+                        type: 'edit',
+                        path: 'src/main.js',
+                        expectedHash: MAIN_JS_HASH,
+                        edits: [{ oldText: '[REDACTED]', newText: '[REDACTED]' }],
+                    },
+                    { type: 'delete', path: 'src/old.js', expectedHash: MAIN_JS_HASH },
+                ],
+            });
+            expect(args).toStrictEqual(argsBefore);
+        });
+
+        it.each<[string, Record<string, unknown>]>([
+            ['no arguments', {}],
+            ['operations that are not a list', { operations: SECRET }],
+            ['operations that are not objects', { operations: [SECRET, null, 1, [SECRET]] }],
+            ['edits that are not a list', { operations: [{ type: 'edit', path: 'a.js', edits: SECRET }] }],
+            ['edits that are not objects', { operations: [{ type: 'edit', path: 'a.js', edits: [SECRET, null] }] }],
+            ['a path that is not a string', { operations: [{ type: 'write', path: { text: SECRET } }] }],
+            ['content that is not a string', { operations: [{ type: 'write', path: 'a.js', content: [SECRET] }] }],
+            ['an actor that is not a string', { actor: { name: SECRET }, operations: [] }],
+        ])('accept %s without throwing or logging their values', (_, args) => {
+            const argsBefore = structuredClone(args);
+
+            expect(JSON.stringify(getLoggedArgs(args))).not.toContain(SECRET);
+            expect(args).toStrictEqual(argsBefore);
         });
     });
 
@@ -1477,6 +1606,51 @@ describe('update-actor-version', () => {
             },
         );
 
+        it.each([
+            ['U+0000', 'src/a\0.js'],
+            ['U+000A', 'src/\nmain.js'],
+            ['U+0009', 'src/a\tb.js'],
+            ['U+001F', 'src/a\u001f.js'],
+            ['U+007F', 'src/a\u007f.js'],
+        ])(
+            'refuses a path with the control character %s in any operation, before any request',
+            async (character, path) => {
+                const text = await callToolExpectingUserError({
+                    autoBuild: true,
+                    operations: [
+                        write('src/ok.js', 'x'),
+                        edit(path, { oldText: 'a', newText: 'b' }),
+                        remove(path, MAIN_JS_HASH),
+                        write(path, 'x'),
+                    ],
+                });
+
+                expect(text).toBe(
+                    `operations[1] has the control character ${character} in its path; ` +
+                        'a path cannot hold characters U+0000 to U+001F or U+007F.',
+                );
+                expect(actorGetMock).not.toHaveBeenCalled();
+                expect(buildMock).not.toHaveBeenCalled();
+            },
+        );
+
+        it('refuses the delete, delete, and write whose file sets once gave one revision, before any request', async () => {
+            // Joined as path, NUL, hash, and a line break per file, the files before and after read the same, so the
+            // call reported changes and sent no PUT.
+            mockFiles({ name: 'a', format: 'TEXT', content: 'A' }, { name: 'b', format: 'TEXT', content: 'B' });
+            const path = `a\0${sha256Prefix('A')}\nb`;
+
+            const text = await callToolExpectingUserError({
+                operations: [remove('a', sha256Prefix('A')), remove('b', sha256Prefix('B')), write(path, 'B')],
+            });
+
+            expect(text).toBe(
+                'operations[2] has the control character U+0000 in its path; ' +
+                    'a path cannot hold characters U+0000 to U+001F or U+007F.',
+            );
+            expect(actorGetMock).not.toHaveBeenCalled();
+        });
+
         it.each(['.', './', 'src/', 'src//', 'src/..'])('refuses a write to %s, which names a folder', async (path) => {
             const text = await callToolExpectingUserError({ autoBuild: true, operations: [write(path, 'x')] });
 
@@ -2007,6 +2181,24 @@ describe('update-actor-version', () => {
             const result = await callTool({ autoBuild: true, operations: [write('b.js', 'b')] }, controller.signal);
 
             expect(result).toEqual({});
+            expect(versionUpdateMock).toHaveBeenCalledTimes(1);
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+
+        it('keeps the write and starts no build when the request is cancelled during the Console link lookup', async () => {
+            const controller = new AbortController();
+            vi.mocked(getUserInfoCached).mockImplementationOnce(async () => {
+                controller.abort();
+                return mockUserInfo();
+            });
+
+            const result = await callToolInConsole(
+                { autoBuild: true, operations: [write('b.js', 'b')] },
+                controller.signal,
+            );
+
+            expect(result).toEqual({});
+            expect(getUserInfoCached).toHaveBeenCalledTimes(1);
             expect(versionUpdateMock).toHaveBeenCalledTimes(1);
             expect(buildMock).not.toHaveBeenCalled();
         });
