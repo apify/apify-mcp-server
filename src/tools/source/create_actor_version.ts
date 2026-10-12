@@ -49,7 +49,7 @@ const createActorVersionArgs = z.object({
 
 /**
  * The warning about the secret env vars a copy leaves out. With `startedBuild`, it says that the build this call started
- * runs without them and takes the buildTag, if one was given.
+ * runs without them and takes the buildTag if it succeeds, when one was given.
  */
 function formatSecretEnvVarsWarning(
     secretNames: readonly (string | undefined)[],
@@ -63,7 +63,7 @@ function formatSecretEnvVarsWarning(
             `in Apify Console, then build the version before running it: ${names}.`
         );
     }
-    const tag = startedBuild.buildTag === undefined ? '' : ` and takes tag ${startedBuild.buildTag}`;
+    const tag = startedBuild.buildTag === undefined ? '' : ` and, if it succeeds, takes tag ${startedBuild.buildTag}`;
     return (
         `These secret environment variables were not copied, so the build this call started runs without them${tag}; ` +
         `set them on version ${versionNumber} in Apify Console, then build the version again before running it: ` +

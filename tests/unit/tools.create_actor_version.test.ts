@@ -874,8 +874,8 @@ describe('create-actor-version', () => {
             expect(result.structuredContent.warnings).toEqual([
                 'These files are empty, and the build skips empty files, so they will not exist in the build: src/__init__.py.',
                 'These secret environment variables were not copied, so the build this call started runs without ' +
-                    'them and takes tag beta; set them on version 0.2 in Apify Console, then build the version again ' +
-                    'before running it: API_KEY.',
+                    'them and, if it succeeds, takes tag beta; set them on version 0.2 in Apify Console, then build ' +
+                    'the version again before running it: API_KEY.',
             ]);
         });
 
