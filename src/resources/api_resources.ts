@@ -9,6 +9,8 @@ import type { ApifyClient } from '../apify_client.js';
 import { getApifyAPIBaseUrl, sendApifyApiRequest } from '../apify_client.js';
 import { MAX_INLINE_BYTES } from '../const.js';
 import { InternalError, InvalidParamsError } from '../mcp/errors.js';
+import { validateApiBlocklist } from '../tools/api/apify_api_blocklist.js';
+import { normalizeApiPath } from '../tools/api/apify_api_path.js';
 import { parseBaseMimeType } from '../tools/storage/storage_helpers.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 import { getHttpErrorHint } from '../utils/mcp.js';
@@ -222,6 +224,14 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
             uri,
         });
     }
+    // A GET with the method query parameter can delete, and one to a synchronous run endpoint starts a paid run.
+    const { pathname, search } = new URL(uri);
+    const refusal = validateApiBlocklist({
+        method: 'GET',
+        normalizedPath: normalizeApiPath(`${pathname}${search}`),
+        loadedToolNames: [],
+    });
+    if (refusal) throw new InvalidParamsError(`Failed to read ${uri}: ${refusal}`, { uri });
 
     let response: { data: unknown; headers: Record<string, unknown>; status: number; statusText: string };
     try {

@@ -189,6 +189,21 @@ describe('readApiResource()', () => {
         expect(error.data).toEqual({ uri: 'https://example.com/steal-my-token' });
     });
 
+    it.each([
+        `${API}/v2/datasets/ds-1?method=DELETE`,
+        `${API}/v2/datasets/ds-1?%6Dethod=DELETE`,
+        `${API}/v2/acts/apify~hello-world/run-sync`,
+        `${API}/v2/actor-tasks/abc/run-sync-get-dataset-items`,
+    ])('throws InvalidParams without a request for %s, as the API tools refuse it', async (uri) => {
+        const { request, captured } = requestReturning(streamOf('{}'), 'application/json');
+
+        const error = await expectReadError(readApiResource(uri, stubApifyClient({ request })));
+
+        expect(error).toBeInstanceOf(InvalidParamsError);
+        expect(error.data).toEqual({ uri });
+        expect(captured.url).toBe('');
+    });
+
     it('requests the full URL as a stream capped at MAX_INLINE_BYTES', async () => {
         // The size cap is enforced by axios itself mid-consumption (streamed responses are wrapped in a
         // byte-counting generator since axios 1.16), so the contract under test is the request config.
