@@ -117,9 +117,10 @@ function isRuleMatch(
 }
 
 /**
- * Why a rule refuses a request, or `undefined` when none does. It matches fail-closed: a path in any letter
- * case, decoded segment by segment, and with trailing or doubled slashes; a query parameter name decoded, in
- * any letter case, and with brackets.
+ * Why the API tools refuse a request, or `undefined` when they send it: a path that leaves `/v2/` once resolved,
+ * whatever the rules, or a request a rule matches. Rules match fail-closed: a path in any letter case, decoded
+ * segment by segment, and with trailing or doubled slashes; a query parameter name decoded, in any letter case,
+ * and with brackets.
  */
 export function validateApiBlocklist(
     request: {
