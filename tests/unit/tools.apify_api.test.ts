@@ -1174,6 +1174,7 @@ describe('apify-api-write', () => {
     });
 
     it.each([
+        { statusCode: 300, hint: '' },
         { statusCode: 400, hint: '' },
         { statusCode: 429, hint: ' Rate limit exceeded, wait before retrying.' },
     ])(
