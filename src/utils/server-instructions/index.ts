@@ -10,7 +10,7 @@
 
 import { getApifyAPIBaseUrl } from '../../apify_client.js';
 import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../const.js';
-import { actorNameToToolName } from '../../tools/actor_tool_naming.js';
+import { actorNameToToolName, hasActorRunPath } from '../../tools/actor_tool_naming.js';
 import type { ToolDescriptionContext } from '../../types.js';
 import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../types.js';
 
@@ -80,6 +80,10 @@ export function getServerInstructions(
     const widgetWorkflowSection = isApps
         ? buildWidgetWorkflowSection({ hasCall, hasRunsGet, hasCallWidget, hasRunsGetWidget })
         : '';
+
+    const runLimitationLine = hasActorRunPath(hasTool)
+        ? ''
+        : '- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, open its Apify page or configure it separately.\n';
 
     const apiReadLine = hasTool(HELPER_TOOLS.API_READ)
         ? `- Use \`${HELPER_TOOLS.API_READ}\` for API GETs. If your client can read resources, \`resources/read\` also returns binary records, such as key-value store files, which \`${HELPER_TOOLS.API_READ}\` does not.\n`
@@ -195,7 +199,7 @@ These tools are called **Actors**. They enable you to extract structured data fr
 ## Actor discovery and selection
 - Choose the most appropriate Actor based on the conversation context.
 - Search the Apify Store first; a relevant Actor likely already exists.
-- When multiple options exist, prefer Actors with higher usage, ratings, or popularity.
+${runLimitationLine}- When multiple options exist, prefer Actors with higher usage, ratings, or popularity.
 - Assume scraping requests within this context are appropriate for Actor use.
 - Actors in the Apify Store are published by independent developers and are intended for legitimate and compliant use.
 

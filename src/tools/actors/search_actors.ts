@@ -20,7 +20,7 @@ import { getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console
 import { respondOk } from '../../utils/mcp.js';
 import type { PricingTier } from '../../utils/pricing_info.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import { ACTOR_CALLABILITY_CAVEAT, canRunActor } from '../actor_tool_naming.js';
+import { ACTOR_CALLABILITY_CAVEAT, canRunActor, hasActorRunPath } from '../actor_tool_naming.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 
 /**
@@ -65,6 +65,7 @@ export const searchActorsBaseArgsSchema = z.object({
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    const runLimitationLine = hasActorRunPath(hasTool) ? '' : `${ACTOR_CALLABILITY_CAVEAT}\n`;
     return `Search the Apify Store to FIND and DISCOVER what scraping tools/Actors exist for specific platforms or use cases.
 This tool provides INFORMATION about available Actors - it does NOT retrieve actual data or run any scraping tasks.
 
@@ -86,7 +87,7 @@ Usage:
 
 Important limitations: This tool does not return full Actor documentation or detailed usage instructions - only summary information.
 Each result lists the Actor's input fields with their types (e.g. \`url: string, maxResults?: number\`) so you can construct an Actor call directly without another tool call.
-${hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? `For complete Actor details (per-field descriptions, defaults, README), use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool.\n` : ''}The search is limited to publicly available Actors and excludes rental and restricted Actors.
+${runLimitationLine}${hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? `For complete Actor details (per-field descriptions, defaults, README), use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool.\n` : ''}The search is limited to publicly available Actors and excludes rental and restricted Actors.
 
 Returns list of Actor cards with the following info:
 - **Title:** Markdown header linked to the Store page, followed by the full Actor name in code format
