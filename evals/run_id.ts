@@ -17,14 +17,12 @@ export function createRunId(): string {
     return `${seconds}${random}`;
 }
 
-/** Name suffix for one attempt of one trial of one item; `trial` and `attempt` are 1-based. */
+/** Suffix for one agent run: `trial` is the `--iterations` index, `attempt` is 1 or 2 on the retry. Both count from 1. */
 export function buildRunSuffix(runId: string, trial: number, attempt: number): string {
     return `${runId}-n${runId.length}-t${trial}r${attempt}`;
 }
 
-/**
- * The length after the id distinguishes `a-1` from `1` as well as CI run attempt 12 from 1.
- */
+/** The length after the id distinguishes `a-1` from `1` as well as CI run attempt 12 from 1. */
 export function isNameFromRun(name: string, runId: string): boolean {
     return name.includes(`-${runId}-n${runId.length}-t`);
 }
