@@ -691,12 +691,32 @@ describe('create-actor-version', () => {
             await expect(callTool({ files: [ACTOR_JSON] })).rejects.toBe(error);
         });
 
-        it.each([
-            ['files', { files: [ACTOR_JSON] }],
-            ['a copy of that version', { copyFromVersion: '0.1' }],
+        it.each<{ source: string; args: Record<string, unknown>; version: Record<string, unknown>; ending: string }>([
+            {
+                source: 'files',
+                args: { files: [ACTOR_JSON] },
+                version: {},
+                ending: 'if it holds the files this call sent, this call created it.',
+            },
+            {
+                source: 'a copy',
+                args: { copyFromVersion: '0.1' },
+                version: {},
+                ending:
+                    'if it holds the files of version 0.1, this call created it. These secret environment variables ' +
+                    'were not copied, so set them on version 0.2 in Apify Console, then build the version before ' +
+                    'running it: API_KEY.',
+            },
+            {
+                source: 'a copy of a version without secret env vars',
+                args: { copyFromVersion: '0.1' },
+                version: { envVars: [{ name: 'REGION', value: 'eu' }] },
+                ending: 'if it holds the files of version 0.1, this call created it.',
+            },
         ])(
-            'says an earlier attempt may have created the version when the platform refuses the number on a retried POST, from %s',
-            async (_, args) => {
+            'says an earlier attempt may have created the version when the platform refuses the number on a retried POST, from $source',
+            async ({ args, version, ending }) => {
+                mockActorRead(version);
                 // apify-client retries a POST that timed out or got a 5xx, and the platform may have saved the attempt.
                 versionsCreateMock.mockRejectedValue(
                     apiError(403, 'Version with this number already exists', 'version-already-exists', 2),
@@ -713,7 +733,7 @@ describe('create-actor-version', () => {
                         text:
                             'The platform refused version 0.2 as taken when the request was retried, so an earlier ' +
                             'attempt of this call may have created it. Read it with get-actor-version before calling ' +
-                            'create-actor-version again; if it holds the files this call sent, this call created it.',
+                            `create-actor-version again; ${ending}`,
                     },
                 ]);
                 expect(getPostBody().versionNumber).toBe('0.2');

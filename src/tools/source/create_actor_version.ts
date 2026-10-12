@@ -123,6 +123,8 @@ export const createActorVersion: ToolEntry = Object.freeze({
         if ((copyFromVersion === undefined) === (parsed.files === undefined)) {
             return respondUserError('Give either files or copyFromVersion.');
         }
+        // Set before the POST, so the reply to a retried POST can name them.
+        let secretNames: (string | undefined)[] = [];
         try {
             const { actor, fullName } = await fetchActor(client, parsed.actor);
             // TODO: A copy takes every file of the other version from the Actor GET and sends them all back in the POST
@@ -133,6 +135,7 @@ export const createActorVersion: ToolEntry = Object.freeze({
             const sourceFiles = copied
                 ? extractSourceFiles(copied, `Version ${copied.versionNumber} of ${fullName}`)
                 : buildSourceFileEntries(parsed.files!);
+            secretNames = copied?.envVars?.filter(({ isSecret }) => isSecret).map(({ name }) => name) ?? [];
             // A cancel during the read creates nothing; per the MCP spec the cancelled request gets no response.
             if (signal?.aborted) return respondAborted();
             await client
@@ -155,7 +158,6 @@ export const createActorVersion: ToolEntry = Object.freeze({
             const emptyPaths = files.filter(({ sizeBytes }) => sizeBytes === 0).map(({ path }) => path);
             const { warnings = [] } = buildEmptyFilesWarnings(emptyPaths);
             const buildStartedWarnings = [...warnings];
-            const secretNames = copied?.envVars?.filter(({ isSecret }) => isSecret).map(({ name }) => name) ?? [];
             if (secretNames.length > 0) {
                 warnings.push(formatSecretEnvVarsWarning(secretNames, versionNumber));
                 buildStartedWarnings.push(
@@ -186,11 +188,17 @@ export const createActorVersion: ToolEntry = Object.freeze({
                 const readTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_GET)
                     ? ` with ${HELPER_TOOLS.ACTOR_VERSION_GET}`
                     : '';
+                const sentFiles =
+                    copyFromVersion === undefined
+                        ? 'the files this call sent'
+                        : `the files of version ${copyFromVersion}`;
+                const secretsWarning =
+                    secretNames.length > 0 ? ` ${formatSecretEnvVarsWarning(secretNames, versionNumber)}` : '';
                 return respondUserError(
                     `The platform refused version ${versionNumber} as taken when the request was retried, so an ` +
                         `earlier attempt of this call may have created it. Read it${readTool} before calling ` +
-                        `${HELPER_TOOLS.ACTOR_VERSION_CREATE} again; if it holds the files this call sent, this call ` +
-                        'created it.',
+                        `${HELPER_TOOLS.ACTOR_VERSION_CREATE} again; if it holds ${sentFiles}, this call created ` +
+                        `it.${secretsWarning}`,
                     { httpStatus: error.statusCode },
                 );
             }
