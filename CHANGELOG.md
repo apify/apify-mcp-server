@@ -8,6 +8,8 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Add Apify API search, details, and read tools ([#1444](https://github.com/apify/apify-mcp-server/pull/1444)) ([682a540](https://github.com/apify/apify-mcp-server/commit/682a540b2750b0fda3712f85e5262e9c6bee7155)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1443](https://github.com/apify/apify-mcp-server/issues/1443)
+- Mark read-only Apify-maintained Actors with limited permissions ([#1451](https://github.com/apify/apify-mcp-server/pull/1451)) ([c7d503c](https://github.com/apify/apify-mcp-server/commit/c7d503c7a3077cbe107df710e9496a0a478d1369)) by [@jirispilka](https://github.com/jirispilka), closes [#973](https://github.com/apify/apify-mcp-server/issues/973)
+- Add apify-api-write to call any Apify API write method ([#1445](https://github.com/apify/apify-mcp-server/pull/1445)) ([11e7e7c](https://github.com/apify/apify-mcp-server/commit/11e7e7cc66399fcff2620dd1d80b288da94cf50d)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1443](https://github.com/apify/apify-mcp-server/issues/1443)
 
 ### 🐛 Bug Fixes
 
@@ -16,6 +18,9 @@ All notable changes to this project will be documented in this file.
 - Remove instructions that force extra tool calls ([#1504](https://github.com/apify/apify-mcp-server/pull/1504)) ([cb02e17](https://github.com/apify/apify-mcp-server/commit/cb02e17cb8dfac73d14c35333d20f06fd61a4112)) by [@jirispilka](https://github.com/jirispilka), closes [#331](https://github.com/apify/apify-mcp-server/issues/331)
 - Keep URL signing key and API token out of responses and logs ([#1508](https://github.com/apify/apify-mcp-server/pull/1508)) ([ce7098c](https://github.com/apify/apify-mcp-server/commit/ce7098c4664d0be30f6527f12a15f9fe46240871)) by [@jirispilka](https://github.com/jirispilka), closes [#330](https://github.com/apify/apify-mcp-server/issues/330)
 - **evals:** Make schedule eval runs safe to run in parallel ([#1423](https://github.com/apify/apify-mcp-server/pull/1423)) ([a781d6a](https://github.com/apify/apify-mcp-server/commit/a781d6a23d798334252c6b83f55fbe05b3f3f16f)) by [@jirispilka](https://github.com/jirispilka), closes [#1394](https://github.com/apify/apify-mcp-server/issues/1394)
+- Refuse the method query parameter in the API tools ([#1506](https://github.com/apify/apify-mcp-server/pull/1506)) ([22aa888](https://github.com/apify/apify-mcp-server/commit/22aa888e4a87b8176f98919ebaa9eaec7d944af8)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1501](https://github.com/apify/apify-mcp-server/issues/1501)
+- Refuse the run-sync GETs in apify-api-read ([#1507](https://github.com/apify/apify-mcp-server/pull/1507)) ([20fef3b](https://github.com/apify/apify-mcp-server/commit/20fef3b4a57f5087a6337cc7be246768aab45591)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1502](https://github.com/apify/apify-mcp-server/issues/1502)
+- **evals:** Re-resolve {{uniq}} per retry attempt ([#1516](https://github.com/apify/apify-mcp-server/pull/1516)) ([2039c3c](https://github.com/apify/apify-mcp-server/commit/2039c3c009808c4d0bda19ab498d0cd5bb282773)) by [@jirispilka](https://github.com/jirispilka), closes [#1426](https://github.com/apify/apify-mcp-server/issues/1426)
 
 
 <!-- git-cliff-unreleased-end -->

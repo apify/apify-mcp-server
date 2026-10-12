@@ -11,13 +11,13 @@ const HOURS_AGO_9 = new Date(NOW - 9 * 60 * 60 * 1000);
 const DAYS_AGO_3 = new Date(NOW - 3 * 24 * 60 * 60 * 1000);
 const WEEKS_AGO_3 = new Date(NOW - 21 * 24 * 60 * 60 * 1000);
 const RUN_ID = '35014680476-1';
-const OTHER_RUN_TASK_NAME = `eval-sum-daily-${buildRunSuffix('35014680999-1', 1)}`;
+const OTHER_RUN_TASK_NAME = `eval-sum-daily-${buildRunSuffix('35014680999-1', 1, 1)}`;
 
 describe('isSweepableTask()', () => {
     it('deletes a task this run created, however young', () => {
         expect(
             isSweepableTask(
-                { name: `eval-sum-daily-${buildRunSuffix(RUN_ID, 1)}`, createdAt: MINUTES_AGO_12 },
+                { name: `eval-sum-daily-${buildRunSuffix(RUN_ID, 1, 1)}`, createdAt: MINUTES_AGO_12 },
                 RUN_ID,
                 NOW,
             ),
@@ -27,7 +27,7 @@ describe('isSweepableTask()', () => {
     it('deletes a task this run created that is also past the age limit', () => {
         expect(
             isSweepableTask(
-                { name: `eval-sum-daily-${buildRunSuffix(RUN_ID, 2)}`, createdAt: HOURS_AGO_9 },
+                { name: `eval-sum-daily-${buildRunSuffix(RUN_ID, 2, 1)}`, createdAt: HOURS_AGO_9 },
                 RUN_ID,
                 NOW,
             ),
@@ -37,7 +37,7 @@ describe('isSweepableTask()', () => {
     it('keeps a young task from a run id this one only prefixes', () => {
         expect(
             isSweepableTask(
-                { name: `eval-sum-daily-${buildRunSuffix('35014680476-12', 1)}`, createdAt: MINUTES_AGO_12 },
+                { name: `eval-sum-daily-${buildRunSuffix('35014680476-12', 1, 1)}`, createdAt: MINUTES_AGO_12 },
                 RUN_ID,
                 NOW,
             ),

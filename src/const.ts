@@ -86,6 +86,7 @@ export const HELPER_TOOLS = {
     API_SEARCH: 'apify-api-search',
     API_DETAILS: 'apify-api-details',
     API_READ: 'apify-api-read',
+    API_WRITE: 'apify-api-write',
     PROBLEM_REPORT: 'report-problem',
 } as const;
 export type HelperToolName = (typeof HELPER_TOOLS)[keyof typeof HELPER_TOOLS];
@@ -254,6 +255,17 @@ export const OFFICIAL_APIFY_USERNAMES: ReadonlySet<string> = new Set([
     'tri_angle',
     'vdrmota',
     'voyager',
+]);
+
+/**
+ * Official Apify Actors that pass the input checks in `isReadOnlyActor` but still act outside
+ * their run storages, so their tools keep the destructive hints.
+ */
+export const OFFICIAL_ACTORS_WITH_SIDE_EFFECTS: ReadonlySet<string> = new Set([
+    'apify/send-mail', // Sends email.
+    'apify/actor-light-fixture', // Controls a physical light.
+    'apifyatevents/wishlist-raffle', // Submits a raffle entry with terms and marketing consent.
+    'tri_angle/sitemap-change-orchestrator', // Keeps a snapshot between runs and starts other Actor runs.
 ]);
 
 export const APIFY_STORE_URL = 'https://apify.com';

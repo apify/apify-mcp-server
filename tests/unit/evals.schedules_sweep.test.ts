@@ -13,7 +13,7 @@ describe('isSweepableSchedule()', () => {
     it('deletes a schedule this run created, however young', () => {
         expect(
             isSweepableSchedule(
-                { name: `eval-sched-add-${buildRunSuffix(RUN_ID, 1)}`, createdAt: MINUTES_AGO_12 },
+                { name: `eval-sched-add-${buildRunSuffix(RUN_ID, 1, 1)}`, createdAt: MINUTES_AGO_12 },
                 RUN_ID,
                 NOW,
             ),
@@ -23,7 +23,7 @@ describe('isSweepableSchedule()', () => {
     it('deletes a schedule this run created that is also past the age limit', () => {
         expect(
             isSweepableSchedule(
-                { name: `eval-sched-add-${buildRunSuffix(RUN_ID, 2)}`, createdAt: HOURS_AGO_9 },
+                { name: `eval-sched-add-${buildRunSuffix(RUN_ID, 2, 1)}`, createdAt: HOURS_AGO_9 },
                 RUN_ID,
                 NOW,
             ),
@@ -33,7 +33,7 @@ describe('isSweepableSchedule()', () => {
     it('keeps a young schedule from a run id this one only prefixes', () => {
         expect(
             isSweepableSchedule(
-                { name: `eval-sched-add-${buildRunSuffix('35014680476-12', 1)}`, createdAt: MINUTES_AGO_12 },
+                { name: `eval-sched-add-${buildRunSuffix('35014680476-12', 1, 1)}`, createdAt: MINUTES_AGO_12 },
                 RUN_ID,
                 NOW,
             ),
