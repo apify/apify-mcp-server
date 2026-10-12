@@ -197,7 +197,7 @@ describe('delete-actor-version', () => {
         );
     });
 
-    it('takes no tag of version 0.10 for one of version 0.1', async () => {
+    it('names no tag of build 0.10.1 when deleting version 0.1', async () => {
         actorGetMock.mockResolvedValue(
             mockActor({
                 versions: [
