@@ -575,6 +575,23 @@ describe('create-actor-version', () => {
             expect(buildMock).not.toHaveBeenCalled();
         });
 
+        it.each([
+            ['U+0000', 'src/a\0.js'],
+            ['U+000A', 'src/\nmain.js'],
+            ['U+0009', 'src/a\tb.js'],
+            ['U+001F', 'src/a\u001f.js'],
+            ['U+007F', 'src/a\u007f.js'],
+        ])('refuses a path with the control character %s, and creates nothing', async (character, path) => {
+            expect(
+                await callToolExpectingUserError({ autoBuild: true, files: [MAIN_JS, { path, content: 'x' }] }),
+            ).toBe(
+                `files[1] has the control character ${character} in its path; ` +
+                    'a path cannot hold characters U+0000 to U+001F or U+007F.',
+            );
+            expectNoOtherWrite();
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+
         it('refuses a call with neither files nor copyFromVersion before any request', async () => {
             expect(await callToolExpectingUserError({})).toBe('Give either files or copyFromVersion.');
             expect(actorMock).not.toHaveBeenCalled();
