@@ -55,10 +55,11 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 }
 
 /**
- * The only method of the path in the spec, or why the agent must give one. Only a call without a
- * method needs the spec. The agent is asked only for the write methods; a GET goes to the read tool.
+ * Called only when the method is omitted. When the path has exactly one operation in the spec, it uses
+ * that operation's write method; otherwise it asks the caller to choose. The caller is asked only for
+ * the write methods; a GET goes to the read tool.
  */
-async function inferMethod(
+async function inferWriteMethod(
     path: string,
     loadedToolNames: readonly string[],
 ): Promise<{ method: Exclude<ApiMethod, 'GET'> } | { error: string }> {
@@ -74,12 +75,8 @@ async function inferMethod(
         return { error: `The path has only the GET method, which this tool does not send${readTool}.` };
     }
     if (operations.length === 1) return { method: writeMethods[0] };
-    const prompt =
-        writeMethods.length === 1
-            ? `The path matches method ${writeMethods[0]}; specify it to call the endpoint with.`
-            : `The path matches methods ${formatList(writeMethods, 'and')}; specify which one to call the endpoint with.`;
     const getNote = writeMethods.length < operations.length ? ` This tool does not send its GET${readTool}.` : '';
-    return { error: `${prompt}${getNote}` };
+    return { error: `Specify a method for this path: ${formatList(writeMethods, 'or')}.${getNote}` };
 }
 
 /**
@@ -124,7 +121,7 @@ export const apifyApiWrite: ToolEntry = Object.freeze({
         if ('error' in body) return respondUserError(body.error);
         const resolved = parsed.method
             ? { method: parsed.method }
-            : await inferMethod(parsed.path, toolArgs.loadedToolNames);
+            : await inferWriteMethod(parsed.path, toolArgs.loadedToolNames);
         if ('error' in resolved) return respondUserError(resolved.error);
         return callApi({
             client: toolArgs.apifyClient,

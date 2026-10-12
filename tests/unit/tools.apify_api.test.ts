@@ -803,10 +803,7 @@ describe('apify-api-write', () => {
     });
 
     it.each([
-        [
-            'request-queues/q/requests/batch',
-            'The path matches methods POST and DELETE; specify which one to call the endpoint with.',
-        ],
+        ['request-queues/q/requests/batch', 'Specify a method for this path: POST or DELETE.'],
         ['not-in-spec/abc', 'The path is not in the API spec; specify the method.'],
     ])('asks for the method of %s without a request', async (path, message) => {
         const result = await callTool(apifyApiWrite, { path, body: { name: 'x' } });
@@ -819,13 +816,12 @@ describe('apify-api-write', () => {
     it.each([
         [
             'datasets/abc',
-            'The path matches methods PUT and DELETE; specify which one to call the endpoint with. This tool ' +
-                `does not send its GET; call it with ${HELPER_TOOLS.API_READ}.`,
+            'Specify a method for this path: PUT or DELETE. This tool does not send its GET; call it with ' +
+                `${HELPER_TOOLS.API_READ}.`,
         ],
         [
             'webhooks',
-            'The path matches method POST; specify it to call the endpoint with. This tool does not send its ' +
-                `GET; call it with ${HELPER_TOOLS.API_READ}.`,
+            `Specify a method for this path: POST. This tool does not send its GET; call it with ${HELPER_TOOLS.API_READ}.`,
         ],
     ])('asks only for a write method of %s and sends its GET to the read tool', async (path, message) => {
         const result = await callTool(apifyApiWrite, { path, body: { name: 'x' } }, [
@@ -842,8 +838,7 @@ describe('apify-api-write', () => {
         const result = await callTool(apifyApiWrite, { path: 'datasets/abc' }, [HELPER_TOOLS.API_WRITE]);
 
         expect(result.content[0].text).toBe(
-            'The path matches methods PUT and DELETE; specify which one to call the endpoint with. This tool ' +
-                'does not send its GET.',
+            'Specify a method for this path: PUT or DELETE. This tool does not send its GET.',
         );
     });
 
