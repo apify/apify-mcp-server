@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - Add Apify API search, details, and read tools ([#1444](https://github.com/apify/apify-mcp-server/pull/1444)) ([682a540](https://github.com/apify/apify-mcp-server/commit/682a540b2750b0fda3712f85e5262e9c6bee7155)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1443](https://github.com/apify/apify-mcp-server/issues/1443)
 - Mark read-only Apify-maintained Actors with limited permissions ([#1451](https://github.com/apify/apify-mcp-server/pull/1451)) ([c7d503c](https://github.com/apify/apify-mcp-server/commit/c7d503c7a3077cbe107df710e9496a0a478d1369)) by [@jirispilka](https://github.com/jirispilka), closes [#973](https://github.com/apify/apify-mcp-server/issues/973)
+- Add apify-api-write to call any Apify API write method ([#1445](https://github.com/apify/apify-mcp-server/pull/1445)) ([11e7e7c](https://github.com/apify/apify-mcp-server/commit/11e7e7cc66399fcff2620dd1d80b288da94cf50d)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1443](https://github.com/apify/apify-mcp-server/issues/1443)
 
 ### 🐛 Bug Fixes
 
