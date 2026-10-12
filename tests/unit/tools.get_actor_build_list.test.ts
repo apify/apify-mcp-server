@@ -3,10 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HELPER_TOOLS } from '../../src/const.js';
 import { getActorBuildList } from '../../src/tools/builds/get_actor_build_list.js';
 import { getActorBuildListToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
-import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import type { HelperTool } from '../../src/types.js';
 import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
+    mockApifyClient,
     only,
     stubToolCallContext,
     type TextToolResult,
@@ -18,7 +19,7 @@ const actorMock = vi.fn(() => ({ builds: buildsMock }));
 // client.builds(): the account-wide list, used when no actorId is given.
 const accountBuildsMock = vi.fn(() => ({ list: listMock }));
 
-const stubClient = { actor: actorMock, builds: accountBuildsMock } as unknown as InternalToolArgs['apifyClient'];
+const stubClient = mockApifyClient({ actor: actorMock, builds: accountBuildsMock });
 
 /** A build list item as the API returns it, with internal fields that the tool must not leak. */
 function mockBuild(overrides: Record<string, unknown> = {}) {

@@ -1,3 +1,5 @@
+import { TIP_MESSAGE_LIMIT } from '../const.js';
+
 /**
  * Shared JSON schema definitions for structured output across tools.
  * These schemas define the format of structured data returned by various tools.
@@ -529,6 +531,76 @@ export const buildActorToolOutputSchema = {
     required: ['build'],
 };
 
+/** Schema for delete-actor. */
+export const deleteActorToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'ID of the deleted Actor' },
+        fullName: { type: 'string', description: 'Full name of the deleted Actor, username/name' },
+        deleted: { type: 'boolean', description: 'Always true; the Actor no longer exists' },
+        abortedRunCount: {
+            type: 'integer',
+            description:
+                'Unfinished runs found just before the deletion. The platform aborts them; a run that starts in between is aborted and not included.',
+        },
+    },
+    required: ['actorId', 'fullName', 'deleted', 'abortedRunCount'],
+};
+
+/** Schema for get-actor-version: the version's file manifest, its revision, and the content returned. */
+export const getActorVersionToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'Actor ID' },
+        fullName: { type: 'string', description: 'Actor full name, username/name' },
+        versionNumber: { type: 'string', description: 'Version number, e.g. 0.1' },
+        revision: { type: 'string', description: 'Identifies the whole file set; changes when any file changes' },
+        files: {
+            type: 'array',
+            description: 'Regular files sorted by path, folders excluded',
+            items: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'Path relative to the Actor root' },
+                    sizeBytes: { type: 'number', description: 'Size of the decoded bytes' },
+                    hash: { type: 'string', description: 'First 16 hex characters of the SHA-256 of the bytes' },
+                },
+                required: ['path', 'sizeBytes', 'hash'],
+            },
+        },
+        contents: {
+            type: 'array',
+            description: 'Content of the returned files, raw with no line numbers',
+            items: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string' },
+                    content: { type: 'string' },
+                    encoding: { type: 'string', enum: ['utf8', 'base64'] },
+                    startLine: {
+                        type: 'integer',
+                        description: 'First returned line, counting from 1; set for a line range',
+                    },
+                    endLine: { type: 'integer', description: 'Last returned line; set for a line range' },
+                    totalLines: { type: 'integer', description: 'Lines in the whole file; set for a line range' },
+                },
+                required: ['path', 'content', 'encoding'],
+            },
+        },
+        omittedPaths: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Requested files left out to stay within the content limit',
+        },
+        notFoundPaths: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Requested paths the version has no file at',
+        },
+    },
+    required: ['actorId', 'fullName', 'versionNumber', 'revision', 'files', 'contents'],
+};
+
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
 // object identity: if `default` and `additionalProperties` referenced the same object, cloning
 // `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into
@@ -639,6 +711,30 @@ export const actorRunOutputSchema = {
                     additionalProperties: buildKeyValueStoreEntrySchema(),
                 },
             },
+        },
+        tip: {
+            type: 'object' as const,
+            description: 'Advisory guidance RAG Web Browser wrote to its key-value store under the reserved "TIP" key',
+            properties: {
+                message: {
+                    type: 'string',
+                    description: `Truncated to ${TIP_MESSAGE_LIMIT} characters, with a trailing ellipsis if the Actor's message was longer`,
+                },
+                level: {
+                    type: 'string',
+                    enum: ['info', 'warning'],
+                    description: 'Omitted when the Actor wrote an unrecognized level',
+                },
+                recommendedActorId: {
+                    type: 'string',
+                    description: 'Apify Actor ID the tip recommends, when it names one',
+                },
+                caveat: {
+                    type: 'string',
+                    description: 'Present when this session cannot run the Actor the tip recommends',
+                },
+            },
+            required: ['message'],
         },
         summary: { type: 'string', description: 'Past-tense summary of the run state' },
         nextStep: { type: 'string', description: 'One primary follow-up action with identifiers interpolated' },
@@ -915,4 +1011,93 @@ export const keyValueStoreRecordOutputSchema = {
         summary: summaryProperty,
     },
     required: ['keyValueStoreId', 'key', 'value', 'summary'],
+};
+
+/**
+ * Schema for the operations found by apify-api-search.
+ */
+export const apifyApiSearchOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        operations: {
+            type: 'array' as const,
+            items: {
+                type: 'object' as const,
+                properties: {
+                    method: { type: 'string', description: 'HTTP method' },
+                    path: { type: 'string', description: 'Path template; each {name} is a path parameter' },
+                    summary: { type: 'string', description: 'What the operation does' },
+                    docsUrl: { type: 'string', description: "The operation's page in the API reference" },
+                },
+                required: ['method', 'path', 'summary', 'docsUrl'],
+            },
+        },
+    },
+    required: ['operations'],
+};
+
+/** One operation in the apify-api-details response. */
+const apiOperationDetailsSchema = {
+    type: 'object' as const,
+    properties: {
+        method: { type: 'string', description: 'HTTP method' },
+        path: { type: 'string', description: 'Path template; each {name} is a path parameter' },
+        summary: { type: 'string', description: 'What the operation does' },
+        description: { type: 'string', description: 'Full description from the API reference' },
+        parameters: {
+            type: 'array' as const,
+            items: {
+                type: 'object' as const,
+                properties: {
+                    name: { type: 'string', description: 'Parameter name' },
+                    in: { type: 'string', enum: ['path', 'query'], description: 'Where the parameter goes' },
+                    isRequired: { type: 'boolean', description: 'Whether the parameter is required' },
+                    description: { type: 'string', description: 'What the parameter does' },
+                    schema: { description: 'JSON schema of the value' },
+                },
+                required: ['name', 'in', 'isRequired'],
+            },
+            description: 'Path and query parameters',
+        },
+        requestBody: {
+            type: 'object' as const,
+            properties: {
+                isRequired: { type: 'boolean', description: 'Whether the body is required' },
+                schema: { description: 'JSON schema of the body, sent as JSON' },
+            },
+            required: ['isRequired', 'schema'],
+            description: 'Only when the operation takes a body',
+        },
+    },
+    required: ['method', 'path', 'summary', 'description', 'parameters'],
+};
+
+/**
+ * Schema for the operations on one path (apify-api-details).
+ */
+export const apifyApiDetailsOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        operations: {
+            type: 'array' as const,
+            items: apiOperationDetailsSchema,
+            description: 'The operations on the path, or only the one with the given method',
+        },
+    },
+    required: ['operations'],
+};
+
+/**
+ * Schema for the response of an API call (apify-api-read).
+ */
+export const apifyApiCallOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        method: { type: 'string', description: 'HTTP method' },
+        path: { type: 'string', description: 'Request path as it was sent' },
+        statusCode: { type: 'integer', description: 'HTTP status code' },
+        contentType: { type: 'string', description: 'Content-Type of the response' },
+        data: { description: 'Response body: parsed JSON, text, or null for an empty or binary body' },
+    },
+    required: ['method', 'path', 'statusCode', 'data'],
 };

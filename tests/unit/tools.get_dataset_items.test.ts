@@ -7,8 +7,9 @@ import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
-    expectSoftFailInvalidInput,
     expectSchemaConformingStructuredContent,
+    expectSoftFailInvalidInput,
+    mockApifyClient,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -55,9 +56,9 @@ const MANY_ITEMS = Array.from({ length: 20 }, (_, i) => ({ n: i }));
 function stubApifyClient(
     listItems: (...args: unknown[]) => unknown = async () => ({ items: MOCK_ITEMS, total: 1 }),
 ): InternalToolArgs['apifyClient'] {
-    return {
+    return mockApifyClient({
         dataset: (_id: string) => ({ listItems }),
-    } as unknown as InternalToolArgs['apifyClient'];
+    });
 }
 
 function stubApifyClientThrowing(err: unknown): InternalToolArgs['apifyClient'] {
@@ -164,7 +165,7 @@ describe('get-dataset-items', () => {
 
     it('passes the wrapper-stripped datasetId to client.dataset()', async () => {
         const datasetSpy = vi.fn().mockReturnValue({ listItems: async () => ({ items: MOCK_ITEMS, total: 1 }) });
-        const client = { dataset: datasetSpy } as unknown as InternalToolArgs['apifyClient'];
+        const client = mockApifyClient({ dataset: datasetSpy });
 
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext({ datasetId: '`user~my-dataset`' }, client),

@@ -2,17 +2,18 @@ import { describe, expect, it } from 'vitest';
 
 import { FAILURE_CATEGORY, HELPER_TOOLS } from '../../src/const.js';
 import {
+    appendReportProblemNudge,
     REPORT_PROBLEM_INVALID_INPUT_NUDGE,
     REPORT_PROBLEM_NUDGE,
-    appendReportProblemNudge,
     reportProblem,
 } from '../../src/tools/dev/report_problem.js';
 import { reportProblemToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool } from '../../src/types.js';
 import {
     expectSchemaConformingStructuredContent,
-    type TextToolResult,
+    mockApifyClient,
     stubToolCallContext,
+    type TextToolResult,
 } from './helpers/tool_context.js';
 
 const errorResult = () => ({ content: [{ type: 'text', text: 'Actor not found.' }], isError: true });
@@ -23,7 +24,7 @@ describe('reportProblem', () => {
     describe('call()', () => {
         it('acknowledges a submission that has a message', async () => {
             const result = await (reportProblem as HelperTool).call(
-                stubToolCallContext({ message: 'The search-actors results were unclear.' }, {} as never),
+                stubToolCallContext({ message: 'The search-actors results were unclear.' }, mockApifyClient()),
             );
             const { content, isError } = result as TextToolResult;
 
@@ -33,7 +34,7 @@ describe('reportProblem', () => {
 
         it('returns structuredContent conforming to the declared outputSchema', async () => {
             const result = await (reportProblem as HelperTool).call(
-                stubToolCallContext({ message: 'The search-actors results were unclear.' }, {} as never),
+                stubToolCallContext({ message: 'The search-actors results were unclear.' }, mockApifyClient()),
             );
 
             expect((result as TextToolResult).structuredContent).toEqual({ reported: true });

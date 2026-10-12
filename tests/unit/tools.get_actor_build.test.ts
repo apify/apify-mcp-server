@@ -9,6 +9,7 @@ import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
+    mockApifyClient,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -21,7 +22,7 @@ vi.mock('../../src/utils/userid_cache.js', () => ({
 const getMock = vi.fn();
 const buildMock = vi.fn(() => ({ get: getMock }));
 
-const stubClient = { build: buildMock } as unknown as InternalToolArgs['apifyClient'];
+const stubClient = mockApifyClient({ build: buildMock });
 
 /** A build API document with internal fields that the tool must not leak. */
 function mockBuild(overrides: Record<string, unknown> = {}) {

@@ -226,6 +226,30 @@ describe('getServerInstructions()', () => {
         });
     });
 
+    describe('"## Apify API resources" section', () => {
+        const API_READ_LINE =
+            `- Use \`${HELPER_TOOLS.API_READ}\` for API GETs. If your client can read resources, \`resources/read\` ` +
+            `also returns binary records, such as key-value store files, which \`${HELPER_TOOLS.API_READ}\` does not.\n`;
+
+        it('sends API GETs to apify-api-read when the session has it', () => {
+            const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.API_READ));
+            const start = instructions.indexOf('## Apify API resources');
+            const end = instructions.indexOf('\n## ', start + 1);
+            expect(instructions.slice(start, end === -1 ? undefined : end)).toContain(API_READ_LINE);
+        });
+
+        it('adds only that line, and nothing when the session lacks apify-api-read', () => {
+            const withRead = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.API_READ));
+            const withoutRead = getServerInstructions(
+                SERVER_MODE.DEFAULT,
+                only(HELPER_TOOLS.API_SEARCH, HELPER_TOOLS.API_DETAILS),
+            );
+            expect(withoutRead).not.toContain(HELPER_TOOLS.API_READ);
+            expect(withRead).not.toBe(withoutRead);
+            expect(withRead.replace(API_READ_LINE, '')).toBe(withoutRead);
+        });
+    });
+
     describe('"Tool dependencies and disambiguation" section', () => {
         const HEADING = '## Tool dependencies and disambiguation';
 

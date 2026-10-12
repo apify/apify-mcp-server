@@ -2,11 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { ApifyClient } from '../../src/apify_client.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
+import { mockApifyClient } from './helpers/tool_context.js';
 
 function stubClient(getImpl: () => Promise<unknown>): ApifyClient {
-    return {
+    return mockApifyClient({
         user: vi.fn(() => ({ get: getImpl })),
-    } as unknown as ApifyClient;
+    });
 }
 
 describe('getUserInfoCached', () => {
@@ -73,7 +74,7 @@ describe('getUserInfoCached', () => {
 
     it('caches result and avoids second API call', async () => {
         const get = vi.fn(async () => ({ id: 'u5', plan: { tier: 'PLATINUM' } }));
-        const client = { user: vi.fn(() => ({ get })) } as unknown as ApifyClient;
+        const client = mockApifyClient({ user: vi.fn(() => ({ get })) });
         const token = `token-${Math.random()}`;
         await getUserInfoCached(token, client);
         await getUserInfoCached(token, client);
@@ -82,7 +83,7 @@ describe('getUserInfoCached', () => {
 
     it.each([undefined, ''])('returns anonymous FREE default without calling API when token is %p', async (token) => {
         const get = vi.fn();
-        const client = { user: vi.fn(() => ({ get })) } as unknown as ApifyClient;
+        const client = mockApifyClient({ user: vi.fn(() => ({ get })) });
         const out = await getUserInfoCached(token, client);
         expect(out).toEqual({ userId: null, userPlanTier: 'FREE', isOrganization: false });
         expect(get).not.toHaveBeenCalled();
@@ -95,7 +96,7 @@ describe('getUserInfoCached', () => {
             if (attempts === 1) throw new Error('transient');
             return { id: 'u6', plan: { tier: 'BRONZE' } };
         });
-        const client = { user: vi.fn(() => ({ get })) } as unknown as ApifyClient;
+        const client = mockApifyClient({ user: vi.fn(() => ({ get })) });
         const token = `token-${Math.random()}`;
         const first = await getUserInfoCached(token, client);
         expect(first).toEqual({ userId: null, userPlanTier: 'FREE', isOrganization: false });

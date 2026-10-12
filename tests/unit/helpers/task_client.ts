@@ -1,4 +1,5 @@
 import type { InternalToolArgs } from '../../../src/types.js';
+import { mockApifyClient } from './tool_context.js';
 
 /** A task API document with internal fields that the task tools must not leak. */
 export function mockTask(overrides: Record<string, unknown> = {}) {
@@ -33,7 +34,7 @@ export function mockTaskApiClient(task: unknown | ((taskId: string) => unknown))
     // The function form maps a taskId to the task the API would return, so tests can make a
     // lookup miss under one id and hit under another (the ID-vs-name fallback).
     const resolve = (taskId: string) => (typeof task === 'function' ? task(taskId) : task);
-    const apifyClient = {
+    const apifyClient = mockApifyClient({
         // `taskId` is recorded because the tools normalize a bare task name to `~name` before the
         // call — the API would otherwise read the name as an ID and 404.
         task: (taskId: string) => ({
@@ -60,6 +61,6 @@ export function mockTaskApiClient(task: unknown | ((taskId: string) => unknown))
                 return task;
             },
         }),
-    } as unknown as InternalToolArgs['apifyClient'];
+    });
     return { apifyClient, calls };
 }

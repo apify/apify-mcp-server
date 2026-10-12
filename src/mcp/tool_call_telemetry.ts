@@ -2,6 +2,7 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../apify_client.js';
 import { HELPER_TOOLS, TOOL_STATUS } from '../const.js';
+import type { PaymentProvider } from '../payments/types.js';
 import { buildReportedProblemProperties, trackReportedProblem, trackToolCall } from '../telemetry.js';
 import type {
     CallDiagnostics,
@@ -26,6 +27,8 @@ type PrepareTelemetryDataParams = {
     clientContext: McpClientContext | undefined;
     /** Raw `?client=` URL query-param value for this connection/request, if any. */
     clientParam?: string;
+    /** Payment provider the connection was opened with, if any. */
+    paymentProvider?: PaymentProvider;
 };
 
 /**
@@ -34,7 +37,16 @@ type PrepareTelemetryDataParams = {
 export async function prepareTelemetryData(
     params: PrepareTelemetryDataParams,
 ): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string | null }> {
-    const { toolName, mcpSessionId, apifyToken, telemetryEnabled, transportType, clientContext, clientParam } = params;
+    const {
+        toolName,
+        mcpSessionId,
+        apifyToken,
+        telemetryEnabled,
+        transportType,
+        clientContext,
+        clientParam,
+        paymentProvider,
+    } = params;
     if (!telemetryEnabled) {
         return { telemetryData: null, userId: null };
     }
@@ -57,6 +69,7 @@ export async function prepareTelemetryData(
         mcp_session_id: mcpSessionId || '',
         transport_type: transportType || '',
         mcp_url_client: clientParam || '',
+        ...(paymentProvider && { payment_provider: paymentProvider.id }),
         tool_name: toolName,
         tool_status: TOOL_STATUS.SUCCEEDED, // Will be updated in finally
         tool_exec_time_ms: 0, // Will be calculated in finally

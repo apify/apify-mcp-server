@@ -1,6 +1,8 @@
 import type { ActorRun } from 'apify-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { HELPER_TOOLS, KV_KEYS_LIMIT, TIP_MESSAGE_LIMIT } from '../../src/const.js';
+import { ACTOR_TIP_CAVEAT } from '../../src/tools/actor_tool_naming.js';
 import {
     buildStartRunResponse,
     buildStartRunWidgetResponse,
@@ -14,7 +16,7 @@ import { getActorRun } from '../../src/tools/runs/get_actor_run.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockUserInfo, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import { mockApifyClient, mockUserInfo, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 // Only Console UI token sessions reach the users/me lookup; the default 'test-token'
 // stub never triggers it.
@@ -24,7 +26,7 @@ vi.mock('../../src/utils/userid_cache.js', () => ({
 
 /**
  * Default mode `get-actor-run` returns: runId, actorId, status, storages, summary, nextStep
- * — with no inlined dataset items or KV record bodies.
+ * — with no inlined dataset items or KV record bodies, except RAG Web Browser's reserved `TIP` key.
  * Tests cover shape invariants and the branching status templates (SUCCEEDED, TIMED-OUT).
  * Pure-template states (READY, RUNNING, TIMING-OUT, ABORTING, FAILED, ABORTED) are intentionally
  * not asserted here — see the comment above `describe('buildStatusTemplate', ...)` below.
@@ -70,7 +72,7 @@ function stubClient(opts: {
     listItemsProbe?: { items: unknown[]; total?: number };
 }): InternalToolArgs['apifyClient'] {
     const { run, dataset, listKeys, listItemsProbe } = opts;
-    return {
+    return mockApifyClient({
         run: (_id: string) => ({
             get: async () => run,
             waitForFinish: async () => run,
@@ -83,7 +85,7 @@ function stubClient(opts: {
         keyValueStore: (_id: string) => ({
             listKeys: async () => listKeys ?? { items: [], count: 0, isTruncated: false, limit: 50 },
         }),
-    } as unknown as InternalToolArgs['apifyClient'];
+    });
 }
 
 describe('get-actor-run default response', () => {
@@ -165,7 +167,7 @@ describe('get-actor-run default response', () => {
         let datasetCalls = 0;
         let kvCalls = 0;
         const run = { ...mockSucceededRun({ status: 'RUNNING', finishedAt: undefined }), exitCode: undefined };
-        const client = {
+        const client = mockApifyClient({
             run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
             actor: (_id: string) => ({ get: async () => ACTOR }),
             dataset: (_id: string) => {
@@ -179,7 +181,7 @@ describe('get-actor-run default response', () => {
                 kvCalls += 1;
                 return { listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }) };
             },
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
 
         const result = await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
@@ -222,7 +224,7 @@ describe('get-actor-run default response', () => {
         const run = mockSucceededRun({
             storageIds: { datasets: { default: 'dataset-xyz', results: 'dataset-results' } },
         });
-        const client = {
+        const client = mockApifyClient({
             run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
             actor: (_id: string) => ({ get: async () => ACTOR }),
             dataset: (id: string) => ({
@@ -234,7 +236,7 @@ describe('get-actor-run default response', () => {
             keyValueStore: (_id: string) => ({
                 listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
             }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
 
         const result = await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
@@ -252,7 +254,7 @@ describe('get-actor-run default response', () => {
             const run = mockSucceededRun();
             const dataset = mockDataset({ itemCount: 0 });
             let probeCalls = 0;
-            const client = {
+            const client = mockApifyClient({
                 run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
                 actor: (_id: string) => ({ get: async () => ACTOR }),
                 dataset: (_id: string) => ({
@@ -265,7 +267,7 @@ describe('get-actor-run default response', () => {
                 keyValueStore: (_id: string) => ({
                     listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
                 }),
-            } as unknown as InternalToolArgs['apifyClient'];
+            });
 
             const callPromise = (getActorRun as HelperTool).call(
                 stubToolCallContext({ runId: 'run-1', waitSecs: 5 }, client),
@@ -289,7 +291,7 @@ describe('get-actor-run default response', () => {
             const run = mockSucceededRun();
             const dataset = mockDataset({ itemCount: 0 });
             let probeCalls = 0;
-            const client = {
+            const client = mockApifyClient({
                 run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
                 actor: (_id: string) => ({ get: async () => ACTOR }),
                 dataset: (_id: string) => ({
@@ -302,7 +304,7 @@ describe('get-actor-run default response', () => {
                 keyValueStore: (_id: string) => ({
                     listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
                 }),
-            } as unknown as InternalToolArgs['apifyClient'];
+            });
 
             const callPromise = (getActorRun as HelperTool).call(
                 stubToolCallContext({ runId: 'run-1', waitSecs: 5 }, client),
@@ -325,7 +327,7 @@ describe('get-actor-run default response', () => {
         const run = mockSucceededRun();
         const dataset = mockDataset({ itemCount: 0 });
         let probeCalls = 0;
-        const client = {
+        const client = mockApifyClient({
             run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
             actor: (_id: string) => ({ get: async () => ACTOR }),
             dataset: (_id: string) => ({
@@ -338,7 +340,7 @@ describe('get-actor-run default response', () => {
             keyValueStore: (_id: string) => ({
                 listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
             }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
 
         await (getActorRun as HelperTool).call(stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client));
         // Exactly one immediate probe — no delayed retries.
@@ -352,7 +354,7 @@ describe('get-actor-run default response', () => {
         controller.abort();
 
         let getCalls = 0;
-        const client = {
+        const client = mockApifyClient({
             run: (_id: string) => ({
                 get: async () => {
                     getCalls += 1;
@@ -370,7 +372,7 @@ describe('get-actor-run default response', () => {
             keyValueStore: (_id: string) => ({
                 listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
             }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
 
         const result = await (getActorRun as HelperTool).call({
             ...stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
@@ -396,7 +398,7 @@ describe('get-actor-run default response', () => {
 
     it('degrades gracefully when dataset metadata fetch fails: keeps SUCCEEDED, points at dataset', async () => {
         const run = mockSucceededRun();
-        const client = {
+        const client = mockApifyClient({
             run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
             actor: (_id: string) => ({ get: async () => ACTOR }),
             dataset: (_id: string) => ({
@@ -408,7 +410,7 @@ describe('get-actor-run default response', () => {
             keyValueStore: (_id: string) => ({
                 listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
             }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
 
         const result = await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
@@ -434,7 +436,7 @@ describe('get-actor-run default response', () => {
 
     it('degrades gracefully when KV listKeys fails: keeps dataset, omits KV', async () => {
         const run = mockSucceededRun();
-        const client = {
+        const client = mockApifyClient({
             run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
             actor: (_id: string) => ({ get: async () => ACTOR }),
             dataset: (_id: string) => ({
@@ -446,7 +448,7 @@ describe('get-actor-run default response', () => {
                     throw new Error('transient KV error');
                 },
             }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
 
         const result = await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
@@ -478,7 +480,7 @@ describe('get-actor-run default response', () => {
             'kv-xyz': [{ key: 'OUTPUT' }],
             'kv-screenshots': [{ key: 'shot-1' }, { key: 'shot-2' }],
         };
-        const client = {
+        const client = mockApifyClient({
             run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
             actor: (_id: string) => ({ get: async () => ACTOR }),
             dataset: (id: string) => ({
@@ -488,7 +490,7 @@ describe('get-actor-run default response', () => {
             keyValueStore: (id: string) => ({
                 listKeys: async () => ({ items: kvKeysById[id] ?? [], isTruncated: false }),
             }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
 
         const result = await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
@@ -512,6 +514,315 @@ describe('get-actor-run default response', () => {
         });
     });
 
+    function makeKvStoreClient(opts: {
+        displayedKeys: { key: string }[];
+        displayTruncated?: boolean;
+        hasTipKey?: boolean;
+        tipRecordValue?: unknown;
+    }) {
+        let getRecordCalls = 0;
+        const listKeysCalls: { limit: number }[] = [];
+        const recordExistsCalls: string[] = [];
+        return {
+            client: {
+                keyValueStore: (_id: string) => ({
+                    listKeys: async (listOpts: { limit: number }) => {
+                        listKeysCalls.push(listOpts);
+                        return { items: opts.displayedKeys, isTruncated: opts.displayTruncated ?? false };
+                    },
+                    recordExists: async (key: string) => {
+                        recordExistsCalls.push(key);
+                        return key === 'TIP' && (opts.hasTipKey ?? false);
+                    },
+                    getRecord: async (key: string) => {
+                        getRecordCalls += 1;
+                        return key === 'TIP' && opts.tipRecordValue !== undefined
+                            ? { key, value: opts.tipRecordValue }
+                            : undefined;
+                    },
+                }),
+            } as unknown as InternalToolArgs['apifyClient'],
+            getRecordCalls: () => getRecordCalls,
+            listKeysCalls: () => listKeysCalls,
+            recordExistsCalls: () => recordExistsCalls,
+        };
+    }
+
+    function makeRunClient(kvStoreClient: unknown, actorId = '3ox4R101TgZz67sLr', actor = ACTOR) {
+        const run = mockSucceededRun({ actId: actorId });
+        return {
+            run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+            actor: (_id: string) => ({ get: async () => actor }),
+            dataset: (_id: string) => ({
+                get: async () => mockDataset(),
+                listItems: async () => ({ items: [], total: 0 }),
+            }),
+            ...(kvStoreClient as object),
+        } as unknown as InternalToolArgs['apifyClient'];
+    }
+
+    it('fetches and surfaces the TIP record when the key-value store lists a TIP key', async () => {
+        const { client, getRecordCalls, listKeysCalls } = makeKvStoreClient({
+            displayedKeys: [{ key: 'OUTPUT' }, { key: 'TIP' }],
+            tipRecordValue: { message: 'Use the Instagram Scraper instead.', level: 'info' },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent, content } = result as {
+            structuredContent: RunResponse;
+            content: { type: string; text: string }[];
+        };
+
+        expect(structuredContent.tip).toEqual({ message: 'Use the Instagram Scraper instead.', level: 'info' });
+        expect(content[1].text.endsWith('\nTip from Actor:\n```\nUse the Instagram Scraper instead.\n```')).toBe(true);
+        expect(getRecordCalls()).toBe(1);
+        expect(listKeysCalls()).toHaveLength(1);
+    });
+
+    it.each([false, true])(
+        'skips TIP reads for another Actor when the key page is truncated=%s',
+        async (isTruncated) => {
+            const { client, getRecordCalls, recordExistsCalls } = makeKvStoreClient({
+                displayedKeys: isTruncated
+                    ? Array.from({ length: 50 }, (_, i) => ({ key: `KEY_${i}` }))
+                    : [{ key: 'TIP' }],
+                displayTruncated: isTruncated,
+                hasTipKey: true,
+                tipRecordValue: { message: 'Use a specialized Actor.', level: 'info' },
+            });
+
+            const result = await (getActorRun as HelperTool).call(
+                stubToolCallContext(
+                    { runId: 'run-1', waitSecs: 0 },
+                    makeRunClient(client, 'shu8hvrXbJbY3Eb9W', { username: 'another-user', name: 'rag-web-browser' }),
+                ),
+            );
+            const { structuredContent, content } = result as {
+                structuredContent: RunResponse;
+                content: { type: string; text: string }[];
+            };
+
+            expect(structuredContent.tip).toBeUndefined();
+            expect(content[1].text).not.toContain('Tip from Actor');
+            expect(getRecordCalls()).toBe(0);
+            expect(recordExistsCalls()).toEqual([]);
+        },
+    );
+
+    it('omits tip and never fetches the TIP record when a non-truncated store does not have it', async () => {
+        const { client, getRecordCalls, listKeysCalls } = makeKvStoreClient({
+            displayedKeys: [{ key: 'OUTPUT' }],
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent, content } = result as {
+            structuredContent: RunResponse;
+            content: { type: string; text: string }[];
+        };
+
+        expect(structuredContent.tip).toBeUndefined();
+        expect(content[1].text).not.toContain('Tip');
+        expect(getRecordCalls()).toBe(0);
+        expect(listKeysCalls()).toHaveLength(1);
+    });
+
+    it('finds a TIP key via a targeted lookup when the displayed page is truncated', async () => {
+        const displayedKeys = Array.from({ length: 50 }, (_, i) => ({ key: `KEY_${i}` }));
+        const { client, getRecordCalls, listKeysCalls, recordExistsCalls } = makeKvStoreClient({
+            displayedKeys,
+            displayTruncated: true,
+            hasTipKey: true,
+            tipRecordValue: { message: 'Use a specialized Actor.', level: 'info' },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).toEqual({ message: 'Use a specialized Actor.', level: 'info' });
+        expect(getRecordCalls()).toBe(1);
+        expect(listKeysCalls()).toEqual([{ limit: KV_KEYS_LIMIT }]);
+        expect(recordExistsCalls()).toEqual(['TIP']);
+    });
+
+    it("omits tip and skips getRecord when the truncated page's targeted lookup finds nothing", async () => {
+        const displayedKeys = Array.from({ length: 50 }, (_, i) => ({ key: `KEY_${i}` }));
+        const { client, getRecordCalls, listKeysCalls, recordExistsCalls } = makeKvStoreClient({
+            displayedKeys,
+            displayTruncated: true,
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).toBeUndefined();
+        expect(getRecordCalls()).toBe(0);
+        expect(listKeysCalls()).toHaveLength(1);
+        expect(recordExistsCalls()).toEqual(['TIP']);
+    });
+
+    it('discards a malformed TIP record instead of throwing', async () => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: { level: 'warning' }, // no `message`
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).toBeUndefined();
+    });
+
+    it(`truncates a TIP message longer than ${TIP_MESSAGE_LIMIT} characters`, async () => {
+        const longMessage = 'x'.repeat(TIP_MESSAGE_LIMIT + 100);
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: { message: longMessage, level: 'info' },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip?.message).toBe(`${'x'.repeat(TIP_MESSAGE_LIMIT)}…`);
+    });
+
+    it('truncates on Unicode code points, not UTF-16 units, so a trailing emoji is not split', async () => {
+        const message = `${'x'.repeat(TIP_MESSAGE_LIMIT - 1)}🚀extra`;
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: { message, level: 'info' },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip?.message).toBe(`${'x'.repeat(TIP_MESSAGE_LIMIT - 1)}🚀…`);
+    });
+
+    it('omits an unrecognized TIP level instead of coercing it to "info"', async () => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: { message: 'Try a different Actor.', level: 'critical' },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).toEqual({ message: 'Try a different Actor.' });
+        expect(structuredContent.tip).not.toHaveProperty('level');
+    });
+
+    it('surfaces recommendedActorId when the TIP record names one', async () => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: {
+                message: 'Use the Instagram Scraper instead.',
+                level: 'info',
+                recommendedActorId: 'shu8hvrXbJbY3Eb9W',
+            },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).toEqual({
+            message: 'Use the Instagram Scraper instead.',
+            level: 'info',
+            recommendedActorId: 'shu8hvrXbJbY3Eb9W',
+        });
+    });
+
+    it('omits recommendedActorId when the TIP record does not name one', async () => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: { message: 'General advice, no specific Actor.', level: 'info' },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).not.toHaveProperty('recommendedActorId');
+    });
+
+    it.each([
+        ['a number', 12345],
+        ['an empty string', ''],
+        ['prose', 'Use the Instagram Scraper instead.'],
+        ['an oversized string', 'x'.repeat(100_000)],
+        ['an invalid character', 'shu8hvrXbJbY3Eb9_'],
+        ['a trailing newline', 'shu8hvrXbJbY3Eb9W\n'],
+    ])('omits recommendedActorId when it is %s', async (_name, recommendedActorId) => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: { message: 'Use a specialized Actor.', level: 'info', recommendedActorId },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip).toEqual({ message: 'Use a specialized Actor.', level: 'info' });
+        expect(structuredContent.tip).not.toHaveProperty('recommendedActorId');
+    });
+
+    it('adds the callability caveat after the tip when the session cannot run the recommended Actor', async () => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: {
+                message: 'Use a different Actor.',
+                level: 'info',
+                recommendedActorId: 'shu8hvrXbJbY3Eb9W',
+            },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client), {
+                loadedToolNames: [HELPER_TOOLS.ACTOR_RUNS_GET],
+            }),
+        );
+        const { content, structuredContent } = result as {
+            content: { type: string; text: string }[];
+            structuredContent: RunResponse;
+        };
+
+        expect(structuredContent.tip?.caveat).toBe(ACTOR_TIP_CAVEAT);
+        expect(content[1].text).toContain(`Use a different Actor.\n\`\`\`\n${ACTOR_TIP_CAVEAT}`);
+    });
+
+    it('renders the tip in a fenced code block in the text response', async () => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: { message: 'Use a different Actor.', level: 'info' },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client)),
+        );
+        const { content } = result as { content: { type: string; text: string }[] };
+
+        expect(content[1].text).toContain('Tip from Actor:\n```\nUse a different Actor.\n```');
+    });
+
     it('emits progress with formatted status messages on wait + terminal flip', async () => {
         // RUNNING with a non-terminal statusMessage at start; SUCCEEDED with a terminal statusMessage
         // at end. formatRunStatusMessage suppresses non-terminal-marked statusMessages on terminal
@@ -530,7 +841,7 @@ describe('get-actor-run default response', () => {
         });
 
         let runFetchCount = 0;
-        const client = {
+        const client = mockApifyClient({
             // First .get() returns RUNNING; the post-waitForFinish re-fetch returns the terminal run.
             run: (_id: string) => ({
                 get: async () => {
@@ -547,7 +858,7 @@ describe('get-actor-run default response', () => {
             keyValueStore: (_id: string) => ({
                 listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
             }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
 
         const updateProgressCalls: string[] = [];
         const startActorRunUpdatesCalls: string[] = [];
@@ -582,10 +893,10 @@ describe('get-actor-run default response', () => {
     });
 
     it('returns isError on a missing run', async () => {
-        const client = {
+        const client = mockApifyClient({
             run: (_id: string) => ({ get: async () => undefined }),
             actor: (_id: string) => ({ get: async () => ACTOR }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
         const result = (await (getActorRun as HelperTool).call(
             stubToolCallContext({ runId: 'missing', waitSecs: 0 }, client),
         )) as TextToolResult;

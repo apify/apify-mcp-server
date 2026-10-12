@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { HELPER_TOOLS } from '../../src/const.js';
 import { ABORT, WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
 import { buildNextStepForBuild, listVersionNumbers, startBuild } from '../../src/tools/builds/build_helpers.js';
-import type { InternalToolArgs } from '../../src/types.js';
+import { mockApifyClient } from './helpers/tool_context.js';
 
 // Cast because the client's `Build.status` type lists only terminal statuses; the API also returns RUNNING.
 const runningBuild = { id: 'build-1', buildNumber: '0.0.3', status: 'RUNNING' } as unknown as Parameters<
@@ -49,10 +49,10 @@ describe('startBuild', () => {
         getMock: ReturnType<typeof vi.fn>,
         abortMock: ReturnType<typeof vi.fn>,
     ) =>
-        ({
+        mockApifyClient({
             actor: () => ({ build: buildMock }),
             build: () => ({ get: getMock, abort: abortMock }),
-        }) as unknown as InternalToolArgs['apifyClient'];
+        });
 
     it('aborts the started build and returns ABORT when the request signal is already aborted', async () => {
         const buildMock = vi.fn().mockResolvedValue({ id: 'build-1', status: 'RUNNING' });

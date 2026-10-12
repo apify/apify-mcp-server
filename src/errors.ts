@@ -3,6 +3,14 @@ export class TimeoutError extends Error {
 }
 
 /**
+ * A problem the caller can fix or has to be told about, thrown from helpers several calls deep; the tool
+ * turns it into a soft-fail response with the message as its text, so the message must be safe to show.
+ */
+export class UserInputError extends Error {
+    override readonly name = 'UserInputError';
+}
+
+/**
  * Thrown by `fixedAjvCompile` when an untrusted Actor / proxied-MCP input schema exceeds the byte
  * cap that bounds AJV's synchronous codegen. It's a property of the schema, not a server fault, so
  * `logHttpError` logs it as a soft fail and the caller drops just that one tool.

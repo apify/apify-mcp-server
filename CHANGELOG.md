@@ -2,6 +2,57 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.17.5 - **not yet released**
+
+### 🚀 Features
+
+- Add Apify API search, details, and read tools ([#1444](https://github.com/apify/apify-mcp-server/pull/1444)) ([682a540](https://github.com/apify/apify-mcp-server/commit/682a540b2750b0fda3712f85e5262e9c6bee7155)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1443](https://github.com/apify/apify-mcp-server/issues/1443)
+- Mark read-only Apify-maintained Actors with limited permissions ([#1451](https://github.com/apify/apify-mcp-server/pull/1451)) ([c7d503c](https://github.com/apify/apify-mcp-server/commit/c7d503c7a3077cbe107df710e9496a0a478d1369)) by [@jirispilka](https://github.com/jirispilka), closes [#973](https://github.com/apify/apify-mcp-server/issues/973)
+
+### 🐛 Bug Fixes
+
+- Hint for 429 and 5xx errors ([#1456](https://github.com/apify/apify-mcp-server/pull/1456)) ([ced3f1d](https://github.com/apify/apify-mcp-server/commit/ced3f1dd0d67e080aa865e320c93777418241b00)) by [@jsimecek](https://github.com/jsimecek), closes [#1115](https://github.com/apify/apify-mcp-server/issues/1115)
+- Attribute runs from the Apify AI agent to the APIFY_AI origin ([#1498](https://github.com/apify/apify-mcp-server/pull/1498)) ([3b37cba](https://github.com/apify/apify-mcp-server/commit/3b37cba32253e005351ed6f4d9d853a11a814036)) by [@vojtechj-apify](https://github.com/vojtechj-apify), closes [#1495](https://github.com/apify/apify-mcp-server/issues/1495)
+- Remove instructions that force extra tool calls ([#1504](https://github.com/apify/apify-mcp-server/pull/1504)) ([cb02e17](https://github.com/apify/apify-mcp-server/commit/cb02e17cb8dfac73d14c35333d20f06fd61a4112)) by [@jirispilka](https://github.com/jirispilka), closes [#331](https://github.com/apify/apify-mcp-server/issues/331)
+- Keep URL signing key and API token out of responses and logs ([#1508](https://github.com/apify/apify-mcp-server/pull/1508)) ([ce7098c](https://github.com/apify/apify-mcp-server/commit/ce7098c4664d0be30f6527f12a15f9fe46240871)) by [@jirispilka](https://github.com/jirispilka), closes [#330](https://github.com/apify/apify-mcp-server/issues/330)
+- **evals:** Make schedule eval runs safe to run in parallel ([#1423](https://github.com/apify/apify-mcp-server/pull/1423)) ([a781d6a](https://github.com/apify/apify-mcp-server/commit/a781d6a23d798334252c6b83f55fbe05b3f3f16f)) by [@jirispilka](https://github.com/jirispilka), closes [#1394](https://github.com/apify/apify-mcp-server/issues/1394)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.17.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.4) (2026-10-07)
+
+### 🐛 Bug Fixes
+
+- Stop pointing non-Actor tools at fetch-actor-details ([#1485](https://github.com/apify/apify-mcp-server/pull/1485)) ([d9768ca](https://github.com/apify/apify-mcp-server/commit/d9768ca1c551b5d1d7f5f3bc86e5321d3505c8a6)) by [@daveomri](https://github.com/daveomri), closes [#1214](https://github.com/apify/apify-mcp-server/issues/1214)
+- Stop get-dataset-schema calling clean-filtered datasets empty ([#1486](https://github.com/apify/apify-mcp-server/pull/1486)) ([ee4760d](https://github.com/apify/apify-mcp-server/commit/ee4760dedff701935a54c2fca6cef0ace8a6a09e)) by [@daveomri](https://github.com/daveomri), closes [#900](https://github.com/apify/apify-mcp-server/issues/900)
+
+
+## [0.17.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.3) (2026-10-06)
+
+### 🚀 Features
+
+- Add delete-actor tool ([#1439](https://github.com/apify/apify-mcp-server/pull/1439)) ([0387245](https://github.com/apify/apify-mcp-server/commit/0387245ef46954f4ae8cc3e61edfea1f65e0046b)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1417](https://github.com/apify/apify-mcp-server/issues/1417)
+- **telemetry:** Add payment_provider to the tool-call Segment event ([#1473](https://github.com/apify/apify-mcp-server/pull/1473)) ([c0d48f0](https://github.com/apify/apify-mcp-server/commit/c0d48f00b18773bc03ac78f3bd6eb7761d823d60)) by [@MQ37](https://github.com/MQ37)
+
+### 🐛 Bug Fixes
+
+- **ci:** Wait until npm serves the version before finishing publish ([#1474](https://github.com/apify/apify-mcp-server/pull/1474)) ([88cbc3e](https://github.com/apify/apify-mcp-server/commit/88cbc3e135a78a602f51eb4822449a4392f2eb43)) by [@jirispilka](https://github.com/jirispilka)
+- **actors:** Match TIP pilot by Actor full name across environments ([#1476](https://github.com/apify/apify-mcp-server/pull/1476)) ([143b1bc](https://github.com/apify/apify-mcp-server/commit/143b1bca6f92739d842162ffb8e4c9583cae5983)) by [@jirispilka](https://github.com/jirispilka)
+
+
+## [0.17.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.2) (2026-10-05)
+
+### 🚀 Features
+
+- Add get-actor-version tool ([#1450](https://github.com/apify/apify-mcp-server/pull/1450)) ([0c1c93e](https://github.com/apify/apify-mcp-server/commit/0c1c93e10aed623e3c8b93a4137eee127167b9aa)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1460](https://github.com/apify/apify-mcp-server/issues/1460)
+- **actors:** Surface run tip from key-value store ([#1363](https://github.com/apify/apify-mcp-server/pull/1363)) ([6830279](https://github.com/apify/apify-mcp-server/commit/683027922c5df28658e2e1d784b071a1aa7574b3)) by [@MQ37](https://github.com/MQ37), closes [#1361](https://github.com/apify/apify-mcp-server/issues/1361)
+
+### 🐛 Bug Fixes
+
+- **actors:** Limit and validate the RAG Web Browser TIP pilot ([#1468](https://github.com/apify/apify-mcp-server/pull/1468)) ([fb731c5](https://github.com/apify/apify-mcp-server/commit/fb731c549fc837e67f0f4b04dd8d243e74f59b56)) by [@jirispilka](https://github.com/jirispilka)
+
+
 ## [0.17.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.1) (2026-09-30)
 
 ### 🐛 Bug Fixes

@@ -7,8 +7,9 @@ import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
-    expectSoftFailInvalidInput,
     expectSchemaConformingStructuredContent,
+    expectSoftFailInvalidInput,
+    mockApifyClient,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -27,9 +28,9 @@ const MOCK_DATASET = {
 };
 
 function stubApifyClient(dataset: unknown): InternalToolArgs['apifyClient'] {
-    return {
+    return mockApifyClient({
         dataset: (_id: string) => ({ get: async () => dataset }),
-    } as unknown as InternalToolArgs['apifyClient'];
+    });
 }
 
 describe('get-dataset', () => {
@@ -55,6 +56,31 @@ describe('get-dataset', () => {
         const { summary, nextStep, ...data } = structuredContent;
         expect(JSON.parse(content[0].text)).toEqual(data);
         expect(content[1].text).toBe(`${summary}\n${nextStep}`);
+    });
+
+    it.each([
+        ['RESTRICTED', 'mock-signing-secret'],
+        ['ANYONE_WITH_ID_CAN_READ', 'mock-signing-secret'],
+        ['RESTRICTED', null],
+    ])('omits the signing key and keeps public URLs for %s access (%s)', async (generalAccess, urlSigningSecretKey) => {
+        const metadata = {
+            ...MOCK_DATASET,
+            generalAccess,
+            itemsPublicUrl: 'https://api.apify.com/v2/datasets/ds-1/items?signature=sig-1',
+        };
+        const result = await (getDataset as HelperTool).call(
+            stubToolCallContext({ datasetId: MOCK_DATASET.id }, stubApifyClient({ ...metadata, urlSigningSecretKey })),
+        );
+        const { content, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
+        const { summary, nextStep, ...data } = structuredContent;
+
+        expectSchemaConformingStructuredContent(result, datasetMetadataOutputSchema);
+        expect(data).toEqual(metadata);
+        expect(JSON.parse(content[0].text)).toEqual(metadata);
+        expect(JSON.stringify(result)).not.toContain('urlSigningSecretKey');
+        expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
     });
 
     it('steers nextStep away from fetching when the dataset is large', async () => {

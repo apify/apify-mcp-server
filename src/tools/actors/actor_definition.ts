@@ -6,6 +6,7 @@ import type {
     ActorDefinitionWithInfo,
     SchemaProperties,
 } from '../../types.js';
+import { getHttpStatusCode } from '../../utils/logging.js';
 
 /**
  * Get Actor input schema by Actor name.
@@ -53,13 +54,8 @@ export async function getActorDefinition(
         return null;
     } catch (error) {
         // Check if it's a "not found" error (404 or 400 status codes)
-        const isNotFound =
-            typeof error === 'object' &&
-            error !== null &&
-            'statusCode' in error &&
-            (error.statusCode === 404 || error.statusCode === 400);
-
-        if (isNotFound) {
+        const statusCode = getHttpStatusCode(error);
+        if (statusCode === 404 || statusCode === 400) {
             // Return null for not found - caller will log appropriately
             return null;
         }

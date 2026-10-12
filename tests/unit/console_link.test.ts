@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ApifyClient } from '../../src/apify_client.js';
 import { STAGING_MCP_HOSTNAME } from '../../src/const.js';
 import {
     buildConsoleActorUrl,
@@ -11,14 +10,14 @@ import {
     getConsoleLinkContext,
 } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockUserInfo } from './helpers/tool_context.js';
+import { mockApifyClient, mockUserInfo } from './helpers/tool_context.js';
 
 vi.mock('../../src/utils/userid_cache.js', () => ({
     getUserInfoCached: vi.fn(),
 }));
 
 describe('getConsoleLinkContext', () => {
-    const client = {} as ApifyClient;
+    const client = mockApifyClient();
 
     beforeEach(() => {
         vi.mocked(getUserInfoCached).mockReset();

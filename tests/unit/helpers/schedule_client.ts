@@ -1,5 +1,6 @@
 import { JSON_CONTENT_TYPE } from '../../../src/tools/schedules/schedule_helpers.js';
 import type { InternalToolArgs } from '../../../src/types.js';
+import { mockApifyClient } from './tool_context.js';
 
 /**
  * A schedule as the client returns it: every `*At` field parsed into a Date (the client's
@@ -58,7 +59,7 @@ export function mockScheduleApiClient(
 } {
     const calls: RecordedCall[] = [];
     const resolve = (scheduleId: string) => (typeof schedule === 'function' ? schedule(scheduleId) : schedule);
-    const apifyClient = {
+    const apifyClient = mockApifyClient({
         // `scheduleId` is recorded because the tools normalize a bare name to `~name` before the
         // call — the API would otherwise read the name as an ID and 404.
         schedule: (scheduleId: string) => ({
@@ -92,6 +93,6 @@ export function mockScheduleApiClient(
                 return task(taskId);
             },
         }),
-    } as unknown as InternalToolArgs['apifyClient'];
+    });
     return { apifyClient, calls };
 }

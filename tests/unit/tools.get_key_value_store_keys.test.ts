@@ -7,8 +7,9 @@ import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
-    expectSoftFailInvalidInput,
     expectSchemaConformingStructuredContent,
+    expectSoftFailInvalidInput,
+    mockApifyClient,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -31,11 +32,11 @@ const MOCK_KEYS = {
 };
 
 function stubApifyClient(listKeysSpy: ReturnType<typeof vi.fn>): InternalToolArgs['apifyClient'] {
-    return {
+    return mockApifyClient({
         keyValueStore: (_id: string) => ({
             listKeys: listKeysSpy,
         }),
-    } as unknown as InternalToolArgs['apifyClient'];
+    });
 }
 
 function stubApifyClientThrowing(err: unknown): InternalToolArgs['apifyClient'] {
@@ -163,7 +164,7 @@ describe('get-key-value-store-keys', () => {
 
     it('passes the wrapper-stripped keyValueStoreId to client.keyValueStore()', async () => {
         const kvStoreSpy = vi.fn().mockReturnValue({ listKeys: async () => MOCK_KEYS });
-        const client = { keyValueStore: kvStoreSpy } as unknown as InternalToolArgs['apifyClient'];
+        const client = mockApifyClient({ keyValueStore: kvStoreSpy });
 
         await (getKeyValueStoreKeys as HelperTool).call(
             stubToolCallContext({ keyValueStoreId: '`user~my-store`' }, client),

@@ -1,7 +1,7 @@
 /**
  * Protocol-neutral domain errors for the prompt and resource services. They carry the message and
- * optional `data` payload but no protocol error code — the `server.ts` boundary maps each 1:1 to a
- * v1 `McpError` right before serialization, and a future v2 adapter maps them to its own error type.
+ * optional `data` payload but no protocol error code. Each adapter maps them 1:1 right before
+ * serialization: `legacy_server.ts` to a v1 `McpError`, `stateless_server.ts` to a v2 `ProtocolError`.
  * This module imports nothing from any MCP SDK.
  */
 

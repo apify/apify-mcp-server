@@ -29,6 +29,7 @@ import {
     withStatelessServer,
     X402_PAYMENT_DATA,
 } from './helpers/mcp_server.js';
+import { mockApifyClient } from './helpers/tool_context.js';
 
 vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
     const actual = await importOriginal<typeof ToolsLoaderModule>();
@@ -136,7 +137,7 @@ function softFailsStartingWith(
 
 async function loadSource(server: ActorsMcpServer, actorTools: ToolEntry[], input: Input = { tools: [] }) {
     getActorsMock.mockResolvedValue(actorTools);
-    await server.loadToolsFromInput(input, {} as never);
+    await server.loadToolsFromInput(input, mockApifyClient());
 }
 
 const LEGACY_INITIALIZE = {

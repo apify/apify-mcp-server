@@ -16,12 +16,14 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   output across tools.
 - `utils.ts` — shared tool helpers (schema property shaping, AJV compile).
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
-  - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), the
-    actor-tools factory, the direct actor-tool executor (`actor_executor.ts`), `actor_definition.ts` (fetches and
-    prunes an Actor's definition, `getActorDefinition`), and `actor_run_response.ts` —
+  - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), delete
+    (`delete_actor.ts`), the actor-tools factory, the direct actor-tool executor (`actor_executor.ts`),
+    `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`), and
+    `actor_run_response.ts` —
     the one canonical run shape `call-actor` and `get-actor-run` share across sync, task
     and wait-timeout modes: storage IDs plus a `summary` (past) / `nextStep` (one primary
-    action) pair, never inline dataset items or KV bodies.
+    action) pair, never inline dataset items or KV bodies — except the reserved `TIP` key,
+    inlined as `tip` on terminal RAG Web Browser runs only.
   - `runs/` — get/abort runs, run logs, run list.
   - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`.
   - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public
@@ -34,6 +36,31 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     first, pointing at the newest failed one) and `build-actor` (start a build of one version and wait for it); `build_helpers.ts` holds the
     allowlisted build result shape, the build start and wait calls (the wait reports progress), the
     shared `waitSecs` field, the shared build response and the by-status next-step text.
+  - `source/`: `get-actor-version` (an Actor version's file manifest with hashes, revision, and
+    requested content). `source_files.ts` holds the file shape, the manifest builder, the hash and
+    revision rules, and the text-or-base64 detection. Versions not stored as files (Git repository,
+    gist, or zip) are refused.
+  - `api/` — the generic Apify API tools: search the operations of the published OpenAPI spec, get the
+    operations on a path, and send a GET to a path. The call tool is a proxy to the API, like
+    `apify api` in the Apify CLI: it refuses nothing the API accepts. `apify_api_spec.ts` builds the
+    operation index from the spec (cached for a day); search and details use it, and a call uses it
+    only for hints, waiting at most a few seconds, so a failed download does not stop a call.
+    `apify_api_request.ts` normalizes the path as the CLI does (`actors`, `v2/actors`, and `/v2/actors`
+    are the same), sends it as written with the query added after any query string in it, and
+    looks up a legacy `acts` path as `actors`, the prefix the spec lists. It asserts that the URL stays
+    on the API origin, sends one request with no retries, masks the session token in the response,
+    redacts the `urlSigningSecretKey` value in a JSON body, keeps a query in the path out of the error
+    it throws, and adds the closest spec paths to a `page-not-found` 404 (a wrong path), not to a
+    missing record.
+    The one capped request (`sendApifyApiRequest`) is in `../apify_client.ts`. The origin check
+    (`isApifyApiUri`), the detection of a body over `MAX_INLINE_BYTES` (`isMaxContentLengthAbort`),
+    the binary token mask (`maskSessionToken`), the key redaction (`redactUrlSigningSecretKey`) and
+    `REDACTED` are the API resource's own, imported from `../resources/api_resources.ts`
+    ([`../resources/AGENTS.md`](../resources/AGENTS.md#api-resources-api_resourcests)).
+    A request failure is thrown as `toPlainError` (`../utils/logging.ts`), without the axios config.
+    The details and call tools log their arguments through `redactApiCallArgs` (`redactArgs`): an
+    allowlist of path, method, query, and body, with the body and the `token`, `signature`, and
+    `webhooks` query values redacted, and a query written into the path cut to `?[REDACTED]`.
   - `docs/` — search and fetch Apify docs.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).

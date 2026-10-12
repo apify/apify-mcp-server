@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ApifyClient } from '../../src/apify_client.js';
 import type { ActorStoreList } from '../../src/types.js';
 import { searchActorsByKeywords, searchAgentSafeActors } from '../../src/utils/actor_search.js';
+import { mockApifyClient } from './helpers/tool_context.js';
 
 const listMock = vi.fn();
 const paramsHolder: { params: Record<string, unknown> } = { params: {} };
 
-const stubApifyClient = {
+const stubApifyClient = mockApifyClient({
     store: () => ({
         get params(): Record<string, unknown> {
             return paramsHolder.params;
@@ -17,7 +17,7 @@ const stubApifyClient = {
         },
         list: listMock,
     }),
-} as unknown as ApifyClient;
+});
 
 const baseStoreActor: ActorStoreList = {
     id: 'id-default',

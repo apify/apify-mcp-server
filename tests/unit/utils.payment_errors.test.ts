@@ -7,14 +7,13 @@ import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { ApifyClient } from '../../src/apify_client.js';
 import {
     buildPaymentRequiredResponse,
     buildPermissionApprovalResponse,
     isX402PaymentRequiredError,
     registerPaymentRequiredInterceptor,
 } from '../../src/utils/payment_errors.js';
-import { textOf } from './helpers/tool_context.js';
+import { mockApifyClient, textOf } from './helpers/tool_context.js';
 
 const SAMPLE_PAYMENT_REQUIRED = {
     x402Version: 2,
@@ -27,7 +26,7 @@ const SAMPLE_PAYMENT_REQUIRED = {
 describe('registerPaymentRequiredInterceptor()', () => {
     it('forwards a 402 payment-required header into the MCP response', async () => {
         const use = vi.fn();
-        const client = { httpClient: { axios: { interceptors: { response: { use } } } } } as unknown as ApifyClient;
+        const client = mockApifyClient({ httpClient: { axios: { interceptors: { response: { use } } } } });
         registerPaymentRequiredInterceptor(client);
 
         const onRejected = use.mock.calls[0][1] as (error: unknown) => Promise<never>;
@@ -48,7 +47,7 @@ describe('registerPaymentRequiredInterceptor()', () => {
 
     it('does not attach payment data to a non-402 response', async () => {
         const use = vi.fn();
-        const client = { httpClient: { axios: { interceptors: { response: { use } } } } } as unknown as ApifyClient;
+        const client = mockApifyClient({ httpClient: { axios: { interceptors: { response: { use } } } } });
         registerPaymentRequiredInterceptor(client);
 
         const onRejected = use.mock.calls[0][1] as (error: unknown) => Promise<never>;

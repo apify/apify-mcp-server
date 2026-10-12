@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import type { ActorExecutionParams } from '../../src/types.js';
-import { textOf } from './helpers/tool_context.js';
+import { mockApifyClient, textOf } from './helpers/tool_context.js';
 
 /**
  * The executor's three migration-specific responsibilities:
@@ -60,7 +60,7 @@ function buildStub(): { client: ActorExecutionParams['apifyClient']; spies: Spie
     const startedRun = mockRunningRun();
     const finishedRun = mockSucceededRun();
     let currentRun: ActorRun = startedRun;
-    const client = {
+    const client = mockApifyClient({
         actor: (_id: string) => ({
             start: async (input: unknown) => {
                 spies.startInput = input;
@@ -88,7 +88,7 @@ function buildStub(): { client: ActorExecutionParams['apifyClient']; spies: Spie
         keyValueStore: (_id: string) => ({
             listKeys: async () => ({ items: [], count: 0, isTruncated: false }),
         }),
-    } as unknown as ActorExecutionParams['apifyClient'];
+    });
     return { client, spies };
 }
 
@@ -158,12 +158,12 @@ describe('actorExecutor', () => {
 
         it('returns the platform message instead of throwing, on a confirmed invalid-input error (no schema — already in tools/list)', async () => {
             const { params } = buildParams({ query: 'foo' }, { actorId: 'actor-1' });
-            params.apifyClient = {
+            params.apifyClient = mockApifyClient({
                 ...params.apifyClient,
                 actor: () => ({
                     start: vi.fn().mockRejectedValue(invalidInputError('query: must be a non-empty string')),
                 }),
-            } as unknown as ActorExecutionParams['apifyClient'];
+            });
 
             const result = await actorExecutor.executeActorTool(params);
 
@@ -175,10 +175,10 @@ describe('actorExecutor', () => {
 
         it('rethrows any other actor.start() error unchanged', async () => {
             const { params } = buildParams({ query: 'foo' });
-            params.apifyClient = {
+            params.apifyClient = mockApifyClient({
                 ...params.apifyClient,
                 actor: () => ({ start: vi.fn().mockRejectedValue(new Error('socket hang up')) }),
-            } as unknown as ActorExecutionParams['apifyClient'];
+            });
 
             await expect(actorExecutor.executeActorTool(params)).rejects.toThrow('socket hang up');
         });

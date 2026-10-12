@@ -16,7 +16,10 @@ import { stripQuoteWrappers } from './generic.js';
 import { getHttpStatusCode } from './logging.js';
 import { buildActorFields } from './tools.js';
 
-type ResourceIds = Pick<ToolCallTelemetryProperties, 'run_id' | 'run_status' | 'dataset_id' | 'key_value_store_id'>;
+type ResourceIds = Pick<
+    ToolCallTelemetryProperties,
+    'run_id' | 'run_status' | 'dataset_id' | 'key_value_store_id' | 'tip_recommended_actor_id'
+>;
 
 /**
  * The resource ids for the "MCP Tool Call" Segment event, read from data the telemetry sink already
@@ -28,17 +31,17 @@ type ResourceIds = Pick<ToolCallTelemetryProperties, 'run_id' | 'run_status' | '
  * - `run_id` also comes from `args.runId` for tools whose response carries no RunResponse
  *   (abort-actor-run, get-actor-run-log) and for not-found.
  * - `dataset_id` / `key_value_store_id` come from `args`, quote-stripped to match the storage tools.
+ * - `tip_recommended_actor_id` comes from `structuredContent.tip`, when the run's Actor named one.
  */
 export function deriveResourceIds(args: Record<string, unknown> | undefined, result: unknown): ResourceIds {
     const argObj = (args ?? {}) as { datasetId?: unknown; keyValueStoreId?: unknown; runId?: unknown };
-    const run = (result as { structuredContent?: Pick<RunResponse, 'runId' | 'status'> } | null | undefined)
+    const run = (result as { structuredContent?: Pick<RunResponse, 'runId' | 'status' | 'tip'> } | null | undefined)
         ?.structuredContent;
-    // Build-time shape guard: these typed reads fail to compile if RunResponse renames `runId`/`status`
-    // (Pick fails) or retypes them away from `string` (assignment fails) — telemetry can't silently go
-    // blank on a shape change. The `typeof` checks below guard the runtime value. A run tool ceasing to
-    // emit a RunResponse at all is caught by the deriveResourceIds regression test.
+    // Build-time shape guard: these typed reads fail to compile if RunResponse renames `runId`/`status`/`tip`.
+    // The `typeof` checks below guard the runtime value.
     const scRunId: string | undefined = run?.runId;
     const scStatus: string | undefined = run?.status;
+    const scRecommendedActorId: string | undefined = run?.tip?.recommendedActorId;
     const runId = scRunId ?? (typeof argObj.runId === 'string' ? argObj.runId : undefined);
     return {
         ...(typeof runId === 'string' && { run_id: runId }),
@@ -47,6 +50,7 @@ export function deriveResourceIds(args: Record<string, unknown> | undefined, res
         ...(typeof argObj.keyValueStoreId === 'string' && {
             key_value_store_id: stripQuoteWrappers(argObj.keyValueStoreId),
         }),
+        ...(typeof scRecommendedActorId === 'string' && { tip_recommended_actor_id: scRecommendedActorId }),
     };
 }
 

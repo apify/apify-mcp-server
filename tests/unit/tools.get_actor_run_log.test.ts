@@ -4,17 +4,18 @@ import { HELPER_TOOLS } from '../../src/const.js';
 import { getActorRun } from '../../src/tools/runs/get_actor_run.js';
 import { getActorRunLog } from '../../src/tools/runs/get_actor_run_log.js';
 import { getActorRunLogToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
-import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import type { HelperTool } from '../../src/types.js';
 import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
+    mockApifyClient,
     stubToolCallContext,
     type TextToolResult,
 } from './helpers/tool_context.js';
 
 const getMock = vi.fn();
 
-const stubClient = { run: () => ({ log: () => ({ get: getMock }) }) } as unknown as InternalToolArgs['apifyClient'];
+const stubClient = mockApifyClient({ run: () => ({ log: () => ({ get: getMock }) }) });
 
 const numberedLog = (count: number) => Array.from({ length: count }, (_, i) => `line ${i + 1}`).join('\n');
 
@@ -130,12 +131,12 @@ describe('get-actor-run-log', () => {
     });
 
     it('returns the same not-found error text as get-actor-run for the same missing run', async () => {
-        const client = {
+        const client = mockApifyClient({
             run: (_id: string) => ({
                 get: async () => undefined,
                 log: () => ({ get: getMock }),
             }),
-        } as unknown as InternalToolArgs['apifyClient'];
+        });
         getMock.mockResolvedValue(undefined);
 
         const logResult = (await (getActorRunLog as HelperTool).call(

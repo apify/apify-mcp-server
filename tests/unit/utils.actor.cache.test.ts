@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ApifyClient } from '../../src/apify_client.js';
 import type { ActorDefinitionWithInfo } from '../../src/types.js';
 import { ACTOR_TOOL_MODE } from '../../src/types.js';
 
@@ -11,6 +10,7 @@ import { actorDefinitionCache } from '../../src/state.js';
 import { getActorDefinition } from '../../src/tools/actors/actor_definition.js';
 import { getActorDefinitionCached, getActorToolResolutionCached } from '../../src/utils/actor.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
+import { mockApifyClient } from './helpers/tool_context.js';
 
 const getActorDefinitionMock = vi.mocked(getActorDefinition);
 const getUserInfoCachedMock = vi.mocked(getUserInfoCached);
@@ -41,7 +41,7 @@ function seedCache(
     return entry;
 }
 
-const client = { token: 'caller-token' } as unknown as ApifyClient;
+const client = mockApifyClient({ token: 'caller-token' });
 
 beforeEach(() => {
     getActorDefinitionMock.mockReset();
