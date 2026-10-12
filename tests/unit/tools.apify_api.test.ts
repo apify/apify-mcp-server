@@ -351,6 +351,11 @@ describe('apify-api-read', () => {
         expect(withoutCallActor).not.toContain(HELPER_TOOLS.ACTOR_CALL);
     });
 
+    it('gives no advice about synchronous runs, which it refuses', () => {
+        expect(apifyApiRead.description).toContain('waitForFinish above');
+        expect(apifyApiRead.description).not.toContain('prefer asynchronous runs');
+    });
+
     it.each([
         'actors/apify~hello-world/run-sync',
         '/v2/acts/abc/run-sync-get-dataset-items?token=x',
@@ -851,8 +856,10 @@ describe('apify-api-write', () => {
     });
 
     it('advises an asynchronous run without saying a synchronous run is refused, since it sends the POST', () => {
-        expect(apifyApiWrite.description).toContain('Synchronous runs, and waitForFinish above');
-        expect(apifyApiWrite.description).toContain('so prefer asynchronous runs.');
+        expect(apifyApiWrite.description).toContain('waitForFinish above');
+        expect(apifyApiWrite.description).toContain(
+            'Synchronous runs also outlast the 60-second tool-call timeout, so prefer asynchronous runs.',
+        );
         expect(apifyApiWrite.description).not.toContain('refused');
     });
 
