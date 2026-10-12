@@ -415,8 +415,8 @@ describe('buildDescription()', () => {
         );
     });
 
-    it('omits the run limitation when the session has create-schedule', () => {
-        expect(renderDescription(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.SCHEDULE_CREATE)).not.toContain(
+    it('states the run limitation when the session has only create-schedule', () => {
+        expect(renderDescription(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.SCHEDULE_CREATE)).toContain(
             ACTOR_CALLABILITY_CAVEAT,
         );
     });

@@ -9,8 +9,8 @@
  */
 
 import { getApifyAPIBaseUrl } from '../../apify_client.js';
-import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../const.js';
-import { actorNameToToolName, hasActorRunPath } from '../../tools/actor_tool_naming.js';
+import { APIFY_MCP_URL, HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../const.js';
+import { actorNameToToolName, canRunAnyActor } from '../../tools/actor_tool_naming.js';
 import type { ToolDescriptionContext } from '../../types.js';
 import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../types.js';
 
@@ -81,9 +81,11 @@ export function getServerInstructions(
         ? buildWidgetWorkflowSection({ hasCall, hasRunsGet, hasCallWidget, hasRunsGetWidget })
         : '';
 
-    const runLimitationLine = hasActorRunPath(hasTool)
-        ? ''
-        : '- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, open its Apify page or configure it separately.\n';
+    // Only worth saying when the session can discover Store Actors it cannot run.
+    const runLimitationLine =
+        canRunAnyActor(hasTool) || !(hasSearch || hasDetails)
+            ? ''
+            : `- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, set up your own Apify MCP server at ${APIFY_MCP_URL}.\n`;
 
     const apiReadLine = hasTool(HELPER_TOOLS.API_READ)
         ? `- Use \`${HELPER_TOOLS.API_READ}\` for API GETs. If your client can read resources, \`resources/read\` also returns binary records, such as key-value store files, which \`${HELPER_TOOLS.API_READ}\` does not.\n`

@@ -7,7 +7,7 @@ import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../../src/mcp/const
 import {
     actorNameToToolName,
     canRunActor,
-    hasActorRunPath,
+    canRunAnyActor,
     legacyToolNameToNew,
     resolveActorToolMode,
 } from '../../src/tools/actor_tool_naming.js';
@@ -149,17 +149,15 @@ describe('canRunActor()', () => {
     });
 });
 
-describe('hasActorRunPath()', () => {
-    it.each([
-        HELPER_TOOLS.ACTOR_CALL,
-        HELPER_TOOLS.ACTOR_CALL_WIDGET,
-        HELPER_TOOLS.API_WRITE,
-        HELPER_TOOLS.SCHEDULE_CREATE,
-    ])('returns true when only %s is loaded', (toolName) => {
-        expect(hasActorRunPath(only(toolName).hasTool)).toBe(true);
-    });
+describe('canRunAnyActor()', () => {
+    it.each([HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.ACTOR_CALL_WIDGET, HELPER_TOOLS.API_WRITE])(
+        'returns true when only %s is loaded',
+        (toolName) => {
+            expect(canRunAnyActor(only(toolName).hasTool)).toBe(true);
+        },
+    );
 
-    it('returns false when none of the run-path tools is loaded', () => {
-        expect(hasActorRunPath(only(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS).hasTool)).toBe(false);
+    it('returns false when no tool can run an arbitrary Actor', () => {
+        expect(canRunAnyActor(only(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS).hasTool)).toBe(false);
     });
 });

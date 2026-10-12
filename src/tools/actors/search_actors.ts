@@ -20,7 +20,7 @@ import { getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console
 import { respondOk } from '../../utils/mcp.js';
 import type { PricingTier } from '../../utils/pricing_info.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import { ACTOR_CALLABILITY_CAVEAT, canRunActor, hasActorRunPath } from '../actor_tool_naming.js';
+import { ACTOR_CALLABILITY_CAVEAT, canRunActor, canRunAnyActor } from '../actor_tool_naming.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 
 /**
@@ -65,7 +65,7 @@ export const searchActorsBaseArgsSchema = z.object({
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    const runLimitationLine = hasActorRunPath(hasTool) ? '' : `${ACTOR_CALLABILITY_CAVEAT}\n`;
+    const runLimitationLine = canRunAnyActor(hasTool) ? '' : `${ACTOR_CALLABILITY_CAVEAT}\n`;
     return `Search the Apify Store to FIND and DISCOVER what scraping tools/Actors exist for specific platforms or use cases.
 This tool provides INFORMATION about available Actors - it does NOT retrieve actual data or run any scraping tasks.
 

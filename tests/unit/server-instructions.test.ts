@@ -10,7 +10,7 @@ import { CLAUDE_CONNECTOR_TOOLS } from './helpers/claude_connector_tools.js';
 import { only } from './helpers/tool_context.js';
 
 const RUN_LIMITATION_LINE =
-    '- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, open its Apify page or configure it separately.\n';
+    '- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, set up your own Apify MCP server at https://mcp.apify.com.\n';
 
 describe('getServerInstructions()', () => {
     it('defaults to ALL_TOOLS_PRESENT — no regression for the common case (every tool loaded)', () => {
@@ -300,10 +300,18 @@ describe('getServerInstructions()', () => {
             expect(instructions).not.toContain('MUST');
         });
 
-        it('states the limitation when the session has no Actor tool and no call-actor', () => {
-            const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.DOCS_SEARCH));
+        it('states the limitation when the session can only fetch Actor details', () => {
+            const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.ACTOR_GET_DETAILS));
             expect(instructions).toContain(RUN_LIMITATION_LINE);
             expect(instructions).not.toContain('MUST');
+        });
+
+        it('omits the limitation when the session cannot discover Store Actors', () => {
+            const instructions = getServerInstructions(
+                SERVER_MODE.DEFAULT,
+                only(HELPER_TOOLS.DOCS_SEARCH, actorNameToToolName(RAG_WEB_BROWSER)),
+            );
+            expect(instructions).not.toContain(RUN_LIMITATION_LINE);
         });
 
         it('omits the limitation when every tool is loaded', () => {
@@ -332,12 +340,12 @@ describe('getServerInstructions()', () => {
             expect(instructions).not.toContain(RUN_LIMITATION_LINE);
         });
 
-        it('omits the limitation when the session has create-schedule', () => {
+        it('states the limitation when the session has only create-schedule', () => {
             const instructions = getServerInstructions(
                 SERVER_MODE.DEFAULT,
                 only(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.SCHEDULE_CREATE),
             );
-            expect(instructions).not.toContain(RUN_LIMITATION_LINE);
+            expect(instructions).toContain(RUN_LIMITATION_LINE);
         });
     });
 });
