@@ -6,12 +6,14 @@ import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { UserInputError } from '../../errors.js';
+import { REDACTED } from '../../resources/api_resources.js';
 import type { ConsoleLinkContext, InternalToolArgs } from '../../types.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondUserError } from '../../utils/mcp.js';
 import { ABORT } from '../actors/actor_run_response.js';
+import { isRecord } from '../api/apify_api_spec.js';
 import {
     buildNextStepForBuild,
     listVersionNumbers,
@@ -32,6 +34,54 @@ export const sourceFileArgs = z.object({
             'utf8 for text, base64 for binary files. Defaults to base64 for binary extensions such as .png and to utf8 otherwise.',
         ),
 });
+
+/** `keys` of `record` that are set: a string, number, or boolean as is, any other value as `REDACTED`. */
+function pickLoggedValues(record: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+    return Object.fromEntries(
+        keys.flatMap((key) => {
+            const value = record[key];
+            if (value === undefined) return [];
+            return [[key, ['string', 'number', 'boolean'].includes(typeof value) ? value : REDACTED]];
+        }),
+    );
+}
+
+/** `keys` of `record` that are set, each as `REDACTED`. */
+function maskLoggedValues(record: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+    return Object.fromEntries(keys.filter((key) => record[key] !== undefined).map((key) => [key, REDACTED]));
+}
+
+/**
+ * The logged copy of a source tool's arguments (`redactArgs`), built as an allowlist: `keys`, and each entry of the
+ * list under `listKey` with its `entryKeys`, and with its content and its edits' oldText and newText as `REDACTED`.
+ * File content can hold secrets, such as an API key written into the code.
+ */
+export function redactSourceToolArgs(
+    args: Record<string, unknown>,
+    fields: { keys: readonly string[]; listKey: string; entryKeys: readonly string[] },
+): Record<string, unknown> {
+    const { keys, listKey, entryKeys } = fields;
+    const redactEntry = (entry: unknown) => {
+        if (!isRecord(entry)) return REDACTED;
+        const { edits } = entry;
+        return {
+            ...pickLoggedValues(entry, entryKeys),
+            ...maskLoggedValues(entry, ['content']),
+            ...(edits !== undefined && {
+                edits: Array.isArray(edits)
+                    ? edits.map((textEdit) =>
+                          isRecord(textEdit) ? maskLoggedValues(textEdit, ['oldText', 'newText']) : REDACTED,
+                      )
+                    : REDACTED,
+            }),
+        };
+    };
+    const list = args[listKey];
+    return {
+        ...pickLoggedValues(args, keys),
+        ...(list !== undefined && { [listKey]: Array.isArray(list) ? list.map(redactEntry) : REDACTED }),
+    };
+}
 
 /**
  * The Actor by its ID or full name, `username/name` or `username~name` (apify-client turns username/name into the

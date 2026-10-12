@@ -5,6 +5,7 @@ import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
+import { prepareToolCallContext } from '../../src/payments/helpers.js';
 import { createActor } from '../../src/tools/source/create_actor.js';
 import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
 import { buildFilesRevision } from '../../src/tools/source/source_files.js';
@@ -182,6 +183,62 @@ describe('create-actor', () => {
 
         it('accepts one empty file', () => {
             expect(validate({ name: 'x', files: [{ path: 'a.js', content: '' }] })).toBe(true);
+        });
+    });
+
+    describe('logged arguments', () => {
+        const SECRET = 'synthetic-secret-4f2a';
+        const getLoggedArgs = (args: Record<string, unknown>) =>
+            prepareToolCallContext({ provider: undefined, tool: createActor, args, apifyToken: 'test-token' })
+                .toolArgsRedacted;
+
+        it('keep the paths and other metadata, and replace file content with a marker', () => {
+            const args = {
+                name: 'my-actor',
+                title: 'My Actor',
+                description: 'Scrapes pages',
+                versionNumber: '1.0',
+                buildTag: 'beta',
+                autoBuild: true,
+                files: [
+                    { path: 'src/config.js', content: `export const key = '${SECRET}';\n`, encoding: 'utf8' },
+                    { path: 'assets/key.bin', content: Buffer.from(SECRET).toString('base64'), extra: SECRET },
+                ],
+                undeclared: SECRET,
+            };
+            const argsBefore = structuredClone(args);
+
+            const logged = getLoggedArgs(args);
+
+            expect(JSON.stringify(logged)).not.toContain(SECRET);
+            expect(JSON.stringify(logged)).not.toContain(Buffer.from(SECRET).toString('base64'));
+            expect(logged).toStrictEqual({
+                name: 'my-actor',
+                title: 'My Actor',
+                description: 'Scrapes pages',
+                versionNumber: '1.0',
+                buildTag: 'beta',
+                autoBuild: true,
+                files: [
+                    { path: 'src/config.js', encoding: 'utf8', content: '[REDACTED]' },
+                    { path: 'assets/key.bin', content: '[REDACTED]' },
+                ],
+            });
+            expect(args).toStrictEqual(argsBefore);
+        });
+
+        it.each<[string, Record<string, unknown>]>([
+            ['no arguments', {}],
+            ['files that are not a list', { files: SECRET }],
+            ['files that are not objects', { files: [SECRET, null, 1, [SECRET]] }],
+            ['a path that is not a string', { files: [{ path: { text: SECRET }, content: 'x' }] }],
+            ['content that is not a string', { files: [{ path: 'a.js', content: { text: SECRET } }] }],
+            ['a name that is not a string', { name: [SECRET], files: [] }],
+        ])('accept %s without throwing or logging their values', (_, args) => {
+            const argsBefore = structuredClone(args);
+
+            expect(JSON.stringify(getLoggedArgs(args))).not.toContain(SECRET);
+            expect(args).toStrictEqual(argsBefore);
         });
     });
 

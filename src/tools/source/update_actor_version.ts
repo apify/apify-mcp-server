@@ -24,6 +24,7 @@ import {
     buildSourceFileEntry,
     extractSourceFiles,
     fetchActor,
+    redactSourceToolArgs,
     resolveVersion,
     respondAfterWrite,
     respondToSourceToolError,
@@ -286,6 +287,12 @@ export const updateActorVersion: ToolEntry = Object.freeze({
         idempotentHint: false,
         openWorldHint: false,
     },
+    redactArgs: (args: Record<string, unknown>) =>
+        redactSourceToolArgs(args, {
+            keys: ['actor', 'versionNumber', 'expectedRevision', 'autoBuild'],
+            listKey: 'operations',
+            entryKeys: ['type', 'path', 'encoding', 'expectedHash'],
+        }),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client, signal } = toolArgs;
         const parsed = updateActorVersionArgs.parse(args);

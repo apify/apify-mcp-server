@@ -15,6 +15,7 @@ import {
     buildEmptyFilesWarnings,
     buildSourceFileEntry,
     extractSourceFiles,
+    redactSourceToolArgs,
     resolveVersion,
     respondAfterWrite,
     respondToSourceToolError,
@@ -97,6 +98,12 @@ export const createActor: ToolEntry = Object.freeze({
         idempotentHint: false,
         openWorldHint: false,
     },
+    redactArgs: (args: Record<string, unknown>) =>
+        redactSourceToolArgs(args, {
+            keys: ['name', 'title', 'description', 'versionNumber', 'buildTag', 'autoBuild'],
+            listKey: 'files',
+            entryKeys: ['path', 'encoding'],
+        }),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client, signal, loadedToolNames } = toolArgs;
         const parsed = createActorArgs.parse(args);

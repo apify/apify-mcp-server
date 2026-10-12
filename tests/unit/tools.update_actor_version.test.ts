@@ -5,6 +5,7 @@ import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
+import { prepareToolCallContext } from '../../src/payments/helpers.js';
 import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
 import { buildFilesRevision } from '../../src/tools/source/source_files.js';
 import { updateActorVersion } from '../../src/tools/source/update_actor_version.js';
@@ -336,6 +337,69 @@ describe('update-actor-version', () => {
             );
             expect(actorGetMock).not.toHaveBeenCalled();
             expect(buildMock).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('logged arguments', () => {
+        const SECRET = 'synthetic-secret-4f2a';
+        const getLoggedArgs = (args: Record<string, unknown>) =>
+            prepareToolCallContext({ provider: undefined, tool: updateActorVersion, args, apifyToken: 'test-token' })
+                .toolArgsRedacted;
+
+        it('keep the paths, operation types, and hashes, and replace content and edit texts with a marker', () => {
+            const args = {
+                actor: 'john/my-actor',
+                versionNumber: '0.1',
+                expectedRevision: 'abc',
+                autoBuild: true,
+                operations: [
+                    write('src/config.js', `export const key = '${SECRET}';\n`, { encoding: 'utf8' }),
+                    {
+                        ...edit('src/main.js', { oldText: `'${SECRET}'`, newText: `process.env.KEY ?? '${SECRET}'` }),
+                        expectedHash: MAIN_JS_HASH,
+                    },
+                    remove('src/old.js', MAIN_JS_HASH),
+                ],
+                undeclared: SECRET,
+            };
+            const argsBefore = structuredClone(args);
+
+            const logged = getLoggedArgs(args);
+
+            expect(JSON.stringify(logged)).not.toContain(SECRET);
+            expect(logged).toStrictEqual({
+                actor: 'john/my-actor',
+                versionNumber: '0.1',
+                expectedRevision: 'abc',
+                autoBuild: true,
+                operations: [
+                    { type: 'write', path: 'src/config.js', encoding: 'utf8', content: '[REDACTED]' },
+                    {
+                        type: 'edit',
+                        path: 'src/main.js',
+                        expectedHash: MAIN_JS_HASH,
+                        edits: [{ oldText: '[REDACTED]', newText: '[REDACTED]' }],
+                    },
+                    { type: 'delete', path: 'src/old.js', expectedHash: MAIN_JS_HASH },
+                ],
+            });
+            expect(args).toStrictEqual(argsBefore);
+        });
+
+        it.each<[string, Record<string, unknown>]>([
+            ['no arguments', {}],
+            ['operations that are not a list', { operations: SECRET }],
+            ['operations that are not objects', { operations: [SECRET, null, 1, [SECRET]] }],
+            ['edits that are not a list', { operations: [{ type: 'edit', path: 'a.js', edits: SECRET }] }],
+            ['edits that are not objects', { operations: [{ type: 'edit', path: 'a.js', edits: [SECRET, null] }] }],
+            ['a path that is not a string', { operations: [{ type: 'write', path: { text: SECRET } }] }],
+            ['content that is not a string', { operations: [{ type: 'write', path: 'a.js', content: [SECRET] }] }],
+            ['an actor that is not a string', { actor: { name: SECRET }, operations: [] }],
+        ])('accept %s without throwing or logging their values', (_, args) => {
+            const argsBefore = structuredClone(args);
+
+            expect(JSON.stringify(getLoggedArgs(args))).not.toContain(SECRET);
+            expect(args).toStrictEqual(argsBefore);
         });
     });
 
