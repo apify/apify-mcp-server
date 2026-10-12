@@ -331,16 +331,18 @@ export function buildEmptyFilesWarnings(paths: readonly string[]): { warnings?: 
  * The response to a committed write. With autoBuild, a build of the version starts first, with no tag so the version's
  * buildTag applies, and is not waited for. The write stands either way, so a failed start goes to `buildError` rather
  * than being thrown: a caller told the call failed would retry writes that were saved. A cancel that arrives before
- * the start gets the cancelled-call response and starts no build.
+ * the start gets the cancelled-call response and starts no build. When the build starts, `buildStartedWarnings`, if
+ * given, replaces the warnings in `structuredContent`.
  */
 export async function respondAfterWrite(params: {
     toolArgs: Pick<InternalToolArgs, 'apifyClient' | 'apifyToken' | 'loadedToolNames' | 'signal'>;
     autoBuild: boolean;
     target: { actorId: string; versionNumber: string };
     structuredContent: Record<string, unknown>;
+    buildStartedWarnings?: string[];
     summary: string;
 }): Promise<ToolResponse> {
-    const { toolArgs, autoBuild, target, structuredContent, summary } = params;
+    const { toolArgs, autoBuild, target, structuredContent, buildStartedWarnings, summary } = params;
     const { apifyClient: client, apifyToken, loadedToolNames, signal } = toolArgs;
     if (!autoBuild) {
         return respondWithBuild({
@@ -375,7 +377,11 @@ export async function respondAfterWrite(params: {
     // startBuild returns ABORT only for a passed signal; the check narrows the type.
     if (build === ABORT) return respondAborted();
     return respondWithBuild({
-        structuredContent: { ...structuredContent, build: toBuildResult(build, linkContext) },
+        structuredContent: {
+            ...structuredContent,
+            ...(buildStartedWarnings && { warnings: buildStartedWarnings }),
+            build: toBuildResult(build, linkContext),
+        },
         summary,
         nextStep: buildNextStepForBuild(build, { loadedToolNames }),
     });

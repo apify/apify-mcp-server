@@ -48,6 +48,30 @@ const createActorVersionArgs = z.object({
 });
 
 /**
+ * The warning about the secret env vars a copy leaves out. With `startedBuild`, it says that the build this call started
+ * runs without them and takes the buildTag, if one was given.
+ */
+function formatSecretEnvVarsWarning(
+    secretNames: readonly (string | undefined)[],
+    versionNumber: string,
+    startedBuild?: { buildTag: string | undefined },
+): string {
+    const names = secretNames.join(', ');
+    if (!startedBuild) {
+        return (
+            `These secret environment variables were not copied, so set them on version ${versionNumber} ` +
+            `in Apify Console, then build the version before running it: ${names}.`
+        );
+    }
+    const tag = startedBuild.buildTag === undefined ? '' : ` and takes tag ${startedBuild.buildTag}`;
+    return (
+        `These secret environment variables were not copied, so the build this call started runs without them${tag}; ` +
+        `set them on version ${versionNumber} in Apify Console, then build the version again before running it: ` +
+        `${names}.`
+    );
+}
+
+/**
  * https://docs.apify.com/api/v2/actor-get
  *  /v2/actors/{actorId}
  * https://docs.apify.com/api/v2/actor-versions-post
@@ -130,11 +154,12 @@ export const createActorVersion: ToolEntry = Object.freeze({
             const files = buildFilesManifest(sourceFiles);
             const emptyPaths = files.filter(({ sizeBytes }) => sizeBytes === 0).map(({ path }) => path);
             const { warnings = [] } = buildEmptyFilesWarnings(emptyPaths);
+            const buildStartedWarnings = [...warnings];
             const secretNames = copied?.envVars?.filter(({ isSecret }) => isSecret).map(({ name }) => name) ?? [];
             if (secretNames.length > 0) {
-                warnings.push(
-                    `These secret environment variables were not copied, so set them on version ${versionNumber} ` +
-                        `in Apify Console, then build the version before running it: ${secretNames.join(', ')}.`,
+                warnings.push(formatSecretEnvVarsWarning(secretNames, versionNumber));
+                buildStartedWarnings.push(
+                    formatSecretEnvVarsWarning(secretNames, versionNumber, { buildTag: parsed.buildTag }),
                 );
             }
             return await respondAfterWrite({
@@ -149,6 +174,7 @@ export const createActorVersion: ToolEntry = Object.freeze({
                     files: files.map(({ path, sizeBytes, hash }) => ({ path, sizeBytes, hash })),
                     ...(warnings.length > 0 && { warnings }),
                 },
+                ...(secretNames.length > 0 && { buildStartedWarnings }),
                 summary: `Created version ${versionNumber} of ${fullName}.`,
             });
         } catch (error) {

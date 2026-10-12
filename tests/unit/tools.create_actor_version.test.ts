@@ -830,8 +830,61 @@ describe('create-actor-version', () => {
             });
             // The build started without the secret, so the warning says to build again once it is set.
             expect(result.structuredContent.warnings).toEqual([
+                'These secret environment variables were not copied, so the build this call started runs without ' +
+                    'them; set them on version 0.2 in Apify Console, then build the version again before running it: ' +
+                    'API_KEY.',
+            ]);
+        });
+
+        it('warns that the build it started takes the buildTag without the secret env vars, after the empty files', async () => {
+            mockActorRead({
+                sourceFiles: [
+                    ...structuredClone(STORED_FILES),
+                    { name: 'src/__init__.py', format: 'TEXT', content: '' },
+                ],
+            });
+
+            const result = await callTool({ copyFromVersion: '0.1', autoBuild: true, buildTag: 'beta' });
+
+            expectSchemaConformingStructuredContent(result, createActorVersionToolOutputSchema);
+            expect(buildMock).toHaveBeenCalledTimes(1);
+            expect(result.structuredContent.warnings).toEqual([
+                'These files are empty, and the build skips empty files, so they will not exist in the build: src/__init__.py.',
+                'These secret environment variables were not copied, so the build this call started runs without ' +
+                    'them and takes tag beta; set them on version 0.2 in Apify Console, then build the version again ' +
+                    'before running it: API_KEY.',
+            ]);
+        });
+
+        it.each([
+            ['without autoBuild', { autoBuild: false }, 'Build the version before running it.'],
+            [
+                'when the build failed to start',
+                { autoBuild: true },
+                'The build could not be started; start it again before running the version.',
+            ],
+        ])('keeps the warning to build the version once the secret env vars are set, %s', async (_, args, nextStep) => {
+            buildMock.mockRejectedValue(apiError(402, 'Not enough credit'));
+
+            const result = await callTool({ copyFromVersion: '0.1', buildTag: 'beta', ...args });
+
+            expect(result.structuredContent).not.toHaveProperty('build');
+            expect(result.structuredContent.warnings).toEqual([
                 'These secret environment variables were not copied, so set them on version 0.2 in Apify Console, then build the version before running it: API_KEY.',
             ]);
+            expect(result.content[1].text).toBe(`Created version 0.2 of john/my-actor.\n${nextStep}`);
+        });
+
+        it.each([
+            ['only non-secret env vars', [{ name: 'REGION', value: 'eu', isSecret: false }]],
+            ['no envVars field', undefined],
+        ])('adds no warning to the build it started for a version with %s', async (_, envVars) => {
+            mockActorRead({ envVars });
+
+            const result = await callTool({ copyFromVersion: '0.1', autoBuild: true, buildTag: 'beta' });
+
+            expect(result.structuredContent).toHaveProperty('build');
+            expect(result.structuredContent).not.toHaveProperty('warnings');
         });
 
         it('starts no build without autoBuild', async () => {
