@@ -56,6 +56,35 @@ describe('get-key-value-store', () => {
         expect(content[1].text).toBe(`${summary}\n${nextStep}`);
     });
 
+    it.each([
+        ['RESTRICTED', 'mock-signing-secret'],
+        ['ANYONE_WITH_ID_CAN_READ', 'mock-signing-secret'],
+        ['RESTRICTED', null],
+    ])('omits the signing key and keeps public URLs for %s access (%s)', async (generalAccess, urlSigningSecretKey) => {
+        const metadata = {
+            ...MOCK_STORE,
+            generalAccess,
+            keysPublicUrl: 'https://api.apify.com/v2/key-value-stores/kv-1/keys?signature=sig-1',
+            recordsPublicUrl: 'https://api.apify.com/v2/key-value-stores/kv-1/records?signature=sig-1',
+        };
+        const result = await (getKeyValueStore as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: MOCK_STORE.id },
+                stubApifyClient({ ...metadata, urlSigningSecretKey }),
+            ),
+        );
+        const { content, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
+        const { summary, nextStep, ...data } = structuredContent;
+
+        expectSchemaConformingStructuredContent(result, keyValueStoreOutputSchema);
+        expect(data).toEqual(metadata);
+        expect(JSON.parse(content[0].text)).toEqual(metadata);
+        expect(JSON.stringify(result)).not.toContain('urlSigningSecretKey');
+        expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
+    });
+
     it('includes the byte count in the summary when stats are present', async () => {
         const result = await (getKeyValueStore as HelperTool).call(
             stubToolCallContext(

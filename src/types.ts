@@ -33,6 +33,9 @@ export type SchemaProperties = {
     items?: SchemaProperties;
     editor?: string;
     examples?: unknown[];
+    isSecret?: boolean;
+    resourceType?: string;
+    resourcePermissions?: string[];
 
     properties?: Record<string, SchemaProperties>;
     required?: string[];
@@ -534,6 +537,8 @@ export type ActorExecutionParams = {
      * task mode would let the task complete before the Actor has produced output.
      */
     taskMode?: boolean;
+    /** Whether the session serves call-actor; without it, an Actor's tip gets the callability caveat. */
+    hasCallActorTool?: boolean;
 };
 
 /**

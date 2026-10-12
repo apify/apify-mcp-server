@@ -1,7 +1,8 @@
 import type { ActorRun } from 'apify-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { KV_KEYS_LIMIT, TIP_MESSAGE_LIMIT } from '../../src/const.js';
+import { HELPER_TOOLS, KV_KEYS_LIMIT, TIP_MESSAGE_LIMIT } from '../../src/const.js';
+import { ACTOR_TIP_CAVEAT } from '../../src/tools/actor_tool_naming.js';
 import {
     buildStartRunResponse,
     buildStartRunWidgetResponse,
@@ -782,6 +783,30 @@ describe('get-actor-run default response', () => {
 
         expect(structuredContent.tip).toEqual({ message: 'Use a specialized Actor.', level: 'info' });
         expect(structuredContent.tip).not.toHaveProperty('recommendedActorId');
+    });
+
+    it('adds the callability caveat after the tip when the session cannot run the recommended Actor', async () => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: {
+                message: 'Use a different Actor.',
+                level: 'info',
+                recommendedActorId: 'shu8hvrXbJbY3Eb9W',
+            },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client), {
+                loadedToolNames: [HELPER_TOOLS.ACTOR_RUNS_GET],
+            }),
+        );
+        const { content, structuredContent } = result as {
+            content: { type: string; text: string }[];
+            structuredContent: RunResponse;
+        };
+
+        expect(structuredContent.tip?.caveat).toBe(ACTOR_TIP_CAVEAT);
+        expect(content[1].text).toContain(`Use a different Actor.\n\`\`\`\n${ACTOR_TIP_CAVEAT}`);
     });
 
     it('renders the tip in a fenced code block in the text response', async () => {
