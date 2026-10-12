@@ -18,6 +18,9 @@ export type ApiBlockRule = {
     suggestedToolNames?: readonly HelperToolName[];
 };
 
+const SYNC_RUN_GET_REASON =
+    'A GET to the synchronous run endpoints starts a paid run, as a POST does, so the API tools do not send it.';
+
 /** What the API tools refuse to send. The operation index leaves out each operation a rule matches. */
 export const API_BLOCK_RULES: readonly ApiBlockRule[] = [
     {
@@ -26,6 +29,28 @@ export const API_BLOCK_RULES: readonly ApiBlockRule[] = [
         reason:
             'The API tools do not send the method query parameter: the API would take it as the HTTP method ' +
             'of the request.',
+        suggestedToolNames: [HELPER_TOOLS.API_WRITE],
+    },
+    // A GET here starts a paid run, so the read tool would not be read-only; see apify/apify-mcp-server#1502.
+    {
+        match: { method: 'GET', path: '/v2/actors/{actorId}/run-sync' },
+        reason: SYNC_RUN_GET_REASON,
+        suggestedToolNames: [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.API_WRITE],
+    },
+    {
+        match: { method: 'GET', path: '/v2/actors/{actorId}/run-sync-get-dataset-items' },
+        reason: SYNC_RUN_GET_REASON,
+        suggestedToolNames: [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.API_WRITE],
+    },
+    // call-actor runs an Actor, not a saved task.
+    {
+        match: { method: 'GET', path: '/v2/actor-tasks/{actorTaskId}/run-sync' },
+        reason: SYNC_RUN_GET_REASON,
+        suggestedToolNames: [HELPER_TOOLS.API_WRITE],
+    },
+    {
+        match: { method: 'GET', path: '/v2/actor-tasks/{actorTaskId}/run-sync-get-dataset-items' },
+        reason: SYNC_RUN_GET_REASON,
         suggestedToolNames: [HELPER_TOOLS.API_WRITE],
     },
 ];

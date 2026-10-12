@@ -16,7 +16,13 @@ describe('buildApiOperationIndex()', () => {
         expect(index.has('dataset_items_head')).toBe(false);
         expect(index.has('outside_get')).toBe(false);
         expect([...index.values()].every((operation) => operation.operationId)).toBe(true);
-        expect(index.size).toBe(38);
+        expect(index.size).toBe(37);
+    });
+
+    it('leaves out the GET of the synchronous run endpoints and keeps the POST', () => {
+        expect(index.has('actor_runSync_get')).toBe(false);
+        expect(index.has('actor_runSync_post')).toBe(true);
+        expect(index.has('actor_runSyncGetDatasetItems_post')).toBe(true);
     });
 
     it('leaves out the operations a rule matches', () => {
@@ -96,7 +102,7 @@ describe('searchApiOperations()', () => {
     }
 
     it('matches word prefixes and ignores stop words', () => {
-        // Without the stop words, "with" would also match "Run Actor synchronously without input".
+        // Without the stop words, "with" would also match "Run Actor synchronously with input and return output".
         expect(searchIds('webhook with')).toEqual(['webhooks_get', 'webhooks_post', 'actor_webhooks_get']);
     });
 

@@ -40,6 +40,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
     return dedent`
         Send a POST, PUT, PATCH, or DELETE request to the Apify API at a path, such as /v2/datasets/abc.
         ${API_CALL_DESCRIPTION}${findPath}${getParameters}
+        Synchronous runs also outlast the 60-second tool-call timeout, so prefer asynchronous runs.
         The request is sent once and applies at once.
         Returns the parsed response body, JSON with its data wrapper included: integers above 2^53 can
         lose precision. A body over ${MAX_INLINE_BYTES} bytes is not returned.
