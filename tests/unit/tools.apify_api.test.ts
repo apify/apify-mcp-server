@@ -864,7 +864,7 @@ describe('apify-api-write', () => {
         const result = await callToolWithRule(apifyApiWrite, rule, { path: '/v2/datasets/abc' });
 
         expectSoftFailInvalidInput(result);
-        expect(result.content[0].text).toContain('The path matches method PUT; specify it to call the endpoint with.');
+        expect(result.content[0].text).toContain('Specify a method for this path: PUT.');
         expect(requestMock).not.toHaveBeenCalled();
     });
 
@@ -877,7 +877,7 @@ describe('apify-api-write', () => {
         const result = await callToolWithRule(apifyApiWrite, rule, { path: 'request-queues/q/requests/batch' });
 
         expectSoftFailInvalidInput(result);
-        expect(result.content[0].text).toBe('The path matches method DELETE; specify it to call the endpoint with.');
+        expect(result.content[0].text).toBe('Specify a method for this path: DELETE.');
         expect(requestMock).not.toHaveBeenCalled();
     });
 
