@@ -321,6 +321,8 @@ export const APIFY_ERROR_TYPE_INVALID_INPUT = 'invalid-input';
 export const APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE = 'actor-name-not-unique';
 export const APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS = 'version-already-exists';
 export const APIFY_ERROR_TYPE_TOO_FEW_VERSIONS = 'too-few-versions';
+export const APIFY_ERROR_TYPE_TOO_MANY_VERSIONS = 'too-many-versions';
+export const APIFY_ERROR_TYPE_VERSIONS_SIZE_EXCEEDED = 'versions-size-exceeded';
 export const APIFY_ERROR_TYPE_PAGE_NOT_FOUND = 'page-not-found';
 
 // HTTP status codes

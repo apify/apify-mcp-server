@@ -664,6 +664,26 @@ describe('create-actor-version', () => {
             expect(buildMock).not.toHaveBeenCalled();
         });
 
+        it.each([
+            ['too-many-versions', 'The Actor can have at most 10 versions.'],
+            [
+                'versions-size-exceeded',
+                'The limit on the combined size of all versions has been exceeded. Delete unused versions to free up ' +
+                    'space or use another source type. See https://docs.apify.com/platform/actors/development/deployment/source-types.',
+            ],
+        ])('reports the platform refusing the POST with %s', async (type, message) => {
+            versionsCreateMock.mockRejectedValue(apiError(403, message, type));
+
+            const result = await callTool({ files: [ACTOR_JSON], autoBuild: true });
+
+            // The platform's reason, without the token-access hint the engine adds to a 403.
+            expectSoftFailInvalidInput(result);
+            expect(result.toolTelemetry).toEqual(expect.objectContaining({ failureHttpStatus: 403 }));
+            expect(result.content).toStrictEqual([{ type: 'text', text: `${message} (API error type: ${type})` }]);
+            expectNoOtherWrite();
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+
         it('lets any other API error of the POST through to the engine', async () => {
             const error = apiError(403, 'You do not have permission to modify this Actor.', 'insufficient-permissions');
             versionsCreateMock.mockRejectedValue(error);
@@ -728,8 +748,8 @@ describe('create-actor-version', () => {
         it('lets any other API error of a retried POST through unchanged', async () => {
             const error = apiError(
                 403,
-                'The limit on the combined size of all versions has been exceeded.',
-                'versions-size-exceeded',
+                'You do not have permission to modify this Actor.',
+                'insufficient-permissions',
                 2,
             );
             versionsCreateMock.mockRejectedValue(error);

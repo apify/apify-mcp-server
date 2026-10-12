@@ -5,7 +5,12 @@ import { ActorSourceType, ApifyApiError } from 'apify-client';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { APIFY_ERROR_TYPE_TOO_FEW_VERSIONS, APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS } from '../../const.js';
+import {
+    APIFY_ERROR_TYPE_TOO_FEW_VERSIONS,
+    APIFY_ERROR_TYPE_TOO_MANY_VERSIONS,
+    APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS,
+    APIFY_ERROR_TYPE_VERSIONS_SIZE_EXCEEDED,
+} from '../../const.js';
 import { UserInputError } from '../../errors.js';
 import { REDACTED } from '../../resources/api_resources.js';
 import type { ConsoleLinkContext, InternalToolArgs } from '../../types.js';
@@ -376,17 +381,23 @@ export async function respondAfterWrite(params: {
     });
 }
 
+/** The platform's 403 refusals of a version write that are not about access. */
+const VERSION_REFUSAL_ERROR_TYPE_SET = new Set<string | undefined>([
+    APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS,
+    APIFY_ERROR_TYPE_TOO_FEW_VERSIONS,
+    APIFY_ERROR_TYPE_TOO_MANY_VERSIONS,
+    APIFY_ERROR_TYPE_VERSIONS_SIZE_EXCEEDED,
+]);
+
 /**
- * A `UserInputError`, or the platform's refusal of a taken version number or of deleting the last version, as a soft
- * failure with the platform's own message; anything else is rethrown for the tool-call engine to report. The engine
- * would add a token-access hint to these two 403s, which contradicts their reason.
+ * A `UserInputError`, or the platform's refusal of a taken version number, of deleting the last version, or of a
+ * version over the limit on the number of versions or on their combined size, as a soft failure with the platform's
+ * own message; anything else is rethrown for the tool-call engine to report. The engine would add a token-access hint
+ * to these 403s, which contradicts their reason.
  */
 export function respondToSourceToolError(error: unknown): ToolResponse {
     if (error instanceof UserInputError) return respondUserError(error.message);
-    if (
-        error instanceof ApifyApiError &&
-        (error.type === APIFY_ERROR_TYPE_TOO_FEW_VERSIONS || error.type === APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS)
-    ) {
+    if (error instanceof ApifyApiError && VERSION_REFUSAL_ERROR_TYPE_SET.has(error.type)) {
         return respondUserError(`${error.message} (API error type: ${error.type})`, { httpStatus: error.statusCode });
     }
     throw error;
