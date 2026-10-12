@@ -73,7 +73,7 @@ export class ApifyClient extends _ApifyClient {
  */
 export async function sendApifyApiRequest(
     apifyClient: ApifyClient,
-    config: Pick<AxiosRequestConfig, 'url' | 'method' | 'params' | 'responseType' | 'signal'>,
+    config: Pick<AxiosRequestConfig, 'url' | 'method' | 'params' | 'data' | 'headers' | 'responseType' | 'signal'>,
 ): Promise<AxiosResponse<unknown>> {
     return apifyClient.httpClient.axios.request<unknown>({ ...config, maxContentLength: MAX_INLINE_BYTES });
 }

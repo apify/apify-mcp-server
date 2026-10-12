@@ -24,7 +24,10 @@ const apifyApiSearchArgs = z.object({
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    const callTools = [hasTool(HELPER_TOOLS.API_READ) && `${HELPER_TOOLS.API_READ} for a GET`].filter(Boolean);
+    const callTools = [
+        hasTool(HELPER_TOOLS.API_READ) && `${HELPER_TOOLS.API_READ} for a GET`,
+        hasTool(HELPER_TOOLS.API_WRITE) && `${HELPER_TOOLS.API_WRITE} for a POST, PUT, PATCH, or DELETE`,
+    ].filter(Boolean);
     const nextSteps = [
         hasTool(HELPER_TOOLS.API_DETAILS) &&
             `get its parameters with ${HELPER_TOOLS.API_DETAILS} by its method and path`,
