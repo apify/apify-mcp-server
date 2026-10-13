@@ -6,7 +6,7 @@ import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSche
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
-import { actorTaskOutputSchema } from '../structured_output_schemas.js';
+import { actorTaskOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
 import {
     getTaskByIdOrName,
     isAmbiguousResourceId,
@@ -26,9 +26,7 @@ const updateActorTaskArgs = z.object({
     name: taskNameSchema.optional().describe('New name of the task: 3-63 characters, letters, digits and dashes only.'),
     title: z.string().optional().describe('New human-readable title of the task.'),
     description: z.string().optional().describe('New short description of the task.'),
-    input: z
-        .object({})
-        .passthrough()
+    input: anyJsonObjectSchema
         .optional()
         .describe('Replacement input JSON for the task. Replaces the stored input, it is not merged into it.'),
     build: z.string().optional().describe('Actor build tag or number to run, e.g. "latest".'),

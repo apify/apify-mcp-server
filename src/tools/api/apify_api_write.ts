@@ -6,7 +6,7 @@ import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSche
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondUserError } from '../../utils/mcp.js';
-import { apifyApiCallOutputSchema } from '../structured_output_schemas.js';
+import { anyJsonValueSchema, apifyApiCallOutputSchema } from '../structured_output_schemas.js';
 import { isEndpointBlocked } from './apify_api_blocklist.js';
 import { normalizeApiPath } from './apify_api_path.js';
 import {
@@ -29,7 +29,11 @@ const apifyApiWriteArgs = z.object({
             'HTTP method: POST, PUT, PATCH, or DELETE. Omit it only when the path has one method in the API spec.',
         ),
     query: apiCallArgsShape.query,
-    body: z.unknown().optional().describe('The request body: a JSON object or array, sent as JSON.'),
+    body: z
+        .unknown()
+        .meta(anyJsonValueSchema)
+        .optional()
+        .describe('The request body: a JSON object or array, sent as JSON.'),
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
