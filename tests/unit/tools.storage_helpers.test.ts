@@ -4,6 +4,7 @@ import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import {
     buildDatasetItemsSummaryNextStep,
     buildBinaryRecordDisposition,
+    buildKvsKeysSummaryNextStep,
     normalizeRecordKey,
 } from '../../src/tools/storage/storage_helpers.js';
 
@@ -54,6 +55,41 @@ describe('buildDatasetItemsSummaryNextStep()', () => {
         expect(loaded.nextStep).toBe(unloaded.nextStep);
         expect(loaded.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
         expect(loaded.nextStep).toContain('offset=20');
+    });
+});
+
+// Regression: #1296 — the terminal nextStep named record/store tools the session was not served.
+describe('buildKvsKeysSummaryNextStep()', () => {
+    const base = { keyValueStoreId: 'kv-1', count: 1, isTruncated: false };
+
+    it.each([
+        [
+            'a nonempty listing',
+            { firstKey: 'INPUT' },
+            HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
+            `Use ${HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=kv-1 and recordKey=INPUT to read a value.`,
+        ],
+        [
+            'an empty listing',
+            { count: 0 },
+            HELPER_TOOLS.KEY_VALUE_STORE_GET,
+            `Use ${HELPER_TOOLS.KEY_VALUE_STORE_GET} with keyValueStoreId=kv-1 to inspect the store.`,
+        ],
+    ])('names the sibling on %s only when it is loaded', (_, extra, sibling, hint) => {
+        expect(buildKvsKeysSummaryNextStep({ ...base, ...extra, loadedToolNames: [sibling] }).nextStep).toBe(hint);
+        expect(buildKvsKeysSummaryNextStep({ ...base, ...extra, loadedToolNames: [] }).nextStep).toBe(
+            'Inspect the returned result directly.',
+        );
+    });
+
+    it('points at the next page whatever is loaded', () => {
+        const page = { ...base, isTruncated: true, nextExclusiveStartKey: 'OUTPUT', firstKey: 'INPUT' };
+        const expected = `Call ${HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET} again with exclusiveStartKey=OUTPUT to fetch the next page.`;
+
+        expect(buildKvsKeysSummaryNextStep({ ...page, loadedToolNames: [] }).nextStep).toBe(expected);
+        expect(buildKvsKeysSummaryNextStep({ ...page, loadedToolNames: Object.values(HELPER_TOOLS) }).nextStep).toBe(
+            expected,
+        );
     });
 });
 

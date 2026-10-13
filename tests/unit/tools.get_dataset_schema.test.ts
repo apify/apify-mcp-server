@@ -163,3 +163,62 @@ describe('get-dataset-schema', () => {
         expect(toolTelemetry?.failureCategory).not.toBe(FAILURE_CATEGORY.INVALID_INPUT);
     });
 });
+
+// Regression: #1296 — nextStep named a sibling tool the session was not served.
+describe('get-dataset-schema nextStep gating', () => {
+    const cases = [
+        {
+            name: 'nonempty output',
+            args: { datasetId: 'ds-1' },
+            response: { items: MOCK_ITEMS, total: 2 },
+            sibling: HELPER_TOOLS.DATASET_GET_ITEMS,
+            hint: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=ds-1 and fields="..." to project specific fields.`,
+        },
+        {
+            name: 'empty output',
+            args: { datasetId: 'ds-1', clean: false },
+            response: { items: [], total: 0 },
+            sibling: HELPER_TOOLS.DATASET_GET,
+            hint: `Use ${HELPER_TOOLS.DATASET_GET} with datasetId=ds-1 to check itemCount and stats.`,
+        },
+        {
+            name: 'clean-filtered output',
+            args: { datasetId: 'ds-1' },
+            response: { items: [], total: 3 },
+            sibling: HELPER_TOOLS.DATASET_GET,
+            hint: `Retry with clean=false to include those items, or use ${HELPER_TOOLS.DATASET_GET} with datasetId=ds-1 to check itemCount and stats.`,
+        },
+    ];
+
+    it.each(cases)('falls back on $name when $sibling is not loaded', async ({ args, response, sibling }) => {
+        const result = (await (getDatasetSchema as HelperTool).call(
+            stubToolCallContext(args, stubApifyClient(response), {
+                loadedToolNames: [HELPER_TOOLS.DATASET_SCHEMA_GET],
+            }),
+        )) as TextToolResult & { structuredContent: Record<string, unknown> };
+
+        expect(result.structuredContent.nextStep).toBe('Inspect the returned result directly.');
+        expect(JSON.stringify([result.content, result.structuredContent])).not.toContain(sibling);
+        expectSchemaConformingStructuredContent(result, datasetSchemaOutputSchema);
+    });
+
+    it.each(cases)('keeps the hint on $name when $sibling is loaded', async ({ args, response, sibling, hint }) => {
+        const result = (await (getDatasetSchema as HelperTool).call(
+            stubToolCallContext(args, stubApifyClient(response), {
+                loadedToolNames: [HELPER_TOOLS.DATASET_SCHEMA_GET, sibling],
+            }),
+        )) as TextToolResult & { structuredContent: Record<string, unknown> };
+
+        expect(result.structuredContent.nextStep).toBe(hint);
+    });
+
+    it('still explains clean filtering in the summary when get-dataset is not loaded', async () => {
+        const result = (await (getDatasetSchema as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: [], total: 3 }), {
+                loadedToolNames: [HELPER_TOOLS.DATASET_SCHEMA_GET],
+            }),
+        )) as TextToolResult & { structuredContent: Record<string, unknown> };
+
+        expect(result.structuredContent.summary).toContain('clean=true');
+    });
+});

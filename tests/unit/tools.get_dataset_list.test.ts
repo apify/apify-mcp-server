@@ -123,3 +123,39 @@ describe('get-dataset-list', () => {
         expect(tool.ajvValidate({ limit: 20 })).toBe(true);
     });
 });
+
+// Regression: #1296 — the terminal nextStep named a sibling tool the session was not served.
+describe('get-dataset-list nextStep gating', () => {
+    async function callWith(list: Record<string, unknown>, loadedToolNames: string[]) {
+        return (await (getDatasetList as HelperTool).call(
+            stubToolCallContext({}, stubApifyClient(vi.fn().mockResolvedValue(list)), { loadedToolNames }),
+        )) as TextToolResult & { structuredContent: Record<string, unknown> };
+    }
+
+    it('falls back on the last page when get-dataset is not loaded', async () => {
+        const result = await callWith(MOCK_LIST, [HELPER_TOOLS.DATASET_LIST_GET]);
+
+        expect(result.structuredContent.nextStep).toBe('Inspect the returned result directly.');
+        expect(JSON.stringify([result.content, result.structuredContent])).not.toContain(HELPER_TOOLS.DATASET_GET);
+        expectSchemaConformingStructuredContent(result, storageListOutputSchema);
+    });
+
+    it('keeps the inspect hint on the last page when the sibling is loaded', async () => {
+        const result = await callWith(MOCK_LIST, [HELPER_TOOLS.DATASET_LIST_GET, HELPER_TOOLS.DATASET_GET]);
+
+        expect(result.structuredContent.nextStep).toBe(
+            `Use ${HELPER_TOOLS.DATASET_GET} with a datasetId from the list to inspect a dataset.`,
+        );
+    });
+
+    it('keeps the pagination hint whether or not the sibling is loaded', async () => {
+        const page = { ...MOCK_LIST, total: 5 };
+        const narrow = await callWith(page, [HELPER_TOOLS.DATASET_LIST_GET]);
+        const wide = await callWith(page, [HELPER_TOOLS.DATASET_LIST_GET, HELPER_TOOLS.DATASET_GET]);
+
+        expect(narrow.structuredContent.nextStep).toBe(
+            `Call ${HELPER_TOOLS.DATASET_LIST_GET} again with offset=2 to fetch the next page.`,
+        );
+        expect(wide.structuredContent.nextStep).toBe(narrow.structuredContent.nextStep);
+    });
+});
