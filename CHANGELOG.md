@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.18.1 - **not yet released**
 
+### 🚀 Features
+
+- State the run limitation when no tool can start an Actor run ([#1533](https://github.com/apify/apify-mcp-server/pull/1533)) ([282807e](https://github.com/apify/apify-mcp-server/commit/282807e628a9362168342581be7a0872a818b3a9)) by [@jirispilka](https://github.com/jirispilka), closes [#1527](https://github.com/apify/apify-mcp-server/issues/1527)
+
 ### 🐛 Bug Fixes
 
 - **evals:** Fail an item when its MCP server is not connected at init ([#1519](https://github.com/apify/apify-mcp-server/pull/1519)) ([5001237](https://github.com/apify/apify-mcp-server/commit/5001237e56cd91634d7cb4f9673cabde334a09ea)) by [@jirispilka](https://github.com/jirispilka), closes [#1510](https://github.com/apify/apify-mcp-server/issues/1510)
