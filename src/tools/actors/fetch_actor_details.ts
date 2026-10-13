@@ -128,9 +128,9 @@ The 'readme' field returns the summary when available, full README otherwise.
 Use when querying Actor details, documentation, input requirements, or MCP tools.
 
 EXAMPLES:
-- What does apify/rag-web-browser do?
+- What does apify/web-fetch do?
 - What is the input schema for apify/web-scraper?
-- What tools does apify/actors-mcp-server provide?`;
+- What tools does this MCP server Actor provide?`;
 }
 
 /**
