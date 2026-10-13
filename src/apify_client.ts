@@ -33,10 +33,10 @@ export function getApifyAPIBaseUrl(): string {
 }
 
 /**
- * Apify API origin shown to clients: resource templates, server-instruction examples, read refusals and
- * download links. Separate from `getApifyAPIBaseUrl()`, where requests go — the hosted server reaches the
- * API through an internal host clients cannot resolve. Mirrors `getConsoleBaseUrl()` (`utils/console_link.ts`):
- * `APIFY_API_PUBLIC_BASE_URL` when set, the staging API on the staging MCP host, production otherwise.
+ * Apify API origin for every API URL handed to clients. Separate from `getApifyAPIBaseUrl()`, where requests
+ * go — the hosted server reaches the API through an internal host clients cannot resolve. Mirrors
+ * `getConsoleBaseUrl()` (`utils/console_link.ts`): `APIFY_API_PUBLIC_BASE_URL` when set, the staging API on
+ * the staging MCP host, production otherwise.
  */
 export function getApifyAPIPublicBaseUrl(): string {
     if (process.env.APIFY_API_PUBLIC_BASE_URL) return process.env.APIFY_API_PUBLIC_BASE_URL;

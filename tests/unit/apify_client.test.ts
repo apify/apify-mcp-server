@@ -77,7 +77,6 @@ describe('ApifyClient', () => {
         void new ApifyClient({ token: 'test-token' });
         const passed = capturedOptions[0] as CapturedClientOptions;
         expect(passed.baseUrl).toBe('http://api.internal.example:3333');
-        // Signed storage links (`getRecordPublicUrl`) are handed to clients, so they take the client-facing origin.
         expect(passed.publicBaseUrl).toBe('https://api.apify.com');
     });
 });

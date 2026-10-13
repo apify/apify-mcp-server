@@ -445,9 +445,8 @@ export const storageCases: Case[] = [
         name: 'rejects resources/read of a nonexistent dataset with a JSON-RPC error',
         isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, _run, ctx) => {
-            const api = getApiOrigin(ctx);
             await expect(
-                client.readResource({ uri: `${api}/v2/datasets/this-dataset-does-not-exist-xyz/items` }),
+                client.readResource({ uri: `${getApiOrigin(ctx)}/v2/datasets/this-dataset-does-not-exist-xyz/items` }),
             ).rejects.toThrow(/Failed to read/i);
         }),
     },
@@ -464,8 +463,7 @@ export const storageCases: Case[] = [
         name: 'redacts the URL signing key via resources/read',
         isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }, ctx) => {
-            const api = getApiOrigin(ctx);
-            const result = await client.readResource({ uri: `${api}/v2/datasets/${datasetId}` });
+            const result = await client.readResource({ uri: `${getApiOrigin(ctx)}/v2/datasets/${datasetId}` });
             const text = (result.contents[0] as { text?: string }).text as string;
             const { data } = JSON.parse(text) as { data: Record<string, unknown> };
             expect(data.urlSigningSecretKey).toBe('[REDACTED]');
@@ -490,8 +488,7 @@ export const storageCases: Case[] = [
         name: 'masks the session token via resources/read',
         isDeploymentTest: false,
         run: withClient({ tools: ['storage'] }, async (client, ctx) => {
-            const api = getApiOrigin(ctx);
-            const result = await client.readResource({ uri: `${api}/v2/browser-info` });
+            const result = await client.readResource({ uri: `${getApiOrigin(ctx)}/v2/browser-info` });
             expect((result.contents[0] as { text?: string }).text).toContain('Bearer [REDACTED]');
         }),
     },

@@ -32,7 +32,7 @@ function stubApifyClient(opts: {
     record: unknown;
     store?: unknown;
     onGetRecordPublicUrl?: () => void;
-    /** Egress origin of the SDK client; `url` is built on it, as apify-client does. */
+    /** Egress base URL of the SDK client (ends with `/v2`); `url` is built on it, as apify-client does. */
     baseUrl?: string;
 }): InternalToolArgs['apifyClient'] {
     const { record, store, onGetRecordPublicUrl, baseUrl = 'https://api.apify.com/v2' } = opts;
