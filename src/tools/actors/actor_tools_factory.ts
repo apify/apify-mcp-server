@@ -11,6 +11,8 @@ import {
     OFFICIAL_APIFY_USERNAMES,
     RAG_WEB_BROWSER,
     RAG_WEB_BROWSER_ADDITIONAL_DESC,
+    RAG_WEB_BROWSER_STORE_ACTOR_HINT,
+    RAG_WEB_BROWSER_WEB_FETCH_HINT,
     WEB_FETCH,
     WEB_FETCH_ADDITIONAL_DESC,
 } from '../../const.js';
@@ -37,7 +39,12 @@ import { ajv } from '../../utils/ajv.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildActorInputSchema, fixedAjvCompile } from '../actor_input_schema.js';
-import { actorNameToToolName, isActorBlockedUnderPaymentProvider, resolveActorToolMode } from '../actor_tool_naming.js';
+import {
+    actorNameToToolName,
+    canRunAnyActor,
+    isActorBlockedUnderPaymentProvider,
+    resolveActorToolMode,
+} from '../actor_tool_naming.js';
 import { buildEnrichedDirectActorOutputSchema, actorRunOutputSchema } from '../structured_output_schemas.js';
 import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from './actor_run_response.js';
 
@@ -162,6 +169,8 @@ export async function getNormalActorsAsTools(
 ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this specific Actor.\n` : ''}Actor description: ${actorDescription}`;
             if (isRag) {
                 description += `\n\n${RAG_WEB_BROWSER_ADDITIONAL_DESC}`;
+                if (canRunAnyActor(hasTool)) description += ` ${RAG_WEB_BROWSER_STORE_ACTOR_HINT}`;
+                if (hasTool(actorNameToToolName(WEB_FETCH))) description += `\n${RAG_WEB_BROWSER_WEB_FETCH_HINT}`;
             } else if (isWebFetch) {
                 description += `\n\n${WEB_FETCH_ADDITIONAL_DESC}`;
             }
