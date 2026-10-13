@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { APIFY_STORE_URL, HELPER_TOOLS, MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../../src/const.js';
-import { ACTOR_CALLABILITY_CAVEAT } from '../../src/tools/actor_tool_naming.js';
+import { APIFY_STORE_URL, HELPER_TOOLS, MAX_INPUT_FIELDS_IN_ACTOR_CARD, RAG_WEB_BROWSER } from '../../src/const.js';
+import { ACTOR_CALLABILITY_CAVEAT, actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { ACTOR_DETAILS_HINT, searchActors, searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors.js';
 import { actorInfoSchema } from '../../src/tools/structured_output_schemas.js';
 import type { ActorStoreInputSchema, ActorStoreList, HelperTool } from '../../src/types.js';
@@ -381,10 +381,10 @@ describe('search-actors without widget (searchActors)', () => {
 describe('buildDescription()', () => {
     const renderDescription = (...present: string[]) => searchActors.buildDescription!(only(...present));
 
-    it('states the run limitation after the call-construction sentence when call-actor and its widget are absent', () => {
+    it('states the run limitation after the input-fields sentence when call-actor and its widget are absent', () => {
         const description = renderDescription(HELPER_TOOLS.STORE_SEARCH);
         expect(description).toContain(
-            `so you can construct an Actor call directly without another tool call.\n${ACTOR_CALLABILITY_CAVEAT}\nThe search is limited to publicly available Actors`,
+            `so you can see what input an Actor needs.\n${ACTOR_CALLABILITY_CAVEAT}\nThe search is limited to publicly available Actors`,
         );
         // No hard directive — the directory review rejects MUST-style solicitation.
         expect(description).not.toContain('MUST');
@@ -430,5 +430,21 @@ describe('buildDescription()', () => {
             'so you can construct an Actor call directly without another tool call.\nFor complete Actor details',
         );
         expect(searchActors.description).not.toContain(ACTOR_CALLABILITY_CAVEAT);
+    });
+
+    // Regression: #1532 — the description named apify/rag-web-browser when the session did not serve it.
+    it('names apify/rag-web-browser only when its tool is served', () => {
+        const ragClause = '— use apify/rag-web-browser instead.';
+        expect(renderDescription(HELPER_TOOLS.STORE_SEARCH, actorNameToToolName(RAG_WEB_BROWSER))).toContain(ragClause);
+        const withoutRag = renderDescription(HELPER_TOOLS.STORE_SEARCH);
+        expect(withoutRag).toContain('This tool discovers Actors; it does not retrieve their output.');
+        expect(withoutRag).not.toContain('rag-web-browser');
+    });
+
+    // Regression: #1532 — "prefer searching the Store first" sent named-Actor questions to search (evals: typo-actor-name 7/10 → 2/10).
+    it('tells the agent to look up a named Actor instead of searching', () => {
+        const carveOut = 'When the user names a specific Actor, look up that Actor directly instead of searching.';
+        expect(searchActors.description).toContain(carveOut);
+        expect(renderDescription(HELPER_TOOLS.STORE_SEARCH)).toContain(carveOut);
     });
 });
