@@ -131,10 +131,10 @@ Examples of when to use:
 - General questions answered by web pages (e.g., "What's the weather in Prague?", "Latest news about the EU AI Act", "How does HTTP/3 work?")
 
 For detailed data from a specific platform (e.g. Amazon products with prices, Instagram posts, Google Maps places with ratings), a specialized Actor from the Apify Store returns complete, structured results; this tool returns page text only.`;
-/** Follows RAG_WEB_BROWSER_ADDITIONAL_DESC on its own line when the session serves the apify/web-fetch tool. */
-export const RAG_WEB_BROWSER_WEB_FETCH_HINT = `When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated apify/web-fetch tool - this tool is for searching and scraping by query.`;
 
 export const WEB_FETCH = 'apify/web-fetch';
+/** Follows RAG_WEB_BROWSER_ADDITIONAL_DESC on its own line when the session serves the apify/web-fetch tool. */
+export const RAG_WEB_BROWSER_WEB_FETCH_HINT = `When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated ${WEB_FETCH} tool - this tool is for searching and scraping by query.`;
 /**
  * Appended to the `apify/web-fetch` Actor tool description. Client-agnostic on purpose:
  * no references to any specific client or its built-in tools, so the same text works
