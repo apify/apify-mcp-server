@@ -30,9 +30,11 @@ const SINGLE_NORMAL_MODE_ACTOR = [ACTOR_NORMAL_MODE];
 const DOCS_CATEGORY = ['docs'] as ToolCategory[];
 const DOCS_RUNS_STORAGE_CATEGORIES = ['docs', 'runs', 'storage'] as ToolCategory[];
 
-// Claude-connector `?tools=` allowlist (ai-team#214/#229). No call-actor. Duplicated in
-// tests/unit/helpers/claude_connector_tools.ts, not imported from there: tests/test_kit is its own
-// `tsc -b` project (see its tsconfig's `rootDir`) and cannot import outside itself.
+// Claude-connector `?tools=` allowlist (ai-team#214/#229), the exact listed URL. No call-actor.
+// abort-actor-run is named because the loader injects it with any Actor tool anyway; the listed URL
+// must show every served tool. Duplicated in tests/unit/helpers/claude_connector_tools.ts, not
+// imported from there: tests/test_kit is its own `tsc -b` project (see its tsconfig's `rootDir`)
+// and cannot import outside itself.
 const CLAUDE_CONNECTOR_TOOLS = [
     'search-actors',
     'search-actors-widget',
@@ -53,6 +55,8 @@ const CLAUDE_CONNECTOR_TOOLS = [
     'get-key-value-store-record',
     'get-key-value-store-list',
     'apify/rag-web-browser',
+    'apify/website-content-crawler',
+    'apify/screenshot-url',
     'apify/web-fetch',
     'report-problem',
 ];
@@ -62,9 +66,10 @@ const CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES = CLAUDE_CONNECTOR_TOOLS.map((selecto
 );
 // telemetry: true is explicit — the deployed target defaults it off, unlike this package's own default.
 // clientName: real Claude handshake name — exercises the blocklist bypass (client= URL tag doesn't gate it).
+// client: the listed URL's attribution tag.
 const CLAUDE_CONNECTOR_CLIENT_OPTIONS: SuiteClientOptions = {
     tools: CLAUDE_CONNECTOR_TOOLS,
-    client: 'claude connector',
+    client: 'claude',
     clientName: 'claude-ai',
     telemetry: { enabled: true },
 };
@@ -114,7 +119,7 @@ export const registrationCases: Case[] = [
     {
         // Pinned ?tools= wins for call-actor even with report-problem auto-inject live.
         // No ?ui=: apps mode comes from the client's own UI-capability advertisement (serverMode 'auto'), not a URL override.
-        name: 'Claude connector: pinned tool surface excludes call-actor, includes report-problem, tagged ?client=claude+connector',
+        name: 'Claude connector: pinned tool surface excludes call-actor, includes report-problem, tagged ?client=claude',
         isDeploymentTest: true,
         skipIf: () => !SERVER_MODE_AUTO_DETECTION_ENABLED,
         run: withClient(
@@ -130,7 +135,7 @@ export const registrationCases: Case[] = [
                 expect(new Set(names)).toEqual(new Set(CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES));
 
                 const url = buildClientUrl('http://placeholder/', CLAUDE_CONNECTOR_CLIENT_OPTIONS);
-                expect(url.search.endsWith('client=claude+connector')).toBe(true);
+                expect(url.search.endsWith('client=claude')).toBe(true);
             },
         ),
     },
