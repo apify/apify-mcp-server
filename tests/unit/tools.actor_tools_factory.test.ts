@@ -48,6 +48,38 @@ async function getAnnotations(actorInfo: ActorInfo) {
 const LIMITED = { actorPermissionLevel: 'LIMITED_PERMISSIONS' };
 
 describe('getNormalActorsAsTools()', () => {
+    // Regression: #1513 — the validator required a property the platform fills from its default.
+    describe('input validation', () => {
+        const actorInfo = createMockActorInfo('apify/screenshot-url', {
+            inputProperties: {
+                delay: { type: 'integer', default: 0 },
+                waitUntil: { type: 'string', enum: ['load', 'networkidle2'] },
+            },
+            inputRequired: ['url', 'delay', 'waitUntil'],
+        });
+
+        it('accepts a call that omits a required property with a default', async () => {
+            const [tool] = await getNormalActorsAsTools([actorInfo]);
+
+            expect(tool.ajvValidate({ url: 'https://example.com', waitUntil: 'load' })).toBe(true);
+            expect(tool.inputSchema.required).toEqual(['url', 'waitUntil']);
+            expect(getToolPublicFieldOnly(tool).inputSchema.required).toEqual(tool.inputSchema.required);
+        });
+
+        it('rejects a call that omits a required property without a default', async () => {
+            const [tool] = await getNormalActorsAsTools([actorInfo]);
+
+            expect(tool.ajvValidate({ url: 'https://example.com' })).toBe(false);
+            expect(tool.ajvValidate({ waitUntil: 'load' })).toBe(false);
+        });
+
+        it('rejects a supplied defaulted property of the wrong type', async () => {
+            const [tool] = await getNormalActorsAsTools([actorInfo]);
+
+            expect(tool.ajvValidate({ url: 'https://example.com', waitUntil: 'load', delay: 'soon' })).toBe(false);
+        });
+    });
+
     describe('annotations', () => {
         it.each(['apify/web-fetch', 'compass/crawler-google-places'])(
             'marks the Apify-maintained Actor %s read-only',
@@ -103,38 +135,6 @@ describe('getNormalActorsAsTools()', () => {
                 destructiveHint: true,
                 openWorldHint: true,
             });
-        });
-    });
-
-    // Regression: #1513 — the validator required a property the platform fills from its default.
-    describe('input validation', () => {
-        const actorInfo = createMockActorInfo('apify/screenshot-url', {
-            inputProperties: {
-                delay: { type: 'integer', default: 0 },
-                waitUntil: { type: 'string', enum: ['load', 'networkidle2'] },
-            },
-            inputRequired: ['url', 'delay', 'waitUntil'],
-        });
-
-        it('accepts a call that omits a required property with a default', async () => {
-            const [tool] = await getNormalActorsAsTools([actorInfo]);
-
-            expect(tool.ajvValidate({ url: 'https://example.com', waitUntil: 'load' })).toBe(true);
-            expect(tool.inputSchema.required).toEqual(['url', 'waitUntil']);
-            expect(getToolPublicFieldOnly(tool).inputSchema.required).toEqual(tool.inputSchema.required);
-        });
-
-        it('rejects a call that omits a required property without a default', async () => {
-            const [tool] = await getNormalActorsAsTools([actorInfo]);
-
-            expect(tool.ajvValidate({ url: 'https://example.com' })).toBe(false);
-            expect(tool.ajvValidate({ waitUntil: 'load' })).toBe(false);
-        });
-
-        it('rejects a supplied defaulted property of the wrong type', async () => {
-            const [tool] = await getNormalActorsAsTools([actorInfo]);
-
-            expect(tool.ajvValidate({ url: 'https://example.com', waitUntil: 'load', delay: 'soon' })).toBe(false);
         });
     });
 });
