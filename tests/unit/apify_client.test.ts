@@ -1,7 +1,8 @@
-/** ApifyClient: request-origin header + baseUrl override. */
-import { describe, expect, it, vi } from 'vitest';
+/** ApifyClient: request-origin header + baseUrl override + the client-facing API origin. */
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ApifyClient, REQUEST_ORIGIN } from '../../src/apify_client.js';
+import { ApifyClient, getApifyAPIPublicBaseUrl, REQUEST_ORIGIN } from '../../src/apify_client.js';
+import { STAGING_MCP_HOSTNAME } from '../../src/const.js';
 
 const { capturedOptions } = vi.hoisted(() => ({ capturedOptions: [] as unknown[] }));
 
@@ -17,6 +18,7 @@ type RequestConfig = { headers: Record<string, string> };
 type CapturedClientOptions = {
     requestInterceptors: ((config: RequestConfig) => RequestConfig)[];
     baseUrl: string;
+    publicBaseUrl: string;
 };
 
 /** Builds a client and runs its request interceptor to get the headers sent with every request. */
@@ -35,6 +37,8 @@ function buildBaseUrl(options: ConstructorParameters<typeof ApifyClient>[0]): st
 }
 
 describe('ApifyClient', () => {
+    afterEach(() => vi.unstubAllEnvs());
+
     it('sends the MCP request origin by default', () => {
         const headers = buildStaticHeaders({ token: 'test-token' });
         expect(headers['X-Apify-Request-Origin']).toBe('MCP');
@@ -65,5 +69,36 @@ describe('ApifyClient', () => {
             if (original === undefined) delete process.env.APIFY_API_BASE_URL;
             else process.env.APIFY_API_BASE_URL = original;
         }
+    });
+
+    it('passes the client-facing origin as publicBaseUrl, separately from the egress baseUrl', () => {
+        vi.stubEnv('APIFY_API_BASE_URL', 'http://api.internal.example:3333');
+        capturedOptions.length = 0;
+        void new ApifyClient({ token: 'test-token' });
+        const passed = capturedOptions[0] as CapturedClientOptions;
+        expect(passed.baseUrl).toBe('http://api.internal.example:3333');
+        // Signed storage links (`getRecordPublicUrl`) are handed to clients, so they take the client-facing origin.
+        expect(passed.publicBaseUrl).toBe('https://api.apify.com');
+    });
+});
+
+describe('getApifyAPIPublicBaseUrl()', () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it('stays on the production API when APIFY_API_BASE_URL points at an internal host', () => {
+        // The hosted server reaches the API through a host clients cannot resolve; what clients see must not follow it.
+        vi.stubEnv('APIFY_API_BASE_URL', 'http://api.internal.example:3333');
+        expect(getApifyAPIPublicBaseUrl()).toBe('https://api.apify.com');
+    });
+
+    it('uses the staging API on the staging MCP host', () => {
+        vi.stubEnv('HOSTNAME', STAGING_MCP_HOSTNAME);
+        expect(getApifyAPIPublicBaseUrl()).toBe('https://api-securitybyobscurity.apify.com');
+    });
+
+    it('uses the APIFY_API_PUBLIC_BASE_URL override, and it wins over the staging host check', () => {
+        vi.stubEnv('HOSTNAME', STAGING_MCP_HOSTNAME);
+        vi.stubEnv('APIFY_API_PUBLIC_BASE_URL', 'http://localhost:3333');
+        expect(getApifyAPIPublicBaseUrl()).toBe('http://localhost:3333');
     });
 });

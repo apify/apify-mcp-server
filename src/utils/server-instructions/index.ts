@@ -8,7 +8,7 @@
  * exact tool name it mentions.
  */
 
-import { getApifyAPIBaseUrl } from '../../apify_client.js';
+import { getApifyAPIPublicBaseUrl } from '../../apify_client.js';
 import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../const.js';
 import { actorNameToToolName } from '../../tools/actor_tool_naming.js';
 import type { ToolDescriptionContext } from '../../types.js';
@@ -66,9 +66,8 @@ export function getServerInstructions(
     { hasTool }: ToolDescriptionContext = ALL_TOOLS_PRESENT,
 ): string {
     const isApps = mode === SERVER_MODE.APPS;
-    // Derive the API base from config so examples match the gate/templates under an
-    // APIFY_API_BASE_URL / staging override, instead of a hardcoded api.apify.com.
-    const apiBaseUrl = getApifyAPIBaseUrl();
+    // Client-facing origin, matching the templates and the read gate.
+    const apiBaseUrl = getApifyAPIPublicBaseUrl();
 
     const hasSearch = hasTool(HELPER_TOOLS.STORE_SEARCH);
     const hasDetails = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS);

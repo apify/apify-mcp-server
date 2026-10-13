@@ -1,6 +1,6 @@
 import { Readable } from 'node:stream';
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { InternalError, InvalidParamsError } from '../../src/mcp/errors.js';
 import { SKYFIRE_README_CONTENT } from '../../src/payments/const.js';
@@ -199,6 +199,22 @@ describe('createResourceService()', () => {
     });
 
     describe('listResourceTemplates()', () => {
+        afterEach(() => vi.unstubAllEnvs());
+
+        it('advertises the client-facing origin when requests go to another host', async () => {
+            vi.stubEnv('APIFY_API_BASE_URL', 'http://api.internal.example:3333');
+            const service = createResourceService({
+                getMode: () => 'default',
+                getAvailableWidgets: () => new Map(),
+            });
+
+            const { resourceTemplates } = await service.listResourceTemplates();
+
+            for (const template of resourceTemplates) {
+                expect(template.uriTemplate).toMatch(/^https:\/\/api\.apify\.com\/v2\//);
+            }
+        });
+
         it('advertises the common API URL shapes with descriptions', async () => {
             const service = createResourceService({
                 getMode: () => 'default',

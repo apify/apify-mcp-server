@@ -69,6 +69,14 @@ function withNormalModeRun(
     };
 }
 
+/** Origin the server advertises for API resources; on a deployment not the host it sends requests to. */
+async function getAdvertisedApiOrigin(client: SuiteClient): Promise<string> {
+    const { resourceTemplates } = await client.listResourceTemplates();
+    const template = resourceTemplates.find((t) => t.name === 'dataset-items')?.uriTemplate;
+    expect(template).toBeDefined();
+    return new URL(template!).origin;
+}
+
 /** Dataset/KV read tools. */
 export const storageCases: Case[] = [
     {
@@ -409,10 +417,10 @@ export const storageCases: Case[] = [
     },
     {
         name: 'reads dataset items via resources/read',
-        isDeploymentTest: false,
+        isDeploymentTest: true,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
             const result = await client.readResource({
-                uri: `https://api.apify.com/v2/datasets/${datasetId}/items?limit=5`,
+                uri: `${await getAdvertisedApiOrigin(client)}/v2/datasets/${datasetId}/items?limit=5`,
             });
             const contents = result.contents[0] as { mimeType?: string; text?: string };
             // Content-Type may include charset — match base type only.
@@ -424,10 +432,10 @@ export const storageCases: Case[] = [
     },
     {
         name: 'reads a KV record via resources/read',
-        isDeploymentTest: false,
+        isDeploymentTest: true,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { defaultKvId }) => {
             const result = await client.readResource({
-                uri: `https://api.apify.com/v2/key-value-stores/${defaultKvId}/records/INPUT`,
+                uri: `${await getAdvertisedApiOrigin(client)}/v2/key-value-stores/${defaultKvId}/records/INPUT`,
             });
             const contents = result.contents[0] as { text?: string };
             expect(contents.text).toContain('firstNumber');
@@ -437,8 +445,9 @@ export const storageCases: Case[] = [
         name: 'rejects resources/read of a nonexistent dataset with a JSON-RPC error',
         isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client) => {
+            const api = await getAdvertisedApiOrigin(client);
             await expect(
-                client.readResource({ uri: 'https://api.apify.com/v2/datasets/this-dataset-does-not-exist-xyz/items' }),
+                client.readResource({ uri: `${api}/v2/datasets/this-dataset-does-not-exist-xyz/items` }),
             ).rejects.toThrow(/Failed to read/i);
         }),
     },
@@ -455,7 +464,8 @@ export const storageCases: Case[] = [
         name: 'redacts the URL signing key via resources/read',
         isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
-            const result = await client.readResource({ uri: `https://api.apify.com/v2/datasets/${datasetId}` });
+            const api = await getAdvertisedApiOrigin(client);
+            const result = await client.readResource({ uri: `${api}/v2/datasets/${datasetId}` });
             const text = (result.contents[0] as { text?: string }).text as string;
             const { data } = JSON.parse(text) as { data: Record<string, unknown> };
             expect(data.urlSigningSecretKey).toBe('[REDACTED]');
@@ -480,17 +490,20 @@ export const storageCases: Case[] = [
         name: 'masks the session token via resources/read',
         isDeploymentTest: false,
         run: withClient({ tools: ['storage'] }, async (client) => {
-            const result = await client.readResource({ uri: 'https://api.apify.com/v2/browser-info' });
+            const api = await getAdvertisedApiOrigin(client);
+            const result = await client.readResource({ uri: `${api}/v2/browser-info` });
             expect((result.contents[0] as { text?: string }).text).toContain('Bearer [REDACTED]');
         }),
     },
     {
         name: 'advertises API URL templates via resources/templates/list',
-        isDeploymentTest: false,
+        isDeploymentTest: true,
         run: withNormalModeRun({ tools: ['storage'] }, async (client) => {
             const { resourceTemplates } = await client.listResourceTemplates();
             const datasetItems = resourceTemplates.find((t) => t.name === 'dataset-items');
             expect(datasetItems?.uriTemplate).toContain('/v2/datasets/{datasetId}/items{?limit,offset,');
+            // A deployment advertises its public API origin, never the internal host it sends requests to.
+            expect(datasetItems?.uriTemplate).toMatch(/^https:\/\//);
         }),
     },
 ];

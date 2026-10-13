@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
 import { parseInputParamsFromUrl } from '../../src/mcp/utils.js';
@@ -227,6 +227,8 @@ describe('getServerInstructions()', () => {
     });
 
     describe('"## Apify API resources" section', () => {
+        afterEach(() => vi.unstubAllEnvs());
+
         const API_READ_LINE =
             `- Use \`${HELPER_TOOLS.API_READ}\` for API GETs. If your client can read resources, \`resources/read\` ` +
             `also returns binary records, such as key-value store files, which \`${HELPER_TOOLS.API_READ}\` does not.\n`;
@@ -247,6 +249,13 @@ describe('getServerInstructions()', () => {
             expect(withoutRead).not.toContain(HELPER_TOOLS.API_READ);
             expect(withRead).not.toBe(withoutRead);
             expect(withRead.replace(API_READ_LINE, '')).toBe(withoutRead);
+        });
+
+        it('builds the examples on the client-facing origin when requests go to another host', () => {
+            vi.stubEnv('APIFY_API_BASE_URL', 'http://api.internal.example:3333');
+            const instructions = getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT);
+            expect(instructions).toContain('https://api.apify.com/v2/datasets/{datasetId}/items');
+            expect(instructions).not.toContain('api.internal.example');
         });
     });
 
