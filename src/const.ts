@@ -124,17 +124,15 @@ export const APIFY_AI_CLIENT_NAME = 'apify-ai';
 
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
 export const RAG_WEB_BROWSER_WHITELISTED_FIELDS = ['query', 'maxResults', 'outputFormats'];
-export const RAG_WEB_BROWSER_ADDITIONAL_DESC = `Use this tool when user wants to GET or RETRIEVE actual data immediately (one-time data retrieval).
+export const RAG_WEB_BROWSER_ADDITIONAL_DESC = `Use this tool for generic web content: it searches the web by query and returns the text of the top results.
 This tool scrapes the data itself - it does NOT just find tools.
 
 Examples of when to use:
-- User wants current/immediate data (e.g., "Get flight prices for tomorrow", "What's the weather today?")
-- User needs to fetch specific content now (e.g., "Fetch news articles from CNN", "Get product info from Amazon")
-- User has time indicators like "today", "current", "latest", "recent", "now"
+- General questions answered by web pages (e.g., "What's the weather in Prague?", "Latest news about the EU AI Act", "How does HTTP/3 work?")
 
-This is for general web scraping and immediate data needs. For repeated/scheduled scraping of specific platforms (e-commerce, social media), consider suggesting a specialized Actor from the Store for better performance and reliability.`;
+For detailed data from a specific platform (e.g. Amazon products with prices, Instagram posts, Google Maps places with ratings), a specialized Actor from the Apify Store returns complete, structured results; this tool returns page text only.`;
 /** Follows RAG_WEB_BROWSER_ADDITIONAL_DESC on its own line when the session serves the apify/web-fetch tool. */
-export const RAG_WEB_BROWSER_WEB_FETCH_HINT = `When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated apify/web-fetch tool when it is available - this tool is for searching and scraping by query.`;
+export const RAG_WEB_BROWSER_WEB_FETCH_HINT = `When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated apify/web-fetch tool - this tool is for searching and scraping by query.`;
 
 export const WEB_FETCH = 'apify/web-fetch';
 /**
