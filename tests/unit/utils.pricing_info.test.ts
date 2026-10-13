@@ -469,3 +469,35 @@ describe('pricingInfoToSimplifiedString (simplified mode)', () => {
         );
     });
 });
+
+describe('simplified pricing recommendations', () => {
+    it.each([multiTierPayPerEvent, multiTierDatasetItem, multiTierRental])(
+        'keeps tier prices while omitting an unavailable details recommendation for %j',
+        (info) => {
+            const oldStructured = pricingInfoToSimplifiedStructured(info, 'GOLD');
+            expect(pricingInfoToSimplifiedStructured(info, 'GOLD', false)).toStrictEqual({
+                ...oldStructured,
+                pricingNote: 'Prices shown are for GOLD tier. Higher tiers may offer lower prices.',
+            });
+            expect(pricingInfoToSimplifiedString(info, 'GOLD', false)).toBe(
+                pricingInfoToSimplifiedString(info, 'GOLD').replace(
+                    NOTE_GOLD,
+                    'Prices shown are for GOLD tier. Higher tiers may offer lower prices.',
+                ),
+            );
+        },
+    );
+
+    it('keeps the omission notice and event prices without naming an unavailable tool', () => {
+        expect(pricingInfoToSimplifiedStructured(longPayPerEvent, 'FREE', false)).toStrictEqual({
+            ...pricingInfoToSimplifiedStructured(longPayPerEvent, 'FREE'),
+            eventDescriptionsNote: 'Event descriptions were omitted because this actor has many pricing events.',
+        });
+        expect(pricingInfoToSimplifiedString(longPayPerEvent, 'FREE', false)).toBe(
+            pricingInfoToSimplifiedString(longPayPerEvent, 'FREE').replace(
+                EVENT_DESCRIPTIONS_OMITTED_NOTE,
+                'Event descriptions were omitted because this actor has many pricing events.',
+            ),
+        );
+    });
+});

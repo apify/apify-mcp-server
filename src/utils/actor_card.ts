@@ -207,7 +207,7 @@ export function formatActorToActorCard(
 
     if (options.includePricing) {
         const pricingString = options.simplifyPricingForUserTier
-            ? pricingInfoToSimplifiedString(data.pricingInfo, userTier)
+            ? pricingInfoToSimplifiedString(data.pricingInfo, userTier, options.canFetchActorDetails)
             : pricingInfoToString(data.pricingInfo);
         // Console has no /pricing sub-page — link to the Actor detail page instead.
         const pricingUrl = options.linkContext ? data.actorUrl : `${data.actorUrl}/pricing`;
@@ -262,7 +262,7 @@ export function formatActorToStructuredCard(
     const userTier = options.userTier ?? 'FREE';
 
     const pricing = options.simplifyPricingForUserTier
-        ? pricingInfoToSimplifiedStructured(data.pricingInfo, userTier)
+        ? pricingInfoToSimplifiedStructured(data.pricingInfo, userTier, options.canFetchActorDetails)
         : pricingInfoToStructured(data.pricingInfo, userTier);
     const inputSchema = getInputSchema(actor);
     const inputFieldsTotalCount = inputSchema ? Object.keys(inputSchema.properties).length : 0;
@@ -318,7 +318,11 @@ export type WidgetActor = {
  * `pricePerUnit` / `events[0].priceUsd` (which is what the widget UI renders)
  * matches the tier-filtered prices shown in the LLM text and structured output.
  */
-export function formatActorForWidget(actor: Actor | ActorStoreList, userTier: PricingTier): WidgetActor {
+export function formatActorForWidget(
+    actor: Actor | ActorStoreList,
+    userTier: PricingTier,
+    canFetchActorDetails = true,
+): WidgetActor {
     const fullName = `${actor.username}/${actor.name}`;
     return {
         id: actor.id,
@@ -336,6 +340,10 @@ export function formatActorForWidget(actor: Actor | ActorStoreList, userTier: Pr
             totalUsers: actor.stats?.totalUsers || 0,
         },
         url: `${APIFY_STORE_URL}/${fullName}`,
-        currentPricingInfo: pricingInfoToSimplifiedStructured(getActorPricingInfo(actor), userTier),
+        currentPricingInfo: pricingInfoToSimplifiedStructured(
+            getActorPricingInfo(actor),
+            userTier,
+            canFetchActorDetails,
+        ),
     };
 }

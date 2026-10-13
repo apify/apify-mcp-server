@@ -743,6 +743,8 @@ export type ActorCardOptions = {
      * false/undefined → keep the full tiered matrix (fetch-actor-details).
      */
     simplifyPricingForUserTier?: boolean;
+    /** Include recommendations naming the base details tool. Defaults to true for standalone formatters. */
+    canFetchActorDetails?: boolean;
     /** When set, Actor links are minted as Apify Console links instead of public website links. */
     linkContext?: ConsoleLinkContext;
 };
