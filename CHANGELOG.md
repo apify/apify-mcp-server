@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - **evals:** Sweep eval tasks by age or run id instead of by prefix ([#1522](https://github.com/apify/apify-mcp-server/pull/1522)) ([4f3e318](https://github.com/apify/apify-mcp-server/commit/4f3e318d9a1d38a142b7bb52eb7c065250b6dea2)) by [@jirispilka](https://github.com/jirispilka), closes [#1424](https://github.com/apify/apify-mcp-server/issues/1424)
 - Align search-actors keyword guidance with the keywords parameter ([#1541](https://github.com/apify/apify-mcp-server/pull/1541)) ([dfead2b](https://github.com/apify/apify-mcp-server/commit/dfead2be809d4418cf75df6e7e06268ded2d572c)) by [@jirispilka](https://github.com/jirispilka), closes [#1503](https://github.com/apify/apify-mcp-server/issues/1503)
 - Accept omitted Actor input fields that have a default ([#1539](https://github.com/apify/apify-mcp-server/pull/1539)) ([1ab9e99](https://github.com/apify/apify-mcp-server/commit/1ab9e99e42e08c13da5323e5a91f1fa73745ddbd)) by [@jirispilka](https://github.com/jirispilka), closes [#1513](https://github.com/apify/apify-mcp-server/issues/1513)
+- Name storage sibling tools in nextStep only when served ([#1540](https://github.com/apify/apify-mcp-server/pull/1540)) ([108cc21](https://github.com/apify/apify-mcp-server/commit/108cc2133a33ce791e9a5f9cff109032cebadf73)) by [@jirispilka](https://github.com/jirispilka), closes [#1296](https://github.com/apify/apify-mcp-server/issues/1296)
 
 
 <!-- git-cliff-unreleased-end -->
