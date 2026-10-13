@@ -29,11 +29,7 @@ const apifyApiWriteArgs = z.object({
             'HTTP method: POST, PUT, PATCH, or DELETE. Omit it only when the path has one method in the API spec.',
         ),
     query: apiCallArgsShape.query,
-    body: z
-        .unknown()
-        .meta(anyJsonValueSchema)
-        .optional()
-        .describe('The request body: a JSON object or array, sent as JSON.'),
+    body: z.unknown().optional().describe('The request body: a JSON object or array, sent as JSON.'),
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
@@ -112,7 +108,10 @@ export const apifyApiWrite: ToolEntry = Object.freeze({
     title: 'Write Apify API',
     description: buildDescription(ALL_TOOLS_PRESENT),
     buildDescription,
-    inputSchema: z.toJSONSchema(apifyApiWriteArgs) as ToolInputSchema,
+    // Advertise explicit JSON types without letting AJV coerce the body before parseBody() (#1546).
+    inputSchema: z.toJSONSchema(
+        apifyApiWriteArgs.extend({ body: apifyApiWriteArgs.shape.body.meta(anyJsonValueSchema) }),
+    ) as ToolInputSchema,
     outputSchema: apifyApiCallOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(apifyApiWriteArgs)),
     annotations: {
