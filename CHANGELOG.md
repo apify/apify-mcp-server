@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.18.1 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- **evals:** Fail an item when its MCP server is not connected at init ([#1519](https://github.com/apify/apify-mcp-server/pull/1519)) ([5001237](https://github.com/apify/apify-mcp-server/commit/5001237e56cd91634d7cb4f9673cabde334a09ea)) by [@jirispilka](https://github.com/jirispilka), closes [#1510](https://github.com/apify/apify-mcp-server/issues/1510)
+- Drop removed actors-mcp-server Actor from tool descriptions ([#1550](https://github.com/apify/apify-mcp-server/pull/1550)) ([03cf392](https://github.com/apify/apify-mcp-server/commit/03cf392ea8241cb3b3da4c914f542af51116e3d8)) by [@jirispilka](https://github.com/jirispilka), closes [#1549](https://github.com/apify/apify-mcp-server/issues/1549)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.18.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.18.0) (2026-10-13)
 
 ### 🚀 Features
