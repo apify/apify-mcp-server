@@ -47,4 +47,4 @@ export const MOCK_PRICED_STORE_ACTOR = {
             ),
         },
     },
-} as ActorStoreList;
+} as unknown as ActorStoreList;

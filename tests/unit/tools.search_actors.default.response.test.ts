@@ -48,8 +48,7 @@ describe('search-actors without widget (searchActors)', () => {
         vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo({ userId: null }));
     });
 
-
-    it.each([
+    it.each<{ loadedToolNames: string[] }>([
         { loadedToolNames: [] },
         { loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET] },
         { loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS] },
@@ -66,13 +65,15 @@ describe('search-actors without widget (searchActors)', () => {
             ? 'Event descriptions were omitted because this actor has many pricing events. Use fetch-actor-details for full pricing details.'
             : 'Event descriptions were omitted because this actor has many pricing events.';
         const structured = result.structuredContent as {
-            actors: { pricing: { pricingNote: string; eventDescriptionsNote: string; events: { priceUsd: number }[] } }[];
+            actors: {
+                pricing: { pricingNote: string; eventDescriptionsNote: string; events: { priceUsd: number }[] };
+            }[];
             widgetActors?: { currentPricingInfo: unknown }[];
         };
         expect(structured.actors[0].pricing).toMatchObject({ pricingNote, eventDescriptionsNote });
         expect(structured.actors[0].pricing.events).toHaveLength(6);
         expect(structured.actors[0].pricing.events.every((event) => event.priceUsd === 0.002)).toBe(true);
-        const text = result.content.filter((item) => item.type === 'text').map((item) => item.text).join('\n');
+        const text = (result.content as { type: string; text: string }[]).map((item) => item.text).join('\n');
         expect(text).toContain(pricingNote);
         expect(text).toContain(eventDescriptionsNote);
         if (!hasDetails) expect(JSON.stringify(result)).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);

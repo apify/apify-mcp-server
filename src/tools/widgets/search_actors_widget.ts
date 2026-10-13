@@ -87,13 +87,15 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
             });
         }
 
-        const { actorCardStructured } = buildSearchActorsResult(actors, userPlanTier);
+        const { actorCardStructured } = buildSearchActorsResult(actors, userPlanTier, { loadedToolNames });
         const structuredContent = {
             actors: actorCardStructured,
             query: parsed.keywords,
             count: actors.length,
             userTier: userPlanTier,
-            widgetActors: actors.map((actor) => formatActorForWidget(actor, userPlanTier)),
+            widgetActors: actors.map((actor) =>
+                formatActorForWidget(actor, userPlanTier, loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)),
+            ),
         };
 
         const texts = [

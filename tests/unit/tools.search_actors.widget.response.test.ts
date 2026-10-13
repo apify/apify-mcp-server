@@ -31,8 +31,7 @@ describe('search-actors-widget response', () => {
         vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo({ userId: null }));
     });
 
-
-    it.each([
+    it.each<{ loadedToolNames: string[] }>([
         { loadedToolNames: [] },
         { loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET] },
         { loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS] },
@@ -49,7 +48,9 @@ describe('search-actors-widget response', () => {
             ? 'Event descriptions were omitted because this actor has many pricing events. Use fetch-actor-details for full pricing details.'
             : 'Event descriptions were omitted because this actor has many pricing events.';
         const structured = result.structuredContent as {
-            actors: { pricing: { pricingNote: string; eventDescriptionsNote: string; events: { priceUsd: number }[] } }[];
+            actors: {
+                pricing: { pricingNote: string; eventDescriptionsNote: string; events: { priceUsd: number }[] };
+            }[];
             widgetActors?: { currentPricingInfo: unknown }[];
         };
         expect(structured.actors[0].pricing).toMatchObject({ pricingNote, eventDescriptionsNote });

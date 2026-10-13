@@ -109,9 +109,16 @@ export type SearchActorsResult = {
 export function buildSearchActorsResult(
     actors: ActorStoreList[],
     userTier: PricingTier,
-    linkContext?: ConsoleLinkContext,
+    { loadedToolNames, linkContext }: { loadedToolNames: readonly string[]; linkContext?: ConsoleLinkContext },
 ): SearchActorsResult {
-    const options = { ...DEFAULT_CARD_OPTIONS, userTier, simplifyPricingForUserTier: true, linkContext };
+    // Pricing recommendations are result text, so gate them on the live registry (see apify/apify-mcp-server#1543).
+    const options = {
+        ...DEFAULT_CARD_OPTIONS,
+        userTier,
+        simplifyPricingForUserTier: true,
+        canFetchActorDetails: loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS),
+        linkContext,
+    };
     return {
         actorCardText: actors.map((actor) => formatActorToActorCard(actor, options)).join('\n\n'),
         actorCardStructured: actors.map((actor) => formatActorToStructuredCard(actor, options)),
@@ -211,7 +218,10 @@ export const searchActors: ToolEntry = Object.freeze({
 
         // Cache hit — the Promise.all above already resolved users/me for this token.
         const linkContext = await getConsoleLinkContext(apifyToken, apifyClient);
-        const { actorCardText, actorCardStructured } = buildSearchActorsResult(actors, userPlanTier, linkContext);
+        const { actorCardText, actorCardStructured } = buildSearchActorsResult(actors, userPlanTier, {
+            loadedToolNames,
+            linkContext,
+        });
         const verbatimLinksNudge = linkContext ? VERBATIM_LINKS_NUDGE : '';
         const actorIds = actors.map((actor) => actor.id);
         const footer = buildSearchActorsFooter(verbatimLinksNudge, actorIds, loadedToolNames, loadedActorIds);
