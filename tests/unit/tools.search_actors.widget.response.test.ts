@@ -9,7 +9,7 @@ import { formatActorForWidget } from '../../src/utils/actor_card.js';
 import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import { mockApifyClient, mockUserInfo, stubToolCallContext } from './helpers/tool_context.js';
-import { MOCK_STORE_ACTOR, SEARCH_KEYWORDS } from './tools.search_actors.fixtures.js';
+import { MOCK_STORE_ACTOR, NO_ACTORS_FOUND_TEXT, SEARCH_KEYWORDS } from './tools.search_actors.fixtures.js';
 
 /**
  * Apps / UI mode: search-actors-widget renders an interactive UI element
@@ -110,7 +110,7 @@ describe('search-actors-widget response', () => {
         expect(structuredContent.count).toBe(0);
         expect(structuredContent.widgetActors).toEqual([]);
         expect(content).toHaveLength(1);
-        expect(content[0].text).toContain('No Actors were found');
+        expect(content[0].text).toBe(NO_ACTORS_FOUND_TEXT);
         expect(_meta).toBeUndefined();
     });
 
