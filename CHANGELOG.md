@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - State the run limitation when no tool can start an Actor run ([#1533](https://github.com/apify/apify-mcp-server/pull/1533)) ([282807e](https://github.com/apify/apify-mcp-server/commit/282807e628a9362168342581be7a0872a818b3a9)) by [@jirispilka](https://github.com/jirispilka), closes [#1527](https://github.com/apify/apify-mcp-server/issues/1527)
+- Reword run-implying text in sessions without an Actor runner ([#1542](https://github.com/apify/apify-mcp-server/pull/1542)) ([2326baf](https://github.com/apify/apify-mcp-server/commit/2326bafdeea0ab04d91af673638b3f018e7d686b)) by [@jirispilka](https://github.com/jirispilka), closes [#1532](https://github.com/apify/apify-mcp-server/issues/1532)
 
 ### 🐛 Bug Fixes
 
