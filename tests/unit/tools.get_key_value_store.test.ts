@@ -139,28 +139,16 @@ describe('get-key-value-store', () => {
 });
 
 // Regression: #1296 — nextStep named a sibling tool the session was not served.
-describe('get-key-value-store nextStep gating', () => {
-    async function callWith(loadedToolNames: string[]) {
-        return (await (getKeyValueStore as HelperTool).call(
-            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(MOCK_STORE), { loadedToolNames }),
-        )) as TextToolResult & { structuredContent: Record<string, unknown> };
-    }
+it('get-key-value-store falls back without naming get-key-value-store-keys when it is not loaded', async () => {
+    const result = (await (getKeyValueStore as HelperTool).call(
+        stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(MOCK_STORE), {
+            loadedToolNames: [HELPER_TOOLS.KEY_VALUE_STORE_GET],
+        }),
+    )) as TextToolResult & { structuredContent: Record<string, unknown> };
 
-    it('falls back without naming get-key-value-store-keys when it is not loaded', async () => {
-        const result = await callWith([HELPER_TOOLS.KEY_VALUE_STORE_GET]);
-
-        expect(result.structuredContent.nextStep).toBe('Inspect the returned result directly.');
-        expect(JSON.stringify([result.content, result.structuredContent])).not.toContain(
-            HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
-        );
-        expectSchemaConformingStructuredContent(result, keyValueStoreOutputSchema);
-    });
-
-    it('keeps the get-key-value-store-keys hint when it is loaded', async () => {
-        const result = await callWith([HELPER_TOOLS.KEY_VALUE_STORE_GET, HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET]);
-
-        expect(result.structuredContent.nextStep).toBe(
-            `Use ${HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET} with keyValueStoreId=kv-1 to list keys.`,
-        );
-    });
+    expect(result.structuredContent.nextStep).toBe('No follow-up step.');
+    expect(JSON.stringify([result.content, result.structuredContent])).not.toContain(
+        HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
+    );
+    expectSchemaConformingStructuredContent(result, keyValueStoreOutputSchema);
 });

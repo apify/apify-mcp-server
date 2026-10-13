@@ -28,9 +28,14 @@ function suggestTool(toolName: string, loadedToolNames: readonly string[]): stri
     return loadedToolNames.includes(toolName) ? toolName : undefined;
 }
 
-/** `nextStep` when the session was served the sibling tool it names, otherwise a hint that names no tool (see #1296). */
-export function resolveSiblingNextStep(toolName: string, loadedToolNames: readonly string[], nextStep: string): string {
-    return suggestTool(toolName, loadedToolNames) ? nextStep : 'Inspect the returned result directly.';
+/** `nextStep` when the session was served the sibling tool it names, otherwise `fallback`, which names no tool (see #1296). */
+export function resolveSiblingNextStep(
+    toolName: string,
+    loadedToolNames: readonly string[],
+    nextStep: string,
+    fallback = 'No follow-up step.',
+): string {
+    return suggestTool(toolName, loadedToolNames) ? nextStep : fallback;
 }
 
 /**

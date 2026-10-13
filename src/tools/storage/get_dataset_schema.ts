@@ -93,6 +93,7 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
                 isCleanFiltered
                     ? `Retry with clean=false to include those items, or use ${checkStats}`
                     : `Use ${checkStats}`,
+                isCleanFiltered ? 'clean=false includes those items.' : undefined,
             );
             return buildStorageResponse({ structuredContent: { datasetId, schema: {} }, summary, nextStep });
         }

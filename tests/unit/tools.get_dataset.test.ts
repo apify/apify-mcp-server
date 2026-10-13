@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import { getDataset } from '../../src/tools/storage/get_dataset.js';
-import { DEFAULT_DATASET_ITEMS_LIMIT } from '../../src/tools/storage/get_dataset_items.js';
 import { datasetMetadataOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
@@ -241,37 +240,14 @@ describe('get-dataset fields normalization', () => {
 });
 
 // Regression: #1296 — nextStep named a sibling tool the session was not served.
-describe('get-dataset nextStep gating', () => {
-    async function callWith(loadedToolNames: string[], dataset: unknown = MOCK_DATASET) {
-        return (await (getDataset as HelperTool).call(
-            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient(dataset), { loadedToolNames }),
-        )) as TextToolResult & { structuredContent: Record<string, unknown> };
-    }
+it('get-dataset falls back without naming get-dataset-items when it is not loaded', async () => {
+    const result = (await (getDataset as HelperTool).call(
+        stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient(MOCK_DATASET), {
+            loadedToolNames: [HELPER_TOOLS.DATASET_GET],
+        }),
+    )) as TextToolResult & { structuredContent: Record<string, unknown> };
 
-    it('falls back without naming get-dataset-items when it is not loaded', async () => {
-        const result = await callWith([HELPER_TOOLS.DATASET_GET]);
-
-        expect(result.structuredContent.nextStep).toBe('Inspect the returned result directly.');
-        expect(JSON.stringify([result.content, result.structuredContent])).not.toContain(
-            HELPER_TOOLS.DATASET_GET_ITEMS,
-        );
-        expectSchemaConformingStructuredContent(result, datasetMetadataOutputSchema);
-    });
-
-    it('drops the size hint with the get-dataset-items hint when it is not loaded', async () => {
-        const result = await callWith([HELPER_TOOLS.DATASET_GET], {
-            ...MOCK_DATASET,
-            stats: { inflatedBytes: 2_400_000 },
-        });
-
-        expect(result.structuredContent.nextStep).toBe('Inspect the returned result directly.');
-    });
-
-    it('keeps the get-dataset-items hint when it is loaded', async () => {
-        const result = await callWith([HELPER_TOOLS.DATASET_GET, HELPER_TOOLS.DATASET_GET_ITEMS]);
-
-        expect(result.structuredContent.nextStep).toBe(
-            `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=ds-1 and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items.`,
-        );
-    });
+    expect(result.structuredContent.nextStep).toBe('No follow-up step.');
+    expect(JSON.stringify([result.content, result.structuredContent])).not.toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
+    expectSchemaConformingStructuredContent(result, datasetMetadataOutputSchema);
 });
