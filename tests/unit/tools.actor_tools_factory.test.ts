@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import { RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import type { ActorInfo, SchemaProperties } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
+import { only } from './helpers/tool_context.js';
 
 type MockActorOptions = {
     actorPermissionLevel?: string;
@@ -142,5 +145,15 @@ describe('getNormalActorsAsTools()', () => {
                 openWorldHint: true,
             });
         });
+    });
+
+    // Regression: #1532 — the RAG description named apify/web-fetch when the session did not serve it.
+    it('names apify/web-fetch in the RAG description only when its tool is served', async () => {
+        const [tool] = await getNormalActorsAsTools([createMockActorInfo(RAG_WEB_BROWSER)]);
+        const ragTool = actorNameToToolName(RAG_WEB_BROWSER);
+        expect(tool.buildDescription!(only(ragTool, actorNameToToolName(WEB_FETCH)))).toContain(
+            'prefer the dedicated apify/web-fetch tool',
+        );
+        expect(tool.buildDescription!(only(ragTool))).not.toContain('web-fetch');
     });
 });

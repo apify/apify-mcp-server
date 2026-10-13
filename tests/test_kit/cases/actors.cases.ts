@@ -1,7 +1,7 @@
 import { expect } from 'vitest';
 
 import { actorNameToToolName, getCategoryTools } from '@apify/actors-mcp-server/internals.js';
-import { HELPER_TOOLS, MAX_LIMIT_WITH_INPUT_SCHEMA } from '@apify/actors-mcp-server/internals/test-kit.js';
+import { MAX_LIMIT_WITH_INPUT_SCHEMA } from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
     ACTOR_EXAMPLE_MCP_SERVER,
@@ -30,13 +30,13 @@ export const actorsCases: Case[] = [
         run: withClient({ tools: ['call-actor'] }, async (client) => {
             const names = getToolNames(await client.listTools());
             expect(names).toHaveLength(1 + AUTO_INJECTED_TOOL_NAMES.length);
-            expect(names).toContain(HELPER_TOOLS.ACTOR_CALL);
+            expect(names).toContain('call-actor');
             expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
             expect(names).not.toContain(NORMAL_MODE_TOOL_NAME);
 
             // No dynamic "add" step exists — call-actor calls any Actor by name directly.
             const result = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_CALL,
+                name: 'call-actor',
                 arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 } },
             });
             expectNormalModeTestStructuredContent(result);
@@ -51,13 +51,13 @@ export const actorsCases: Case[] = [
             const numberOfTools = getCategoryTools('default').actors.length + AUTO_INJECTED_TOOL_NAMES.length;
             expect(names).toHaveLength(numberOfTools);
             // get-actor-run should be automatically included when call-actor is present
-            expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
+            expect(names).toContain('get-actor-run');
             expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
             // Check that the Actor is not in the tools list
             expect(names).not.toContain(NORMAL_MODE_TOOL_NAME);
 
             const result = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_CALL,
+                name: 'call-actor',
                 arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 } },
             });
 
@@ -79,12 +79,12 @@ export const actorsCases: Case[] = [
         run: withClient({ tools: ['actors'] }, async (client) => {
             // Should fail without input (AJV validation error)
             await expect(
-                client.callTool({ name: HELPER_TOOLS.ACTOR_CALL, arguments: { actor: ACTOR_NORMAL_MODE } }),
+                client.callTool({ name: 'call-actor', arguments: { actor: ACTOR_NORMAL_MODE } }),
             ).rejects.toThrow(/must have required property 'input'/);
 
             // Should succeed with input
             const callResult = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_CALL,
+                name: 'call-actor',
                 arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 } },
             });
             expect(callResult.content).toBeDefined();
@@ -95,12 +95,12 @@ export const actorsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const callResult = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_CALL,
+                name: 'call-actor',
                 // Max wait (45s) so the test does not flake on a slow run.
                 arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 }, waitSecs: 45 },
             });
 
-            validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
+            validateStructuredOutputForTool(callResult, 'call-actor', 'default');
             expectNormalModeTestStructuredContent(callResult);
 
             const sc = (callResult as { structuredContent?: { status?: string; summary?: string } }).structuredContent;
@@ -115,11 +115,11 @@ export const actorsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const callResult = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_CALL,
+                name: 'call-actor',
                 arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 }, waitSecs: 0 },
             });
 
-            validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
+            validateStructuredOutputForTool(callResult, 'call-actor', 'default');
 
             const sc = (callResult as { structuredContent?: { runId?: string; status?: string } }).structuredContent;
             expect(sc?.runId).toBeDefined();
@@ -132,7 +132,7 @@ export const actorsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const callResult = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_CALL,
+                name: 'call-actor',
                 arguments: {
                     actor: ACTOR_NORMAL_MODE,
                     input: { firstNumber: 1, secondNumber: 2 },
@@ -142,7 +142,7 @@ export const actorsCases: Case[] = [
             });
 
             // previewOutput is ignored; still canonical RunResponse.
-            validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
+            validateStructuredOutputForTool(callResult, 'call-actor', 'default');
             expectNormalModeTestStructuredContent(callResult);
         }),
     },
@@ -151,7 +151,7 @@ export const actorsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const callResult = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_CALL,
+                name: 'call-actor',
                 arguments: {
                     actor: ACTOR_NORMAL_MODE,
                     input: { firstNumber: 1, secondNumber: 2 },
@@ -175,12 +175,12 @@ export const actorsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const callResult = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_CALL,
+                name: 'call-actor',
                 arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 }, waitSecs: 45 },
             });
 
             // No inlined items — agents use dataset id + fields via get-dataset-items.
-            validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
+            validateStructuredOutputForTool(callResult, 'call-actor', 'default');
             expectNormalModeTestStructuredContent(callResult);
 
             const sc = (
@@ -197,13 +197,13 @@ export const actorsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const callResult = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_CALL,
+                name: 'call-actor',
                 arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 }, waitSecs: 45 },
             });
 
             expect(callResult.isError).not.toBe(true);
             // Schema validation must accept the alias entries (additionalProperties: full dataset shape).
-            validateStructuredOutputForTool(callResult, HELPER_TOOLS.ACTOR_CALL, 'default');
+            validateStructuredOutputForTool(callResult, 'call-actor', 'default');
             const sc = (
                 callResult as { structuredContent?: { storages?: { datasets?: Record<string, { id?: string }> } } }
             ).structuredContent;
@@ -218,7 +218,7 @@ export const actorsCases: Case[] = [
         isDeploymentTest: true,
         run: withClient(undefined, async (client) => {
             const result = await client.callTool({
-                name: HELPER_TOOLS.STORE_SEARCH,
+                name: 'search-actors',
                 arguments: { keywords: 'normal-mode-test-actor', limit: 5 },
             });
             const content = result.content as { text: string }[];
@@ -230,7 +230,7 @@ export const actorsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient(undefined, async (client) => {
             const result = await client.callTool({
-                name: HELPER_TOOLS.STORE_SEARCH,
+                name: 'search-actors',
                 arguments: { keywords: 'rental', limit: MAX_LIMIT_WITH_INPUT_SCHEMA },
             });
             const content = result.content as { text: string }[];
@@ -246,7 +246,7 @@ export const actorsCases: Case[] = [
         run: withClient({ tools: ['actors'] }, async (client) => {
             const nonExistentActor = 'apify/this-actor-does-not-exist';
             const result = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_CALL,
+                name: 'call-actor',
                 arguments: { actor: nonExistentActor, input: {} },
             });
             expect(result).toBeDefined();
@@ -261,13 +261,13 @@ export const actorsCases: Case[] = [
         name: 'should return structured output for fetch-actor-details matching outputSchema',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
-            const toolName = HELPER_TOOLS.ACTOR_GET_DETAILS;
+            const toolName = 'fetch-actor-details';
             const result = await client.callTool({ name: toolName, arguments: { actor: ACTOR_NORMAL_MODE } });
 
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
+            validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
         }),
     },
     {
@@ -275,7 +275,7 @@ export const actorsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                name: 'fetch-actor-details',
                 arguments: {
                     actor: ACTOR_NORMAL_MODE,
                     output: {
@@ -302,7 +302,7 @@ export const actorsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                name: 'fetch-actor-details',
                 arguments: {
                     actor: ACTOR_NORMAL_MODE,
                     output: {
@@ -329,7 +329,7 @@ export const actorsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                name: 'fetch-actor-details',
                 arguments: {
                     actor: ACTOR_EXAMPLE_MCP_SERVER,
                     output: {
@@ -355,7 +355,7 @@ export const actorsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                name: 'fetch-actor-details',
                 arguments: {
                     actor: ACTOR_NORMAL_MODE,
                     output: {
@@ -379,7 +379,7 @@ export const actorsCases: Case[] = [
         name: 'should return structured output for fetch-actor-details with selective output matching outputSchema',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
-            const toolName = HELPER_TOOLS.ACTOR_GET_DETAILS;
+            const toolName = 'fetch-actor-details';
 
             // Test with output={ mcpTools: true } - should validate against schema even with selective fields
             const result = await client.callTool({
@@ -403,14 +403,14 @@ export const actorsCases: Case[] = [
             expect(content.length).toBeGreaterThan(0);
 
             // This should validate successfully - structured output must match schema
-            validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
+            validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
         }),
     },
     {
         name: 'should return structured output for fetch-actor-details with output={ description: true, readme: true } matching outputSchema',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
-            const toolName = HELPER_TOOLS.ACTOR_GET_DETAILS;
+            const toolName = 'fetch-actor-details';
 
             // Test with output={ description: true, readme: true } - inputSchema should be undefined
             const result = await client.callTool({
@@ -434,7 +434,7 @@ export const actorsCases: Case[] = [
             expect(content.length).toBeGreaterThan(0);
 
             // This should validate successfully - structured output must match schema
-            validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
+            validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
         }),
     },
     {
@@ -442,7 +442,7 @@ export const actorsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                name: 'fetch-actor-details',
                 arguments: {
                     actor: ACTOR_NORMAL_MODE,
                     output: {
@@ -465,7 +465,7 @@ export const actorsCases: Case[] = [
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
 
             // Validate structured output
-            validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
+            validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
         }),
     },
     {
@@ -473,7 +473,7 @@ export const actorsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                name: 'fetch-actor-details',
                 arguments: {
                     actor: ACTOR_NORMAL_MODE,
                     output: {
@@ -496,7 +496,7 @@ export const actorsCases: Case[] = [
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
 
             // Validate structured output
-            validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
+            validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
         }),
     },
     {
@@ -521,7 +521,7 @@ export const actorsCases: Case[] = [
 
             validateStructuredOutput(
                 result,
-                findToolByName(HELPER_TOOLS.ACTOR_GET_DETAILS, 'default')?.outputSchema,
+                findToolByName('fetch-actor-details', 'default')?.outputSchema,
                 'fetch-actor-details',
             );
         }),
@@ -532,7 +532,7 @@ export const actorsCases: Case[] = [
         run: withClient({ tools: ['actors'] }, async (client) => {
             // When output is not provided, all fields should default to their default values
             const result = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                name: 'fetch-actor-details',
                 arguments: { actor: ACTOR_NORMAL_MODE },
             });
 
@@ -549,7 +549,7 @@ export const actorsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                name: 'fetch-actor-details',
                 arguments: {
                     actor: ACTOR_NORMAL_MODE,
                     output: {
@@ -580,7 +580,7 @@ export const actorsCases: Case[] = [
             expect(resultWithStructured.structuredContent?.inputSchema).toBeDefined();
 
             // Validate against schema
-            validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
+            validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
         }),
     },
     {
@@ -589,7 +589,7 @@ export const actorsCases: Case[] = [
         run: withClient({ tools: ['actors'] }, async (client) => {
             // Test 1: Only pricing (should include pricing, NOT other sections)
             const pricingOnlyResult = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                name: 'fetch-actor-details',
                 arguments: {
                     actor: ACTOR_NORMAL_MODE,
                     output: {
@@ -621,7 +621,7 @@ export const actorsCases: Case[] = [
 
             // Test 2: Only rating
             const ratingOnlyResult = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                name: 'fetch-actor-details',
                 arguments: {
                     actor: ACTOR_NORMAL_MODE,
                     output: {
@@ -654,7 +654,7 @@ export const actorsCases: Case[] = [
 
             // Test 3: Only metadata (should include developer, categories, last modified, deprecation status)
             const metadataOnlyResult = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                name: 'fetch-actor-details',
                 arguments: {
                     actor: ACTOR_NORMAL_MODE,
                     output: {
@@ -685,7 +685,7 @@ export const actorsCases: Case[] = [
 
             // Test 4: Combination - pricing + rating + metadata (should exclude description, stats, readme, input-schema)
             const combinationResult = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                name: 'fetch-actor-details',
                 arguments: {
                     actor: ACTOR_NORMAL_MODE,
                     output: {
@@ -717,10 +717,10 @@ export const actorsCases: Case[] = [
             expect(combinationText).not.toContain('Input schema');
 
             // Validate structured output for all test cases
-            validateStructuredOutputForTool(pricingOnlyResult, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-            validateStructuredOutputForTool(ratingOnlyResult, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-            validateStructuredOutputForTool(metadataOnlyResult, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
-            validateStructuredOutputForTool(combinationResult, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
+            validateStructuredOutputForTool(pricingOnlyResult, 'fetch-actor-details', 'default');
+            validateStructuredOutputForTool(ratingOnlyResult, 'fetch-actor-details', 'default');
+            validateStructuredOutputForTool(metadataOnlyResult, 'fetch-actor-details', 'default');
+            validateStructuredOutputForTool(combinationResult, 'fetch-actor-details', 'default');
         }),
     },
     {
@@ -822,7 +822,7 @@ export const actorsCases: Case[] = [
             // Test each output option individually
             for (const option of outputOptions) {
                 const result = await client.callTool({
-                    name: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                    name: 'fetch-actor-details',
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
                         output: {
@@ -852,12 +852,12 @@ export const actorsCases: Case[] = [
                 }
 
                 // Validate structured output
-                validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
+                validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
             }
 
             // Test a combination: all actor card sections (description, stats, pricing, rating, metadata)
             const allCardSectionsResult = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_GET_DETAILS,
+                name: 'fetch-actor-details',
                 arguments: {
                     actor: ACTOR_NORMAL_MODE,
                     output: {
@@ -890,14 +890,14 @@ export const actorsCases: Case[] = [
             expect(allCardText).not.toContain('README');
             expect(allCardText).not.toContain('Input schema');
 
-            validateStructuredOutputForTool(allCardSectionsResult, HELPER_TOOLS.ACTOR_GET_DETAILS, 'default');
+            validateStructuredOutputForTool(allCardSectionsResult, 'fetch-actor-details', 'default');
         }),
     },
     {
         name: 'should return structured output for search-actors matching outputSchema',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
-            const toolName = HELPER_TOOLS.STORE_SEARCH;
+            const toolName = 'search-actors';
             const result = await client.callTool({
                 name: toolName,
                 arguments: { keywords: 'rag web browser', limit: 5, offset: 0 },
@@ -906,7 +906,7 @@ export const actorsCases: Case[] = [
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutputForTool(result, HELPER_TOOLS.STORE_SEARCH, 'default');
+            validateStructuredOutputForTool(result, 'search-actors', 'default');
         }),
     },
     {
@@ -916,10 +916,10 @@ export const actorsCases: Case[] = [
         run: withClient({ tools: ['get-actor-list'] }, async (client) => {
             // listTools caches the outputSchema, so the SDK validates structuredContent on the call.
             await client.listTools();
-            const result = await client.callTool({ name: HELPER_TOOLS.ACTOR_LIST_GET, arguments: { limit: 2 } });
+            const result = await client.callTool({ name: 'get-actor-list', arguments: { limit: 2 } });
 
             expect(result.isError).not.toBe(true);
-            validateStructuredOutputForTool(result, HELPER_TOOLS.ACTOR_LIST_GET, 'default');
+            validateStructuredOutputForTool(result, 'get-actor-list', 'default');
             const sc = (result as { structuredContent?: { limit?: number; items?: { fullName: string }[] } })
                 .structuredContent;
             expect(sc?.limit).toBe(2);
@@ -935,7 +935,7 @@ export const actorsCases: Case[] = [
         run: withClient({ tools: ['actors', 'runs'] }, async (client) => {
             // First, start an async actor run to get a runId
             const callResult = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_CALL,
+                name: 'call-actor',
                 arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 }, waitSecs: 0 },
             });
 
@@ -944,11 +944,11 @@ export const actorsCases: Case[] = [
             const runId = resultWithStructured.structuredContent!.runId!;
 
             // Now test get-actor-run
-            const runResult = await client.callTool({ name: HELPER_TOOLS.ACTOR_RUNS_GET, arguments: { runId } });
+            const runResult = await client.callTool({ name: 'get-actor-run', arguments: { runId } });
 
             expect(runResult.content).toBeDefined();
             // Validate structured output for get-actor-run
-            validateStructuredOutputForTool(runResult, HELPER_TOOLS.ACTOR_RUNS_GET, 'default');
+            validateStructuredOutputForTool(runResult, 'get-actor-run', 'default');
         }),
     },
     {
@@ -983,7 +983,7 @@ export const actorsCases: Case[] = [
         run: withClient({ tools: ['actors', 'runs'] }, async (client) => {
             // First, start an async actor run to get a runId
             const callResult = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_CALL,
+                name: 'call-actor',
                 arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 }, waitSecs: 0 },
             });
 
@@ -992,7 +992,7 @@ export const actorsCases: Case[] = [
 
             // Now test get-actor-run with waitSecs to drive it to terminal state.
             const runResult = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_RUNS_GET,
+                name: 'get-actor-run',
                 arguments: { runId, waitSecs: 30 },
             });
 
@@ -1037,7 +1037,7 @@ export const actorsCases: Case[] = [
             // treated as missing, so the waitSecs check fires first.
             const nonExistentRunId = 'aaaaaaaaaaaaaaaaa';
             const result = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_RUNS_LOG,
+                name: 'get-actor-run-log',
                 arguments: { runId: nonExistentRunId },
             });
             expect(result).toBeDefined();
@@ -1054,7 +1054,7 @@ export const actorsCases: Case[] = [
             // Fake-but-plausible runId so failure is waitSecs validation, not missing run.
             await expect(
                 client.callTool({
-                    name: HELPER_TOOLS.ACTOR_RUNS_GET,
+                    name: 'get-actor-run',
                     arguments: { runId: 'aaaaaaaaaaaaaaaaa', waitSecs: 46 },
                 }),
             ).rejects.toThrow(/waitSecs|less than or equal to 45|<= 45/i);

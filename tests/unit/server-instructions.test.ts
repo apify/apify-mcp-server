@@ -5,9 +5,12 @@ import { parseInputParamsFromUrl } from '../../src/mcp/utils.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../src/types.js';
 import { getServerInstructions } from '../../src/utils/server-instructions/index.js';
-import { getToolsForServerMode } from '../../src/utils/tools_loader.js';
+import { AUTO_INJECTED_TOOLS, getToolsForServerMode, resolveToolNamesFromInput } from '../../src/utils/tools_loader.js';
 import { CLAUDE_CONNECTOR_TOOLS } from './helpers/claude_connector_tools.js';
 import { only } from './helpers/tool_context.js';
+
+const RUN_LIMITATION_LINE =
+    '- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, set up your own Apify MCP server at https://mcp.apify.com.\n';
 
 describe('getServerInstructions()', () => {
     it('defaults to ALL_TOOLS_PRESENT — no regression for the common case (every tool loaded)', () => {
@@ -274,23 +277,106 @@ describe('getServerInstructions()', () => {
             expect(instructions).toContain(`${HEADING}\n\n- **${WEB_FETCH} vs ${RAG_WEB_BROWSER}:**`);
         });
     });
+
+    describe('run limitation without call-actor', () => {
+        it('states the limitation right after the search-first bullet when the session has an Actor tool but no call-actor', () => {
+            const instructions = getServerInstructions(
+                SERVER_MODE.APPS,
+                only(HELPER_TOOLS.STORE_SEARCH, actorNameToToolName(RAG_WEB_BROWSER)),
+            );
+            expect(instructions).toContain(
+                `- Search the Apify Store first; a relevant Actor likely already exists.\n${RUN_LIMITATION_LINE}- When multiple options exist`,
+            );
+            // No hard directive — the directory review rejects MUST-style solicitation.
+            expect(instructions).not.toContain('MUST');
+        });
+
+        it('states the limitation when the session can only fetch Actor details', () => {
+            const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.ACTOR_GET_DETAILS));
+            expect(instructions).toContain(RUN_LIMITATION_LINE);
+            expect(instructions).not.toContain('MUST');
+        });
+
+        it('omits the limitation when the session cannot discover Store Actors', () => {
+            const instructions = getServerInstructions(
+                SERVER_MODE.DEFAULT,
+                only(HELPER_TOOLS.DOCS_SEARCH, actorNameToToolName(RAG_WEB_BROWSER)),
+            );
+            expect(instructions).not.toContain(RUN_LIMITATION_LINE);
+        });
+
+        it('omits the limitation when every tool is loaded', () => {
+            expect(getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT)).not.toContain(RUN_LIMITATION_LINE);
+            expect(getServerInstructions(SERVER_MODE.APPS, ALL_TOOLS_PRESENT)).not.toContain(RUN_LIMITATION_LINE);
+        });
+
+        it('omits the limitation when the session has call-actor', () => {
+            const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.ACTOR_CALL));
+            expect(instructions).not.toContain(RUN_LIMITATION_LINE);
+        });
+
+        it('states the limitation when the session has only create-schedule', () => {
+            const instructions = getServerInstructions(
+                SERVER_MODE.DEFAULT,
+                only(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.SCHEDULE_CREATE),
+            );
+            expect(instructions).toContain(RUN_LIMITATION_LINE);
+        });
+
+        // Regression: #1532 — apps mode advised silent lookups before running an Actor the session could not run.
+        it('omits the silent-lookup bullet in apps mode when no tool can run an Actor', () => {
+            const discoveryTools = [
+                HELPER_TOOLS.STORE_SEARCH,
+                HELPER_TOOLS.STORE_SEARCH_WIDGET,
+                HELPER_TOOLS.ACTOR_GET_DETAILS,
+                HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
+            ];
+            const silentLookup = 'When the next step is running an Actor, prefer silent lookups';
+            expect(getServerInstructions(SERVER_MODE.APPS, only(...discoveryTools))).not.toContain(silentLookup);
+            expect(getServerInstructions(SERVER_MODE.APPS, only(...discoveryTools, HELPER_TOOLS.ACTOR_CALL))).toContain(
+                silentLookup,
+            );
+        });
+    });
 });
 
 /** Pins the Claude-connector tool surface (no call-actor); offline, no network or fixture. */
 describe('Claude-connector tool surface (no call-actor)', () => {
-    const url = `https://mcp.apify.com/?tools=${CLAUDE_CONNECTOR_TOOLS.join(',')}`;
+    const listedUrl = `https://mcp.apify.com/?tools=${CLAUDE_CONNECTOR_TOOLS.join(',')}&client=claude`;
 
-    // Actor-tool selectors (contain '/') need a live fetch to resolve; checks the internal-tool subset only.
+    // Internal-tool subset of the fixture: Actor selectors (contain '/') resolve only with pre-fetched Actor tools.
     const expectedInternalToolNames = CLAUDE_CONNECTOR_TOOLS.filter((tool) => !tool.includes('/'));
 
+    const resolveToolNames = (url: string) =>
+        getToolsForServerMode(parseInputParamsFromUrl(url), [], SERVER_MODE.APPS).map((tool) => tool.name);
+
     it('resolves to exactly the expected internal tools, no call-actor, and instructions mention it nowhere', () => {
-        const resolved = new Set(
-            getToolsForServerMode(parseInputParamsFromUrl(url), [], SERVER_MODE.APPS).map((tool) => tool.name),
-        );
+        const resolved = new Set(resolveToolNames(listedUrl));
         expect(resolved).toEqual(new Set(expectedInternalToolNames));
         expect(resolved.has(HELPER_TOOLS.ACTOR_CALL)).toBe(false);
 
         const instructions = getServerInstructions(SERVER_MODE.APPS, { hasTool: (name) => resolved.has(name) });
         expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+    });
+
+    it('names every auto-injected tool explicitly, so the listed URL shows the whole served surface', () => {
+        for (const tool of AUTO_INJECTED_TOOLS) expect(CLAUDE_CONNECTOR_TOOLS).toContain(tool.name);
+    });
+
+    it('serves the same tools with and without ?client=claude', () => {
+        expect(resolveToolNames(listedUrl)).toEqual(resolveToolNames(listedUrl.replace('&client=claude', '')));
+    });
+
+    it('states the run limitation in the discovery section once Actor tools are resolved offline', () => {
+        const resolved = resolveToolNamesFromInput(parseInputParamsFromUrl(listedUrl), SERVER_MODE.APPS);
+        expect(resolved.has(actorNameToToolName(RAG_WEB_BROWSER))).toBe(true);
+        expect(resolved.has(HELPER_TOOLS.ACTOR_CALL)).toBe(false);
+
+        const instructions = getServerInstructions(SERVER_MODE.APPS, { hasTool: (name) => resolved.has(name) });
+        expect(instructions).toContain(
+            `- Search the Apify Store first; a relevant Actor likely already exists.\n${RUN_LIMITATION_LINE}- When multiple options exist`,
+        );
+        expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+        expect(instructions).not.toContain('MUST');
     });
 });

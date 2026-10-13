@@ -2,14 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
+import { ACTOR_CALLABILITY_CAVEAT } from '../../src/tools/actor_tool_naming.js';
 import { searchActorsWidget } from '../../src/tools/widgets/search_actors_widget.js';
 import type { HelperTool } from '../../src/types.js';
 import type { formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 import { formatActorForWidget } from '../../src/utils/actor_card.js';
 import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockApifyClient, mockUserInfo, stubToolCallContext } from './helpers/tool_context.js';
-import { MOCK_STORE_ACTOR, SEARCH_KEYWORDS } from './tools.search_actors.fixtures.js';
+import { mockApifyClient, mockUserInfo, only, stubToolCallContext } from './helpers/tool_context.js';
+import { MOCK_STORE_ACTOR, NO_ACTORS_FOUND_TEXT, SEARCH_KEYWORDS } from './tools.search_actors.fixtures.js';
 
 /**
  * Apps / UI mode: search-actors-widget renders an interactive UI element
@@ -110,7 +111,7 @@ describe('search-actors-widget response', () => {
         expect(structuredContent.count).toBe(0);
         expect(structuredContent.widgetActors).toEqual([]);
         expect(content).toHaveLength(1);
-        expect(content[0].text).toContain('No Actors were found');
+        expect(content[0].text).toBe(NO_ACTORS_FOUND_TEXT);
         expect(_meta).toBeUndefined();
     });
 
@@ -182,5 +183,33 @@ describe('search-actors-widget response', () => {
         const tool = searchActorsWidget as HelperTool;
         const ok = tool.ajvValidate({ keywords: 'web scraper' });
         expect(ok).toBe(true);
+    });
+});
+
+// Regression: #1532 — the widget told the model to find, fetch the schema of, and call an Actor it could not run.
+describe('search-actors-widget buildDescription()', () => {
+    const renderDescription = (...present: string[]) => searchActorsWidget.buildDescription!(only(...present));
+    const FIND_SCHEMA_CALL = 'then fetch its schema and call it';
+    const countCaveats = (description: string) => description.split(ACTOR_CALLABILITY_CAVEAT).length - 1;
+
+    it('drops the run-implying hint and states the run limitation once when no tool can run an Actor', () => {
+        for (const tools of [
+            [HELPER_TOOLS.STORE_SEARCH_WIDGET, HELPER_TOOLS.STORE_SEARCH],
+            [HELPER_TOOLS.STORE_SEARCH_WIDGET],
+        ]) {
+            const description = renderDescription(...tools);
+            expect(description).not.toContain(FIND_SCHEMA_CALL);
+            expect(countCaveats(description)).toBe(1);
+        }
+    });
+
+    it('keeps the original hint and no caveat with call-actor', () => {
+        const description = renderDescription(
+            HELPER_TOOLS.STORE_SEARCH_WIDGET,
+            HELPER_TOOLS.STORE_SEARCH,
+            HELPER_TOOLS.ACTOR_CALL,
+        );
+        expect(description).toContain(FIND_SCHEMA_CALL);
+        expect(countCaveats(description)).toBe(0);
     });
 });

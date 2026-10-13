@@ -1035,7 +1035,7 @@ describe('getToolFullName', () => {
         const tool = {
             type: TOOL_TYPE.ACTOR_MCP,
             name: 'mcp-tool-search',
-            actorId: 'apify/actors-mcp-server',
+            actorId: 'apify/example-mcp-server',
         } as unknown as ToolEntry;
         expect(getToolFullName(tool)).toBe('mcp-tool-search');
     });
@@ -1048,8 +1048,8 @@ describe('extractActorName', () => {
     });
 
     it('returns actorId for actor-mcp tools', () => {
-        const tool = { type: TOOL_TYPE.ACTOR_MCP, actorId: 'apify/actors-mcp-server' } as unknown as ToolEntry;
-        expect(extractActorName(tool)).toBe('apify/actors-mcp-server');
+        const tool = { type: TOOL_TYPE.ACTOR_MCP, actorId: 'apify/example-mcp-server' } as unknown as ToolEntry;
+        expect(extractActorName(tool)).toBe('apify/example-mcp-server');
     });
 
     it('parses actor name from call-actor args', () => {
@@ -1059,7 +1059,7 @@ describe('extractActorName', () => {
 
     it('strips :toolName suffix from call-actor args', () => {
         const tool = { type: TOOL_TYPE.INTERNAL, name: 'call-actor' } as unknown as ToolEntry;
-        expect(extractActorName(tool, { actor: 'apify/actors-mcp-server:search' })).toBe('apify/actors-mcp-server');
+        expect(extractActorName(tool, { actor: 'apify/example-mcp-server:add' })).toBe('apify/example-mcp-server');
     });
 
     it('returns undefined for internal tools without actor arg', () => {
