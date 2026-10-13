@@ -1146,7 +1146,11 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
             ],
         };
         const genuinelyRequired = ['url', 'prefillOnly', 'undefinedDefault'];
-        const supplied = { url: 'https://example.com', prefillOnly: 'x', undefinedDefault: 'y' };
+        const supplied: Record<string, string> = {
+            url: 'https://example.com',
+            prefillOnly: 'x',
+            undefinedDefault: 'y',
+        };
 
         it('keeps only properties without a defined default in required and REQUIRED marking', () => {
             const { inputSchema } = buildActorInputSchema('someone/some-actor', upstream, false);
@@ -1161,7 +1165,11 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
         it('compiles a validator that accepts omitted defaulted properties and agrees with tools/list', () => {
             const { inputSchema } = buildActorInputSchema('someone/some-actor', upstream, false);
             const validate = fixedAjvCompile(ajv, inputSchema);
-            const pub = getToolPublicFieldOnly({ name: 'someone--some-actor', description: '', inputSchema } as ToolBase);
+            const pub = getToolPublicFieldOnly({
+                name: 'someone--some-actor',
+                description: '',
+                inputSchema,
+            } as ToolBase);
 
             expect(validate({ ...supplied })).toBe(true);
             expect((pub.inputSchema as { required?: string[] }).required).toEqual(inputSchema.required);
@@ -1201,7 +1209,11 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
                 required: ['query', 'maxResults', 'outputFormats'],
             };
             const { inputSchema } = buildActorInputSchema('apify/rag-web-browser', ragUpstream, true);
-            const pub = getToolPublicFieldOnly({ name: 'apify--rag-web-browser', description: '', inputSchema } as ToolBase);
+            const pub = getToolPublicFieldOnly({
+                name: 'apify--rag-web-browser',
+                description: '',
+                inputSchema,
+            } as ToolBase);
             const validate = fixedAjvCompile(ajv, inputSchema);
 
             expect(inputSchema.required).toEqual(['query']);

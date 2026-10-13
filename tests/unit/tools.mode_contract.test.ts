@@ -473,6 +473,31 @@ describe('getToolPublicFieldOnly inputSchema normalization', () => {
 
         expect(schema.required).toEqual(['query']);
     });
+
+    // Regression: #1513 — the Actor tool's validator required a field tools/list advertised as optional.
+    it('advertises the same required fields the Actor tool validator enforces', async () => {
+        const fixture = buildFixtureActorInfo('apify/test-actor');
+        const actorInfo: ActorInfo = {
+            ...fixture,
+            definition: {
+                ...fixture.definition,
+                input: {
+                    type: 'object',
+                    properties: {
+                        query: { type: 'string', title: 'Query', description: 'Search query' },
+                        maxResults: { type: 'integer', title: 'Limit', description: 'Limit', default: 3 },
+                    },
+                    required: ['query', 'maxResults'],
+                },
+            },
+        };
+        const [tool] = await getNormalActorsAsTools([actorInfo]);
+        const schema = getToolPublicFieldOnly(tool).inputSchema as { required?: string[] };
+
+        expect(schema.required).toEqual(['query']);
+        expect(tool.ajvValidate({ query: 'apify' })).toBe(true);
+        expect(tool.ajvValidate({ maxResults: 3 })).toBe(false);
+    });
 });
 
 /**
