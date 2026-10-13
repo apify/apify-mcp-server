@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { APIFY_STORE_URL, HELPER_TOOLS, MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../../src/const.js';
-import { ACTOR_CALLABILITY_CAVEAT } from '../../src/tools/actor_tool_naming.js';
+import { APIFY_STORE_URL, HELPER_TOOLS, MAX_INPUT_FIELDS_IN_ACTOR_CARD, RAG_WEB_BROWSER } from '../../src/const.js';
+import { ACTOR_CALLABILITY_CAVEAT, actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { ACTOR_DETAILS_HINT, searchActors, searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors.js';
 import { actorInfoSchema } from '../../src/tools/structured_output_schemas.js';
 import type { ActorStoreInputSchema, ActorStoreList, HelperTool } from '../../src/types.js';
@@ -381,10 +381,10 @@ describe('search-actors without widget (searchActors)', () => {
 describe('buildDescription()', () => {
     const renderDescription = (...present: string[]) => searchActors.buildDescription!(only(...present));
 
-    it('states the run limitation after the call-construction sentence when call-actor and its widget are absent', () => {
+    it('states the run limitation after the input-fields sentence when call-actor and its widget are absent', () => {
         const description = renderDescription(HELPER_TOOLS.STORE_SEARCH);
         expect(description).toContain(
-            `so you can construct an Actor call directly without another tool call.\n${ACTOR_CALLABILITY_CAVEAT}\nThe search is limited to publicly available Actors`,
+            `so you can see what input an Actor needs.\n${ACTOR_CALLABILITY_CAVEAT}\nThe search is limited to publicly available Actors`,
         );
         // No hard directive — the directory review rejects MUST-style solicitation.
         expect(description).not.toContain('MUST');
@@ -430,5 +430,61 @@ describe('buildDescription()', () => {
             'so you can construct an Actor call directly without another tool call.\nFor complete Actor details',
         );
         expect(searchActors.description).not.toContain(ACTOR_CALLABILITY_CAVEAT);
+    });
+});
+
+// Regression: #1532 — the description promised to construct Actor calls and named a RAG tool the session might lack.
+describe('buildDescription() without a general Actor runner', () => {
+    const renderDescription = (...present: string[]) => searchActors.buildDescription!(only(...present));
+    const RAG_TOOL = actorNameToToolName(RAG_WEB_BROWSER);
+    const STORE_FIRST =
+        'IMPORTANT: When the user is looking for scraping tools or Actors, prefer searching the Store first — a relevant Actor often already exists. Do not use Store search as a substitute for immediate data retrieval.';
+    const STORE_INFO =
+        "IMPORTANT: Store search provides information about Actors relevant to the user's request. Do not use Store search as a substitute for immediate data retrieval.";
+    const CALL_CONSTRUCTION = 'so you can construct an Actor call directly without another tool call.';
+    const INPUT_NEEDED = 'so you can see what input an Actor needs.';
+    const RAG_CLAUSE =
+        'Do NOT use this tool when user wants immediate data retrieval (time words like "today", "latest", "recent", "current", "now", or "get/fetch data right now") — use apify/rag-web-browser instead.';
+    const NO_RAG_CLAUSE = 'This tool discovers Actors; it does not retrieve their output.';
+
+    it.each([
+        ['no other tool', [HELPER_TOOLS.STORE_SEARCH]],
+        ['create-schedule', [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.SCHEDULE_CREATE]],
+    ])('describes Store search as information with %s', (_, tools) => {
+        const description = renderDescription(...tools);
+        expect(description).toContain(STORE_INFO);
+        expect(description).toContain(INPUT_NEEDED);
+        expect(description).not.toContain(STORE_FIRST);
+        expect(description).not.toContain(CALL_CONSTRUCTION);
+    });
+
+    it.each([[HELPER_TOOLS.ACTOR_CALL], [HELPER_TOOLS.ACTOR_CALL_WIDGET], [HELPER_TOOLS.API_WRITE]])(
+        'keeps the Store-first and call-construction sentences with %s',
+        (runner) => {
+            const description = renderDescription(HELPER_TOOLS.STORE_SEARCH, runner);
+            expect(description).toContain(STORE_FIRST);
+            expect(description).toContain(CALL_CONSTRUCTION);
+            expect(description).not.toContain(STORE_INFO);
+            expect(description).not.toContain(INPUT_NEEDED);
+        },
+    );
+
+    it('names apify/rag-web-browser only when its tool is served', () => {
+        for (const runner of [[], [HELPER_TOOLS.ACTOR_CALL]]) {
+            const withRag = renderDescription(HELPER_TOOLS.STORE_SEARCH, RAG_TOOL, ...runner);
+            const withoutRag = renderDescription(HELPER_TOOLS.STORE_SEARCH, ...runner);
+            expect(withRag).toContain(RAG_CLAUSE);
+            expect(withRag).not.toContain(NO_RAG_CLAUSE);
+            expect(withoutRag).toContain(NO_RAG_CLAUSE);
+            expect(withoutRag).not.toContain('rag-web-browser');
+            expect(withoutRag).toContain('Do not use Store search as a substitute for immediate data retrieval.');
+        }
+    });
+
+    it('keeps the all-tools description on the original sentences', () => {
+        for (const sentence of [STORE_FIRST, CALL_CONSTRUCTION, RAG_CLAUSE]) {
+            expect(searchActors.description).toContain(sentence);
+        }
+        expect(searchActors.description).not.toContain(NO_RAG_CLAUSE);
     });
 });

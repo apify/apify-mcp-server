@@ -2,13 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
+import { ACTOR_CALLABILITY_CAVEAT } from '../../src/tools/actor_tool_naming.js';
 import { searchActorsWidget } from '../../src/tools/widgets/search_actors_widget.js';
 import type { HelperTool } from '../../src/types.js';
 import type { formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 import { formatActorForWidget } from '../../src/utils/actor_card.js';
 import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockApifyClient, mockUserInfo, stubToolCallContext } from './helpers/tool_context.js';
+import { mockApifyClient, mockUserInfo, only, stubToolCallContext } from './helpers/tool_context.js';
 import { MOCK_STORE_ACTOR, NO_ACTORS_FOUND_TEXT, SEARCH_KEYWORDS } from './tools.search_actors.fixtures.js';
 
 /**
@@ -182,5 +183,43 @@ describe('search-actors-widget response', () => {
         const tool = searchActorsWidget as HelperTool;
         const ok = tool.ajvValidate({ keywords: 'web scraper' });
         expect(ok).toBe(true);
+    });
+});
+
+// Regression: #1532 — the widget told the model to find, fetch the schema of, and call an Actor it could not run.
+describe('search-actors-widget buildDescription()', () => {
+    const renderDescription = (...present: string[]) => searchActorsWidget.buildDescription!(only(...present));
+    const FIND_SCHEMA_CALL = 'then fetch its schema and call it';
+    const SILENT_DISCOVERY =
+        'For silent Actor discovery, search-actors returns the same data without rendering a widget.';
+    const countCaveats = (description: string) => description.split(ACTOR_CALLABILITY_CAVEAT).length - 1;
+
+    it('points at silent discovery and appends the run limitation once when no tool can run an Actor', () => {
+        const description = renderDescription(HELPER_TOOLS.STORE_SEARCH_WIDGET, HELPER_TOOLS.STORE_SEARCH);
+        expect(description).toContain(SILENT_DISCOVERY);
+        expect(description).not.toContain(FIND_SCHEMA_CALL);
+        expect(countCaveats(description)).toBe(1);
+    });
+
+    it('appends the run limitation once in a widget-only session, naming no base tool', () => {
+        const description = renderDescription(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+        expect(description).not.toContain(HELPER_TOOLS.STORE_SEARCH + ' ');
+        expect(description).not.toContain(SILENT_DISCOVERY);
+        expect(countCaveats(description)).toBe(1);
+    });
+
+    it.each([[HELPER_TOOLS.ACTOR_CALL], [HELPER_TOOLS.ACTOR_CALL_WIDGET], [HELPER_TOOLS.API_WRITE]])(
+        'keeps the original hint and no caveat with %s',
+        (runner) => {
+            const description = renderDescription(HELPER_TOOLS.STORE_SEARCH_WIDGET, HELPER_TOOLS.STORE_SEARCH, runner);
+            expect(description).toContain(FIND_SCHEMA_CALL);
+            expect(description).not.toContain(SILENT_DISCOVERY);
+            expect(countCaveats(description)).toBe(0);
+        },
+    );
+
+    it('keeps the all-tools description on the original hint', () => {
+        expect(searchActorsWidget.description).toContain(FIND_SCHEMA_CALL);
+        expect(countCaveats(searchActorsWidget.description)).toBe(0);
     });
 });

@@ -9,7 +9,13 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { ALLOWED_TASK_TOOL_EXECUTION_MODES, HELPER_TOOLS, type HelperToolName } from '../../src/const.js';
+import {
+    ALLOWED_TASK_TOOL_EXECUTION_MODES,
+    HELPER_TOOLS,
+    type HelperToolName,
+    RAG_WEB_BROWSER,
+    WEB_FETCH,
+} from '../../src/const.js';
 import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
 import { searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors.js';
@@ -45,6 +51,11 @@ function buildFixtureActorInfo(actorFullName: string): ActorInfo {
 
 // Real getNormalActorsAsTools output, not a hand-written stand-in — exercises the gated description.
 const [actorToolStub] = await getNormalActorsAsTools([buildFixtureActorInfo('apify/test-actor')]);
+// Real dedicated Actor tools that other descriptions refer to.
+const [ragToolStub, webFetchToolStub] = await getNormalActorsAsTools([
+    buildFixtureActorInfo(RAG_WEB_BROWSER),
+    buildFixtureActorInfo(WEB_FETCH),
+]);
 
 /** Helper to extract tool names from a category. */
 function toolNames(tools: ToolEntry[]): string[] {
@@ -537,7 +548,23 @@ describe('tool descriptions never name a tool absent from the session', () => {
             input: { tools: ['docs', HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET] },
             actorTools: [],
         },
+        // Dedicated Actor tools with and without discovery tools and each other.
+        { label: 'RAG Web Browser only', input: { tools: [RAG_WEB_BROWSER] }, actorTools: [ragToolStub] },
+        {
+            label: 'search-actors, fetch-actor-details and RAG Web Browser',
+            input: { tools: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS, RAG_WEB_BROWSER] },
+            actorTools: [ragToolStub],
+        },
+        {
+            label: 'RAG Web Browser and Web Fetch',
+            input: { tools: [RAG_WEB_BROWSER, WEB_FETCH] },
+            actorTools: [ragToolStub, webFetchToolStub],
+        },
     ];
+    // A dedicated Actor is named by its tool name, or by its full name in a tool reference
+    // ("use apify/rag-web-browser", "the dedicated apify/web-fetch tool"); a full name given as an
+    // example Actor (e.g. "apify/rag-web-browser" as a call-actor input) is not a tool reference.
+    const DEDICATED_ACTOR_TOOLS = [ragToolStub, webFetchToolStub];
 
     for (const mode of SERVER_MODES) {
         for (const { label, input, actorTools } of sessions) {
@@ -545,6 +572,8 @@ describe('tool descriptions never name a tool absent from the session', () => {
                 const tools = getToolsForServerMode(input, actorTools, mode);
                 const present = new Set(tools.map((t) => t.name));
                 const absent = ALL_TOOL_NAMES.filter((name) => !present.has(name));
+
+                const absentDedicatedActors = DEDICATED_ACTOR_TOOLS.filter((actorTool) => !present.has(actorTool.name));
 
                 const violations: string[] = [];
                 for (const tool of tools) {
@@ -560,6 +589,14 @@ describe('tool descriptions never name a tool absent from the session', () => {
                             // not a tool served from this session.
                             if (new RegExp(`(?<![\\w-:])${name}(?![\\w-])`).test(line)) {
                                 violations.push(`${tool.name} names absent ${name}: ${line.trim()}`);
+                            }
+                        }
+                        for (const { name, actorFullName } of absentDedicatedActors) {
+                            if (
+                                line.includes(name) ||
+                                new RegExp(`\\b(?:use|dedicated) ${actorFullName}\\b`).test(line)
+                            ) {
+                                violations.push(`${tool.name} names absent ${actorFullName}: ${line.trim()}`);
                             }
                         }
                     }
