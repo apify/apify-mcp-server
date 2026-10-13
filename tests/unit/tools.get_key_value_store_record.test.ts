@@ -28,8 +28,6 @@ vi.mock('../../src/utils/userid_cache.js', () => ({
 const MOCK_RECORD = { key: 'INPUT', value: { query: 'hello' }, contentType: 'application/json' };
 const MOCK_STORE = { id: 'kv-1', name: 'my-store' };
 
-const PUBLIC_BASE_URL = 'https://api.apify.com/v2';
-
 function stubApifyClient(opts: {
     record: unknown;
     store?: unknown;
@@ -37,11 +35,9 @@ function stubApifyClient(opts: {
     /** Egress origin of the SDK client; `url` is built on it, as apify-client does. */
     baseUrl?: string;
 }): InternalToolArgs['apifyClient'] {
-    const { record, store, onGetRecordPublicUrl, baseUrl = PUBLIC_BASE_URL } = opts;
+    const { record, store, onGetRecordPublicUrl, baseUrl = 'https://api.apify.com/v2' } = opts;
     return mockApifyClient({
         keyValueStore: (id: string) => ({
-            baseUrl,
-            publicBaseUrl: PUBLIC_BASE_URL,
             url: `${baseUrl}/key-value-stores/${id}`,
             getRecord: async (_key: string) => record,
             get: async () => store,

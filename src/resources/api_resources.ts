@@ -76,7 +76,7 @@ export function isApifyApiUri(uri: string): boolean {
 }
 
 /** `uri` with the scheme, host and port of `base`; the path, query and fragment stay. */
-function withOrigin(uri: string, base: string): string {
+export function buildUrlOnOrigin(uri: string, base: string): string {
     const url = new URL(uri);
     const { protocol, hostname, port } = new URL(base);
     url.protocol = protocol;
@@ -107,7 +107,7 @@ function safeDecodeURIComponent(segment: string): string {
  * endpoint, or if minting the signed URL fails (fetching that link then needs a token).
  */
 async function fetchRecordDownloadUrl(uri: string, apifyClient: ApifyClient): Promise<string> {
-    const apiUrl = withOrigin(uri, getApifyAPIPublicBaseUrl());
+    const apiUrl = buildUrlOnOrigin(uri, getApifyAPIPublicBaseUrl());
     const match = KV_RECORD_PATH_RE.exec(new URL(uri).pathname);
     if (!match) return apiUrl;
     try {
@@ -233,7 +233,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     try {
         // Sent on the egress origin; the result and the errors keep the URI as given.
         response = await sendApifyApiRequest(apifyClient, {
-            url: withOrigin(uri, getApifyAPIBaseUrl()),
+            url: buildUrlOnOrigin(uri, getApifyAPIBaseUrl()),
             method: 'GET',
             responseType: 'stream',
         });

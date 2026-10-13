@@ -2,7 +2,9 @@ import type { AudioContent, EmbeddedResource, ImageContent, ResourceLink } from 
 import dedent from 'dedent';
 import { z } from 'zod';
 
+import { getApifyAPIPublicBaseUrl } from '../../apify_client.js';
 import { HELPER_TOOLS } from '../../const.js';
+import { buildUrlOnOrigin } from '../../resources/api_resources.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -131,7 +133,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             // The blob is inlined, so the uri is just an identifier — build it from the store's API
             // URL instead of getRecordPublicUrl, which fetches store metadata to sign a link nobody follows.
             // `store.url` is on the egress origin; clients get the client-facing one.
-            const uri = `${store.url.replace(store.baseUrl, store.publicBaseUrl)}/records/${recordKey}`;
+            const uri = `${buildUrlOnOrigin(store.url, getApifyAPIPublicBaseUrl())}/records/${recordKey}`;
             return respondRaw({
                 structuredContent,
                 content: [

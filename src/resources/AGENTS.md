@@ -33,7 +33,7 @@ unauthenticated). An accepted URI is sent on the egress origin and returned unde
 templates, instructions, refusals and link-out URLs name only the client-facing origin. The API tools' `callApi`
 (`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`, `isMaxContentLengthAbort()`,
 `maskSessionToken()`, `redactUrlSigningSecretKey()` and `REDACTED`, so a change to any changes the
-tools too.
+tools too. `get-key-value-store-record` builds its inlined-record URI with `buildUrlOnOrigin()`.
 
 `sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through
 `httpClient.axios.request` with `maxContentLength: MAX_INLINE_BYTES`. `readApiResource()` sends
