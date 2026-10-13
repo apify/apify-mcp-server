@@ -64,11 +64,57 @@ describe('getNormalActorsAsTools()', () => {
         });
 
         it('accepts a call that omits a required property with a default', async () => {
+            const upstream = structuredClone(actorInfo);
             const [tool] = await getNormalActorsAsTools([actorInfo]);
+            const args = { url: 'https://example.com', waitUntil: 'load' };
 
-            expect(tool.ajvValidate({ url: 'https://example.com', waitUntil: 'load' })).toBe(true);
+            expect(tool.ajvValidate(args)).toBe(true);
+            expect(args).toEqual({ url: 'https://example.com', waitUntil: 'load' });
+            expect(actorInfo).toEqual(upstream);
             expect(tool.inputSchema.required).toEqual(['url', 'waitUntil']);
             expect(getToolPublicFieldOnly(tool).inputSchema.required).toEqual(tool.inputSchema.required);
+        });
+
+        it.each<[string, Partial<SchemaProperties>, boolean]>([
+            ['zero', { type: 'integer', default: 0, prefill: 100 }, true],
+            ['false', { type: 'boolean', default: false }, true],
+            ['null', { type: 'string', default: null }, true],
+            ['empty string', { type: 'string', default: '' }, true],
+            ['empty array', { type: 'array', default: [] }, true],
+            ['empty object', { type: 'object', default: {} }, true],
+            ['undefined', { type: 'string', default: undefined }, false],
+            ['prefill only', { type: 'string', prefill: 'example' }, false],
+        ])('validates omission with %s through the compiled Actor tool', async (_label, property, isValid) => {
+            const [tool] = await getNormalActorsAsTools([
+                createMockActorInfo('someone/defaults', {
+                    inputProperties: { value: { type: 'string', ...property } },
+                    inputRequired: ['value'],
+                }),
+            ]);
+            const args = {};
+
+            expect(tool.ajvValidate(args)).toBe(isValid);
+            expect(args).toEqual({});
+        });
+
+        it('validates supplied nested objects instead of filling their missing fields', async () => {
+            const [tool] = await getNormalActorsAsTools([
+                createMockActorInfo('someone/nested-defaults', {
+                    inputProperties: {
+                        settings: {
+                            type: 'object',
+                            default: { mode: 'a' },
+                            properties: buildInputProperties({ mode: { type: 'string', default: 'a' } }),
+                            required: ['mode'],
+                        },
+                    },
+                    inputRequired: ['settings'],
+                }),
+            ]);
+
+            expect(tool.ajvValidate({})).toBe(true);
+            expect(tool.ajvValidate({ settings: {} })).toBe(false);
+            expect(tool.ajvValidate({ settings: { mode: 'b' } })).toBe(true);
         });
 
         it('rejects a call that omits a required property without a default', async () => {
