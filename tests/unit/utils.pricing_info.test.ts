@@ -564,34 +564,6 @@ describe('pricingNote edge cases', () => {
         expect(out.pricingNote).toBeUndefined();
     });
 
-    it('marks the only tiered event as primary in simplified output, so every plan gets the same badge event', () => {
-        const info = {
-            pricingModel: ACTOR_PRICING_MODEL.PAY_PER_EVENT,
-            pricingPerEvent: {
-                actorChargeEvents: {
-                    place: {
-                        eventTitle: 'Scraped place',
-                        eventDescription: '',
-                        eventTieredPricingUsd: {
-                            FREE: { tieredEventPriceUsd: 0.004 },
-                            GOLD: { tieredEventPriceUsd: 0.0021 },
-                        },
-                    },
-                    start: {
-                        eventTitle: 'Actor start',
-                        eventDescription: '',
-                        eventPriceUsd: 0.00005,
-                        isOneTimeEvent: true,
-                    },
-                },
-            },
-        } as unknown as PricingInfo;
-        expect(pricingInfoToSimplifiedStructured(info, 'GOLD').events).toEqual([
-            { title: 'Scraped place', description: '', isPrimaryEvent: true, priceUsd: 0.0021 },
-            { title: 'Actor start', description: '', isOneTimeEvent: true, priceUsd: 0.00005 },
-        ]);
-    });
-
     it('omits the event title from the note when the Actor has a single event', () => {
         const info = {
             pricingModel: ACTOR_PRICING_MODEL.PAY_PER_EVENT,

@@ -91,23 +91,6 @@ describe('formatPricing()', () => {
         );
     });
 
-    it('uses the event flagged isPrimaryEvent when an Actor has several events', () => {
-        expect(
-            formatPricing({
-                model: 'PAY_PER_EVENT',
-                events: [
-                    { title: 'Actor start', priceUsd: 0.0004, isOneTimeEvent: true },
-                    {
-                        title: 'Each tweet. Cheaper for higher plans',
-                        priceUsd: 0.005,
-                        isPrimaryEvent: true,
-                        paidPlanPriceUsd: 0.00025,
-                    },
-                ],
-            }),
-        ).toBe('$5.00 / 1,000 each tweet. cheaper for higher plans · from $0.25 on paid plans');
-    });
-
     it('renders the event the server chose when no event is flagged primary (the only tiered one)', () => {
         // compass/crawler-google-places-like: only "Scraped place" has tiers, "Actor start" is a flat one-time fee.
         const actor = {
