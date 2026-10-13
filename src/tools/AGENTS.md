@@ -104,8 +104,9 @@ renders it per session — so never name a tool there; put the guidance in `buil
 auto-injects the `get-actor-run` it names.
 
 Result text (`summary` / `nextStep` in `content[1]`) has no `hasTool`, but it does have a per-session
-gate: `InternalToolArgs.loadedToolNames` (see `suggestTool` in `storage/storage_helpers.ts`). Name a
-tool there only through that gate, or when it is the calling tool itself (the "call it again with the
+gate: `InternalToolArgs.loadedToolNames`. A `nextStep` that names a sibling tool goes through
+`resolveSiblingNextStep` in `storage/storage_helpers.ts`. Name a tool there only through that gate,
+or when it is the calling tool itself (the "call it again with the
 next offset" pagination hint); otherwise leave the cross-tool guidance to the gated description.
 An `AUTO_INJECTED_TOOLS` member is no exception — the injection is conditional on `call-actor`, an
 Actor tool, or `get-actor-run` being loaded, so a session that loaded only `abort-actor-run` gets
