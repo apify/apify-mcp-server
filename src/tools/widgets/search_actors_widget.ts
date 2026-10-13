@@ -32,7 +32,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
     const silentSearchHint = canRunAny
         ? `For silent name resolution before running an Actor (e.g., "scrape google maps" — you need to find the right Actor first, then fetch its schema and call it), use ${HELPER_TOOLS.STORE_SEARCH} instead — it returns the same data without rendering a widget.`
         : `For silent Actor discovery, ${HELPER_TOOLS.STORE_SEARCH} returns the same data without rendering a widget.`;
-    // Appended outside dedent: the caveat's flush-left second line would reset dedent's indentation.
+    // Kept outside dedent, per CONTRIBUTING's rule against interpolating flush-left values into it.
     const runLimitation = canRunAny ? '' : `\n\n${ACTOR_CALLABILITY_CAVEAT}`;
     return (
         dedent`

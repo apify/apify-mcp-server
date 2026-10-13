@@ -323,6 +323,76 @@ describe('getServerInstructions()', () => {
             expect(instructions).toContain(RUN_LIMITATION_LINE);
         });
     });
+
+    // Regression: #1532 — sessions with no general Actor runner were told to pick, compare and run Store Actors.
+    describe('discovery guidance without a general Actor runner', () => {
+        const RUNNABLE_BULLETS = [
+            '- Before running an Actor, always check its **input schema** to understand the required parameters.\n',
+            '- Choose the most appropriate Actor based on the conversation context.\n',
+            '- Search the Apify Store first; a relevant Actor likely already exists.\n',
+            '- When multiple options exist, prefer Actors with higher usage, ratings, or popularity.\n',
+        ];
+        const NARROW_BULLETS = [
+            '- For an Actor exposed as a dedicated tool, its input schema describes the required parameters.\n',
+            "- Store discovery can help compare Actors relevant to the user's request.\n",
+            '- Store search shows what Actors exist; it does not make them runnable through a tool in this session.\n',
+            '- When comparing Store results, usage, ratings, or popularity can help assess the options.\n',
+        ];
+        const RAG_TOOL = actorNameToToolName(RAG_WEB_BROWSER);
+        const SILENT_LOOKUP_BULLET = 'When the next step is running an Actor, prefer silent lookups';
+        const DISCOVERY_WIDGETS = [
+            HELPER_TOOLS.STORE_SEARCH,
+            HELPER_TOOLS.STORE_SEARCH_WIDGET,
+            HELPER_TOOLS.ACTOR_GET_DETAILS,
+            HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
+        ];
+
+        const narrowSessions: [string, string[]][] = [
+            ['search-actors with a dedicated Actor tool', [HELPER_TOOLS.STORE_SEARCH, RAG_TOOL]],
+            ['fetch-actor-details alone', [HELPER_TOOLS.ACTOR_GET_DETAILS]],
+            ['search-actors-widget alone', [HELPER_TOOLS.STORE_SEARCH_WIDGET]],
+            ['search-actors with create-schedule', [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.SCHEDULE_CREATE]],
+            ['a dedicated Actor tool alone', [RAG_TOOL]],
+        ];
+        const runnerSessions: [string, string[]][] = [
+            ['call-actor', [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_CALL]],
+            ['call-actor-widget', [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_CALL_WIDGET]],
+            ['apify-api-write', [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.API_WRITE]],
+            ['call-actor with a dedicated Actor tool', [HELPER_TOOLS.ACTOR_CALL, RAG_TOOL]],
+        ];
+
+        for (const mode of [SERVER_MODE.DEFAULT, SERVER_MODE.APPS]) {
+            it.each(narrowSessions)(`rewords the run-implying bullets for %s in ${mode} mode`, (_, tools) => {
+                const instructions = getServerInstructions(mode, only(...tools));
+                for (const bullet of NARROW_BULLETS) expect(instructions).toContain(bullet);
+                for (const bullet of RUNNABLE_BULLETS) expect(instructions).not.toContain(bullet);
+                expect(instructions).not.toContain('MUST');
+            });
+
+            it.each(runnerSessions)(`keeps the original bullets with %s in ${mode} mode`, (_, tools) => {
+                const instructions = getServerInstructions(mode, only(...tools));
+                for (const bullet of RUNNABLE_BULLETS) expect(instructions).toContain(bullet);
+                for (const bullet of NARROW_BULLETS) expect(instructions).not.toContain(bullet);
+            });
+        }
+
+        it('keeps the original bullets when every tool is loaded', () => {
+            for (const mode of [SERVER_MODE.DEFAULT, SERVER_MODE.APPS]) {
+                const instructions = getServerInstructions(mode, ALL_TOOLS_PRESENT);
+                for (const bullet of RUNNABLE_BULLETS) expect(instructions).toContain(bullet);
+                for (const bullet of NARROW_BULLETS) expect(instructions).not.toContain(bullet);
+            }
+        });
+
+        it('omits the silent-lookup bullet in apps mode when no tool can run an Actor', () => {
+            expect(getServerInstructions(SERVER_MODE.APPS, only(...DISCOVERY_WIDGETS))).not.toContain(
+                SILENT_LOOKUP_BULLET,
+            );
+            expect(
+                getServerInstructions(SERVER_MODE.APPS, only(...DISCOVERY_WIDGETS, HELPER_TOOLS.ACTOR_CALL)),
+            ).toContain(SILENT_LOOKUP_BULLET);
+        });
+    });
 });
 
 /** Pins the Claude-connector tool surface (no call-actor); offline, no network or fixture. */
@@ -363,73 +433,5 @@ describe('Claude-connector tool surface (no call-actor)', () => {
         );
         expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_CALL);
         expect(instructions).not.toContain('MUST');
-    });
-});
-
-// Regression: #1532 — sessions with no general Actor runner were told to pick, compare and run Store Actors.
-describe('discovery guidance without a general Actor runner', () => {
-    const RUNNABLE_BULLETS = [
-        '- Before running an Actor, always check its **input schema** to understand the required parameters.\n',
-        '- Choose the most appropriate Actor based on the conversation context.\n',
-        '- Search the Apify Store first; a relevant Actor likely already exists.\n',
-        '- When multiple options exist, prefer Actors with higher usage, ratings, or popularity.\n',
-    ];
-    const NARROW_BULLETS = [
-        '- For an Actor exposed as a dedicated tool, its input schema describes the required parameters.\n',
-        "- Store discovery can help compare Actors relevant to the user's request.\n",
-        '- Store search shows what Actors exist; it does not make them runnable through a tool in this session.\n',
-        '- When comparing Store results, usage, ratings, or popularity can help assess the options.\n',
-    ];
-    const RAG_TOOL = actorNameToToolName(RAG_WEB_BROWSER);
-    const SILENT_LOOKUP_BULLET = 'When the next step is running an Actor, prefer silent lookups';
-    const DISCOVERY_WIDGETS = [
-        HELPER_TOOLS.STORE_SEARCH,
-        HELPER_TOOLS.STORE_SEARCH_WIDGET,
-        HELPER_TOOLS.ACTOR_GET_DETAILS,
-        HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
-    ];
-
-    const narrowSessions: [string, string[]][] = [
-        ['search-actors with a dedicated Actor tool', [HELPER_TOOLS.STORE_SEARCH, RAG_TOOL]],
-        ['fetch-actor-details alone', [HELPER_TOOLS.ACTOR_GET_DETAILS]],
-        ['search-actors-widget alone', [HELPER_TOOLS.STORE_SEARCH_WIDGET]],
-        ['search-actors with create-schedule', [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.SCHEDULE_CREATE]],
-        ['a dedicated Actor tool alone', [RAG_TOOL]],
-    ];
-    const runnerSessions: [string, string[]][] = [
-        ['call-actor', [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_CALL]],
-        ['call-actor-widget', [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_CALL_WIDGET]],
-        ['apify-api-write', [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.API_WRITE]],
-        ['call-actor with a dedicated Actor tool', [HELPER_TOOLS.ACTOR_CALL, RAG_TOOL]],
-    ];
-
-    for (const mode of [SERVER_MODE.DEFAULT, SERVER_MODE.APPS]) {
-        it.each(narrowSessions)(`rewords the run-implying bullets for %s in ${mode} mode`, (_, tools) => {
-            const instructions = getServerInstructions(mode, only(...tools));
-            for (const bullet of NARROW_BULLETS) expect(instructions).toContain(bullet);
-            for (const bullet of RUNNABLE_BULLETS) expect(instructions).not.toContain(bullet);
-            expect(instructions).not.toContain('MUST');
-        });
-
-        it.each(runnerSessions)(`keeps the original bullets with %s in ${mode} mode`, (_, tools) => {
-            const instructions = getServerInstructions(mode, only(...tools));
-            for (const bullet of RUNNABLE_BULLETS) expect(instructions).toContain(bullet);
-            for (const bullet of NARROW_BULLETS) expect(instructions).not.toContain(bullet);
-        });
-    }
-
-    it('keeps the original bullets when every tool is loaded', () => {
-        for (const mode of [SERVER_MODE.DEFAULT, SERVER_MODE.APPS]) {
-            const instructions = getServerInstructions(mode, ALL_TOOLS_PRESENT);
-            for (const bullet of RUNNABLE_BULLETS) expect(instructions).toContain(bullet);
-            for (const bullet of NARROW_BULLETS) expect(instructions).not.toContain(bullet);
-        }
-    });
-
-    it('omits the silent-lookup bullet in apps mode when no tool can run an Actor', () => {
-        expect(getServerInstructions(SERVER_MODE.APPS, only(...DISCOVERY_WIDGETS))).not.toContain(SILENT_LOOKUP_BULLET);
-        expect(getServerInstructions(SERVER_MODE.APPS, only(...DISCOVERY_WIDGETS, HELPER_TOOLS.ACTOR_CALL))).toContain(
-            SILENT_LOOKUP_BULLET,
-        );
     });
 });

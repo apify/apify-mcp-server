@@ -562,8 +562,8 @@ describe('tool descriptions never name a tool absent from the session', () => {
         },
     ];
     // A dedicated Actor is named by its tool name, or by its full name in a tool reference
-    // ("use apify/rag-web-browser", "the dedicated apify/web-fetch tool"); a full name given as an
-    // example Actor (e.g. "apify/rag-web-browser" as a call-actor input) is not a tool reference.
+    // ("use apify/rag-web-browser", "prefer the dedicated apify/web-fetch tool"); a full name given as
+    // an example Actor (e.g. "apify/rag-web-browser" as a call-actor input) is not a tool reference.
     const DEDICATED_ACTORS = [
         { name: ragToolStub.name, actorFullName: RAG_WEB_BROWSER },
         { name: webFetchToolStub.name, actorFullName: WEB_FETCH },
@@ -597,7 +597,7 @@ describe('tool descriptions never name a tool absent from the session', () => {
                         for (const { name, actorFullName } of absentDedicatedActors) {
                             if (
                                 line.includes(name) ||
-                                new RegExp(`\\b(?:use|dedicated) ${actorFullName}\\b`).test(line)
+                                new RegExp(`\\b(?:use|prefer|dedicated) (?:the )?${actorFullName}\\b`).test(line)
                             ) {
                                 violations.push(`${tool.name} names absent ${actorFullName}: ${line.trim()}`);
                             }

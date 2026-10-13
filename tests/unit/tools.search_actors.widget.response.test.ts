@@ -203,7 +203,7 @@ describe('search-actors-widget buildDescription()', () => {
 
     it('appends the run limitation once in a widget-only session, naming no base tool', () => {
         const description = renderDescription(HELPER_TOOLS.STORE_SEARCH_WIDGET);
-        expect(description).not.toContain(HELPER_TOOLS.STORE_SEARCH + ' ');
+        expect(description).not.toMatch(new RegExp(`(?<![\\w-])${HELPER_TOOLS.STORE_SEARCH}(?![\\w-])`));
         expect(description).not.toContain(SILENT_DISCOVERY);
         expect(countCaveats(description)).toBe(1);
     });
