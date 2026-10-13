@@ -154,6 +154,6 @@ describe('apify/rag-web-browser description', () => {
 
     it('keeps the all-tools description on both hints', async () => {
         const [tool] = await getNormalActorsAsTools([createMockActorInfo(RAG_WEB_BROWSER)]);
-        expect(tool.description.endsWith(`${GENERAL_SCRAPING} ${STORE_ACTOR_HINT}\n${WEB_FETCH_HINT}`)).toBe(true);
+        expect(tool.description?.endsWith(`${GENERAL_SCRAPING} ${STORE_ACTOR_HINT}\n${WEB_FETCH_HINT}`)).toBe(true);
     });
 });

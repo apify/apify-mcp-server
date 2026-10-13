@@ -220,6 +220,6 @@ describe('search-actors-widget buildDescription()', () => {
 
     it('keeps the all-tools description on the original hint', () => {
         expect(searchActorsWidget.description).toContain(FIND_SCHEMA_CALL);
-        expect(countCaveats(searchActorsWidget.description)).toBe(0);
+        expect(countCaveats(searchActorsWidget.description ?? '')).toBe(0);
     });
 });
