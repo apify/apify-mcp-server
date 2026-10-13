@@ -87,13 +87,12 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
             const summary = isCleanFiltered
                 ? `Dataset '${datasetId}' returned no items with clean=true, which skips empty items and hidden (#) fields; no schema to infer.`
                 : `Dataset '${datasetId}' is empty; no schema to infer.`;
+            const cleanFalseFact = 'clean=false includes those items.';
             const nextStep = resolveSiblingNextStep(
                 HELPER_TOOLS.DATASET_GET,
                 loadedToolNames,
-                isCleanFiltered
-                    ? `Retry with clean=false to include those items, or use ${checkStats}`
-                    : `Use ${checkStats}`,
-                isCleanFiltered ? 'clean=false includes those items.' : undefined,
+                isCleanFiltered ? `${cleanFalseFact} Use ${checkStats}` : `Use ${checkStats}`,
+                isCleanFiltered ? cleanFalseFact : undefined,
             );
             return buildStorageResponse({ structuredContent: { datasetId, schema: {} }, summary, nextStep });
         }

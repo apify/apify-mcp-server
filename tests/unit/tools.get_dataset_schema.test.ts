@@ -112,7 +112,10 @@ describe('get-dataset-schema', () => {
         expect(isError).not.toBe(true);
         expect(structuredContent.schema).toEqual({});
         expect(structuredContent.summary).not.toContain('is empty');
-        expect(structuredContent.nextStep).toContain('clean=false');
+        // States what clean=false does rather than telling the agent to call again (TOOL_GUIDELINES.md).
+        expect(structuredContent.nextStep).toBe(
+            `clean=false includes those items. Use ${HELPER_TOOLS.DATASET_GET} with datasetId=ds-1 to check itemCount and stats.`,
+        );
         expectSchemaConformingStructuredContent(result, datasetSchemaOutputSchema);
     });
 
