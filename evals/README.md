@@ -64,8 +64,10 @@ Read-only probes count too, which is the point: the gate is what keeps the tool 
 enough that an agent resolves a loose Actor reference with `search-actors` instead of guessing a slug.
 
 One caveat when reading a failure: a transient agent failure is retried once, and the retry replays the
-whole prompt, so a fixed-name create case can hit a name collision the second time round and fail the
-gate on it. The console prints a `retrying once` line for those items.
+whole prompt. An item that names its resources with `{{uniq}}` gets a fresh name on the retry (its
+`r<attempt>` part), so a create that succeeded before the failure does not collide with its replay; a
+fixed-name create case still can, and fails the gate on it. The console prints a `retrying once` line for
+those items.
 
 The tasks family (`merge/tasks/*`, 10 items: 7 proper + 3 with `expectedErrors`) uses fixed `eval-*`
 task names, which are unique per account, and the create cases never clean up — so every run
@@ -174,15 +176,16 @@ query:     ... and call it eval-sched-add-{{uniq}}
 reference: PASS only if create-schedule created eval-sched-add-{{uniq}}.
 ```
 
-The runner rewrites every `{{uniq}}` to `<run-id>-n<run-id length>-t<trial>` before the item reaches the agent and the
-judge. Keep the static part of the name at 34 characters or fewer: a schedule or task name is capped at
-63, and a run id of up to 20 characters with its `-n<length>-t<trial>` tail takes the rest.
+The runner rewrites every `{{uniq}}` to `<run-id>-n<run-id length>-t<trial>r<attempt>` before the item reaches the
+agent and the judge; `attempt` is `1`, or `2` on the transient-failure retry. Keep the static part of the name at
+34 characters or fewer: a schedule or task name is capped at 63, and a run id of up to 18 characters with its
+`-n<length>-t<trial>r<attempt>` tail takes the rest.
 
 Substitute both or neither — a marker in the query alone makes the judge demand a name the agent never
 used. An unmarked item keeps colliding exactly as before, so the fix is per item, not automatic.
 `metadata.expectedArgs` is never substituted.
 
-`--run-id` overrides the generated id (lowercase letters, digits and dashes, at most 20 characters); CI passes
+`--run-id` overrides the generated id (lowercase letters, digits and dashes, at most 18 characters); CI passes
 `<github.run_id>-<github.run_attempt>` to the run and to its teardown step. A run prints its id and its
 teardown command when it finishes:
 
@@ -314,7 +317,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 
 - `config.ts` - Models and the MCP tool-name prefix, shared across responsibilities
 - `environment.ts` - Env var sanitization and missing-var reporting
-- `run_id.ts` - The `<static>-<runId>-n<runId length>-t<trial>` name grammar and `--run-id` parsing, shared by the runner and the fixtures scripts
+- `run_id.ts` - The `<static>-<runId>-n<runId length>-t<trial>r<attempt>` name grammar and `--run-id` parsing, shared by the runner and the fixtures scripts
 - `runner/run.ts` - Main CLI entry, runner defaults
 - `runner/experiment.ts` - Experiment task (agent + tool-call dispatch), `EVALUATORS`, run summary, exit gate
 - `runner/filters.ts` - Test case filtering by category and id

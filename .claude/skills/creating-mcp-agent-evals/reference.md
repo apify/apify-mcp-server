@@ -39,7 +39,7 @@ pnpm run evals:mcp-agent --dataset mcp-server-evals-merge --id '^merge/<family>/
 }
 ```
 
-- `{{uniq}}` in `query` and `expectedOutput` is replaced by the runner with `<runId>-n<runId length>-t<trial>`; put it in both or neither, and keep the static part of the name at 35 characters or fewer (63-char platform cap). Not substituted in `expectedArgs`.
+- `{{uniq}}` in `query` and `expectedOutput` is replaced by the runner with `<runId>-n<runId length>-t<trial>r<attempt>`; put it in both or neither, and keep the static part of the name at 34 characters or fewer (63-char platform cap). Not substituted in `expectedArgs`.
 - `datasetName` is one of the two: `mcp-server-evals-merge` for a `kind: "agent"` case, `mcp-server-evals-pr` for a `kind: "tool-call"` one.
 - `metadata` is strict-validated (`langfuse/dataset.ts`): unknown keys fail the run before LLM spend. Knobs: `category`, `kind`, `expectedTools`, `expectedArgs`, `expectedErrors`, `maxTurns`, `tools`, `failTools`, `mcpToolsOnly`.
 - `category` = tool under test (what `--category` filters); difficulty goes in the id's `<slug>` half.
