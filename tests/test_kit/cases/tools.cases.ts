@@ -7,7 +7,6 @@ import { expect, vi } from 'vitest';
 import {
     APIFY_ACTOR_RUN_META_KEY,
     CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
-    HELPER_TOOLS,
 } from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
@@ -38,7 +37,7 @@ export const toolsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient(undefined, async (client) => {
             const names = getToolNames(await client.listTools());
-            expect(names).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+            expect(names).not.toContain('report-problem');
         }),
     },
     {
@@ -66,7 +65,7 @@ export const toolsCases: Case[] = [
             await client.listTools();
 
             const callResult = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_CALL,
+                name: 'call-actor',
                 arguments: { actor: `${ACTOR_EXAMPLE_MCP_SERVER}:add`, input: { firstNumber: 2, secondNumber: 3 } },
             });
 
@@ -92,7 +91,7 @@ export const toolsCases: Case[] = [
         name: 'should search Apify documentation',
         isDeploymentTest: false,
         run: withClient({ tools: ['docs'] }, async (client) => {
-            const toolName = HELPER_TOOLS.DOCS_SEARCH;
+            const toolName = 'search-apify-docs';
             const query = 'standby actor';
             const result = await client.callTool({ name: toolName, arguments: { query, limit: 5, offset: 0 } });
 
@@ -108,7 +107,7 @@ export const toolsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['docs'] }, async (client) => {
             const documentUrl = 'https://docs.apify.com/academy/getting-started/creating-actors';
-            const result = await client.callTool({ name: HELPER_TOOLS.DOCS_FETCH, arguments: { url: documentUrl } });
+            const result = await client.callTool({ name: 'fetch-apify-docs', arguments: { url: documentUrl } });
 
             const content = result.content as { text: string }[];
             expect(content.length).toBeGreaterThan(0);
@@ -120,7 +119,7 @@ export const toolsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['docs'] }, async (client) => {
             const forbiddenUrl = 'https://example.com/some-page';
-            const result = await client.callTool({ name: HELPER_TOOLS.DOCS_FETCH, arguments: { url: forbiddenUrl } });
+            const result = await client.callTool({ name: 'fetch-apify-docs', arguments: { url: forbiddenUrl } });
 
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
@@ -137,7 +136,7 @@ export const toolsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['docs'] }, async (client) => {
             const crawleeDocsUrl = 'https://crawlee.dev/js/docs/quick-start';
-            const result = await client.callTool({ name: HELPER_TOOLS.DOCS_FETCH, arguments: { url: crawleeDocsUrl } });
+            const result = await client.callTool({ name: 'fetch-apify-docs', arguments: { url: crawleeDocsUrl } });
 
             // Should not have error status
             expect(result.isError).not.toBe(true);
@@ -151,21 +150,21 @@ export const toolsCases: Case[] = [
         name: 'should return structured output for search-apify-docs matching outputSchema',
         isDeploymentTest: false,
         run: withClient({ tools: ['docs'] }, async (client) => {
-            const toolName = HELPER_TOOLS.DOCS_SEARCH;
+            const toolName = 'search-apify-docs';
             const query = 'standby actor';
             const result = await client.callTool({ name: toolName, arguments: { query, limit: 5, offset: 0 } });
 
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutputForTool(result, HELPER_TOOLS.DOCS_SEARCH, 'default');
+            validateStructuredOutputForTool(result, 'search-apify-docs', 'default');
         }),
     },
     {
         name: 'should return structured output for fetch-apify-docs matching outputSchema',
         isDeploymentTest: false,
         run: withClient({ tools: ['docs'] }, async (client) => {
-            const toolName = HELPER_TOOLS.DOCS_FETCH;
+            const toolName = 'fetch-apify-docs';
             const result = await client.callTool({
                 name: toolName,
                 arguments: { url: 'https://docs.apify.com/platform/actors/development' },
@@ -174,7 +173,7 @@ export const toolsCases: Case[] = [
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutputForTool(result, HELPER_TOOLS.DOCS_FETCH, 'default');
+            validateStructuredOutputForTool(result, 'fetch-apify-docs', 'default');
         }),
     },
     {
@@ -252,7 +251,7 @@ export const toolsCases: Case[] = [
         skipIf: skipUnlessLegacyHttp,
         run: withClient({ tools: ['storage'] }, async (client) => {
             const response = await client.callTool({
-                name: HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
+                name: 'get-key-value-store-list',
                 arguments: {},
                 _meta: { apifyToken: 'apify_api_invalid_token' },
             });
@@ -269,7 +268,7 @@ export const toolsCases: Case[] = [
             const serverInfo = client.getServerVersion();
             expect(serverInfo?.name).toBe('apify-mcp-server');
             expect(serverInfo?.version).toMatch(/^\d+\.\d+\.\d+/);
-            expect(client.getInstructions()).toContain(HELPER_TOOLS.ACTOR_CALL);
+            expect(client.getInstructions()).toContain('call-actor');
 
             const capabilities = client.getServerCapabilities();
             // #1232: `tools` must stay `{}` (no listChanged).
@@ -353,7 +352,7 @@ export const toolsCases: Case[] = [
             });
 
             const result = await statelessClient.callTool({
-                name: HELPER_TOOLS.ACTOR_CALL,
+                name: 'call-actor',
                 arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 } },
                 _meta: { progressToken: PROGRESS_TOKEN },
             });

@@ -1,7 +1,7 @@
 import { expect } from 'vitest';
 
 import { actorNameToToolName } from '@apify/actors-mcp-server/internals.js';
-import { actorRunOutputSchema, HELPER_TOOLS } from '@apify/actors-mcp-server/internals/test-kit.js';
+import { actorRunOutputSchema } from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
     ACTOR_NORMAL_MODE,
@@ -26,7 +26,7 @@ const normalModeRunFixture: Fixture<NormalModeRun> = {
         const setupClient = await ctx.createClientFn({ tools: ['actors', 'storage'] });
         try {
             const callResult = await setupClient.callTool({
-                name: HELPER_TOOLS.ACTOR_CALL,
+                name: 'call-actor',
                 arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 1, secondNumber: 2 }, waitSecs: 45 },
             });
             const callStructured = callResult as {
@@ -76,7 +76,7 @@ export const storageCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['storage'] }, async (client) => {
             await expect(
-                client.callTool({ name: HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET, arguments: { recordKey: 'INPUT' } }),
+                client.callTool({ name: 'get-key-value-store-record', arguments: { recordKey: 'INPUT' } }),
             ).rejects.toThrow(/must have required property 'keyValueStoreId'/);
         }),
     },
@@ -116,7 +116,7 @@ export const storageCases: Case[] = [
             expect(new Set(fields).size).toBe(fields.length);
 
             const outputResult = await client.callTool({
-                name: HELPER_TOOLS.DATASET_GET_ITEMS,
+                name: 'get-dataset-items',
                 arguments: { datasetId: datasetId!, fields: 'firstNumber,sum' },
             });
 
@@ -160,14 +160,14 @@ export const storageCases: Case[] = [
 
             // summary/nextStep must name datasetId + follow-up tool.
             expect(content[1].text).toContain(datasetId);
-            expect(content[1].text).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
+            expect(content[1].text).toContain('get-dataset-items');
 
             // Dataset field paths surface in `storages.datasets.default.fields`.
             const fields = sc?.storages?.datasets?.default?.fields ?? [];
             expect(fields).toEqual(expect.arrayContaining(['firstNumber', 'secondNumber', 'sum']));
 
             const outputResult = await client.callTool({
-                name: HELPER_TOOLS.DATASET_GET_ITEMS,
+                name: 'get-dataset-items',
                 arguments: { datasetId: datasetId!, fields: 'sum' },
             });
 
@@ -177,7 +177,7 @@ export const storageCases: Case[] = [
             expect(items!.length).toBeGreaterThan(0);
             expect(items![0]).toHaveProperty('sum', 10);
 
-            validateStructuredOutputForTool(outputResult, HELPER_TOOLS.DATASET_GET_ITEMS, 'default');
+            validateStructuredOutputForTool(outputResult, 'get-dataset-items', 'default');
         }),
     },
     {
@@ -203,7 +203,7 @@ export const storageCases: Case[] = [
             expect(datasetId).toBeDefined();
 
             const outputResult = await client.callTool({
-                name: HELPER_TOOLS.DATASET_GET_ITEMS,
+                name: 'get-dataset-items',
                 arguments: { datasetId: datasetId! },
             });
 
@@ -215,7 +215,7 @@ export const storageCases: Case[] = [
             expect(items![0]).toHaveProperty('secondNumber', input.secondNumber);
             expect(items![0]).toHaveProperty('sum', input.firstNumber + input.secondNumber);
 
-            validateStructuredOutputForTool(outputResult, HELPER_TOOLS.DATASET_GET_ITEMS, 'default');
+            validateStructuredOutputForTool(outputResult, 'get-dataset-items', 'default');
         }),
     },
     {
@@ -224,7 +224,7 @@ export const storageCases: Case[] = [
         run: withClient({ tools: ['actors', 'storage'] }, async (client) => {
             // First, run an actor to get a datasetId
             const callResult = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_CALL,
+                name: 'call-actor',
                 arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 3, secondNumber: 4 } },
             });
 
@@ -236,13 +236,13 @@ export const storageCases: Case[] = [
 
             // Now test get-dataset-items
             const datasetResult = await client.callTool({
-                name: HELPER_TOOLS.DATASET_GET_ITEMS,
+                name: 'get-dataset-items',
                 arguments: { datasetId },
             });
 
             expect(datasetResult.content).toBeDefined();
             // Validate structured output for get-dataset-items
-            validateStructuredOutputForTool(datasetResult, HELPER_TOOLS.DATASET_GET_ITEMS, 'default');
+            validateStructuredOutputForTool(datasetResult, 'get-dataset-items', 'default');
 
             // Validate structured content has items with actual results
             const datasetWithStructured = datasetResult as {
@@ -266,7 +266,7 @@ export const storageCases: Case[] = [
         name: 'applies the default `limit` of 20 when omitted on get-dataset-items',
         isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
-            const result = await client.callTool({ name: HELPER_TOOLS.DATASET_GET_ITEMS, arguments: { datasetId } });
+            const result = await client.callTool({ name: 'get-dataset-items', arguments: { datasetId } });
             expect(result.isError).not.toBe(true);
             const structured = (result as { structuredContent?: { items?: unknown[]; limit?: number } })
                 .structuredContent;
@@ -278,7 +278,7 @@ export const storageCases: Case[] = [
         name: "reads INPUT from the run's default KV store via get-actor-run + get-key-value-store-record",
         isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['runs', 'storage'] }, async (client, { runId }) => {
-            const runResult = await client.callTool({ name: HELPER_TOOLS.ACTOR_RUNS_GET, arguments: { runId } });
+            const runResult = await client.callTool({ name: 'get-actor-run', arguments: { runId } });
             expect(runResult.isError).not.toBe(true);
             const runText = (runResult.content as { text: string }[])[0].text;
             // content[0] is JSON.stringify(structuredContent), not markdown-embedded JSON.
@@ -287,7 +287,7 @@ export const storageCases: Case[] = [
             expect(kvId).toBeDefined();
 
             const kvResult = await client.callTool({
-                name: HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
+                name: 'get-key-value-store-record',
                 arguments: { keyValueStoreId: kvId!, recordKey: 'INPUT' },
             });
             expect(kvResult.isError).not.toBe(true);
@@ -303,7 +303,7 @@ export const storageCases: Case[] = [
         name: 'returns dataset metadata via get-dataset',
         isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
-            const result = await client.callTool({ name: HELPER_TOOLS.DATASET_GET, arguments: { datasetId } });
+            const result = await client.callTool({ name: 'get-dataset', arguments: { datasetId } });
             expect(result.isError).not.toBe(true);
             const { text } = (result.content as { text: string }[])[0];
             expect(text).toContain(datasetId);
@@ -313,14 +313,14 @@ export const storageCases: Case[] = [
             expect(text).toContain('itemsPublicUrl');
             const sc = (result as { structuredContent?: { summary?: string; nextStep?: string } }).structuredContent;
             expect(sc?.summary).toContain('items');
-            expect(sc?.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
+            expect(sc?.nextStep).toContain('get-dataset-items');
         }),
     },
     {
         name: 'infers schema from dataset items via get-dataset-schema',
         isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
-            const result = await client.callTool({ name: HELPER_TOOLS.DATASET_SCHEMA_GET, arguments: { datasetId } });
+            const result = await client.callTool({ name: 'get-dataset-schema', arguments: { datasetId } });
             expect(result.isError).not.toBe(true);
             const { text } = (result.content as { text: string }[])[0];
             expect(text).toContain('properties');
@@ -328,7 +328,7 @@ export const storageCases: Case[] = [
             expect(text).toContain('math');
             const sc = (result as { structuredContent?: { summary?: string; nextStep?: string } }).structuredContent;
             expect(sc?.summary).toContain('Schema inferred');
-            expect(sc?.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
+            expect(sc?.nextStep).toContain('get-dataset-items');
         }),
     },
     {
@@ -336,7 +336,7 @@ export const storageCases: Case[] = [
         isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { defaultKvId }) => {
             const result = await client.callTool({
-                name: HELPER_TOOLS.KEY_VALUE_STORE_GET,
+                name: 'get-key-value-store',
                 arguments: { keyValueStoreId: defaultKvId },
             });
             expect(result.isError).not.toBe(true);
@@ -346,7 +346,7 @@ export const storageCases: Case[] = [
             expect(text).toContain('keysPublicUrl');
             expect(text).toContain('recordsPublicUrl');
             const sc = (result as { structuredContent?: { nextStep?: string } }).structuredContent;
-            expect(sc?.nextStep).toContain(HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET);
+            expect(sc?.nextStep).toContain('get-key-value-store-keys');
         }),
     },
     {
@@ -354,7 +354,7 @@ export const storageCases: Case[] = [
         isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { defaultKvId }) => {
             const result = await client.callTool({
-                name: HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
+                name: 'get-key-value-store-keys',
                 arguments: { keyValueStoreId: defaultKvId, limit: 10 },
             });
             expect(result.isError).not.toBe(true);
@@ -366,7 +366,7 @@ export const storageCases: Case[] = [
             expect(text).toContain('COVER');
             const sc = (result as { structuredContent?: { summary?: string; nextStep?: string } }).structuredContent;
             expect(sc?.summary).toContain('keys');
-            expect(sc?.nextStep).toContain(HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET);
+            expect(sc?.nextStep).toContain('get-key-value-store-record');
         }),
     },
     {
@@ -375,7 +375,7 @@ export const storageCases: Case[] = [
         isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client) => {
             const result = await client.callTool({
-                name: HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
+                name: 'get-key-value-store-list',
                 arguments: { desc: true, unnamed: true, limit: 10 },
             });
             expect(result.isError).not.toBe(true);
@@ -394,7 +394,7 @@ export const storageCases: Case[] = [
         isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
             const result = await client.callTool({
-                name: HELPER_TOOLS.DATASET_GET_ITEMS,
+                name: 'get-dataset-items',
                 arguments: { datasetId, fields: 'math.factorial.first' },
             });
             expect(result.isError).not.toBe(true);
@@ -467,7 +467,7 @@ export const storageCases: Case[] = [
         isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['api'] }, async (client, { runId }) => {
             const result = await client.callTool({
-                name: HELPER_TOOLS.API_READ,
+                name: 'apify-api-read',
                 arguments: { path: `/v2/actor-runs/${runId}/key-value-store` },
             });
             expect(result.isError).not.toBe(true);
