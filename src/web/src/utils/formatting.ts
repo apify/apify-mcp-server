@@ -103,10 +103,8 @@ export const formatPricing = (pricing: StructuredPricingInfo): string => {
         }
 
         // The Store badge shows the advertised event, not a generic label; see apify/apify-mcp-server#905.
-        // The server flags it isPrimaryEvent (the API's flag, else the only tiered event).
-        const advertisedEvent =
-            pricing.events.length === 1 ? pricing.events[0] : pricing.events.find((event) => event.isPrimaryEvent);
-
+        // The server flags it isPrimaryEvent (the only event, else the API's flag, else the only tiered event).
+        const advertisedEvent = pricing.events.find((event) => event.isPrimaryEvent);
         return advertisedEvent ? formatPayPerEventPricing(advertisedEvent) : 'Pay per event';
     }
 

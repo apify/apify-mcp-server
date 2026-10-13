@@ -4,6 +4,7 @@ import { ACTOR_PRICING_MODEL } from '../../src/const.js';
 import type { ActorStoreList } from '../../src/types.js';
 import { formatActorForWidget } from '../../src/utils/actor_card.js';
 import type { PricingInfo } from '../../src/utils/pricing_info.js';
+import type { StructuredPricingInfo } from '../../src/web/src/types.js';
 import { formatPricing } from '../../src/web/src/utils/formatting.js';
 
 /**
@@ -68,11 +69,17 @@ describe('formatPricing()', () => {
     });
 
     it('quotes repeatable events per 1,000, like the Store, whatever the unit price', () => {
-        expect(formatPricing({ model: 'PAY_PER_EVENT', events: [{ title: 'Result', priceUsd: 0.00025 }] })).toBe(
-            '$0.25 / 1,000 results',
-        );
         expect(
-            formatPricing({ model: 'PAY_PER_EVENT', events: [{ title: 'Competitor analysis', priceUsd: 0.05 }] }),
+            formatPricing({
+                model: 'PAY_PER_EVENT',
+                events: [{ title: 'Result', priceUsd: 0.00025, isPrimaryEvent: true }],
+            }),
+        ).toBe('$0.25 / 1,000 results');
+        expect(
+            formatPricing({
+                model: 'PAY_PER_EVENT',
+                events: [{ title: 'Competitor analysis', priceUsd: 0.05, isPrimaryEvent: true }],
+            }),
         ).toBe('$50.00 / 1,000 competitor analyses');
     });
 
@@ -80,15 +87,26 @@ describe('formatPricing()', () => {
         expect(
             formatPricing({
                 model: 'PAY_PER_EVENT',
-                events: [{ title: 'Actor start', priceUsd: 0.0005, isOneTimeEvent: true, paidPlanPriceUsd: 0.0004 }],
+                events: [
+                    {
+                        title: 'Actor start',
+                        priceUsd: 0.0005,
+                        isPrimaryEvent: true,
+                        isOneTimeEvent: true,
+                        paidPlanPriceUsd: 0.0004,
+                    },
+                ],
             }),
         ).toBe('$0.0005 per run · from $0.0004 on paid plans');
     });
 
     it('keeps sub-cent per-1,000 prices precise instead of rounding to $0.00', () => {
-        expect(formatPricing({ model: 'PAY_PER_EVENT', events: [{ title: 'Review', priceUsd: 0.0000945 }] })).toBe(
-            '$0.0945 / 1,000 reviews',
-        );
+        expect(
+            formatPricing({
+                model: 'PAY_PER_EVENT',
+                events: [{ title: 'Review', priceUsd: 0.0000945, isPrimaryEvent: true }],
+            }),
+        ).toBe('$0.0945 / 1,000 reviews');
     });
 
     it('renders the event the server chose when no event is flagged primary (the only tiered one)', () => {
@@ -127,7 +145,7 @@ describe('formatPricing()', () => {
         );
     });
 
-    it('falls back to Pay per event without a primary event, events, or a price', () => {
+    it('falls back to Pay per event without a flagged event, events, or a price', () => {
         expect(
             formatPricing({
                 model: 'PAY_PER_EVENT',
@@ -139,13 +157,20 @@ describe('formatPricing()', () => {
         ).toBe('Pay per event');
         expect(formatPricing({ model: 'PAY_PER_EVENT', events: [] })).toBe('Pay per event');
         expect(formatPricing({ model: 'PAY_PER_EVENT' })).toBe('Pay per event');
-        expect(formatPricing({ model: 'PAY_PER_EVENT', events: [{ title: 'Result' }] })).toBe('Pay per event');
+        expect(formatPricing({ model: 'PAY_PER_EVENT', events: [{ title: 'Result', isPrimaryEvent: true }] })).toBe(
+            'Pay per event',
+        );
+    });
+
+    it('renders Pay per usage without pricing or for an unknown model', () => {
+        expect(formatPricing(null as unknown as StructuredPricingInfo)).toBe('Pay per usage');
+        expect(formatPricing({ model: 'PAY_PER_USAGE' })).toBe('Pay per usage');
     });
 
     it('renders a $0 price as $0.00', () => {
-        expect(formatPricing({ model: 'PAY_PER_EVENT', events: [{ title: 'Result', priceUsd: 0 }] })).toBe(
-            '$0.00 / 1,000 results',
-        );
+        expect(
+            formatPricing({ model: 'PAY_PER_EVENT', events: [{ title: 'Result', priceUsd: 0, isPrimaryEvent: true }] }),
+        ).toBe('$0.00 / 1,000 results');
     });
 
     it('formats PRICE_PER_DATASET_ITEM per 1,000 with the paid-plan hint when the server sets one', () => {

@@ -192,6 +192,8 @@ describe('pricingInfoToStructured (complete mode)', () => {
                         { tier: 'PLATINUM', priceUsd: 0.00126 },
                         { tier: 'DIAMOND', priceUsd: 0.00076 },
                     ],
+                    // The only tiered event is the advertised one, flagged in both output modes.
+                    isPrimaryEvent: true,
                 },
                 {
                     title: 'Actor start',
@@ -214,6 +216,7 @@ describe('pricingInfoToStructured (complete mode)', () => {
                     description: 'A Google Maps place scraped',
                     priceUsd: undefined,
                     tieredPricing: [{ tier: 'FREE', priceUsd: 0.004 }],
+                    isPrimaryEvent: true,
                 },
             ],
         });
@@ -298,6 +301,24 @@ describe('pricingInfoToString (complete mode)', () => {
         );
     });
 
+    it('quotes the only tier over the flat price, and the flat price when there are no tiers', () => {
+        const singleTierDataset = {
+            pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
+            pricePerUnitUsd: 0.005,
+            unitName: 'page',
+            tieredPricing: { FREE: { tieredPricePerUnitUsd: 0.004 } },
+        } as unknown as PricingInfo;
+        expect(pricingInfoToString(singleTierDataset)).toBe('This Actor costs $4.00 / 1,000 pages.');
+        const flatRental = {
+            pricingModel: ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH,
+            pricePerUnitUsd: 25,
+            trialMinutes: 120,
+        } as unknown as PricingInfo;
+        expect(pricingInfoToString(flatRental)).toBe(
+            'This Actor is rental and costs $25.00 per month, with a trial period of 2 hours.',
+        );
+    });
+
     it('prints an unknown tier code as is', () => {
         const info = {
             pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
@@ -348,7 +369,7 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
         });
     });
 
-    it('FREE user — note names the Free plan and the advertised price; the advertised event carries paidPlanPriceUsd', () => {
+    it('carries paidPlanPriceUsd on the advertised event and names the Free plan and the advertised price in the note', () => {
         const out = pricingInfoToSimplifiedStructured(multiTierPayPerEvent, 'FREE');
         expect(out.events?.[0].priceUsd).toBe(0.004);
         expect(out.events?.[0].paidPlanPriceUsd).toBe(0.0021);
@@ -391,9 +412,10 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
                 'Use fetch-actor-details for the full pricing table.',
         );
         expect(out.events?.map((event) => event.paidPlanPriceUsd)).toEqual([undefined, 0.00025]);
+        expect(out.events?.map((event) => event.isPrimaryEvent)).toEqual([undefined, true]);
     });
 
-    it('E3: user on DIAMOND, actor offers only FREE and BRONZE — shows the FREE price, never hints the top tier', () => {
+    it('E3: shows the FREE price to a DIAMOND user when the Actor prices only FREE and BRONZE, with no hint', () => {
         const info = {
             pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
             pricePerUnitUsd: 0.005,
@@ -415,7 +437,7 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
         );
     });
 
-    it('resolves to the first entry when neither user tier nor FREE exist; omits the tieredPricing array', () => {
+    it('falls back to the first tier when neither the user tier nor FREE exist and advertises the lower of Starter/Scale', () => {
         const info = {
             pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
             pricePerUnitUsd: 0.005,
@@ -425,7 +447,7 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
                 SILVER: { tieredPricePerUnitUsd: 0.003 },
             },
         } as unknown as PricingInfo;
-        const out = pricingInfoToSimplifiedStructured(info, 'GOLD');
+        const out = pricingInfoToSimplifiedStructured(info, 'FREE');
         expect(out.pricePerUnit).toBe(0.004);
         expect(out.paidPlanPricePerUnit).toBe(0.003);
         expect(out.pricingNote).toBe(
@@ -443,6 +465,7 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
                 {
                     title: 'Scraped place',
                     description: 'A Google Maps place scraped',
+                    isPrimaryEvent: true,
                     priceUsd: 0.004,
                 },
             ],
@@ -478,30 +501,22 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
         });
     });
 
-    it('user on DIAMOND — resolved price is DIAMOND, no hint, pricingNote is suppressed (top tier)', () => {
-        const info = {
-            pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
-            pricePerUnitUsd: 0.005,
-            unitName: 'result',
-            tieredPricing: {
-                FREE: { tieredPricePerUnitUsd: 0.005 },
-                GOLD: { tieredPricePerUnitUsd: 0.002 },
-                DIAMOND: { tieredPricePerUnitUsd: 0.001 },
-            },
-        } as unknown as PricingInfo;
-        const out = pricingInfoToSimplifiedStructured(info, 'DIAMOND');
-        expect(out.pricePerUnit).toBe(0.001);
-        expect(out.paidPlanPricePerUnit).toBeUndefined();
-        expect(out.pricingNote).toBeUndefined();
-        expect(out.tieredPricing).toBeUndefined();
-    });
-
     it('E7: FLAT_PRICE_PER_MONTH simplified includes trialMinutes + resolved tier price', () => {
         expect(pricingInfoToSimplifiedStructured(multiTierRental, 'GOLD')).toEqual({
             model: 'FLAT_PRICE_PER_MONTH',
             pricePerUnit: 20,
             trialMinutes: 60 * 24 * 7,
             pricingNote: NOTE_GOLD,
+        });
+        // A Free user gets the advertised monthly price as the hint, quoted per month.
+        expect(pricingInfoToSimplifiedStructured(multiTierRental, 'FREE')).toEqual({
+            model: 'FLAT_PRICE_PER_MONTH',
+            pricePerUnit: 30,
+            paidPlanPricePerUnit: 20,
+            trialMinutes: 60 * 24 * 7,
+            pricingNote:
+                'Prices shown are for the Free plan. Paid plans from $20.00 per month. ' +
+                'Use fetch-actor-details for the full pricing table.',
         });
     });
 
@@ -546,7 +561,7 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
     });
 });
 
-describe('pricingNote edge cases', () => {
+describe('pricingInfoToSimplifiedStructured() paid-plan hint', () => {
     it('never hints a top-tier user, even when a developer priced a lower tier below DIAMOND', () => {
         const info = {
             pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
@@ -672,6 +687,7 @@ describe('pricingNote edge cases', () => {
             unitName: 'result',
             tieredPricing: {
                 FREE: { tieredPricePerUnitUsd: 0.004 },
+                PLATINUM: { tieredPricePerUnitUsd: 0.0006 },
                 DIAMOND: { tieredPricePerUnitUsd: 0.0005 },
             },
         } as unknown as PricingInfo;
@@ -679,6 +695,97 @@ describe('pricingNote edge cases', () => {
         expect(out.paidPlanPricePerUnit).toBeUndefined();
         expect(out.pricingNote).toBe(
             'Prices shown are for the Free plan. Use fetch-actor-details for the full pricing table.',
+        );
+    });
+
+    it('omits the "from" clause for Business and enterprise users, whose price no public plan undercuts', () => {
+        // PLATINUM pays less than the advertised Business price: own price, no hint, Platinum named in the note.
+        const out = pricingInfoToSimplifiedStructured(multiTierPayPerEvent, 'PLATINUM');
+        expect(out.events?.[0].priceUsd).toBe(0.00126);
+        expect(out.events?.[0].paidPlanPriceUsd).toBeUndefined();
+        expect(out.pricingNote).toBe(
+            'Prices shown are for the Platinum plan. Use fetch-actor-details for the full pricing table.',
+        );
+        // A Business user whose tier the Actor does not price sees the Free price, still with no upsell.
+        const info = {
+            pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
+            pricePerUnitUsd: 0.005,
+            unitName: 'result',
+            tieredPricing: {
+                FREE: { tieredPricePerUnitUsd: 0.005 },
+                BRONZE: { tieredPricePerUnitUsd: 0.004 },
+            },
+        } as unknown as PricingInfo;
+        expect(pricingInfoToSimplifiedStructured(info, 'GOLD')).toEqual({
+            model: 'PRICE_PER_DATASET_ITEM',
+            pricePerUnit: 0.005,
+            unitName: 'result',
+            pricingNote: 'Prices shown are for the Free plan. Use fetch-actor-details for the full pricing table.',
+        });
+    });
+
+    it('gives no hint when the advertised event has a flat price, even if it also lists tiers', () => {
+        const info = {
+            pricingModel: ACTOR_PRICING_MODEL.PAY_PER_EVENT,
+            pricingPerEvent: {
+                actorChargeEvents: {
+                    tweet: {
+                        eventTitle: 'Tweet',
+                        eventDescription: '',
+                        isPrimaryEvent: true,
+                        eventPriceUsd: 0.01,
+                        eventTieredPricingUsd: {
+                            FREE: { tieredEventPriceUsd: 0.005 },
+                            GOLD: { tieredEventPriceUsd: 0.00025 },
+                        },
+                    },
+                    profile: {
+                        eventTitle: 'Profile',
+                        eventDescription: '',
+                        eventTieredPricingUsd: {
+                            FREE: { tieredEventPriceUsd: 0.02 },
+                            GOLD: { tieredEventPriceUsd: 0.01 },
+                        },
+                    },
+                },
+            },
+        } as unknown as PricingInfo;
+        const out = pricingInfoToSimplifiedStructured(info, 'FREE');
+        expect(out.events?.[0]).toEqual({ title: 'Tweet', description: '', isPrimaryEvent: true, priceUsd: 0.01 });
+        expect(out.pricingNote).toBe(
+            'Prices shown are for the Free plan. Use fetch-actor-details for the full pricing table.',
+        );
+    });
+
+    it('quotes the hint per run when the advertised event is a one-time event', () => {
+        const info = {
+            pricingModel: ACTOR_PRICING_MODEL.PAY_PER_EVENT,
+            pricingPerEvent: {
+                actorChargeEvents: {
+                    start: {
+                        eventTitle: 'Actor start',
+                        eventDescription: '',
+                        isOneTimeEvent: true,
+                        eventTieredPricingUsd: {
+                            FREE: { tieredEventPriceUsd: 0.0005 },
+                            GOLD: { tieredEventPriceUsd: 0.0004 },
+                        },
+                    },
+                },
+            },
+        } as unknown as PricingInfo;
+        const out = pricingInfoToSimplifiedStructured(info, 'FREE');
+        expect(out.events?.[0]).toEqual({
+            title: 'Actor start',
+            description: '',
+            isPrimaryEvent: true,
+            isOneTimeEvent: true,
+            priceUsd: 0.0005,
+            paidPlanPriceUsd: 0.0004,
+        });
+        expect(out.pricingNote).toBe(
+            'Prices shown are for the Free plan. Paid plans from $0.0004 per run. ' +
+                'Use fetch-actor-details for the full pricing table.',
         );
     });
 
@@ -741,7 +848,7 @@ describe('pricingInfoToSimplifiedString (simplified mode)', () => {
         );
     });
 
-    it('FREE user — note names the Free plan and the advertised paid-plan price per model', () => {
+    it('names the Free plan and the advertised paid-plan price in the text per model', () => {
         expect(pricingInfoToSimplifiedString(multiTierDatasetItem, 'FREE')).toBe(
             'This Actor costs $5.00 / 1,000 results. Prices shown are for the Free plan. ' +
                 'Paid plans from $2.00 / 1,000 results. Use fetch-actor-details for the full pricing table.',
@@ -760,7 +867,7 @@ describe('pricingInfoToSimplifiedString (simplified mode)', () => {
         );
     });
 
-    it('user on DIAMOND — resolved tier is DIAMOND, pricingNote is suppressed (top tier)', () => {
+    it('suppresses the pricingNote text for a DIAMOND user with a DIAMOND price', () => {
         const info = {
             pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
             pricePerUnitUsd: 0.005,
