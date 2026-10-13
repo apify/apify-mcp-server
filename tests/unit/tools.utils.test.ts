@@ -795,8 +795,7 @@ describe('transformActorInputSchemaProperties', () => {
         expect(result.enumString.enum).toEqual(['A', 'B', 'C']);
         expect(result.enumString.description).not.toContain('Possible values:');
         expect(result.enumString.description).toContain('Example values:');
-        // Has a default, so the platform fills it in.
-        expect(result.enumString.description).not.toContain('**REQUIRED**');
+        expect(result.enumString.description).toContain('**REQUIRED**');
 
         // Array of Strings
         expect(result.arrayOfStrings).toBeDefined();

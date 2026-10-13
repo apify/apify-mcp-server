@@ -394,7 +394,7 @@ export function decodeDotPropertyNames(properties: Record<string, unknown>): Rec
 
 export function transformActorInputSchemaProperties(input: Readonly<ActorInputSchema>): ActorInputSchemaProperties {
     // Deep clone input to avoid mutating the original object
-    const inputClone = fixZodSchemaRequired(structuredClone(input)) as ActorInputSchema;
+    const inputClone: ActorInputSchema = structuredClone(input);
     let transformedProperties = markInputPropertiesAsRequired(inputClone);
     transformedProperties = buildApifySpecificProperties(transformedProperties);
     transformedProperties = inferArrayItemsTypeIfMissing(transformedProperties);
