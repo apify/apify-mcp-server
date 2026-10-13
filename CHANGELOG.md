@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.17.5 - **not yet released**
+## [0.18.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.18.0) (2026-10-13)
 
 ### 🚀 Features
 
@@ -23,7 +22,6 @@ All notable changes to this project will be documented in this file.
 - **evals:** Re-resolve {{uniq}} per retry attempt ([#1516](https://github.com/apify/apify-mcp-server/pull/1516)) ([2039c3c](https://github.com/apify/apify-mcp-server/commit/2039c3c009808c4d0bda19ab498d0cd5bb282773)) by [@jirispilka](https://github.com/jirispilka), closes [#1426](https://github.com/apify/apify-mcp-server/issues/1426)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.17.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.4) (2026-10-07)
 
 ### 🐛 Bug Fixes

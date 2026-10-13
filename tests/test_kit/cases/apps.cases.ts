@@ -1,10 +1,6 @@
 import { expect } from 'vitest';
 
-import {
-    HELPER_TOOLS,
-    RESOURCE_MIME_TYPE,
-    SERVER_MODE_AUTO_DETECTION_ENABLED,
-} from '@apify/actors-mcp-server/internals/test-kit.js';
+import { RESOURCE_MIME_TYPE, SERVER_MODE_AUTO_DETECTION_ENABLED } from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import { ACTOR_NORMAL_MODE, expectWidgetToolMeta, getToolNames, withClient } from '../helpers.js';
 import type { Case } from '../types.js';
@@ -63,13 +59,9 @@ export const appsCases: Case[] = [
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);
 
-            expect(toolNames).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
-            expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
-            for (const toolName of [
-                HELPER_TOOLS.STORE_SEARCH,
-                HELPER_TOOLS.ACTOR_GET_DETAILS,
-                HELPER_TOOLS.ACTOR_CALL,
-            ]) {
+            expect(toolNames).not.toContain('search-actors-widget');
+            expect(toolNames).not.toContain('fetch-actor-details-widget');
+            for (const toolName of ['search-actors', 'fetch-actor-details', 'call-actor']) {
                 const tool = tools.tools.find((t) => t.name === toolName);
                 expect(tool).toBeDefined();
                 expect((tool?._meta as Record<string, unknown> | undefined)?.ui).toBeUndefined();
@@ -81,7 +73,7 @@ export const appsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'], serverMode: 'apps' }, async (client) => {
             const result = await client.callTool({
-                name: HELPER_TOOLS.STORE_SEARCH_WIDGET,
+                name: 'search-actors-widget',
                 arguments: { keywords: 'python', limit: 5 },
             });
 
@@ -110,7 +102,7 @@ export const appsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'], serverMode: 'apps' }, async (client) => {
             const result = await client.callTool({
-                name: HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
+                name: 'fetch-actor-details-widget',
                 arguments: { actor: ACTOR_NORMAL_MODE },
             });
 
@@ -147,12 +139,12 @@ export const appsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['get-actor-run-widget'], serverMode: 'apps' }, async (client) => {
             const toolNames = getToolNames(await client.listTools());
-            expect(toolNames).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
-            expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET); // widget-only, no base auto-added
+            expect(toolNames).toContain('get-actor-run-widget');
+            expect(toolNames).not.toContain('get-actor-run'); // widget-only, no base auto-added
 
             const instructions = client.getInstructions();
             expect(instructions).toContain('Widget workflow');
-            expect(instructions).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+            expect(instructions).toContain('get-actor-run-widget');
         }),
     },
     {
@@ -161,12 +153,12 @@ export const appsCases: Case[] = [
         run: withClient({ tools: ['call-actor', 'call-actor-widget'], serverMode: 'apps' }, async (client) => {
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);
-            expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL);
-            expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+            expect(toolNames).toContain('call-actor');
+            expect(toolNames).toContain('call-actor-widget');
 
-            const callActorTool = tools.tools.find((t) => t.name === HELPER_TOOLS.ACTOR_CALL);
+            const callActorTool = tools.tools.find((t) => t.name === 'call-actor');
             expect(callActorTool?.description).toContain('WIDGET ALTERNATIVE');
-            expect(callActorTool?.description).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
+            expect(callActorTool?.description).toContain('call-actor-widget');
         }),
     },
     {
@@ -174,8 +166,8 @@ export const appsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['call-actor-widget'], serverMode: 'apps' }, async (client) => {
             const toolNames = getToolNames(await client.listTools());
-            expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
-            expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_CALL); // widget-only, no base auto-added
+            expect(toolNames).toContain('call-actor-widget');
+            expect(toolNames).not.toContain('call-actor'); // widget-only, no base auto-added
 
             const instructions = client.getInstructions();
             expect(instructions).not.toContain('WIDGET ALTERNATIVE'); // that bullet lives on call-actor's own description, absent here
@@ -190,17 +182,17 @@ export const appsCases: Case[] = [
             { tools: ['call-actor-widget', 'get-actor-run-widget'], serverMode: 'apps' },
             async (client) => {
                 const toolNames = getToolNames(await client.listTools());
-                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
-                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
-                expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_CALL);
-                expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
-                expect(toolNames).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
-                expect(toolNames).toContain(HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET);
-                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_RUNS_ABORT);
+                expect(toolNames).toContain('call-actor-widget');
+                expect(toolNames).toContain('get-actor-run-widget');
+                expect(toolNames).not.toContain('call-actor');
+                expect(toolNames).not.toContain('get-actor-run');
+                expect(toolNames).toContain('get-dataset-items');
+                expect(toolNames).toContain('get-key-value-store-record');
+                expect(toolNames).toContain('abort-actor-run');
 
                 const instructions = client.getInstructions();
-                expect(instructions).toContain(HELPER_TOOLS.ACTOR_CALL_WIDGET);
-                expect(instructions).toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+                expect(instructions).toContain('call-actor-widget');
+                expect(instructions).toContain('get-actor-run-widget');
             },
         ),
     },
