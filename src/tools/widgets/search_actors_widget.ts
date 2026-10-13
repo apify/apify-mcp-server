@@ -28,12 +28,11 @@ import { actorSearchWidgetOutputSchema } from '../structured_output_schemas.js';
 const searchActorsWidgetArgsSchema = searchActorsBaseArgsSchema.strict();
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    const canRunAny = canRunAnyActor(hasTool);
-    const silentSearchHint = canRunAny
+    const silentSearchHint = canRunAnyActor(hasTool)
         ? `For silent name resolution before running an Actor (e.g., "scrape google maps" — you need to find the right Actor first, then fetch its schema and call it), use ${HELPER_TOOLS.STORE_SEARCH} instead — it returns the same data without rendering a widget.`
         : `For silent Actor discovery, ${HELPER_TOOLS.STORE_SEARCH} returns the same data without rendering a widget.`;
     // Kept outside dedent, per CONTRIBUTING's rule against interpolating flush-left values into it.
-    const runLimitation = canRunAny ? '' : `\n\n${ACTOR_CALLABILITY_CAVEAT}`;
+    const runLimitation = canRunAnyActor(hasTool) ? '' : `\n\n${ACTOR_CALLABILITY_CAVEAT}`;
     return (
         dedent`
         Render an interactive UI element (widget) displaying Apify Store search results for the user.

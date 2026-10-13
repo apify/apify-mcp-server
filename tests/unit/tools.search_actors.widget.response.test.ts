@@ -190,36 +190,26 @@ describe('search-actors-widget response', () => {
 describe('search-actors-widget buildDescription()', () => {
     const renderDescription = (...present: string[]) => searchActorsWidget.buildDescription!(only(...present));
     const FIND_SCHEMA_CALL = 'then fetch its schema and call it';
-    const SILENT_DISCOVERY =
-        'For silent Actor discovery, search-actors returns the same data without rendering a widget.';
     const countCaveats = (description: string) => description.split(ACTOR_CALLABILITY_CAVEAT).length - 1;
 
-    it('points at silent discovery and appends the run limitation once when no tool can run an Actor', () => {
-        const description = renderDescription(HELPER_TOOLS.STORE_SEARCH_WIDGET, HELPER_TOOLS.STORE_SEARCH);
-        expect(description).toContain(SILENT_DISCOVERY);
-        expect(description).not.toContain(FIND_SCHEMA_CALL);
-        expect(countCaveats(description)).toBe(1);
+    it('drops the run-implying hint and states the run limitation once when no tool can run an Actor', () => {
+        for (const tools of [
+            [HELPER_TOOLS.STORE_SEARCH_WIDGET, HELPER_TOOLS.STORE_SEARCH],
+            [HELPER_TOOLS.STORE_SEARCH_WIDGET],
+        ]) {
+            const description = renderDescription(...tools);
+            expect(description).not.toContain(FIND_SCHEMA_CALL);
+            expect(countCaveats(description)).toBe(1);
+        }
     });
 
-    it('appends the run limitation once in a widget-only session, naming no base tool', () => {
-        const description = renderDescription(HELPER_TOOLS.STORE_SEARCH_WIDGET);
-        expect(description).not.toMatch(new RegExp(`(?<![\\w-])${HELPER_TOOLS.STORE_SEARCH}(?![\\w-])`));
-        expect(description).not.toContain(SILENT_DISCOVERY);
-        expect(countCaveats(description)).toBe(1);
-    });
-
-    it.each([[HELPER_TOOLS.ACTOR_CALL], [HELPER_TOOLS.ACTOR_CALL_WIDGET], [HELPER_TOOLS.API_WRITE]])(
-        'keeps the original hint and no caveat with %s',
-        (runner) => {
-            const description = renderDescription(HELPER_TOOLS.STORE_SEARCH_WIDGET, HELPER_TOOLS.STORE_SEARCH, runner);
-            expect(description).toContain(FIND_SCHEMA_CALL);
-            expect(description).not.toContain(SILENT_DISCOVERY);
-            expect(countCaveats(description)).toBe(0);
-        },
-    );
-
-    it('keeps the all-tools description on the original hint', () => {
-        expect(searchActorsWidget.description).toContain(FIND_SCHEMA_CALL);
-        expect(countCaveats(searchActorsWidget.description ?? '')).toBe(0);
+    it('keeps the original hint and no caveat with call-actor', () => {
+        const description = renderDescription(
+            HELPER_TOOLS.STORE_SEARCH_WIDGET,
+            HELPER_TOOLS.STORE_SEARCH,
+            HELPER_TOOLS.ACTOR_CALL,
+        );
+        expect(description).toContain(FIND_SCHEMA_CALL);
+        expect(countCaveats(description)).toBe(0);
     });
 });

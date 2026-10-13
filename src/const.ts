@@ -132,9 +132,7 @@ Examples of when to use:
 - User needs to fetch specific content now (e.g., "Fetch news articles from CNN", "Get product info from Amazon")
 - User has time indicators like "today", "current", "latest", "recent", "now"
 
-This is for general web scraping and immediate data needs.`;
-/** Follows RAG_WEB_BROWSER_ADDITIONAL_DESC on the same line when the session can run any Actor. */
-export const RAG_WEB_BROWSER_STORE_ACTOR_HINT = `For repeated/scheduled scraping of specific platforms (e-commerce, social media), consider suggesting a specialized Actor from the Store for better performance and reliability.`;
+This is for general web scraping and immediate data needs. For repeated/scheduled scraping of specific platforms (e-commerce, social media), consider suggesting a specialized Actor from the Store for better performance and reliability.`;
 /** Follows RAG_WEB_BROWSER_ADDITIONAL_DESC on its own line when the session serves the apify/web-fetch tool. */
 export const RAG_WEB_BROWSER_WEB_FETCH_HINT = `When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated apify/web-fetch tool when it is available - this tool is for searching and scraping by query.`;
 

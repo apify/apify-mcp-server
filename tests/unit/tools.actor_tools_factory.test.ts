@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
+import { RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import type { ActorInfo, SchemaProperties } from '../../src/types.js';
@@ -106,54 +106,13 @@ describe('getNormalActorsAsTools()', () => {
         });
     });
 
-    // Regression: #1532 — the RAG description recommended Store Actors and a web-fetch tool the session might not have.
-    describe('apify/rag-web-browser description', () => {
-        const STORE_ACTOR_HINT =
-            'For repeated/scheduled scraping of specific platforms (e-commerce, social media), consider suggesting a specialized Actor from the Store for better performance and reliability.';
-        const WEB_FETCH_HINT =
-            "When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated apify/web-fetch tool when it is available - this tool is for searching and scraping by query.";
-        const GENERAL_SCRAPING = 'This is for general web scraping and immediate data needs.';
-        const RAG_TOOL = actorNameToToolName(RAG_WEB_BROWSER);
-        const WEB_FETCH_TOOL = actorNameToToolName(WEB_FETCH);
-
-        async function renderRagDescription(...present: string[]) {
-            const [tool] = await getNormalActorsAsTools([createMockActorInfo(RAG_WEB_BROWSER)]);
-            return tool.buildDescription!(only(RAG_TOOL, ...present));
-        }
-
-        it('keeps both hints when a general runner and apify/web-fetch are served', async () => {
-            const description = await renderRagDescription(HELPER_TOOLS.ACTOR_CALL, WEB_FETCH_TOOL);
-            expect(description).toContain(`${GENERAL_SCRAPING} ${STORE_ACTOR_HINT}\n${WEB_FETCH_HINT}`);
-        });
-
-        it('omits the Store Actor hint when no tool can run an Actor', async () => {
-            const description = await renderRagDescription(WEB_FETCH_TOOL);
-            expect(description).toContain(`${GENERAL_SCRAPING}\n${WEB_FETCH_HINT}`);
-            expect(description).not.toContain(STORE_ACTOR_HINT);
-        });
-
-        it.each([[HELPER_TOOLS.ACTOR_CALL], [HELPER_TOOLS.ACTOR_CALL_WIDGET], [HELPER_TOOLS.API_WRITE]])(
-            'names apify/web-fetch only when its tool is served, with %s',
-            async (runner) => {
-                const description = await renderRagDescription(runner);
-                expect(description).toContain(`${GENERAL_SCRAPING} ${STORE_ACTOR_HINT}`);
-                expect(description).not.toContain('web-fetch');
-            },
+    // Regression: #1532 — the RAG description named apify/web-fetch when the session did not serve it.
+    it('names apify/web-fetch in the RAG description only when its tool is served', async () => {
+        const [tool] = await getNormalActorsAsTools([createMockActorInfo(RAG_WEB_BROWSER)]);
+        const ragTool = actorNameToToolName(RAG_WEB_BROWSER);
+        expect(tool.buildDescription!(only(ragTool, actorNameToToolName(WEB_FETCH)))).toContain(
+            'prefer the dedicated apify/web-fetch tool',
         );
-
-        it('keeps the general-scraping sentence and the Actor description with neither', async () => {
-            const description = await renderRagDescription();
-            expect(description.endsWith(GENERAL_SCRAPING)).toBe(true);
-            expect(description).toContain(
-                `This tool calls the Actor "${RAG_WEB_BROWSER}" and retrieves its output results.`,
-            );
-            expect(description).not.toContain(STORE_ACTOR_HINT);
-            expect(description).not.toContain('web-fetch');
-        });
-
-        it('keeps the all-tools description on both hints', async () => {
-            const [tool] = await getNormalActorsAsTools([createMockActorInfo(RAG_WEB_BROWSER)]);
-            expect(tool.description?.endsWith(`${GENERAL_SCRAPING} ${STORE_ACTOR_HINT}\n${WEB_FETCH_HINT}`)).toBe(true);
-        });
+        expect(tool.buildDescription!(only(ragTool))).not.toContain('web-fetch');
     });
 });

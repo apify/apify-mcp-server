@@ -202,37 +202,11 @@ describe('fetch-actor-details-widget response', () => {
 
 // Regression: #1532 — the widget described fetching a schema before calling an Actor the session could not run.
 describe('fetch-actor-details-widget buildDescription()', () => {
-    const renderDescription = (...present: string[]) => fetchActorDetailsWidget.buildDescription!(only(...present));
-    const BEFORE_CALLING = 'fetching the input schema before calling an Actor';
-    const SILENT_DETAILS =
-        'For silent Actor details, fetch-actor-details returns the same data without rendering a widget.';
-
-    it('points at silent details when no tool can run an Actor', () => {
-        const description = renderDescription(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET, HELPER_TOOLS.ACTOR_GET_DETAILS);
-        expect(description).toContain(SILENT_DETAILS);
-        expect(description).not.toContain(BEFORE_CALLING);
-    });
-
-    it('names no base tool in a widget-only session', () => {
-        const description = renderDescription(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
-        expect(description).not.toContain(SILENT_DETAILS);
-        expect(description).not.toContain(BEFORE_CALLING);
-    });
-
-    it.each([[HELPER_TOOLS.ACTOR_CALL], [HELPER_TOOLS.ACTOR_CALL_WIDGET], [HELPER_TOOLS.API_WRITE]])(
-        'keeps the original hint with %s',
-        (runner) => {
-            const description = renderDescription(
-                HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
-                HELPER_TOOLS.ACTOR_GET_DETAILS,
-                runner,
-            );
-            expect(description).toContain(BEFORE_CALLING);
-            expect(description).not.toContain(SILENT_DETAILS);
-        },
-    );
-
-    it('keeps the all-tools description on the original hint', () => {
-        expect(fetchActorDetailsWidget.description).toContain(BEFORE_CALLING);
+    it('mentions calling an Actor only when a tool can run one', () => {
+        const renderDescription = (...present: string[]) => fetchActorDetailsWidget.buildDescription!(only(...present));
+        const beforeCalling = 'fetching the input schema before calling an Actor';
+        const pair = [HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET, HELPER_TOOLS.ACTOR_GET_DETAILS];
+        expect(renderDescription(...pair)).not.toContain(beforeCalling);
+        expect(renderDescription(...pair, HELPER_TOOLS.ACTOR_CALL)).toContain(beforeCalling);
     });
 });

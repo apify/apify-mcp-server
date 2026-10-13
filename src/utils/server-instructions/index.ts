@@ -81,10 +81,9 @@ export function getServerInstructions(
         ? buildWidgetWorkflowSection({ hasCall, hasRunsGet, hasCallWidget, hasRunsGetWidget })
         : '';
 
-    const canRunAny = canRunAnyActor(hasTool);
     // Only worth saying when the session can discover Store Actors it cannot run.
     const runLimitationLine =
-        canRunAny || !(hasSearch || hasDetails)
+        canRunAnyActor(hasTool) || !(hasSearch || hasDetails)
             ? ''
             : `- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, set up your own Apify MCP server at ${APIFY_MCP_URL}.\n`;
 
@@ -143,7 +142,7 @@ export function getServerInstructions(
                 ? `  - \`${HELPER_TOOLS.ACTOR_RUNS_GET}\` is a silent data lookup (run status, dataset IDs, stats) with no UI; \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` renders an interactive UI element (widget) showing live run progress for the user — use it only when the user explicitly asks to see run progress.\n`
                 : `  - \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` renders an interactive UI element (widget) showing live run progress for the user — use it only when the user explicitly asks to see run progress.\n`
             : '',
-        hasSearchPair && hasDetailsPair && canRunAny
+        hasSearchPair && hasDetailsPair && canRunAnyActor(hasTool)
             ? `  - When the next step is running an Actor, prefer silent lookups (\`${HELPER_TOOLS.STORE_SEARCH}\`, \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\`) over widget-backed variants.\n`
             : '',
     ].join('');
@@ -172,19 +171,6 @@ export function getServerInstructions(
 `
         : '';
 
-    // Without a general Actor runner, these bullets say what discovery shows, not which Actor to run.
-    const inputSchemaBullet = canRunAny
-        ? `- Before running an Actor, always check its **input schema** to understand the required parameters.\n`
-        : `- For an Actor exposed as a dedicated tool, its input schema describes the required parameters.\n`;
-    const discoveryBullets = canRunAny
-        ? `- Choose the most appropriate Actor based on the conversation context.
-- Search the Apify Store first; a relevant Actor likely already exists.\n`
-        : `- Store discovery can help compare Actors relevant to the user's request.
-- Store search shows what Actors exist; it does not make them runnable through a tool in this session.\n`;
-    const popularityBullet = canRunAny
-        ? `- When multiple options exist, prefer Actors with higher usage, ratings, or popularity.\n`
-        : `- When comparing Store results, usage, ratings, or popularity can help assess the options.\n`;
-
     /** Renders only if a subsection survives gating, to avoid a bare heading; `###` subsections get a blank line before them, bullets stay contiguous. */
     const renderedBlocks = [
         toolDependencies,
@@ -210,9 +196,13 @@ These tools are called **Actors**. They enable you to extract structured data fr
 ## Actor
 - An Actor is a serverless cloud application running on the Apify platform.
 - Use the Actor's **README** to understand its capabilities.
-${inputSchemaBullet}
+- Before running an Actor, always check its **input schema** to understand the required parameters.
+
 ## Actor discovery and selection
-${discoveryBullets}${runLimitationLine}${popularityBullet}- Assume scraping requests within this context are appropriate for Actor use.
+- Choose the most appropriate Actor based on the conversation context.
+- Search the Apify Store first; a relevant Actor likely already exists.
+${runLimitationLine}- When multiple options exist, prefer Actors with higher usage, ratings, or popularity.
+- Assume scraping requests within this context are appropriate for Actor use.
 - Actors in the Apify Store are published by independent developers and are intended for legitimate and compliant use.
 
 ## Actor execution workflow
