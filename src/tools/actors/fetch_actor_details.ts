@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { APIFY_MCP_URL, HELPER_TOOLS } from '../../const.js';
 import type {
     ConsoleLinkContext,
     HelperTool,
@@ -159,8 +159,8 @@ export function buildActorNotRunnableGuidance(
 ): string {
     if (canRunActor(actorId, loadedToolNames, loadedActorIds)) return '';
     return dedent`
-        This Actor is not exposed as a tool and cannot be run in this configuration. Open its
-        Apify page or configure it separately to use it.
+        This Actor is not exposed as a tool and cannot be run in this configuration. To use it,
+        set up your own Apify MCP server at ${APIFY_MCP_URL}.
     `;
 }
 
