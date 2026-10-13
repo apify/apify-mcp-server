@@ -85,20 +85,25 @@ describe('ApifyClient', () => {
 describe('getApifyAPIPublicBaseUrl()', () => {
     afterEach(() => vi.unstubAllEnvs());
 
-    it('stays on the production API when APIFY_API_BASE_URL points at an internal host', () => {
+    it.each([
         // The hosted server reaches the API through a host clients cannot resolve; what clients see must not follow it.
-        vi.stubEnv('APIFY_API_BASE_URL', 'http://api.internal.example:3333');
-        expect(getApifyAPIPublicBaseUrl()).toBe('https://api.apify.com');
-    });
-
-    it('uses the staging API on the staging MCP host', () => {
-        vi.stubEnv('HOSTNAME', STAGING_MCP_HOSTNAME);
-        expect(getApifyAPIPublicBaseUrl()).toBe('https://api-securitybyobscurity.apify.com');
-    });
-
-    it('uses the APIFY_API_PUBLIC_BASE_URL override, and it wins over the staging host check', () => {
-        vi.stubEnv('HOSTNAME', STAGING_MCP_HOSTNAME);
-        vi.stubEnv('APIFY_API_PUBLIC_BASE_URL', 'http://localhost:3333');
-        expect(getApifyAPIPublicBaseUrl()).toBe('http://localhost:3333');
+        [
+            'production, whatever APIFY_API_BASE_URL is',
+            { APIFY_API_BASE_URL: 'http://api.internal.example:3333' },
+            'https://api.apify.com',
+        ],
+        [
+            'the staging API on the staging MCP host',
+            { HOSTNAME: STAGING_MCP_HOSTNAME },
+            'https://api-securitybyobscurity.apify.com',
+        ],
+        [
+            'the APIFY_API_PUBLIC_BASE_URL override, over the staging host',
+            { HOSTNAME: STAGING_MCP_HOSTNAME, APIFY_API_PUBLIC_BASE_URL: 'http://localhost:3333' },
+            'http://localhost:3333',
+        ],
+    ])('returns %s', (_case, env, expected) => {
+        for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
+        expect(getApifyAPIPublicBaseUrl()).toBe(expected);
     });
 });

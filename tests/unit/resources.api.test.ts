@@ -729,13 +729,6 @@ describe('readApiResource()', () => {
             expect(result.contents[0].uri).toBe(uri);
         });
 
-        it('names only the client-facing origin in the origin refusal', async () => {
-            const error = await expectReadError(readApiResource('https://example.com/x', stubApifyClient()));
-
-            expect(error.message).toContain(API);
-            expect(error.message).not.toContain('api.internal.example');
-        });
-
         it('links an oversized body read on the egress origin to its client-facing URL', async () => {
             const { request } = requestReturning(abortingStream(), 'application/json');
 

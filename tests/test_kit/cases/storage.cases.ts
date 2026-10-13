@@ -432,7 +432,7 @@ export const storageCases: Case[] = [
     },
     {
         name: 'reads a KV record via resources/read',
-        isDeploymentTest: true,
+        isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { defaultKvId }) => {
             const result = await client.readResource({
                 uri: `${await getAdvertisedApiOrigin(client)}/v2/key-value-stores/${defaultKvId}/records/INPUT`,
