@@ -132,6 +132,21 @@ describe('get-dataset', () => {
         expect(tool.ajvValidate({ datasetId: '' })).toBe(false);
         expect(tool.ajvValidate({ datasetId: 'ds-1' })).toBe(true);
     });
+
+    // Regression: #1296 — nextStep named a sibling tool the session was not served.
+    it('falls back without naming get-dataset-items when it is not loaded', async () => {
+        const result = (await (getDataset as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient(MOCK_DATASET), {
+                loadedToolNames: [HELPER_TOOLS.DATASET_GET],
+            }),
+        )) as TextToolResult & { structuredContent: Record<string, unknown> };
+
+        expect(result.structuredContent.nextStep).toBe('No follow-up step.');
+        expect(JSON.stringify([result.content, result.structuredContent])).not.toContain(
+            HELPER_TOOLS.DATASET_GET_ITEMS,
+        );
+        expectSchemaConformingStructuredContent(result, datasetMetadataOutputSchema);
+    });
 });
 
 /**
@@ -237,17 +252,4 @@ describe('get-dataset fields normalization', () => {
             `Apify Console: https://console.apify.com/storage/datasets/ds-1\n${VERBATIM_LINKS_NUDGE}`,
         );
     });
-});
-
-// Regression: #1296 — nextStep named a sibling tool the session was not served.
-it('get-dataset falls back without naming get-dataset-items when it is not loaded', async () => {
-    const result = (await (getDataset as HelperTool).call(
-        stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient(MOCK_DATASET), {
-            loadedToolNames: [HELPER_TOOLS.DATASET_GET],
-        }),
-    )) as TextToolResult & { structuredContent: Record<string, unknown> };
-
-    expect(result.structuredContent.nextStep).toBe('No follow-up step.');
-    expect(JSON.stringify([result.content, result.structuredContent])).not.toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
-    expectSchemaConformingStructuredContent(result, datasetMetadataOutputSchema);
 });
