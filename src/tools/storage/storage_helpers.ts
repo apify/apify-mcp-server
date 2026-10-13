@@ -28,7 +28,7 @@ function suggestTool(toolName: string, loadedToolNames: readonly string[]): stri
     return loadedToolNames.includes(toolName) ? toolName : undefined;
 }
 
-/** `nextStep` when the session was served the sibling tool it names, otherwise a hint that names no tool. */
+/** `nextStep` when the session was served the sibling tool it names, otherwise a hint that names no tool (see #1296). */
 export function resolveSiblingNextStep(toolName: string, loadedToolNames: readonly string[], nextStep: string): string {
     return suggestTool(toolName, loadedToolNames) ? nextStep : 'Inspect the returned result directly.';
 }
@@ -140,7 +140,7 @@ export function buildKvsKeysSummaryNextStep(params: {
     isTruncated: boolean;
     nextExclusiveStartKey?: string;
     firstKey?: string;
-    /** Active loaded tool set; gates the terminal record and store references. */
+    /** Active loaded tool set; gates the terminal record and store references (see #1296). */
     loadedToolNames: readonly string[];
 }): { summary: string; nextStep: string } {
     const { keyValueStoreId, count, isTruncated, nextExclusiveStartKey, firstKey, loadedToolNames } = params;

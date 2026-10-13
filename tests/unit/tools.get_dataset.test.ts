@@ -242,9 +242,9 @@ describe('get-dataset fields normalization', () => {
 
 // Regression: #1296 — nextStep named a sibling tool the session was not served.
 describe('get-dataset nextStep gating', () => {
-    async function callWith(loadedToolNames: string[]) {
+    async function callWith(loadedToolNames: string[], dataset: unknown = MOCK_DATASET) {
         return (await (getDataset as HelperTool).call(
-            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient(MOCK_DATASET), { loadedToolNames }),
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient(dataset), { loadedToolNames }),
         )) as TextToolResult & { structuredContent: Record<string, unknown> };
     }
 
@@ -256,6 +256,15 @@ describe('get-dataset nextStep gating', () => {
             HELPER_TOOLS.DATASET_GET_ITEMS,
         );
         expectSchemaConformingStructuredContent(result, datasetMetadataOutputSchema);
+    });
+
+    it('drops the size hint with the get-dataset-items hint when it is not loaded', async () => {
+        const result = await callWith([HELPER_TOOLS.DATASET_GET], {
+            ...MOCK_DATASET,
+            stats: { inflatedBytes: 2_400_000 },
+        });
+
+        expect(result.structuredContent.nextStep).toBe('Inspect the returned result directly.');
     });
 
     it('keeps the get-dataset-items hint when it is loaded', async () => {
