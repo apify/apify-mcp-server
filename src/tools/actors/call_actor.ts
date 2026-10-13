@@ -65,7 +65,7 @@ export const CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG = `When calling an MCP server 
 /** Shared MCP server instructions — identical in both modes. */
 export function buildCallActorMcpServerSection({ hasTool }: ToolDescriptionContext): string {
     return `For MCP server Actors:
-${hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? `- Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output={ mcpTools: true } to list available tools\n` : ''}- Call using format: "actorName:toolName" (e.g., "apify/actors-mcp-server:fetch-apify-docs")`;
+${hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? `- Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output={ mcpTools: true } to list available tools\n` : ''}- Call using format: "actorName:toolName" (e.g., "username/name:tool-name")`;
 }
 
 /** Shared "two ways to run" + USAGE section — identical in both modes. */
@@ -310,7 +310,7 @@ export const callActorArgs = z.object({
     actor: z.string().describe(dedent`
             The Actor to call: its ID, or its name in the "username/name" form (e.g., "apify/rag-web-browser").
 
-            For MCP server Actors, use format "actorName:toolName" to call a specific tool (e.g., "apify/actors-mcp-server:fetch-apify-docs").
+            For MCP server Actors, use format "actorName:toolName" to call a specific tool (e.g., "username/name:tool-name").
         `),
     input: z.object({}).passthrough().describe('The input JSON to pass to the Actor. Required.'),
     waitSecs: z

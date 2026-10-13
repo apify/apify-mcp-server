@@ -333,7 +333,7 @@ async function main() {
         console.error(`❌ Run failed: ${error instanceof Error ? error.message : String(error)}`);
         exitCode = 1;
     } finally {
-        // In the finally: a run that crashed may already have created schedules under this id.
+        // In the finally: a run that crashed may already have created schedules or tasks under this id.
         // Not for the pr dataset: its tool-call items create nothing.
         if (runId && datasetName !== MCP_AGENT_PR_DATASET_NAME) {
             for (const line of formatTeardownHint(runId)) console.log(line);

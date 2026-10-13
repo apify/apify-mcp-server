@@ -13,7 +13,7 @@ import {
 import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockApifyClient, mockUserInfo, stubToolCallContext } from './helpers/tool_context.js';
+import { mockApifyClient, mockUserInfo, only, stubToolCallContext } from './helpers/tool_context.js';
 import { MOCK_STORE_ACTOR, SEARCH_KEYWORDS } from './tools.search_actors.fixtures.js';
 
 /**
@@ -376,5 +376,43 @@ describe('search-actors without widget (searchActors)', () => {
 
         expect(structuredContent.instructions).toContain('cannot be run in this configuration');
         expect(content[0].text).toContain('cannot be run in this configuration');
+    });
+});
+
+describe('buildDescription()', () => {
+    const renderDescription = (...present: string[]) => searchActors.buildDescription!(only(...present));
+
+    it('states the run limitation after the call-construction sentence when call-actor and its widget are absent', () => {
+        const description = renderDescription(HELPER_TOOLS.STORE_SEARCH);
+        expect(description).toContain(
+            `so you can construct an Actor call directly without another tool call.\n${ACTOR_CALLABILITY_CAVEAT}\nThe search is limited to publicly available Actors`,
+        );
+        // No hard directive — the directory review rejects MUST-style solicitation.
+        expect(description).not.toContain('MUST');
+    });
+
+    it('keeps the run limitation and the details line on separate lines when fetch-actor-details is loaded', () => {
+        expect(renderDescription(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS)).toContain(
+            `${ACTOR_CALLABILITY_CAVEAT}\nFor complete Actor details (per-field descriptions, defaults, README), use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool.\nThe search is limited to publicly available Actors`,
+        );
+    });
+
+    it('omits the run limitation when the session has call-actor', () => {
+        expect(renderDescription(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_CALL)).not.toContain(
+            ACTOR_CALLABILITY_CAVEAT,
+        );
+    });
+
+    it('states the run limitation when the session has only create-schedule', () => {
+        expect(renderDescription(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.SCHEDULE_CREATE)).toContain(
+            ACTOR_CALLABILITY_CAVEAT,
+        );
+    });
+
+    it('keeps the static description unchanged where the run limitation would go', () => {
+        expect(searchActors.description).toContain(
+            'so you can construct an Actor call directly without another tool call.\nFor complete Actor details',
+        );
+        expect(searchActors.description).not.toContain(ACTOR_CALLABILITY_CAVEAT);
     });
 });
