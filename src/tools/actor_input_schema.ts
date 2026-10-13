@@ -177,7 +177,6 @@ export function buildActorInputSchema(actorFullName: string, input: ActorInputSc
         };
     }
 
-    // Work on a shallow cloned structure (deep clone only if needed later)
     // A required property with a default is optional: the platform fills it in (see apify/apify-mcp-server#1513).
     const working = fixZodSchemaRequired(structuredClone(input)) as ActorInputSchema;
 

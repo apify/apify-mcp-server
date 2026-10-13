@@ -1132,6 +1132,7 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
                 prefillOnly: { type: 'string', title: 'Prefill', description: 'Prefill.', prefill: 'x' },
                 undefinedDefault: { type: 'string', title: 'Undef', description: 'Undef.', default: undefined },
                 optional: { type: 'string', title: 'Optional', description: 'Optional.' },
+                'dotted.default': { type: 'string', title: 'Dotted', description: 'Dotted.', default: 'z' },
             },
             required: [
                 'url',
@@ -1143,8 +1144,11 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
                 'mode',
                 'prefillOnly',
                 'undefinedDefault',
+                'dotted.default',
             ],
         };
+        // Taken before any test runs, so a builder that modified `upstream` in place is caught.
+        const upstreamSnapshot = structuredClone(upstream);
         const genuinelyRequired = ['url', 'prefillOnly', 'undefinedDefault'];
         const supplied: Record<string, string> = {
             url: 'https://example.com',
@@ -1188,9 +1192,8 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
         });
 
         it('does not change the upstream schema', () => {
-            const upstreamCopy = structuredClone(upstream);
             buildActorInputSchema('someone/some-actor', upstream, false);
-            expect(upstream).toEqual(upstreamCopy);
+            expect(upstream).toEqual(upstreamSnapshot);
         });
 
         it('keeps the RAG Web Browser query required through the builder, tools/list and validator', () => {
