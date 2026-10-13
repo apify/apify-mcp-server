@@ -83,7 +83,7 @@ Use this tool when user wants to:
 - Learn about MCP servers or AI agents available in the Store
 
 ${hasTool(RAG_WEB_BROWSER_TOOL) ? `Do NOT use this tool for generic web content (news, articles, general questions) — use ${RAG_WEB_BROWSER} instead.` : 'This tool discovers Actors; it does not retrieve their output.'}
-IMPORTANT: When the user wants detailed data from a specific platform or is looking for scraping tools, prefer searching the Store first — a relevant Actor often already exists.
+IMPORTANT: When the user wants detailed data from a specific platform or is looking for scraping tools, prefer searching the Store first — a relevant Actor often already exists. When the user names a specific Actor, look up that Actor directly instead of searching.
 ${hasTool(HELPER_TOOLS.ACTOR_LIST_GET) ? `Do NOT use this tool to find the user's own Actors (e.g., "find my weather scraper", "run my Actor"): the Store never returns private Actors. Use ${HELPER_TOOLS.ACTOR_LIST_GET} for those.\n` : ''}
 Usage:
 - Use 1-3 simple terms from the platform and/or data type the user named (e.g. "Instagram posts", "Twitter", "Amazon products"). With neither named, empty keywords return the Store's default ordering. A platform-only query is an option if more specific results do not fit.

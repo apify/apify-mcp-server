@@ -440,4 +440,11 @@ describe('buildDescription()', () => {
         expect(withoutRag).toContain('This tool discovers Actors; it does not retrieve their output.');
         expect(withoutRag).not.toContain('rag-web-browser');
     });
+
+    // Regression: #1532 — "prefer searching the Store first" sent named-Actor questions to search (evals: typo-actor-name 7/10 → 2/10).
+    it('tells the agent to look up a named Actor instead of searching', () => {
+        const carveOut = 'When the user names a specific Actor, look up that Actor directly instead of searching.';
+        expect(searchActors.description).toContain(carveOut);
+        expect(renderDescription(HELPER_TOOLS.STORE_SEARCH)).toContain(carveOut);
+    });
 });
