@@ -42,10 +42,10 @@
  * returned once at the search-response top level). It emits `pricingNote` only when
  * the Actor actually has multiple tiers *and* they resolve consistently. The note names
  * the user's plan and, when a paid plan is cheaper, the price the Store page advertises
- * ("Paid plans from $X") — GOLD, else the cheapest paid tier, the same rule as the widget
- * badge. It is omitted for single-tier Actors and when PAY_PER_EVENT events resolve to
- * different tiers (no truthful single label). Text uses plan names (Free, Starter, Scale,
- * Business); structured `userTier` keeps the tier codes.
+ * ("Paid plans from $X") — Business (GOLD), else the cheapest Starter/Scale tier, the same
+ * rule as the widget badge. It is omitted for single-tier Actors and when PAY_PER_EVENT events
+ * resolve to different tiers (no truthful single label). Text uses plan names (Free, Starter,
+ * Scale, Business); structured `userTier` keeps the tier codes.
  *
  * Simplified `PAY_PER_EVENT` also trims long event lists:
  * - `events.length <= 5`: keep event descriptions
@@ -129,7 +129,7 @@ export type StructuredPricingInfo = {
     model: string;
     userTier?: PricingTier;
     pricePerUnit?: number;
-    /** Simplified mode: the Store page's "from" price (GOLD, else cheapest paid tier) when it is below `pricePerUnit`. */
+    /** Simplified mode: the Store page's "from" price (Business, else cheapest Starter/Scale) when it is below `pricePerUnit`. */
     paidPlanPricePerUnit?: number;
     unitName?: string;
     trialMinutes?: number;
