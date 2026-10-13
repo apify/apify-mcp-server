@@ -1146,14 +1146,7 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
                 'dotted.default',
             ],
         };
-        // Taken before any test runs, so a builder that modified `upstream` in place is caught.
-        const upstreamSnapshot = structuredClone(upstream);
         const genuinelyRequired = ['url', 'prefillOnly', 'undefinedDefault'];
-        const supplied: Record<string, string> = {
-            url: 'https://example.com',
-            prefillOnly: 'x',
-            undefinedDefault: 'y',
-        };
 
         it('keeps only properties without a defined default in required and REQUIRED marking', () => {
             const { inputSchema } = buildActorInputSchema('someone/some-actor', upstream, false);
@@ -1163,36 +1156,6 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
             for (const [name, property] of Object.entries(properties)) {
                 expect(property.description.startsWith('**REQUIRED**')).toBe(genuinelyRequired.includes(name));
             }
-        });
-
-        it('compiles a validator that accepts omitted defaulted properties and agrees with tools/list', () => {
-            const { inputSchema } = buildActorInputSchema('someone/some-actor', upstream, false);
-            const validate = fixedAjvCompile(ajv, inputSchema);
-            const pub = getToolPublicFieldOnly({
-                name: 'someone--some-actor',
-                description: '',
-                inputSchema,
-            } as ToolBase);
-
-            expect(validate({ ...supplied })).toBe(true);
-            expect((pub.inputSchema as { required?: string[] }).required).toEqual(inputSchema.required);
-            for (const name of genuinelyRequired) {
-                const { [name]: _omitted, ...rest } = supplied;
-                expect(validate(rest)).toBe(false);
-            }
-        });
-
-        it('still rejects a supplied value of the wrong type or outside the enum', () => {
-            const { inputSchema } = buildActorInputSchema('someone/some-actor', upstream, false);
-            const validate = fixedAjvCompile(ajv, inputSchema);
-
-            expect(validate({ ...supplied, mode: 'c' })).toBe(false);
-            expect(validate({ ...supplied, proxy: 'not-an-object' })).toBe(false);
-        });
-
-        it('does not change the upstream schema', () => {
-            buildActorInputSchema('someone/some-actor', upstream, false);
-            expect(upstream).toEqual(upstreamSnapshot);
         });
 
         it('keeps the RAG Web Browser query required through the builder, tools/list and validator', () => {

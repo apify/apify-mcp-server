@@ -54,8 +54,10 @@ describe('getNormalActorsAsTools()', () => {
             inputProperties: {
                 delay: { type: 'integer', default: 0 },
                 waitUntil: { type: 'string', enum: ['load', 'networkidle2'] },
+                mode: { type: 'string', enum: ['a', 'b'], default: 'a' },
+                proxy: { type: 'object', editor: 'proxy', default: { useApifyProxy: true } },
             },
-            inputRequired: ['url', 'delay', 'waitUntil'],
+            inputRequired: ['url', 'delay', 'waitUntil', 'mode', 'proxy'],
         });
 
         it('accepts a call that omits a required property with a default', async () => {
@@ -73,10 +75,14 @@ describe('getNormalActorsAsTools()', () => {
             expect(tool.ajvValidate({ waitUntil: 'load' })).toBe(false);
         });
 
-        it('rejects a supplied defaulted property of the wrong type', async () => {
+        it('rejects supplied defaulted properties of the wrong type or outside the enum', async () => {
             const [tool] = await getNormalActorsAsTools([actorInfo]);
 
             expect(tool.ajvValidate({ url: 'https://example.com', waitUntil: 'load', delay: 'soon' })).toBe(false);
+            expect(tool.ajvValidate({ url: 'https://example.com', waitUntil: 'load', mode: 'c' })).toBe(false);
+            expect(tool.ajvValidate({ url: 'https://example.com', waitUntil: 'load', proxy: 'not-an-object' })).toBe(
+                false,
+            );
         });
     });
 
