@@ -16,7 +16,7 @@ import type { Case, CaseCtx } from '../types.js';
  * account never deletes one mid-assertion.
  *
  * Tool names are hardcoded, not read from `HELPER_TOOLS`, so a rename fails these tests
- * (CONTRIBUTING.md, "Integration tests").
+ * (CONTRIBUTING.md, "Constants and tool names").
  */
 
 /** Unique per call: three transport dimensions register the same case and CI runs PRs concurrently. */
