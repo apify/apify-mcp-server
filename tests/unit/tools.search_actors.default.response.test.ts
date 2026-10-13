@@ -410,10 +410,8 @@ describe('buildDescription()', () => {
 
     // Regression: #1503 — the Usage bullet recommended platform-only keywords, against the keywords parameter.
     it('gives the same keyword strategy as the keywords parameter', () => {
-        const usage = `Usage:
-- Use 1-3 simple terms from the platform and/or data type the user named (e.g. "Instagram posts", "Twitter", "Amazon products"). With neither named, empty keywords return the Store's default ordering. A platform-only query is an option if more specific results do not fit.
-
-Important limitations:`;
+        const usage =
+            'Usage:\n- Use 1-3 simple terms from the platform and/or data type the user named (e.g. "Instagram posts", "Twitter", "Amazon products"). With neither named, empty keywords return the Store\'s default ordering. A platform-only query is an option if more specific results do not fit.\n\nImportant limitations:';
         for (const description of [searchActors.description, renderDescription(HELPER_TOOLS.STORE_SEARCH)]) {
             expect(description).toContain(usage);
             expect(description).not.toContain('broad keywords');
