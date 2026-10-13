@@ -83,7 +83,7 @@ Do NOT use this tool when user wants immediate data retrieval (time words like "
 IMPORTANT: When the user is looking for scraping tools or Actors, prefer searching the Store first — a relevant Actor often already exists. Do not use Store search as a substitute for immediate data retrieval.
 ${hasTool(HELPER_TOOLS.ACTOR_LIST_GET) ? `Do NOT use this tool to find the user's own Actors (e.g., "find my weather scraper", "run my Actor"): the Store never returns private Actors. Use ${HELPER_TOOLS.ACTOR_LIST_GET} for those.\n` : ''}
 Usage:
-- Search matches Actor titles and descriptions, so broad keywords (just the platform name, e.g. "Instagram") find more Actors than specific phrases ("Instagram scraper"). If the results don't fit, try broader keywords.
+- Use 1-3 simple terms from the platform and/or data type the user named (e.g. "Instagram posts", "Twitter", "Amazon products"). With neither named, empty keywords return the Store's default ordering. A platform-only query is an option if more specific results do not fit.
 
 Important limitations: This tool does not return full Actor documentation or detailed usage instructions - only summary information.
 Each result lists the Actor's input fields with their types (e.g. \`url: string, maxResults?: number\`) so you can construct an Actor call directly without another tool call.
@@ -126,8 +126,8 @@ export function buildSearchActorsResult(
 export function buildNoActorsFoundInstructions(keywords: string): string {
     return dedent`
         No Actors were found for the search query "${keywords}".
-        Broad, generic keywords usually return better matches - for example, just the platform
-        name ("TikTok" instead of "TikTok posts").
+        Keywords can include the named platform and/or data type (e.g. "TikTok posts").
+        A platform-only query such as "TikTok" is an option if more specific results do not fit.
     `;
 }
 

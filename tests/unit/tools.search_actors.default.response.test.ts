@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { APIFY_STORE_URL, HELPER_TOOLS, MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../../src/const.js';
 import { ACTOR_CALLABILITY_CAVEAT } from '../../src/tools/actor_tool_naming.js';
-import { ACTOR_DETAILS_HINT, searchActors } from '../../src/tools/actors/search_actors.js';
+import { ACTOR_DETAILS_HINT, searchActors, searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors.js';
 import { actorInfoSchema } from '../../src/tools/structured_output_schemas.js';
 import type { ActorStoreInputSchema, ActorStoreList, HelperTool } from '../../src/types.js';
 import {
@@ -14,7 +14,7 @@ import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import { mockApifyClient, mockUserInfo, only, stubToolCallContext } from './helpers/tool_context.js';
-import { MOCK_STORE_ACTOR, SEARCH_KEYWORDS } from './tools.search_actors.fixtures.js';
+import { MOCK_STORE_ACTOR, NO_ACTORS_FOUND_TEXT, SEARCH_KEYWORDS } from './tools.search_actors.fixtures.js';
 
 /**
  * Default server mode: search-actors returns markdown + structured cards for the LLM only
@@ -181,11 +181,10 @@ describe('search-actors without widget (searchActors)', () => {
         expect(structuredContent.actors).toEqual([]);
         expect(structuredContent.count).toBe(0);
         expect(structuredContent.query).toBe(SEARCH_KEYWORDS);
-        expect(structuredContent.instructions).toContain('Broad, generic keywords');
+        expect(structuredContent.instructions).toBe(NO_ACTORS_FOUND_TEXT);
 
         expect(content).toHaveLength(1);
-        expect(content[0].text).toContain('No Actors were found');
-        expect(content[0].text).toContain(SEARCH_KEYWORDS);
+        expect(content[0].text).toBe(NO_ACTORS_FOUND_TEXT);
     });
 
     it('declares every field the structured card emits (guards schema/runtime drift)', () => {
@@ -406,6 +405,23 @@ describe('buildDescription()', () => {
     it('states the run limitation when the session has only create-schedule', () => {
         expect(renderDescription(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.SCHEDULE_CREATE)).toContain(
             ACTOR_CALLABILITY_CAVEAT,
+        );
+    });
+
+    // Regression: #1503 — the Usage bullet recommended platform-only keywords, against the keywords parameter.
+    it('gives the same keyword strategy as the keywords parameter', () => {
+        const usage =
+            'Usage:\n- Use 1-3 simple terms from the platform and/or data type the user named (e.g. "Instagram posts", "Twitter", "Amazon products"). With neither named, empty keywords return the Store\'s default ordering. A platform-only query is an option if more specific results do not fit.\n\nImportant limitations:';
+        for (const description of [searchActors.description, renderDescription(HELPER_TOOLS.STORE_SEARCH)]) {
+            expect(description).toContain(usage);
+            expect(description).not.toContain('broad keywords');
+        }
+        const keywordsDescription = searchActorsBaseArgsSchema.shape.keywords.description;
+        expect(keywordsDescription).toContain(
+            '- Use 1-3 simple keyword terms maximum (e.g., "Instagram posts", "Twitter", "Amazon products")',
+        );
+        expect(keywordsDescription).toContain(
+            'Pass empty string ("") whenever the user has NOT named a specific platform',
         );
     });
 
