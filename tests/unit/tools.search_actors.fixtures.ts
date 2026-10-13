@@ -25,3 +25,26 @@ export const MOCK_STORE_ACTOR = {
 } as unknown as ActorStoreList;
 
 export const SEARCH_KEYWORDS = 'web scraper';
+
+/** Tiered pricing with enough events to omit their descriptions. */
+export const MOCK_PRICED_STORE_ACTOR = {
+    ...MOCK_STORE_ACTOR,
+    currentPricingInfo: {
+        pricingModel: ACTOR_PRICING_MODEL.PAY_PER_EVENT,
+        pricingPerEvent: {
+            actorChargeEvents: Object.fromEntries(
+                Array.from({ length: 6 }, (_, i) => [
+                    `event${i}`,
+                    {
+                        eventTitle: `Event ${i}`,
+                        eventDescription: `Description ${i}`,
+                        eventTieredPricingUsd: {
+                            FREE: { tieredEventPriceUsd: 0.002 },
+                            GOLD: { tieredEventPriceUsd: 0.001 },
+                        },
+                    },
+                ]),
+            ),
+        },
+    },
+} as ActorStoreList;

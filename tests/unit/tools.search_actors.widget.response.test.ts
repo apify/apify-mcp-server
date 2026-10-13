@@ -9,7 +9,7 @@ import { formatActorForWidget } from '../../src/utils/actor_card.js';
 import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import { mockApifyClient, mockUserInfo, stubToolCallContext } from './helpers/tool_context.js';
-import { MOCK_STORE_ACTOR, SEARCH_KEYWORDS } from './tools.search_actors.fixtures.js';
+import { MOCK_PRICED_STORE_ACTOR, MOCK_STORE_ACTOR, SEARCH_KEYWORDS } from './tools.search_actors.fixtures.js';
 
 /**
  * Apps / UI mode: search-actors-widget renders an interactive UI element
@@ -29,6 +29,34 @@ describe('search-actors-widget response', () => {
         vi.mocked(searchAgentSafeActors).mockReset();
         vi.mocked(getUserInfoCached).mockReset();
         vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo({ userId: null }));
+    });
+
+
+    it.each([
+        { loadedToolNames: [] },
+        { loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET] },
+        { loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS] },
+    ])('gates pricing recommendations on the base details tool in %j', async ({ loadedToolNames }) => {
+        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_PRICED_STORE_ACTOR]);
+        const result = await (searchActorsWidget as HelperTool).call(
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS }, mockApifyClient(), { loadedToolNames }),
+        );
+        const hasDetails = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS);
+        const pricingNote = hasDetails
+            ? 'Prices shown are for FREE tier. Higher tiers may offer lower prices — use fetch-actor-details to see the full pricing table.'
+            : 'Prices shown are for FREE tier. Higher tiers may offer lower prices.';
+        const eventDescriptionsNote = hasDetails
+            ? 'Event descriptions were omitted because this actor has many pricing events. Use fetch-actor-details for full pricing details.'
+            : 'Event descriptions were omitted because this actor has many pricing events.';
+        const structured = result.structuredContent as {
+            actors: { pricing: { pricingNote: string; eventDescriptionsNote: string; events: { priceUsd: number }[] } }[];
+            widgetActors?: { currentPricingInfo: unknown }[];
+        };
+        expect(structured.actors[0].pricing).toMatchObject({ pricingNote, eventDescriptionsNote });
+        expect(structured.actors[0].pricing.events).toHaveLength(6);
+        expect(structured.actors[0].pricing.events.every((event) => event.priceUsd === 0.002)).toBe(true);
+        expect(structured.widgetActors![0].currentPricingInfo).toStrictEqual(structured.actors[0].pricing);
+        if (!hasDetails) expect(JSON.stringify(result)).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
     });
 
     it('returns widgetActors plus widget _meta and short pointer text', async () => {
