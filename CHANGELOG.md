@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - **evals:** Fail an item when its MCP server is not connected at init ([#1519](https://github.com/apify/apify-mcp-server/pull/1519)) ([5001237](https://github.com/apify/apify-mcp-server/commit/5001237e56cd91634d7cb4f9673cabde334a09ea)) by [@jirispilka](https://github.com/jirispilka), closes [#1510](https://github.com/apify/apify-mcp-server/issues/1510)
 - Drop removed actors-mcp-server Actor from tool descriptions ([#1550](https://github.com/apify/apify-mcp-server/pull/1550)) ([03cf392](https://github.com/apify/apify-mcp-server/commit/03cf392ea8241cb3b3da4c914f542af51116e3d8)) by [@jirispilka](https://github.com/jirispilka), closes [#1549](https://github.com/apify/apify-mcp-server/issues/1549)
+- **evals:** Sweep eval tasks by age or run id instead of by prefix ([#1522](https://github.com/apify/apify-mcp-server/pull/1522)) ([4f3e318](https://github.com/apify/apify-mcp-server/commit/4f3e318d9a1d38a142b7bb52eb7c065250b6dea2)) by [@jirispilka](https://github.com/jirispilka), closes [#1424](https://github.com/apify/apify-mcp-server/issues/1424)
 
 
 <!-- git-cliff-unreleased-end -->
