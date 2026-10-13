@@ -182,16 +182,21 @@ describe('isTransientAgentError()', () => {
         'read ECONNRESET',
         'API error: 529 overloaded_error',
         'Request failed with status 503',
+        'MCP server "apify" not connected at init (status: pending)',
+        'MCP server "apify" not connected at init (status: failed)',
     ])('treats "%s" as transient', (message) => {
         expect(isTransientAgentError(new Error(message))).toBe(true);
     });
 
-    it.each(['spawn ENOENT', 'Prompt is too long', 'stdio binary not found', 'Invalid model name'])(
-        'treats "%s" as permanent',
-        (message) => {
-            expect(isTransientAgentError(new Error(message))).toBe(false);
-        },
-    );
+    it.each([
+        'spawn ENOENT',
+        'Prompt is too long',
+        'stdio binary not found',
+        'Invalid model name',
+        'MCP server "apify" not connected at init (status: disabled)',
+    ])('treats "%s" as permanent', (message) => {
+        expect(isTransientAgentError(new Error(message))).toBe(false);
+    });
 });
 
 describe('createExperimentTask()', () => {
@@ -250,6 +255,19 @@ describe('createExperimentTask()', () => {
             judgeResult: { verdict: 'PASS' },
         });
         expect(mocks.runAgentConversation).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries once and never judges when the MCP server stays unconnected', async () => {
+        mocks.runAgentConversation.mockRejectedValue(
+            new Error('MCP server "apify" not connected at init (status: pending)'),
+        );
+
+        await expect(makeMcpAgentTask()(makeItem())).rejects.toThrow(
+            'Item "search-001": MCP server "apify" not connected at init (status: pending)',
+        );
+        expect(mocks.runAgentConversation).toHaveBeenCalledTimes(2);
+        expect(mocks.evaluateConversation).not.toHaveBeenCalled();
+        expect(mocks.emitObservations).not.toHaveBeenCalled();
     });
 
     it('still scores the item when emitting the agent trace throws', async () => {
