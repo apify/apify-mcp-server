@@ -109,7 +109,7 @@ describe('isApifyApiUri()', () => {
     afterEach(() => vi.unstubAllEnvs());
 
     it('accepts both the client-facing and the egress origin when they differ', () => {
-        // The hosted server sends requests to an internal host; a URI minted before the split names it.
+        // The hosted server sends requests to an internal host; URIs on that host stay readable.
         vi.stubEnv('APIFY_API_BASE_URL', 'http://api.internal.example:3333');
         expect(isApifyApiUri(`${API}/v2/datasets/ds-1/items`)).toBe(true);
         expect(isApifyApiUri('http://api.internal.example:3333/v2/datasets/ds-1/items')).toBe(true);
