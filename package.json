@@ -135,8 +135,7 @@
     "inspector:stdio": "npx @modelcontextprotocol/inspector -e APIFY_TOKEN=$APIFY_TOKEN -- node dist/stdio.js",
     "evals:mcp-agent": "pnpm run build && tsx evals/runner/run.ts",
     "evals:mcp-agent:export-dataset": "tsx evals/scripts/export_dataset.ts",
-    "evals:mcp-agent:tasks-fixtures": "tsx evals/scripts/tasks_fixtures.ts",
-    "evals:mcp-agent:schedules-fixtures": "tsx evals/scripts/schedules_fixtures.ts"
+    "evals:mcp-agent:fixtures": "tsx evals/scripts/fixtures.ts"
   },
   "author": "Apify",
   "license": "MIT"

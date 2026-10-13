@@ -1,6 +1,6 @@
 /**
  * Name grammar for a run's eval resources: `<static>-<runId>-n<runId length>-t<trial>r<attempt>`.
- * The runner builds the suffix and the fixtures scripts match it, so the two cannot drift.
+ * The runner builds the suffix and the fixtures script matches it, so the two cannot drift.
  */
 
 const RUN_ID_PATTERN = /^[a-z0-9-]+$/;
