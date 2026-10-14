@@ -50,12 +50,14 @@ USAGE EXAMPLES:
         const parsed = abortRunArgs.parse(args);
         // An abort returns a finished run unchanged, so an already-ABORTED run would read as a fresh abort;
         // see apify/apify-mcp-server#1560.
-        const current = await client.run(parsed.runId).get();
-        if (!current) {
+        const runBeforeAbort = await client.run(parsed.runId).get();
+        if (!runBeforeAbort) {
             return respondUserError(`Run with ID '${parsed.runId}' not found.`);
         }
-        const isFinished = TERMINAL_RUN_STATUSES.has(current.status);
-        const run = isFinished ? current : await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
+        const isFinished = TERMINAL_RUN_STATUSES.has(runBeforeAbort.status);
+        const run = isFinished
+            ? runBeforeAbort
+            : await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
 
         const dataset = run.defaultDatasetId ? { id: run.defaultDatasetId } : undefined;
         const keyValueStore = run.defaultKeyValueStoreId ? { id: run.defaultKeyValueStoreId } : undefined;
