@@ -148,6 +148,30 @@ describe('actorExecutor', () => {
         });
     });
 
+    // The website-content-crawler tool does not offer pageFunction, and AJV keeps undeclared fields (#1575).
+    describe('omitted inputs', () => {
+        const START_URLS = [{ url: 'https://example.com' }];
+
+        it('drops pageFunction from a website-content-crawler run input', async () => {
+            const { params, spies } = buildParams(
+                { startUrls: START_URLS, pageFunction: 'async () => {}' },
+                { actorFullName: 'apify/website-content-crawler' },
+            );
+
+            await actorExecutor.executeActorTool(params);
+
+            expect(spies.startInput).toEqual({ startUrls: START_URLS });
+        });
+
+        it('keeps pageFunction for other Actors', async () => {
+            const { params, spies } = buildParams({ startUrls: START_URLS, pageFunction: 'async () => {}' });
+
+            await actorExecutor.executeActorTool(params);
+
+            expect(spies.startInput).toEqual({ startUrls: START_URLS, pageFunction: 'async () => {}' });
+        });
+    });
+
     describe('platform input-validation error', () => {
         function invalidInputError(message: string): ApifyApiError {
             return new ApifyApiError(

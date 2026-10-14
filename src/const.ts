@@ -267,6 +267,22 @@ export const OFFICIAL_ACTORS_WITH_SIDE_EFFECTS: ReadonlySet<string> = new Set([
     'tri_angle/sitemap-change-orchestrator', // Keeps a snapshot between runs and starts other Actor runs.
 ]);
 
+/**
+ * Secret inputs that `isReadOnlyActor` does not count, per official Apify Actor, because they only
+ * authenticate requests to the sites the Actor reads.
+ */
+export const READ_ONLY_ALLOWED_SECRET_INPUTS_BY_ACTOR: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+    ['apify/website-content-crawler', new Set(['initialCookies'])], // Cookies sent to the crawled sites.
+]);
+
+/**
+ * Actor inputs that this server's direct Actor tools neither serve nor send, per Actor. MCP-only: the Actor
+ * itself still accepts them, for example through call-actor.
+ */
+export const ACTOR_TOOL_OMITTED_INPUTS_BY_ACTOR: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+    ['apify/website-content-crawler', new Set(['pageFunction'])], // Page code can click and submit forms.
+]);
+
 export const APIFY_STORE_URL = 'https://apify.com';
 /** Apify Console origin (production). */
 export const CONSOLE_BASE_URL = 'https://console.apify.com';

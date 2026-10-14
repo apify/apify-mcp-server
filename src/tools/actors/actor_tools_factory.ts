@@ -5,6 +5,7 @@ import log from '@apify/log';
 import type { ApifyClient } from '../../apify_client.js';
 import {
     ACTOR_MAX_MEMORY_MBYTES,
+    ACTOR_TOOL_OMITTED_INPUTS_BY_ACTOR,
     FAILURE_CATEGORY,
     HELPER_TOOLS,
     OFFICIAL_ACTORS_WITH_SIDE_EFFECTS,
@@ -12,6 +13,7 @@ import {
     RAG_WEB_BROWSER,
     RAG_WEB_BROWSER_ADDITIONAL_DESC,
     RAG_WEB_BROWSER_WEB_FETCH_HINT,
+    READ_ONLY_ALLOWED_SECRET_INPUTS_BY_ACTOR,
     WEB_FETCH,
     WEB_FETCH_ADDITIONAL_DESC,
 } from '../../const.js';
@@ -96,18 +98,19 @@ export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStor
  * Clients such as Claude run read-only tools without asking each time (see apify/apify-mcp-server#973).
  * An Actor counts as read-only only when Apify maintains it and nothing lets it act outside its run
  * storages: limited permissions keep it out of the user's other Apify data, and it has no secret input
- * (credentials for other services), writable storage input (writes to the user's existing storages),
- * MCP connector input (writes to connected apps) or code input.
+ * (credentials for other services, except those in `READ_ONLY_ALLOWED_SECRET_INPUTS_BY_ACTOR`), writable storage
+ * input (writes to the user's existing storages), MCP connector input (writes to connected apps) or code input.
  */
 function isReadOnlyActor({ actor, definition }: ActorInfo): boolean {
     if (!OFFICIAL_APIFY_USERNAMES.has(actor.username)) return false;
     if (OFFICIAL_ACTORS_WITH_SIDE_EFFECTS.has(definition.actorFullName)) return false;
     if (actor.actorPermissionLevel !== 'LIMITED_PERMISSIONS') return false;
 
-    const inputProperties = Object.values(definition.input?.properties ?? {});
+    const readOnlySecretInputs = READ_ONLY_ALLOWED_SECRET_INPUTS_BY_ACTOR.get(definition.actorFullName);
+    const inputProperties = Object.entries(definition.input?.properties ?? {});
     return !inputProperties.some(
-        (property) =>
-            property.isSecret ||
+        ([name, property]) =>
+            (property.isSecret && !readOnlySecretInputs?.has(name)) ||
             (['dataset', 'keyValueStore', 'requestQueue'].includes(property.resourceType ?? '') &&
                 property.resourcePermissions?.includes('WRITE')) ||
             property.resourceType === 'mcpConnector' ||
@@ -149,6 +152,9 @@ export async function getNormalActorsAsTools(
         const isRag = actorFullName === RAG_WEB_BROWSER;
         const isWebFetch = actorFullName === WEB_FETCH;
         const { inputSchema } = buildActorInputSchema(definition.actorFullName, definition.input, isRag);
+        for (const name of ACTOR_TOOL_OMITTED_INPUTS_BY_ACTOR.get(actorFullName) ?? []) {
+            delete inputSchema.properties[name];
+        }
 
         // Inject the MCP-only `waitSecs` opt-in before AJV compile so the LLM can cap the wait.
         const inputSchemaWithWaitSecs = inputSchema as { properties?: Record<string, unknown> };
@@ -177,9 +183,9 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
 
         let ajvValidate;
         try {
-            // Unknown properties are silently stripped by AJV's removeAdditional option.
-            // Dynamic Actor input fields are part of the Actor's own inputSchema, so they
-            // are declared properties and won't be stripped.
+            // AJV's removeAdditional strips undeclared properties only where the schema sets
+            // additionalProperties: false. Dynamic Actor input fields are part of the Actor's own
+            // inputSchema, so they are declared properties and won't be stripped.
             ajvValidate = fixedAjvCompile(ajv, inputSchema);
         } catch (e) {
             // SchemaTooLargeError logs as a soft fail; a genuine AJV compile error stays an error.

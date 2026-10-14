@@ -147,6 +147,19 @@ describe('getNormalActorsAsTools()', () => {
             },
         );
 
+        // Its secret initialCookies input authenticates the crawl of the sites it reads (#1575).
+        it('marks apify/website-content-crawler read-only despite its secret input', async () => {
+            const actorInfo = createMockActorInfo('apify/website-content-crawler', {
+                ...LIMITED,
+                inputProperties: { initialCookies: { type: 'array', editor: 'json', isSecret: true } },
+            });
+            expect(await getAnnotations(actorInfo)).toMatchObject({
+                readOnlyHint: true,
+                destructiveHint: false,
+                openWorldHint: true,
+            });
+        });
+
         it.each<[string, Partial<SchemaProperties>, boolean]>([
             ['a read-only dataset input', { resourceType: 'dataset', resourcePermissions: ['READ'] }, true],
             ['a writable dataset input', { resourceType: 'dataset', resourcePermissions: ['READ', 'WRITE'] }, false],
@@ -184,6 +197,33 @@ describe('getNormalActorsAsTools()', () => {
             ],
             ['an Actor with unknown permissions', createMockActorInfo('apify/web-fetch')],
             ['an Apify-maintained Actor that sends email', createMockActorInfo('apify/send-mail', LIMITED)],
+            [
+                'a community Actor named website-content-crawler with a secret input',
+                createMockActorInfo('someone/website-content-crawler', {
+                    ...LIMITED,
+                    inputProperties: { initialCookies: { type: 'array', isSecret: true } },
+                }),
+            ],
+            [
+                'apify/website-content-crawler with another secret input',
+                createMockActorInfo('apify/website-content-crawler', {
+                    ...LIMITED,
+                    inputProperties: {
+                        initialCookies: { type: 'array', isSecret: true },
+                        apiKey: { type: 'string', isSecret: true },
+                    },
+                }),
+            ],
+            [
+                'apify/website-content-crawler with a writable dataset input',
+                createMockActorInfo('apify/website-content-crawler', {
+                    ...LIMITED,
+                    inputProperties: {
+                        initialCookies: { type: 'array', isSecret: true },
+                        output: { type: 'string', resourceType: 'dataset', resourcePermissions: ['READ', 'WRITE'] },
+                    },
+                }),
+            ],
         ])('keeps %s destructive', async (_, actorInfo) => {
             expect(await getAnnotations(actorInfo)).toMatchObject({
                 readOnlyHint: false,
@@ -191,6 +231,19 @@ describe('getNormalActorsAsTools()', () => {
                 openWorldHint: true,
             });
         });
+    });
+
+    // The read-only website-content-crawler tool offers no page code (#1575); the Actor itself still accepts it.
+    it('omits pageFunction only from the apify/website-content-crawler tool', async () => {
+        const pageFunction = { type: 'string', editor: 'hidden' } as const;
+        const [crawler, other] = await getNormalActorsAsTools([
+            createMockActorInfo('apify/website-content-crawler', { inputProperties: { pageFunction } }),
+            createMockActorInfo('apify/web-scraper', { inputProperties: { pageFunction } }),
+        ]);
+
+        expect(getToolPublicFieldOnly(crawler).inputSchema.properties).not.toHaveProperty('pageFunction');
+        expect(crawler.inputSchema.properties).toHaveProperty('url');
+        expect(other.inputSchema.properties).toHaveProperty('pageFunction');
     });
 
     // Regression: #1532 — the RAG description named apify/web-fetch when the session did not serve it.

@@ -1,6 +1,6 @@
 import log from '@apify/log';
 
-import { FAILURE_CATEGORY } from '../../const.js';
+import { ACTOR_TOOL_OMITTED_INPUTS_BY_ACTOR, FAILURE_CATEGORY } from '../../const.js';
 import type { ActorExecutionParams, ActorExecutionResult, ActorExecutor } from '../../types.js';
 import { isActorInputValidationError } from '../../utils/apify_errors.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
@@ -26,6 +26,8 @@ export const actorExecutor: ActorExecutor = {
             string,
             unknown
         >;
+        // AJV keeps fields the tool does not declare, so an omitted input could still arrive.
+        for (const name of ACTOR_TOOL_OMITTED_INPUTS_BY_ACTOR.get(actorFullName) ?? []) delete actorInput[name];
         // Task mode waits until terminal; honoring waitSecs would let the task complete
         // before the Actor produced output. Mirrors executeCallActor.
         // AJV doesn't fill `default` values, so apply the 30 s default here when the LLM omits waitSecs.
