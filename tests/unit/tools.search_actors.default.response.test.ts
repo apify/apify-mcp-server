@@ -187,6 +187,24 @@ describe('search-actors without widget (searchActors)', () => {
         expect(content[0].text).toBe(NO_ACTORS_FOUND_TEXT);
     });
 
+    it.each([1, 1000000])('says that no Actors are past offset %i, without keyword guidance', async (offset) => {
+        vi.mocked(searchAgentSafeActors).mockResolvedValue([]);
+
+        const result = await (searchActors as HelperTool).call(
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset }, mockApifyClient(), {
+                loadedToolNames: [],
+            }),
+        );
+
+        const { structuredContent, content } = result as {
+            structuredContent: Record<string, unknown>;
+            content: { type: string; text: string }[];
+        };
+        const text = `No Actors past offset ${offset} for the search query "${SEARCH_KEYWORDS}".`;
+        expect(structuredContent).toEqual({ actors: [], query: SEARCH_KEYWORDS, count: 0, instructions: text });
+        expect(content).toEqual([{ type: 'text', text }]);
+    });
+
     it('declares every field the structured card emits (guards schema/runtime drift)', () => {
         // Regression guard for #889: the advertised output schema must declare every field
         // the runtime card actually emits. `pictureUrl` was emitted but undeclared — this

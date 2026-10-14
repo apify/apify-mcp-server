@@ -124,9 +124,12 @@ export function buildSearchActorsResult(
 
 /**
  * Builds the empty-results guidance message for when no Actors are found.
- * Interpolates the search keywords into the message.
+ * Interpolates the search keywords, and past offset 0 the offset, into the message. Past offset 0 the
+ * query may have matched and the page only lies past the last result, so keyword guidance does not
+ * apply (see apify/apify-mcp-server#1276).
  */
-export function buildNoActorsFoundInstructions(keywords: string): string {
+export function buildNoActorsFoundInstructions(keywords: string, offset: number): string {
+    if (offset > 0) return `No Actors past offset ${offset} for the search query "${keywords}".`;
     return dedent`
         No Actors were found for the search query "${keywords}".
         Keywords can include the named platform and/or data type (e.g. "TikTok posts").
@@ -207,7 +210,7 @@ export const searchActors: ToolEntry = Object.freeze({
         ]);
 
         if (actors.length === 0) {
-            const instructions = buildNoActorsFoundInstructions(parsed.keywords);
+            const instructions = buildNoActorsFoundInstructions(parsed.keywords, parsed.offset);
             return respondOk(instructions, {
                 structuredContent: { actors: [], query: parsed.keywords, count: 0, instructions },
             });

@@ -115,6 +115,27 @@ describe('search-actors-widget response', () => {
         expect(_meta).toBeUndefined();
     });
 
+    it.each([1, 1000000])('says that no Actors are past offset %i, without keyword guidance', async (offset) => {
+        vi.mocked(searchAgentSafeActors).mockResolvedValue([]);
+
+        const result = await (searchActorsWidget as HelperTool).call(
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset }, mockApifyClient(), {
+                loadedToolNames: [],
+            }),
+        );
+
+        const { structuredContent, content, _meta } = result as {
+            structuredContent: Record<string, unknown>;
+            content: { type: string; text: string }[];
+            _meta?: unknown;
+        };
+        expect(structuredContent).toEqual({ actors: [], query: SEARCH_KEYWORDS, count: 0, widgetActors: [] });
+        expect(content).toEqual([
+            { type: 'text', text: `No Actors past offset ${offset} for the search query "${SEARCH_KEYWORDS}".` },
+        ]);
+        expect(_meta).toBeUndefined();
+    });
+
     it('appends the not-runnable caveat when call-actor is absent', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
