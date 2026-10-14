@@ -19,15 +19,15 @@ import {
     parseInitializeParams,
 } from '../../src/dev_server.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
-import { getActors } from '../../src/utils/tools_loader.js';
+import { getActorsFromInput } from '../../src/utils/tools_loader.js';
 import { makeArgsRecorderTool, readJsonRpcPayload, STATELESS_PROTOCOL_VERSION } from './helpers/mcp_server.js';
 
 vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
     const actual = await importOriginal<typeof ToolsLoaderModule>();
-    return { ...actual, getActors: vi.fn() };
+    return { ...actual, getActorsFromInput: vi.fn() };
 });
 
-const getActorsMock = vi.mocked(getActors);
+const getActorsMock = vi.mocked(getActorsFromInput);
 
 /** The per-request `_meta` envelope that makes a request 2026-07-28 traffic. */
 const ENVELOPE = {
@@ -134,7 +134,7 @@ const DEV_URL = '/?telemetry-enabled=false';
 /**
  * Runs `run` against the dev server's real Express app, listening on an ephemeral loopback port, so
  * era routing and the stateless branch behind it are exercised through the same POST route a client
- * hits. Nothing leaves the machine: `getActors` is mocked, so no Actor metadata is fetched.
+ * hits. Nothing leaves the machine: `getActorsFromInput` is mocked, so no Actor metadata is fetched.
  */
 async function withDevServer<T>(run: (post: PostFn, port: number) => Promise<T>): Promise<T> {
     const httpServer: HttpServer = createExpressApp().listen(0, '127.0.0.1');

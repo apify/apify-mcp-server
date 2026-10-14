@@ -1,0 +1,17 @@
+{"timestamp": "2026-10-13T23:47:42Z", "problemId": "P_a5360ec888", "phase": "INIT", "event": "PROBLEM_CREATED"}
+{"timestamp": "2026-10-13T23:47:48Z", "problemId": "P_a5360ec888", "phase": "SPECIFY", "event": "SPECIFIED", "riskLevel": "low", "acceptanceCriteria": 2}
+{"timestamp": "2026-10-13T23:47:48Z", "problemId": "P_a5360ec888", "phase": "DIAGNOSE", "event": "CORPUS_SKIPPED", "reason": "no_match_or_unavailable"}
+{"timestamp": "2026-10-13T23:47:48Z", "problemId": "P_a5360ec888", "phase": "CHECKPOINT", "event": "CHECKPOINT_CREATED", "ref": "02d6e318", "iteration": 1}
+{"timestamp": "2026-10-13T23:47:48Z", "problemId": "P_a5360ec888", "phase": "RESOLVE", "event": "CORPUS_SKIPPED", "reason": "no_match_or_unavailable"}
+{"timestamp": "2026-10-13T23:52:10Z", "problemId": "P_a5360ec888", "phase": "CERTIFY", "event": "TEST_PASS"}
+{"timestamp": "2026-10-13T23:52:10Z", "problemId": "P_a5360ec888", "phase": "CERTIFY", "event": "CERTIFY_BLOCKED", "reason": "anti_gaming_failed", "detail": {"antiGamingVerdict": "SUSPICIOUS"}}
+{"timestamp": "2026-10-13T23:53:38Z", "problemId": "P_a5360ec888", "phase": "RESUME", "event": "RESUME", "resumeTo": "DIAGNOSE"}
+{"timestamp": "2026-10-13T23:53:38Z", "problemId": "P_a5360ec888", "phase": "DIAGNOSE", "event": "CORPUS_SKIPPED", "reason": "no_match_or_unavailable"}
+{"timestamp": "2026-10-13T23:53:38Z", "problemId": "P_a5360ec888", "phase": "CHECKPOINT", "event": "CHECKPOINT_CREATED", "ref": "36366435", "iteration": 2}
+{"timestamp": "2026-10-13T23:54:03Z", "problemId": "P_a5360ec888", "phase": "RESOLVE", "event": "CORPUS_SKIPPED", "reason": "no_match_or_unavailable"}
+{"timestamp": "2026-10-13T23:54:10Z", "problemId": "P_a5360ec888", "phase": "CERTIFY", "event": "TEST_PASS"}
+{"timestamp": "2026-10-13T23:54:10Z", "problemId": "P_a5360ec888", "phase": "DOCUMENT", "event": "DOCUMENT_FINAL", "score": null, "gates": {"tests": true, "build": true, "typecheck": true, "lint": true, "security": true, "noCriticalRegression": false, "acceptanceCriteria": true, "traceability": true, "immutablePrinciples": true, "independentReview": false, "antiGaming": true, "secretsExposure": true, "flakyTestsResolved": false}, "review": null}
+{"timestamp": "2026-10-14T00:01:15Z", "problemId": "P_a5360ec888", "phase": "REVIEW", "event": "REVIEW", "verdict": "PASS"}
+{"timestamp": "2026-10-14T00:01:23Z", "problemId": "P_a5360ec888", "phase": "SCORE", "event": "SCORE", "score": 8.6}
+{"timestamp": "2026-10-14T00:01:23Z", "problemId": "P_a5360ec888", "phase": "STOP", "event": "STOP", "note": "STOPPED-resolved-verified it.2: rename total + doc."}
+{"timestamp": "2026-10-14T00:01:26Z", "problemId": "P_a5360ec888", "phase": "LESSON", "event": "LESSON_EXTRACTED", "lessonId": "L_3d72da1d75", "confidenceScore": 0.85}

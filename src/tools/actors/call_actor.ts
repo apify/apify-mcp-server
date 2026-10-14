@@ -52,7 +52,7 @@ import {
     CALL_ACTOR_WAIT_SECS_DEFAULT,
     fetchActorRunData,
 } from './actor_run_response.js';
-import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory.js';
+import { fixActorNameInputAndLog, fetchActorsAsTools } from './actor_tools_factory.js';
 
 // ---------------------------------------------------------------------------
 // Shared call-actor description building blocks
@@ -475,7 +475,7 @@ export async function resolveAndValidateActor(params: {
     const { actorName, input, toolArgs } = params;
     const { apifyClient, loadedToolNames } = toolArgs;
 
-    const { tools, errors } = await getActorsAsTools([actorName], apifyClient, {
+    const { tools, errors } = await fetchActorsAsTools([actorName], apifyClient, {
         mcpSessionId: toolArgs.mcpSessionId,
     });
 
@@ -483,7 +483,7 @@ export async function resolveAndValidateActor(params: {
     // Any other error (LOAD_FAILED / STANDBY_PAYMENT_NOT_SUPPORTED /
     // STANDBY_WITHOUT_MCP_NOT_SUPPORTED) is rethrown so the outer call-actor handler reports it.
     // STANDBY_PAYMENT_NOT_SUPPORTED cannot actually appear here: the call above passes no
-    // `paymentProvider`, so `getActorsAsTools`' payment gate never fires. Kept in the list because
+    // `paymentProvider`, so `fetchActorsAsTools`' payment gate never fires. Kept in the list because
     // the rethrow is keyed on "not NOT_FOUND", not on an enumeration of kinds.
     if (errors[0] && errors[0].kind !== ACTOR_LOAD_ERROR_KIND.NOT_FOUND) {
         throw errors[0];
@@ -556,7 +556,7 @@ export async function resolveAndValidateActor(params: {
  *
  * Returns either an early response (error or MCP tool result) or the parsed context for mode-specific execution.
  *
- * Applies the same `actor` string normalization as `getActorsAsTools` **before** MCP URL lookup and routing so
+ * Applies the same `actor` string normalization as `fetchActorsAsTools` **before** MCP URL lookup and routing so
  * clients cannot pass a clean-enough id for definition fetch but a dirty id to `apifyClient.actor()` (see Mezmo:
  * e.g. trailing `` ` `` on `apify/rag-web-browser`).
  */

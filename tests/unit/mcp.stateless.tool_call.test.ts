@@ -18,7 +18,7 @@ import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
 import { respondRaw } from '../../src/utils/mcp.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
-import { getActors } from '../../src/utils/tools_loader.js';
+import { getActorsFromInput } from '../../src/utils/tools_loader.js';
 import {
     getRequestHandler,
     makeArgsRecorderTool,
@@ -33,7 +33,7 @@ import { mockApifyClient } from './helpers/tool_context.js';
 
 vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
     const actual = await importOriginal<typeof ToolsLoaderModule>();
-    return { ...actual, getActors: vi.fn() };
+    return { ...actual, getActorsFromInput: vi.fn() };
 });
 
 // Capturing ApifyClient construction is how the request-origin tag is observed; it is a static
@@ -52,7 +52,7 @@ vi.mock('../../src/apify_client.js', async (importOriginal) => {
     };
 });
 
-const getActorsMock = vi.mocked(getActors);
+const getActorsMock = vi.mocked(getActorsFromInput);
 
 function makeActorTool(): ToolEntry {
     return {
