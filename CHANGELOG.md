@@ -8,6 +8,8 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Drop the generic input hint from tool errors with an HTTP status ([#1565](https://github.com/apify/apify-mcp-server/pull/1565)) ([97c5965](https://github.com/apify/apify-mcp-server/commit/97c5965dca5f4afe69e7a9f399a907045dc73f45)) by [@jirispilka](https://github.com/jirispilka), closes [#1561](https://github.com/apify/apify-mcp-server/issues/1561)
+- Redact the proxy password in API resource and tool responses ([#1563](https://github.com/apify/apify-mcp-server/pull/1563)) ([ea02139](https://github.com/apify/apify-mcp-server/commit/ea021391b1d7aec8c93eb8dc532f63e5179eed63)) by [@jirispilka](https://github.com/jirispilka), closes [#334](https://github.com/apify/apify-mcp-server/issues/334)
+- Keep Actor run retries conditional on user intent ([#1564](https://github.com/apify/apify-mcp-server/pull/1564)) ([3aee515](https://github.com/apify/apify-mcp-server/commit/3aee5152238e5b4db76f0de621af31310795b197)) by [@jirispilka](https://github.com/jirispilka), closes [#255](https://github.com/apify/apify-mcp-server/issues/255), [#1559](https://github.com/apify/apify-mcp-server/issues/1559)
 
 
 <!-- git-cliff-unreleased-end -->
