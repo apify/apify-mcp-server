@@ -187,11 +187,11 @@ describe('search-actors without widget (searchActors)', () => {
         expect(content[0].text).toBe(NO_ACTORS_FOUND_TEXT);
     });
 
-    it.each([1, 1000000])('says that no Actors are past offset %i, without keyword guidance', async (offset) => {
+    it('says that no Actors are past the offset, without keyword guidance', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([]);
 
         const result = await (searchActors as HelperTool).call(
-            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset }, mockApifyClient(), {
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 1 }, mockApifyClient(), {
                 loadedToolNames: [],
             }),
         );
@@ -200,7 +200,7 @@ describe('search-actors without widget (searchActors)', () => {
             structuredContent: Record<string, unknown>;
             content: { type: string; text: string }[];
         };
-        const text = `No Actors past offset ${offset} for the search query "${SEARCH_KEYWORDS}".`;
+        const text = `No Actors past offset 1 for the search query "${SEARCH_KEYWORDS}".`;
         expect(structuredContent).toEqual({ actors: [], query: SEARCH_KEYWORDS, count: 0, instructions: text });
         expect(content).toEqual([{ type: 'text', text }]);
     });

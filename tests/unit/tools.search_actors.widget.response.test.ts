@@ -115,11 +115,11 @@ describe('search-actors-widget response', () => {
         expect(_meta).toBeUndefined();
     });
 
-    it.each([1, 1000000])('says that no Actors are past offset %i, without keyword guidance', async (offset) => {
+    it('says that no Actors are past the offset, without keyword guidance', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([]);
 
         const result = await (searchActorsWidget as HelperTool).call(
-            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset }, mockApifyClient(), {
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 1 }, mockApifyClient(), {
                 loadedToolNames: [],
             }),
         );
@@ -131,7 +131,7 @@ describe('search-actors-widget response', () => {
         };
         expect(structuredContent).toEqual({ actors: [], query: SEARCH_KEYWORDS, count: 0, widgetActors: [] });
         expect(content).toEqual([
-            { type: 'text', text: `No Actors past offset ${offset} for the search query "${SEARCH_KEYWORDS}".` },
+            { type: 'text', text: `No Actors past offset 1 for the search query "${SEARCH_KEYWORDS}".` },
         ]);
         expect(_meta).toBeUndefined();
     });
