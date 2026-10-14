@@ -49,7 +49,9 @@ describe('abort-actor-run', () => {
             keyValueStores: { default: { id: 'kv-xyz' } },
         });
         expect(structuredContent.summary).toBeDefined();
-        expect(structuredContent.nextStep).toBeDefined();
+        expect(structuredContent.nextStep).toBe(
+            "Items written before the abort, if any, remain in the run's default dataset.",
+        );
 
         // Billing/internal fields must NOT leak.
         const dump = JSON.stringify(structuredContent);

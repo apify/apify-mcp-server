@@ -599,12 +599,10 @@ function buildSucceededSummaryNextStep(
     // so we don't recommend it as `nextStep` — but `kv.summarySuffix` keeps it visible in the summary
     // when records exist, so callers can still discover them. Surface the upstream statusMessage so
     // a text-only reader sees the actor's own diagnostic (often the only signal here). The nextStep
-    // stays generic ("re-run the Actor"): this builder is shared by get-actor-run / abort-actor-run,
-    // which only have a runId and can't know whether the run came from call-actor or a native Actor
-    // tool — naming a specific tool would mislead callers (see #1007).
+    // asks for no re-run: that is a new paid run the user did not ask for (see #1559).
     return {
         summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items found.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
-        nextStep: `Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run the Actor with adjusted input.`,
+        nextStep: `Inspect statusMessage and stats in this response.`,
     };
 }
 
@@ -686,12 +684,12 @@ export function buildStatusSummaryNextStep(params: {
         case 'FAILED':
             return {
                 summary: `FAILED after ${runTimeSecs}s.${statusMessageLine(statusMessage)}`,
-                nextStep: `Diagnose using statusMessage and exitCode in this response; re-run the Actor with adjusted input if the cause is fixable.`,
+                nextStep: `Diagnose using statusMessage and exitCode in this response.`,
             };
         case 'ABORTED':
             return {
                 summary: `ABORTED after ${runTimeSecs}s.${statusMessageLine(statusMessage)}`,
-                nextStep: `Re-run the Actor if you want to retry.`,
+                nextStep: `Items written before the abort, if any, remain in the run's default dataset.`,
             };
         case 'TIMED-OUT':
             return buildTimedOutSummaryNextStep(runTimeSecs, dataset, keyValueStore);

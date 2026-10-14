@@ -28,8 +28,8 @@ vi.mock('../../src/utils/userid_cache.js', () => ({
  * Default mode `get-actor-run` returns: runId, actorId, status, storages, summary, nextStep
  * — with no inlined dataset items or KV record bodies, except RAG Web Browser's reserved `TIP` key.
  * Tests cover shape invariants and the branching status templates (SUCCEEDED, TIMED-OUT).
- * Pure-template states (READY, RUNNING, TIMING-OUT, ABORTING, FAILED, ABORTED) are intentionally
- * not asserted here — see the comment above `describe('buildStatusTemplate', ...)` below.
+ * Pure-template states are asserted only where a rule applies (FAILED and ABORTED only for their
+ * nextStep) — see the comment above `describe('buildStatusTemplate', ...)` below.
  */
 
 const ACTOR = { username: 'apify', name: 'rag-web-browser' };
@@ -129,6 +129,28 @@ describe('get-actor-run default response', () => {
             usageUsd: { ACTOR_COMPUTE_UNITS: 0.0001 },
         });
     });
+
+    it.each([
+        ['SUCCEEDED', { defaultDatasetId: undefined }, 'Inspect statusMessage and stats in this response.'],
+        ['FAILED', { exitCode: 1 }, 'Diagnose using statusMessage and exitCode in this response.'],
+        ['ABORTED', {}, "Items written before the abort, if any, remain in the run's default dataset."],
+    ])(
+        'returns a nextStep that asks for no new run for %s without dataset items',
+        async (status, overrides, nextStep) => {
+            const run = mockSucceededRun({ status, ...overrides });
+            const result = await (getActorRun as HelperTool).call(
+                stubToolCallContext(
+                    { runId: 'run-1', waitSecs: 0 },
+                    stubClient({ run, dataset: mockDataset({ itemCount: 0 }) }),
+                ),
+            );
+
+            const { structuredContent, content } = result as TextToolResult & { structuredContent: RunResponse };
+            expect(structuredContent.nextStep).toBe(nextStep);
+            expect(content[1].text).toContain(nextStep);
+            expect(content[1].text).not.toMatch(/re-run|retry/i);
+        },
+    );
 
     it('surfaces dataset inflatedBytes from stats in structuredContent', async () => {
         // The single-dataset GET does not return `inflatedBytes` (only the dataset-list endpoint does);
@@ -426,12 +448,12 @@ describe('get-actor-run default response', () => {
         expect(structuredContent.storages.datasets?.default.itemCount).toBeUndefined();
         expect(structuredContent.storages.datasets?.default.fields).toBeUndefined();
 
-        // nextStep points at get-dataset-items, not the "no output / re-run" branch.
+        // nextStep points at get-dataset-items, not the "no output" branch.
         expect(structuredContent.nextStep).toContain('get-dataset-items');
         expect(structuredContent.nextStep).toContain('datasetId=dataset-xyz');
-        // Narrative (content[1]) avoids the "re-run" branch wording.
+        // Narrative (content[1]) avoids the "no output" branch wording.
         expect(content[1].text).not.toContain('No dataset items and no key-value records were found');
-        expect(content[1].text).not.toMatch(/re-run/i);
+        expect(content[1].text).not.toContain('No dataset items found');
     });
 
     it('degrades gracefully when KV listKeys fails: keeps dataset, omits KV', async () => {
@@ -1087,9 +1109,10 @@ const kvWithRecords: RunKeyValueStore = { id: 'kv-1', keys: ['result-a', 'result
 /**
  * Tests below cover real branching in buildSucceededSummaryNextStep / buildTimedOutSummaryNextStep
  * (3 branches each) and the dataset-vs-KV priority + truncation-labelling rules. Pure template
- * re-statements (READY/RUNNING/TIMING-OUT/ABORTING/FAILED/ABORTED) are deliberately not tested
- * here — they would just spell-check the format string and would change in lockstep with any
- * wording tweak. Default-mode integration coverage exercises the dispatch path.
+ * re-statements (READY/RUNNING/TIMING-OUT/ABORTING) are deliberately not tested here — they would
+ * just spell-check the format string and would change in lockstep with any wording tweak. FAILED
+ * and ABORTED are pinned because their nextStep must not ask for a new run (#1559). Default-mode
+ * integration coverage exercises the dispatch path.
  */
 describe('buildStatusTemplate', () => {
     it('SUCCEEDED with dataset items routes to dataset-items nextStep', () => {
@@ -1163,7 +1186,16 @@ describe('buildStatusTemplate', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED') });
         expect(t.summary).toContain('No dataset items found');
         expect(t.summary).not.toContain('Key-value store');
-        expect(t.nextStep).toContain('re-run');
+        expect(t.nextStep).toBe('Inspect statusMessage and stats in this response.');
+    });
+
+    it.each([
+        ['FAILED', 'Diagnose using statusMessage and exitCode in this response.'],
+        ['ABORTED', "Items written before the abort, if any, remain in the run's default dataset."],
+    ])('%s nextStep asks for no new run and names no tool', (status, expected) => {
+        const t = buildStatusSummaryNextStep({ run: makeRun(status), dataset: datasetWithItems });
+        expect(t.nextStep).toBe(expected);
+        expect(t.nextStep).not.toMatch(/re-run|retry/i);
     });
 
     it('SUCCEEDED with both dataset items and KV records picks dataset for nextStep, mentions both in summary', () => {
