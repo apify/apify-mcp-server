@@ -13,7 +13,7 @@ import {
     isMaxContentLengthAbort,
     maskSessionToken,
     REDACTED,
-    redactUrlSigningSecretKey,
+    redactJsonSecrets,
 } from '../../resources/api_resources.js';
 import { toPlainError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
@@ -348,6 +348,6 @@ export async function callApi(params: {
         : `${method} ${path} returned HTTP ${response.status}.`;
     // A text body is an escaped JSON string here, so it never matches.
     const json = JSON.stringify(structuredContent);
-    const text = redactUrlSigningSecretKey(json);
+    const text = redactJsonSecrets(json);
     return respondOk([text, summary], { structuredContent: text === json ? structuredContent : JSON.parse(text) });
 }
