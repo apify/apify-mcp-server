@@ -7,7 +7,7 @@ import {
     RAG_WEB_BROWSER_WHITELISTED_FIELDS,
     WEB_FETCH,
     WEB_FETCH_URL_SCHEME_NOTE,
-    WEBSITE_CONTENT_CRAWLER,
+    SERVED_INPUT_DEFAULTS,
 } from '../const.js';
 import { SchemaTooLargeError } from '../errors.js';
 import type { ActorInputSchema, SchemaProperties } from '../types.js';
@@ -217,23 +217,16 @@ export function buildActorInputSchema(actorFullName: string, input: ActorInputSc
     return { inputSchema: finalSchema };
 }
 
-/**
- * Sets the input defaults this server serves instead of the Actor's own; `buildActorRunInput` sends them.
- * website-content-crawler's respectRobotsTxtFile defaults to false in the Actor and to true here (#1574).
- */
+/** Shows `SERVED_INPUT_DEFAULTS` in the served schema. */
 export function applyServedInputDefaults(actorFullName: string, properties: Record<string, SchemaProperties>): void {
-    if (actorFullName === WEBSITE_CONTENT_CRAWLER && properties.respectRobotsTxtFile) {
-        properties.respectRobotsTxtFile.default = true;
+    for (const [field, value] of Object.entries(SERVED_INPUT_DEFAULTS[actorFullName] ?? {})) {
+        if (properties[field]) properties[field].default = value;
     }
 }
 
-/**
- * The input an Actor run starts with. The platform fills an omitted field from the Actor's own schema, where
- * website-content-crawler's respectRobotsTxtFile defaults to false, so an omitted one is sent as true.
- */
+/** The input a run starts with: `SERVED_INPUT_DEFAULTS` under the caller's fields. */
 export function buildActorRunInput(actorFullName: string, input: Record<string, unknown>): Record<string, unknown> {
-    if (actorFullName !== WEBSITE_CONTENT_CRAWLER) return input;
-    return { ...input, respectRobotsTxtFile: input.respectRobotsTxtFile ?? true };
+    return { ...SERVED_INPUT_DEFAULTS[actorFullName], ...input };
 }
 
 /**

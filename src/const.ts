@@ -161,7 +161,14 @@ If the exact URL cannot be fetched (e.g. a non-http(s) scheme), say so rather th
 export const WEB_FETCH_URL_SCHEME_NOTE =
     'http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.';
 
-export const WEBSITE_CONTENT_CRAWLER = 'apify/website-content-crawler';
+/**
+ * Input defaults this server applies instead of the Actor's own, keyed by Actor full name. The served schema
+ * shows them and a run starts with them unless the caller sets the field. The platform fills an omitted field
+ * from the Actor's schema, where website-content-crawler's respectRobotsTxtFile defaults to false (#1574).
+ */
+export const SERVED_INPUT_DEFAULTS: Record<string, Record<string, unknown>> = {
+    'apify/website-content-crawler': { respectRobotsTxtFile: true },
+};
 
 export const defaults = {
     actors: [RAG_WEB_BROWSER, WEB_FETCH],
