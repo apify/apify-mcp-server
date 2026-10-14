@@ -4,7 +4,7 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { respondOk } from '../../utils/mcp.js';
+import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 import { buildStats, buildStatusSummaryNextStep, type RunResponse, toIsoString } from '../actors/actor_run_response.js';
 import { actorRunOutputSchema } from '../structured_output_schemas.js';
@@ -48,7 +48,14 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = abortRunArgs.parse(args);
-        const run = await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
+        // An abort returns a finished run unchanged, so an already-ABORTED run would look like an abort
+        // that took effect. Read the status first and skip the abort for a finished run.
+        const current = await client.run(parsed.runId).get();
+        if (!current) {
+            return respondUserError(`Run with ID '${parsed.runId}' not found.`);
+        }
+        const isFinished = TERMINAL_RUN_STATUSES.has(current.status);
+        const run = isFinished ? current : await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
 
         const dataset = run.defaultDatasetId ? { id: run.defaultDatasetId } : undefined;
         const keyValueStore = run.defaultKeyValueStoreId ? { id: run.defaultKeyValueStoreId } : undefined;
@@ -58,11 +65,9 @@ USAGE EXAMPLES:
             keyValueStore,
             datasetMetadataFetched: false,
         });
-        // A run that had finished comes back unchanged; an abort that took effect returns ABORTING or ABORTED.
-        const summary =
-            TERMINAL_RUN_STATUSES.has(run.status) && run.status !== 'ABORTED'
-                ? `Nothing was aborted: the run had already finished. ${statusSummary}`
-                : statusSummary;
+        const summary = isFinished
+            ? `Nothing was aborted: the run had already finished. ${statusSummary}`
+            : statusSummary;
 
         const structuredContent: RunResponse = {
             runId: run.id,
