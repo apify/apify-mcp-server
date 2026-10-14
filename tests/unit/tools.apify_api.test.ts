@@ -1197,7 +1197,7 @@ describe('apify-api-write', () => {
     it.each([
         { statusCode: 300, hint: '' },
         { statusCode: 400, hint: '' },
-        { statusCode: 429, hint: ' Rate limit exceeded, wait before retrying.' },
+        { statusCode: 429, hint: ' The Apify API rate limit was reached.' },
     ])(
         'reports a failed write whose error body is over the inline limit with its status $statusCode',
         async ({ statusCode, hint }) => {

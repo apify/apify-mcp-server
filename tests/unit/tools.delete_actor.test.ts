@@ -132,7 +132,8 @@ describe('delete-actor', () => {
         });
         expect(text).toBe(
             'john/my-actor has 2 unfinished runs (run-1, run-2), and deleting it aborts them. Ask the user whether ' +
-                'to abort them, and if so call again with abortRunningRuns set to true; otherwise wait until they finish.',
+                'to abort them. abortRunningRuns=true deletes it anyway, which aborts them; otherwise the Actor ' +
+                'can be deleted once they finish.',
         );
         expect(actorDeleteMock).not.toHaveBeenCalled();
     });
