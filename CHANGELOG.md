@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.18.1 - **not yet released**
+## [0.18.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.18.1) (2026-10-14)
 
 ### 🚀 Features
 
@@ -20,7 +19,6 @@ All notable changes to this project will be documented in this file.
 - Name storage sibling tools in nextStep only when served ([#1540](https://github.com/apify/apify-mcp-server/pull/1540)) ([108cc21](https://github.com/apify/apify-mcp-server/commit/108cc2133a33ce791e9a5f9cff109032cebadf73)) by [@jirispilka](https://github.com/jirispilka), closes [#1296](https://github.com/apify/apify-mcp-server/issues/1296)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.18.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.18.0) (2026-10-13)
 
 ### 🚀 Features
