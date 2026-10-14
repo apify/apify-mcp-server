@@ -85,6 +85,7 @@ export const getDatasetList: ToolEntry = Object.freeze({
                 loadedToolNames,
                 `Use ${HELPER_TOOLS.DATASET_GET} with a datasetId from the list to inspect a dataset.`,
             ),
+            isNamedOnly: !parsed.unnamed,
         });
         return buildStorageResponse({
             structuredContent: datasets as unknown as Record<string, unknown>,

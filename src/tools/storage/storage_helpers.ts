@@ -84,7 +84,8 @@ export function buildStorageResponse(params: {
 
 /**
  * {summary, nextStep} for paginated storage listings (datasets, key-value stores).
- * When more items remain, nextStep points at the next page; otherwise at inspecting an entry.
+ * When more items remain, nextStep points at the next page; on an empty last page, at what
+ * `unnamed=true` adds when it is not set; otherwise at inspecting an entry.
  */
 export function buildStorageListSummaryNextStep(params: {
     count: number;
@@ -93,15 +94,26 @@ export function buildStorageListSummaryNextStep(params: {
     noun: string;
     listToolName: string;
     inspectHint: string;
+    /** The API's default `unnamed=false` lists only named storages; Actor runs write to unnamed ones. */
+    isNamedOnly: boolean;
 }): { summary: string; nextStep: string } {
-    const { count, total, offset, noun, listToolName, inspectHint } = params;
-    return {
-        summary: `Listed ${count} of ${total} ${noun}.`,
-        nextStep:
-            offset + count < total
-                ? `Call ${listToolName} again with offset=${offset + count} to fetch the next page.`
-                : inspectHint,
-    };
+    const { count, total, offset, noun, listToolName, inspectHint, isNamedOnly } = params;
+    const summary = `Listed ${count} of ${total} ${isNamedOnly ? 'named ' : ''}${noun}.`;
+    if (offset + count < total) {
+        return {
+            summary,
+            nextStep: `Call ${listToolName} again with offset=${offset + count} to fetch the next page.`,
+        };
+    }
+    if (count === 0) {
+        return {
+            summary,
+            nextStep: isNamedOnly
+                ? `unnamed=true includes the unnamed ${noun} that Actor runs create.`
+                : 'No follow-up step.',
+        };
+    }
+    return { summary, nextStep: inspectHint };
 }
 
 /**

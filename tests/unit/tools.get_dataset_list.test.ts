@@ -43,7 +43,7 @@ describe('get-dataset-list', () => {
         };
 
         expect(structuredContent).toMatchObject(MOCK_LIST);
-        expect(structuredContent.summary).toBe('Listed 2 of 2 datasets.');
+        expect(structuredContent.summary).toBe('Listed 2 of 2 named datasets.');
         // Not truncated → nextStep points at inspecting a dataset, not pagination.
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET);
         // content[0] ships the JSON data; content[1] carries the prose summary + nextStep.
@@ -75,7 +75,7 @@ describe('get-dataset-list', () => {
         const result = await (getDatasetList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
-        expect(structuredContent.summary).toBe('Listed 2 of 25 datasets.');
+        expect(structuredContent.summary).toBe('Listed 2 of 25 named datasets.');
         expect(structuredContent.nextStep).toBe(
             `Call ${HELPER_TOOLS.DATASET_LIST_GET} again with offset=2 to fetch the next page.`,
         );
@@ -115,6 +115,67 @@ describe('get-dataset-list', () => {
 
         expect(structuredContent).toHaveProperty('count', 0);
         expectSchemaConformingStructuredContent(result, storageListOutputSchema);
+    });
+
+    it('leaves "named" out of the summary with unnamed=true', async () => {
+        const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
+
+        const result = await (getDatasetList as HelperTool).call(
+            stubToolCallContext({ unnamed: true }, stubApifyClient(listSpy)),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+        expect(structuredContent.summary).toBe('Listed 2 of 2 datasets.');
+        expect(structuredContent.nextStep).toBe(
+            `Use ${HELPER_TOOLS.DATASET_GET} with a datasetId from the list to inspect a dataset.`,
+        );
+    });
+
+    it.each([
+        [
+            false,
+            0,
+            0,
+            'Listed 0 of 0 named datasets.',
+            'unnamed=true includes the unnamed datasets that Actor runs create.',
+        ],
+        [
+            false,
+            5,
+            20,
+            'Listed 0 of 5 named datasets.',
+            'unnamed=true includes the unnamed datasets that Actor runs create.',
+        ],
+        [true, 0, 0, 'Listed 0 of 0 datasets.', 'No follow-up step.'],
+    ])(
+        'returns the empty-last-page nextStep for unnamed=%s (total=%i, offset=%i)',
+        async (unnamed, total, offset, summary, nextStep) => {
+            const listSpy = vi.fn().mockResolvedValue({ ...MOCK_LIST, total, offset, count: 0, items: [] });
+
+            const result = await (getDatasetList as HelperTool).call(
+                stubToolCallContext({ unnamed }, stubApifyClient(listSpy)),
+            );
+            const { content, structuredContent } = result as TextToolResult & {
+                structuredContent: Record<string, unknown>;
+            };
+
+            expect(structuredContent.summary).toBe(summary);
+            expect(structuredContent.nextStep).toBe(nextStep);
+            expect(content[1].text).toBe(`${summary}\n${nextStep}`);
+            expectSchemaConformingStructuredContent(result, storageListOutputSchema);
+        },
+    );
+
+    it('keeps the pagination nextStep on a page with no items when more remain', async () => {
+        const listSpy = vi.fn().mockResolvedValue({ ...MOCK_LIST, total: 5, offset: 0, count: 0, items: [] });
+
+        const result = await (getDatasetList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+        expect(structuredContent.summary).toBe('Listed 0 of 5 named datasets.');
+        expect(structuredContent.nextStep).toBe(
+            `Call ${HELPER_TOOLS.DATASET_LIST_GET} again with offset=0 to fetch the next page.`,
+        );
     });
 
     it('rejects limit above 20 via ajv validation', () => {

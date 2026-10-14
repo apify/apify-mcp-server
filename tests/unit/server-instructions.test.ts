@@ -211,6 +211,18 @@ describe('getServerInstructions()', () => {
         });
     });
 
+    describe('"## Storage types" section', () => {
+        it('states the retention of unnamed and named storages', () => {
+            const instructions = getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT);
+            const start = instructions.indexOf('## Storage types');
+            const end = instructions.indexOf('\n## ', start + 1);
+            const block = instructions.slice(start, end === -1 ? undefined : end);
+            expect(block).toContain(
+                "- Unnamed storages are deleted after the account's data-retention period; named storages are kept until deleted.",
+            );
+        });
+    });
+
     describe('"## Schedules" section', () => {
         const instructions = getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT);
 

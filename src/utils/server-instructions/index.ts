@@ -229,6 +229,7 @@ ${runLimitationLine}- When multiple options exist, prefer Actors with higher usa
 ## Storage types
 - **Dataset:** Structured, append-only storage ideal for tabular or list data (e.g., scraped items).
 - **Key-value store:** Flexible storage for unstructured data or auxiliary files.
+- Unnamed storages are deleted after the account's data-retention period; named storages are kept until deleted.
 
 ## Apify API resources
 - Any Apify API GET endpoint can be read as an MCP resource. Pass the full \`${apiBaseUrl}/v2/...\` URL to \`resources/read\`; the server injects the session's Apify token and returns the response body. Reads require an Apify token — a session without one (e.g. payment-only x402/Skyfire) fails with a JSON-RPC error.
