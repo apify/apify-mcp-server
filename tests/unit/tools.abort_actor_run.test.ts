@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { abortActorRun } from '../../src/tools/runs/abort_actor_run.js';
+import { actorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { mockApifyClient, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import {
+    expectSchemaConformingStructuredContent,
+    mockApifyClient,
+    stubToolCallContext,
+    type TextToolResult,
+} from './helpers/tool_context.js';
 
 function mockAbortedRun(overrides: Record<string, unknown> = {}) {
     return {
@@ -72,5 +78,32 @@ describe('abort-actor-run', () => {
 
         expect(structuredContent.status).toBe('SUCCEEDED');
         expect(structuredContent.summary as string).not.toContain('Dataset metadata unavailable');
+    });
+
+    it.each(['SUCCEEDED', 'FAILED', 'TIMED-OUT'])('says that nothing was aborted for a %s run', async (status) => {
+        const run = mockAbortedRun({ status });
+        const result = await (abortActorRun as HelperTool).call(abortContext({ runId: 'run-1' }, run));
+        const { structuredContent, content } = result as TextToolResult & {
+            structuredContent: { summary: string };
+        };
+
+        expect(structuredContent.summary).toMatch(
+            new RegExp(`^Nothing was aborted: the run had already finished\\. ${status} `),
+        );
+        expect(content[1].text.startsWith(structuredContent.summary)).toBe(true);
+        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
+        expectSchemaConformingStructuredContent(result, actorRunOutputSchema);
+    });
+
+    it.each(['ABORTING', 'ABORTED'])('keeps the status summary for an %s run', async (status) => {
+        const run = mockAbortedRun({ status });
+        const result = await (abortActorRun as HelperTool).call(abortContext({ runId: 'run-1' }, run));
+        const { structuredContent, content } = result as TextToolResult & {
+            structuredContent: { summary: string };
+        };
+
+        expect(structuredContent.summary).toMatch(new RegExp(`^${status} after `));
+        expect(content[1].text).not.toContain('Nothing was aborted');
+        expectSchemaConformingStructuredContent(result, actorRunOutputSchema);
     });
 });

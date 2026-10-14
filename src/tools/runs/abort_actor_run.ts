@@ -5,6 +5,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk } from '../../utils/mcp.js';
+import { TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 import { buildStats, buildStatusSummaryNextStep, type RunResponse, toIsoString } from '../actors/actor_run_response.js';
 import { actorRunOutputSchema } from '../structured_output_schemas.js';
 
@@ -51,12 +52,17 @@ USAGE EXAMPLES:
 
         const dataset = run.defaultDatasetId ? { id: run.defaultDatasetId } : undefined;
         const keyValueStore = run.defaultKeyValueStoreId ? { id: run.defaultKeyValueStoreId } : undefined;
-        const { summary, nextStep } = buildStatusSummaryNextStep({
+        const { summary: statusSummary, nextStep } = buildStatusSummaryNextStep({
             run,
             dataset,
             keyValueStore,
             datasetMetadataFetched: false,
         });
+        // A run that had finished comes back unchanged; an abort that took effect returns ABORTING or ABORTED.
+        const summary =
+            TERMINAL_RUN_STATUSES.has(run.status) && run.status !== 'ABORTED'
+                ? `Nothing was aborted: the run had already finished. ${statusSummary}`
+                : statusSummary;
 
         const structuredContent: RunResponse = {
             runId: run.id,
