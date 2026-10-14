@@ -131,11 +131,23 @@ describe('get-actor-run default response', () => {
     });
 
     it.each([
-        ['SUCCEEDED', { defaultDatasetId: undefined }, 'Inspect statusMessage and stats in this response.'],
-        ['FAILED', { exitCode: 1 }, 'Diagnose using statusMessage and exitCode in this response.'],
-        ['ABORTED', {}, "Items written before the abort, if any, remain in the run's default dataset."],
+        [
+            'SUCCEEDED',
+            { defaultDatasetId: undefined },
+            'Inspect statusMessage and stats in this response. If the user wants another attempt, adjust the input before retrying.',
+        ],
+        [
+            'FAILED',
+            { exitCode: 1 },
+            'Diagnose using statusMessage and exitCode in this response. If the user wants another attempt, fix the cause before retrying.',
+        ],
+        [
+            'ABORTED',
+            {},
+            "Items written before the abort, if any, remain in the run's default dataset. Retry only if the user wants another run.",
+        ],
     ])(
-        'returns a nextStep that asks for no new run for %s without dataset items',
+        'returns a nextStep that leaves a retry to the user for %s without dataset items',
         async (status, overrides, nextStep) => {
             const run = mockSucceededRun({ status, ...overrides });
             const result = await (getActorRun as HelperTool).call(
@@ -148,7 +160,7 @@ describe('get-actor-run default response', () => {
             const { structuredContent, content } = result as TextToolResult & { structuredContent: RunResponse };
             expect(structuredContent.nextStep).toBe(nextStep);
             expect(content[1].text).toContain(nextStep);
-            expect(content[1].text).not.toMatch(/re-run|retry/i);
+            expect(content[1].text).toContain('the user wants');
         },
     );
 
@@ -1186,16 +1198,24 @@ describe('buildStatusTemplate', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED') });
         expect(t.summary).toContain('No dataset items found');
         expect(t.summary).not.toContain('Key-value store');
-        expect(t.nextStep).toBe('Inspect statusMessage and stats in this response.');
+        expect(t.nextStep).toBe(
+            'Inspect statusMessage and stats in this response. If the user wants another attempt, adjust the input before retrying.',
+        );
     });
 
     it.each([
-        ['FAILED', 'Diagnose using statusMessage and exitCode in this response.'],
-        ['ABORTED', "Items written before the abort, if any, remain in the run's default dataset."],
-    ])('%s nextStep asks for no new run and names no tool', (status, expected) => {
+        [
+            'FAILED',
+            'Diagnose using statusMessage and exitCode in this response. If the user wants another attempt, fix the cause before retrying.',
+        ],
+        [
+            'ABORTED',
+            "Items written before the abort, if any, remain in the run's default dataset. Retry only if the user wants another run.",
+        ],
+    ])('%s nextStep leaves a retry to the user and names no tool', (status, expected) => {
         const t = buildStatusSummaryNextStep({ run: makeRun(status), dataset: datasetWithItems });
         expect(t.nextStep).toBe(expected);
-        expect(t.nextStep).not.toMatch(/re-run|retry/i);
+        expect(t.nextStep).toContain('the user wants');
     });
 
     it('SUCCEEDED with both dataset items and KV records picks dataset for nextStep, mentions both in summary', () => {

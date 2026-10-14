@@ -50,7 +50,7 @@ describe('abort-actor-run', () => {
         });
         expect(structuredContent.summary).toBeDefined();
         expect(structuredContent.nextStep).toBe(
-            "Items written before the abort, if any, remain in the run's default dataset.",
+            "Items written before the abort, if any, remain in the run's default dataset. Retry only if the user wants another run.",
         );
 
         // Billing/internal fields must NOT leak.
