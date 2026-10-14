@@ -144,7 +144,7 @@ describe('get-actor-run default response', () => {
         [
             'ABORTED',
             {},
-            "Items written before the abort, if any, remain in the run's default dataset. Retry only if the user wants another run.",
+            "Items written before the abort, if any, remain in the run's default dataset (datasetId=dataset-xyz). Retry only if the user wants another run.",
         ],
     ])(
         'returns a nextStep that leaves a retry to the user for %s without dataset items',
@@ -1210,12 +1210,19 @@ describe('buildStatusTemplate', () => {
         ],
         [
             'ABORTED',
-            "Items written before the abort, if any, remain in the run's default dataset. Retry only if the user wants another run.",
+            "Items written before the abort, if any, remain in the run's default dataset (datasetId=ds-1). Retry only if the user wants another run.",
         ],
     ])('%s nextStep leaves a retry to the user and names no tool', (status, expected) => {
         const t = buildStatusSummaryNextStep({ run: makeRun(status), dataset: datasetWithItems });
         expect(t.nextStep).toBe(expected);
         expect(t.nextStep).toContain('the user wants');
+    });
+
+    it('ABORTED nextStep without a dataset gives no datasetId', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('ABORTED') });
+        expect(t.nextStep).toBe(
+            "Items written before the abort, if any, remain in the run's default dataset. Retry only if the user wants another run.",
+        );
     });
 
     it('SUCCEEDED with both dataset items and KV records picks dataset for nextStep, mentions both in summary', () => {

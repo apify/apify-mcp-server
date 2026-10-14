@@ -694,7 +694,7 @@ export function buildStatusSummaryNextStep(params: {
             return {
                 summary: `ABORTED after ${runTimeSecs}s.${statusMessageLine(statusMessage)}`,
                 nextStep:
-                    "Items written before the abort, if any, remain in the run's default dataset. " +
+                    `Items written before the abort, if any, remain in the run's default dataset${dataset ? ` (datasetId=${dataset.id})` : ''}. ` +
                     'Retry only if the user wants another run.',
             };
         case 'TIMED-OUT':
