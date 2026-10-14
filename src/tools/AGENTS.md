@@ -58,12 +58,12 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `/v2/actors` are the same), sends it as written with the query added after any query string in
     it, and looks up a legacy `acts` path as `actors`, the prefix the spec lists. It asserts that the
     URL stays on the API origin, sends one request with no retries, masks the session token in the
-    response, redacts the `urlSigningSecretKey` value in a JSON body, keeps a query in the path out of
-    the error it throws, and adds the closest spec paths to a `page-not-found` 404 (a wrong path), not
-    to a missing record.
+    response, redacts the `urlSigningSecretKey` and `password` values in a JSON body, keeps a query in
+    the path out of the error it throws, and adds the closest spec paths to a `page-not-found` 404 (a
+    wrong path), not to a missing record.
     The one capped request (`sendApifyApiRequest`) is in `../apify_client.ts`. The origin check
     (`isApifyApiUri`), the detection of a body over `MAX_INLINE_BYTES` (`isMaxContentLengthAbort`),
-    the binary token mask (`maskSessionToken`), the key redaction (`redactUrlSigningSecretKey`) and
+    the binary token mask (`maskSessionToken`), the secret redaction (`redactJsonSecrets`) and
     `REDACTED` are the API resource's own, imported from `../resources/api_resources.ts`
     ([`../resources/AGENTS.md`](../resources/AGENTS.md#api-resources-api_resourcests)).
     A request failure is thrown as `toPlainError` (`../utils/logging.ts`), without the axios config.

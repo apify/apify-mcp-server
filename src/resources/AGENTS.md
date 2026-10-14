@@ -29,7 +29,7 @@ identity with the platform's own URLs is the feature. Revisit when tools start e
 to the configured API origin and rejects userinfo-bearing URLs (axios drops the `Authorization`
 header for those, silently degrading to unauthenticated). The API tools' `callApi`
 (`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`, `isMaxContentLengthAbort()`,
-`maskSessionToken()`, `redactUrlSigningSecretKey()` and `REDACTED`, so a change to any changes the
+`maskSessionToken()`, `redactJsonSecrets()` and `REDACTED`, so a change to any changes the
 tools too.
 
 `sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through
@@ -41,9 +41,9 @@ through to blob — lossless beats mangled text, same rule as apify-client's bod
 everything else (including no Content-Type) as a base64 `blob` with the base MIME type; empty body
 as empty text preserving the Content-Type. The body is never parsed, so bytes round-trip exactly,
 except: the session token becomes `[REDACTED]` (`maskSessionToken()`; `/v2/browser-info` echoes the
-`Authorization` header), and so does the `urlSigningSecretKey` value in an `application/json` body
-(`redactUrlSigningSecretKey()`). The key is redacted, not removed: removal means re-serializing, which
-loses formatting and big-number precision and cost about 1 GB on a crafted deep body.
+`Authorization` header), and so do the `urlSigningSecretKey` and `password` values in an
+`application/json` body (`redactJsonSecrets()`). The values are redacted, not removed: removal means
+re-serializing, which loses formatting and big-number precision and cost about 1 GB on a crafted deep body.
 axios enforces `MAX_INLINE_BYTES` (256 KB) mid-consumption on streamed
 responses (axios ≥1.16: byte-counting wrapper throws `ERR_BAD_RESPONSE`, counting decoded bytes) —
 after the request resolves, outside any retry wrapper. On trip, the proxy links out: a `text/plain`

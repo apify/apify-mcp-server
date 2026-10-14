@@ -182,14 +182,15 @@ export function maskSessionToken(body: Buffer, token: string | undefined): Buffe
  * The unescaped closing quote and colon distinguish keys from string contents.
  * Disjoint value branches keep the scan linear.
  */
-const URL_SIGNING_SECRET_KEY_VALUE_RE = /("urlSigningSecretKey"\s*:\s*)"(?:[^"\\]|\\[\s\S])*"/g;
+const SECRET_VALUE_RE = /("(?:urlSigningSecretKey|password)"\s*:\s*)"(?:[^"\\]|\\[\s\S])*"/g;
 
 /**
- * Hide storage signing keys without parsing JSON, preserving formatting and large integers (apify/ai-team#330).
+ * Hide storage signing keys and passwords, such as the proxy password in `/v2/users/me`, without parsing JSON,
+ * preserving formatting and large integers (apify/ai-team#330, apify/ai-team#334).
  * Parsing and re-indenting deeply nested bodies can exhaust memory. Null values and escaped key names stay as is.
  */
-export function redactUrlSigningSecretKey(json: string): string {
-    return json.replace(URL_SIGNING_SECRET_KEY_VALUE_RE, `$1"${REDACTED}"`);
+export function redactJsonSecrets(json: string): string {
+    return json.replace(SECRET_VALUE_RE, `$1"${REDACTED}"`);
 }
 
 /**
@@ -199,7 +200,7 @@ export function redactUrlSigningSecretKey(json: string): string {
  * the body streams in and is returned by its declared Content-Type — textual types
  * (text/*, JSON, XML) as `text`, anything else as a base64 `blob`. The body is never parsed, so
  * JSON primitives, formatting, and bytes round-trip exactly, except that the session token and
- * `urlSigningSecretKey` values in JSON become `[REDACTED]`.
+ * `urlSigningSecretKey` and `password` values in JSON become `[REDACTED]`.
  *
  * Genuine failures (no token, bad origin, a missing resource, a bad token, a 5xx, a network error)
  * throw a domain error (`InvalidParamsError`/`InternalError`) that the protocol adapters
@@ -282,11 +283,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     if (isTextualMimeType(baseMimeType) && Buffer.isEncoding(charset)) {
         const text = body.toString(charset);
         // apify-client parses only `application/json`, so both proxies redact the same bodies.
-        return buildTextResult(
-            uri,
-            baseMimeType === 'application/json' ? redactUrlSigningSecretKey(text) : text,
-            contentType,
-        );
+        return buildTextResult(uri, baseMimeType === 'application/json' ? redactJsonSecrets(text) : text, contentType);
     }
     // Binary or undecodable text: base MIME type only (parameters are meaningless for a blob).
     return {
