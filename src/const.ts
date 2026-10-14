@@ -268,19 +268,17 @@ export const OFFICIAL_ACTORS_WITH_SIDE_EFFECTS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Secret inputs that `isReadOnlyActor` does not count, per official Apify Actor, because they only
- * authenticate requests to the sites the Actor reads.
- */
-export const READ_ONLY_ALLOWED_SECRET_INPUTS_BY_ACTOR: ReadonlyMap<string, ReadonlySet<string>> = new Map([
-    ['apify/website-content-crawler', new Set(['initialCookies'])], // Cookies sent to the crawled sites.
-]);
-
-/**
- * Actor inputs that this server's direct Actor tools neither serve nor send, per Actor. MCP-only: the Actor
- * itself still accepts them, for example through call-actor.
+ * Actor inputs that this server's direct Actor tools neither serve nor accept, per Actor, and that
+ * `isReadOnlyActor` does not count. Exists only so the listed Actors can be served with
+ * `readOnlyHint: true, destructiveHint: false` (#1575). MCP-only: the Actor itself still accepts them.
+ *
+ * This map is the only switch: removing an entry restores the Actor's full input schema, stops the
+ * rejection, drops the description note and lets `isReadOnlyActor` count the inputs again.
  */
 export const ACTOR_TOOL_OMITTED_INPUTS_BY_ACTOR: ReadonlyMap<string, ReadonlySet<string>> = new Map([
-    ['apify/website-content-crawler', new Set(['pageFunction'])], // Page code can click and submit forms.
+    // pageFunction: page code can click and submit forms. initialCookies: session cookies typed into a
+    // chat are no longer secret, and a read-only tool runs without confirmation.
+    ['apify/website-content-crawler', new Set(['pageFunction', 'initialCookies'])],
 ]);
 
 export const APIFY_STORE_URL = 'https://apify.com';

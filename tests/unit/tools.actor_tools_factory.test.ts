@@ -147,11 +147,14 @@ describe('getNormalActorsAsTools()', () => {
             },
         );
 
-        // Its secret initialCookies input authenticates the crawl of the sites it reads (#1575).
-        it('marks apify/website-content-crawler read-only despite its secret input', async () => {
+        // The tool omits its secret initialCookies and pageFunction inputs (#1575).
+        it('marks apify/website-content-crawler read-only despite its secret and code inputs', async () => {
             const actorInfo = createMockActorInfo('apify/website-content-crawler', {
                 ...LIMITED,
-                inputProperties: { initialCookies: { type: 'array', editor: 'json', isSecret: true } },
+                inputProperties: {
+                    initialCookies: { type: 'array', editor: 'json', isSecret: true },
+                    pageFunction: { type: 'string', editor: 'hidden' },
+                },
             });
             expect(await getAnnotations(actorInfo)).toMatchObject({
                 readOnlyHint: true,
@@ -214,16 +217,6 @@ describe('getNormalActorsAsTools()', () => {
                     },
                 }),
             ],
-            [
-                'apify/website-content-crawler with a writable dataset input',
-                createMockActorInfo('apify/website-content-crawler', {
-                    ...LIMITED,
-                    inputProperties: {
-                        initialCookies: { type: 'array', isSecret: true },
-                        output: { type: 'string', resourceType: 'dataset', resourcePermissions: ['READ', 'WRITE'] },
-                    },
-                }),
-            ],
         ])('keeps %s destructive', async (_, actorInfo) => {
             expect(await getAnnotations(actorInfo)).toMatchObject({
                 readOnlyHint: false,
@@ -233,17 +226,38 @@ describe('getNormalActorsAsTools()', () => {
         });
     });
 
-    // The read-only website-content-crawler tool offers no page code (#1575); the Actor itself still accepts it.
-    it('omits pageFunction only from the apify/website-content-crawler tool', async () => {
-        const pageFunction = { type: 'string', editor: 'hidden' } as const;
-        const [crawler, other] = await getNormalActorsAsTools([
-            createMockActorInfo('apify/website-content-crawler', { inputProperties: { pageFunction } }),
-            createMockActorInfo('apify/web-scraper', { inputProperties: { pageFunction } }),
-        ]);
+    // The read-only website-content-crawler tool offers no page code or cookies (#1575); the Actor still accepts them.
+    describe('omitted inputs', () => {
+        const inputProperties = {
+            pageFunction: { type: 'string', editor: 'hidden' },
+            initialCookies: { type: 'array', editor: 'json', isSecret: true },
+        } as const;
 
-        expect(getToolPublicFieldOnly(crawler).inputSchema.properties).not.toHaveProperty('pageFunction');
-        expect(crawler.inputSchema.properties).toHaveProperty('url');
-        expect(other.inputSchema.properties).toHaveProperty('pageFunction');
+        it('omits pageFunction and initialCookies only from the apify/website-content-crawler tool', async () => {
+            const [crawler, other] = await getNormalActorsAsTools([
+                createMockActorInfo('apify/website-content-crawler', { inputProperties }),
+                createMockActorInfo('apify/web-scraper', { inputProperties }),
+            ]);
+
+            const crawlerProperties = getToolPublicFieldOnly(crawler).inputSchema.properties;
+            expect(crawlerProperties).not.toHaveProperty('pageFunction');
+            expect(crawlerProperties).not.toHaveProperty('initialCookies');
+            expect(crawlerProperties).toHaveProperty('url');
+            expect(other.inputSchema.properties).toHaveProperty('pageFunction');
+            expect(other.inputSchema.properties).toHaveProperty('initialCookies');
+        });
+
+        it('states the omitted inputs in the description', async () => {
+            const [crawler, other] = await getNormalActorsAsTools([
+                createMockActorInfo('apify/website-content-crawler', { inputProperties }),
+                createMockActorInfo('apify/web-scraper', { inputProperties }),
+            ]);
+
+            expect(crawler.description).toContain(
+                'This tool does not accept these Actor inputs: "pageFunction", "initialCookies".',
+            );
+            expect(other.description).not.toContain('does not accept these Actor inputs');
+        });
     });
 
     // Regression: #1532 — the RAG description named apify/web-fetch when the session did not serve it.

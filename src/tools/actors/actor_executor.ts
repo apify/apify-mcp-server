@@ -26,8 +26,22 @@ export const actorExecutor: ActorExecutor = {
             string,
             unknown
         >;
-        // AJV keeps fields the tool does not declare, so an omitted input could still arrive.
-        for (const name of ACTOR_TOOL_OMITTED_INPUTS_BY_ACTOR.get(actorFullName) ?? []) delete actorInput[name];
+        // AJV keeps fields the tool does not declare, so an omitted input (e.g. cookies) can still arrive.
+        // Reject rather than drop it: the run would otherwise silently proceed without it.
+        const omittedInputs = [...(ACTOR_TOOL_OMITTED_INPUTS_BY_ACTOR.get(actorFullName) ?? [])].filter(
+            (name) => name in actorInput,
+        );
+        if (omittedInputs.length) {
+            log.softFail('Actor tool received an omitted input', {
+                actorName: actorFullName,
+                mcpSessionId,
+                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+            });
+            const names = omittedInputs.map((name) => `"${name}"`).join(', ');
+            return respondUserError(`Failed to call Actor '${actorFullName}': this tool does not accept ${names}.`, {
+                actorId: params.actorId,
+            }) as ActorExecutionResult;
+        }
         // Task mode waits until terminal; honoring waitSecs would let the task complete
         // before the Actor produced output. Mirrors executeCallActor.
         // AJV doesn't fill `default` values, so apply the 30 s default here when the LLM omits waitSecs.

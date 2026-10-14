@@ -148,19 +148,24 @@ describe('actorExecutor', () => {
         });
     });
 
-    // The website-content-crawler tool does not offer pageFunction, and AJV keeps undeclared fields (#1575).
+    // The website-content-crawler tool does not offer pageFunction or initialCookies, but AJV keeps undeclared
+    // fields (#1575). The executor rejects them instead of running without them.
     describe('omitted inputs', () => {
         const START_URLS = [{ url: 'https://example.com' }];
+        const COOKIES = [{ name: 'session', value: 'abc', domain: 'example.com' }];
 
-        it('drops pageFunction from a website-content-crawler run input', async () => {
+        it('rejects initialCookies and pageFunction on website-content-crawler without starting a run', async () => {
             const { params, spies } = buildParams(
-                { startUrls: START_URLS, pageFunction: 'async () => {}' },
+                { startUrls: START_URLS, initialCookies: COOKIES, pageFunction: 'async () => {}' },
                 { actorFullName: 'apify/website-content-crawler' },
             );
 
-            await actorExecutor.executeActorTool(params);
+            const result = await actorExecutor.executeActorTool(params);
 
-            expect(spies.startInput).toEqual({ startUrls: START_URLS });
+            expect(spies.startInput).toBeUndefined();
+            const text = (result?.content ?? []).map(textOf).join('\n');
+            expect(text).toContain('does not accept "pageFunction", "initialCookies"');
+            expect(text).not.toContain('call-actor');
         });
 
         it('keeps pageFunction for other Actors', async () => {

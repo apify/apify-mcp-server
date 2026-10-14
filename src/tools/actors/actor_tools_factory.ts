@@ -13,7 +13,6 @@ import {
     RAG_WEB_BROWSER,
     RAG_WEB_BROWSER_ADDITIONAL_DESC,
     RAG_WEB_BROWSER_WEB_FETCH_HINT,
-    READ_ONLY_ALLOWED_SECRET_INPUTS_BY_ACTOR,
     WEB_FETCH,
     WEB_FETCH_ADDITIONAL_DESC,
 } from '../../const.js';
@@ -98,25 +97,33 @@ export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStor
  * Clients such as Claude run read-only tools without asking each time (see apify/apify-mcp-server#973).
  * An Actor counts as read-only only when Apify maintains it and nothing lets it act outside its run
  * storages: limited permissions keep it out of the user's other Apify data, and it has no secret input
- * (credentials for other services, except those in `READ_ONLY_ALLOWED_SECRET_INPUTS_BY_ACTOR`), writable storage
- * input (writes to the user's existing storages), MCP connector input (writes to connected apps) or code input.
+ * (credentials for other services), writable storage input (writes to the user's existing storages),
+ * MCP connector input (writes to connected apps) or code input. Inputs the tool omits
+ * (`ACTOR_TOOL_OMITTED_INPUTS_BY_ACTOR`) do not count.
  */
 function isReadOnlyActor({ actor, definition }: ActorInfo): boolean {
     if (!OFFICIAL_APIFY_USERNAMES.has(actor.username)) return false;
     if (OFFICIAL_ACTORS_WITH_SIDE_EFFECTS.has(definition.actorFullName)) return false;
     if (actor.actorPermissionLevel !== 'LIMITED_PERMISSIONS') return false;
 
-    const readOnlySecretInputs = READ_ONLY_ALLOWED_SECRET_INPUTS_BY_ACTOR.get(definition.actorFullName);
-    const inputProperties = Object.entries(definition.input?.properties ?? {});
+    const omittedInputs = ACTOR_TOOL_OMITTED_INPUTS_BY_ACTOR.get(definition.actorFullName);
+    const inputProperties = Object.entries(definition.input?.properties ?? {}).filter(
+        ([name]) => !omittedInputs?.has(name),
+    );
     return !inputProperties.some(
-        ([name, property]) =>
-            (property.isSecret && !readOnlySecretInputs?.has(name)) ||
+        ([, property]) =>
+            property.isSecret ||
             (['dataset', 'keyValueStore', 'requestQueue'].includes(property.resourceType ?? '') &&
                 property.resourcePermissions?.includes('WRITE')) ||
             property.resourceType === 'mcpConnector' ||
             property.editor === 'javascript' ||
             property.editor === 'python',
     );
+}
+
+/** States which Actor inputs the tool leaves out. */
+function buildOmittedInputsNote(omittedInputs: string[]): string {
+    return `This tool does not accept these Actor inputs: ${omittedInputs.map((name) => `"${name}"`).join(', ')}.`;
 }
 
 /**
@@ -152,9 +159,8 @@ export async function getNormalActorsAsTools(
         const isRag = actorFullName === RAG_WEB_BROWSER;
         const isWebFetch = actorFullName === WEB_FETCH;
         const { inputSchema } = buildActorInputSchema(definition.actorFullName, definition.input, isRag);
-        for (const name of ACTOR_TOOL_OMITTED_INPUTS_BY_ACTOR.get(actorFullName) ?? []) {
-            delete inputSchema.properties[name];
-        }
+        const omittedInputs = [...(ACTOR_TOOL_OMITTED_INPUTS_BY_ACTOR.get(actorFullName) ?? [])];
+        for (const name of omittedInputs) delete inputSchema.properties[name];
 
         // Inject the MCP-only `waitSecs` opt-in before AJV compile so the LLM can cap the wait.
         const inputSchemaWithWaitSecs = inputSchema as { properties?: Record<string, unknown> };
@@ -173,6 +179,7 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
             } else if (isWebFetch) {
                 description += `\n\n${WEB_FETCH_ADDITIONAL_DESC}`;
             }
+            if (omittedInputs.length) description += `\n\n${buildOmittedInputsNote(omittedInputs)}`;
             return description;
         };
 
