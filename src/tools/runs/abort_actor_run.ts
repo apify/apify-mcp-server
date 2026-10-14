@@ -48,8 +48,8 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = abortRunArgs.parse(args);
-        // An abort returns a finished run unchanged, so an already-ABORTED run would look like an abort
-        // that took effect. Read the status first and skip the abort for a finished run.
+        // An abort returns a finished run unchanged, so an already-ABORTED run would read as a fresh abort;
+        // see apify/apify-mcp-server#1560.
         const current = await client.run(parsed.runId).get();
         if (!current) {
             return respondUserError(`Run with ID '${parsed.runId}' not found.`);

@@ -105,6 +105,14 @@ describe('abort-actor-run', () => {
         },
     );
 
+    it.each(['READY', 'RUNNING', 'TIMING-OUT', 'ABORTING'])('sends the abort for a %s run', async (status) => {
+        const { context, abort } = abortContext({ runId: 'run-1' }, mockAbortedRun({ status }));
+        const result = await (abortActorRun as HelperTool).call(context);
+
+        expect(abort).toHaveBeenCalledOnce();
+        expect((result as TextToolResult).content[1].text).not.toContain('Nothing was aborted');
+    });
+
     it.each(['ABORTING', 'ABORTED'])('keeps the status summary when the abort returns %s', async (status) => {
         const { context, abort } = abortContext(
             { runId: 'run-1' },
