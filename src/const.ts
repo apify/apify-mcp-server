@@ -161,6 +161,8 @@ If the exact URL cannot be fetched (e.g. a non-http(s) scheme), say so rather th
 export const WEB_FETCH_URL_SCHEME_NOTE =
     'http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.';
 
+export const WEBSITE_CONTENT_CRAWLER = 'apify/website-content-crawler';
+
 export const defaults = {
     actors: [RAG_WEB_BROWSER, WEB_FETCH],
 };

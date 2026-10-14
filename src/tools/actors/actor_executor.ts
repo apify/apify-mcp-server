@@ -6,6 +6,7 @@ import { isActorInputValidationError } from '../../utils/apify_errors.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { redactSkyfirePayId } from '../../utils/logging.js';
 import { buildInvalidInputTexts, respondUserError } from '../../utils/mcp.js';
+import { buildActorRunInput } from '../actor_input_schema.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
 import { abortRunOnSignal, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './actor_run_response.js';
 
@@ -43,7 +44,9 @@ export const actorExecutor: ActorExecutor = {
 
         let actorRun;
         try {
-            actorRun = await apifyClient.actor(actorFullName).start(actorInput, params.callOptions);
+            actorRun = await apifyClient
+                .actor(actorFullName)
+                .start(buildActorRunInput(actorFullName, actorInput), params.callOptions);
         } catch (error) {
             // Platform can reject input our own AJV gate passed (see isActorInputValidationError).
             if (!isActorInputValidationError(error)) throw error;

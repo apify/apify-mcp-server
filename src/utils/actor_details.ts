@@ -5,7 +5,7 @@ import { CODE_RUNTIME_ACTOR_NAME } from '../const.js';
 import { ActorLoadError } from '../errors.js';
 import { connectMCPClient } from '../mcp/client.js';
 import type { PaymentProvider } from '../payments/types.js';
-import { filterSchemaProperties, shortenProperties } from '../tools/actor_input_schema.js';
+import { applyServedInputDefaults, filterSchemaProperties, shortenProperties } from '../tools/actor_input_schema.js';
 import type { Actor, ActorCardOptions, ActorInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
 import { ACTOR_TOOL_MODE } from '../types.js';
 import { getActorToolResolutionCached } from './actor.js';
@@ -111,6 +111,7 @@ export async function fetchActorDetails(
         }) as ActorInputSchema;
         inputSchema.properties = filterSchemaProperties(inputSchema.properties);
         inputSchema.properties = shortenProperties(inputSchema.properties);
+        applyServedInputDefaults(`${actorInfo.username}/${actorInfo.name}`, inputSchema.properties);
         const actorCard = formatActorToActorCard(actorInfoWithPicture, cardOptions);
         const actorCardStructured = formatActorToStructuredCard(actorInfoWithPicture, cardOptions);
         return {

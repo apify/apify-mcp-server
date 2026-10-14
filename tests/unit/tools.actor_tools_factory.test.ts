@@ -193,6 +193,23 @@ describe('getNormalActorsAsTools()', () => {
         });
     });
 
+    // Regression: #1574 — the Actor defaults respectRobotsTxtFile to false for API runs.
+    it('serves respectRobotsTxtFile with default true only for apify/website-content-crawler', async () => {
+        const respectRobotsTxtFile = { type: 'boolean', default: false, prefill: true } as const;
+        const [crawler, other] = await getNormalActorsAsTools([
+            createMockActorInfo('apify/website-content-crawler', { inputProperties: { respectRobotsTxtFile } }),
+            createMockActorInfo('apify/cheerio-scraper', { inputProperties: { respectRobotsTxtFile } }),
+        ]);
+
+        expect(getToolPublicFieldOnly(crawler).inputSchema.properties?.respectRobotsTxtFile).toMatchObject({
+            type: 'boolean',
+            default: true,
+        });
+        expect(getToolPublicFieldOnly(other).inputSchema.properties?.respectRobotsTxtFile).toMatchObject({
+            default: false,
+        });
+    });
+
     // Regression: #1532 — the RAG description named apify/web-fetch when the session did not serve it.
     it('names apify/web-fetch in the RAG description only when its tool is served', async () => {
         const [tool] = await getNormalActorsAsTools([createMockActorInfo(RAG_WEB_BROWSER)]);

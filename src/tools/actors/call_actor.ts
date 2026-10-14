@@ -42,7 +42,8 @@ import {
 } from '../../utils/mcp.js';
 import { buildPermissionApprovalTexts } from '../../utils/payment_errors.js';
 import { classifyFailureCategory, extractAjvErrorDetails } from '../../utils/tool_status.js';
-import { extractActorId } from '../../utils/tools.js';
+import { extractActorId, getToolFullName } from '../../utils/tools.js';
+import { buildActorRunInput } from '../actor_input_schema.js';
 import { actorNameToToolName, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
 import { actorRunOutputSchema } from '../structured_output_schemas.js';
@@ -667,7 +668,9 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
 
         if (abortSignal?.aborted) return respondAborted();
 
-        const actorRun = await apifyClient.actor(baseActorName).start(input, callOptions);
+        const actorRun = await apifyClient
+            .actor(baseActorName)
+            .start(buildActorRunInput(getToolFullName(resolution.actor), input), callOptions);
         log.debug('Started Actor run', {
             actorName: baseActorName,
             runId: actorRun.id,

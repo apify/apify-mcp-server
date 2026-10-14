@@ -181,6 +181,35 @@ describe('fetchActorDetails()', () => {
 
         await expect(fetchActorDetails(client, 'apify/instagram-scraper')).rejects.toMatchObject({ statusCode: 401 });
     });
+
+    // Regression: #1574 — call-actor sends respectRobotsTxtFile true when omitted, so the schema it points to says so.
+    it.each([
+        ['website-content-crawler', true],
+        ['cheerio-scraper', false],
+    ])('serves the respectRobotsTxtFile default of apify/%s as %s', async (name, expected) => {
+        const respectRobotsTxtFile = {
+            title: 'Respect robots.txt',
+            description: 'If enabled, the crawler consults robots.txt.',
+            type: 'boolean',
+            default: false,
+            prefill: true,
+        };
+        const client = mockApifyClient({
+            token: 'test-token',
+            actor: () => ({
+                get: async () => ({ id: 'actor-id', username: 'apify', name, stats: {} }),
+                defaultBuild: async () => ({
+                    get: async () => ({
+                        actorDefinition: { input: { type: 'object', properties: { respectRobotsTxtFile } } },
+                    }),
+                }),
+            }),
+        });
+
+        const result = await fetchActorDetails(client, 'actor-id');
+
+        expect(result?.inputSchema.properties.respectRobotsTxtFile).toMatchObject({ default: expected });
+    });
 });
 
 describe('getMcpToolsMessage()', () => {

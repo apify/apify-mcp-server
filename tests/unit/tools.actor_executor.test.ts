@@ -148,6 +148,35 @@ describe('actorExecutor', () => {
         });
     });
 
+    // The Actor defaults respectRobotsTxtFile to false; its tool sends true unless the caller sets it (#1574).
+    describe('website-content-crawler respectRobotsTxtFile', () => {
+        const WEBSITE_CONTENT_CRAWLER = 'apify/website-content-crawler';
+        const START_URLS = [{ url: 'https://example.com' }];
+
+        it.each([
+            ['an omitted', true, {}],
+            ['an explicit false', false, { respectRobotsTxtFile: false }],
+            ['an explicit true', true, { respectRobotsTxtFile: true }],
+        ])('sends %s field as %s', async (_label, expected, field) => {
+            const { params, spies } = buildParams(
+                { startUrls: START_URLS, ...field },
+                { actorFullName: WEBSITE_CONTENT_CRAWLER },
+            );
+
+            await actorExecutor.executeActorTool(params);
+
+            expect(spies.startInput).toEqual({ startUrls: START_URLS, respectRobotsTxtFile: expected });
+        });
+
+        it('leaves the input of other Actors unchanged', async () => {
+            const { params, spies } = buildParams({ startUrls: START_URLS });
+
+            await actorExecutor.executeActorTool(params);
+
+            expect(spies.startInput).toEqual({ startUrls: START_URLS });
+        });
+    });
+
     describe('platform input-validation error', () => {
         function invalidInputError(message: string): ApifyApiError {
             return new ApifyApiError(

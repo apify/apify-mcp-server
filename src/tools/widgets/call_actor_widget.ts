@@ -9,7 +9,8 @@ import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSche
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondServerError } from '../../utils/mcp.js';
-import { extractActorId } from '../../utils/tools.js';
+import { extractActorId, getToolFullName } from '../../utils/tools.js';
+import { buildActorRunInput } from '../actor_input_schema.js';
 import { buildStartRunWidgetResponse } from '../actors/actor_run_response.js';
 import {
     buildCallActorErrorResponse,
@@ -126,7 +127,10 @@ export const callActorWidget: ToolEntry = Object.freeze({
             const { apifyClient } = toolArgs;
 
             const actorClient = apifyClient.actor(baseActorName);
-            const actorRun = await actorClient.start(input, callOptions);
+            const actorRun = await actorClient.start(
+                buildActorRunInput(getToolFullName(resolution.actor), input),
+                callOptions,
+            );
             log.debug('Started Actor run (widget)', {
                 actorName: baseActorName,
                 runId: actorRun.id,
