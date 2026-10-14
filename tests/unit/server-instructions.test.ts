@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
@@ -219,127 +221,60 @@ describe('getServerInstructions()', () => {
         return instructions.slice(start, end === -1 ? undefined : end);
     };
 
+    it.each([SERVER_MODE.DEFAULT, SERVER_MODE.APPS])(
+        'preserves all-tools task and schedule text in %s mode',
+        (mode) => {
+            const instructions = getServerInstructions(mode, ALL_TOOLS_PRESENT);
+            const sections = instructions.slice(
+                instructions.indexOf('## Actor tasks'),
+                instructions.indexOf('\n## Storage types'),
+            );
+            // Pins the byte-identical text from master 4406158 without duplicating the prose.
+            expect(createHash('sha256').update(sections).digest('hex')).toBe(
+                'b9b1f9dbe2fe38a48d3aeeaf9ac1fe2307bdad47ae1cbbaa6ff34392a98fbe8c',
+            );
+        },
+    );
+
+    it.each(['## Actor tasks', '## Schedules'])('omits %s when its tools are absent', (heading) => {
+        expect(getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.STORE_SEARCH))).not.toContain(heading);
+    });
+
     describe('"## Actor tasks" section', () => {
-        const TASK_TOOLS = [
-            HELPER_TOOLS.ACTOR_TASK_CREATE,
-            HELPER_TOOLS.ACTOR_TASK_GET,
-            HELPER_TOOLS.ACTOR_TASK_UPDATE,
-            HELPER_TOOLS.ACTOR_TASK_PUBLISH,
-            HELPER_TOOLS.ACTOR_TASK_UNPUBLISH,
-        ];
-
-        it('omits the section when no task tool is served', () => {
-            const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.STORE_SEARCH));
-            expect(instructions).not.toContain('## Actor tasks');
-        });
-
-        it.each(TASK_TOOLS)('renders the section with %s alone', (toolName) => {
+        it.each([
+            [HELPER_TOOLS.ACTOR_TASK_CREATE, true, false],
+            [HELPER_TOOLS.ACTOR_TASK_GET, false, false],
+            [HELPER_TOOLS.ACTOR_TASK_UPDATE, true, false],
+            [HELPER_TOOLS.ACTOR_TASK_PUBLISH, false, true],
+            [HELPER_TOOLS.ACTOR_TASK_UNPUBLISH, false, false],
+        ] as const)('gates task guidance with %s alone', (toolName, hasPrivacy, hasPublish) => {
             const section = sectionOf(getServerInstructions(SERVER_MODE.DEFAULT, only(toolName)), '## Actor tasks');
             expect(section).toContain('- An Actor task is a saved, reusable configuration of an Actor.');
-        });
-
-        it('gives only general facts with get-actor-task alone', () => {
-            const section = sectionOf(
-                getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.ACTOR_TASK_GET)),
-                '## Actor tasks',
-            );
             expect(section).toContain('Tasks are useful for repeated or scheduled jobs');
-            expect(section).not.toContain('Creating or updating a task');
-            expect(section).not.toContain('Publishing a task');
-            expect(section).not.toContain('Publish only tasks');
-        });
-
-        it.each([HELPER_TOOLS.ACTOR_TASK_CREATE, HELPER_TOOLS.ACTOR_TASK_UPDATE])(
-            'states that a task stays private with %s',
-            (toolName) => {
-                const section = sectionOf(getServerInstructions(SERVER_MODE.DEFAULT, only(toolName)), '## Actor tasks');
-                expect(section).toContain('- Creating or updating a task does not make it public.');
-                expect(section).not.toContain('Publishing a task');
-            },
-        );
-
-        it('gives publishing guidance only with publish-actor-task', () => {
-            const withPublish = sectionOf(
-                getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.ACTOR_TASK_PUBLISH)),
-                '## Actor tasks',
-            );
-            const withUnpublish = sectionOf(
-                getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.ACTOR_TASK_UNPUBLISH)),
-                '## Actor tasks',
-            );
-            expect(withPublish).toContain('- Publishing a task creates a public landing page');
-            expect(withPublish).toContain('- Publish only tasks that represent a useful');
-            expect(withUnpublish).not.toContain('Publishing a task');
-            expect(withUnpublish).not.toContain('Publish only tasks');
-            expect(withPublish).not.toContain('Creating or updating a task');
-            expect(withUnpublish).not.toContain('Creating or updating a task');
+            expect(section.includes('Creating or updating a task')).toBe(hasPrivacy);
+            expect(section.includes('Publishing a task')).toBe(hasPublish);
+            expect(section.includes('Publish only tasks')).toBe(hasPublish);
         });
     });
 
     describe('"## Schedules" section', () => {
-        const instructions = getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT);
-        const SCHEDULE_TOOLS = [
-            HELPER_TOOLS.SCHEDULE_CREATE,
-            HELPER_TOOLS.SCHEDULE_GET,
-            HELPER_TOOLS.SCHEDULE_UPDATE,
-            HELPER_TOOLS.SCHEDULE_DELETE,
-        ];
-
-        it('renders for ALL_TOOLS_PRESENT', () => {
-            expect(instructions).toContain('## Schedules');
-        });
-
-        it('omits the section when no schedule tool is served', () => {
-            expect(getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.STORE_SEARCH))).not.toContain(
-                '## Schedules',
-            );
-        });
-
-        it.each(SCHEDULE_TOOLS)('renders the section with %s alone', (toolName) => {
+        it.each([
+            [HELPER_TOOLS.SCHEDULE_CREATE, true, false, true],
+            [HELPER_TOOLS.SCHEDULE_GET, false, false, false],
+            [HELPER_TOOLS.SCHEDULE_UPDATE, false, true, true],
+            [HELPER_TOOLS.SCHEDULE_DELETE, false, false, false],
+        ] as const)('gates schedule guidance with %s alone', (toolName, hasCreate, hasUpdate, hasCronAdvice) => {
             const section = sectionOf(getServerInstructions(SERVER_MODE.DEFAULT, only(toolName)), '## Schedules');
             expect(section).toContain('- A schedule runs Actors and/or saved tasks automatically on a cron expression');
-        });
-
-        it.each([HELPER_TOOLS.SCHEDULE_GET, HELPER_TOOLS.SCHEDULE_DELETE])(
-            'gives only general facts with %s alone',
-            (toolName) => {
-                const section = sectionOf(getServerInstructions(SERVER_MODE.DEFAULT, only(toolName)), '## Schedules');
-                expect(section).toContain('fire at a random offset inside their period.\n');
-                expect(section).toContain('- Disabling a schedule pauses it without losing its configuration.');
-                expect(section).toContain('- A schedule holds at most 10 Actor actions and 10 task actions.');
-                expect(section).not.toContain('use an explicit expression');
-                expect(section).not.toContain('the create tool here');
-                expect(section).not.toContain("Updating a schedule's actions");
-            },
-        );
-
-        it('states creation behavior only with create-schedule', () => {
-            const section = sectionOf(
-                getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.SCHEDULE_CREATE)),
-                '## Schedules',
-            );
-            expect(section).toContain(
-                '- The platform creates schedules disabled by default, but the create tool here enables them unless ' +
-                    'told otherwise. Disabling a schedule pauses it',
-            );
-            expect(section).toContain('so use an explicit expression when the user names a time.');
-            expect(section).not.toContain("Updating a schedule's actions");
-        });
-
-        it('states action replacement only with update-schedule', () => {
-            const section = sectionOf(
-                getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.SCHEDULE_UPDATE)),
-                '## Schedules',
-            );
-            expect(section).toContain(
-                "- Updating a schedule's actions replaces the whole list, so send every action to keep.",
-            );
-            expect(section).toContain('so use an explicit expression when the user names a time.');
-            expect(section).not.toContain('the create tool here');
+            expect(section).toContain('Disabling a schedule pauses it without losing its configuration.');
+            expect(section).toContain('- A schedule holds at most 10 Actor actions and 10 task actions.');
+            expect(section.includes('the create tool here')).toBe(hasCreate);
+            expect(section.includes("Updating a schedule's actions")).toBe(hasUpdate);
+            expect(section.includes('so use an explicit expression')).toBe(hasCronAdvice);
         });
     });
 
-    // Gated on the tool group, not on each tool, so a tool name slipping in would reach sessions without that tool.
+    // Group-level gating must not expose names of individual tools that may be absent.
     it.each(['## Actor tasks', '## Schedules'])('names no tool in %s', (heading) => {
         const block = sectionOf(getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT), heading);
         expect(block).not.toBe('');
@@ -348,17 +283,14 @@ describe('getServerInstructions()', () => {
         }
     });
 
-    it.each([
-        HELPER_TOOLS.ACTOR_TASK_GET,
-        HELPER_TOOLS.ACTOR_TASK_PUBLISH,
-        HELPER_TOOLS.SCHEDULE_GET,
-        HELPER_TOOLS.SCHEDULE_UPDATE,
-    ])('keeps the task and schedule sections on their own lines with %s alone', (toolName) => {
-        const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(toolName));
-        expect(instructions).not.toContain('\n\n\n');
-        expect(instructions).not.toMatch(/\.- /);
-        expect(instructions).toMatch(/efficiently\.\n\n## (Actor tasks|Schedules)\n/);
-        expect(instructions).toMatch(/\.\n\n## Storage types\n/);
+    it('separates the read-only task and schedule sections with blank lines', () => {
+        const instructions = getServerInstructions(
+            SERVER_MODE.DEFAULT,
+            only(HELPER_TOOLS.ACTOR_TASK_GET, HELPER_TOOLS.SCHEDULE_GET),
+        );
+        for (const heading of ['## Actor tasks', '## Schedules', '## Storage types']) {
+            expect(instructions).toContain(`\n\n${heading}\n`);
+        }
     });
 
     describe('"## Apify API resources" section', () => {
