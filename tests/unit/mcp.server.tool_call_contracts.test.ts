@@ -275,6 +275,18 @@ describe('CallToolRequestSchema handler', () => {
                 expect('internalToolStatus' in result).toBe(false);
             });
         });
+
+        it('ends a 404 failure with the API message and no generic hint', async () => {
+            await withServer(async (server) => {
+                silenceLogs();
+                const error = Object.assign(new Error('Actor run was not found'), { statusCode: 404 });
+                const result = await runSync(server, makeThrowingTool({ error }));
+                expect(result.isError).toBe(true);
+                expect(result.content).toEqual([
+                    { type: 'text', text: 'Error calling tool "test-throwing-tool": Actor run was not found.' },
+                ]);
+            });
+        });
     });
 
     it('rejects a task-augmented call to a tool without taskSupport before dispatch', async () => {
