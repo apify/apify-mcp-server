@@ -84,7 +84,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
         if (actors.length === 0) {
             // Honor the widget tool's declared outputSchema: widgetActors is required, so
             // emit an empty array rather than dropping the field.
-            const instructions = buildNoActorsFoundInstructions(parsed.keywords);
+            const instructions = buildNoActorsFoundInstructions(parsed.keywords, parsed.offset);
             return respondOk(instructions, {
                 structuredContent: {
                     actors: [],
