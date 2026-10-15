@@ -122,7 +122,7 @@ export const deleteActor: ToolEntry = Object.freeze({
                 return respondUserError(
                     `${fullName} has ${unfinishedRunCount} unfinished ${unfinishedRunCount === 1 ? 'run' : 'runs'} ` +
                         `(${runIds}${more}), and deleting it aborts them. Ask the user whether to abort them. ` +
-                        'abortRunningRuns=true deletes it anyway, which aborts them; otherwise the Actor can be deleted once they finish.',
+                        'abortRunningRuns=true aborts them before deleting; otherwise the Actor can be deleted once they finish.',
                 );
             }
             await client.actor(actor.id).delete();
