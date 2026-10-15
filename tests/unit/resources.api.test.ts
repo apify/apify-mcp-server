@@ -12,6 +12,12 @@ import { mockApifyClient } from './helpers/tool_context.js';
 
 const API = 'https://api.apify.com';
 
+const METHOD_PARAM_REFUSAL =
+    'The API tools do not send the method query parameter: the API would take it as the HTTP method of the request.';
+
+const SYNC_RUN_REFUSAL =
+    'A GET to the synchronous run endpoints starts a paid run, as a POST does, so the API tools do not send it.';
+
 // `contents[0]` is a text|blob union; narrow it in tests that read one shape.
 function firstContent(result: ReadResourceResult): { mimeType?: string; text?: string; blob?: string } {
     return result.contents[0] as { mimeType?: string; text?: string; blob?: string };
@@ -206,16 +212,18 @@ describe('readApiResource()', () => {
     });
 
     it.each([
-        `${API}/v2/datasets/ds-1?method=DELETE`,
-        `${API}/v2/datasets/ds-1?%6Dethod=DELETE`,
-        `${API}/v2/acts/apify~hello-world/run-sync`,
-        `${API}/v2/actor-tasks/abc/run-sync-get-dataset-items`,
-    ])('throws InvalidParams without a request for %s, as the API tools refuse it', async (uri) => {
+        [`${API}/v2/datasets/ds-1?method=DELETE`, METHOD_PARAM_REFUSAL],
+        [`${API}/v2/datasets/ds-1?%6Dethod=DELETE`, METHOD_PARAM_REFUSAL],
+        [`${API}/v2/acts/apify~hello-world/run-sync`, SYNC_RUN_REFUSAL],
+        [`${API}/v2/actor-tasks/abc/run-sync-get-dataset-items`, SYNC_RUN_REFUSAL],
+    ])('throws InvalidParams without a request for %s, as the API tools refuse it', async (uri, refusal) => {
         const { request, captured } = requestReturning(streamOf('{}'), 'application/json');
 
         const error = await expectReadError(readApiResource(uri, stubApifyClient({ request })));
 
         expect(error).toBeInstanceOf(InvalidParamsError);
+        // readApiResource does not know the session's tools, so the refusal names none.
+        expect(error.message).toBe(`Failed to read ${uri}: ${refusal}`);
         expect(error.data).toEqual({ uri });
         expect(captured.url).toBe('');
     });
