@@ -717,9 +717,9 @@ describe('executeToolAndUpdateTask()', () => {
     });
 
     it('suppresses the report-problem nudge for a 402-carrying ACTOR_MCP task failure', async () => {
-        // Pins the accepted task-mode delta. The ACTOR_MCP dispatch catch now carries
-        // failure_http_status, so a contained remote 402 reaches withReportProblemNudge with
-        // failureHttpStatus === 402 and the nudge is suppressed (402 is a billing state, not a defect).
+        // Pins the accepted task-mode delta. A contained remote 402 reaches withReportProblemNudge as
+        // INVALID_INPUT with failureHttpStatus === 402, and the nudge is suppressed (402 is a billing
+        // state, not a defect).
         await withServer(async (server) => {
             silenceLogs();
             const rejectingClient = {

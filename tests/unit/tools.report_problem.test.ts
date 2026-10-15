@@ -175,7 +175,6 @@ describe('reportProblem', () => {
             const result = appendReportProblemNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
-                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
                 failureHttpStatus: 402,
             });
             expect(nudgeCount(result)).toBe(0);
