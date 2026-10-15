@@ -5,8 +5,13 @@ import log from '@apify/log';
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { InvalidToolCall, PreparedCall } from '../../src/mcp/tool_call_engine.js';
-import { executeSyncToolCall, prepareToolCall } from '../../src/mcp/tool_call_engine.js';
+import { classifyToolCallError, executeSyncToolCall, prepareToolCall } from '../../src/mcp/tool_call_engine.js';
 import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
+import {
+    REPORT_PROBLEM_INVALID_INPUT_NUDGE,
+    REPORT_PROBLEM_NUDGE,
+    reportProblem,
+} from '../../src/tools/dev/report_problem.js';
 import type { ToolCallTelemetryProperties, ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
@@ -269,5 +274,32 @@ describe('executeSyncToolCall()', () => {
             expect(outcome.result.isError).toBe(true);
             expect(outcome.result.toolTelemetry).toEqual({ toolStatus: TOOL_STATUS.ABORTED });
         });
+    });
+});
+
+describe('classifyToolCallError()', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it.each([
+        ['an internal failure gets the general sentence', new Error('boom'), REPORT_PROBLEM_NUDGE],
+        [
+            'a 4xx failure gets the friction sentence',
+            Object.assign(new Error('Not found'), { statusCode: 404 }),
+            REPORT_PROBLEM_INVALID_INPUT_NUDGE,
+        ],
+    ])('appends one report-problem sentence to an execution error: %s', (_label, error, sentence) => {
+        silenceLogs();
+        const outcome = classifyToolCallError(error, {
+            tools: new Map<string, ToolEntry>([[HELPER_TOOLS.PROBLEM_REPORT, reportProblem]]),
+            toolName: 'some-tool',
+            failingToolName: 'some-tool',
+            actorName: undefined,
+            actorId: undefined,
+            isAborted: false,
+            mcpSessionId: 's1',
+        });
+        const texts = (outcome.result.content as { text: string }[]).map((c) => c.text);
+        expect(texts).toHaveLength(2);
+        expect(texts[1]).toBe(sentence);
     });
 });

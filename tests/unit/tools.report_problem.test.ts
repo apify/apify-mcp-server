@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { FAILURE_CATEGORY, HELPER_TOOLS } from '../../src/const.js';
-import { appendReportProblemNudge, REPORT_PROBLEM_NUDGE, reportProblem } from '../../src/tools/dev/report_problem.js';
+import {
+    appendReportProblemNudge,
+    REPORT_PROBLEM_INVALID_INPUT_NUDGE,
+    REPORT_PROBLEM_NUDGE,
+    reportProblem,
+} from '../../src/tools/dev/report_problem.js';
 import { reportProblemToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool } from '../../src/types.js';
 import {
@@ -47,7 +52,6 @@ describe('reportProblem', () => {
                     'problem for other users.',
             );
             expect(description).not.toContain('Call it when');
-            expect(description).not.toContain('Use it for');
         });
     });
 
@@ -177,12 +181,14 @@ describe('reportProblem', () => {
             ]);
         });
 
-        it('does not append for a 402 payment response', () => {
+        it('does not append any nudge for a 402 payment response, though 402 is classified INVALID_INPUT', () => {
             const result = appendReportProblemNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
+                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
                 failureHttpStatus: 402,
             });
+            expect(result.content.filter((c) => c.text === REPORT_PROBLEM_INVALID_INPUT_NUDGE)).toHaveLength(0);
             expect(nudgeCount(result)).toBe(0);
             expect(result.content).toHaveLength(1);
         });
