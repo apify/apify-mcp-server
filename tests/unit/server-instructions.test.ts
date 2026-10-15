@@ -306,6 +306,15 @@ describe('getServerInstructions()', () => {
         }
     });
 
+    describe('"## Storage types" section', () => {
+        it('states the retention of unnamed and named storages', () => {
+            const block = sectionOf(getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT), '## Storage types');
+            expect(block).toContain(
+                "- Unnamed storages are deleted after the account's data-retention period; named storages are kept until deleted.",
+            );
+        });
+    });
+
     describe('"## Apify API resources" section', () => {
         const API_READ_LINE =
             `- Use \`${HELPER_TOOLS.API_READ}\` for API GETs. If your client can read resources, \`resources/read\` ` +

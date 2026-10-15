@@ -87,6 +87,7 @@ export const getKeyValueStoreList: ToolEntry = Object.freeze({
                 loadedToolNames,
                 `Use ${HELPER_TOOLS.KEY_VALUE_STORE_GET} with a keyValueStoreId from the list to inspect a store.`,
             ),
+            isNamedOnly: !parsed.unnamed,
         });
         return buildStorageResponse({
             structuredContent: stores as unknown as Record<string, unknown>,
