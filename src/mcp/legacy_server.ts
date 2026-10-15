@@ -364,8 +364,9 @@ export class LegacyMcpServer {
         // Handles the request to list tools.
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
             const presentTools = new Set(this.host.tools.keys());
+            const { clientParam } = this.host.options;
             const tools = Array.from(this.host.tools.values()).map((tool) =>
-                getToolPublicFieldOnly(tool, { presentTools }),
+                getToolPublicFieldOnly(tool, { presentTools, clientParam }),
             );
             return { tools };
         });
@@ -598,6 +599,7 @@ export class LegacyMcpServer {
                     signal,
                     sendNotification,
                     emitLog,
+                    clientParam: this.host.options.clientParam,
                 });
                 toolStatus = outcome.toolStatus;
                 callDiagnostics = outcome.callDiagnostics;

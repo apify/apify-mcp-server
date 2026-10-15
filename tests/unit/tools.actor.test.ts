@@ -8,6 +8,7 @@ import {
     actorNameToToolName,
     canRunActor,
     canRunAnyActor,
+    getOwnServerRemedy,
     legacyToolNameToNew,
     resolveActorToolMode,
 } from '../../src/tools/actor_tool_naming.js';
@@ -146,6 +147,20 @@ describe('canRunActor()', () => {
     it('returns false when call-actor is absent and the Actor ID is not in loadedActorIds', () => {
         expect(canRunActor('actor-id-1', [], new Set(['other-actor-id']))).toBe(false);
         expect(canRunActor('actor-id-1', [], new Set())).toBe(false);
+    });
+});
+
+describe('getOwnServerRemedy()', () => {
+    it('names the Claude custom connector for the Claude connector URL tag', () => {
+        expect(getOwnServerRemedy('claude')).toBe(
+            'create your own Apify MCP server configuration at https://mcp.apify.com and add it to Claude as a custom connector.',
+        );
+    });
+
+    it.each([undefined, 'cursor', 'claude-code', 'Claude'])('names the MCP client for %s', (clientParam) => {
+        expect(getOwnServerRemedy(clientParam)).toBe(
+            'create your own Apify MCP server configuration at https://mcp.apify.com and add it to your MCP client.',
+        );
     });
 });
 

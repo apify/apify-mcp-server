@@ -10,7 +10,7 @@ import { CLAUDE_CONNECTOR_TOOLS } from './helpers/claude_connector_tools.js';
 import { only } from './helpers/tool_context.js';
 
 const RUN_LIMITATION_LINE =
-    '- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, set up your own Apify MCP server at https://mcp.apify.com.\n';
+    '- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, create your own Apify MCP server configuration at https://mcp.apify.com and add it to your MCP client.\n';
 
 describe('getServerInstructions()', () => {
     it('defaults to ALL_TOOLS_PRESENT — no regression for the common case (every tool loaded)', () => {
@@ -399,6 +399,22 @@ describe('getServerInstructions()', () => {
         it('omits the limitation when the session has call-actor', () => {
             const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.ACTOR_CALL));
             expect(instructions).not.toContain(RUN_LIMITATION_LINE);
+        });
+
+        it('names the Claude custom connector when clientParam is claude', () => {
+            const instructions = getServerInstructions(SERVER_MODE.DEFAULT, {
+                ...only(HELPER_TOOLS.STORE_SEARCH),
+                clientParam: 'claude',
+            });
+            expect(instructions).toContain(
+                'To use another Actor, create your own Apify MCP server configuration at https://mcp.apify.com and add it to Claude as a custom connector.\n',
+            );
+        });
+
+        it('renders the same instructions with and without clientParam when the session can run Actors', () => {
+            expect(getServerInstructions(SERVER_MODE.DEFAULT, { ...ALL_TOOLS_PRESENT, clientParam: 'claude' })).toBe(
+                getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT),
+            );
         });
 
         it('states the limitation when the session has only create-schedule', () => {

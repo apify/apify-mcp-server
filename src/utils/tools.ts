@@ -65,6 +65,8 @@ type ToolPublicFieldOptions = {
      * When unset, `description` (the all-tools-present render) is returned as-is.
      */
     presentTools?: ReadonlySet<string>;
+    /** Raw `?client=` URL query-param value, forwarded to `buildDescription`. */
+    clientParam?: string;
 };
 
 /**
@@ -81,10 +83,10 @@ function fixZodInputSchemaRequired(inputSchema: ToolBase['inputSchema']): ToolBa
  * Used for the tools list request.
  */
 export function getToolPublicFieldOnly(tool: ToolBase, options: ToolPublicFieldOptions = {}) {
-    const { presentTools } = options;
+    const { presentTools, clientParam } = options;
     const description =
         tool.buildDescription && presentTools
-            ? tool.buildDescription({ hasTool: (name) => presentTools.has(name) })
+            ? tool.buildDescription({ hasTool: (name) => presentTools.has(name), clientParam })
             : tool.description;
 
     return {

@@ -20,7 +20,7 @@ import { getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console
 import { respondOk } from '../../utils/mcp.js';
 import type { PricingTier } from '../../utils/pricing_info.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import { ACTOR_CALLABILITY_CAVEAT, actorNameToToolName, canRunActor, canRunAnyActor } from '../actor_tool_naming.js';
+import { actorNameToToolName, canRunActor, canRunAnyActor, getActorCallabilityCaveat } from '../actor_tool_naming.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 
 // hasTool checks registered tool names, not Actor full names — see call_actor.ts's RAG_WEB_BROWSER_TOOL.
@@ -67,8 +67,8 @@ export const searchActorsBaseArgsSchema = z.object({
     offset: z.number().int().min(0).default(0).describe('The number of elements to skip from the start (default = 0)'),
 });
 
-function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    const runLimitationLine = canRunAnyActor(hasTool) ? '' : `${ACTOR_CALLABILITY_CAVEAT}\n`;
+function buildDescription({ hasTool, clientParam }: ToolDescriptionContext): string {
+    const runLimitationLine = canRunAnyActor(hasTool) ? '' : `${getActorCallabilityCaveat(clientParam)}\n`;
     return `Search the Apify Store to FIND and DISCOVER what scraping tools/Actors exist for specific platforms or use cases.
 This tool provides INFORMATION about available Actors - it does NOT retrieve actual data or run any scraping tasks.
 
@@ -139,11 +139,14 @@ export function buildNoActorsFoundInstructions(keywords: string, offset: number)
 /** Caveat for the whole result list — appended only when at least one result lacks a run path. */
 export function buildActorCallabilityCaveat(
     actorIds: readonly string[],
-    loadedToolNames: readonly string[],
-    loadedActorIds: ReadonlySet<string>,
+    {
+        loadedToolNames,
+        loadedActorIds,
+        clientParam,
+    }: Pick<InternalToolArgs, 'loadedToolNames' | 'loadedActorIds' | 'clientParam'>,
 ): string {
     const canRunAllActors = actorIds.every((id) => canRunActor(id, loadedToolNames, loadedActorIds));
-    return canRunAllActors ? '' : ACTOR_CALLABILITY_CAVEAT;
+    return canRunAllActors ? '' : getActorCallabilityCaveat(clientParam);
 }
 
 /** Footer line pointing to fetch-actor-details; added only when the session serves that tool. */
@@ -164,11 +167,10 @@ specific Actor name.`;
 export function buildSearchActorsFooter(
     verbatimLinksNudge: string,
     actorIds: readonly string[],
-    loadedToolNames: readonly string[],
-    loadedActorIds: ReadonlySet<string>,
+    session: Pick<InternalToolArgs, 'loadedToolNames' | 'loadedActorIds' | 'clientParam'>,
 ): string {
-    const detailsHint = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS) ? ACTOR_DETAILS_HINT : '';
-    const callabilityCaveat = buildActorCallabilityCaveat(actorIds, loadedToolNames, loadedActorIds);
+    const detailsHint = session.loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS) ? ACTOR_DETAILS_HINT : '';
+    const callabilityCaveat = buildActorCallabilityCaveat(actorIds, session);
     return [detailsHint, verbatimLinksNudge, callabilityCaveat].filter(Boolean).join('\n');
 }
 
@@ -193,7 +195,7 @@ export const searchActors: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyClient, paymentProvider, loadedToolNames, loadedActorIds } = toolArgs;
+        const { args, apifyToken, apifyClient, paymentProvider } = toolArgs;
         const parsed = searchActorsBaseArgsSchema.parse(args);
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
@@ -220,7 +222,7 @@ export const searchActors: ToolEntry = Object.freeze({
         const { actorCardText, actorCardStructured } = buildSearchActorsResult(actors, userPlanTier, linkContext);
         const verbatimLinksNudge = linkContext ? VERBATIM_LINKS_NUDGE : '';
         const actorIds = actors.map((actor) => actor.id);
-        const footer = buildSearchActorsFooter(verbatimLinksNudge, actorIds, loadedToolNames, loadedActorIds);
+        const footer = buildSearchActorsFooter(verbatimLinksNudge, actorIds, toolArgs);
         const structuredContent = {
             actors: actorCardStructured,
             query: parsed.keywords,

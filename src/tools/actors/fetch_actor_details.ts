@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { APIFY_MCP_URL, HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type {
     ConsoleLinkContext,
     HelperTool,
@@ -24,7 +24,7 @@ import { buildConsoleActorUrl, getConsoleLinkContext, VERBATIM_LINKS_NUDGE } fro
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import { canRunActor } from '../actor_tool_naming.js';
+import { canRunActor, getOwnServerRemedy } from '../actor_tool_naming.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 
@@ -154,13 +154,16 @@ export function buildActorNotFoundResponse(actorName: string, loadedToolNames: r
 /** Guidance appended when the Actor exists but `canRunActor` says this session can't run it. */
 export function buildActorNotRunnableGuidance(
     actorId: string,
-    loadedToolNames: readonly string[],
-    loadedActorIds: ReadonlySet<string>,
+    {
+        loadedToolNames,
+        loadedActorIds,
+        clientParam,
+    }: Pick<InternalToolArgs, 'loadedToolNames' | 'loadedActorIds' | 'clientParam'>,
 ): string {
     if (canRunActor(actorId, loadedToolNames, loadedActorIds)) return '';
     return dedent`
         This Actor is not exposed as a tool and cannot be run in this configuration. To use it,
-        set up your own Apify MCP server at ${APIFY_MCP_URL}.
+        ${getOwnServerRemedy(clientParam)}
     `;
 }
 
@@ -245,16 +248,7 @@ export function buildActorDetailsTextResponse(options: {
  * Returns the same text + structured response in both modes.
  */
 export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): Promise<ToolResponse> {
-    const {
-        args,
-        apifyToken,
-        apifyClient,
-        actorStore,
-        paymentProvider,
-        mcpSessionId,
-        loadedToolNames,
-        loadedActorIds,
-    } = toolArgs;
+    const { args, apifyToken, apifyClient, actorStore, paymentProvider, mcpSessionId, loadedToolNames } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
     const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_GET_DETAILS });
 
@@ -295,7 +289,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     });
 
     // Resolved Actor ID, not the raw `actor` input — that may itself be an ID.
-    const runnableGuidance = buildActorNotRunnableGuidance(details.actorInfo.id, loadedToolNames, loadedActorIds);
+    const runnableGuidance = buildActorNotRunnableGuidance(details.actorInfo.id, toolArgs);
     if (runnableGuidance) texts.push(runnableGuidance);
 
     return respondOk(texts, { structuredContent });

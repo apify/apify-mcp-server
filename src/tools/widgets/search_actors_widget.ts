@@ -10,7 +10,7 @@ import { searchAgentSafeActors } from '../../utils/actor_search.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import { ACTOR_CALLABILITY_CAVEAT, canRunAnyActor } from '../actor_tool_naming.js';
+import { canRunAnyActor, getActorCallabilityCaveat } from '../actor_tool_naming.js';
 import {
     buildActorCallabilityCaveat,
     buildNoActorsFoundInstructions,
@@ -27,12 +27,12 @@ import { actorSearchWidgetOutputSchema } from '../structured_output_schemas.js';
  */
 const searchActorsWidgetArgsSchema = searchActorsBaseArgsSchema.strict();
 
-function buildDescription({ hasTool }: ToolDescriptionContext): string {
+function buildDescription({ hasTool, clientParam }: ToolDescriptionContext): string {
     const silentSearchHint = canRunAnyActor(hasTool)
         ? `For silent name resolution before running an Actor (e.g., "scrape google maps" — you need to find the right Actor first, then fetch its schema and call it), use ${HELPER_TOOLS.STORE_SEARCH} instead — it returns the same data without rendering a widget.`
         : `For silent Actor discovery, ${HELPER_TOOLS.STORE_SEARCH} returns the same data without rendering a widget.`;
     // Kept outside dedent, per CONTRIBUTING's rule against interpolating flush-left values into it.
-    const runLimitation = canRunAnyActor(hasTool) ? '' : `\n\n${ACTOR_CALLABILITY_CAVEAT}`;
+    const runLimitation = canRunAnyActor(hasTool) ? '' : `\n\n${getActorCallabilityCaveat(clientParam)}`;
     return (
         dedent`
         Render an interactive UI element (widget) displaying Apify Store search results for the user.
@@ -66,7 +66,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyClient, paymentProvider, loadedToolNames, loadedActorIds } = toolArgs;
+        const { args, apifyToken, apifyClient, paymentProvider } = toolArgs;
         const parsed = searchActorsWidgetArgsSchema.parse(args);
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
@@ -117,8 +117,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
         ];
         const callabilityCaveat = buildActorCallabilityCaveat(
             actors.map((actor) => actor.id),
-            loadedToolNames,
-            loadedActorIds,
+            toolArgs,
         );
         if (callabilityCaveat) texts.push(callabilityCaveat);
 

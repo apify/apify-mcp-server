@@ -286,12 +286,28 @@ describe('buildFetchActorDetailsResult()', () => {
 
 describe('buildActorNotRunnableGuidance()', () => {
     it('is empty when call-actor is loaded', () => {
-        expect(buildActorNotRunnableGuidance('actor-id-1', [HELPER_TOOLS.ACTOR_CALL], new Set())).toBe('');
+        expect(
+            buildActorNotRunnableGuidance('actor-id-1', {
+                loadedToolNames: [HELPER_TOOLS.ACTOR_CALL],
+                loadedActorIds: new Set(),
+            }),
+        ).toBe('');
     });
 
     it('names no tool, only states the Actor cannot run, when neither is loaded', () => {
-        const text = buildActorNotRunnableGuidance('actor-id-1', [], new Set());
+        const text = buildActorNotRunnableGuidance('actor-id-1', { loadedToolNames: [], loadedActorIds: new Set() });
         expect(text).toContain('cannot be run in this configuration');
+    });
+
+    it('names the Claude custom connector when clientParam is claude', () => {
+        const text = buildActorNotRunnableGuidance('actor-id-1', {
+            loadedToolNames: [],
+            loadedActorIds: new Set(),
+            clientParam: 'claude',
+        });
+        expect(text).toContain(
+            'create your own Apify MCP server configuration at https://mcp.apify.com and add it to Claude as a custom connector.',
+        );
     });
 });
 

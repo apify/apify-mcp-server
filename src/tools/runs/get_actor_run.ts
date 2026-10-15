@@ -9,7 +9,7 @@ import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildUsageMeta, respondAborted, respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
-import { ACTOR_TIP_CAVEAT } from '../actor_tool_naming.js';
+import { getActorTipCaveat } from '../actor_tool_naming.js';
 import {
     applyConsoleLinks,
     type FetchActorRunResult,
@@ -66,11 +66,15 @@ export function buildGetActorRunError(runId: string, error: unknown): ToolRespon
  * Without `hasCallActorTool`, `tip.caveat` says the session cannot run the recommended Actor; it is also printed after the tip.
  */
 export function buildGetActorRunResponse(
-    params: FetchActorRunResult & { linkContext?: ConsoleLinkContext; hasCallActorTool?: boolean },
+    params: FetchActorRunResult & {
+        linkContext?: ConsoleLinkContext;
+        hasCallActorTool?: boolean;
+        clientParam?: string;
+    },
 ): ToolResponse {
-    const { run, structuredContent, linkContext, hasCallActorTool = true } = params;
+    const { run, structuredContent, linkContext, hasCallActorTool = true, clientParam } = params;
     if (structuredContent.tip && !hasCallActorTool) {
-        structuredContent.tip = { ...structuredContent.tip, caveat: ACTOR_TIP_CAVEAT };
+        structuredContent.tip = { ...structuredContent.tip, caveat: getActorTipCaveat(clientParam) };
     }
     const { tip } = structuredContent;
 
@@ -141,6 +145,7 @@ export const getActorRun: ToolEntry = Object.freeze({
             mcpSessionId,
             signal,
             loadedToolNames,
+            clientParam,
         } = toolArgs;
         const parsed = getActorRunArgs.parse(args);
 
@@ -163,6 +168,7 @@ export const getActorRun: ToolEntry = Object.freeze({
                 ...fetchResult.result,
                 linkContext: await getConsoleLinkContext(apifyToken, client),
                 hasCallActorTool: loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL),
+                clientParam,
             });
         } catch (error) {
             logHttpError(error, 'Failed to get Actor run', { runId: parsed.runId });

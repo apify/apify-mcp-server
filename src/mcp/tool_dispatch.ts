@@ -60,6 +60,8 @@ export async function dispatchToolCall(params: {
     actorName?: string;
     actorId?: string;
     taskMode: boolean;
+    /** Raw `?client=` URL query-param value, forwarded to the tool for wording. */
+    clientParam?: string;
     // Caller-supplied log decoration (task mode: ' for task' suffix + taskId field), applied
     // mechanically to the per-branch "Calling …" lines — no effect on dispatch behavior.
     logContext?: { messageSuffix: string; fields: Record<string, unknown> };
@@ -83,6 +85,7 @@ export async function dispatchToolCall(params: {
         actorName,
         actorId,
         taskMode,
+        clientParam,
         logContext,
     } = params;
 
@@ -114,6 +117,7 @@ export async function dispatchToolCall(params: {
                     progressTracker,
                     mcpSessionId,
                     taskMode,
+                    clientParam,
                 })) as Record<string, unknown>;
 
                 // Extract diagnostics and strip internal fields from res before returning to client.
@@ -261,6 +265,7 @@ export async function dispatchToolCall(params: {
                     datasetItemsSchema: tool.datasetItemsSchema,
                     taskMode,
                     hasCallActorTool: tools.has(HELPER_TOOLS.ACTOR_CALL),
+                    clientParam,
                 });
 
                 if (!executorResult) {

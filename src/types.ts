@@ -90,6 +90,8 @@ export type ActorDefinitionWithInfo = {
 export type ToolDescriptionContext = {
     /** Whether the named tool is served in the same tools/list as this tool. */
     hasTool: (name: string) => boolean;
+    /** Raw `?client=` URL query-param value; picks wording only, never the tool set. */
+    clientParam?: string;
 };
 
 /** Renders every cross-tool reference as present — for building `description` at module load. */
@@ -193,6 +195,8 @@ export type InternalToolArgs = {
     mcpSessionId?: string;
     /** True when the tool is executing as a background MCP task. */
     taskMode?: boolean;
+    /** Raw `?client=` URL query-param value; picks wording only. */
+    clientParam?: string;
 };
 
 /**
@@ -539,6 +543,8 @@ export type ActorExecutionParams = {
     taskMode?: boolean;
     /** Whether the session serves call-actor; without it, an Actor's tip gets the callability caveat. */
     hasCallActorTool?: boolean;
+    /** Raw `?client=` URL query-param value; picks the caveat wording. */
+    clientParam?: string;
 };
 
 /**

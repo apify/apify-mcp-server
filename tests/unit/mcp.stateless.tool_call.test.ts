@@ -13,7 +13,13 @@ import { X402PaymentProvider } from '../../src/payments/x402.js';
 import * as telemetry from '../../src/telemetry.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import * as callActor from '../../src/tools/actors/call_actor.js';
-import type { ActorsMcpServerOptions, Input, ToolEntry, ToolInputSchema } from '../../src/types.js';
+import type {
+    ActorsMcpServerOptions,
+    Input,
+    ToolDescriptionContext,
+    ToolEntry,
+    ToolInputSchema,
+} from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
 import { respondRaw } from '../../src/utils/mcp.js';
@@ -171,13 +177,17 @@ async function callViaLegacy(
     }, options);
 }
 
-async function listViaLegacy(buildTools: () => ToolEntry[], input: Input): Promise<Record<string, unknown>> {
+async function listViaLegacy(
+    buildTools: () => ToolEntry[],
+    input: Input,
+    options?: Partial<ActorsMcpServerOptions>,
+): Promise<Record<string, unknown>> {
     return await withServer(async (server) => {
         await loadSource(server, buildTools(), input);
         await getRequestHandler(server, 'initialize')(LEGACY_INITIALIZE, {});
         const result = await getRequestHandler(server, 'tools/list')({ method: 'tools/list', params: {} }, {});
         return result;
-    });
+    }, options);
 }
 
 /** Wire-normalize a stateful result so it compares against one that crossed a JSON boundary. */
@@ -290,6 +300,51 @@ describe('createStatelessServer() tools/call', () => {
 
                 expect(response.result?.tools).toEqual(asWire(legacy.tools));
             });
+        });
+
+        it('renders descriptions with the ?client= value', async () => {
+            const buildTools = (): ToolEntry[] => [
+                {
+                    ...makeArgsRecorderTool().tool,
+                    buildDescription: ({ clientParam }: ToolDescriptionContext) => `client: ${clientParam}`,
+                } as ToolEntry,
+            ];
+            const input: Input = { tools: [] };
+            const options = { clientParam: 'claude' };
+            const legacy = await listViaLegacy(buildTools, input, options);
+            const legacyTools = legacy.tools as { name: string; description: string }[];
+            expect(legacyTools.find((tool) => tool.name === 'recorder-tool')?.description).toBe('client: claude');
+
+            await withStatelessServer(async ({ server, call }) => {
+                await loadSource(server, buildTools(), input);
+
+                const response = await call('tools/list');
+
+                expect(response.result?.tools).toEqual(asWire(legacyTools));
+            }, options);
+        });
+
+        it('threads the ?client= value into INTERNAL and ACTOR tool calls', async () => {
+            const executeSpy = vi.spyOn(actorExecutor, 'executeActorTool').mockResolvedValue({
+                content: [{ type: 'text', text: 'actor ok' }],
+            } as never);
+            const options = { clientParam: 'claude' };
+            const legacyRecorder = makeArgsRecorderTool();
+            await callViaLegacy(() => [legacyRecorder.tool], 'recorder-tool', options);
+            await callViaLegacy(() => [makeActorTool()], 'test-actor-tool', options);
+            expect(legacyRecorder.received.clientParam).toBe('claude');
+            expect(executeSpy.mock.calls[0][0].clientParam).toBe('claude');
+
+            await withStatelessServer(async ({ server, call }) => {
+                const { tool, received } = makeArgsRecorderTool();
+                await loadSource(server, [tool, makeActorTool()]);
+
+                await call('tools/call', { name: tool.name, arguments: {} });
+                await call('tools/call', { name: 'test-actor-tool', arguments: {} });
+
+                expect(received.clientParam).toBe('claude');
+                expect(executeSpy.mock.calls[1][0].clientParam).toBe('claude');
+            }, options);
         });
 
         it('returns the same payload for an INTERNAL tool', async () => {

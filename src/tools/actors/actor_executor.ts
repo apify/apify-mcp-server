@@ -19,8 +19,16 @@ import { buildDirectActorRunInput } from './actor_tool_contract.js';
  */
 export const actorExecutor: ActorExecutor = {
     async executeActorTool(params: ActorExecutionParams): Promise<ActorExecutionResult> {
-        const { actorFullName, apifyClient, mcpSessionId, abortSignal, progressTracker, taskMode, hasCallActorTool } =
-            params;
+        const {
+            actorFullName,
+            apifyClient,
+            mcpSessionId,
+            abortSignal,
+            progressTracker,
+            taskMode,
+            hasCallActorTool,
+            clientParam,
+        } = params;
         // Strip `waitSecs` from the Actor's input — it's an MCP-injected opt-in, not an
         // Actor field — so `actor.start()` doesn't reject or silently pass it through.
         const { waitSecs: argsWaitSecs, ...actorInput } = params.input as { waitSecs?: number } & Record<
@@ -112,6 +120,7 @@ export const actorExecutor: ActorExecutor = {
             ...fetchResult.result,
             linkContext: await getConsoleLinkContext(apifyClient.token, apifyClient),
             hasCallActorTool,
+            clientParam,
         }) as ActorExecutionResult;
     },
 };

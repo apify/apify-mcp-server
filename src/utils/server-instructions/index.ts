@@ -9,8 +9,8 @@
  */
 
 import { getApifyAPIPublicBaseUrl } from '../../apify_client.js';
-import { APIFY_MCP_URL, HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../const.js';
-import { actorNameToToolName, canRunAnyActor } from '../../tools/actor_tool_naming.js';
+import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../const.js';
+import { actorNameToToolName, canRunAnyActor, getOwnServerRemedy } from '../../tools/actor_tool_naming.js';
 import type { ToolDescriptionContext } from '../../types.js';
 import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../types.js';
 
@@ -63,7 +63,7 @@ ${dupWarning}${pollOkLine}`;
 /** Every cross-tool mention gates on `ctx.hasTool(...)`, so a session missing a tool is never told to call it. */
 export function getServerInstructions(
     mode: SERVER_MODE = SERVER_MODE.DEFAULT,
-    { hasTool }: ToolDescriptionContext = ALL_TOOLS_PRESENT,
+    { hasTool, clientParam }: ToolDescriptionContext = ALL_TOOLS_PRESENT,
 ): string {
     const isApps = mode === SERVER_MODE.APPS;
     // Client-facing origin, matching the templates and the read gate.
@@ -84,7 +84,7 @@ export function getServerInstructions(
     const runLimitationLine =
         canRunAnyActor(hasTool) || !(hasSearch || hasDetails)
             ? ''
-            : `- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, set up your own Apify MCP server at ${APIFY_MCP_URL}.\n`;
+            : `- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, ${getOwnServerRemedy(clientParam)}\n`;
 
     const apiReadLine = hasTool(HELPER_TOOLS.API_READ)
         ? `- Use \`${HELPER_TOOLS.API_READ}\` for API GETs. If your client can read resources, \`resources/read\` also returns binary records, such as key-value store files, which \`${HELPER_TOOLS.API_READ}\` does not.\n`
