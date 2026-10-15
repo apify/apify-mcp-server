@@ -18,7 +18,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
   - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), delete
     (`delete_actor.ts`), the actor-tools factory, the direct actor-tool executor (`actor_executor.ts`),
-    `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`), and
+    `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`),
+    `actor_tool_contract.ts` (direct-tool input restrictions and defaults, shared by schema generation,
+    the call engine's denied-input check and execution; generic calls use the original contract), and
     `actor_run_response.ts` —
     the one canonical run shape `call-actor` and `get-actor-run` share across sync, task
     and wait-timeout modes: storage IDs plus a `summary` (past) / `nextStep` (one primary

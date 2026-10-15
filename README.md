@@ -315,8 +315,10 @@ Legend for the **Enabled by default** column:
 All tools include metadata annotations to help MCP clients and LLMs understand tool behavior:
 
 - **`title`**: Short display name for the tool (e.g., "Search Actors", "Call Actor", "apify/rag-web-browser")
-- **`readOnlyHint`**: `true` for tools that only read data without modifying state (e.g., `get-dataset`, `fetch-actor-details`). Actor tools get it only for Apify-maintained Actors with limited permissions and no secret, writable storage, MCP connector, or code input (e.g., `apify--web-fetch`); other Actor tools are marked destructive.
+- **`readOnlyHint`**: `true` for tools that only read data without modifying state (e.g., `get-dataset`, `fetch-actor-details`). Actor tools get it only for Apify-maintained Actors with limited permissions and no accepted secret, writable storage, MCP connector, or code input (e.g., `apify--web-fetch`). Direct tools can restrict the original Actor inputs: `apify--website-content-crawler` excludes and rejects `pageFunction` and `initialCookies`, so it is read-only. Other Actor tools are marked destructive.
 - **`openWorldHint`**: `true` for tools that access external resources outside the Apify platform (e.g., `call-actor` executes external Actors). Tools that interact only with the Apify platform (like `search-actors` or `fetch-apify-docs`) do not have this hint.
+
+The direct `apify--website-content-crawler` tool defaults `respectRobotsTxtFile` to `true`; an explicit `false` is preserved. These restrictions and defaults apply only to the direct tool. `call-actor`, `call-actor-widget`, and `fetch-actor-details` retain the original Actor input contract.
 
 ### Tools configuration
 

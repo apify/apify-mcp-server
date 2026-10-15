@@ -41,6 +41,7 @@ import { buildActorInputSchema, fixedAjvCompile } from '../actor_input_schema.js
 import { actorNameToToolName, isActorBlockedUnderPaymentProvider, resolveActorToolMode } from '../actor_tool_naming.js';
 import { buildEnrichedDirectActorOutputSchema, actorRunOutputSchema } from '../structured_output_schemas.js';
 import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from './actor_run_response.js';
+import { buildDirectActorContract } from './actor_tool_contract.js';
 
 /**
  * MCP-only opt-in injected next to the Actor's own input fields. Same contract as `call-actor`'s
@@ -134,9 +135,9 @@ function isReadOnlyActor({ actor, definition }: ActorInfo): boolean {
  */
 export async function getNormalActorsAsTools(
     actorsInfo: ActorInfo[],
-    options?: { mcpSessionId?: string; actorStore?: ActorStore },
+    options?: { mcpSessionId?: string; actorStore?: ActorStore; isDirectTool?: boolean },
 ): Promise<ToolEntry[]> {
-    const { mcpSessionId, actorStore } = options ?? {};
+    const { mcpSessionId, actorStore, isDirectTool = true } = options ?? {};
     const tools: ToolEntry[] = [];
 
     for (const actorInfo of actorsInfo) {
@@ -145,10 +146,13 @@ export async function getNormalActorsAsTools(
         if (!definition) continue;
 
         const { actorFullName, description: actorDescription } = definition;
-        const isReadOnly = isReadOnlyActor(actorInfo);
+        const contract = isDirectTool
+            ? buildDirectActorContract(actorFullName, definition.input)
+            : { input: definition.input, description: '' };
+        const isReadOnly = isReadOnlyActor({ ...actorInfo, definition: { ...definition, input: contract.input } });
         const isRag = actorFullName === RAG_WEB_BROWSER;
         const isWebFetch = actorFullName === WEB_FETCH;
-        const { inputSchema } = buildActorInputSchema(definition.actorFullName, definition.input, isRag);
+        const { inputSchema } = buildActorInputSchema(definition.actorFullName, contract.input, isRag);
 
         // Inject the MCP-only `waitSecs` opt-in before AJV compile so the LLM can cap the wait.
         const inputSchemaWithWaitSecs = inputSchema as { properties?: Record<string, unknown> };
@@ -167,6 +171,7 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
             } else if (isWebFetch) {
                 description += `\n\n${WEB_FETCH_ADDITIONAL_DESC}`;
             }
+            if (contract.description) description += `\n\n${contract.description}`;
             return description;
         };
 
@@ -350,9 +355,10 @@ export async function getActorsAsTools(
         mcpSessionId?: string;
         actorStore?: ActorStore;
         paymentProvider?: PaymentProvider;
+        isDirectTool?: boolean;
     },
 ): Promise<ActorsAsToolsResult> {
-    const { mcpSessionId, actorStore, paymentProvider } = options ?? {};
+    const { mcpSessionId, actorStore, paymentProvider, isDirectTool = true } = options ?? {};
     log.debug('Fetching Actors as tools', {
         actorNames: actorIdsOrNames,
         mcpSessionId,
@@ -429,7 +435,7 @@ export async function getActorsAsTools(
     }
 
     const [normalTools, mcpServerTools] = await Promise.all([
-        getNormalActorsAsTools(normalActorsInfo, { mcpSessionId, actorStore }),
+        getNormalActorsAsTools(normalActorsInfo, { mcpSessionId, actorStore, isDirectTool }),
         getMCPServersAsTools(actorMCPServersInfo, apifyClient.token, mcpSessionId),
     ]);
 
