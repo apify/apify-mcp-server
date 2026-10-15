@@ -9,20 +9,24 @@ import { reportProblemToolOutputSchema } from '../structured_output_schemas.js';
 
 const REPORT_PROBLEM_DESCRIPTION = `Report a problem with Apify's MCP tools or Actors to the Apify team.
 
-Reports can describe missing tools or Actors, errors, timeouts, confusing results, or tasks that the available \
-tools could not complete.
+Reports can describe missing tools or Actors, errors, timeouts, confusing results, steps that took several attempts, \
+or tasks that the available tools could not complete. Reports help fix the problem for other users.
 
 Put what you were doing and what went wrong in "message". Do NOT include personal data, credentials, \
 secrets, or verbatim private conversation content — describe the issue in your own words.`;
 
 const ACKNOWLEDGEMENT = `Problem reported. Thank you — this helps the Apify team improve its tools.`;
 
-/** Describes reporting without requesting a call; see apify/apify-mcp-server#1597. */
-export const REPORT_PROBLEM_NUDGE = `${HELPER_TOOLS.PROBLEM_REPORT} sends a description of this error to the Apify team.`;
+/** Offers reporting without ordering a call or putting it before the reply to the user; see apify/apify-mcp-server#1597. */
+export const REPORT_PROBLEM_NUDGE = `If you cannot resolve this yourself, you can report it to the Apify team with \
+${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and this error).`;
 
-/** Input, auth and approval failures are expected states, not defects to report; see apify/apify-mcp-server#1290. */
+/** For INVALID_INPUT failures: a confusing error or several attempts are friction worth reporting. */
+export const REPORT_PROBLEM_INVALID_INPUT_NUDGE = `If this error was unclear or took several attempts to get past, you can \
+report it to the Apify team with ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and what made it hard).`;
+
+/** Auth and approval failures are expected states the user resolves, not problems to report. */
 const NON_NUDGE_FAILURE_CATEGORIES = new Set<string>([
-    FAILURE_CATEGORY.INVALID_INPUT,
     FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
     FAILURE_CATEGORY.AUTH,
 ]);
@@ -38,7 +42,11 @@ export function appendReportProblemNudge<T>(
     if (opts.failureCategory !== undefined && NON_NUDGE_FAILURE_CATEGORIES.has(opts.failureCategory)) return result;
     const r = result as { isError?: unknown; content?: unknown };
     if (r?.isError !== true || !Array.isArray(r.content)) return result;
-    return { ...r, content: [...r.content, { type: 'text', text: REPORT_PROBLEM_NUDGE }] } as T;
+    const nudge =
+        opts.failureCategory === FAILURE_CATEGORY.INVALID_INPUT
+            ? REPORT_PROBLEM_INVALID_INPUT_NUDGE
+            : REPORT_PROBLEM_NUDGE;
+    return { ...r, content: [...r.content, { type: 'text', text: nudge }] } as T;
 }
 
 /**

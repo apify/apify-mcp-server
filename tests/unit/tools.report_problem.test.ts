@@ -42,8 +42,9 @@ describe('reportProblem', () => {
         it('states what the tool is for without telling the agent when to call it', () => {
             const { description } = reportProblem as HelperTool;
             expect(description).toContain(
-                'Reports can describe missing tools or Actors, errors, timeouts, confusing results, or tasks that ' +
-                    'the available tools could not complete.',
+                'Reports can describe missing tools or Actors, errors, timeouts, confusing results, steps that took ' +
+                    'several attempts, or tasks that the available tools could not complete. Reports help fix the ' +
+                    'problem for other users.',
             );
             expect(description).not.toContain('Call it when');
             expect(description).not.toContain('Use it for');
@@ -110,7 +111,7 @@ describe('reportProblem', () => {
     });
 
     describe('appendReportProblemNudge()', () => {
-        it('appends one sentence that states what report-problem does, without asking for a call', () => {
+        it('appends one sentence that offers report-problem without ordering a call', () => {
             const result = appendReportProblemNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
@@ -119,7 +120,7 @@ describe('reportProblem', () => {
                 errorResult().content[0],
                 {
                     type: 'text',
-                    text: `${HELPER_TOOLS.PROBLEM_REPORT} sends a description of this error to the Apify team.`,
+                    text: `If you cannot resolve this yourself, you can report it to the Apify team with ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and this error).`,
                 },
             ]);
         });
@@ -161,14 +162,19 @@ describe('reportProblem', () => {
             expect(nudgeCount(result)).toBe(0);
         });
 
-        // Regression: #1290 — a not-found or invalid-input failure is the caller's mistake, not a defect to report.
-        it('does not append for an INVALID_INPUT failure, such as not found or invalid input', () => {
+        it('appends the friction sentence for an INVALID_INPUT failure, such as not found or invalid input', () => {
             const result = appendReportProblemNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
                 failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
             });
-            expect(result.content).toHaveLength(1);
+            expect(result.content).toEqual([
+                errorResult().content[0],
+                {
+                    type: 'text',
+                    text: `If this error was unclear or took several attempts to get past, you can report it to the Apify team with ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and what made it hard).`,
+                },
+            ]);
         });
 
         it('does not append for a 402 payment response', () => {

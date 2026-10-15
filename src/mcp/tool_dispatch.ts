@@ -273,7 +273,7 @@ export async function dispatchToolCall(params: {
 
                 // Mirror the INTERNAL branch: read the telemetry the executor embedded on error
                 // results (e.g. respondUserError → SOFT_FAIL/INVALID_INPUT), strip it from the wire,
-                // and set failure_category so the report-problem nudge is suppressed for INVALID_INPUT.
+                // and set failure_category so the report-problem nudge picks the softer variant.
                 ({ toolStatus, callDiagnostics } = applyToolTelemetry(
                     executorResult as Record<string, unknown>,
                     actorName,

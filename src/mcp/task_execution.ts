@@ -290,8 +290,8 @@ export async function executeToolAndUpdateTask(params: {
         // Check if task was cancelled before storing result
         if (await skipIfTaskCancelled(', skipping result storage', toolStatus)) return;
 
-        // On a failed result, append the report-problem sentence (mirrors the synchronous CallTool
-        // path, which task-mode calls like call-actor bypass).
+        // On a failed result, nudge the agent to report the blocker via report-problem (mirrors the
+        // synchronous CallTool path, which task-mode calls like call-actor bypass).
         result = withReportProblemNudge({
             result,
             tools,
@@ -413,10 +413,10 @@ export async function executeToolAndUpdateTask(params: {
                     mcpSessionId,
                 });
                 // Nudge on a genuinely-failed task result (mirrors the completed path and the sync
-                // captureResult). INTERNAL_ERROR and an unknown category get the nudge; payment (402) is
-                // suppressed via the HTTP status and INVALID_INPUT / AUTH / PERMISSION_APPROVAL_REQUIRED via
-                // NON_NUDGE_FAILURE_CATEGORIES. The 402 branch above returns before reaching here, so this
-                // only sees non-payment failures.
+                // captureResult). INTERNAL_ERROR and an unknown category get the full nudge; a genuine
+                // INVALID_INPUT gets the softer nudge; payment (402) is suppressed via the HTTP status and
+                // AUTH / PERMISSION_APPROVAL_REQUIRED via NON_NUDGE_FAILURE_CATEGORIES. The 402 branch above
+                // returns before reaching here, so this only sees non-payment failures.
                 const failedResult = withReportProblemNudge({
                     result: {
                         content: [

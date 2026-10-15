@@ -3,7 +3,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
-import { REPORT_PROBLEM_NUDGE, reportProblem } from '../../src/tools/dev/report_problem.js';
+import {
+    REPORT_PROBLEM_INVALID_INPUT_NUDGE,
+    REPORT_PROBLEM_NUDGE,
+    reportProblem,
+} from '../../src/tools/dev/report_problem.js';
 import type { ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
@@ -77,11 +81,10 @@ describe('report-problem nudge on the direct ACTOR path', () => {
         expect(result.toolTelemetry).toBeUndefined();
     });
 
-    // Regression: #1290 — a not-found failure is the caller's mistake, not a defect to report.
-    it('appends nothing to a not-found failure', async () => {
+    it('appends the friction sentence to a not-found failure', async () => {
         const result = await dispatchActorCall(respondUserError("Run with ID 'x' not found."));
 
         expect(result.isError).toBe(true);
-        expect(nudgeTexts(result)).toEqual(["Run with ID 'x' not found."]);
+        expect(nudgeTexts(result)).toEqual(["Run with ID 'x' not found.", REPORT_PROBLEM_INVALID_INPUT_NUDGE]);
     });
 });
