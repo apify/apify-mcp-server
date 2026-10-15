@@ -6,7 +6,7 @@ import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSche
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondUserError } from '../../utils/mcp.js';
-import { apifyApiCallOutputSchema } from '../structured_output_schemas.js';
+import { anyJsonValueSchema, apifyApiCallOutputSchema } from '../structured_output_schemas.js';
 import { isEndpointBlocked } from './apify_api_blocklist.js';
 import { normalizeApiPath } from './apify_api_path.js';
 import {
@@ -108,7 +108,10 @@ export const apifyApiWrite: ToolEntry = Object.freeze({
     title: 'Write Apify API',
     description: buildDescription(ALL_TOOLS_PRESENT),
     buildDescription,
-    inputSchema: z.toJSONSchema(apifyApiWriteArgs) as ToolInputSchema,
+    // Advertise explicit JSON types without letting AJV coerce the body before parseBody() (#1546).
+    inputSchema: z.toJSONSchema(
+        apifyApiWriteArgs.extend({ body: apifyApiWriteArgs.shape.body.meta(anyJsonValueSchema) }),
+    ) as ToolInputSchema,
     outputSchema: apifyApiCallOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(apifyApiWriteArgs)),
     annotations: {

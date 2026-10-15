@@ -211,33 +211,107 @@ describe('getServerInstructions()', () => {
         });
     });
 
-    describe('"## Storage types" section', () => {
-        it('states the retention of unnamed and named storages', () => {
-            const instructions = getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT);
-            const start = instructions.indexOf('## Storage types');
-            const end = instructions.indexOf('\n## ', start + 1);
-            const block = instructions.slice(start, end === -1 ? undefined : end);
-            expect(block).toContain(
-                "- Unnamed storages are deleted after the account's data-retention period; named storages are kept until deleted.",
+    /** The `## <heading>` block, up to the next `## ` heading; '' when the heading is absent. */
+    const sectionOf = (instructions: string, heading: string): string => {
+        const start = instructions.indexOf(heading);
+        if (start === -1) return '';
+        const end = instructions.indexOf('\n## ', start + 1);
+        return instructions.slice(start, end === -1 ? undefined : end);
+    };
+
+    it.each([SERVER_MODE.DEFAULT, SERVER_MODE.APPS])(
+        'preserves all-tools task and schedule text in %s mode',
+        (mode) => {
+            const instructions = getServerInstructions(mode, ALL_TOOLS_PRESENT);
+            const sections = instructions.slice(
+                instructions.indexOf('## Actor tasks'),
+                instructions.indexOf('\n## Storage types'),
             );
+            expect(sections).toBe(
+                [
+                    '## Actor tasks',
+                    '- An Actor task is a saved, reusable configuration of an Actor. It stores the Actor input and run options such as the build, memory, and timeout.',
+                    '- Tasks are useful for repeated or scheduled jobs, because the user does not have to configure the Actor again for every run.',
+                    '- Creating or updating a task does not make it public.',
+                    "- Publishing a task creates a public landing page for one specific use case. The page shows what the task does, the selected input values, and the expected output. Published tasks appear in the Actor's Examples tab, where users, search engines, and AI agents can discover them, which can help people understand the Actor and increase its runs.",
+                    '- Publish only tasks that represent a useful, reliable, and specific use case. Not every saved task needs to be public.',
+                    '',
+                    '## Schedules',
+                    "- A schedule runs Actors and/or saved tasks automatically on a cron expression, evaluated in the schedule's time zone (default UTC).",
+                    '- A cron expression has 5 fields (minute hour day-of-month month day-of-week), with an optional leading seconds field. The shortcuts @hourly, @daily, @weekly, @monthly and @yearly fire at a random offset inside their period, so use an explicit expression when the user names a time.',
+                    '- The platform creates schedules disabled by default, but the create tool here enables them unless told otherwise. Disabling a schedule pauses it without losing its configuration.',
+                    '- With isExclusive (the default), a run is skipped while the previous run from the same action is still running.',
+                    "- Updating a schedule's actions replaces the whole list, so send every action to keep.",
+                    '- A schedule holds at most 10 Actor actions and 10 task actions.',
+                    '',
+                ].join('\n'),
+            );
+        },
+    );
+
+    it.each(['## Actor tasks', '## Schedules'])('omits %s when its tools are absent', (heading) => {
+        expect(getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.STORE_SEARCH))).not.toContain(heading);
+    });
+
+    describe('"## Actor tasks" section', () => {
+        it.each([
+            [HELPER_TOOLS.ACTOR_TASK_CREATE, true, false],
+            [HELPER_TOOLS.ACTOR_TASK_GET, false, false],
+            [HELPER_TOOLS.ACTOR_TASK_UPDATE, true, false],
+            [HELPER_TOOLS.ACTOR_TASK_PUBLISH, false, true],
+            [HELPER_TOOLS.ACTOR_TASK_UNPUBLISH, false, false],
+        ] as const)('gates task guidance with %s alone', (toolName, hasPrivacy, hasPublish) => {
+            const section = sectionOf(getServerInstructions(SERVER_MODE.DEFAULT, only(toolName)), '## Actor tasks');
+            expect(section).toContain('- An Actor task is a saved, reusable configuration of an Actor.');
+            expect(section).toContain('Tasks are useful for repeated or scheduled jobs');
+            expect(section.includes('Creating or updating a task')).toBe(hasPrivacy);
+            expect(section.includes('Publishing a task')).toBe(hasPublish);
+            expect(section.includes('Publish only tasks')).toBe(hasPublish);
         });
     });
 
     describe('"## Schedules" section', () => {
-        const instructions = getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT);
-
-        it('renders for ALL_TOOLS_PRESENT', () => {
-            expect(instructions).toContain('## Schedules');
+        it.each([
+            [HELPER_TOOLS.SCHEDULE_CREATE, true, false, true],
+            [HELPER_TOOLS.SCHEDULE_GET, false, false, false],
+            [HELPER_TOOLS.SCHEDULE_UPDATE, false, true, true],
+            [HELPER_TOOLS.SCHEDULE_DELETE, false, false, false],
+        ] as const)('gates schedule guidance with %s alone', (toolName, hasCreate, hasUpdate, hasCronAdvice) => {
+            const section = sectionOf(getServerInstructions(SERVER_MODE.DEFAULT, only(toolName)), '## Schedules');
+            expect(section).toContain('- A schedule runs Actors and/or saved tasks automatically on a cron expression');
+            expect(section).toContain('Disabling a schedule pauses it without losing its configuration.');
+            expect(section).toContain('- A schedule holds at most 10 Actor actions and 10 task actions.');
+            expect(section.includes('the create tool here')).toBe(hasCreate);
+            expect(section.includes("Updating a schedule's actions")).toBe(hasUpdate);
+            expect(section.includes('so use an explicit expression')).toBe(hasCronAdvice);
         });
+    });
 
-        // The section is static and ungated, so a tool name slipping in would reach sessions without that tool.
-        it('names no tool', () => {
-            const start = instructions.indexOf('## Schedules');
-            const end = instructions.indexOf('\n## ', start + 1);
-            const block = instructions.slice(start, end === -1 ? undefined : end);
-            for (const toolName of Object.values(HELPER_TOOLS)) {
-                expect(block).not.toContain(toolName);
-            }
+    // Group-level gating must not expose names of individual tools that may be absent.
+    it.each(['## Actor tasks', '## Schedules'])('names no tool in %s', (heading) => {
+        const block = sectionOf(getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT), heading);
+        expect(block).not.toBe('');
+        for (const toolName of Object.values(HELPER_TOOLS)) {
+            expect(block).not.toContain(toolName);
+        }
+    });
+
+    it('separates the read-only task and schedule sections with blank lines', () => {
+        const instructions = getServerInstructions(
+            SERVER_MODE.DEFAULT,
+            only(HELPER_TOOLS.ACTOR_TASK_GET, HELPER_TOOLS.SCHEDULE_GET),
+        );
+        for (const heading of ['## Actor tasks', '## Schedules', '## Storage types']) {
+            expect(instructions).toContain(`\n\n${heading}\n`);
+        }
+    });
+
+    describe('"## Storage types" section', () => {
+        it('states the retention of unnamed and named storages', () => {
+            const block = sectionOf(getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT), '## Storage types');
+            expect(block).toContain(
+                "- Unnamed storages are deleted after the account's data-retention period; named storages are kept until deleted.",
+            );
         });
     });
 
@@ -390,5 +464,12 @@ describe('Claude-connector tool surface (no call-actor)', () => {
         );
         expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_CALL);
         expect(instructions).not.toContain('MUST');
+    });
+
+    it('omits the task and schedule sections', () => {
+        const resolved = resolveToolNamesFromInput(parseInputParamsFromUrl(listedUrl), SERVER_MODE.APPS);
+        const instructions = getServerInstructions(SERVER_MODE.APPS, { hasTool: (name) => resolved.has(name) });
+        expect(instructions).not.toContain('## Actor tasks');
+        expect(instructions).not.toContain('## Schedules');
     });
 });

@@ -1128,6 +1128,7 @@ describe('apify-api-write', () => {
                 { path: '/v2/key-value-stores/s/records/a%2FK', method: 'PUT', body },
                 client,
             );
+            expect(apifyApiWrite.ajvValidate(context.args)).toBe(true);
             return (await (apifyApiWrite as HelperTool).call(context)) as TextToolResult;
         };
 
@@ -1137,10 +1138,15 @@ describe('apify-api-write', () => {
             await call('{"name":"x"}'),
             await call(' [{"key":"a"}] '),
             await call('"text"'),
+            await call(true),
+            await call(false),
+            await call(null),
+            await call([{ key: 'a' }]),
+            await call(undefined),
         ];
 
         expect(results.map((result) => result.structuredContent)).toEqual(
-            Array(5).fill(expect.objectContaining({ statusCode: 201, data: { data: {} } })),
+            Array(10).fill(expect.objectContaining({ statusCode: 201, data: { data: {} } })),
         );
         const url = 'https://api.apify.com/v2/key-value-stores/s/records/a%2FK';
         expect(sent).toEqual([
@@ -1149,13 +1155,20 @@ describe('apify-api-write', () => {
             { url, data: '{"name":"x"}', contentType: 'application/json' },
             { url, data: '[{"key":"a"}]', contentType: 'application/json' },
             { url, data: '"text"', contentType: 'application/json' },
+            { url, data: 'true', contentType: 'application/json' },
+            { url, data: 'false', contentType: 'application/json' },
+            { url, data: 'null', contentType: 'application/json' },
+            { url, data: '[{"key":"a"}]', contentType: 'application/json' },
+            { url, data: undefined, contentType: 'application/x-www-form-urlencoded' },
         ]);
     });
 
     it.each(['text', '', '{"name":'])(
         'refuses the string body %j, which is not JSON, without a request',
         async (body) => {
-            const result = await callTool(apifyApiWrite, { path: 'datasets/abc', method: 'PUT', body });
+            const args = { path: 'datasets/abc', method: 'PUT', body };
+            expect(apifyApiWrite.ajvValidate(args)).toBe(true);
+            const result = await callTool(apifyApiWrite, args);
 
             expectSoftFailInvalidInput(result);
             expect(result.content[0].text).toBe(
@@ -1197,7 +1210,7 @@ describe('apify-api-write', () => {
     it.each([
         { statusCode: 300, hint: '' },
         { statusCode: 400, hint: '' },
-        { statusCode: 429, hint: ' Rate limit exceeded, wait before retrying.' },
+        { statusCode: 429, hint: ' The Apify API rate limit was reached.' },
     ])(
         'reports a failed write whose error body is over the inline limit with its status $statusCode',
         async ({ statusCode, hint }) => {

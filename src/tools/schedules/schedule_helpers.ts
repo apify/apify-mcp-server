@@ -10,6 +10,7 @@ import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { toIsoString } from '../actors/actor_run_response.js';
+import { anyJsonObjectSchema } from '../structured_output_schemas.js';
 import { getResourceByIdOrName, getTaskByIdOrName } from '../tasks/task_helpers.js';
 
 /** A schedule action as the API accepts it on create and update (the server-assigned `id` is optional). */
@@ -70,8 +71,7 @@ export const scheduleActionSchema = z.object({
         .min(1)
         .optional()
         .describe('Task to run: its ID, its name (resolved against your own tasks), or "username/task-name".'),
-    input: z
-        .looseObject({})
+    input: anyJsonObjectSchema
         .optional()
         .describe(
             'For an Actor: the input JSON it runs with. For a task: top-level keys that override the stored task input for this run (shallow merge; a nested object replaces the stored one).',

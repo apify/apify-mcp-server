@@ -456,7 +456,7 @@ describe('readApiResource()', () => {
 
         expect(error).toBeInstanceOf(InternalError);
         expect(error.message).toContain(`Failed to read ${uri}: HTTP 500: Internal Server Error`);
-        expect(error.message).toContain('Retry later');
+        expect(error.message).toContain('this is usually temporary');
     });
 
     it('falls back to statusText when a non-2xx error body itself crosses the limit', async () => {
@@ -499,7 +499,7 @@ describe('readApiResource()', () => {
 
         expect(error).toBeInstanceOf(InternalError);
         expect(error.message).toContain('HTTP 429: Too many requests');
-        expect(error.message).toContain('Rate limit exceeded');
+        expect(error.message).toContain('rate limit was reached');
     });
 
     it('appends the private-resource hint for a 403 response', async () => {

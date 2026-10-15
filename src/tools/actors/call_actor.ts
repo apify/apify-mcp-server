@@ -45,7 +45,7 @@ import { classifyFailureCategory, extractAjvErrorDetails } from '../../utils/too
 import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
-import { actorRunOutputSchema } from '../structured_output_schemas.js';
+import { actorRunOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
 import {
     abortRunOnSignal,
     buildStartRunResponse,
@@ -244,7 +244,7 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         return respondServerError(
             [
                 `Failed to call Actor '${actorName}': ${errMsg}`,
-                `Account memory quota exceeded for your plan. Retry with a smaller callOptions.memory, or wait for current runs to finish before retrying.`,
+                `Account memory quota exceeded for your plan. A smaller callOptions.memory may fit the remaining quota; memory is freed when current runs finish.`,
             ],
             { error, detail: APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED, actorId },
         );
@@ -283,7 +283,7 @@ export const callOptionsSchema = z.object({
         .max(32768, 'Memory cannot exceed 32 GB (32768 MB)')
         .optional().describe(dedent`
             Memory per run in MB. Power of 2 from 128 to 32768.
-            Apify also caps total memory across all your concurrent runs (account plan limit); if a run is rejected because that quota would be exceeded, retry with a smaller value.
+            Apify also caps total memory across all your concurrent runs (account plan limit); a run that would exceed that quota is rejected.
         `),
     timeout: z.number().min(0, 'Timeout must be 0 or greater').optional().describe(dedent`
             Maximum runtime for the Actor in seconds. After this time elapses, the Actor will be automatically terminated.
@@ -312,7 +312,7 @@ export const callActorArgs = z.object({
 
             For MCP server Actors, use format "actorName:toolName" to call a specific tool (e.g., "username/name:tool-name").
         `),
-    input: z.object({}).passthrough().describe('The input JSON to pass to the Actor. Required.'),
+    input: anyJsonObjectSchema.describe('The input JSON to pass to the Actor. Required.'),
     waitSecs: z
         .number()
         .int()
