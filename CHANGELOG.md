@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - State facts instead of asking for a retry in served hints ([#1578](https://github.com/apify/apify-mcp-server/pull/1578)) ([62f30e6](https://github.com/apify/apify-mcp-server/commit/62f30e60ce2bf11ed838f50349c2cc841423aa6f)) by [@jirispilka](https://github.com/jirispilka), closes [#1558](https://github.com/apify/apify-mcp-server/issues/1558)
 - Serve task and schedule instructions only with their tools ([#1579](https://github.com/apify/apify-mcp-server/pull/1579)) ([698fc44](https://github.com/apify/apify-mcp-server/commit/698fc44f89c9d770e5d27c3678e718b0f0a0c4e2)) by [@jirispilka](https://github.com/jirispilka), closes [#1576](https://github.com/apify/apify-mcp-server/issues/1576)
 - Reject limit below 1 on the run, dataset and store list tools ([#1582](https://github.com/apify/apify-mcp-server/pull/1582)) ([5eebfec](https://github.com/apify/apify-mcp-server/commit/5eebfec0399954d9f133a4c70228b8d31a3ec011)) by [@jirispilka](https://github.com/jirispilka), closes [#1479](https://github.com/apify/apify-mcp-server/issues/1479)
+- Report an empty search-actors page past the last result as such ([#1568](https://github.com/apify/apify-mcp-server/pull/1568)) ([6456db7](https://github.com/apify/apify-mcp-server/commit/6456db768a9202af95b437e6825a33e2d7449423)) by [@jirispilka](https://github.com/jirispilka), closes [#1276](https://github.com/apify/apify-mcp-server/issues/1276)
 
 
 <!-- git-cliff-unreleased-end -->
