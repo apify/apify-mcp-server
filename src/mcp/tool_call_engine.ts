@@ -14,7 +14,11 @@ import { prepareToolCallContext } from '../payments/helpers.js';
 import type { PaymentMeta, PaymentProvider, RequestHeaders } from '../payments/types.js';
 import { decodeDotPropertyNames } from '../tools/actor_input_schema.js';
 import { legacyToolNameToNew } from '../tools/actor_tool_naming.js';
-import { getDeniedDirectActorInputs, getDirectActorPolicy } from '../tools/actors/actor_tool_contract.js';
+import {
+    buildDeniedInputsNote,
+    getDeniedDirectActorInputs,
+    getDirectActorPolicy,
+} from '../tools/actors/actor_tool_contract.js';
 import { checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
 import { withReportProblemNudge } from '../tools/dev/report_problem.js';
 import type { ActorStore, CallDiagnostics, ToolCallTelemetryProperties, ToolEntry, ToolStatus } from '../types.js';
@@ -230,9 +234,9 @@ export async function prepareToolCall(params: {
         });
         const deniedInputs =
             tool.type === TOOL_TYPE.ACTOR ? getDeniedDirectActorInputs(tool.actorFullName, toolArgs) : [];
-        if (deniedInputs.length) {
+        if (tool.type === TOOL_TYPE.ACTOR && deniedInputs.length) {
             return {
-                message: `Invalid arguments for tool "${tool.name}": this tool does not accept ${deniedInputs.map((name) => `"${name}"`).join(', ')}.`,
+                message: `Invalid arguments for tool "${tool.name}": ${buildDeniedInputsNote(tool.actorFullName, deniedInputs)}`,
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
                 callDiagnostics: {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,

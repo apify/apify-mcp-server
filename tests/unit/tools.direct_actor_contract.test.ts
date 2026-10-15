@@ -138,7 +138,7 @@ describe('direct tool call', () => {
                     additionalProperties,
                 );
                 if (!('message' in result)) throw new Error('Denied input passed validation');
-                expect(result.message).toContain(`this tool does not accept "${field}"`);
+                expect(result.message).toContain(`"${field}" is not accepted by this tool`);
                 expect(result.message).not.toContain('sensitive-value');
                 expect(result.message).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
             }

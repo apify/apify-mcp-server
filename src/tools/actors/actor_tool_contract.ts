@@ -3,14 +3,17 @@ import type { ActorInputSchema } from '../../types.js';
 type DirectActorPolicyConfig = {
     defaults?: Readonly<Record<string, unknown>>;
     deniedInputs?: readonly string[];
+    /** Why, as served to the agent in the description and the refusal. */
+    deniedInputsReason?: string;
 };
 
 /** MCP-only contracts; the Actor's original API contract stays unchanged (#1574, #1575). */
 const DIRECT_ACTOR_POLICIES: Readonly<Record<string, DirectActorPolicyConfig>> = {
     'apify/website-content-crawler': {
         defaults: { respectRobotsTxtFile: true },
-        // Page code can submit forms; session cookies can grant access to external accounts.
         deniedInputs: ['pageFunction', 'initialCookies'],
+        deniedInputsReason:
+            'page code can act on the crawled sites and session cookies can give access to accounts, which a read-only tool must not allow',
     },
 };
 
@@ -32,10 +35,16 @@ export function buildDirectActorContract(actorFullName: string, input: ActorInpu
 
     return {
         input: effectiveInput,
-        description: deniedInputs.length
-            ? `This tool does not accept these Actor inputs: ${deniedInputs.map((name) => `"${name}"`).join(', ')}.`
-            : '',
+        description: deniedInputs.length ? buildDeniedInputsNote(actorFullName, deniedInputs) : '',
     };
+}
+
+/** One sentence for the description and the refusal: what is off, that the Actor allows it, why, and the consequence. */
+export function buildDeniedInputsNote(actorFullName: string, names: readonly string[]): string {
+    const reason = getDirectActorPolicy(actorFullName)?.deniedInputsReason;
+    const list = names.map((name) => `"${name}"`).join(' and ');
+    const [verb, pronoun] = names.length > 1 ? ['are', 'them'] : ['is', 'it'];
+    return `${list} ${verb} not accepted by this tool, although the Actor supports ${pronoun}${reason ? `: ${reason}` : ''}, so this tool rejects ${pronoun}.`;
 }
 
 /**
