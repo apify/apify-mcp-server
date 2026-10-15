@@ -105,10 +105,13 @@ describe('get-key-value-store-list', () => {
         expectSchemaConformingStructuredContent(result, storageListOutputSchema);
     });
 
-    it('rejects limit above 10 via ajv validation', () => {
-        const tool = getKeyValueStoreList as HelperTool;
-        expect(tool.ajvValidate({ limit: 11 })).toBe(false);
-        expect(tool.ajvValidate({ limit: 10 })).toBe(true);
+    // Regression: #1479 — the API reads limit=0 as no limit and returns up to 1,000 items.
+    it.each([0, -1, 1.5, 11])('rejects limit %s via ajv validation', (limit) => {
+        expect((getKeyValueStoreList as HelperTool).ajvValidate({ limit })).toBe(false);
+    });
+
+    it.each([{ limit: 1 }, { limit: 10 }, {}])('accepts %j via ajv validation', (args) => {
+        expect((getKeyValueStoreList as HelperTool).ajvValidate(args)).toBe(true);
     });
 
     // Regression: #1296 — the terminal nextStep named a sibling tool the session was not served.
