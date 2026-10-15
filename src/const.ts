@@ -123,7 +123,6 @@ export const REPORT_PROBLEM_BLOCKED_CLIENTS: string[] = ['claude', 'anthropic', 
 export const APIFY_AI_CLIENT_NAME = 'apify-ai';
 
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
-export const RAG_WEB_BROWSER_WHITELISTED_FIELDS = ['query', 'maxResults', 'outputFormats'];
 export const RAG_WEB_BROWSER_ADDITIONAL_DESC = `Use this tool for generic web content: it searches the web by query and returns the text of the top results.
 This tool scrapes the data itself - it does NOT just find tools.
 

@@ -9,11 +9,6 @@ import {
     HELPER_TOOLS,
     OFFICIAL_ACTORS_WITH_SIDE_EFFECTS,
     OFFICIAL_APIFY_USERNAMES,
-    RAG_WEB_BROWSER,
-    RAG_WEB_BROWSER_ADDITIONAL_DESC,
-    RAG_WEB_BROWSER_WEB_FETCH_HINT,
-    WEB_FETCH,
-    WEB_FETCH_ADDITIONAL_DESC,
 } from '../../const.js';
 import { ActorLoadError } from '../../errors.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
@@ -41,7 +36,7 @@ import { buildActorInputSchema, fixedAjvCompile } from '../actor_input_schema.js
 import { actorNameToToolName, isActorBlockedUnderPaymentProvider, resolveActorToolMode } from '../actor_tool_naming.js';
 import { buildEnrichedDirectActorOutputSchema, actorRunOutputSchema } from '../structured_output_schemas.js';
 import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from './actor_run_response.js';
-import { buildDirectActorContract } from './actor_tool_contract.js';
+import { buildDirectActorContract, getActorToolPolicy } from './actor_tool_contract.js';
 
 /**
  * MCP-only opt-in injected next to the Actor's own input fields. Same contract as `call-actor`'s
@@ -150,9 +145,7 @@ export async function getNormalActorsAsTools(
             ? buildDirectActorContract(actorFullName, definition.input)
             : { input: definition.input, description: '' };
         const isReadOnly = isReadOnlyActor({ ...actorInfo, definition: { ...definition, input: contract.input } });
-        const isRag = actorFullName === RAG_WEB_BROWSER;
-        const isWebFetch = actorFullName === WEB_FETCH;
-        const { inputSchema } = buildActorInputSchema(definition.actorFullName, contract.input, isRag);
+        const { inputSchema } = buildActorInputSchema(definition.actorFullName, contract.input);
 
         // Inject the MCP-only `waitSecs` opt-in before AJV compile so the LLM can cap the wait.
         const inputSchemaWithWaitSecs = inputSchema as { properties?: Record<string, unknown> };
@@ -162,15 +155,12 @@ export async function getNormalActorsAsTools(
         };
 
         // Names call-actor only when the session actually has it.
-        const buildDescription = ({ hasTool }: ToolDescriptionContext): string => {
+        const buildDescription = (context: ToolDescriptionContext): string => {
+            const { hasTool } = context;
             let description = `This tool calls the Actor "${actorFullName}" and retrieves its output results.
 ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this specific Actor.\n` : ''}Actor description: ${actorDescription}`;
-            if (isRag) {
-                description += `\n\n${RAG_WEB_BROWSER_ADDITIONAL_DESC}`;
-                if (hasTool(actorNameToToolName(WEB_FETCH))) description += `\n${RAG_WEB_BROWSER_WEB_FETCH_HINT}`;
-            } else if (isWebFetch) {
-                description += `\n\n${WEB_FETCH_ADDITIONAL_DESC}`;
-            }
+            const policyDescription = getActorToolPolicy(actorFullName)?.buildDescription?.(context);
+            if (policyDescription) description += `\n\n${policyDescription}`;
             if (contract.description) description += `\n\n${contract.description}`;
             return description;
         };
