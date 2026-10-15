@@ -189,6 +189,46 @@ export function getServerInstructions(
 
 ${renderedBlocks.map((block, index) => (index > 0 && block.startsWith('###') ? `\n${block}` : block)).join('')}`;
 
+    const hasTaskCreate = hasTool(HELPER_TOOLS.ACTOR_TASK_CREATE);
+    const hasTaskUpdate = hasTool(HELPER_TOOLS.ACTOR_TASK_UPDATE);
+    const hasTaskPublish = hasTool(HELPER_TOOLS.ACTOR_TASK_PUBLISH);
+    const taskPrivacyLine =
+        hasTaskCreate || hasTaskUpdate ? '- Creating or updating a task does not make it public.\n' : '';
+    const taskPublishLines = hasTaskPublish
+        ? `- Publishing a task creates a public landing page for one specific use case. The page shows what the task does, the selected input values, and the expected output. Published tasks appear in the Actor's Examples tab, where users, search engines, and AI agents can discover them, which can help people understand the Actor and increase its runs.
+- Publish only tasks that represent a useful, reliable, and specific use case. Not every saved task needs to be public.
+`
+        : '';
+    const actorTasksSection =
+        hasTaskCreate ||
+        hasTaskUpdate ||
+        hasTaskPublish ||
+        hasTool(HELPER_TOOLS.ACTOR_TASK_GET) ||
+        hasTool(HELPER_TOOLS.ACTOR_TASK_UNPUBLISH)
+            ? `
+## Actor tasks
+- An Actor task is a saved, reusable configuration of an Actor. It stores the Actor input and run options such as the build, memory, and timeout.
+- Tasks are useful for repeated or scheduled jobs, because the user does not have to configure the Actor again for every run.
+${taskPrivacyLine}${taskPublishLines}`
+            : '';
+
+    const hasScheduleCreate = hasTool(HELPER_TOOLS.SCHEDULE_CREATE);
+    const hasScheduleUpdate = hasTool(HELPER_TOOLS.SCHEDULE_UPDATE);
+    const schedulesSection =
+        hasScheduleCreate ||
+        hasScheduleUpdate ||
+        hasTool(HELPER_TOOLS.SCHEDULE_GET) ||
+        hasTool(HELPER_TOOLS.SCHEDULE_DELETE)
+            ? `
+## Schedules
+- A schedule runs Actors and/or saved tasks automatically on a cron expression, evaluated in the schedule's time zone (default UTC).
+- A cron expression has 5 fields (minute hour day-of-month month day-of-week), with an optional leading seconds field. The shortcuts @hourly, @daily, @weekly, @monthly and @yearly fire at a random offset inside their period${hasScheduleCreate || hasScheduleUpdate ? ', so use an explicit expression when the user names a time' : ''}.
+- ${hasScheduleCreate ? 'The platform creates schedules disabled by default, but the create tool here enables them unless told otherwise. ' : ''}Disabling a schedule pauses it without losing its configuration.
+- With isExclusive (the default), a run is skipped while the previous run from the same action is still running.
+${hasScheduleUpdate ? "- Updating a schedule's actions replaces the whole list, so send every action to keep.\n" : ''}- A schedule holds at most 10 Actor actions and 10 task actions.
+`
+            : '';
+
     return `
 Apify is the world's largest marketplace of tools for web scraping, data extraction, and web automation.
 These tools are called **Actors**. They enable you to extract structured data from social media, e-commerce, search engines, maps, travel sites, and many other sources.
@@ -210,22 +250,7 @@ ${runLimitationLine}- When multiple options exist, prefer Actors with higher usa
 - Every Actor run generates **dataset** and **key-value store** outputs (even if empty).
 - Actor execution may take time, and outputs can be large.
 - Large datasets can be paginated to retrieve results efficiently.
-
-## Actor tasks
-- An Actor task is a saved, reusable configuration of an Actor. It stores the Actor input and run options such as the build, memory, and timeout.
-- Tasks are useful for repeated or scheduled jobs, because the user does not have to configure the Actor again for every run.
-- Creating or updating a task does not make it public.
-- Publishing a task creates a public landing page for one specific use case. The page shows what the task does, the selected input values, and the expected output. Published tasks appear in the Actor's Examples tab, where users, search engines, and AI agents can discover them, which can help people understand the Actor and increase its runs.
-- Publish only tasks that represent a useful, reliable, and specific use case. Not every saved task needs to be public.
-
-## Schedules
-- A schedule runs Actors and/or saved tasks automatically on a cron expression, evaluated in the schedule's time zone (default UTC).
-- A cron expression has 5 fields (minute hour day-of-month month day-of-week), with an optional leading seconds field. The shortcuts @hourly, @daily, @weekly, @monthly and @yearly fire at a random offset inside their period, so use an explicit expression when the user names a time.
-- The platform creates schedules disabled by default, but the create tool here enables them unless told otherwise. Disabling a schedule pauses it without losing its configuration.
-- With isExclusive (the default), a run is skipped while the previous run from the same action is still running.
-- Updating a schedule's actions replaces the whole list, so send every action to keep.
-- A schedule holds at most 10 Actor actions and 10 task actions.
-
+${actorTasksSection}${schedulesSection}
 ## Storage types
 - **Dataset:** Structured, append-only storage ideal for tabular or list data (e.g., scraped items).
 - **Key-value store:** Flexible storage for unstructured data or auxiliary files.
