@@ -13,8 +13,11 @@ const getUserDatasetsListArgs = z.object({
         .number()
         .describe('Number of array elements that should be skipped at the start. Default is 0.')
         .default(0),
+    // min(1): the API reads limit=0 as "no limit" and returns up to 1,000 items.
     limit: z
         .number()
+        .int()
+        .min(1)
         .max(20)
         .describe('Maximum number of array elements to return. Default is 10. Maximum is 20.')
         .default(10),

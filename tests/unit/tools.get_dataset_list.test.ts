@@ -166,10 +166,13 @@ describe('get-dataset-list', () => {
         },
     );
 
-    it('rejects limit above 20 via ajv validation', () => {
-        const tool = getDatasetList as HelperTool;
-        expect(tool.ajvValidate({ limit: 21 })).toBe(false);
-        expect(tool.ajvValidate({ limit: 20 })).toBe(true);
+    // Regression: #1479 — the API reads limit=0 as no limit and returns up to 1,000 items.
+    it.each([0, -1, 1.5, 21])('rejects limit %s via ajv validation', (limit) => {
+        expect((getDatasetList as HelperTool).ajvValidate({ limit })).toBe(false);
+    });
+
+    it.each([{ limit: 1 }, { limit: 20 }, {}])('accepts %j via ajv validation', (args) => {
+        expect((getDatasetList as HelperTool).ajvValidate(args)).toBe(true);
     });
 
     // Regression: #1296 — the terminal nextStep named a sibling tool the session was not served.
