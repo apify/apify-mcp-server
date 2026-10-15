@@ -1,21 +1,55 @@
-import type { ActorInputSchema } from '../../types.js';
+import {
+    RAG_WEB_BROWSER,
+    RAG_WEB_BROWSER_ADDITIONAL_DESC,
+    RAG_WEB_BROWSER_WEB_FETCH_HINT,
+    WEB_FETCH,
+    WEB_FETCH_ADDITIONAL_DESC,
+    WEB_FETCH_URL_SCHEME_NOTE,
+} from '../../const.js';
+import type { ActorInputSchema, ToolDescriptionContext } from '../../types.js';
+import { actorNameToToolName } from '../actor_tool_naming.js';
 
 type DirectActorPolicyConfig = {
     defaults?: Readonly<Record<string, unknown>>;
     deniedInputs?: readonly string[];
 };
 
-/** MCP-only contracts; the Actor's original API contract stays unchanged (#1574, #1575). */
-const DIRECT_ACTOR_POLICIES: Readonly<Record<string, DirectActorPolicyConfig>> = {
+type ActorToolPolicyConfig = {
+    directInput?: DirectActorPolicyConfig;
+    exposedInputs?: readonly string[];
+    inputDescriptionSuffixes?: Readonly<Record<string, string>>;
+    buildDescription?: (context: ToolDescriptionContext) => string;
+};
+
+/** Presentation rules preserve existing generic-call behavior; directInput is direct-tool-only. */
+const ACTOR_TOOL_POLICIES: Readonly<Record<string, ActorToolPolicyConfig>> = {
     'apify/website-content-crawler': {
-        defaults: { respectRobotsTxtFile: true },
-        // Page code can submit forms; session cookies can grant access to external accounts.
-        deniedInputs: ['pageFunction', 'initialCookies'],
+        directInput: {
+            defaults: { respectRobotsTxtFile: true },
+            // Page code can submit forms; session cookies can grant access to external accounts (#1575).
+            deniedInputs: ['pageFunction', 'initialCookies'],
+        },
+    },
+    [RAG_WEB_BROWSER]: {
+        exposedInputs: ['query', 'maxResults', 'outputFormats'],
+        buildDescription: ({ hasTool }) => {
+            let description = RAG_WEB_BROWSER_ADDITIONAL_DESC;
+            if (hasTool(actorNameToToolName(WEB_FETCH))) description += `\n${RAG_WEB_BROWSER_WEB_FETCH_HINT}`;
+            return description;
+        },
+    },
+    [WEB_FETCH]: {
+        inputDescriptionSuffixes: { url: WEB_FETCH_URL_SCHEME_NOTE },
+        buildDescription: () => WEB_FETCH_ADDITIONAL_DESC,
     },
 };
 
+export function getActorToolPolicy(actorFullName: string): ActorToolPolicyConfig | undefined {
+    return ACTOR_TOOL_POLICIES[actorFullName];
+}
+
 export function getDirectActorPolicy(actorFullName: string): DirectActorPolicyConfig | undefined {
-    return DIRECT_ACTOR_POLICIES[actorFullName];
+    return getActorToolPolicy(actorFullName)?.directInput;
 }
 
 export function buildDirectActorContract(actorFullName: string, input: ActorInputSchema | undefined) {
