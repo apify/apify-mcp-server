@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.18.3 - **not yet released**
+## [0.18.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.18.3) (2026-10-15)
 
 ### 🐛 Bug Fixes
 
@@ -21,7 +20,6 @@ All notable changes to this project will be documented in this file.
 - Advertise the public API origin to clients ([#1552](https://github.com/apify/apify-mcp-server/pull/1552)) ([eded3e4](https://github.com/apify/apify-mcp-server/commit/eded3e44bcb8be5b0498f168d922e9eab2cccb2a)) by [@jirispilka](https://github.com/jirispilka), closes [#1176](https://github.com/apify/apify-mcp-server/issues/1176), [#700](https://github.com/apify/apify-mcp-server/issues/700)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.18.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.18.2) (2026-10-14)
 
 
