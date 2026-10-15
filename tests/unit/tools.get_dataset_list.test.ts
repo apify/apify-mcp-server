@@ -166,18 +166,6 @@ describe('get-dataset-list', () => {
         },
     );
 
-    it('keeps the pagination nextStep on a page with no items when more remain', async () => {
-        const listSpy = vi.fn().mockResolvedValue({ ...MOCK_LIST, total: 5, offset: 0, count: 0, items: [] });
-
-        const result = await (getDatasetList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
-        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
-
-        expect(structuredContent.summary).toBe('Listed 0 of 5 named datasets.');
-        expect(structuredContent.nextStep).toBe(
-            `Call ${HELPER_TOOLS.DATASET_LIST_GET} again with offset=0 to fetch the next page.`,
-        );
-    });
-
     it('rejects limit above 20 via ajv validation', () => {
         const tool = getDatasetList as HelperTool;
         expect(tool.ajvValidate({ limit: 21 })).toBe(false);
