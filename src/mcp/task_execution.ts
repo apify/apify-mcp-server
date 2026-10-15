@@ -81,7 +81,7 @@ export async function emitTaskStatusNotification(
  * @param params.mcpSessionId - MCP session ID for telemetry
  * @param params.actorName - Actor name, used for telemetry and error diagnostics
  * @param params.actorId - Actor ID, used for telemetry and error diagnostics
- * @param params.clientParam - Raw `?client=` URL query-param value, for Segment attribution
+ * @param params.clientParam - Raw `?client=` URL query-param value, for Segment attribution and tool wording
  * @param params.taskStore - Task store (legacy) for status/result persistence
  * @param params.server - v1 SDK server (legacy) for task-status notifications and logging
  * @param params.sendNotification - Progress-notification sink for the running tool
