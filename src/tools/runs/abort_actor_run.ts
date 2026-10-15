@@ -4,7 +4,8 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { respondOk } from '../../utils/mcp.js';
+import { respondOk, respondUserError } from '../../utils/mcp.js';
+import { TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 import { buildStats, buildStatusSummaryNextStep, type RunResponse, toIsoString } from '../actors/actor_run_response.js';
 import { actorRunOutputSchema } from '../structured_output_schemas.js';
 
@@ -47,16 +48,28 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = abortRunArgs.parse(args);
-        const run = await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
+        // An abort returns a finished run unchanged, so an already-ABORTED run would read as a fresh abort;
+        // see apify/apify-mcp-server#1560.
+        const runBeforeAbort = await client.run(parsed.runId).get();
+        if (!runBeforeAbort) {
+            return respondUserError(`Run with ID '${parsed.runId}' not found.`);
+        }
+        const isFinished = TERMINAL_RUN_STATUSES.has(runBeforeAbort.status);
+        const run = isFinished
+            ? runBeforeAbort
+            : await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
 
         const dataset = run.defaultDatasetId ? { id: run.defaultDatasetId } : undefined;
         const keyValueStore = run.defaultKeyValueStoreId ? { id: run.defaultKeyValueStoreId } : undefined;
-        const { summary, nextStep } = buildStatusSummaryNextStep({
+        const { summary: statusSummary, nextStep } = buildStatusSummaryNextStep({
             run,
             dataset,
             keyValueStore,
             datasetMetadataFetched: false,
         });
+        const summary = isFinished
+            ? `Nothing was aborted: the run had already finished. ${statusSummary}`
+            : statusSummary;
 
         const structuredContent: RunResponse = {
             runId: run.id,
