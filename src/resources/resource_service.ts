@@ -12,7 +12,7 @@ import type {
 import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
-import { getApifyAPIBaseUrl } from '../apify_client.js';
+import { getApifyAPIPublicBaseUrl } from '../apify_client.js';
 import { InvalidParamsError } from '../mcp/errors.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { SERVER_MODE } from '../types.js';
@@ -172,7 +172,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
     // Advertisement only, NOT a route table: the read path stays a generic proxy, and any other
     // Apify API GET URL is readable the same way.
     const listResourceTemplates = async (): Promise<ListResourceTemplatesResult> => {
-        const api = getApifyAPIBaseUrl();
+        const api = getApifyAPIPublicBaseUrl();
         return {
             resourceTemplates: [
                 {

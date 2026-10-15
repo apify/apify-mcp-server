@@ -1035,7 +1035,7 @@ describe('getToolFullName', () => {
         const tool = {
             type: TOOL_TYPE.ACTOR_MCP,
             name: 'mcp-tool-search',
-            actorId: 'apify/actors-mcp-server',
+            actorId: 'apify/example-mcp-server',
         } as unknown as ToolEntry;
         expect(getToolFullName(tool)).toBe('mcp-tool-search');
     });
@@ -1048,8 +1048,8 @@ describe('extractActorName', () => {
     });
 
     it('returns actorId for actor-mcp tools', () => {
-        const tool = { type: TOOL_TYPE.ACTOR_MCP, actorId: 'apify/actors-mcp-server' } as unknown as ToolEntry;
-        expect(extractActorName(tool)).toBe('apify/actors-mcp-server');
+        const tool = { type: TOOL_TYPE.ACTOR_MCP, actorId: 'apify/example-mcp-server' } as unknown as ToolEntry;
+        expect(extractActorName(tool)).toBe('apify/example-mcp-server');
     });
 
     it('parses actor name from call-actor args', () => {
@@ -1059,7 +1059,7 @@ describe('extractActorName', () => {
 
     it('strips :toolName suffix from call-actor args', () => {
         const tool = { type: TOOL_TYPE.INTERNAL, name: 'call-actor' } as unknown as ToolEntry;
-        expect(extractActorName(tool, { actor: 'apify/actors-mcp-server:search' })).toBe('apify/actors-mcp-server');
+        expect(extractActorName(tool, { actor: 'apify/example-mcp-server:add' })).toBe('apify/example-mcp-server');
     });
 
     it('returns undefined for internal tools without actor arg', () => {
@@ -1090,7 +1090,7 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
             required: ['query'],
         };
 
-        const { inputSchema } = buildActorInputSchema('apify/rag-web-browser', upstream, false);
+        const { inputSchema } = buildActorInputSchema('apify/rag-web-browser', upstream);
 
         const tool = {
             name: 'apify--rag-web-browser',
@@ -1108,6 +1108,84 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
         expect(schema.properties?.query?.description).toMatch(/^\*\*REQUIRED\*\*/);
         expect(schema.properties?.maxResults?.description).not.toMatch(/^\*\*REQUIRED\*\*/);
         expect(schema.properties?.query?.prefill).toBe('web browser for RAG pipelines');
+    });
+
+    // Regression: #1513 — a required property with a default was still required by the Actor tool's validator.
+    describe('required properties with a default', () => {
+        const upstream: ActorInputSchema = {
+            type: 'object',
+            properties: {
+                url: { type: 'string', title: 'URL', description: 'Page URL.' },
+                zeroDefault: { type: 'integer', title: 'Delay', description: 'Delay.', default: 0 },
+                falseDefault: { type: 'boolean', title: 'Flag', description: 'Flag.', default: false },
+                nullDefault: { type: 'string', title: 'Null', description: 'Null.', default: null },
+                emptyDefault: { type: 'string', title: 'Empty', description: 'Empty.', default: '' },
+                proxy: {
+                    type: 'object',
+                    title: 'Proxy',
+                    description: 'Proxy.',
+                    editor: 'proxy',
+                    default: { useApifyProxy: true },
+                },
+                mode: { type: 'string', title: 'Mode', description: 'Mode.', enum: ['a', 'b'], default: 'a' },
+                prefillOnly: { type: 'string', title: 'Prefill', description: 'Prefill.', prefill: 'x' },
+                undefinedDefault: { type: 'string', title: 'Undef', description: 'Undef.', default: undefined },
+                optional: { type: 'string', title: 'Optional', description: 'Optional.' },
+                'dotted.default': { type: 'string', title: 'Dotted', description: 'Dotted.', default: 'z' },
+            },
+            required: [
+                'url',
+                'zeroDefault',
+                'falseDefault',
+                'nullDefault',
+                'emptyDefault',
+                'proxy',
+                'mode',
+                'prefillOnly',
+                'undefinedDefault',
+                'dotted.default',
+            ],
+        };
+        const genuinelyRequired = ['url', 'prefillOnly', 'undefinedDefault'];
+
+        it('keeps only properties without a defined default in required and REQUIRED marking', () => {
+            const { inputSchema } = buildActorInputSchema('someone/some-actor', upstream);
+            const properties = inputSchema.properties as Record<string, SchemaProperties>;
+
+            expect(inputSchema.required).toEqual(genuinelyRequired);
+            for (const [name, property] of Object.entries(properties)) {
+                expect(property.description.startsWith('**REQUIRED**')).toBe(genuinelyRequired.includes(name));
+            }
+        });
+
+        it('keeps the RAG Web Browser query required through the builder, tools/list and validator', () => {
+            const ragUpstream: ActorInputSchema = {
+                type: 'object',
+                properties: {
+                    query: { type: 'string', title: 'Query', description: 'Search term or URL.', prefill: 'apify' },
+                    maxResults: { type: 'integer', title: 'Max', description: 'Max results.', default: 3 },
+                    outputFormats: {
+                        type: 'array',
+                        title: 'Formats',
+                        description: 'Formats.',
+                        default: ['markdown'],
+                    },
+                },
+                required: ['query', 'maxResults', 'outputFormats'],
+            };
+            const { inputSchema } = buildActorInputSchema('apify/rag-web-browser', ragUpstream);
+            const pub = getToolPublicFieldOnly({
+                name: 'apify--rag-web-browser',
+                description: '',
+                inputSchema,
+            } as ToolBase);
+            const validate = fixedAjvCompile(ajv, inputSchema);
+
+            expect(inputSchema.required).toEqual(['query']);
+            expect((pub.inputSchema as { required?: string[] }).required).toEqual(['query']);
+            expect(validate({})).toBe(false);
+            expect(validate({ query: 'apify' })).toBe(true);
+        });
     });
 
     // An oversized enum is dropped entirely (not partially truncated), one schema for both display and AJV.
@@ -1136,7 +1214,7 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
             required: [],
         };
 
-        const { inputSchema } = buildActorInputSchema('compass/crawler-google-places', upstream, false);
+        const { inputSchema } = buildActorInputSchema('compass/crawler-google-places', upstream);
         const displayProperties = inputSchema.properties as Record<string, SchemaProperties>;
 
         // No partial/incomplete list shown as if exhaustive.

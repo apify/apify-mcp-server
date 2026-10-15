@@ -24,8 +24,8 @@ pnpm run evals:mcp-agent --dataset mcp-server-evals-merge --id '^merge/<family>/
 - `--claude-judge` runs the judge on the Agent SDK too (`--judge-model` then takes an Anthropic ID, default `claude-sonnet-5`); with `--subscription --claude-judge` a run needs only `APIFY_TOKEN` + Langfuse keys. Caveat: a Claude judge scoring a Claude agent can be self-lenient — prefer the OpenRouter judge for comparable numbers.
 - `<m>` above is any agent model; pick it off this ladder rather than a default in the examples: `claude-opus-5` (calibration) → `claude-sonnet-5` → `claude-haiku-4-5` (the CLI default, and the sensitive probe). A chained shell command's exit code is the LAST run's — read each log's `📊` line, not the chain status.
 - Known flakes, retry the single item once before diagnosing: `🔥 Never completed (task threw)` (harness/SDK spawn); in remote/sandboxed environments, the agent reading "MCP servers still connecting" and falling back to built-ins (doesn't reproduce locally).
-- Between runs of suites that create named resources: `pnpm run evals:mcp-agent:tasks-fixtures` (adapt per family) deletes leftover `eval-*` resources and reseeds the permanent fixture. Web-target families that create no named state need no fixtures script — say so in the README instead.
-- After a run of the schedules family, delete what it created: `pnpm run evals:mcp-agent:schedules-fixtures -- --run-id <id>`, with the id the run's summary printed. CI passes `<github.run_id>-<github.run_attempt>` to the run and to its teardown step.
+- Between runs of suites that create named resources: `pnpm run evals:mcp-agent:fixtures` deletes `eval-*` leftovers older than 6 h (with `--run-id`, only that run's) and reseeds the permanent fixtures. Web-target families that create no named state need no fixtures — say so in the README instead.
+- After a run of the schedules or tasks family, delete what it created: `pnpm run evals:mcp-agent:fixtures -- --run-id <id>`, with the id the run's summary printed. CI passes `<github.run_id>-<github.run_attempt>` to the run and to its teardown step.
 
 ## Dataset item shape (Langfuse)
 
@@ -115,9 +115,9 @@ const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
 
 ## Fixtures script pattern
 
-One script per stateful family, wired as `evals:mcp-agent:<family>-fixtures` in package.json: create the permanent fixture if missing, **reset its mutable state** every run (an eval agent may have mutated it), and sweep leftovers.
+One script for every stateful family, `evals/scripts/fixtures.ts` (`pnpm run evals:mcp-agent:fixtures`): sweep leftovers, then create each permanent fixture if missing and **reset its mutable state** every run (an eval agent may have mutated it). A new stateful family adds its sweep and fixture there.
 
-`evals/scripts/schedules_fixtures.ts` is the current template for the sweep: `--run-id <id>` deletes only names with that run's `-<id>-n<id length>-t` token. Without it, the seed sweep deletes `eval-*` schedules older than `LEFTOVER_MAX_AGE_MS` (6 h). The rule is a pure function in a side-effect-free sibling module (`evals/scripts/schedules_sweep.ts`), so a unit test imports it without the CLI's `dotenv` load running. `evals/scripts/tasks_fixtures.ts` still sweeps by prefix alone.
+The sweep: `--run-id <id>` deletes only names with that run's `-<id>-n<id length>-t` token. Without it, the seed sweep deletes `eval-*` schedules and tasks older than `LEFTOVER_MAX_AGE_MS` (6 h). The rule is a pure function in a side-effect-free sibling module (`evals/scripts/sweep.ts`), so a unit test imports it without the CLI's `dotenv` load running.
 
 ## Coverage matrix (definition of done for the dataset)
 

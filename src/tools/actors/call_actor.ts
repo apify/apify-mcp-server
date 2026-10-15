@@ -45,7 +45,7 @@ import { classifyFailureCategory, extractAjvErrorDetails } from '../../utils/too
 import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
-import { actorRunOutputSchema } from '../structured_output_schemas.js';
+import { actorRunOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
 import {
     abortRunOnSignal,
     buildStartRunResponse,
@@ -65,7 +65,7 @@ export const CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG = `When calling an MCP server 
 /** Shared MCP server instructions — identical in both modes. */
 export function buildCallActorMcpServerSection({ hasTool }: ToolDescriptionContext): string {
     return `For MCP server Actors:
-${hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? `- Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output={ mcpTools: true } to list available tools\n` : ''}- Call using format: "actorName:toolName" (e.g., "apify/actors-mcp-server:fetch-apify-docs")`;
+${hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? `- Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output={ mcpTools: true } to list available tools\n` : ''}- Call using format: "actorName:toolName" (e.g., "username/name:tool-name")`;
 }
 
 /** Shared "two ways to run" + USAGE section — identical in both modes. */
@@ -244,7 +244,7 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         return respondServerError(
             [
                 `Failed to call Actor '${actorName}': ${errMsg}`,
-                `Account memory quota exceeded for your plan. Retry with a smaller callOptions.memory, or wait for current runs to finish before retrying.`,
+                `Account memory quota exceeded for your plan. A smaller callOptions.memory may fit the remaining quota; memory is freed when current runs finish.`,
             ],
             { error, detail: APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED, actorId },
         );
@@ -283,7 +283,7 @@ export const callOptionsSchema = z.object({
         .max(32768, 'Memory cannot exceed 32 GB (32768 MB)')
         .optional().describe(dedent`
             Memory per run in MB. Power of 2 from 128 to 32768.
-            Apify also caps total memory across all your concurrent runs (account plan limit); if a run is rejected because that quota would be exceeded, retry with a smaller value.
+            Apify also caps total memory across all your concurrent runs (account plan limit); a run that would exceed that quota is rejected.
         `),
     timeout: z.number().min(0, 'Timeout must be 0 or greater').optional().describe(dedent`
             Maximum runtime for the Actor in seconds. After this time elapses, the Actor will be automatically terminated.
@@ -310,9 +310,9 @@ export const callActorArgs = z.object({
     actor: z.string().describe(dedent`
             The Actor to call: its ID, or its name in the "username/name" form (e.g., "apify/rag-web-browser").
 
-            For MCP server Actors, use format "actorName:toolName" to call a specific tool (e.g., "apify/actors-mcp-server:fetch-apify-docs").
+            For MCP server Actors, use format "actorName:toolName" to call a specific tool (e.g., "username/name:tool-name").
         `),
-    input: z.object({}).passthrough().describe('The input JSON to pass to the Actor. Required.'),
+    input: anyJsonObjectSchema.describe('The input JSON to pass to the Actor. Required.'),
     waitSecs: z
         .number()
         .int()
@@ -477,6 +477,7 @@ export async function resolveAndValidateActor(params: {
 
     const { tools, errors } = await getActorsAsTools([actorName], apifyClient, {
         mcpSessionId: toolArgs.mcpSessionId,
+        isDirectTool: false,
     });
 
     // NOT_FOUND falls through to the structured "Actor not found" response below.

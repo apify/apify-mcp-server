@@ -2,8 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.17.5 - **not yet released**
+## [0.18.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.18.3) (2026-10-15)
+
+### 🐛 Bug Fixes
+
+- Drop the generic input hint from tool errors with an HTTP status ([#1565](https://github.com/apify/apify-mcp-server/pull/1565)) ([97c5965](https://github.com/apify/apify-mcp-server/commit/97c5965dca5f4afe69e7a9f399a907045dc73f45)) by [@jirispilka](https://github.com/jirispilka), closes [#1561](https://github.com/apify/apify-mcp-server/issues/1561)
+- Redact the proxy password in API resource and tool responses ([#1563](https://github.com/apify/apify-mcp-server/pull/1563)) ([ea02139](https://github.com/apify/apify-mcp-server/commit/ea021391b1d7aec8c93eb8dc532f63e5179eed63)) by [@jirispilka](https://github.com/jirispilka), closes [#334](https://github.com/apify/apify-mcp-server/issues/334)
+- Keep Actor run retries conditional on user intent ([#1564](https://github.com/apify/apify-mcp-server/pull/1564)) ([3aee515](https://github.com/apify/apify-mcp-server/commit/3aee5152238e5b4db76f0de621af31310795b197)) by [@jirispilka](https://github.com/jirispilka), closes [#255](https://github.com/apify/apify-mcp-server/issues/255), [#1559](https://github.com/apify/apify-mcp-server/issues/1559)
+- Make tool schemas portable across MCP clients ([#1548](https://github.com/apify/apify-mcp-server/pull/1548)) ([37541af](https://github.com/apify/apify-mcp-server/commit/37541af564817717308977182ee6542b48f884d7)) by [@jirispilka](https://github.com/jirispilka), closes [#1545](https://github.com/apify/apify-mcp-server/issues/1545), [#1546](https://github.com/apify/apify-mcp-server/issues/1546)
+- State facts instead of asking for a retry in served hints ([#1578](https://github.com/apify/apify-mcp-server/pull/1578)) ([62f30e6](https://github.com/apify/apify-mcp-server/commit/62f30e60ce2bf11ed838f50349c2cc841423aa6f)) by [@jirispilka](https://github.com/jirispilka), closes [#1558](https://github.com/apify/apify-mcp-server/issues/1558)
+- Serve task and schedule instructions only with their tools ([#1579](https://github.com/apify/apify-mcp-server/pull/1579)) ([698fc44](https://github.com/apify/apify-mcp-server/commit/698fc44f89c9d770e5d27c3678e718b0f0a0c4e2)) by [@jirispilka](https://github.com/jirispilka), closes [#1576](https://github.com/apify/apify-mcp-server/issues/1576)
+- Reject limit below 1 on the run, dataset and store list tools ([#1582](https://github.com/apify/apify-mcp-server/pull/1582)) ([5eebfec](https://github.com/apify/apify-mcp-server/commit/5eebfec0399954d9f133a4c70228b8d31a3ec011)) by [@jirispilka](https://github.com/jirispilka), closes [#1479](https://github.com/apify/apify-mcp-server/issues/1479)
+- Report an empty search-actors page past the last result as such ([#1568](https://github.com/apify/apify-mcp-server/pull/1568)) ([6456db7](https://github.com/apify/apify-mcp-server/commit/6456db768a9202af95b437e6825a33e2d7449423)) by [@jirispilka](https://github.com/jirispilka), closes [#1276](https://github.com/apify/apify-mcp-server/issues/1276)
+- State the named-only filter and unnamed retention in storage lists ([#1567](https://github.com/apify/apify-mcp-server/pull/1567)) ([05b7586](https://github.com/apify/apify-mcp-server/commit/05b758644ccad99b76d120f48fb5508aa024f06d)) by [@jirispilka](https://github.com/jirispilka), closes [#335](https://github.com/apify/apify-mcp-server/issues/335)
+- Say that nothing was aborted when aborting a finished run ([#1566](https://github.com/apify/apify-mcp-server/pull/1566)) ([92600d5](https://github.com/apify/apify-mcp-server/commit/92600d5118f3c2653ad7042d97580b447bfbf33d)) by [@jirispilka](https://github.com/jirispilka), closes [#1560](https://github.com/apify/apify-mcp-server/issues/1560)
+- Apply direct Actor input contracts consistently ([#1585](https://github.com/apify/apify-mcp-server/pull/1585)) ([1f421e1](https://github.com/apify/apify-mcp-server/commit/1f421e1b0900cd08a0b476c8a9caafeff08b8a87)) by [@jirispilka](https://github.com/jirispilka), closes [#1574](https://github.com/apify/apify-mcp-server/issues/1574), [#1575](https://github.com/apify/apify-mcp-server/issues/1575)
+- Advertise the public API origin to clients ([#1552](https://github.com/apify/apify-mcp-server/pull/1552)) ([eded3e4](https://github.com/apify/apify-mcp-server/commit/eded3e44bcb8be5b0498f168d922e9eab2cccb2a)) by [@jirispilka](https://github.com/jirispilka), closes [#1176](https://github.com/apify/apify-mcp-server/issues/1176), [#700](https://github.com/apify/apify-mcp-server/issues/700)
+
+
+## [0.18.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.18.2) (2026-10-14)
+
+
+## [0.18.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.18.1) (2026-10-14)
+
+### 🚀 Features
+
+- State the run limitation when no tool can start an Actor run ([#1533](https://github.com/apify/apify-mcp-server/pull/1533)) ([282807e](https://github.com/apify/apify-mcp-server/commit/282807e628a9362168342581be7a0872a818b3a9)) by [@jirispilka](https://github.com/jirispilka), closes [#1527](https://github.com/apify/apify-mcp-server/issues/1527)
+- Reword run-implying text in sessions without an Actor runner ([#1542](https://github.com/apify/apify-mcp-server/pull/1542)) ([2326baf](https://github.com/apify/apify-mcp-server/commit/2326bafdeea0ab04d91af673638b3f018e7d686b)) by [@jirispilka](https://github.com/jirispilka), closes [#1532](https://github.com/apify/apify-mcp-server/issues/1532)
+
+### 🐛 Bug Fixes
+
+- **evals:** Fail an item when its MCP server is not connected at init ([#1519](https://github.com/apify/apify-mcp-server/pull/1519)) ([5001237](https://github.com/apify/apify-mcp-server/commit/5001237e56cd91634d7cb4f9673cabde334a09ea)) by [@jirispilka](https://github.com/jirispilka), closes [#1510](https://github.com/apify/apify-mcp-server/issues/1510)
+- Drop removed actors-mcp-server Actor from tool descriptions ([#1550](https://github.com/apify/apify-mcp-server/pull/1550)) ([03cf392](https://github.com/apify/apify-mcp-server/commit/03cf392ea8241cb3b3da4c914f542af51116e3d8)) by [@jirispilka](https://github.com/jirispilka), closes [#1549](https://github.com/apify/apify-mcp-server/issues/1549)
+- **evals:** Sweep eval tasks by age or run id instead of by prefix ([#1522](https://github.com/apify/apify-mcp-server/pull/1522)) ([4f3e318](https://github.com/apify/apify-mcp-server/commit/4f3e318d9a1d38a142b7bb52eb7c065250b6dea2)) by [@jirispilka](https://github.com/jirispilka), closes [#1424](https://github.com/apify/apify-mcp-server/issues/1424)
+- Align search-actors keyword guidance with the keywords parameter ([#1541](https://github.com/apify/apify-mcp-server/pull/1541)) ([dfead2b](https://github.com/apify/apify-mcp-server/commit/dfead2be809d4418cf75df6e7e06268ded2d572c)) by [@jirispilka](https://github.com/jirispilka), closes [#1503](https://github.com/apify/apify-mcp-server/issues/1503)
+- Accept omitted Actor input fields that have a default ([#1539](https://github.com/apify/apify-mcp-server/pull/1539)) ([1ab9e99](https://github.com/apify/apify-mcp-server/commit/1ab9e99e42e08c13da5323e5a91f1fa73745ddbd)) by [@jirispilka](https://github.com/jirispilka), closes [#1513](https://github.com/apify/apify-mcp-server/issues/1513)
+- Name storage sibling tools in nextStep only when served ([#1540](https://github.com/apify/apify-mcp-server/pull/1540)) ([108cc21](https://github.com/apify/apify-mcp-server/commit/108cc2133a33ce791e9a5f9cff109032cebadf73)) by [@jirispilka](https://github.com/jirispilka), closes [#1296](https://github.com/apify/apify-mcp-server/issues/1296)
+
+
+## [0.18.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.18.0) (2026-10-13)
 
 ### 🚀 Features
 
@@ -23,7 +60,6 @@ All notable changes to this project will be documented in this file.
 - **evals:** Re-resolve {{uniq}} per retry attempt ([#1516](https://github.com/apify/apify-mcp-server/pull/1516)) ([2039c3c](https://github.com/apify/apify-mcp-server/commit/2039c3c009808c4d0bda19ab498d0cd5bb282773)) by [@jirispilka](https://github.com/jirispilka), closes [#1426](https://github.com/apify/apify-mcp-server/issues/1426)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.17.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.17.4) (2026-10-07)
 
 ### 🐛 Bug Fixes

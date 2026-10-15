@@ -1,15 +1,10 @@
 import type { ValidateFunction } from 'ajv';
 import type Ajv from 'ajv';
 
-import {
-    ACTOR_ENUM_MAX_LENGTH,
-    ACTOR_MAX_DESCRIPTION_LENGTH,
-    RAG_WEB_BROWSER_WHITELISTED_FIELDS,
-    WEB_FETCH,
-    WEB_FETCH_URL_SCHEME_NOTE,
-} from '../const.js';
+import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../const.js';
 import { SchemaTooLargeError } from '../errors.js';
 import type { ActorInputSchema, SchemaProperties } from '../types.js';
+import { fixZodSchemaRequired } from '../utils/ajv.js';
 import {
     addGlobsProperties,
     addKeyValueProperties,
@@ -19,6 +14,7 @@ import {
     addResourcePickerProperties as addArrayResourcePickerProperties,
 } from '../utils/apify_properties.js';
 import { getToolSchemaID } from './actor_tool_naming.js';
+import { getActorToolPolicy } from './actors/actor_tool_contract.js';
 
 type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 
@@ -164,7 +160,7 @@ export function markInputPropertiesAsRequired(input: ActorInputSchema): Record<s
 /**
  * Builds the final Actor input schema for MCP tool usage.
  */
-export function buildActorInputSchema(actorFullName: string, input: ActorInputSchema | undefined, isRag: boolean) {
+export function buildActorInputSchema(actorFullName: string, input: ActorInputSchema | undefined) {
     if (!input) {
         return {
             inputSchema: {
@@ -176,8 +172,8 @@ export function buildActorInputSchema(actorFullName: string, input: ActorInputSc
         };
     }
 
-    // Work on a shallow cloned structure (deep clone only if needed later)
-    const working = structuredClone(input);
+    // A required property with a default is optional: the platform fills it in (see apify/apify-mcp-server#1513).
+    const working = fixZodSchemaRequired(structuredClone(input)) as ActorInputSchema;
 
     if (working && typeof working === 'object' && 'properties' in working && working.properties) {
         working.properties = transformActorInputSchemaProperties(working);
@@ -200,13 +196,12 @@ export function buildActorInputSchema(actorFullName: string, input: ActorInputSc
         delete (working as { $schema?: string }).$schema;
     }
 
-    let finalSchema = working;
-    if (isRag) {
-        finalSchema = pruneSchemaPropertiesByWhitelist(finalSchema, RAG_WEB_BROWSER_WHITELISTED_FIELDS);
-    }
-
-    if (actorFullName === WEB_FETCH && finalSchema.properties.url) {
-        finalSchema.properties.url.description += ` ${WEB_FETCH_URL_SCHEME_NOTE}`;
+    const policy = getActorToolPolicy(actorFullName);
+    const finalSchema = policy?.exposedInputs
+        ? pruneSchemaPropertiesByWhitelist(working, policy.exposedInputs)
+        : working;
+    for (const [name, description] of Object.entries(policy?.inputDescriptionSuffixes ?? {})) {
+        if (finalSchema.properties[name]) finalSchema.properties[name].description += ` ${description}`;
     }
 
     finalSchema.$id = getToolSchemaID(actorFullName);
@@ -218,8 +213,7 @@ export function buildActorInputSchema(actorFullName: string, input: ActorInputSc
  * and filters the required array accordingly. All other top-level fields are preserved.
  * If properties are missing, the original input is returned unchanged.
  *
- * This is used specifically for apify/rag-web-browser where we want to expose
- * only a subset of input properties to the MCP tool without redefining the schema.
+ * Exposure policies can offer a subset of Actor inputs without redefining the schema.
  */
 export function pruneSchemaPropertiesByWhitelist(
     input: ActorInputSchema,

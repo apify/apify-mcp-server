@@ -33,7 +33,7 @@ Two exceptions: **documentation fixes** (typos, broken links, wrong commands) go
 AI tools are welcome — we use them, and this repo ships [`AGENTS.md`](./AGENTS.md) for them. These rules are about accountability, and they don't replace the issue-first process above.
 
 - **Reviewers talk to you, not your agent.** Answer review comments in your own words.
-- **Disclose AI assistance.** In the issue or PR description, name the tool and what it did. Do not add a model as a co-author.
+- **Disclose AI assistance.** In the issue or PR description, name the tool and what it did.
 - **Show it works.** Include a test, an `mcpc` transcript, a screenshot, or an Actor run. Green CI alone is not enough.
 - **Do not post automated AI review comments** on your PR or other people's.
 - **Verify issues yourself.** Don't file a bug an agent "found" without reproducing it, and never file a speculative security report.
@@ -112,6 +112,7 @@ Use comments to guide reviewers:
 *   **Minimal parameters**: functions should only accept what they actually use.
 *   **Reuse utilities**: prefer existing helpers instead of re-implementing logic.
 *   **Consistency reinforcement**: rely on the shared ESLint config (`@apify/eslint-config`) and EditorConfig settings to enforce standards automatically.
+*   **Tool text, annotations and surface**: follow [TOOL_GUIDELINES.md](./TOOL_GUIDELINES.md) for anything the model receives — descriptions, instructions, result text, errors, annotations, the tool set.
 
 ### Standards
 *   **Avoid `else`:** Return early to reduce indentation and keep logic flat.
@@ -327,7 +328,7 @@ Use comments to guide reviewers:
     * **Input validation**: Always validate tool inputs with Zod before processing.
     * **Caching**: Use TTL-based caching for Actor schemas and details (see `src/utils/ttl_lru.ts`).
     * **Constants and tool names**: Always use constants and never hardcoded values. When referring to tools, ALWAYS use the `HELPER_TOOLS` `as const` object.
-        * Exception: Integration tests (`tests/integration/`) must use hardcoded strings for tool names. This ensures tests fail if a tool is renamed, preventing accidental breaking changes.
+        * Exception: the integration suite (`tests/integration/` and the shared `tests/test_kit/` cases and helpers) must use hardcoded strings for tool names. This ensures tests fail if a tool is renamed, preventing accidental breaking changes.
 
 *   **Anti-patterns:**
     * Don't call Apify API directly — always use the Apify client utilities.

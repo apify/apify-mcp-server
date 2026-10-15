@@ -6,7 +6,7 @@ import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSche
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk } from '../../utils/mcp.js';
-import { actorTaskOutputSchema } from '../structured_output_schemas.js';
+import { actorTaskOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
 import { publicConfigSchema, taskNameSchema, taskResult, toSafeResourceId } from './task_helpers.js';
 
 const createActorTaskArgs = z.object({
@@ -21,7 +21,7 @@ const createActorTaskArgs = z.object({
         .describe(
             'Name of the task, unique within the account: 3-63 characters, letters, digits and dashes only (e.g. "my-task"). Generated from the Actor name when omitted.',
         ),
-    input: z.looseObject({}).optional().describe('The input JSON the task runs the Actor with.'),
+    input: anyJsonObjectSchema.optional().describe('The input JSON the task runs the Actor with.'),
     title: z.string().optional().describe('Human-readable title of the task.'),
     description: z.string().optional().describe('Short description of what the task does.'),
     build: z.string().optional().describe('Actor build tag or number to run, e.g. "latest".'),

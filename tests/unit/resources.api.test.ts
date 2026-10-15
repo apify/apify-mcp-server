@@ -2,12 +2,12 @@ import { Readable } from 'node:stream';
 
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError } from 'axios';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { MAX_INLINE_BYTES } from '../../src/const.js';
 import { InternalError, InvalidParamsError } from '../../src/mcp/errors.js';
-import { isApifyApiUri, readApiResource, redactUrlSigningSecretKey } from '../../src/resources/api_resources.js';
+import { isApifyApiUri, readApiResource, redactJsonSecrets } from '../../src/resources/api_resources.js';
 import { mockApifyClient } from './helpers/tool_context.js';
 
 const API = 'https://api.apify.com';
@@ -106,6 +106,16 @@ function requestFailing(status: number, statusText: string, body?: object) {
 }
 
 describe('isApifyApiUri()', () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it('accepts both the client-facing and the egress origin when they differ', () => {
+        // The hosted server sends requests to an internal host; URIs on that host stay readable.
+        vi.stubEnv('APIFY_API_BASE_URL', 'http://api.internal.example:3333');
+        expect(isApifyApiUri(`${API}/v2/datasets/ds-1/items`)).toBe(true);
+        expect(isApifyApiUri('http://api.internal.example:3333/v2/datasets/ds-1/items')).toBe(true);
+        expect(isApifyApiUri('https://example.com/v2/datasets/ds-1/items')).toBe(false);
+    });
+
     it('returns true for Apify API URLs', () => {
         expect(isApifyApiUri(`${API}/v2/datasets/ds-1/items`)).toBe(true);
         expect(isApifyApiUri(`${API}/v2/key-value-stores/kv-1/records/INPUT`)).toBe(true);
@@ -127,7 +137,7 @@ describe('isApifyApiUri()', () => {
     });
 });
 
-describe('redactUrlSigningSecretKey()', () => {
+describe('redactJsonSecrets()', () => {
     it.each([
         [
             'in pretty-printed JSON',
@@ -155,8 +165,13 @@ describe('redactUrlSigningSecretKey()', () => {
             '{"urlSigningSecretKey"\n:\n"s"}',
             '{"urlSigningSecretKey"\n:\n"[REDACTED]"}',
         ],
+        [
+            'of the password key, at depth and in arrays',
+            '{"proxy":{"password":"fake-password","groups":[]},"items":[{"password" : "p"}]}',
+            '{"proxy":{"password":"[REDACTED]","groups":[]},"items":[{"password" : "[REDACTED]"}]}',
+        ],
     ])('redacts the value %s', (_kind, json, expected) => {
-        expect(redactUrlSigningSecretKey(json)).toBe(expected);
+        expect(redactJsonSecrets(json)).toBe(expected);
     });
 
     it.each([
@@ -164,9 +179,10 @@ describe('redactUrlSigningSecretKey()', () => {
         ['the name as a value', '{"note":"urlSigningSecretKey","fields":["urlSigningSecretKey"]}'],
         ['a number or object value', '{"urlSigningSecretKey":1,"o":{"urlSigningSecretKey":{"a":"b"}}}'],
         ['a longer name', '{"myurlSigningSecretKey":"s","urlSigningSecretKeyX":"s"}'],
+        ['a longer password name', '{"mypassword":"s","passwordX":"s"}'],
         ['the name inside a string value', '{"note":"\\"urlSigningSecretKey\\": \\"s\\""}'],
     ])('returns JSON with %s as it is', (_kind, json) => {
-        expect(redactUrlSigningSecretKey(json)).toBe(json);
+        expect(redactJsonSecrets(json)).toBe(json);
     });
 });
 
@@ -465,7 +481,7 @@ describe('readApiResource()', () => {
 
         expect(error).toBeInstanceOf(InternalError);
         expect(error.message).toContain(`Failed to read ${uri}: HTTP 500: Internal Server Error`);
-        expect(error.message).toContain('Retry later');
+        expect(error.message).toContain('this is usually temporary');
     });
 
     it('falls back to statusText when a non-2xx error body itself crosses the limit', async () => {
@@ -508,7 +524,7 @@ describe('readApiResource()', () => {
 
         expect(error).toBeInstanceOf(InternalError);
         expect(error.message).toContain('HTTP 429: Too many requests');
-        expect(error.message).toContain('Rate limit exceeded');
+        expect(error.message).toContain('rate limit was reached');
     });
 
     it('appends the private-resource hint for a 403 response', async () => {
@@ -566,6 +582,18 @@ describe('readApiResource()', () => {
         expect(firstContent(result).text).toBe(body.replace('"mock-signing-secret"', '"[REDACTED]"'));
         expect(firstContent(result).mimeType).toBe('application/json; charset=utf-8');
         expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
+    });
+
+    it('redacts the proxy password read from /v2/users/me', async () => {
+        const body = JSON.stringify({
+            data: { id: 'user-1', username: 'test-user', proxy: { password: 'fake-proxy-password', groups: [] } },
+        });
+        const { request } = requestReturning(streamOf(body), 'application/json; charset=utf-8');
+
+        const result = await readApiResource(`${API}/v2/users/me`, stubApifyClient({ request }));
+
+        expect(firstContent(result).text).toBe(body.replace('"fake-proxy-password"', '"[REDACTED]"'));
+        expect(JSON.stringify(result)).not.toContain('fake-proxy-password');
     });
 
     it('keeps the URL signing key in a binary body', async () => {
@@ -717,5 +745,30 @@ describe('readApiResource()', () => {
         expect(firstContent(result).text).toContain(uri);
         expect(logOutput()).toContain('Failed to mint signed download URL');
         expect(logOutput()).not.toContain('test-token');
+    });
+
+    describe('with the egress origin separate from the client-facing one', () => {
+        const EGRESS = 'http://api.internal.example:3333';
+        beforeEach(() => vi.stubEnv('APIFY_API_BASE_URL', EGRESS));
+        afterEach(() => vi.unstubAllEnvs());
+
+        it('sends a client-facing URI to the egress origin and returns it under the URI as given', async () => {
+            const { request, captured } = requestReturning(streamOf('[]'), 'application/json');
+            const uri = `${API}/v2/datasets/ds-1/items?limit=5`;
+
+            const result = await readApiResource(uri, stubApifyClient({ request }));
+
+            expect(captured.url).toBe(`${EGRESS}/v2/datasets/ds-1/items?limit=5`);
+            expect(result.contents[0].uri).toBe(uri);
+        });
+
+        it('links an oversized body read on the egress origin to its client-facing URL', async () => {
+            const { request } = requestReturning(abortingStream(), 'application/json');
+
+            const result = await readApiResource(`${EGRESS}/v2/datasets/ds-1/items`, stubApifyClient({ request }));
+
+            expect(firstContent(result).text).toContain(`${API}/v2/datasets/ds-1/items`);
+            expect(firstContent(result).text).not.toContain('api.internal.example');
+        });
     });
 });

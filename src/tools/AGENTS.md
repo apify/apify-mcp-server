@@ -18,7 +18,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
   - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), delete
     (`delete_actor.ts`), the actor-tools factory, the direct actor-tool executor (`actor_executor.ts`),
-    `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`), and
+    `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`),
+    `actor_tool_contract.ts` (Actor-specific presentation policies plus direct-tool input restrictions
+    and defaults, shared by schema generation, the call engine's denied-input check and execution;
+    generic calls skip direct-only restrictions and defaults), and
     `actor_run_response.ts` —
     the one canonical run shape `call-actor` and `get-actor-run` share across sync, task
     and wait-timeout modes: storage IDs plus a `summary` (past) / `nextStep` (one primary
@@ -58,12 +61,12 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `/v2/actors` are the same), sends it as written with the query added after any query string in
     it, and looks up a legacy `acts` path as `actors`, the prefix the spec lists. It asserts that the
     URL stays on the API origin, sends one request with no retries, masks the session token in the
-    response, redacts the `urlSigningSecretKey` value in a JSON body, keeps a query in the path out of
-    the error it throws, and adds the closest spec paths to a `page-not-found` 404 (a wrong path), not
-    to a missing record.
+    response, redacts the `urlSigningSecretKey` and `password` values in a JSON body, keeps a query in
+    the path out of the error it throws, and adds the closest spec paths to a `page-not-found` 404 (a
+    wrong path), not to a missing record.
     The one capped request (`sendApifyApiRequest`) is in `../apify_client.ts`. The origin check
     (`isApifyApiUri`), the detection of a body over `MAX_INLINE_BYTES` (`isMaxContentLengthAbort`),
-    the binary token mask (`maskSessionToken`), the key redaction (`redactUrlSigningSecretKey`) and
+    the binary token mask (`maskSessionToken`), the secret redaction (`redactJsonSecrets`) and
     `REDACTED` are the API resource's own, imported from `../resources/api_resources.ts`
     ([`../resources/AGENTS.md`](../resources/AGENTS.md#api-resources-api_resourcests)).
     A request failure is thrown as `toPlainError` (`../utils/logging.ts`), without the axios config.
@@ -79,8 +82,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 - **Validate inputs with Zod**; no ad-hoc shape checks. AJV + Zod already validate
   before a tool runs — don't re-check the same constraint inside the tool body.
 - **Reference tool names via the `HELPER_TOOLS` `as const` object**, never hardcoded strings
-  (exception: integration tests).
+  (exception: the integration suite, `tests/integration/` and the shared `tests/test_kit/` cases and helpers, which hardcode them so a renamed tool fails).
 - Keep a new tool mode-agnostic unless it is genuinely a widget variant.
+- Descriptions, result text, annotations and the tool set follow [TOOL_GUIDELINES.md](../../TOOL_GUIDELINES.md); the gating mechanics below implement its "name only what the session has" rule.
 
 **Storage tool description skeleton** (`storage/`, all 8 tools): lead sentence stating what the tool
 returns, then a disambiguation line naming the sibling tool(s) it's confused with via
@@ -104,8 +108,9 @@ renders it per session — so never name a tool there; put the guidance in `buil
 auto-injects the `get-actor-run` it names.
 
 Result text (`summary` / `nextStep` in `content[1]`) has no `hasTool`, but it does have a per-session
-gate: `InternalToolArgs.loadedToolNames` (see `suggestTool` in `storage/storage_helpers.ts`). Name a
-tool there only through that gate, or when it is the calling tool itself (the "call it again with the
+gate: `InternalToolArgs.loadedToolNames`. A `nextStep` that names a sibling tool goes through
+`resolveSiblingNextStep` in `storage/storage_helpers.ts`. Name a tool there only through that gate,
+or when it is the calling tool itself (the "call it again with the
 next offset" pagination hint); otherwise leave the cross-tool guidance to the gated description.
 An `AUTO_INJECTED_TOOLS` member is no exception — the injection is conditional on `call-actor`, an
 Actor tool, or `get-actor-run` being loaded, so a session that loaded only `abort-actor-run` gets

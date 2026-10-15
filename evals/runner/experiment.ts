@@ -334,24 +334,25 @@ export function formatRunSummary(summary: RunSummary, passThreshold: number, ite
 }
 
 /**
- * The run's id and the command that deletes the schedules it created. The runner never deletes them
+ * The run's id and the command that deletes the schedules and tasks it created. The runner never deletes them
  * itself: family-specific cleanup does not belong in the runner every family shares.
  */
 export function formatTeardownHint(runId: string): string[] {
     return [
-        `🧹 Run id ${runId} — delete this run's schedules:`,
-        `   pnpm run evals:mcp-agent:schedules-fixtures -- --run-id ${runId}`,
+        `🧹 Run id ${runId} — delete this run's schedules and tasks:`,
+        `   pnpm run evals:mcp-agent:fixtures -- --run-id ${runId}`,
     ];
 }
 
 /**
- * Messages of failures worth replaying the agent run for: the network or the provider
- * dropped the request, not the agent's own doing.
+ * Messages of failures worth replaying the agent run for: the network, the provider or the
+ * MCP handshake failed, not the agent's own doing.
  *
  * Matched on the message because the SDK surfaces them as plain `Error`s with no code or
  * status. Deliberately narrow: retrying a deterministic failure (a bad prompt, a missing
  * binary, a tool timeout) only doubles the spend and, for a case with fixed-name fixtures,
  * turns the replay itself into a name collision that fails the zero-tool-error gate.
+ * An MCP server `pending` or `failed` at init is replayed once; other statuses are configuration errors.
  */
 const TRANSIENT_AGENT_ERROR_PATTERNS = [
     /connection error/i,
@@ -362,6 +363,7 @@ const TRANSIENT_AGENT_ERROR_PATTERNS = [
     /\b(408|429|500|502|503|504)\b/,
     /overloaded/i,
     /rate.?limit/i,
+    /MCP server ".+" not connected at init \(status: (pending|failed)\)/,
 ];
 
 /** Whether an agent-run failure is transient, so replaying the prompt could recover it. */

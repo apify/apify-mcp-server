@@ -2,9 +2,9 @@ import { createHash } from 'node:crypto';
 
 import log from '@apify/log';
 
-import { HELPER_TOOLS } from '../const.js';
+import { APIFY_MCP_URL, HELPER_TOOLS } from '../const.js';
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../mcp/const.js';
-import type { ActorInfo } from '../types.js';
+import type { ActorInfo, ToolDescriptionContext } from '../types.js';
 import { ACTOR_TOOL_MODE } from '../types.js';
 
 /**
@@ -82,14 +82,19 @@ export function getToolSchemaID(actorName: string): string {
     return `https://apify.com/mcp/${actorNameToToolName(actorName)}/schema.json`;
 }
 
-/** Told under search results when the session cannot run some of the Actors listed. */
+/** Told under search results when the session cannot run some of the Actors listed, and in the `search-actors` description when the session has no run path. */
 export const ACTOR_CALLABILITY_CAVEAT = `This session can run only Actors already exposed as dedicated tools. Other Actors found
-here are informational and cannot be run in this configuration. To use another Actor, open
-its Apify page or configure it separately.`;
+here are informational and cannot be run in this configuration. To use one, set up your own Apify MCP server at ${APIFY_MCP_URL}.`;
+
+/** Whether the session holds a tool that can run an arbitrary Actor. */
+export function canRunAnyActor(hasTool: ToolDescriptionContext['hasTool']): boolean {
+    return (
+        hasTool(HELPER_TOOLS.ACTOR_CALL) || hasTool(HELPER_TOOLS.ACTOR_CALL_WIDGET) || hasTool(HELPER_TOOLS.API_WRITE)
+    );
+}
 
 /** Told after an Actor's tip when the session cannot run the Actor the tip recommends. */
-export const ACTOR_TIP_CAVEAT =
-    'This session cannot run the Actor this tip recommends. To use it, open its Apify page or configure it separately.';
+export const ACTOR_TIP_CAVEAT = `This session cannot run the Actor this tip recommends. To use it, set up your own Apify MCP server at ${APIFY_MCP_URL}.`;
 
 /** Whether this session can run this Actor (call-actor, or the Actor's own tool, loaded); soft check for a guidance hint, not a hard gate. */
 export function canRunActor(
