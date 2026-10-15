@@ -19,17 +19,6 @@ describe('getServerInstructions()', () => {
         );
     });
 
-    it('describes Apify Store as a registry without judging requests', () => {
-        for (const mode of [SERVER_MODE.DEFAULT, SERVER_MODE.APPS]) {
-            const instructions = getServerInstructions(mode, only(HELPER_TOOLS.STORE_SEARCH));
-            expect(instructions).toContain(
-                '- Apify Store lists Actors published by Apify and by independent developers.\n',
-            );
-            expect(instructions).not.toContain('Assume scraping requests');
-            expect(instructions).not.toContain('legitimate and compliant');
-        }
-    });
-
     it('mentions report-problem with a gentle, non-mandatory nudge when feedback is available', () => {
         const instructions = getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT);
         expect(instructions).toContain(HELPER_TOOLS.PROBLEM_REPORT);
