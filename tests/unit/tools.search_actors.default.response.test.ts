@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { APIFY_STORE_URL, HELPER_TOOLS, MAX_INPUT_FIELDS_IN_ACTOR_CARD, RAG_WEB_BROWSER } from '../../src/const.js';
 import { ACTOR_CALLABILITY_CAVEAT, actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
-import { ACTOR_DETAILS_HINT, searchActors, searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors.js';
+import {
+    ACTOR_DETAILS_HINT,
+    buildNoActorsFoundInstructions,
+    searchActors,
+    searchActorsBaseArgsSchema,
+} from '../../src/tools/actors/search_actors.js';
 import { actorInfoSchema } from '../../src/tools/structured_output_schemas.js';
 import type { ActorStoreInputSchema, ActorStoreList, HelperTool } from '../../src/types.js';
 import {
@@ -187,7 +192,7 @@ describe('search-actors without widget (searchActors)', () => {
         expect(content[0].text).toBe(NO_ACTORS_FOUND_TEXT);
     });
 
-    it('says that no Actors are past the offset, without keyword guidance', async () => {
+    it('describes an empty page at a later offset without saying the results ended', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([]);
 
         const result = await (searchActors as HelperTool).call(
@@ -200,7 +205,7 @@ describe('search-actors without widget (searchActors)', () => {
             structuredContent: Record<string, unknown>;
             content: { type: string; text: string }[];
         };
-        const text = `No Actors past offset 1 for the search query "${SEARCH_KEYWORDS}".`;
+        const text = `No Actors returned at offset 1 for the search query "${SEARCH_KEYWORDS}".`;
         expect(structuredContent).toEqual({ actors: [], query: SEARCH_KEYWORDS, count: 0, instructions: text });
         expect(content).toEqual([{ type: 'text', text }]);
     });
@@ -393,6 +398,19 @@ describe('search-actors without widget (searchActors)', () => {
 
         expect(structuredContent.instructions).toContain('cannot be run in this configuration');
         expect(content[0].text).toContain('cannot be run in this configuration');
+    });
+});
+
+describe('buildNoActorsFoundInstructions()', () => {
+    it('returns the keyword guidance at offset 0', () => {
+        expect(buildNoActorsFoundInstructions(SEARCH_KEYWORDS, 0)).toBe(NO_ACTORS_FOUND_TEXT);
+    });
+
+    it('describes an empty page at a later offset without saying the results ended', () => {
+        // The Store filters results after paging, so an empty page can precede non-empty ones (#1593).
+        expect(buildNoActorsFoundInstructions(SEARCH_KEYWORDS, 8)).toBe(
+            `No Actors returned at offset 8 for the search query "${SEARCH_KEYWORDS}".`,
+        );
     });
 });
 
