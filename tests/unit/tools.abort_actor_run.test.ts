@@ -11,7 +11,7 @@ import {
     type TextToolResult,
 } from './helpers/tool_context.js';
 
-function mockAbortedRun(overrides: Record<string, unknown> = {}) {
+function mockRun(overrides: Record<string, unknown> = {}) {
     return {
         id: 'run-1',
         actId: 'actor-id-1',
@@ -41,11 +41,7 @@ function abortContext(args: Record<string, unknown>, run: unknown, abortedRun: u
 
 describe('abort-actor-run', () => {
     it('returns structuredContent with summary, nextStep, and run subset', async () => {
-        const { context, abort } = abortContext(
-            { runId: 'run-1' },
-            mockAbortedRun({ status: 'RUNNING' }),
-            mockAbortedRun(),
-        );
+        const { context, abort } = abortContext({ runId: 'run-1' }, mockRun({ status: 'RUNNING' }), mockRun());
         const result = await (abortActorRun as HelperTool).call(context);
         const { structuredContent, content } = result as TextToolResult & {
             structuredContent: Record<string, unknown>;
@@ -77,7 +73,7 @@ describe('abort-actor-run', () => {
     });
 
     it('does not contain "Dataset metadata unavailable" for a SUCCEEDED run', async () => {
-        const { context } = abortContext({ runId: 'run-1' }, mockAbortedRun({ status: 'SUCCEEDED' }));
+        const { context } = abortContext({ runId: 'run-1' }, mockRun({ status: 'SUCCEEDED' }));
         const result = await (abortActorRun as HelperTool).call(context);
         const { structuredContent } = result as TextToolResult & {
             structuredContent: Record<string, unknown>;
@@ -90,7 +86,7 @@ describe('abort-actor-run', () => {
     it.each(['SUCCEEDED', 'FAILED', 'TIMED-OUT', 'ABORTED'])(
         'says that nothing was aborted for a %s run and sends no abort',
         async (status) => {
-            const { context, abort } = abortContext({ runId: 'run-1' }, mockAbortedRun({ status }));
+            const { context, abort } = abortContext({ runId: 'run-1' }, mockRun({ status }));
             const result = await (abortActorRun as HelperTool).call(context);
             const { structuredContent, content } = result as TextToolResult & {
                 structuredContent: { summary: string };
@@ -108,7 +104,7 @@ describe('abort-actor-run', () => {
     );
 
     it.each(['READY', 'RUNNING', 'TIMING-OUT', 'ABORTING'])('sends the abort for a %s run', async (status) => {
-        const { context, abort } = abortContext({ runId: 'run-1' }, mockAbortedRun({ status }));
+        const { context, abort } = abortContext({ runId: 'run-1' }, mockRun({ status }));
         const result = await (abortActorRun as HelperTool).call(context);
 
         expect(abort).toHaveBeenCalledOnce();
@@ -118,8 +114,8 @@ describe('abort-actor-run', () => {
     it.each(['ABORTING', 'ABORTED'])('keeps the status summary when the abort returns %s', async (status) => {
         const { context, abort } = abortContext(
             { runId: 'run-1' },
-            mockAbortedRun({ status: 'RUNNING' }),
-            mockAbortedRun({ status }),
+            mockRun({ status: 'RUNNING' }),
+            mockRun({ status }),
         );
         const result = await (abortActorRun as HelperTool).call(context);
         const { structuredContent, content } = result as TextToolResult & {
