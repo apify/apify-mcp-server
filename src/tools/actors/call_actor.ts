@@ -45,7 +45,7 @@ import { classifyFailureCategory, extractAjvErrorDetails } from '../../utils/too
 import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
-import { actorRunOutputSchema } from '../structured_output_schemas.js';
+import { actorRunOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
 import {
     abortRunOnSignal,
     buildStartRunResponse,
@@ -312,7 +312,7 @@ export const callActorArgs = z.object({
 
             For MCP server Actors, use format "actorName:toolName" to call a specific tool (e.g., "username/name:tool-name").
         `),
-    input: z.object({}).passthrough().describe('The input JSON to pass to the Actor. Required.'),
+    input: anyJsonObjectSchema.describe('The input JSON to pass to the Actor. Required.'),
     waitSecs: z
         .number()
         .int()
