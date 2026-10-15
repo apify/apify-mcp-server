@@ -14,6 +14,7 @@ import { prepareToolCallContext } from '../payments/helpers.js';
 import type { PaymentMeta, PaymentProvider, RequestHeaders } from '../payments/types.js';
 import { decodeDotPropertyNames } from '../tools/actor_input_schema.js';
 import { legacyToolNameToNew } from '../tools/actor_tool_naming.js';
+import { getDirectActorPolicy } from '../tools/actors/actor_tool_contract.js';
 import { checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
 import { withReportProblemNudge } from '../tools/dev/report_problem.js';
 import type { ActorStore, CallDiagnostics, ToolCallTelemetryProperties, ToolEntry, ToolStatus } from '../types.js';
@@ -175,9 +176,11 @@ export async function prepareToolCall(params: {
 
     const actorName = extractActorName(tool, args as Record<string, unknown>);
     const actorId = extractActorId(tool);
-    // fetch-actor-details only describes Actors, and only helps if this session serves it.
+    // Actor details describe the original schema; restricted direct tools publish their own in tools/list.
     const schemaHint =
-        tool.type === TOOL_TYPE.ACTOR && tools.has(HELPER_TOOLS.ACTOR_GET_DETAILS)
+        tool.type === TOOL_TYPE.ACTOR &&
+        !getDirectActorPolicy(tool.actorFullName) &&
+        tools.has(HELPER_TOOLS.ACTOR_GET_DETAILS)
             ? `using ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool`
             : 'in tools/list';
 

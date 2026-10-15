@@ -477,6 +477,7 @@ export async function resolveAndValidateActor(params: {
 
     const { tools, errors } = await getActorsAsTools([actorName], apifyClient, {
         mcpSessionId: toolArgs.mcpSessionId,
+        isDirectTool: false,
     });
 
     // NOT_FOUND falls through to the structured "Actor not found" response below.

@@ -193,6 +193,67 @@ describe('getNormalActorsAsTools()', () => {
         });
     });
 
+    describe('direct Actor contract', () => {
+        const actorInfo = createMockActorInfo('apify/website-content-crawler', {
+            ...LIMITED,
+            inputProperties: {
+                respectRobotsTxtFile: { type: 'boolean', default: false },
+                pageFunction: { type: 'string', editor: 'hidden', default: '' },
+                initialCookies: { type: 'array', editor: 'json', isSecret: true },
+            },
+        });
+
+        it('serves restricted inputs and derives read-only annotations without changing the source', async () => {
+            const original = structuredClone(actorInfo);
+            const [tool] = await getNormalActorsAsTools([actorInfo]);
+            expect(tool.inputSchema.properties).not.toHaveProperty('pageFunction');
+            expect(tool.inputSchema.properties).not.toHaveProperty('initialCookies');
+            expect(tool.inputSchema.properties?.respectRobotsTxtFile).toMatchObject({ default: true });
+            expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+            expect(tool.description).toContain('pageFunction');
+            expect(tool.description).toContain('initialCookies');
+            expect(actorInfo).toEqual(original);
+        });
+
+        it.each([true, false])(
+            'rejects denied fields even with additionalProperties %s',
+            async (additionalProperties) => {
+                const info = structuredClone(actorInfo);
+                Object.assign(info.definition.input!, { additionalProperties });
+                const [tool] = await getNormalActorsAsTools([info]);
+                for (const field of ['pageFunction', 'initialCookies']) {
+                    const input = { url: 'https://example.com', [field]: 'sensitive-value' };
+                    expect(tool.ajvValidate(input)).toBe(false);
+                    expect(JSON.stringify(tool.ajvValidate.errors)).not.toContain('sensitive-value');
+                }
+                expect(tool.ajvValidate({ url: 'https://example.com', respectRobotsTxtFile: false })).toBe(true);
+            },
+        );
+
+        it('removes denied fields from required', async () => {
+            const info = structuredClone(actorInfo);
+            info.definition.input!.required = ['url', 'initialCookies'];
+            const [tool] = await getNormalActorsAsTools([info]);
+            expect(tool.inputSchema.required).toEqual(['url']);
+            expect(tool.ajvValidate({ url: 'https://example.com' })).toBe(true);
+        });
+
+        it('retains permission checks and other secret inputs', async () => {
+            const fullPermissions = structuredClone(actorInfo);
+            fullPermissions.actor.actorPermissionLevel = 'FULL_PERMISSIONS';
+            const otherSecret = structuredClone(actorInfo);
+            otherSecret.definition.input!.properties.password = {
+                type: 'string',
+                title: 'Password',
+                description: 'Password',
+                isSecret: true,
+            };
+            for (const info of [fullPermissions, otherSecret]) {
+                expect(await getAnnotations(info)).toMatchObject({ readOnlyHint: false, destructiveHint: true });
+            }
+        });
+    });
+
     // Regression: #1532 — the RAG description named apify/web-fetch when the session did not serve it.
     it('names apify/web-fetch in the RAG description only when its tool is served', async () => {
         const [tool] = await getNormalActorsAsTools([createMockActorInfo(RAG_WEB_BROWSER)]);
