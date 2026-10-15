@@ -17,33 +17,17 @@ secrets, or verbatim private conversation content — describe the issue in your
 
 const ACKNOWLEDGEMENT = `Problem reported. Thank you — this helps the Apify team improve its tools.`;
 
-/**
- * Sentence appended to an eligible failed (isError) tool result, so the agent learns that report-problem
- * exists where it decides what to do next. It states what the tool does and asks for no call: served text
- * never instructs a call the user did not ask for (TOOL_GUIDELINES.md, apify/apify-mcp-server#1597).
- */
+/** Describes reporting without requesting a call; see apify/apify-mcp-server#1597. */
 export const REPORT_PROBLEM_NUDGE = `${HELPER_TOOLS.PROBLEM_REPORT} sends a description of this error to the Apify team.`;
 
-/**
- * Failure categories that represent expected, user-resolvable states rather than potential Apify
- * defects: input the caller can fix, such as a resource that does not exist or an invalid argument
- * (apify/apify-mcp-server#1290), an approval, or a token. The sentence is suppressed for these, so
- * it does not flood the channel or distract from surfacing the payment/approval URL. `INTERNAL_ERROR`
- * and an absent/unknown category get {@link REPORT_PROBLEM_NUDGE}.
- */
+/** Input, auth and approval failures are expected states, not defects to report; see apify/apify-mcp-server#1290. */
 const NON_NUDGE_FAILURE_CATEGORIES = new Set<string>([
     FAILURE_CATEGORY.INVALID_INPUT,
     FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
     FAILURE_CATEGORY.AUTH,
 ]);
 
-/**
- * Append {@link REPORT_PROBLEM_NUDGE} to a failed tool result's text content, returning a shallow copy with
- * a new `content` array (never mutates the input). Returns the original unchanged unless the result is
- * an error with a text `content[]`, `report-problem` is actually served (`available`), the failing tool
- * is not `report-problem` itself, `failureHttpStatus` is not 402 (a payment/billing state), and
- * `failureCategory` is not an expected, user-resolvable state (see {@link NON_NUDGE_FAILURE_CATEGORIES}).
- */
+/** Returns a copy so appending the sentence does not mutate the original tool result. */
 export function appendReportProblemNudge<T>(
     result: T,
     opts: { failingToolName?: string; available: boolean; failureCategory?: string; failureHttpStatus?: number },
