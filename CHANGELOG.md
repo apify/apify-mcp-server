@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - Reject limit below 1 on the run, dataset and store list tools ([#1582](https://github.com/apify/apify-mcp-server/pull/1582)) ([5eebfec](https://github.com/apify/apify-mcp-server/commit/5eebfec0399954d9f133a4c70228b8d31a3ec011)) by [@jirispilka](https://github.com/jirispilka), closes [#1479](https://github.com/apify/apify-mcp-server/issues/1479)
 - Report an empty search-actors page past the last result as such ([#1568](https://github.com/apify/apify-mcp-server/pull/1568)) ([6456db7](https://github.com/apify/apify-mcp-server/commit/6456db768a9202af95b437e6825a33e2d7449423)) by [@jirispilka](https://github.com/jirispilka), closes [#1276](https://github.com/apify/apify-mcp-server/issues/1276)
 - State the named-only filter and unnamed retention in storage lists ([#1567](https://github.com/apify/apify-mcp-server/pull/1567)) ([05b7586](https://github.com/apify/apify-mcp-server/commit/05b758644ccad99b76d120f48fb5508aa024f06d)) by [@jirispilka](https://github.com/jirispilka), closes [#335](https://github.com/apify/apify-mcp-server/issues/335)
+- Say that nothing was aborted when aborting a finished run ([#1566](https://github.com/apify/apify-mcp-server/pull/1566)) ([92600d5](https://github.com/apify/apify-mcp-server/commit/92600d5118f3c2653ad7042d97580b447bfbf33d)) by [@jirispilka](https://github.com/jirispilka), closes [#1560](https://github.com/apify/apify-mcp-server/issues/1560)
 
 
 <!-- git-cliff-unreleased-end -->
