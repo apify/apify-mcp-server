@@ -843,6 +843,28 @@ describe('get-actor-run default response', () => {
         expect(content[1].text).toContain(`Use a different Actor.\n\`\`\`\n${getActorTipCaveat()}`);
     });
 
+    it('names the Claude custom connector in the tip caveat for ?client=claude', async () => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: {
+                message: 'Use a different Actor.',
+                level: 'info',
+                recommendedActorId: 'shu8hvrXbJbY3Eb9W',
+            },
+        });
+
+        const result = await (getActorRun as HelperTool).call({
+            ...stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client), {
+                loadedToolNames: [HELPER_TOOLS.ACTOR_RUNS_GET],
+            }),
+            clientParam: 'claude',
+        });
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expect(structuredContent.tip?.caveat).toBe(getActorTipCaveat('claude'));
+        expect(structuredContent.tip?.caveat).toContain('add it to Claude as a custom connector.');
+    });
+
     it('renders the tip in a fenced code block in the text response', async () => {
         const { client } = makeKvStoreClient({
             displayedKeys: [{ key: 'TIP' }],
