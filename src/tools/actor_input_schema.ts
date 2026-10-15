@@ -10,6 +10,7 @@ import {
 } from '../const.js';
 import { SchemaTooLargeError } from '../errors.js';
 import type { ActorInputSchema, SchemaProperties } from '../types.js';
+import { fixZodSchemaRequired } from '../utils/ajv.js';
 import {
     addGlobsProperties,
     addKeyValueProperties,
@@ -176,8 +177,8 @@ export function buildActorInputSchema(actorFullName: string, input: ActorInputSc
         };
     }
 
-    // Work on a shallow cloned structure (deep clone only if needed later)
-    const working = structuredClone(input);
+    // A required property with a default is optional: the platform fills it in (see apify/apify-mcp-server#1513).
+    const working = fixZodSchemaRequired(structuredClone(input)) as ActorInputSchema;
 
     if (working && typeof working === 'object' && 'properties' in working && working.properties) {
         working.properties = transformActorInputSchemaProperties(working);

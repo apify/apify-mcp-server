@@ -110,4 +110,19 @@ describe('get-key-value-store-list', () => {
         expect(tool.ajvValidate({ limit: 11 })).toBe(false);
         expect(tool.ajvValidate({ limit: 10 })).toBe(true);
     });
+
+    // Regression: #1296 — the terminal nextStep named a sibling tool the session was not served.
+    it('falls back on the last page when get-key-value-store is not loaded', async () => {
+        const result = (await (getKeyValueStoreList as HelperTool).call(
+            stubToolCallContext({}, stubApifyClient(vi.fn().mockResolvedValue(MOCK_LIST)), {
+                loadedToolNames: [HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET],
+            }),
+        )) as TextToolResult & { structuredContent: Record<string, unknown> };
+
+        expect(result.structuredContent.nextStep).toBe('No follow-up step.');
+        expect(JSON.stringify([result.content, result.structuredContent])).not.toContain(
+            HELPER_TOOLS.KEY_VALUE_STORE_GET,
+        );
+        expectSchemaConformingStructuredContent(result, storageListOutputSchema);
+    });
 });

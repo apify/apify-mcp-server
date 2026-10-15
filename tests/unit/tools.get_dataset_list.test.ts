@@ -122,4 +122,17 @@ describe('get-dataset-list', () => {
         expect(tool.ajvValidate({ limit: 21 })).toBe(false);
         expect(tool.ajvValidate({ limit: 20 })).toBe(true);
     });
+
+    // Regression: #1296 — the terminal nextStep named a sibling tool the session was not served.
+    it('falls back on the last page when get-dataset is not loaded', async () => {
+        const result = (await (getDatasetList as HelperTool).call(
+            stubToolCallContext({}, stubApifyClient(vi.fn().mockResolvedValue(MOCK_LIST)), {
+                loadedToolNames: [HELPER_TOOLS.DATASET_LIST_GET],
+            }),
+        )) as TextToolResult & { structuredContent: Record<string, unknown> };
+
+        expect(result.structuredContent.nextStep).toBe('No follow-up step.');
+        expect(JSON.stringify([result.content, result.structuredContent])).not.toContain(HELPER_TOOLS.DATASET_GET);
+        expectSchemaConformingStructuredContent(result, storageListOutputSchema);
+    });
 });

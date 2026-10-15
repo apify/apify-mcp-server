@@ -11,7 +11,7 @@ import { respondUserError } from '../../utils/mcp.js';
 import { datasetSizeNextStepHint, normalizeDatasetFields } from '../actors/actor_run_response.js';
 import { datasetMetadataOutputSchema } from '../structured_output_schemas.js';
 import { DEFAULT_DATASET_ITEMS_LIMIT } from './get_dataset_items.js';
-import { buildStorageResponse } from './storage_helpers.js';
+import { buildStorageResponse, resolveSiblingNextStep } from './storage_helpers.js';
 
 const getDatasetArgs = z.object({
     datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
@@ -63,7 +63,7 @@ export const getDataset: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, apifyToken } = toolArgs;
+        const { args, apifyClient: client, apifyToken, loadedToolNames } = toolArgs;
         const parsed = getDatasetArgs.parse(args);
         const datasetId = stripQuoteWrappers(parsed.datasetId);
         const dataset = await client.dataset(datasetId).get();
@@ -91,7 +91,11 @@ export const getDataset: ToolEntry = Object.freeze({
         // response today (only the dataset-list endpoint returns it), so read it defensively.
         const inflatedBytes = (dataset.stats as { inflatedBytes?: number } | undefined)?.inflatedBytes;
         const summary = `Dataset '${normalized.name ?? datasetId}' has ${normalized.itemCount ?? 0} items${fieldCount !== undefined ? `, ${fieldCount} fields` : ''}.`;
-        const nextStep = `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}`;
+        const nextStep = resolveSiblingNextStep(
+            HELPER_TOOLS.DATASET_GET_ITEMS,
+            loadedToolNames,
+            `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}`,
+        );
         return buildStorageResponse({
             structuredContent: normalized,
             summary,

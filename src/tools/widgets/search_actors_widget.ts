@@ -10,6 +10,7 @@ import { searchAgentSafeActors } from '../../utils/actor_search.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
+import { ACTOR_CALLABILITY_CAVEAT, canRunAnyActor } from '../actor_tool_naming.js';
 import {
     buildActorCallabilityCaveat,
     buildNoActorsFoundInstructions,
@@ -27,15 +28,22 @@ import { actorSearchWidgetOutputSchema } from '../structured_output_schemas.js';
 const searchActorsWidgetArgsSchema = searchActorsBaseArgsSchema.strict();
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    return dedent`
+    const silentSearchHint = canRunAnyActor(hasTool)
+        ? `For silent name resolution before running an Actor (e.g., "scrape google maps" — you need to find the right Actor first, then fetch its schema and call it), use ${HELPER_TOOLS.STORE_SEARCH} instead — it returns the same data without rendering a widget.`
+        : `For silent Actor discovery, ${HELPER_TOOLS.STORE_SEARCH} returns the same data without rendering a widget.`;
+    // Kept outside dedent, per CONTRIBUTING's rule against interpolating flush-left values into it.
+    const runLimitation = canRunAnyActor(hasTool) ? '' : `\n\n${ACTOR_CALLABILITY_CAVEAT}`;
+    return (
+        dedent`
         Render an interactive UI element (widget) displaying Apify Store search results for the user.
 
         Use this tool ONLY when the user explicitly wants to browse or discover Actors visually
         (e.g., "find me scrapers for Instagram", "show me Amazon Actors", "what tools exist for Twitter").
         The response renders as an interactive widget the user can view directly.
-        ${hasTool(HELPER_TOOLS.STORE_SEARCH) ? `\nFor silent name resolution before running an Actor (e.g., "scrape google maps" — you need to find the right Actor first, then fetch its schema and call it), use ${HELPER_TOOLS.STORE_SEARCH} instead — it returns the same data without rendering a widget.\n` : ''}
+        ${hasTool(HELPER_TOOLS.STORE_SEARCH) ? `\n${silentSearchHint}\n` : ''}
         Input: keywords (plus optional limit/offset). Output fields are fixed by the widget contract.
-    `;
+    ` + runLimitation
+    );
 }
 
 export const searchActorsWidget: ToolEntry = Object.freeze({

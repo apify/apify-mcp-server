@@ -136,4 +136,19 @@ describe('get-key-value-store', () => {
             `Apify Console: https://console.apify.com/storage/key-value-stores/kv-1\n${VERBATIM_LINKS_NUDGE}`,
         );
     });
+
+    // Regression: #1296 — nextStep named a sibling tool the session was not served.
+    it('falls back without naming get-key-value-store-keys when it is not loaded', async () => {
+        const result = (await (getKeyValueStore as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(MOCK_STORE), {
+                loadedToolNames: [HELPER_TOOLS.KEY_VALUE_STORE_GET],
+            }),
+        )) as TextToolResult & { structuredContent: Record<string, unknown> };
+
+        expect(result.structuredContent.nextStep).toBe('No follow-up step.');
+        expect(JSON.stringify([result.content, result.structuredContent])).not.toContain(
+            HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
+        );
+        expectSchemaConformingStructuredContent(result, keyValueStoreOutputSchema);
+    });
 });

@@ -6,7 +6,7 @@ import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSche
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { storageListOutputSchema } from '../structured_output_schemas.js';
-import { buildStorageListSummaryNextStep, buildStorageResponse } from './storage_helpers.js';
+import { buildStorageListSummaryNextStep, buildStorageResponse, resolveSiblingNextStep } from './storage_helpers.js';
 
 const getUserKeyValueStoresListArgs = z.object({
     offset: z
@@ -65,7 +65,7 @@ export const getKeyValueStoreList: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client } = toolArgs;
+        const { args, apifyClient: client, loadedToolNames } = toolArgs;
         const parsed = getUserKeyValueStoresListArgs.parse(args);
         const stores = await client.keyValueStores().list({
             limit: parsed.limit,
@@ -79,7 +79,11 @@ export const getKeyValueStoreList: ToolEntry = Object.freeze({
             offset: stores.offset,
             noun: 'key-value stores',
             listToolName: HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
-            inspectHint: `Use ${HELPER_TOOLS.KEY_VALUE_STORE_GET} with a keyValueStoreId from the list to inspect a store.`,
+            inspectHint: resolveSiblingNextStep(
+                HELPER_TOOLS.KEY_VALUE_STORE_GET,
+                loadedToolNames,
+                `Use ${HELPER_TOOLS.KEY_VALUE_STORE_GET} with a keyValueStoreId from the list to inspect a store.`,
+            ),
         });
         return buildStorageResponse({
             structuredContent: stores as unknown as Record<string, unknown>,

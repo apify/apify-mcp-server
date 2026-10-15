@@ -322,6 +322,21 @@ describe('getServerInstructions()', () => {
             );
             expect(instructions).toContain(RUN_LIMITATION_LINE);
         });
+
+        // Regression: #1532 — apps mode advised silent lookups before running an Actor the session could not run.
+        it('omits the silent-lookup bullet in apps mode when no tool can run an Actor', () => {
+            const discoveryTools = [
+                HELPER_TOOLS.STORE_SEARCH,
+                HELPER_TOOLS.STORE_SEARCH_WIDGET,
+                HELPER_TOOLS.ACTOR_GET_DETAILS,
+                HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
+            ];
+            const silentLookup = 'When the next step is running an Actor, prefer silent lookups';
+            expect(getServerInstructions(SERVER_MODE.APPS, only(...discoveryTools))).not.toContain(silentLookup);
+            expect(getServerInstructions(SERVER_MODE.APPS, only(...discoveryTools, HELPER_TOOLS.ACTOR_CALL))).toContain(
+                silentLookup,
+            );
+        });
     });
 });
 
