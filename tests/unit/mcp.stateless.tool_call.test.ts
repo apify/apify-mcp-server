@@ -11,6 +11,7 @@ import * as mcpClient from '../../src/mcp/client.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import { X402PaymentProvider } from '../../src/payments/x402.js';
 import * as telemetry from '../../src/telemetry.js';
+import { getOwnServerRemedy } from '../../src/tools/actor_tool_naming.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import * as callActor from '../../src/tools/actors/call_actor.js';
 import type { ActorsMcpServerOptions, Input, ToolEntry, ToolInputSchema } from '../../src/types.js';
@@ -303,6 +304,34 @@ describe('createStatelessServer() tools/call', () => {
                 await loadSource(server, [tool]);
                 await call('tools/call', { name: tool.name, arguments: {} });
                 expect(received.clientParam).toBe('claude');
+            }, options);
+        });
+
+        it('renders the ?client=claude remedy in tools/list and the instructions', async () => {
+            const options = { clientParam: 'claude' };
+            // search-actors without a run tool states the run limitation in its description and the instructions.
+            const input: Input = { tools: [HELPER_TOOLS.STORE_SEARCH] };
+            const remedy = getOwnServerRemedy('claude');
+            const findSearchActors = (tools: unknown) =>
+                (tools as { name: string; description: string }[]).find(
+                    (tool) => tool.name === HELPER_TOOLS.STORE_SEARCH,
+                );
+
+            await withServer(async (server) => {
+                await loadSource(server, [], input);
+                const initialized = await getRequestHandler(server, 'initialize')(LEGACY_INITIALIZE, {});
+                const listed = await getRequestHandler(server, 'tools/list')({ method: 'tools/list', params: {} }, {});
+                expect(initialized.instructions).toContain(remedy);
+                expect(findSearchActors(listed.tools)?.description).toContain(remedy);
+            }, options);
+
+            await withStatelessServer(async ({ server, call }) => {
+                await loadSource(server, [], input);
+                const response = await call('tools/list');
+                expect(findSearchActors(response.result?.tools)?.description).toContain(remedy);
+                expect(
+                    server.getStatelessServerInstructions(`https://mcp.apify.com/?tools=${HELPER_TOOLS.STORE_SEARCH}`),
+                ).toContain(remedy);
             }, options);
         });
 
