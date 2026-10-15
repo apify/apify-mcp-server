@@ -119,8 +119,9 @@ export const registrationCases: Case[] = [
     {
         // Pinned ?tools= wins for call-actor even with report-problem auto-inject live.
         // No ?ui=: apps mode comes from the client's own UI-capability advertisement (serverMode 'auto'), not a URL override.
+        // Not a deployment test: the exact set needs every pinned Actor on the target Apify API, and staging lacks some.
         name: 'Claude connector: pinned tool surface excludes call-actor, includes report-problem, tagged ?client=claude',
-        isDeploymentTest: true,
+        isDeploymentTest: false,
         skipIf: () => !SERVER_MODE_AUTO_DETECTION_ENABLED,
         run: withClient(
             {

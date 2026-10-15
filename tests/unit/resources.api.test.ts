@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApifyClient } from '../../src/apify_client.js';
 import { MAX_INLINE_BYTES } from '../../src/const.js';
 import { InternalError, InvalidParamsError } from '../../src/mcp/errors.js';
-import { isApifyApiUri, readApiResource, redactUrlSigningSecretKey } from '../../src/resources/api_resources.js';
+import { isApifyApiUri, readApiResource, redactJsonSecrets } from '../../src/resources/api_resources.js';
 import { mockApifyClient } from './helpers/tool_context.js';
 
 const API = 'https://api.apify.com';
@@ -127,7 +127,7 @@ describe('isApifyApiUri()', () => {
     });
 });
 
-describe('redactUrlSigningSecretKey()', () => {
+describe('redactJsonSecrets()', () => {
     it.each([
         [
             'in pretty-printed JSON',
@@ -155,8 +155,13 @@ describe('redactUrlSigningSecretKey()', () => {
             '{"urlSigningSecretKey"\n:\n"s"}',
             '{"urlSigningSecretKey"\n:\n"[REDACTED]"}',
         ],
+        [
+            'of the password key, at depth and in arrays',
+            '{"proxy":{"password":"fake-password","groups":[]},"items":[{"password" : "p"}]}',
+            '{"proxy":{"password":"[REDACTED]","groups":[]},"items":[{"password" : "[REDACTED]"}]}',
+        ],
     ])('redacts the value %s', (_kind, json, expected) => {
-        expect(redactUrlSigningSecretKey(json)).toBe(expected);
+        expect(redactJsonSecrets(json)).toBe(expected);
     });
 
     it.each([
@@ -164,9 +169,10 @@ describe('redactUrlSigningSecretKey()', () => {
         ['the name as a value', '{"note":"urlSigningSecretKey","fields":["urlSigningSecretKey"]}'],
         ['a number or object value', '{"urlSigningSecretKey":1,"o":{"urlSigningSecretKey":{"a":"b"}}}'],
         ['a longer name', '{"myurlSigningSecretKey":"s","urlSigningSecretKeyX":"s"}'],
+        ['a longer password name', '{"mypassword":"s","passwordX":"s"}'],
         ['the name inside a string value', '{"note":"\\"urlSigningSecretKey\\": \\"s\\""}'],
     ])('returns JSON with %s as it is', (_kind, json) => {
-        expect(redactUrlSigningSecretKey(json)).toBe(json);
+        expect(redactJsonSecrets(json)).toBe(json);
     });
 });
 
@@ -551,6 +557,18 @@ describe('readApiResource()', () => {
         expect(firstContent(result).text).toBe(body.replace('"mock-signing-secret"', '"[REDACTED]"'));
         expect(firstContent(result).mimeType).toBe('application/json; charset=utf-8');
         expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
+    });
+
+    it('redacts the proxy password read from /v2/users/me', async () => {
+        const body = JSON.stringify({
+            data: { id: 'user-1', username: 'test-user', proxy: { password: 'fake-proxy-password', groups: [] } },
+        });
+        const { request } = requestReturning(streamOf(body), 'application/json; charset=utf-8');
+
+        const result = await readApiResource(`${API}/v2/users/me`, stubApifyClient({ request }));
+
+        expect(firstContent(result).text).toBe(body.replace('"fake-proxy-password"', '"[REDACTED]"'));
+        expect(JSON.stringify(result)).not.toContain('fake-proxy-password');
     });
 
     it('keeps the URL signing key in a binary body', async () => {

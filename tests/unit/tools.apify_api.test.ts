@@ -600,6 +600,20 @@ describe('apify-api-read', () => {
         expect(JSON.stringify(result)).not.toContain('test-token');
     });
 
+    it('redacts the proxy password read from /v2/users/me', async () => {
+        requestMock.mockResolvedValue(
+            mockResponse(200, { data: { id: 'user-1', proxy: { password: 'fake-proxy-password', groups: [] } } }),
+        );
+
+        const result = await callTool(apifyApiRead, { path: '/v2/users/me' });
+
+        expect(result.structuredContent).toMatchObject({
+            data: { data: { id: 'user-1', proxy: { password: '[REDACTED]', groups: [] } } },
+        });
+        expect(result.content[0].text).toBe(JSON.stringify(result.structuredContent));
+        expect(JSON.stringify(result)).not.toContain('fake-proxy-password');
+    });
+
     it.each([
         ['a text body', '"urlSigningSecretKey": "abc123"', 'text/plain', '"urlSigningSecretKey": "abc123"'],
         ['a number', 42, 'application/json', 42],
