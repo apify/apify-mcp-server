@@ -236,12 +236,14 @@ describe('getHttpErrorHint()', () => {
     });
 
     it('returns the rate-limit hint for 429', () => {
-        expect(getHttpErrorHint(429)).toContain('Rate limit exceeded');
+        expect(getHttpErrorHint(429)).toBe('The Apify API rate limit was reached.');
     });
 
     it('returns the server-error hint for 5xx', () => {
         for (const status of [500, 503, 599]) {
-            expect(getHttpErrorHint(status)).toContain('server failed');
+            expect(getHttpErrorHint(status)).toBe(
+                'The Apify API failed to process the request; this is usually temporary.',
+            );
         }
     });
 
@@ -270,14 +272,14 @@ describe('getToolCallErrorUserText()', () => {
     it('replaces the input hint with the rate-limit hint for 429', () => {
         const error = Object.assign(new Error('Too Many Requests'), { statusCode: 429 });
         const text = getToolCallErrorUserText('apify/instagram-scraper', error);
-        expect(text).toContain('Rate limit exceeded');
+        expect(text).toContain('rate limit was reached');
         expect(text).not.toContain('Verify the tool name');
     });
 
     it('replaces the input hint with the server-error hint for 5xx', () => {
         const error = Object.assign(new Error('Service Unavailable'), { statusCode: 503 });
         const text = getToolCallErrorUserText('apify/instagram-scraper', error);
-        expect(text).toContain('server failed');
+        expect(text).toContain('failed to process the request');
         expect(text).not.toContain('Verify the tool name');
     });
 
@@ -293,8 +295,8 @@ describe('getToolCallErrorUserText()', () => {
     it.each([
         [401, 'Authentication failed, check APIFY_TOKEN is set and valid.'],
         [403, 'The resource may be private or your token may lack access.'],
-        [429, 'Rate limit exceeded, wait before retrying.'],
-        [500, 'The server failed to process the request, likely a temporary issue. Retry later.'],
+        [429, 'The Apify API rate limit was reached.'],
+        [500, 'The Apify API failed to process the request; this is usually temporary.'],
     ])('keeps the HTTP %i hint', (statusCode, hint) => {
         const error = Object.assign(new Error('Request failed'), { statusCode });
         const text = getToolCallErrorUserText('get-actor-run', error);

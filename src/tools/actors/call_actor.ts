@@ -244,7 +244,7 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         return respondServerError(
             [
                 `Failed to call Actor '${actorName}': ${errMsg}`,
-                `Account memory quota exceeded for your plan. Retry with a smaller callOptions.memory, or wait for current runs to finish before retrying.`,
+                `Account memory quota exceeded for your plan. A smaller callOptions.memory may fit the remaining quota; memory is freed when current runs finish.`,
             ],
             { error, detail: APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED, actorId },
         );
@@ -283,7 +283,7 @@ export const callOptionsSchema = z.object({
         .max(32768, 'Memory cannot exceed 32 GB (32768 MB)')
         .optional().describe(dedent`
             Memory per run in MB. Power of 2 from 128 to 32768.
-            Apify also caps total memory across all your concurrent runs (account plan limit); if a run is rejected because that quota would be exceeded, retry with a smaller value.
+            Apify also caps total memory across all your concurrent runs (account plan limit); a run that would exceed that quota is rejected.
         `),
     timeout: z.number().min(0, 'Timeout must be 0 or greater').optional().describe(dedent`
             Maximum runtime for the Actor in seconds. After this time elapses, the Actor will be automatically terminated.
