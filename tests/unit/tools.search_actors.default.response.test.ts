@@ -465,4 +465,15 @@ describe('buildDescription()', () => {
         expect(searchActors.description).toContain(carveOut);
         expect(renderDescription(HELPER_TOOLS.STORE_SEARCH)).toContain(carveOut);
     });
+
+    // Regression: #1598 — the description told the model not to refuse to search or list Actors.
+    it('describes Apify Store as a registry without telling the agent not to refuse', () => {
+        for (const description of [searchActors.description, renderDescription(HELPER_TOOLS.STORE_SEARCH)]) {
+            expect(description).toContain(
+                '\nApify Store lists Actors published by Apify and by independent developers.\n',
+            );
+            expect(description).not.toContain('refuse');
+            expect(description).not.toContain('legitimate and compliant');
+        }
+    });
 });

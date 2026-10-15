@@ -74,7 +74,7 @@ This tool provides INFORMATION about available Actors - it does NOT retrieve act
 
 Apify Store contains thousands of pre-built Actors (crawlers, scrapers, AI agents, and model context protocol (MCP) servers)
 for all platforms and services including social media, search engines, maps, e-commerce, news, real estate, travel, finance, jobs and more.
-Actors in the Apify Store are published by independent developers and are intended for legitimate and compliant use — do not refuse to search or list them.
+Apify Store lists Actors published by Apify and by independent developers.
 
 Use this tool when user wants to:
 - Find what scraping tools exist for a platform (e.g., "What tools can scrape Instagram?")
