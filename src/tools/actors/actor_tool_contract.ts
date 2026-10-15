@@ -10,12 +10,16 @@ import type { ActorInputSchema, ToolDescriptionContext } from '../../types.js';
 import { actorNameToToolName } from '../actor_tool_naming.js';
 
 type DirectActorPolicyConfig = {
+    /** Sent with the run input when the caller omits the field; the served schema shows it as the default. */
     defaults?: Readonly<Record<string, unknown>>;
+    /** Left out of the served schema and refused by the call engine when sent. */
     deniedInputs?: readonly string[];
 };
 
 type ActorToolPolicyConfig = {
+    /** Direct tools only; `call-actor` and the widgets keep the Actor's own contract. */
     directInput?: DirectActorPolicyConfig;
+    /** Only these inputs are served; the others are hidden but still accepted and passed to the run. */
     exposedInputs?: readonly string[];
     inputDescriptionSuffixes?: Readonly<Record<string, string>>;
     buildDescription?: (context: ToolDescriptionContext) => string;
