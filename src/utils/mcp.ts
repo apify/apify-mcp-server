@@ -316,8 +316,11 @@ export function getToolCallErrorUserText(toolName: string, error: unknown): stri
             'ask the user for its key; no tool can list dataset views.'
         );
     }
-    const hint = getHttpErrorHint(getHttpStatusCode(error)) ?? 'Verify the tool name and input parameters.';
-    return `Error calling tool "${toolName}": ${msg}. ${hint}`;
+    // With an HTTP status, the API's message says what failed; the generic hint adds nothing and can
+    // blame valid input (#1561).
+    const statusCode = getHttpStatusCode(error);
+    const hint = statusCode === undefined ? 'Verify the tool name and input parameters.' : getHttpErrorHint(statusCode);
+    return `Error calling tool "${toolName}": ${msg}.${hint ? ` ${hint}` : ''}`;
 }
 
 /** Texts for a confirmed platform input-validation error — same shape wherever start() can throw one. */

@@ -3,7 +3,20 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.18.1 - **not yet released**
+## 0.18.3 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Drop the generic input hint from tool errors with an HTTP status ([#1565](https://github.com/apify/apify-mcp-server/pull/1565)) ([97c5965](https://github.com/apify/apify-mcp-server/commit/97c5965dca5f4afe69e7a9f399a907045dc73f45)) by [@jirispilka](https://github.com/jirispilka), closes [#1561](https://github.com/apify/apify-mcp-server/issues/1561)
+- Redact the proxy password in API resource and tool responses ([#1563](https://github.com/apify/apify-mcp-server/pull/1563)) ([ea02139](https://github.com/apify/apify-mcp-server/commit/ea021391b1d7aec8c93eb8dc532f63e5179eed63)) by [@jirispilka](https://github.com/jirispilka), closes [#334](https://github.com/apify/apify-mcp-server/issues/334)
+- Keep Actor run retries conditional on user intent ([#1564](https://github.com/apify/apify-mcp-server/pull/1564)) ([3aee515](https://github.com/apify/apify-mcp-server/commit/3aee5152238e5b4db76f0de621af31310795b197)) by [@jirispilka](https://github.com/jirispilka), closes [#255](https://github.com/apify/apify-mcp-server/issues/255), [#1559](https://github.com/apify/apify-mcp-server/issues/1559)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.18.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.18.2) (2026-10-14)
+
+
+## [0.18.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.18.1) (2026-10-14)
 
 ### 🚀 Features
 
@@ -20,7 +33,6 @@ All notable changes to this project will be documented in this file.
 - Name storage sibling tools in nextStep only when served ([#1540](https://github.com/apify/apify-mcp-server/pull/1540)) ([108cc21](https://github.com/apify/apify-mcp-server/commit/108cc2133a33ce791e9a5f9cff109032cebadf73)) by [@jirispilka](https://github.com/jirispilka), closes [#1296](https://github.com/apify/apify-mcp-server/issues/1296)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.18.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.18.0) (2026-10-13)
 
 ### 🚀 Features

@@ -281,6 +281,31 @@ describe('getToolCallErrorUserText()', () => {
         expect(text).not.toContain('Verify the tool name');
     });
 
+    it.each([
+        [400, 'Input is not valid'],
+        [404, 'Actor run was not found'],
+    ])('ends an HTTP %i error with the API message and no generic hint', (statusCode, message) => {
+        const error = Object.assign(new Error(message), { statusCode });
+        const text = getToolCallErrorUserText('get-actor-run', error);
+        expect(text).toBe(`Error calling tool "get-actor-run": ${message}.`);
+    });
+
+    it.each([
+        [401, 'Authentication failed, check APIFY_TOKEN is set and valid.'],
+        [403, 'The resource may be private or your token may lack access.'],
+        [429, 'Rate limit exceeded, wait before retrying.'],
+        [500, 'The server failed to process the request, likely a temporary issue. Retry later.'],
+    ])('keeps the HTTP %i hint', (statusCode, hint) => {
+        const error = Object.assign(new Error('Request failed'), { statusCode });
+        const text = getToolCallErrorUserText('get-actor-run', error);
+        expect(text).toBe(`Error calling tool "get-actor-run": Request failed. ${hint}`);
+    });
+
+    it('keeps the generic hint for an error without an HTTP status', () => {
+        const text = getToolCallErrorUserText('get-actor-run', new Error('boom'));
+        expect(text).toBe('Error calling tool "get-actor-run": boom. Verify the tool name and input parameters.');
+    });
+
     it('names the API error type so the model can report the exact failure', () => {
         const error = new ApifyApiError(
             {
