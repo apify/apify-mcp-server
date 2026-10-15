@@ -154,7 +154,7 @@ describe('getOwnServerRemedy()', () => {
     it('names the Claude custom connector only for ?client=claude', () => {
         expect(getOwnServerRemedy('claude')).toContain('add it to Claude as a custom connector.');
         for (const clientParam of [undefined, 'cursor', 'claude-code']) {
-            expect(getOwnServerRemedy(clientParam)).toContain('add it to your MCP client.');
+            expect(getOwnServerRemedy(clientParam)).toContain('add it to your agent.');
         }
     });
 });

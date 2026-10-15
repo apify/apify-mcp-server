@@ -84,7 +84,7 @@ export function getToolSchemaID(actorName: string): string {
 
 /** How to get an Actor this session cannot run. `?client=claude` (the Claude connector URL) names Claude's custom connector flow. */
 export function getOwnServerRemedy(clientParam?: string): string {
-    const target = clientParam === 'claude' ? 'Claude as a custom connector' : 'your MCP client';
+    const target = clientParam === 'claude' ? 'Claude as a custom connector' : 'your agent';
     return `create your own Apify MCP server configuration at ${APIFY_MCP_URL} and add it to ${target}.`;
 }
 
