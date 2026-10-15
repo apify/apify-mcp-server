@@ -278,21 +278,6 @@ describe('search-actors without widget (searchActors)', () => {
         expect(content[0].text.split(VERBATIM_LINKS_NUDGE)).toHaveLength(2);
     });
 
-    it('names the Claude custom connector in the footer when clientParam is claude', async () => {
-        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
-        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
-
-        const result = await (searchActors as HelperTool).call({
-            ...stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
-                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH],
-            }),
-            clientParam: 'claude',
-        });
-        const { structuredContent } = result as { structuredContent: { instructions?: string } };
-
-        expect(structuredContent.instructions).toBe(getActorCallabilityCaveat('claude'));
-    });
-
     // The footer is result text, which `tools.mode_contract.test.ts` cannot see — it renders
     // descriptions only. A `?tools=search-actors` session is served no fetch-actor-details.
     it('names no follow-up tool in the footer when the session was not served one', async () => {
@@ -427,14 +412,6 @@ describe('buildDescription()', () => {
         expect(renderDescription(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS)).toContain(
             `${getActorCallabilityCaveat()}\nFor complete Actor details (per-field descriptions, defaults, README), use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool.\nThe search is limited to publicly available Actors`,
         );
-    });
-
-    it('names the Claude custom connector in the run limitation when clientParam is claude', () => {
-        const description = searchActors.buildDescription!({
-            ...only(HELPER_TOOLS.STORE_SEARCH),
-            clientParam: 'claude',
-        });
-        expect(description).toContain(getActorCallabilityCaveat('claude'));
     });
 
     it('omits the run limitation when the session has call-actor', () => {

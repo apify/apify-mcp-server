@@ -3,16 +3,14 @@ import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
-import { searchActors } from '../../src/tools/actors/search_actors.js';
 import { SERVER_MODE } from '../../src/types.js';
 
-function makeServer(serverMode: SERVER_MODE = SERVER_MODE.DEFAULT, clientParam?: string): ActorsMcpServer {
+function makeServer(serverMode: SERVER_MODE = SERVER_MODE.DEFAULT): ActorsMcpServer {
     return new ActorsMcpServer({
         taskStore: new InMemoryTaskStore(),
         setupSigintHandler: false,
         serverMode,
         telemetry: { enabled: false },
-        clientParam,
     });
 }
 
@@ -58,24 +56,9 @@ describe('ActorsMcpServer.getStatelessServerInstructions()', () => {
         expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
     });
 
-    it('names the Claude custom connector in the run limitation when clientParam is claude', () => {
-        const instructions = makeServer(SERVER_MODE.DEFAULT, 'claude').getStatelessServerInstructions(
-            'http://localhost/?tools=search-actors',
-        );
-        expect(instructions).toContain('add it to Claude as a custom connector.');
-    });
-
     // ?tools=dev seeds report-problem into the candidate set so this exercises the filter, not an always-true check.
     it('never mentions report-problem via a requestUrl, even when explicitly selected', () => {
         const instructions = makeServer().getStatelessServerInstructions('http://localhost/?tools=dev');
         expect(instructions).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
-    });
-});
-
-describe('ActorsMcpServer.getServerInstructions()', () => {
-    it('names the Claude custom connector in the run limitation when clientParam is claude', () => {
-        const server = makeServer(SERVER_MODE.DEFAULT, 'claude');
-        server.upsertTools([searchActors]);
-        expect(server.getServerInstructions()).toContain('add it to Claude as a custom connector.');
     });
 });

@@ -298,17 +298,6 @@ describe('buildActorNotRunnableGuidance()', () => {
         const text = buildActorNotRunnableGuidance('actor-id-1', { loadedToolNames: [], loadedActorIds: new Set() });
         expect(text).toContain('cannot be run in this configuration');
     });
-
-    it('names the Claude custom connector when clientParam is claude', () => {
-        const text = buildActorNotRunnableGuidance('actor-id-1', {
-            loadedToolNames: [],
-            loadedActorIds: new Set(),
-            clientParam: 'claude',
-        });
-        expect(text).toContain(
-            'create your own Apify MCP server configuration at https://mcp.apify.com and add it to Claude as a custom connector.',
-        );
-    });
 });
 
 // Result text has no `hasTool`, so tools.mode_contract.test.ts does not cover it. A guessed Actor

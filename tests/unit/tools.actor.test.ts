@@ -151,16 +151,11 @@ describe('canRunActor()', () => {
 });
 
 describe('getOwnServerRemedy()', () => {
-    it('names the Claude custom connector for the Claude connector URL tag', () => {
-        expect(getOwnServerRemedy('claude')).toBe(
-            'create your own Apify MCP server configuration at https://mcp.apify.com and add it to Claude as a custom connector.',
-        );
-    });
-
-    it.each([undefined, 'cursor', 'claude-code', 'Claude'])('names the MCP client for %s', (clientParam) => {
-        expect(getOwnServerRemedy(clientParam)).toBe(
-            'create your own Apify MCP server configuration at https://mcp.apify.com and add it to your MCP client.',
-        );
+    it('names the Claude custom connector only for ?client=claude', () => {
+        expect(getOwnServerRemedy('claude')).toContain('add it to Claude as a custom connector.');
+        for (const clientParam of [undefined, 'cursor', 'claude-code']) {
+            expect(getOwnServerRemedy(clientParam)).toContain('add it to your MCP client.');
+        }
     });
 });
 

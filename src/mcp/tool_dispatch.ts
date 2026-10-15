@@ -60,7 +60,6 @@ export async function dispatchToolCall(params: {
     actorName?: string;
     actorId?: string;
     taskMode: boolean;
-    /** Raw `?client=` URL query-param value, forwarded to the tool for wording. */
     clientParam?: string;
     // Caller-supplied log decoration (task mode: ' for task' suffix + taskId field), applied
     // mechanically to the per-branch "Calling …" lines — no effect on dispatch behavior.

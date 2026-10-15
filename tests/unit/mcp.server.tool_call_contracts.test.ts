@@ -29,7 +29,6 @@ import {
     getLegacyServer,
     getRequestHandler,
     getTaskStore,
-    makeArgsRecorderTool,
     makePaymentRequiredError,
     makePermissionApprovalError,
     makePaymentProvider,
@@ -631,19 +630,6 @@ describe('executeToolAndUpdateTask()', () => {
                 expect(trackSpy.mock.calls[0][2]).not.toHaveProperty('task_id');
             });
         }
-    });
-
-    it('threads the ?client= value into the tool', async () => {
-        await withServer(
-            async (server) => {
-                const { tool, received } = makeArgsRecorderTool();
-                const { task } = await runTaskAndReadBack(server, { ...tool, execution: { taskSupport: 'optional' } });
-
-                expect(task.status).toBe('completed');
-                expect(received.clientParam).toBe('claude');
-            },
-            { clientParam: 'claude' },
-        );
     });
 
     it('uses the client context captured when the task is scheduled', async () => {

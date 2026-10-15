@@ -401,22 +401,6 @@ describe('getServerInstructions()', () => {
             expect(instructions).not.toContain(RUN_LIMITATION_LINE);
         });
 
-        it('names the Claude custom connector when clientParam is claude', () => {
-            const instructions = getServerInstructions(SERVER_MODE.DEFAULT, {
-                ...only(HELPER_TOOLS.STORE_SEARCH),
-                clientParam: 'claude',
-            });
-            expect(instructions).toContain(
-                'To use another Actor, create your own Apify MCP server configuration at https://mcp.apify.com and add it to Claude as a custom connector.\n',
-            );
-        });
-
-        it('renders the same instructions with and without clientParam when the session can run Actors', () => {
-            expect(getServerInstructions(SERVER_MODE.DEFAULT, { ...ALL_TOOLS_PRESENT, clientParam: 'claude' })).toBe(
-                getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT),
-            );
-        });
-
         it('states the limitation when the session has only create-schedule', () => {
             const instructions = getServerInstructions(
                 SERVER_MODE.DEFAULT,

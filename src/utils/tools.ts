@@ -65,7 +65,6 @@ type ToolPublicFieldOptions = {
      * When unset, `description` (the all-tools-present render) is returned as-is.
      */
     presentTools?: ReadonlySet<string>;
-    /** Raw `?client=` URL query-param value, forwarded to `buildDescription`. */
     clientParam?: string;
 };
 

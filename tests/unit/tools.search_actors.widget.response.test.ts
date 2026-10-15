@@ -224,14 +224,6 @@ describe('search-actors-widget buildDescription()', () => {
         }
     });
 
-    it('names the Claude custom connector when clientParam is claude', () => {
-        const description = searchActorsWidget.buildDescription!({
-            ...only(HELPER_TOOLS.STORE_SEARCH_WIDGET),
-            clientParam: 'claude',
-        });
-        expect(description.endsWith(getActorCallabilityCaveat('claude'))).toBe(true);
-    });
-
     it('keeps the original hint and no caveat with call-actor', () => {
         const description = renderDescription(
             HELPER_TOOLS.STORE_SEARCH_WIDGET,

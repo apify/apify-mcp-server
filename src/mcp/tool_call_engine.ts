@@ -344,7 +344,6 @@ export async function executeSyncToolCall(
         signal: AbortSignal;
         sendNotification: (notification: ServerNotification) => Promise<void>;
         emitLog: (msg: { level: string; data?: unknown }) => Promise<void>;
-        /** Raw `?client=` URL query-param value, forwarded to the tool for wording. */
         clientParam?: string;
     },
 ): Promise<ToolCallOutcome> {
