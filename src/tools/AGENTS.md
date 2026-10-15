@@ -20,7 +20,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     (`delete_actor.ts`), the actor-tools factory, the direct actor-tool executor (`actor_executor.ts`),
     `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`),
     `actor_tool_contract.ts` (Actor-specific presentation policies plus direct-tool input restrictions
-    and defaults; generic calls skip direct-only restrictions and defaults), and
+    and defaults, shared by schema generation, the call engine's denied-input check and execution;
+    generic calls skip direct-only restrictions and defaults), and
     `actor_run_response.ts` —
     the one canonical run shape `call-actor` and `get-actor-run` share across sync, task
     and wait-timeout modes: storage IDs plus a `summary` (past) / `nextStep` (one primary

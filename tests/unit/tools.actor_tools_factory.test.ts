@@ -215,20 +215,13 @@ describe('getNormalActorsAsTools()', () => {
             expect(actorInfo).toEqual(original);
         });
 
-        it.each([true, false])(
-            'rejects denied fields even with additionalProperties %s',
-            async (additionalProperties) => {
-                const info = structuredClone(actorInfo);
-                Object.assign(info.definition.input!, { additionalProperties });
-                const [tool] = await getNormalActorsAsTools([info]);
-                for (const field of ['pageFunction', 'initialCookies']) {
-                    const input = { url: 'https://example.com', [field]: 'sensitive-value' };
-                    expect(tool.ajvValidate(input)).toBe(false);
-                    expect(JSON.stringify(tool.ajvValidate.errors)).not.toContain('sensitive-value');
-                }
-                expect(tool.ajvValidate({ url: 'https://example.com', respectRobotsTxtFile: false })).toBe(true);
-            },
-        );
+        it('serves a plain object schema without composition keywords', async () => {
+            // OpenAI rejects a function schema with allOf/anyOf/oneOf/not at the top level, strict or not.
+            const [tool] = await getNormalActorsAsTools([actorInfo]);
+            for (const keyword of ['allOf', 'anyOf', 'oneOf', 'not'])
+                expect(tool.inputSchema).not.toHaveProperty(keyword);
+            expect(tool.ajvValidate({ url: 'https://example.com', respectRobotsTxtFile: false })).toBe(true);
+        });
 
         it('removes denied fields from required', async () => {
             const info = structuredClone(actorInfo);
