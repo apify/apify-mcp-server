@@ -19,7 +19,6 @@ describe('getServerInstructions()', () => {
         );
     });
 
-    // Regression: #1598 — the instructions told the model to treat every scraping request as appropriate.
     it('describes Apify Store as a registry without judging requests', () => {
         for (const mode of [SERVER_MODE.DEFAULT, SERVER_MODE.APPS]) {
             const instructions = getServerInstructions(mode, only(HELPER_TOOLS.STORE_SEARCH));
