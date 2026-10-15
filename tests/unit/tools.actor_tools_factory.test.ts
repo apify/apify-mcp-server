@@ -247,6 +247,48 @@ describe('getNormalActorsAsTools()', () => {
         });
     });
 
+    describe('existing Actor presentation policies', () => {
+        it.each([true, false])('preserves RAG exposure and validation with isDirectTool %s', async (isDirectTool) => {
+            const actorInfo = createMockActorInfo(RAG_WEB_BROWSER, {
+                ...LIMITED,
+                inputProperties: {
+                    query: { type: 'string' },
+                    maxResults: { type: 'integer', default: 3 },
+                    outputFormats: { type: 'array', default: ['markdown'] },
+                    hiddenSecret: { type: 'string', isSecret: true },
+                },
+                inputRequired: ['query', 'maxResults'],
+            });
+            const original = structuredClone(actorInfo);
+            const [tool] = await getNormalActorsAsTools([actorInfo], { isDirectTool });
+            expect(Object.keys(tool.inputSchema.properties ?? {})).toEqual([
+                'query',
+                'maxResults',
+                'outputFormats',
+                'waitSecs',
+            ]);
+            expect(tool.inputSchema.required).toEqual(['query']);
+            const input = { query: 'apify', hiddenSecret: 'original-input' };
+            expect(tool.ajvValidate(input)).toBe(true);
+            expect(input).toEqual({ query: 'apify', hiddenSecret: 'original-input' });
+            expect(tool.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true });
+            expect(actorInfo).toEqual(original);
+        });
+
+        it.each([true, false])('preserves Web Fetch descriptions with isDirectTool %s', async (isDirectTool) => {
+            const actorInfo = createMockActorInfo(WEB_FETCH, { ...LIMITED });
+            const original = structuredClone(actorInfo);
+            const [tool] = await getNormalActorsAsTools([actorInfo], { isDirectTool });
+            expect(tool.description).toContain('Use this tool to fetch a specific http(s) URL');
+            expect(tool.inputSchema.properties?.url).toMatchObject({
+                description:
+                    'The URL to process http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.',
+            });
+            expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+            expect(actorInfo).toEqual(original);
+        });
+    });
+
     // Regression: #1532 — the RAG description named apify/web-fetch when the session did not serve it.
     it('names apify/web-fetch in the RAG description only when its tool is served', async () => {
         const [tool] = await getNormalActorsAsTools([createMockActorInfo(RAG_WEB_BROWSER)]);

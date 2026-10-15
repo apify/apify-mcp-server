@@ -1090,7 +1090,7 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
             required: ['query'],
         };
 
-        const { inputSchema } = buildActorInputSchema('apify/rag-web-browser', upstream, false);
+        const { inputSchema } = buildActorInputSchema('apify/rag-web-browser', upstream);
 
         const tool = {
             name: 'apify--rag-web-browser',
@@ -1149,7 +1149,7 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
         const genuinelyRequired = ['url', 'prefillOnly', 'undefinedDefault'];
 
         it('keeps only properties without a defined default in required and REQUIRED marking', () => {
-            const { inputSchema } = buildActorInputSchema('someone/some-actor', upstream, false);
+            const { inputSchema } = buildActorInputSchema('someone/some-actor', upstream);
             const properties = inputSchema.properties as Record<string, SchemaProperties>;
 
             expect(inputSchema.required).toEqual(genuinelyRequired);
@@ -1173,7 +1173,7 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
                 },
                 required: ['query', 'maxResults', 'outputFormats'],
             };
-            const { inputSchema } = buildActorInputSchema('apify/rag-web-browser', ragUpstream, true);
+            const { inputSchema } = buildActorInputSchema('apify/rag-web-browser', ragUpstream);
             const pub = getToolPublicFieldOnly({
                 name: 'apify--rag-web-browser',
                 description: '',
@@ -1214,7 +1214,7 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
             required: [],
         };
 
-        const { inputSchema } = buildActorInputSchema('compass/crawler-google-places', upstream, false);
+        const { inputSchema } = buildActorInputSchema('compass/crawler-google-places', upstream);
         const displayProperties = inputSchema.properties as Record<string, SchemaProperties>;
 
         // No partial/incomplete list shown as if exhaustive.
