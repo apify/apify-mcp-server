@@ -26,11 +26,14 @@ IDs that Actors and tools return. This is a deliberate deviation from the MCP sp
 scheme guidance (SHOULD only be used for client-fetchable URLs — ours are token-gated): the
 identity with the platform's own URLs is the feature. Revisit when tools start emitting
 `resource_link`s, where clients may fetch `https://` URIs directly. `isApifyApiUri()` gates reads
-to the configured API origin and rejects userinfo-bearing URLs (axios drops the `Authorization`
-header for those, silently degrading to unauthenticated). The API tools' `callApi`
+to two origins — the one clients are told to use (`getApifyAPIPublicBaseUrl()`, `../apify_client.ts`)
+and the egress one (`getApifyAPIBaseUrl()`), which differ on the hosted server — and rejects
+userinfo-bearing URLs (axios drops the `Authorization` header for those, silently degrading to
+unauthenticated). An accepted URI is sent on the egress origin and returned under the URI as given;
+templates, instructions, refusals and link-out URLs name only the client-facing origin. The API tools' `callApi`
 (`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`, `isMaxContentLengthAbort()`,
 `maskSessionToken()`, `redactJsonSecrets()` and `REDACTED`, so a change to any changes the
-tools too.
+tools too. `get-key-value-store-record` builds its inlined-record URI with `buildUrlOnOrigin()`.
 
 `sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through
 `httpClient.axios.request` with `maxContentLength: MAX_INLINE_BYTES`. `readApiResource()` sends

@@ -235,6 +235,10 @@ export const APIFY_STORE_URL = 'https://apify.com';
 export const CONSOLE_BASE_URL = 'https://console.apify.com';
 /** Apify Console origin on the staging cluster, selected when running on the staging MCP host. */
 export const CONSOLE_BASE_URL_STAGING = 'https://console-securitybyobscurity.apify.com';
+/** Apify API origin clients are told to use (production); where requests go is `getApifyAPIBaseUrl()`. */
+export const API_PUBLIC_BASE_URL = 'https://api.apify.com';
+/** Apify API origin on the staging cluster, selected when running on the staging MCP host. */
+export const API_PUBLIC_BASE_URL_STAGING = 'https://api-securitybyobscurity.apify.com';
 /** Staging MCP host; mirrors the check in `getActorMCPServerURL` to pick staging vs production origins. */
 export const STAGING_MCP_HOSTNAME = 'mcp-securitybyobscurity.apify.com';
 export const APIFY_FAVICON_URL = `${APIFY_STORE_URL}/favicon.ico`;

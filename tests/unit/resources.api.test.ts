@@ -2,7 +2,7 @@ import { Readable } from 'node:stream';
 
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError } from 'axios';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { MAX_INLINE_BYTES } from '../../src/const.js';
@@ -106,6 +106,16 @@ function requestFailing(status: number, statusText: string, body?: object) {
 }
 
 describe('isApifyApiUri()', () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it('accepts both the client-facing and the egress origin when they differ', () => {
+        // The hosted server sends requests to an internal host; URIs on that host stay readable.
+        vi.stubEnv('APIFY_API_BASE_URL', 'http://api.internal.example:3333');
+        expect(isApifyApiUri(`${API}/v2/datasets/ds-1/items`)).toBe(true);
+        expect(isApifyApiUri('http://api.internal.example:3333/v2/datasets/ds-1/items')).toBe(true);
+        expect(isApifyApiUri('https://example.com/v2/datasets/ds-1/items')).toBe(false);
+    });
+
     it('returns true for Apify API URLs', () => {
         expect(isApifyApiUri(`${API}/v2/datasets/ds-1/items`)).toBe(true);
         expect(isApifyApiUri(`${API}/v2/key-value-stores/kv-1/records/INPUT`)).toBe(true);
@@ -720,5 +730,30 @@ describe('readApiResource()', () => {
         expect(firstContent(result).text).toContain(uri);
         expect(logOutput()).toContain('Failed to mint signed download URL');
         expect(logOutput()).not.toContain('test-token');
+    });
+
+    describe('with the egress origin separate from the client-facing one', () => {
+        const EGRESS = 'http://api.internal.example:3333';
+        beforeEach(() => vi.stubEnv('APIFY_API_BASE_URL', EGRESS));
+        afterEach(() => vi.unstubAllEnvs());
+
+        it('sends a client-facing URI to the egress origin and returns it under the URI as given', async () => {
+            const { request, captured } = requestReturning(streamOf('[]'), 'application/json');
+            const uri = `${API}/v2/datasets/ds-1/items?limit=5`;
+
+            const result = await readApiResource(uri, stubApifyClient({ request }));
+
+            expect(captured.url).toBe(`${EGRESS}/v2/datasets/ds-1/items?limit=5`);
+            expect(result.contents[0].uri).toBe(uri);
+        });
+
+        it('links an oversized body read on the egress origin to its client-facing URL', async () => {
+            const { request } = requestReturning(abortingStream(), 'application/json');
+
+            const result = await readApiResource(`${EGRESS}/v2/datasets/ds-1/items`, stubApifyClient({ request }));
+
+            expect(firstContent(result).text).toContain(`${API}/v2/datasets/ds-1/items`);
+            expect(firstContent(result).text).not.toContain('api.internal.example');
+        });
     });
 });

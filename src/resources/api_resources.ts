@@ -6,7 +6,7 @@ import type {
 import { isAxiosError } from 'axios';
 
 import type { ApifyClient } from '../apify_client.js';
-import { getApifyAPIBaseUrl, sendApifyApiRequest } from '../apify_client.js';
+import { getApifyAPIBaseUrl, getApifyAPIPublicBaseUrl, sendApifyApiRequest } from '../apify_client.js';
 import { MAX_INLINE_BYTES } from '../const.js';
 import { InternalError, InvalidParamsError } from '../mcp/errors.js';
 import { parseBaseMimeType } from '../tools/storage/storage_helpers.js';
@@ -55,7 +55,8 @@ function throwReadFailure(uri: string, status: number | undefined, message: stri
 }
 
 /**
- * True when the URI is an Apify API URL (same origin as the configured API base).
+ * True when the URI is an Apify API URL: on the origin clients are told to use (`getApifyAPIPublicBaseUrl()`)
+ * or on the egress origin (`getApifyAPIBaseUrl()`), which differ on the hosted server.
  *
  * This is the security gate for the generic read proxy: the apify-client attaches the
  * session token as an `Authorization` header to every outbound request, so we must only
@@ -68,10 +69,20 @@ export function isApifyApiUri(uri: string): boolean {
     try {
         const url = new URL(uri);
         if (url.username || url.password) return false;
-        return url.origin === new URL(getApifyAPIBaseUrl()).origin;
+        return [getApifyAPIPublicBaseUrl(), getApifyAPIBaseUrl()].some((base) => url.origin === new URL(base).origin);
     } catch {
         return false;
     }
+}
+
+/** `uri` with the scheme, host and port of `base`; the path, query and fragment stay. */
+export function buildUrlOnOrigin(uri: string, base: string): string {
+    const url = new URL(uri);
+    const { protocol, hostname, port } = new URL(base);
+    url.protocol = protocol;
+    url.hostname = hostname;
+    url.port = port;
+    return url.href;
 }
 
 /**
@@ -92,24 +103,19 @@ function safeDecodeURIComponent(segment: string): string {
 /**
  * Download URL for a body too large to inline. For a key-value-store record URI, returns the
  * store's signed `recordPublicUrl` — fetchable without an API token when the client can read the
- * store's URL signing key. Falls back to the original API URL for any other endpoint, or if minting
- * the signed URL fails (fetching that link then needs a token).
+ * store's URL signing key. Falls back to the API URL on the client-facing origin for any other
+ * endpoint, or if minting the signed URL fails (fetching that link then needs a token).
  */
 async function fetchRecordDownloadUrl(uri: string, apifyClient: ApifyClient): Promise<string> {
-    let pathname: string;
-    try {
-        pathname = new URL(uri).pathname;
-    } catch {
-        return uri;
-    }
-    const match = KV_RECORD_PATH_RE.exec(pathname);
-    if (!match) return uri;
+    const apiUrl = buildUrlOnOrigin(uri, getApifyAPIPublicBaseUrl());
+    const match = KV_RECORD_PATH_RE.exec(new URL(uri).pathname);
+    if (!match) return apiUrl;
     try {
         const store = apifyClient.keyValueStore(safeDecodeURIComponent(match[1]));
         return await store.getRecordPublicUrl(safeDecodeURIComponent(match[2]));
     } catch (err) {
         logHttpError(err, `Failed to mint signed download URL for ${uri}; falling back to API URL`);
-        return uri;
+        return apiUrl;
     }
 }
 
@@ -214,7 +220,7 @@ export function redactJsonSecrets(json: string): string {
 export async function readApiResource(uri: string, apifyClient?: ApifyClient): Promise<ReadResourceResult> {
     if (!isApifyApiUri(uri)) {
         throw new InvalidParamsError(
-            `Failed to read ${uri}: only Apify API URLs (${getApifyAPIBaseUrl()}) are readable as resources.`,
+            `Failed to read ${uri}: only Apify API URLs (${getApifyAPIPublicBaseUrl()}) are readable as resources.`,
             { uri },
         );
     }
@@ -226,7 +232,12 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
 
     let response: { data: unknown; headers: Record<string, unknown>; status: number; statusText: string };
     try {
-        response = await sendApifyApiRequest(apifyClient, { url: uri, method: 'GET', responseType: 'stream' });
+        // Sent on the egress origin; the result and the errors keep the URI as given.
+        response = await sendApifyApiRequest(apifyClient, {
+            url: buildUrlOnOrigin(uri, getApifyAPIBaseUrl()),
+            method: 'GET',
+            responseType: 'stream',
+        });
     } catch (err) {
         logHttpError(err, `resources/read request failed`, { uri });
         throwReadFailure(uri, getHttpStatusCode(err), err instanceof Error ? err.message : String(err));
