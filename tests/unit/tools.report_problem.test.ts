@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { FAILURE_CATEGORY, HELPER_TOOLS } from '../../src/const.js';
-import {
-    appendReportProblemNudge,
-    REPORT_PROBLEM_INVALID_INPUT_NUDGE,
-    REPORT_PROBLEM_NUDGE,
-    reportProblem,
-} from '../../src/tools/dev/report_problem.js';
+import { appendReportProblemNudge, REPORT_PROBLEM_NUDGE, reportProblem } from '../../src/tools/dev/report_problem.js';
 import { reportProblemToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool } from '../../src/types.js';
 import {
@@ -40,6 +35,18 @@ describe('reportProblem', () => {
             expect((result as TextToolResult).structuredContent).toEqual({ reported: true });
             expect((reportProblem as HelperTool).outputSchema).toBe(reportProblemToolOutputSchema);
             expectSchemaConformingStructuredContent(result, reportProblemToolOutputSchema);
+        });
+    });
+
+    describe('description', () => {
+        it('states what the tool is for without telling the agent when to call it', () => {
+            const { description } = reportProblem as HelperTool;
+            expect(description).toContain(
+                'Reports can describe missing tools or Actors, errors, timeouts, confusing results, or tasks that ' +
+                    'the available tools could not complete.',
+            );
+            expect(description).not.toContain('Call it when');
+            expect(description).not.toContain('Use it for');
         });
     });
 
@@ -103,12 +110,18 @@ describe('reportProblem', () => {
     });
 
     describe('appendReportProblemNudge()', () => {
-        it('appends the nudge to a failed result when the tool is available', () => {
+        it('appends one sentence that states what report-problem does, without asking for a call', () => {
             const result = appendReportProblemNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
             });
-            expect(nudgeCount(result)).toBe(1);
+            expect(result.content).toEqual([
+                errorResult().content[0],
+                {
+                    type: 'text',
+                    text: `${HELPER_TOOLS.PROBLEM_REPORT} sends a description of this error to the Apify team.`,
+                },
+            ]);
         });
 
         it('does not append when the tool is unavailable', () => {
@@ -148,24 +161,23 @@ describe('reportProblem', () => {
             expect(nudgeCount(result)).toBe(0);
         });
 
-        it('appends the softer nudge for a genuine INVALID_INPUT with no 402 (input bug)', () => {
+        // Regression: #1290 — a not-found or invalid-input failure is the caller's mistake, not a defect to report.
+        it('does not append for an INVALID_INPUT failure, such as not found or invalid input', () => {
             const result = appendReportProblemNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
                 failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
             });
-            expect(result.content.filter((c) => c.text === REPORT_PROBLEM_INVALID_INPUT_NUDGE)).toHaveLength(1);
-            expect(nudgeCount(result)).toBe(0);
+            expect(result.content).toHaveLength(1);
         });
 
-        it('does not append any nudge for a 402 payment response, though 402 is classified INVALID_INPUT', () => {
+        it('does not append for a 402 payment response', () => {
             const result = appendReportProblemNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
                 failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
                 failureHttpStatus: 402,
             });
-            expect(result.content.filter((c) => c.text === REPORT_PROBLEM_INVALID_INPUT_NUDGE)).toHaveLength(0);
             expect(nudgeCount(result)).toBe(0);
             expect(result.content).toHaveLength(1);
         });

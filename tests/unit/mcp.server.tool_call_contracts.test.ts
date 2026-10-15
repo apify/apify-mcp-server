@@ -13,11 +13,7 @@ import { getMCPServerTools } from '../../src/mcp/proxy.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import * as telemetry from '../../src/telemetry.js';
 import * as callActor from '../../src/tools/actors/call_actor.js';
-import {
-    REPORT_PROBLEM_INVALID_INPUT_NUDGE,
-    REPORT_PROBLEM_NUDGE,
-    reportProblem,
-} from '../../src/tools/dev/report_problem.js';
+import { REPORT_PROBLEM_NUDGE, reportProblem } from '../../src/tools/dev/report_problem.js';
 import { getActorRunList } from '../../src/tools/runs/get_actor_run_list.js';
 import { getDatasetList } from '../../src/tools/storage/get_dataset_list.js';
 import { getKeyValueStoreList } from '../../src/tools/storage/get_key_value_store_list.js';
@@ -724,8 +720,6 @@ describe('executeToolAndUpdateTask()', () => {
         // Pins the accepted task-mode delta. The ACTOR_MCP dispatch catch now carries
         // failure_http_status, so a contained remote 402 reaches withReportProblemNudge with
         // failureHttpStatus === 402 and the nudge is suppressed (402 is a billing state, not a defect).
-        // If the ACTOR_MCP path stopped carrying failure_http_status, this INVALID_INPUT failure would
-        // instead append REPORT_PROBLEM_INVALID_INPUT_NUDGE and this test would fail.
         await withServer(async (server) => {
             silenceLogs();
             const rejectingClient = {
@@ -743,7 +737,6 @@ describe('executeToolAndUpdateTask()', () => {
             const texts = (result.content as { text: string }[]).map((c) => c.text);
             expect(texts.some((t) => t.includes('Failed to call MCP tool'))).toBe(true);
             expect(texts).not.toContain(REPORT_PROBLEM_NUDGE);
-            expect(texts).not.toContain(REPORT_PROBLEM_INVALID_INPUT_NUDGE);
         });
     });
 });

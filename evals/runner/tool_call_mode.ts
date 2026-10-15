@@ -5,8 +5,8 @@ import { stripToolPrefix } from '../config.js';
 /**
  * Denial wording for tool-call items, calibrated by spike (2026-09-04): stops the
  * agent cleanly after exactly one denied call on every sample query. The `failTools`
- * nudge (`REPORT_PROBLEM_NUDGE`) reads as "work around this" and measurably causes
- * retries instead — do not reuse it here.
+ * denial (an internal error plus `REPORT_PROBLEM_NUDGE`) measurably caused retries in
+ * that spike — do not reuse it here.
  */
 export const TOOL_CALL_DENY_REASON =
     'Tool calls are disabled in this evaluation. Do not retry with a different tool or ' +
