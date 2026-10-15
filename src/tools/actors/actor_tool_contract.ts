@@ -22,7 +22,7 @@ export function buildDirectActorContract(actorFullName: string, input: ActorInpu
     const policy = getDirectActorPolicy(actorFullName);
     if (!policy || !input) return { input, description: '' };
 
-    const effectiveInput = structuredClone(input) as ActorInputSchema & { allOf?: object[] };
+    const effectiveInput = structuredClone(input);
     const deniedInputs = policy.deniedInputs ?? [];
     for (const name of deniedInputs) delete effectiveInput.properties[name];
     effectiveInput.required = effectiveInput.required?.filter((name) => !deniedInputs.includes(name));
@@ -30,19 +30,21 @@ export function buildDirectActorContract(actorFullName: string, input: ActorInpu
         if (effectiveInput.properties[name]) effectiveInput.properties[name].default = value;
     }
 
-    if (deniedInputs.length) {
-        // Validate before the root's additionalProperties rule can strip a denied field.
-        effectiveInput.allOf = [
-            { properties: Object.fromEntries(deniedInputs.map((name) => [name, false])) },
-            ...(effectiveInput.allOf ?? []),
-        ];
-    }
     return {
         input: effectiveInput,
         description: deniedInputs.length
             ? `This tool does not accept these Actor inputs: ${deniedInputs.map((name) => `"${name}"`).join(', ')}.`
             : '',
     };
+}
+
+/**
+ * Denied inputs are absent from the served schema, but AJV keeps undeclared fields unless the Actor's
+ * schema sets `additionalProperties: false`, in which case it strips them. Either way the run would
+ * proceed, so the call is checked before validation.
+ */
+export function getDeniedDirectActorInputs(actorFullName: string, args: Record<string, unknown>): string[] {
+    return (getDirectActorPolicy(actorFullName)?.deniedInputs ?? []).filter((name) => name in args);
 }
 
 /** AJV does not fill defaults, so the direct tool must send its overrides explicitly. */

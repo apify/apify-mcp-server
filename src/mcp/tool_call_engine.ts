@@ -14,7 +14,7 @@ import { prepareToolCallContext } from '../payments/helpers.js';
 import type { PaymentMeta, PaymentProvider, RequestHeaders } from '../payments/types.js';
 import { decodeDotPropertyNames } from '../tools/actor_input_schema.js';
 import { legacyToolNameToNew } from '../tools/actor_tool_naming.js';
-import { getDirectActorPolicy } from '../tools/actors/actor_tool_contract.js';
+import { getDeniedDirectActorInputs, getDirectActorPolicy } from '../tools/actors/actor_tool_contract.js';
 import { checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
 import { withReportProblemNudge } from '../tools/dev/report_problem.js';
 import type { ActorStore, CallDiagnostics, ToolCallTelemetryProperties, ToolEntry, ToolStatus } from '../types.js';
@@ -228,6 +228,20 @@ export async function prepareToolCall(params: {
             mcpSessionId: params.mcpSessionId,
             input: logSafeArgs,
         });
+        const deniedInputs =
+            tool.type === TOOL_TYPE.ACTOR ? getDeniedDirectActorInputs(tool.actorFullName, toolArgs) : [];
+        if (deniedInputs.length) {
+            return {
+                message: `Invalid arguments for tool "${tool.name}": this tool does not accept ${deniedInputs.map((name) => `"${name}"`).join(', ')}.`,
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+                callDiagnostics: {
+                    failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                    ...buildActorFields(actorName, actorId),
+                },
+                resolvedToolName,
+                decodedArgs,
+            };
+        }
         if (!tool.ajvValidate(toolArgs)) {
             const errors = tool.ajvValidate.errors || [];
             const ajvErrorDetails = extractAjvErrorDetails(errors);

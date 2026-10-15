@@ -106,26 +106,49 @@ describe.each([
     });
 });
 
-it('points restricted direct-tool errors at the tool schema instead of the original Actor schema', async () => {
-    const [tool] = await getNormalActorsAsTools([actorInfo]);
-    const result = await prepareToolCall({
-        tools: new Map([
-            [tool.name, tool],
-            [HELPER_TOOLS.ACTOR_GET_DETAILS, fetchActorDetails],
-        ]),
-        apifyToken: 'test-token',
-        name: tool.name,
-        args: { url: 'https://example.com', initialCookies: [] },
-        meta: undefined,
-        requestHeaders: undefined,
-        isTaskRequest: false,
-        mcpSessionId: 'test-session',
-        telemetryData: null,
-        clientContext: undefined,
+describe('direct tool call', () => {
+    async function prepareDirectToolCall(args: Record<string, unknown>, additionalProperties?: boolean) {
+        const info = structuredClone(actorInfo);
+        if (additionalProperties !== undefined) Object.assign(info.definition.input!, { additionalProperties });
+        const [tool] = await getNormalActorsAsTools([info]);
+        return prepareToolCall({
+            tools: new Map([
+                [tool.name, tool],
+                [HELPER_TOOLS.ACTOR_GET_DETAILS, fetchActorDetails],
+            ]),
+            apifyToken: 'test-token',
+            name: tool.name,
+            args,
+            meta: undefined,
+            requestHeaders: undefined,
+            isTaskRequest: false,
+            mcpSessionId: 'test-session',
+            telemetryData: null,
+            clientContext: undefined,
+        });
+    }
+
+    // AJV keeps an undeclared field, or strips it under additionalProperties: false; both must still refuse.
+    it.each([true, false, undefined])(
+        'rejects denied fields before validation with additionalProperties %s',
+        async (additionalProperties) => {
+            for (const field of ['pageFunction', 'initialCookies']) {
+                const result = await prepareDirectToolCall(
+                    { url: 'https://example.com', [field]: 'sensitive-value' },
+                    additionalProperties,
+                );
+                if (!('message' in result)) throw new Error('Denied input passed validation');
+                expect(result.message).toContain(`this tool does not accept "${field}"`);
+                expect(result.message).not.toContain('sensitive-value');
+                expect(result.message).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+            }
+        },
+    );
+
+    it('points other validation errors at the tool schema instead of the original Actor schema', async () => {
+        const result = await prepareDirectToolCall({});
+        if (!('message' in result)) throw new Error('Invalid input passed validation');
+        expect(result.message).toContain('in tools/list');
+        expect(result.message).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
     });
-    expect('message' in result).toBe(true);
-    if (!('message' in result)) throw new Error('Denied input passed validation');
-    expect(result.message).toContain('initialCookies');
-    expect(result.message).toContain('in tools/list');
-    expect(result.message).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
 });
