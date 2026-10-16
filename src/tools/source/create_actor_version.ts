@@ -1,4 +1,4 @@
-import type { ActorVersion } from 'apify-client';
+import type { ActorVersion, ActorVersionSourceFile } from 'apify-client';
 import { ActorSourceType } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
@@ -44,6 +44,19 @@ const createActorVersionArgs = z.object({
         .default(false)
         .describe('Start a build of the new version after creating it, and return without waiting. Default: false.'),
 });
+
+type CreateActorVersionArgs = z.infer<typeof createActorVersionArgs>;
+
+/** Whether the call gives exactly one of files and copyFromVersion, so that copyFromVersion tells which. */
+function hasOneSource(
+    args: CreateActorVersionArgs,
+): args is CreateActorVersionArgs &
+    (
+        | { copyFromVersion: string; files?: undefined }
+        | { copyFromVersion?: undefined; files: NonNullable<CreateActorVersionArgs['files']> }
+    ) {
+    return (args.copyFromVersion === undefined) !== (args.files === undefined);
+}
 
 /**
  * The warning about the secret env vars a copy leaves out. With `startedBuild`, it says that the build this call started
@@ -118,10 +131,10 @@ export const createActorVersion: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client, signal, loadedToolNames } = toolArgs;
         const parsed = createActorVersionArgs.parse(args);
-        const { versionNumber, copyFromVersion } = parsed;
-        if ((copyFromVersion === undefined) === (parsed.files === undefined)) {
+        if (!hasOneSource(parsed)) {
             return respondUserError('The call takes exactly one of files and copyFromVersion.');
         }
+        const { versionNumber, copyFromVersion, files } = parsed;
         // Set before the POST, so the reply to a retried POST can name them.
         let secretNames: (string | undefined)[] = [];
         try {
@@ -129,11 +142,14 @@ export const createActorVersion: ToolEntry = Object.freeze({
             // TODO: The Apify API has no endpoint that copies a version, so a copy reads every file of the other version
             // from the Actor GET and sends them all back in the POST below. Once the API has one, let the platform make
             // the copy.
-            const copied =
-                copyFromVersion === undefined ? undefined : resolveVersion(actor, copyFromVersion, parsed.actor);
-            const sourceFiles = copied
-                ? extractSourceFiles(copied, `Version ${copied.versionNumber} of ${fullName}`)
-                : buildSourceFileEntries(parsed.files!);
+            let copied: ReturnType<typeof resolveVersion> | undefined;
+            let sourceFiles: ActorVersionSourceFile[];
+            if (copyFromVersion === undefined) {
+                sourceFiles = buildSourceFileEntries(files);
+            } else {
+                copied = resolveVersion(actor, copyFromVersion, parsed.actor);
+                sourceFiles = extractSourceFiles(copied, `Version ${copied.versionNumber} of ${fullName}`);
+            }
             secretNames = copied?.envVars?.filter(({ isSecret }) => isSecret).map(({ name }) => name) ?? [];
             // A cancel during the read creates nothing; per the MCP spec the cancelled request gets no response.
             if (signal?.aborted) return respondAborted();
