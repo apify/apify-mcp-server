@@ -262,7 +262,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             });
 
             expect(description).toContain(
-                'A name without a username means one of your own Actors, never an Actor from Apify Store.',
+                "A name without a username means one of your own Actors, never another account's Actor.",
             );
         });
 

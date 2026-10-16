@@ -386,9 +386,9 @@ describe('call_actor_common', () => {
     describe('callActorArgs.actor', () => {
         // A name alone resolves against the caller's own Actors, so a Store Actor's bare name runs a same-named own
         // Actor if there is one; the schema has to say so.
-        it('says a name without a username means one of your own Actors, never a Store Actor', () => {
+        it("says a name without a username means one of your own Actors, never another account's Actor", () => {
             expect(callActorArgs.shape.actor.description).toContain(
-                'A name without a username always means one of your own Actors, never an Actor from Apify Store.',
+                "A name without a username always means one of your own Actors, never another account's Actor.",
             );
         });
     });

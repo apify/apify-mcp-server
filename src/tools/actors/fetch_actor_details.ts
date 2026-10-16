@@ -110,7 +110,7 @@ export const fetchActorDetailsToolArgsSchema = z.object({
         .string()
         .min(1)
         .describe(
-            'The Actor: its ID, its name (resolved against your own Actors), or its full name as username/name or username~name (e.g., "apify/rag-web-browser"). A name without a username always means one of your own Actors, never an Actor from Apify Store.',
+            'The Actor: its ID, its name (resolved against your own Actors), or its full name as username/name or username~name (e.g., "apify/rag-web-browser"). A name without a username always means one of your own Actors, never another account\'s Actor.',
         ),
     output: actorDetailsOutputOptionsSchema
         .optional()
@@ -120,7 +120,7 @@ export const fetchActorDetailsToolArgsSchema = z.object({
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
     return dedent`Get detailed information about an Actor by its ID, its name (resolved against your own Actors), or its full name (format: "username/name", e.g., "apify/rag-web-browser").
 
-A name without a username means one of your own Actors, never an Actor from Apify Store. Requires the exact ID or name — do not construct a plausible-looking name and call this tool with it.${
+A name without a username means one of your own Actors, never another account's Actor. Requires the exact ID or name — do not construct a plausible-looking name and call this tool with it.${
         hasTool(HELPER_TOOLS.STORE_SEARCH)
             ? ` ${HELPER_TOOLS.STORE_SEARCH} finds an Apify Store Actor from a description or a partial name.`
             : ''
