@@ -7,7 +7,7 @@ import { normalizeApiPath } from '../../src/tools/api/apify_api_path.js';
 import { API_METHODS } from '../../src/tools/api/apify_api_spec.js';
 
 const METHOD_PARAM_REFUSAL =
-    'The API tools do not send the method query parameter: the API would take it as the HTTP method of the request.';
+    'The method query parameter is not allowed because it can turn a read request into a write request.';
 
 const SYNC_RUN_REFUSAL =
     'A GET to the synchronous run endpoints starts a paid run, as a POST does, so the API tools do not send it.';

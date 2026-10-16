@@ -26,9 +26,7 @@ export const API_BLOCK_RULES: readonly ApiBlockRule[] = [
     {
         // A GET with method=DELETE deletes, so the read tool could write; see apify/apify-mcp-server#1501.
         match: { queryParam: 'method' },
-        reason:
-            'The API tools do not send the method query parameter: the API would take it as the HTTP method ' +
-            'of the request.',
+        reason: 'The method query parameter is not allowed because it can turn a read request into a write request.',
         suggestedToolNames: [HELPER_TOOLS.API_WRITE],
     },
     // A GET here starts a paid run, so the read tool would not be read-only; see apify/apify-mcp-server#1502.

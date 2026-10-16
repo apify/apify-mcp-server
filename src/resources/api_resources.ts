@@ -9,6 +9,8 @@ import type { ApifyClient } from '../apify_client.js';
 import { getApifyAPIBaseUrl, getApifyAPIPublicBaseUrl, sendApifyApiRequest } from '../apify_client.js';
 import { MAX_INLINE_BYTES } from '../const.js';
 import { InternalError, InvalidParamsError } from '../mcp/errors.js';
+import { validateApiBlocklist } from '../tools/api/apify_api_blocklist.js';
+import { normalizeApiPath } from '../tools/api/apify_api_path.js';
 import { parseBaseMimeType } from '../tools/storage/storage_helpers.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 import { getHttpErrorHint } from '../utils/mcp.js';
@@ -208,8 +210,8 @@ export function redactJsonSecrets(json: string): string {
  * JSON primitives, formatting, and bytes round-trip exactly, except that the session token and
  * `urlSigningSecretKey` and `password` values in JSON become `[REDACTED]`.
  *
- * Genuine failures (no token, bad origin, a missing resource, a bad token, a 5xx, a network error)
- * throw a domain error (`InvalidParamsError`/`InternalError`) that the protocol adapters
+ * Genuine failures (no token, bad origin, a request the API tools refuse, a missing resource, a bad token,
+ * a 5xx, a network error) throw a domain error (`InvalidParamsError`/`InternalError`) that the protocol adapters
  * (`legacy_server.ts`, `stateless_server.ts`) map to a JSON-RPC error, so the SDK returns an error
  * rather than success-shaped content for an unreadable resource (see SEP-2164). A body over
  * `MAX_INLINE_BYTES` is NOT a failure — it is a successful read returning a download pointer.
@@ -229,6 +231,15 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
             uri,
         });
     }
+    // A GET with the method query parameter can delete, and one to a synchronous run endpoint starts a paid run;
+    // see apify/apify-mcp-server#1524.
+    const { pathname, search } = new URL(uri);
+    const refusal = validateApiBlocklist({
+        method: 'GET',
+        normalizedPath: normalizeApiPath(`${pathname}${search}`),
+        loadedToolNames: [],
+    });
+    if (refusal) throw new InvalidParamsError(`Failed to read ${uri}: ${refusal}`, { uri });
 
     let response: { data: unknown; headers: Record<string, unknown>; status: number; statusText: string };
     try {
