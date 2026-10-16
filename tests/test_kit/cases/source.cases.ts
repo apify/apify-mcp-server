@@ -232,6 +232,7 @@ export const sourceCases: Case[] = [
                     actorId: created.actorId,
                     fullName,
                     versionNumber: '0.0',
+                    buildTag: 'latest',
                     revision: created.revision,
                     files: created.files,
                     contents: [

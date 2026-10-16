@@ -587,6 +587,10 @@ export const getActorVersionToolOutputSchema = {
         actorId: { type: 'string', description: 'Actor ID' },
         fullName: { type: 'string', description: 'Actor full name, username/name' },
         versionNumber: { type: 'string', description: 'Version number, e.g. 0.1' },
+        buildTag: {
+            type: 'string',
+            description: 'Tag that new builds of this version get, e.g. latest; absent when the version has none',
+        },
         revision: { type: 'string', description: 'Identifies the whole file set; changes when any file changes' },
         files: {
             type: 'array',
