@@ -36,10 +36,12 @@ export function isOwnActorLookup(actorIdOrName: string, paymentProvider: Payment
  * `actor` is `null` when a name alone matched one of the caller's own Actors but `fetch` found nothing under its full
  * name: an Actor definition comes from the default build, which an Actor has only after a successful build.
  *
- * `fetch` never gets a `~name` key. `~name` is a different Actor for each token, while `actorDefinitionCache`, which
- * most fetches read, is process-wide (see `resolveActorId` in `tools/schedules/schedule_helpers.ts`), so `~name` is
- * read uncached through `apifyClient` and replaced by the full name. An ID or a full name goes to `fetch` unchanged,
- * at no extra request. Under a payment provider every value goes to `fetch` as given (see `isOwnActorLookup`).
+ * Outside payment sessions, `fetch` never gets a `~name` key. `~name` is a different Actor for each token, while
+ * `actorDefinitionCache`, which most fetches read, is process-wide (see `resolveActorId` in
+ * `tools/schedules/schedule_helpers.ts`), so `~name` is read uncached through `apifyClient` and replaced by the full
+ * name. An ID or a full name goes to `fetch` unchanged, at no extra request. Under a payment provider nothing is
+ * resolved (see `isOwnActorLookup`): every value goes to `fetch` as given, so a literal `~name` reaches `fetch` and can
+ * key `actorDefinitionCache` there.
  */
 export async function getActorByIdOrName<T>(params: {
     actorIdOrName: string;

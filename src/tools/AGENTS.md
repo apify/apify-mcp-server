@@ -84,8 +84,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   name, where a name alone means one of the caller's own. The task, schedule, and versions tools use them,
   and so do `build-actor` and the `actorId` filter of `get-actor-build-list` and `get-actor-run-list`.
   `call-actor` (and `call-actor-widget`, which shares its pre-execution) and `fetch-actor-details` go through
-  `getActorByIdOrName` in `../utils/actor.ts`, which turns a name alone into `username/name` with an uncached
-  read, so `~name` never keys `actorDefinitionCache`, and resolves nothing under a payment provider.
+  `getActorByIdOrName` in `../utils/actor.ts`. Outside payment sessions it turns a name alone into
+  `username/name` with an uncached read, so `~name` never keys `actorDefinitionCache`. Under a payment provider
+  it resolves nothing: every value is passed on as given, a literal `~name` too.
 
 ## Rules when editing here
 
