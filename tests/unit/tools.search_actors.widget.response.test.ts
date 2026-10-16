@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
-import { ACTOR_CALLABILITY_CAVEAT } from '../../src/tools/actor_tool_naming.js';
+import { getActorCallabilityCaveat } from '../../src/tools/actor_tool_naming.js';
 import { searchActorsWidget } from '../../src/tools/widgets/search_actors_widget.js';
 import type { HelperTool } from '../../src/types.js';
 import type { formatActorToStructuredCard } from '../../src/utils/actor_card.js';
@@ -211,7 +211,7 @@ describe('search-actors-widget response', () => {
 describe('search-actors-widget buildDescription()', () => {
     const renderDescription = (...present: string[]) => searchActorsWidget.buildDescription!(only(...present));
     const FIND_SCHEMA_CALL = 'then fetch its schema and call it';
-    const countCaveats = (description: string) => description.split(ACTOR_CALLABILITY_CAVEAT).length - 1;
+    const countCaveats = (description: string) => description.split(getActorCallabilityCaveat()).length - 1;
 
     it('drops the run-implying hint and states the run limitation once when no tool can run an Actor', () => {
         for (const tools of [

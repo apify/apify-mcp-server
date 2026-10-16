@@ -8,6 +8,7 @@ import {
     actorNameToToolName,
     canRunActor,
     canRunAnyActor,
+    getOwnServerRemedy,
     legacyToolNameToNew,
     resolveActorToolMode,
 } from '../../src/tools/actor_tool_naming.js';
@@ -146,6 +147,15 @@ describe('canRunActor()', () => {
     it('returns false when call-actor is absent and the Actor ID is not in loadedActorIds', () => {
         expect(canRunActor('actor-id-1', [], new Set(['other-actor-id']))).toBe(false);
         expect(canRunActor('actor-id-1', [], new Set())).toBe(false);
+    });
+});
+
+describe('getOwnServerRemedy()', () => {
+    it('names the Claude custom connector only for ?client=claude', () => {
+        expect(getOwnServerRemedy('claude')).toContain('add it to Claude as a custom connector.');
+        for (const clientParam of [undefined, 'cursor', 'claude-code']) {
+            expect(getOwnServerRemedy(clientParam)).toContain('add it to your agent.');
+        }
     });
 });
 

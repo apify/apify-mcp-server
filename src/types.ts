@@ -90,6 +90,8 @@ export type ActorDefinitionWithInfo = {
 export type ToolDescriptionContext = {
     /** Whether the named tool is served in the same tools/list as this tool. */
     hasTool: (name: string) => boolean;
+    /** Raw `?client=` URL query-param value; picks wording only, never the tool set. */
+    clientParam?: string;
 };
 
 /** Renders every cross-tool reference as present — for building `description` at module load. */
@@ -652,7 +654,7 @@ export type ActorsMcpServerOptions = {
      * - 'http': Remote HTTP streamable connection
      */
     transportType?: TransportType;
-    /** Raw `?client=` value from the connecting URL, for Segment attribution; independent of `clientInfo.name`, HTTP-only (undefined on stdio). */
+    /** Raw `?client=` value from the connecting URL, for Segment attribution and tool wording; independent of `clientInfo.name`, HTTP-only (undefined on stdio). */
     clientParam?: string;
     /**
      * Apify API token for authentication

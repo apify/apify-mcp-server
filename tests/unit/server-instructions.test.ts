@@ -10,7 +10,7 @@ import { CLAUDE_CONNECTOR_TOOLS } from './helpers/claude_connector_tools.js';
 import { only } from './helpers/tool_context.js';
 
 const RUN_LIMITATION_LINE =
-    '- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, set up your own Apify MCP server at https://mcp.apify.com.\n';
+    '- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, create your own Apify MCP server configuration at https://mcp.apify.com and add it to your agent.\n';
 
 describe('getServerInstructions()', () => {
     it('defaults to ALL_TOOLS_PRESENT — no regression for the common case (every tool loaded)', () => {

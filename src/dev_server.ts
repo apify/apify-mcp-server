@@ -121,7 +121,7 @@ async function parseUrlParams(req: Request) {
             true,
         serverMode: uiParam !== null ? parseServerMode(uiParam) : parseServerMode(process.env.UI_MODE),
         paymentProvider: await resolvePaymentProvider(urlParams.get('payment')),
-        // Client attribution tag (e.g. ?client=cursor), for Segment.
+        // Client attribution tag (e.g. ?client=cursor), for Segment and tool wording.
         clientParam: urlParams.get('client') ?? undefined,
     };
 }
