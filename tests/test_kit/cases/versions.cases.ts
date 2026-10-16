@@ -14,9 +14,9 @@ import type { Case, SuiteClient } from '../types.js';
  * client, so it checks the stored source, not only what the tool reported.
  *
  * Names are `test-source-<random>-<purpose>`, never `eval-`, so the eval harness's `eval-*` sweep on the same account
- * never deletes an Actor mid-case. No case sets autoBuild, since builds cost time and money. Every case deletes its
- * Actor by name in `finally`, so an Actor a failed call left behind goes too; apify-client swallows the 404 when there
- * is none.
+ * never deletes an Actor mid-case. No case sets autoBuild, since builds cost time and money, and the one build-actor
+ * call aborts its build. Every case deletes its Actor by name in `finally`, so an Actor a failed call left behind goes
+ * too; apify-client swallows the 404 when there is none.
  *
  * Tool names are hardcoded, not read from `HELPER_TOOLS`, so a rename fails these tests (CONTRIBUTING.md).
  */
@@ -44,6 +44,8 @@ type GetActorVersionResult = {
 };
 
 type CreateActorResult = Omit<GetActorVersionResult, 'contents'>;
+
+type BuildActorResult = { build: { id: string; actorId: string } };
 
 type UpdateActorVersionResult = {
     revision: string;
@@ -141,7 +143,7 @@ export const versionsCases: Case[] = [
     {
         name: 'create-actor creates a private Actor whose stored files get-actor-version reads back with the same hashes and revision',
         isDeploymentTest: false,
-        run: withClient({ tools: ['versions'] }, async (client, ctx) => {
+        run: withClient({ tools: ['versions', 'build-actor'] }, async (client, ctx) => {
             const api = ctx.createApifyClient();
             const name = buildUniqueActorName('create');
             const selector = await fetchOwnActorSelector(api, name);
@@ -243,6 +245,13 @@ export const versionsCases: Case[] = [
                 expect(readByName).toMatchObject({ actorId: created.actorId, fullName, revision: created.revision });
                 // autoBuild defaults to false.
                 expect(await fetchBuildCount(api, created.actorId)).toBe(0);
+                // build-actor resolves a name without the username the same way.
+                const { build } = expectToolSuccess<BuildActorResult>(
+                    await callTool(client, 'build-actor', { actor: name, waitSecs: 0 }),
+                    'build-actor',
+                );
+                expect(build.actorId).toBe(created.actorId);
+                await api.build(build.id).abort();
             } finally {
                 await api.actor(selector).delete();
             }
