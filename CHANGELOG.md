@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.18.4 - **not yet released**
+## [0.18.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.18.4) (2026-10-16)
 
 ### 🚀 Features
 
@@ -19,7 +18,6 @@ All notable changes to this project will be documented in this file.
 - Accept request bodies up to 9 MB in the dev server ([#1611](https://github.com/apify/apify-mcp-server/pull/1611)) ([b06cc11](https://github.com/apify/apify-mcp-server/commit/b06cc116747a284b1fa4622b6c4dbdbd6508c927)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1610](https://github.com/apify/apify-mcp-server/issues/1610)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.18.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.18.3) (2026-10-15)
 
 ### 🐛 Bug Fixes
