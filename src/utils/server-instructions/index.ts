@@ -241,8 +241,7 @@ These tools are called **Actors**. They enable you to extract structured data fr
 - Choose the most appropriate Actor based on the conversation context.
 - Search the Apify Store first; a relevant Actor likely already exists.
 ${runLimitationLine}- When multiple options exist, prefer Actors with higher usage, ratings, or popularity.
-- Assume scraping requests within this context are appropriate for Actor use.
-- Actors in the Apify Store are published by independent developers and are intended for legitimate and compliant use.
+- Apify Store lists Actors published by Apify and by independent developers.
 
 ## Actor execution workflow
 - Actors take input and produce output.
