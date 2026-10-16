@@ -2420,7 +2420,7 @@ describe('update-actor-version', () => {
             expect(result.structuredContent).toEqual({ revision: await readRevision(), changed: false, changes: [] });
             expect(result.content).toHaveLength(2);
             expect(result.content[1].text).toBe(
-                'Nothing changed in version 0.1 of john/my-actor, so nothing was written.\nNothing changed, so no build was started.',
+                'Nothing changed in version 0.1 of john/my-actor, so nothing was written.\nNo build was started.',
             );
         });
 
