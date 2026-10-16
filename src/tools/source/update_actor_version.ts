@@ -227,7 +227,9 @@ function applyOperation(
     index: number,
 ): void {
     const { files, folderPaths } = version;
-    const { type, content, expectedHash, edits } = operation;
+    const { type, content, edits } = operation;
+    // AJV turns a null expectedHash into an empty string, which no file has, so it counts as not given.
+    const expectedHash = operation.expectedHash || undefined;
     const label = `operations[${index}] (${type} ${operation.path})`;
     // Normalized the way get-actor-version lists paths, so a listed path always matches.
     const path = posix.normalize(operation.path);
@@ -361,7 +363,8 @@ export const updateActorVersion: ToolEntry = Object.freeze({
             const storedEntries = extractSourceFiles(version, `Version ${versionNumber} of ${fullName}`);
             const before = new Map(buildFilesManifest(storedEntries).map((file) => [file.path, file]));
             const previousRevision = buildFilesRevision([...before.values()]);
-            if (parsed.expectedRevision !== undefined && parsed.expectedRevision.toLowerCase() !== previousRevision) {
+            // AJV turns a null expectedRevision into an empty string, which no version has, so it counts as not given.
+            if (parsed.expectedRevision && parsed.expectedRevision.toLowerCase() !== previousRevision) {
                 const detail = `The version's revision is ${previousRevision}, not ${parsed.expectedRevision}.`;
                 throw buildPreconditionError('expectedRevision', PRECONDITION_REASON.REVISION_MISMATCH, detail);
             }

@@ -773,6 +773,18 @@ describe('create-actor', () => {
             expect(result.structuredContent.versionNumber).toBe('0.0');
         });
 
+        it.each([
+            ['the version of .actor/actor.json', actorJsonWith('{"version": "0.1"}'), '0.1'],
+            ['version 0.0 when .actor/actor.json has none', ACTOR_JSON, '0.0'],
+        ])('sends %s for a null versionNumber', async (_, file, versionNumber) => {
+            const args = { name: 'my-actor', versionNumber: null, files: [file] };
+
+            expect((createActor as HelperTool).ajvValidate(args)).toBe(true);
+            await callTool(args);
+
+            expect(getSentVersion().versionNumber).toBe(versionNumber);
+        });
+
         it('sends versionNumber when .actor/actor.json has another version', async () => {
             await callTool({ versionNumber: '0.2', files: [actorJsonWith('{"version": "0.1"}')] });
 

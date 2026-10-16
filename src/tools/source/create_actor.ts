@@ -149,7 +149,8 @@ export const createActor: ToolEntry = Object.freeze({
         try {
             const sourceFiles = buildSourceFileEntries(parsed.files);
             // The platform refuses a version without a number, so this defaults to what `apify push` uses.
-            const versionNumber = parsed.versionNumber ?? readActorJsonVersion(sourceFiles) ?? '0.0';
+            // AJV turns a null versionNumber into an empty string, which counts as not given.
+            const versionNumber = parsed.versionNumber || readActorJsonVersion(sourceFiles) || '0.0';
             const created = await client.actors().create({
                 name: parsed.name,
                 ...(parsed.title !== undefined && { title: parsed.title }),

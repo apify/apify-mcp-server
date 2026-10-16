@@ -101,7 +101,9 @@ export function resolveVersion(
     actorSelector: string,
 ): ActorVersion & { versionNumber: string } {
     const versionNumbers = listVersionNumbers(actor);
-    if (requestedVersionNumber === undefined && versionNumbers.length !== 1) {
+    // AJV turns a null versionNumber into an empty string, which no version has, so it counts as not given.
+    const requested = requestedVersionNumber || undefined;
+    if (requested === undefined && versionNumbers.length !== 1) {
         // The source type and build tag tell the caller which version holds the code it is after.
         const versions = actor.versions
             .filter((version) => version.versionNumber !== undefined)
@@ -111,7 +113,7 @@ export function resolveVersion(
             });
         throw new UserInputError(`Specify versionNumber; this Actor has versions: ${versions.join(', ')}.`);
     }
-    const versionNumber = requestedVersionNumber ?? versionNumbers[0];
+    const versionNumber = requested ?? versionNumbers[0];
     const version = actor.versions.find((candidate) => candidate.versionNumber === versionNumber);
     if (!version) {
         throw new UserInputError(

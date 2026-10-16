@@ -1963,12 +1963,9 @@ describe('update-actor-version', () => {
             expect(versionUpdateMock).toHaveBeenCalledTimes(1);
         });
 
-        it.each<[string, (revision: string) => string]>([
-            ['an empty expectedRevision', () => ''],
-            ['the first 8 characters of the revision', (revision) => revision.slice(0, 8)],
-        ])('refuses %s, since it must match the whole revision (REVISION_MISMATCH)', async (_, getExpectedRevision) => {
+        it('refuses the first 8 characters of the revision, since it must match the whole revision (REVISION_MISMATCH)', async () => {
             const revision = await readRevision();
-            const expectedRevision = getExpectedRevision(revision);
+            const expectedRevision = revision.slice(0, 8);
 
             const text = await callToolExpectingUserError({
                 autoBuild: true,
@@ -1985,25 +1982,59 @@ describe('update-actor-version', () => {
 
         const hashPrefix = MAIN_JS_HASH.slice(0, 8);
         it.each([
-            ['write', 'an empty expectedHash', '', write('src/main.js', 'x', { expectedHash: '' })],
-            ['delete', 'an empty expectedHash', '', remove('src/main.js', '')],
-            [
-                'write',
-                "the first 8 characters of the file's hash",
-                hashPrefix,
-                write('src/main.js', 'x', { expectedHash: hashPrefix }),
-            ],
-            ['delete', "the first 8 characters of the file's hash", hashPrefix, remove('src/main.js', hashPrefix)],
+            ['write', write('src/main.js', 'x', { expectedHash: hashPrefix })],
+            ['delete', remove('src/main.js', hashPrefix)],
         ])(
-            'refuses a %s given %s, since it must match the whole hash (HASH_MISMATCH)',
-            async (type, _, expectedHash, operation) => {
+            "refuses a %s given the first 8 characters of the file's hash, since it must match the whole hash (HASH_MISMATCH)",
+            async (type, operation) => {
                 const text = await callToolExpectingUserError({ autoBuild: true, operations: [operation] });
 
                 expect(text).toBe(
                     `${failedWith(0, type, 'src/main.js', 'HASH_MISMATCH')} ` +
-                        `src/main.js has hash ${MAIN_JS_HASH}, not ${expectedHash}.`,
+                        `src/main.js has hash ${MAIN_JS_HASH}, not ${hashPrefix}.`,
                 );
                 expect(buildMock).not.toHaveBeenCalled();
+            },
+        );
+
+        it('takes a null versionNumber, expectedRevision, and expectedHash as not given', async () => {
+            const args = {
+                actor: 'john/my-actor',
+                versionNumber: null,
+                expectedRevision: null,
+                operations: [write('b.js', 'b', { expectedHash: null })],
+            };
+
+            expect((updateActorVersion as HelperTool).ajvValidate(args)).toBe(true);
+            const result = await callTool(args);
+
+            expect(versionMock).toHaveBeenCalledWith('0.1');
+            expect(result.structuredContent.changes).toEqual([
+                { path: 'b.js', action: 'created', hash: sha256Prefix('b') },
+            ]);
+        });
+
+        it.each([
+            [
+                'write',
+                write('src/main.js', 'x', { expectedHash: null }),
+                `${failedWith(0, 'write', 'src/main.js', 'FILE_EXISTS')} ` +
+                    `src/main.js exists with hash ${MAIN_JS_HASH}; a write with that hash as expectedHash replaces it.`,
+            ],
+            [
+                'delete',
+                { type: 'delete', path: 'src/main.js', expectedHash: null },
+                'operations[0] (delete src/main.js) needs expectedHash.',
+            ],
+        ])(
+            'refuses a %s of an existing file with a null expectedHash as one without it',
+            async (_, operation, message) => {
+                const args = { actor: 'john/my-actor', operations: [operation] };
+
+                expect((updateActorVersion as HelperTool).ajvValidate(args)).toBe(true);
+                const text = await callToolExpectingUserError(args);
+
+                expect(text).toBe(message);
             },
         );
 
