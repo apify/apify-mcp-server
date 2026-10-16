@@ -673,7 +673,10 @@ export const createActorToolOutputSchema = {
 export const updateActorVersionToolOutputSchema = {
     type: 'object' as const,
     properties: {
-        revision: { type: 'string', description: 'Revision after the update; pass it as expectedRevision next time' },
+        revision: {
+            type: 'string',
+            description: 'Revision after the update, the value expectedRevision takes in a later update',
+        },
         changed: { type: 'boolean', description: 'False when the operations changed nothing, so nothing was written' },
         changes: {
             type: 'array',
