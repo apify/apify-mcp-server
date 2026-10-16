@@ -14,7 +14,7 @@ const deleteActorVersionArgs = z.object({
         .string()
         .min(1)
         .describe(
-            'The Actor to delete the version from: its ID, or its full name as username/name or username~name. A name without the username is not enough.',
+            'The Actor to delete the version from: its ID, its name (resolved against your own Actors), or its full name as username/name or username~name.',
         ),
     versionNumber: z.string().min(1).describe('The version to delete, in MAJOR.MINOR form, for example 0.2.'),
 });

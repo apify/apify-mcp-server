@@ -27,7 +27,7 @@ const createActorVersionArgs = z.object({
         .string()
         .min(1)
         .describe(
-            'The Actor to add the version to: its ID, or its full name as username/name or username~name. A name without the username is not enough.',
+            'The Actor to add the version to: its ID, its name (resolved against your own Actors), or its full name as username/name or username~name.',
         ),
     versionNumber: z.string().min(1).describe('Number of the new version in MAJOR.MINOR form, for example 0.2.'),
     copyFromVersion: z
