@@ -273,7 +273,7 @@ describe('create-actor-version', () => {
                 revision: buildFilesRevision(files),
                 files,
                 warnings: [
-                    'These secret environment variables were not copied, so set them on version 0.2 in Apify Console, then build the version before running it: API_KEY.',
+                    'These secret environment variables were not copied, so set them on version 0.2 in Apify Console; only a build made after that includes them: API_KEY.',
                 ],
             });
             expect(result.structuredContent.revision).toBe(read.structuredContent.revision);
@@ -335,7 +335,7 @@ describe('create-actor-version', () => {
             expectSchemaConformingStructuredContent(result, createActorVersionToolOutputSchema);
             expect(result.structuredContent.warnings).toEqual([
                 'These files are empty, and the build skips empty files, so they will not exist in the build: src/__init__.py.',
-                'These secret environment variables were not copied, so set them on version 0.2 in Apify Console, then build the version before running it: API_KEY, TOKEN.',
+                'These secret environment variables were not copied, so set them on version 0.2 in Apify Console; only a build made after that includes them: API_KEY, TOKEN.',
             ]);
             expect(JSON.stringify(result)).not.toMatch(/abc123|secret-value/);
         });
@@ -609,13 +609,15 @@ describe('create-actor-version', () => {
         });
 
         it('refuses a call with neither files nor copyFromVersion before any request', async () => {
-            expect(await callToolExpectingUserError({})).toBe('Give either files or copyFromVersion.');
+            expect(await callToolExpectingUserError({})).toBe(
+                'The call takes exactly one of files and copyFromVersion.',
+            );
             expect(actorMock).not.toHaveBeenCalled();
         });
 
         it('refuses both files and copyFromVersion before any request', async () => {
             expect(await callToolExpectingUserError({ copyFromVersion: '0.1', files: [ACTOR_JSON] })).toBe(
-                'Give either files or copyFromVersion.',
+                'The call takes exactly one of files and copyFromVersion.',
             );
             expect(actorMock).not.toHaveBeenCalled();
         });
@@ -696,22 +698,22 @@ describe('create-actor-version', () => {
                 source: 'files',
                 args: { files: [ACTOR_JSON] },
                 version: {},
-                ending: 'if it holds the files this call sent, this call created it.',
+                ending: 'If it holds the files this call sent, this call created it; get-actor-version reads its files.',
             },
             {
                 source: 'a copy',
                 args: { copyFromVersion: '0.1' },
                 version: {},
                 ending:
-                    'if it holds the files of version 0.1, this call created it. These secret environment variables ' +
-                    'were not copied, so set them on version 0.2 in Apify Console, then build the version before ' +
-                    'running it: API_KEY.',
+                    'If it holds the files of version 0.1, this call created it; get-actor-version reads its files. ' +
+                    'These secret environment variables were not copied, so set them on version 0.2 in Apify ' +
+                    'Console; only a build made after that includes them: API_KEY.',
             },
             {
                 source: 'a copy of a version without secret env vars',
                 args: { copyFromVersion: '0.1' },
                 version: { envVars: [{ name: 'REGION', value: 'eu' }] },
-                ending: 'if it holds the files of version 0.1, this call created it.',
+                ending: 'If it holds the files of version 0.1, this call created it; get-actor-version reads its files.',
             },
         ])(
             'says an earlier attempt may have created the version when the platform refuses the number on a retried POST, from $source',
@@ -732,8 +734,7 @@ describe('create-actor-version', () => {
                         type: 'text',
                         text:
                             'The platform refused version 0.2 as taken when the request was retried, so an earlier ' +
-                            'attempt of this call may have created it. Read it with get-actor-version before calling ' +
-                            `create-actor-version again; ${ending}`,
+                            `attempt of this call may have created it. ${ending}`,
                     },
                 ]);
                 expect(getPostBody().versionNumber).toBe('0.2');
@@ -760,8 +761,7 @@ describe('create-actor-version', () => {
             expectSoftFailInvalidInput(result);
             expect(result.content[0].text).toBe(
                 'The platform refused version 0.2 as taken when the request was retried, so an earlier attempt of ' +
-                    'this call may have created it. Read it before calling create-actor-version again; if it holds ' +
-                    'the files this call sent, this call created it.',
+                    'this call may have created it. If it holds the files this call sent, this call created it.',
             );
         });
 
@@ -851,10 +851,10 @@ describe('create-actor-version', () => {
                 startedAt: '2026-09-01T10:00:00.000Z',
                 finishedAt: null,
             });
-            // The build started without the secret, so the warning says to build again once it is set.
+            // The build started without the secret, so the warning says only a later build includes it.
             expect(result.structuredContent.warnings).toEqual([
                 'These secret environment variables were not copied, so the build this call started runs without ' +
-                    'them; set them on version 0.2 in Apify Console, then build the version again before running it: ' +
+                    'them. Set them on version 0.2 in Apify Console; only a build made after that includes them: ' +
                     'API_KEY.',
             ]);
         });
@@ -874,8 +874,8 @@ describe('create-actor-version', () => {
             expect(result.structuredContent.warnings).toEqual([
                 'These files are empty, and the build skips empty files, so they will not exist in the build: src/__init__.py.',
                 'These secret environment variables were not copied, so the build this call started runs without ' +
-                    'them and, if it succeeds, takes tag beta; set them on version 0.2 in Apify Console, then build ' +
-                    'the version again before running it: API_KEY.',
+                    'them and, if it succeeds, takes tag beta. Set them on version 0.2 in Apify Console; only a build ' +
+                    'made after that includes them: API_KEY.',
             ]);
         });
 
@@ -890,14 +890,14 @@ describe('create-actor-version', () => {
                 { autoBuild: true },
                 'The build could not be started; runs use these files only after the version is built.',
             ],
-        ])('keeps the warning to build the version once the secret env vars are set, %s', async (_, args, nextStep) => {
+        ])('keeps the secret env vars warning, %s', async (_, args, nextStep) => {
             buildMock.mockRejectedValue(apiError(402, 'Not enough credit'));
 
             const result = await callTool({ copyFromVersion: '0.1', buildTag: 'beta', ...args });
 
             expect(result.structuredContent).not.toHaveProperty('build');
             expect(result.structuredContent.warnings).toEqual([
-                'These secret environment variables were not copied, so set them on version 0.2 in Apify Console, then build the version before running it: API_KEY.',
+                'These secret environment variables were not copied, so set them on version 0.2 in Apify Console; only a build made after that includes them: API_KEY.',
             ]);
             expect(result.content[1].text).toBe(`Created version 0.2 of john/my-actor.\n${nextStep}`);
         });

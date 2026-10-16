@@ -60,14 +60,13 @@ function formatSecretEnvVarsWarning(
     if (!startedBuild) {
         return (
             `These secret environment variables were not copied, so set them on version ${versionNumber} ` +
-            `in Apify Console, then build the version before running it: ${names}.`
+            `in Apify Console; only a build made after that includes them: ${names}.`
         );
     }
     const tag = startedBuild.buildTag === undefined ? '' : ` and, if it succeeds, takes tag ${startedBuild.buildTag}`;
     return (
-        `These secret environment variables were not copied, so the build this call started runs without them${tag}; ` +
-        `set them on version ${versionNumber} in Apify Console, then build the version again before running it: ` +
-        `${names}.`
+        `These secret environment variables were not copied, so the build this call started runs without them${tag}. ` +
+        `Set them on version ${versionNumber} in Apify Console; only a build made after that includes them: ${names}.`
     );
 }
 
@@ -121,7 +120,7 @@ export const createActorVersion: ToolEntry = Object.freeze({
         const parsed = createActorVersionArgs.parse(args);
         const { versionNumber, copyFromVersion } = parsed;
         if ((copyFromVersion === undefined) === (parsed.files === undefined)) {
-            return respondUserError('Give either files or copyFromVersion.');
+            return respondUserError('The call takes exactly one of files and copyFromVersion.');
         }
         // Set before the POST, so the reply to a retried POST can name them.
         let secretNames: (string | undefined)[] = [];
@@ -186,7 +185,7 @@ export const createActorVersion: ToolEntry = Object.freeze({
                 error.attempt > 1
             ) {
                 const readTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_GET)
-                    ? ` with ${HELPER_TOOLS.ACTOR_VERSION_GET}`
+                    ? `; ${HELPER_TOOLS.ACTOR_VERSION_GET} reads its files`
                     : '';
                 const sentFiles =
                     copyFromVersion === undefined
@@ -196,9 +195,8 @@ export const createActorVersion: ToolEntry = Object.freeze({
                     secretNames.length > 0 ? ` ${formatSecretEnvVarsWarning(secretNames, versionNumber)}` : '';
                 return respondUserError(
                     `The platform refused version ${versionNumber} as taken when the request was retried, so an ` +
-                        `earlier attempt of this call may have created it. Read it${readTool} before calling ` +
-                        `${HELPER_TOOLS.ACTOR_VERSION_CREATE} again; if it holds ${sentFiles}, this call created ` +
-                        `it.${secretsWarning}`,
+                        `earlier attempt of this call may have created it. ` +
+                        `If it holds ${sentFiles}, this call created it${readTool}.${secretsWarning}`,
                     { httpStatus: error.statusCode },
                 );
             }

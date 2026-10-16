@@ -122,8 +122,8 @@ describe('delete-actor-version', () => {
             versionNumber: '0.1',
             text:
                 'Deleted version 0.1 of john/my-actor.\n' +
-                "Runs with tag latest still use the deleted version's build; to have them run another version, " +
-                'build that version with build-actor and tag latest.',
+                "Runs with tag latest still use the deleted version's build until each tag points to another build, " +
+                'such as one of another version made with build-actor and tag latest.',
         },
         { versionNumber: '0.2', text: 'Deleted version 0.2 of john/my-actor.' },
     ])(
@@ -162,8 +162,8 @@ describe('delete-actor-version', () => {
             taggedBuilds: { latest: { buildId: 'build-2', buildNumber: '0.2.1' } },
             text:
                 'Deleted version 0.2 of john/my-actor.\n' +
-                "Runs with tag latest still use the deleted version's build; to have them run another version, " +
-                'build that version with build-actor and tag latest.',
+                "Runs with tag latest still use the deleted version's build until each tag points to another build, " +
+                'such as one of another version made with build-actor and tag latest.',
         },
     ])(
         'takes the next step about a tag from the build it points to, not from the build tag of version $versionNumber',
@@ -176,7 +176,7 @@ describe('delete-actor-version', () => {
         },
     );
 
-    it('says to build once per tag when several tags point to builds of the deleted version', async () => {
+    it('names one build per tag when several tags point to builds of the deleted version', async () => {
         actorGetMock.mockResolvedValue(
             mockActor({
                 taggedBuilds: {
@@ -192,8 +192,8 @@ describe('delete-actor-version', () => {
         // build-actor takes one tag, so each tag needs its own build.
         expect(result.content[1].text).toBe(
             'Deleted version 0.1 of john/my-actor.\n' +
-                "Runs with tag latest, beta still use the deleted version's build; to have them run another version, " +
-                'build that version with build-actor and tag latest, then again with tag beta.',
+                "Runs with tag latest, beta still use the deleted version's build until each tag points to another " +
+                'build, such as one of another version made with build-actor and tag latest, then one with tag beta.',
         );
     });
 
@@ -223,8 +223,8 @@ describe('delete-actor-version', () => {
 
         expect(result.content[1].text).toBe(
             'Deleted version 0.1 of john/my-actor.\n' +
-                "Runs with tag latest still use the deleted version's build; to have them run another version, " +
-                'build that version with tag latest.',
+                "Runs with tag latest still use the deleted version's build until each tag points to another build, " +
+                'such as one of another version made with tag latest.',
         );
     });
 
