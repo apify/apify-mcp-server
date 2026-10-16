@@ -327,7 +327,8 @@ export const updateActorVersion: ToolEntry = Object.freeze({
         // Writes and deletes overwrite files.
         destructiveHint: true,
         idempotentHint: false,
-        openWorldHint: false,
+        // autoBuild starts a build, like build-actor.
+        openWorldHint: true,
     },
     redactArgs: (args: Record<string, unknown>) =>
         redactSourceToolArgs(args, {

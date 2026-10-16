@@ -242,14 +242,14 @@ describe('create-actor', () => {
         });
     });
 
-    it('is a non-destructive, non-idempotent, closed-world tool without payment', () => {
+    it('is a non-destructive, non-idempotent, open-world tool without payment, since autoBuild starts a build', () => {
         expect(createActor.name).toBe(HELPER_TOOLS.ACTOR_CREATE);
         expect(createActor.annotations).toEqual({
             title: 'Create Actor',
             readOnlyHint: false,
             destructiveHint: false,
             idempotentHint: false,
-            openWorldHint: false,
+            openWorldHint: true,
         });
         expect((createActor as HelperTool).paymentRequired).toBeUndefined();
     });

@@ -167,14 +167,14 @@ describe('update-actor-version', () => {
         });
     });
 
-    it('is a destructive, non-idempotent, closed-world tool without payment', () => {
+    it('is a destructive, non-idempotent, open-world tool without payment, since autoBuild starts a build', () => {
         expect(updateActorVersion.name).toBe(HELPER_TOOLS.ACTOR_VERSION_UPDATE);
         expect(updateActorVersion.annotations).toEqual({
             title: 'Update Actor version',
             readOnlyHint: false,
             destructiveHint: true,
             idempotentHint: false,
-            openWorldHint: false,
+            openWorldHint: true,
         });
         expect((updateActorVersion as HelperTool).paymentRequired).toBeUndefined();
     });

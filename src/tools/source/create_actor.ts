@@ -116,7 +116,8 @@ export const createActor: ToolEntry = Object.freeze({
         destructiveHint: false,
         // A second call with the same name is refused rather than repeated.
         idempotentHint: false,
-        openWorldHint: false,
+        // autoBuild starts a build, like build-actor.
+        openWorldHint: true,
     },
     redactArgs: (args: Record<string, unknown>) =>
         redactSourceToolArgs(args, {
