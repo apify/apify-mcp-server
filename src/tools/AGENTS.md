@@ -32,8 +32,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public
     landing page (`task_helpers.ts` holds the shared task response shape and the publication call).
   - `schedules/` — schedule create/get/update/delete for Actors and tasks; `schedule_helpers.ts`
-    converts the flat action shape to the API shape and back, and reuses the id helpers from
-    `tasks/task_helpers.ts`.
+    converts the flat action shape to the API shape and back, and reuses `getTaskByIdOrName` from
+    `tasks/task_helpers.ts`. The task and schedule tools resolve an Actor, task, or schedule given by
+    ID or name with the helpers in `../utils/apify_resource_id.ts`.
   - `builds/` — `get-actor-build` (build status), `get-actor-build-log` (build log tail),
     `get-actor-build-list` (the account's builds, or one Actor's with `actorId`, in every status, newest
     first, pointing at the newest failed one) and `build-actor` (start a build of one version and wait for it); `build_helpers.ts` holds the
