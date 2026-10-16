@@ -611,7 +611,7 @@ export const versionsCases: Case[] = [
     {
         name: 'create-actor-version adds a version from files that get-actor-version reads back with the same hashes and revision, with no build tag, and leaves the other version as it was',
         isDeploymentTest: false,
-        run: withClient({ tools: ['source'] }, async (client, ctx) => {
+        run: withClient({ tools: ['versions'] }, async (client, ctx) => {
             const api = ctx.createApifyClient();
             const name = buildUniqueActorName('add');
             const selector = await fetchOwnActorSelector(api, name);
@@ -690,7 +690,7 @@ export const versionsCases: Case[] = [
     {
         name: "create-actor-version copies a version's stored entries, non-secret env vars, and applyEnvVarsToBuild, never its build tag, names the secret env vars it left out, and returns the platform error for a version number the Actor already has",
         isDeploymentTest: false,
-        run: withClient({ tools: ['source'] }, async (client, ctx) => {
+        run: withClient({ tools: ['versions'] }, async (client, ctx) => {
             const api = ctx.createApifyClient();
             const name = buildUniqueActorName('copy');
             const selector = await fetchOwnActorSelector(api, name);
@@ -787,7 +787,7 @@ export const versionsCases: Case[] = [
     {
         name: 'delete-actor-version deletes one version, refuses one the Actor does not have, and returns the platform refusal for the last one',
         isDeploymentTest: false,
-        run: withClient({ tools: ['source'] }, async (client, ctx) => {
+        run: withClient({ tools: ['versions'] }, async (client, ctx) => {
             const api = ctx.createApifyClient();
             const name = buildUniqueActorName('delete');
             const selector = await fetchOwnActorSelector(api, name);
