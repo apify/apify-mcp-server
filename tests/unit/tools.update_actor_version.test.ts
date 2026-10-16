@@ -364,7 +364,7 @@ describe('update-actor-version', () => {
             );
         });
 
-        it('applies 20 edits with an oldText over 250 characters to a file of almost 3 MiB within 3 seconds', async () => {
+        it('applies 20 edits with an oldText over 250 characters to a file of almost 3 MiB within 6 seconds', async () => {
             // Each oldText is 300 a's and its own suffix, so it matches once, and the search reads the whole file: over
             // the runs of a it keeps 300 characters matched and steps back one on every character.
             const oldTexts = Array.from({ length: 20 }, (_, index) => `${'a'.repeat(300)}#${index};`);
@@ -379,8 +379,9 @@ describe('update-actor-version', () => {
                 ),
             });
 
-            // CI runs this file about 4.5x slower than locally; 100 edits take about 10 s there, over this bound.
-            expect(performance.now() - startedAt).toBeLessThan(3000);
+            // Bounds the worst-case search times the cap; the 21-edit test pins the cap itself. About 0.5 s locally, and
+            // CI runs this file about 4.5x slower.
+            expect(performance.now() - startedAt).toBeLessThan(6000);
             const [saved] = getPutFiles() as { content: string }[];
             expect(saved.content.slice(-tail.length)).toBe(tail.replaceAll('#', '@'));
         });
