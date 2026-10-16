@@ -1,5 +1,5 @@
 import type { ActorCollectionCreateOptions, ActorVersionSourceFile } from 'apify-client';
-import { ActorSourceType, ApifyApiError } from 'apify-client';
+import { ActorSourceType } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -7,17 +7,15 @@ import { APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE, HELPER_TOOLS } from '../../cons
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
-import { respondAborted, respondUserError } from '../../utils/mcp.js';
+import { respondAborted } from '../../utils/mcp.js';
 import { createActorToolOutputSchema } from '../structured_output_schemas.js';
-import { buildFilesManifest, buildFilesRevision } from './source_files.js';
 import {
-    buildEmptyFilesWarnings,
     buildSourceFileEntries,
     extractSourceFiles,
     redactSourceToolArgs,
     resolveVersion,
-    respondAfterWrite,
-    respondToSourceToolError,
+    respondAfterCreate,
+    respondToCreateError,
     sourceFileArgs,
 } from './source_helpers.js';
 
@@ -124,41 +122,21 @@ export const createActor: ToolEntry = Object.freeze({
             // The platform sets the name in .actor/actor.json on create, so the stored files, not the sent ones, match
             // a later read.
             const version = resolveVersion(created, undefined, fullName);
-            const files = buildFilesManifest(
-                extractSourceFiles(version, `Version ${version.versionNumber} of ${fullName}`),
-            );
-            const emptyPaths = files.filter(({ sizeBytes }) => sizeBytes === 0).map(({ path }) => path);
-            return await respondAfterWrite({
+            return await respondAfterCreate({
                 toolArgs,
                 autoBuild: parsed.autoBuild,
-                target: { actorId: created.id, versionNumber: version.versionNumber },
-                structuredContent: {
-                    actorId: created.id,
-                    fullName,
-                    versionNumber: version.versionNumber,
-                    revision: buildFilesRevision(files),
-                    files: files.map(({ path, sizeBytes, hash }) => ({ path, sizeBytes, hash })),
-                    ...buildEmptyFilesWarnings(emptyPaths),
-                },
+                created: { actorId: created.id, fullName, versionNumber: version.versionNumber },
+                sourceFiles: extractSourceFiles(version, `Version ${version.versionNumber} of ${fullName}`),
                 summary: `Created the private Actor ${fullName}.`,
             });
         } catch (error) {
-            if (
-                error instanceof ApifyApiError &&
-                error.type === APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE &&
-                error.attempt > 1
-            ) {
-                const readTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_GET)
-                    ? `; ${HELPER_TOOLS.ACTOR_VERSION_GET} reads its files`
-                    : '';
-                return respondUserError(
-                    `The platform refused the name ${parsed.name} as taken when the request was retried, so an earlier ` +
-                        `attempt of this call may have created the Actor ${parsed.name}. ` +
-                        `If it holds the files you sent, this call created it${readTool}.`,
-                    { httpStatus: error.statusCode },
-                );
-            }
-            return respondToSourceToolError(error);
+            return respondToCreateError(error, {
+                takenErrorType: APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE,
+                loadedToolNames,
+                refused: `the name ${parsed.name}`,
+                created: `the Actor ${parsed.name}`,
+                sentFiles: 'the files you sent',
+            });
         }
     },
 } as const);

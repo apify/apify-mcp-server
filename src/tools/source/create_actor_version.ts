@@ -1,5 +1,5 @@
 import type { ActorVersion } from 'apify-client';
-import { ActorSourceType, ApifyApiError } from 'apify-client';
+import { ActorSourceType } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -9,16 +9,14 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { respondAborted, respondUserError } from '../../utils/mcp.js';
 import { createActorVersionToolOutputSchema } from '../structured_output_schemas.js';
-import { buildFilesManifest, buildFilesRevision } from './source_files.js';
 import {
-    buildEmptyFilesWarnings,
     buildSourceFileEntries,
     extractSourceFiles,
     fetchActor,
     redactSourceToolArgs,
     resolveVersion,
-    respondAfterWrite,
-    respondToSourceToolError,
+    respondAfterCreate,
+    respondToCreateError,
     sourceFileArgs,
 } from './source_helpers.js';
 
@@ -153,54 +151,33 @@ export const createActorVersion: ToolEntry = Object.freeze({
                         applyEnvVarsToBuild: copied.applyEnvVarsToBuild,
                     }),
                 } satisfies ActorVersion);
-            const files = buildFilesManifest(sourceFiles);
-            const emptyPaths = files.filter(({ sizeBytes }) => sizeBytes === 0).map(({ path }) => path);
-            const { warnings = [] } = buildEmptyFilesWarnings(emptyPaths);
-            const buildStartedWarnings = [...warnings];
-            if (secretNames.length > 0) {
-                warnings.push(formatSecretEnvVarsWarning(secretNames, versionNumber));
-                buildStartedWarnings.push(
-                    formatSecretEnvVarsWarning(secretNames, versionNumber, { buildTag: parsed.buildTag }),
-                );
-            }
-            return await respondAfterWrite({
+            return await respondAfterCreate({
                 toolArgs,
                 autoBuild: parsed.autoBuild,
-                target: { actorId: actor.id, versionNumber },
-                structuredContent: {
-                    actorId: actor.id,
-                    fullName,
-                    versionNumber,
-                    revision: buildFilesRevision(files),
-                    files: files.map(({ path, sizeBytes, hash }) => ({ path, sizeBytes, hash })),
-                    ...(warnings.length > 0 && { warnings }),
-                },
-                ...(secretNames.length > 0 && { buildStartedWarnings }),
+                created: { actorId: actor.id, fullName, versionNumber },
+                sourceFiles,
+                ...(secretNames.length > 0 && {
+                    extraWarning: {
+                        withoutBuild: formatSecretEnvVarsWarning(secretNames, versionNumber),
+                        withBuild: formatSecretEnvVarsWarning(secretNames, versionNumber, {
+                            buildTag: parsed.buildTag,
+                        }),
+                    },
+                }),
                 summary: `Created version ${versionNumber} of ${fullName}.`,
             });
         } catch (error) {
-            if (
-                error instanceof ApifyApiError &&
-                error.type === APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS &&
-                error.attempt > 1
-            ) {
-                const readTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_GET)
-                    ? `; ${HELPER_TOOLS.ACTOR_VERSION_GET} reads its files`
-                    : '';
-                const sentFiles =
+            return respondToCreateError(error, {
+                takenErrorType: APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS,
+                loadedToolNames,
+                refused: `version ${versionNumber}`,
+                created: 'it',
+                sentFiles:
                     copyFromVersion === undefined
                         ? 'the files this call sent'
-                        : `the files of version ${copyFromVersion}`;
-                const secretsWarning =
-                    secretNames.length > 0 ? ` ${formatSecretEnvVarsWarning(secretNames, versionNumber)}` : '';
-                return respondUserError(
-                    `The platform refused version ${versionNumber} as taken when the request was retried, so an ` +
-                        `earlier attempt of this call may have created it. ` +
-                        `If it holds ${sentFiles}, this call created it${readTool}.${secretsWarning}`,
-                    { httpStatus: error.statusCode },
-                );
-            }
-            return respondToSourceToolError(error);
+                        : `the files of version ${copyFromVersion}`,
+                ...(secretNames.length > 0 && { note: formatSecretEnvVarsWarning(secretNames, versionNumber) }),
+            });
         }
     },
 } as const);

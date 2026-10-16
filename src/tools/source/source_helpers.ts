@@ -9,6 +9,7 @@ import {
     APIFY_ERROR_TYPE_TOO_MANY_VERSIONS,
     APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS,
     APIFY_ERROR_TYPE_VERSIONS_SIZE_EXCEEDED,
+    HELPER_TOOLS,
 } from '../../const.js';
 import { UserInputError } from '../../errors.js';
 import { REDACTED } from '../../resources/api_resources.js';
@@ -20,7 +21,7 @@ import { respondAborted, respondUserError } from '../../utils/mcp.js';
 import { isRecord } from '../api/apify_api_spec.js';
 import { buildNextStepForBuild, listVersionNumbers, respondWithBuild, toBuildResult } from '../builds/build_helpers.js';
 import { getResourceByIdOrName } from '../tasks/task_helpers.js';
-import { hasBinaryExtension } from './source_files.js';
+import { buildFilesManifest, buildFilesRevision, hasBinaryExtension } from './source_files.js';
 
 /** The input shape of one file sent whole. */
 export const sourceFileArgs = z.object({
@@ -384,6 +385,42 @@ export async function respondAfterWrite(params: {
     });
 }
 
+/**
+ * The response to a POST that created a version from `sourceFiles`, as `respondAfterWrite` gives it: their manifest
+ * and revision as get-actor-version gives them, and the warnings about empty files followed by
+ * `extraWarning.withoutBuild`, or by `extraWarning.withBuild` when autoBuild starts a build.
+ */
+export async function respondAfterCreate(params: {
+    toolArgs: Pick<InternalToolArgs, 'apifyClient' | 'apifyToken' | 'loadedToolNames' | 'signal'>;
+    autoBuild: boolean;
+    created: { actorId: string; fullName: string; versionNumber: string };
+    sourceFiles: readonly ActorVersionSourceFile[];
+    extraWarning?: { withoutBuild: string; withBuild: string };
+    summary: string;
+}): Promise<ToolResponse> {
+    const { toolArgs, autoBuild, created, sourceFiles, extraWarning, summary } = params;
+    const { actorId, fullName, versionNumber } = created;
+    const files = buildFilesManifest(sourceFiles);
+    const emptyPaths = files.filter(({ sizeBytes }) => sizeBytes === 0).map(({ path }) => path);
+    const { warnings = [] } = buildEmptyFilesWarnings(emptyPaths);
+    const allWarnings = extraWarning ? [...warnings, extraWarning.withoutBuild] : warnings;
+    return await respondAfterWrite({
+        toolArgs,
+        autoBuild,
+        target: { actorId, versionNumber },
+        structuredContent: {
+            actorId,
+            fullName,
+            versionNumber,
+            revision: buildFilesRevision(files),
+            files: files.map(({ path, sizeBytes, hash }) => ({ path, sizeBytes, hash })),
+            ...(allWarnings.length > 0 && { warnings: allWarnings }),
+        },
+        ...(extraWarning && { buildStartedWarnings: [...warnings, extraWarning.withBuild] }),
+        summary,
+    });
+}
+
 /** The platform's 403 refusals of a version write that are not about access. */
 const VERSION_REFUSAL_ERROR_TYPE_SET = new Set<string | undefined>([
     APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS,
@@ -403,4 +440,36 @@ export function respondToSourceToolError(error: unknown): ToolResponse {
         return respondUserError(`${error.message} (API error type: ${error.type})`, { httpStatus: error.statusCode });
     }
     throw error;
+}
+
+/**
+ * The response to an error of a create POST. apify-client retries the POST after a network error, a timeout, a 429,
+ * or a 5xx, so when the platform refuses a retry as taken (`takenErrorType`), an attempt it saved but did not answer
+ * may have created what it refused (`refused`, such as `version 0.2`): the response says so, then adds `note` when
+ * given. Any other error goes to `respondToSourceToolError`.
+ */
+export function respondToCreateError(
+    error: unknown,
+    params: {
+        takenErrorType: string;
+        loadedToolNames: readonly string[];
+        refused: string;
+        created: string;
+        sentFiles: string;
+        note?: string;
+    },
+): ToolResponse {
+    const { takenErrorType, loadedToolNames, refused, created, sentFiles, note } = params;
+    if (!(error instanceof ApifyApiError && error.type === takenErrorType && error.attempt > 1)) {
+        return respondToSourceToolError(error);
+    }
+    const readTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_GET)
+        ? `; ${HELPER_TOOLS.ACTOR_VERSION_GET} reads its files`
+        : '';
+    const noteText = note === undefined ? '' : ` ${note}`;
+    return respondUserError(
+        `The platform refused ${refused} as taken when the request was retried, so an earlier attempt of this call ` +
+            `may have created ${created}. If it holds ${sentFiles}, this call created it${readTool}.${noteText}`,
+        { httpStatus: error.statusCode },
+    );
 }
