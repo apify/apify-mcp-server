@@ -836,12 +836,13 @@ export const sourceCases: Case[] = [
                     extractWrittenState(storedAfter),
                 );
 
-                // The sentence is the platform's, so only the API error type is exact, and no hint follows it.
-                // In apify-core it reads `The Actor must have at least 1 versions`, with status 403.
+                // The platform refuses it with too-few-versions, and no token-access hint follows the text.
                 const lastText = expectToolFailure(
                     await callTool(client, 'delete-actor-version', { actor: selector, versionNumber: '0.0' }),
                 );
-                expect(lastText).toMatch(/^.+ \(API error type: too-few-versions\)$/);
+                expect(lastText).toBe(
+                    `Version 0.0 is the only version of ${seeded.username}/${name}, and an Actor keeps at least one version.`,
+                );
                 expect(extractWrittenState(await fetchStoredActor(api, seeded.id))).toEqual(
                     extractWrittenState(storedAfter),
                 );

@@ -248,7 +248,7 @@ describe('delete-actor-version', () => {
         expectNoOtherWrite();
     });
 
-    it("reports the platform's refusal to delete the last version", async () => {
+    it("reports the platform's refusal to delete the last version as the Actor's only version", async () => {
         actorGetMock.mockResolvedValue(mockActor({ versions: [{ versionNumber: '0.1', sourceType: 'SOURCE_FILES' }] }));
         versionDeleteMock.mockRejectedValue(
             apiError(403, 'The Actor must have at least 1 versions', 'too-few-versions'),
@@ -256,12 +256,15 @@ describe('delete-actor-version', () => {
 
         const result = await callTool({ versionNumber: '0.1' });
 
-        // The platform's reason, without the token-access hint the engine adds to a 403.
+        // Without the token-access hint the engine adds to a 403.
         expectSoftFailInvalidInput(result);
         expect(result.toolTelemetry).toEqual(expect.objectContaining({ failureHttpStatus: 403 }));
-        expect(result.content[0].text).toBe(
-            'The Actor must have at least 1 versions (API error type: too-few-versions)',
-        );
+        expect(result.content).toStrictEqual([
+            {
+                type: 'text',
+                text: 'Version 0.1 is the only version of john/my-actor, and an Actor keeps at least one version.',
+            },
+        ]);
         // The tool leaves the check to the platform, and does nothing else after the refusal.
         expect(versionMock.mock.calls).toEqual([['0.1']]);
         expect(versionDeleteMock).toHaveBeenCalledTimes(1);

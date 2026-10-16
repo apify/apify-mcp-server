@@ -1,11 +1,12 @@
+import { ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { APIFY_ERROR_TYPE_TOO_FEW_VERSIONS, HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { respondAborted, respondOk } from '../../utils/mcp.js';
+import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
 import { deleteActorVersionToolOutputSchema } from '../structured_output_schemas.js';
 import { fetchActor, resolveVersion, respondToSourceToolError } from './source_helpers.js';
 
@@ -59,7 +60,17 @@ export const deleteActorVersion: ToolEntry = Object.freeze({
             const { versionNumber } = resolveVersion(actor, parsed.versionNumber, parsed.actor);
             // A cancel before the DELETE deletes nothing; per the MCP spec the cancelled request gets no response.
             if (signal?.aborted) return respondAborted();
-            await client.actor(actor.id).version(versionNumber).delete();
+            try {
+                await client.actor(actor.id).version(versionNumber).delete();
+            } catch (error) {
+                if (error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_TOO_FEW_VERSIONS) {
+                    return respondUserError(
+                        `Version ${versionNumber} is the only version of ${fullName}, and an Actor keeps at least one version.`,
+                        { httpStatus: error.statusCode },
+                    );
+                }
+                throw error;
+            }
             const structuredContent = { actorId: actor.id, fullName, versionNumber, deleted: true };
             const summary = `Deleted version ${versionNumber} of ${fullName}.`;
             const buildTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD)
