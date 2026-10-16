@@ -70,7 +70,7 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { apifyToken, apifyClient, mcpSessionId, loadedToolNames } = toolArgs;
+        const { apifyToken, apifyClient, mcpSessionId, loadedToolNames, loadedActorIds } = toolArgs;
         const parsed = fetchActorDetailsWidgetArgsSchema.parse(toolArgs.args);
         const actorName = fixActorNameInputAndLog(parsed.actor, {
             mcpSessionId,
@@ -103,7 +103,7 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
         `,
         ];
         // Resolved Actor ID, not the raw `actor` input.
-        const runnableGuidance = buildActorNotRunnableGuidance(details.actorInfo.id, toolArgs);
+        const runnableGuidance = buildActorNotRunnableGuidance(details.actorInfo.id, loadedToolNames, loadedActorIds);
         if (runnableGuidance) texts.push(runnableGuidance);
 
         return respondOk(texts, {

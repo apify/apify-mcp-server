@@ -82,13 +82,18 @@ export function getToolSchemaID(actorName: string): string {
     return `https://apify.com/mcp/${actorNameToToolName(actorName)}/schema.json`;
 }
 
-/** How to get an Actor this session cannot run. `?client=claude` (the Claude connector URL) names Claude's custom connector flow. */
+/** `?client=claude` is the Claude connector URL; the only client whose add-a-server flow has a name. */
+export function isClaudeClient(clientParam?: string): boolean {
+    return clientParam === 'claude';
+}
+
+/** How to get an Actor this session cannot run. Tool results use the neutral wording; descriptions and instructions see `clientParam`. */
 export function getOwnServerRemedy(clientParam?: string): string {
-    const target = clientParam === 'claude' ? 'Claude as a custom connector' : 'your agent';
+    const target = isClaudeClient(clientParam) ? 'Claude as a custom connector' : 'your agent';
     return `create your own Apify MCP server configuration at ${APIFY_MCP_URL} and add it to ${target}.`;
 }
 
-/** Told under search results when the session cannot run some of the Actors listed, and in the `search-actors` description when the session has no run path. */
+/** In the `search-actors` description when the session has no run path, and under search results when the session cannot run some of the Actors listed. */
 export function getActorCallabilityCaveat(clientParam?: string): string {
     return `This session can run only Actors already exposed as dedicated tools. Other Actors found
 here are informational and cannot be run in this configuration. To use one, ${getOwnServerRemedy(clientParam)}`;
@@ -101,10 +106,8 @@ export function canRunAnyActor(hasTool: ToolDescriptionContext['hasTool']): bool
     );
 }
 
-/** Told after an Actor's tip when the session cannot run the Actor the tip recommends. */
-export function getActorTipCaveat(clientParam?: string): string {
-    return `This session cannot run the Actor this tip recommends. To use it, ${getOwnServerRemedy(clientParam)}`;
-}
+/** After an Actor's tip when the session cannot run the Actor the tip recommends. */
+export const ACTOR_TIP_CAVEAT = `This session cannot run the Actor this tip recommends. To use it, ${getOwnServerRemedy()}`;
 
 /** Whether this session can run this Actor (call-actor, or the Actor's own tool, loaded); soft check for a guidance hint, not a hard gate. */
 export function canRunActor(

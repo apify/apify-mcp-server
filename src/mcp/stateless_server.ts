@@ -275,7 +275,6 @@ class StatelessMcpServer {
                     signal,
                     sendNotification: this.buildNotificationForwarder(ctx),
                     emitLog: emitLogServerSide,
-                    clientParam: this.host.options.clientParam,
                 });
                 toolStatus = outcome.toolStatus;
                 callDiagnostics = outcome.callDiagnostics;

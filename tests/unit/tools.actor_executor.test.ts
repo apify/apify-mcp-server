@@ -3,8 +3,6 @@ import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
-import { RAG_WEB_BROWSER } from '../../src/const.js';
-import { getActorTipCaveat } from '../../src/tools/actor_tool_naming.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import type { ActorExecutionParams } from '../../src/types.js';
 import { mockApifyClient, textOf } from './helpers/tool_context.js';
@@ -219,27 +217,6 @@ describe('actorExecutor', () => {
             expect((structuredContent as Record<string, unknown>).items).toBeUndefined();
             expect((structuredContent as Record<string, unknown>).datasetId).toBeUndefined();
             expect((structuredContent as Record<string, unknown>).instructions).toBeUndefined();
-        });
-    });
-
-    describe('tip caveat', () => {
-        it('names the Claude custom connector when the session has no call-actor and clientParam is claude', async () => {
-            const { params } = buildParams(
-                { query: 'foo' },
-                { actorFullName: RAG_WEB_BROWSER, hasCallActorTool: false, clientParam: 'claude' },
-            );
-            params.apifyClient = mockApifyClient({
-                ...params.apifyClient,
-                keyValueStore: () => ({
-                    listKeys: async () => ({ items: [{ key: 'TIP' }], isTruncated: false }),
-                    getRecord: async () => ({ key: 'TIP', value: { message: 'Use a different Actor.' } }),
-                }),
-            });
-
-            const result = await actorExecutor.executeActorTool(params);
-
-            const { structuredContent } = result as { structuredContent?: { tip?: { caveat?: string } } };
-            expect(structuredContent?.tip?.caveat).toBe(getActorTipCaveat('claude'));
         });
     });
 

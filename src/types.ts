@@ -195,8 +195,6 @@ export type InternalToolArgs = {
     mcpSessionId?: string;
     /** True when the tool is executing as a background MCP task. */
     taskMode?: boolean;
-    /** Raw `?client=` URL query-param value; picks wording only. */
-    clientParam?: string;
 };
 
 /**
@@ -543,8 +541,6 @@ export type ActorExecutionParams = {
     taskMode?: boolean;
     /** Whether the session serves call-actor; without it, an Actor's tip gets the callability caveat. */
     hasCallActorTool?: boolean;
-    /** Raw `?client=` URL query-param value; picks the caveat wording. */
-    clientParam?: string;
 };
 
 /**

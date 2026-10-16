@@ -599,7 +599,6 @@ export class LegacyMcpServer {
                     signal,
                     sendNotification,
                     emitLog,
-                    clientParam: this.host.options.clientParam,
                 });
                 toolStatus = outcome.toolStatus;
                 callDiagnostics = outcome.callDiagnostics;

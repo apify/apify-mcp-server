@@ -344,7 +344,6 @@ export async function executeSyncToolCall(
         signal: AbortSignal;
         sendNotification: (notification: ServerNotification) => Promise<void>;
         emitLog: (msg: { level: string; data?: unknown }) => Promise<void>;
-        clientParam?: string;
     },
 ): Promise<ToolCallOutcome> {
     const {
@@ -358,7 +357,6 @@ export async function executeSyncToolCall(
         signal,
         sendNotification,
         emitLog,
-        clientParam,
     } = params;
     const { tool, toolArgs, logSafeArgs, apifyClient, actorName, actorId, standbyRejection, paymentRequiredResult } =
         prepared;
@@ -409,7 +407,6 @@ export async function executeSyncToolCall(
             actorName,
             actorId,
             taskMode: false,
-            clientParam,
         });
         return {
             result: nudge(dispatchResult.result, dispatchResult.callDiagnostics),

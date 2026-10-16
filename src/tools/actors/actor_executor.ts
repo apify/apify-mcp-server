@@ -112,7 +112,6 @@ export const actorExecutor: ActorExecutor = {
             ...fetchResult.result,
             linkContext: await getConsoleLinkContext(apifyClient.token, apifyClient),
             hasCallActorTool,
-            clientParam: params.clientParam,
         }) as ActorExecutionResult;
     },
 };

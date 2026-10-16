@@ -154,16 +154,13 @@ export function buildActorNotFoundResponse(actorName: string, loadedToolNames: r
 /** Guidance appended when the Actor exists but `canRunActor` says this session can't run it. */
 export function buildActorNotRunnableGuidance(
     actorId: string,
-    {
-        loadedToolNames,
-        loadedActorIds,
-        clientParam,
-    }: Pick<InternalToolArgs, 'loadedToolNames' | 'loadedActorIds' | 'clientParam'>,
+    loadedToolNames: readonly string[],
+    loadedActorIds: ReadonlySet<string>,
 ): string {
     if (canRunActor(actorId, loadedToolNames, loadedActorIds)) return '';
     return dedent`
         This Actor is not exposed as a tool and cannot be run in this configuration. To use it,
-        ${getOwnServerRemedy(clientParam)}
+        ${getOwnServerRemedy()}
     `;
 }
 
@@ -248,7 +245,16 @@ export function buildActorDetailsTextResponse(options: {
  * Returns the same text + structured response in both modes.
  */
 export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): Promise<ToolResponse> {
-    const { args, apifyToken, apifyClient, actorStore, paymentProvider, mcpSessionId, loadedToolNames } = toolArgs;
+    const {
+        args,
+        apifyToken,
+        apifyClient,
+        actorStore,
+        paymentProvider,
+        mcpSessionId,
+        loadedToolNames,
+        loadedActorIds,
+    } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
     const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_GET_DETAILS });
 
@@ -289,7 +295,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     });
 
     // Resolved Actor ID, not the raw `actor` input — that may itself be an ID.
-    const runnableGuidance = buildActorNotRunnableGuidance(details.actorInfo.id, toolArgs);
+    const runnableGuidance = buildActorNotRunnableGuidance(details.actorInfo.id, loadedToolNames, loadedActorIds);
     if (runnableGuidance) texts.push(runnableGuidance);
 
     return respondOk(texts, { structuredContent });

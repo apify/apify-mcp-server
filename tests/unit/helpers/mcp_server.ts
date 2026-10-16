@@ -314,9 +314,9 @@ export function makeBlockingTool(): {
 /** A synthetic internal tool that records the plain values the server threaded into it. */
 export function makeArgsRecorderTool(name = 'recorder-tool'): {
     tool: ToolEntry;
-    received: { apifyToken?: string; mcpSessionId?: string | undefined; clientParam?: string };
+    received: { apifyToken?: string; mcpSessionId?: string | undefined };
 } {
-    const received: { apifyToken?: string; mcpSessionId?: string | undefined; clientParam?: string } = {};
+    const received: { apifyToken?: string; mcpSessionId?: string | undefined } = {};
     const tool = {
         type: TOOL_TYPE.INTERNAL,
         name,
@@ -326,7 +326,6 @@ export function makeArgsRecorderTool(name = 'recorder-tool'): {
         call: async (toolArgs: InternalToolArgs) => {
             received.apifyToken = toolArgs.apifyToken;
             received.mcpSessionId = toolArgs.mcpSessionId;
-            received.clientParam = toolArgs.clientParam;
             return respondRaw({ content: [{ type: 'text', text: 'internal ok' }] });
         },
     } as ToolEntry;

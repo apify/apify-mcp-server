@@ -139,14 +139,11 @@ export function buildNoActorsFoundInstructions(keywords: string, offset: number)
 /** Caveat for the whole result list — appended only when at least one result lacks a run path. */
 export function buildActorCallabilityCaveat(
     actorIds: readonly string[],
-    {
-        loadedToolNames,
-        loadedActorIds,
-        clientParam,
-    }: Pick<InternalToolArgs, 'loadedToolNames' | 'loadedActorIds' | 'clientParam'>,
+    loadedToolNames: readonly string[],
+    loadedActorIds: ReadonlySet<string>,
 ): string {
     const canRunAllActors = actorIds.every((id) => canRunActor(id, loadedToolNames, loadedActorIds));
-    return canRunAllActors ? '' : getActorCallabilityCaveat(clientParam);
+    return canRunAllActors ? '' : getActorCallabilityCaveat();
 }
 
 /** Footer line pointing to fetch-actor-details; added only when the session serves that tool. */
@@ -167,10 +164,11 @@ specific Actor name.`;
 export function buildSearchActorsFooter(
     verbatimLinksNudge: string,
     actorIds: readonly string[],
-    session: Pick<InternalToolArgs, 'loadedToolNames' | 'loadedActorIds' | 'clientParam'>,
+    loadedToolNames: readonly string[],
+    loadedActorIds: ReadonlySet<string>,
 ): string {
-    const detailsHint = session.loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS) ? ACTOR_DETAILS_HINT : '';
-    const callabilityCaveat = buildActorCallabilityCaveat(actorIds, session);
+    const detailsHint = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS) ? ACTOR_DETAILS_HINT : '';
+    const callabilityCaveat = buildActorCallabilityCaveat(actorIds, loadedToolNames, loadedActorIds);
     return [detailsHint, verbatimLinksNudge, callabilityCaveat].filter(Boolean).join('\n');
 }
 
@@ -195,7 +193,7 @@ export const searchActors: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyClient, paymentProvider } = toolArgs;
+        const { args, apifyToken, apifyClient, paymentProvider, loadedToolNames, loadedActorIds } = toolArgs;
         const parsed = searchActorsBaseArgsSchema.parse(args);
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
@@ -222,7 +220,7 @@ export const searchActors: ToolEntry = Object.freeze({
         const { actorCardText, actorCardStructured } = buildSearchActorsResult(actors, userPlanTier, linkContext);
         const verbatimLinksNudge = linkContext ? VERBATIM_LINKS_NUDGE : '';
         const actorIds = actors.map((actor) => actor.id);
-        const footer = buildSearchActorsFooter(verbatimLinksNudge, actorIds, toolArgs);
+        const footer = buildSearchActorsFooter(verbatimLinksNudge, actorIds, loadedToolNames, loadedActorIds);
         const structuredContent = {
             actors: actorCardStructured,
             query: parsed.keywords,

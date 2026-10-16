@@ -293,27 +293,6 @@ describe('createStatelessServer() tools/call', () => {
             });
         });
 
-        it('threads the ?client= value into INTERNAL and ACTOR tool calls', async () => {
-            const executeSpy = vi.spyOn(actorExecutor, 'executeActorTool').mockResolvedValue({
-                content: [{ type: 'text', text: 'actor ok' }],
-            } as never);
-            const options = { clientParam: 'claude' };
-            const legacyRecorder = makeArgsRecorderTool();
-            await callViaLegacy(() => [legacyRecorder.tool], 'recorder-tool', options);
-            await callViaLegacy(() => [makeActorTool()], 'test-actor-tool', options);
-            expect(legacyRecorder.received.clientParam).toBe('claude');
-            expect(executeSpy.mock.calls[0][0].clientParam).toBe('claude');
-
-            await withStatelessServer(async ({ server, call }) => {
-                const { tool, received } = makeArgsRecorderTool();
-                await loadSource(server, [tool, makeActorTool()]);
-                await call('tools/call', { name: tool.name, arguments: {} });
-                await call('tools/call', { name: 'test-actor-tool', arguments: {} });
-                expect(received.clientParam).toBe('claude');
-                expect(executeSpy.mock.calls[1][0].clientParam).toBe('claude');
-            }, options);
-        });
-
         it('renders the ?client=claude remedy in tools/list and the instructions', async () => {
             const options = { clientParam: 'claude' };
             // search-actors without a run tool states the run limitation in its description and the instructions.
