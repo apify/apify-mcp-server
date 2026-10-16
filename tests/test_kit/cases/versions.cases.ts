@@ -144,11 +144,11 @@ async function fetchBuildCount(api: ApifyClient, actorId: string): Promise<numbe
     return total;
 }
 
-export const sourceCases: Case[] = [
+export const versionsCases: Case[] = [
     {
         name: 'create-actor creates a private Actor whose stored files get-actor-version reads back with the same hashes and revision',
         isDeploymentTest: false,
-        run: withClient({ tools: ['source'] }, async (client, ctx) => {
+        run: withClient({ tools: ['versions'] }, async (client, ctx) => {
             const api = ctx.createApifyClient();
             const name = buildUniqueActorName('create');
             const selector = await fetchOwnActorSelector(api, name);
@@ -259,7 +259,7 @@ export const sourceCases: Case[] = [
     {
         name: 'update-actor-version creates, replaces, edits, and deletes files in one call and leaves the other files, env vars, and build tag as they were',
         isDeploymentTest: false,
-        run: withClient({ tools: ['source'] }, async (client, ctx) => {
+        run: withClient({ tools: ['versions'] }, async (client, ctx) => {
             const api = ctx.createApifyClient();
             const name = buildUniqueActorName('update');
             const selector = await fetchOwnActorSelector(api, name);
@@ -431,7 +431,7 @@ export const sourceCases: Case[] = [
     {
         name: 'update-actor-version fails a write, an edit, or a revision that does not match with its reason code and writes nothing',
         isDeploymentTest: false,
-        run: withClient({ tools: ['source'] }, async (client, ctx) => {
+        run: withClient({ tools: ['versions'] }, async (client, ctx) => {
             const api = ctx.createApifyClient();
             const name = buildUniqueActorName('conflicts');
             const selector = await fetchOwnActorSelector(api, name);
@@ -525,7 +525,7 @@ export const sourceCases: Case[] = [
     {
         name: 'update-actor-version and a copy in create-actor-version refuse a version stored in a Git repository, name the repository without its credentials, and change nothing',
         isDeploymentTest: false,
-        run: withClient({ tools: ['source'] }, async (client, ctx) => {
+        run: withClient({ tools: ['versions'] }, async (client, ctx) => {
             const api = ctx.createApifyClient();
             const name = buildUniqueActorName('git');
             const selector = await fetchOwnActorSelector(api, name);
@@ -570,7 +570,7 @@ export const sourceCases: Case[] = [
     {
         name: 'create-actor returns the platform error for a name the account already uses and creates nothing',
         isDeploymentTest: false,
-        run: withClient({ tools: ['source'] }, async (client, ctx) => {
+        run: withClient({ tools: ['versions'] }, async (client, ctx) => {
             const api = ctx.createApifyClient();
             const name = buildUniqueActorName('taken');
             const selector = await fetchOwnActorSelector(api, name);

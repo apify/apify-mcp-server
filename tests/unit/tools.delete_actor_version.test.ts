@@ -3,8 +3,8 @@ import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
-import { deleteActorVersion } from '../../src/tools/source/delete_actor_version.js';
-import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
+import { deleteActorVersion } from '../../src/tools/versions/delete_actor_version.js';
+import { getActorVersion } from '../../src/tools/versions/get_actor_version.js';
 import { deleteActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {

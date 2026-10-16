@@ -6,9 +6,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { getCategoryTools, toolCategoriesEnabledByDefault } from '../../src/tools/index.js';
-import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
-import { buildFilesRevision, compareSourcePaths } from '../../src/tools/source/source_files.js';
 import { getActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
+import { getActorVersion } from '../../src/tools/versions/get_actor_version.js';
+import { buildFilesRevision, compareSourcePaths } from '../../src/tools/versions/source_files.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {
     expectSchemaConformingStructuredContent,
@@ -180,15 +180,15 @@ describe('get-actor-version', () => {
         }
     });
 
-    it('is served in the source category, which is not enabled by default', () => {
-        expect(getCategoryTools().source.map((tool) => tool.name)).toEqual([
+    it('is served in the versions category, which is not enabled by default', () => {
+        expect(getCategoryTools().versions.map((tool) => tool.name)).toEqual([
             HELPER_TOOLS.ACTOR_VERSION_GET,
             HELPER_TOOLS.ACTOR_CREATE,
             HELPER_TOOLS.ACTOR_VERSION_UPDATE,
             HELPER_TOOLS.ACTOR_VERSION_CREATE,
             HELPER_TOOLS.ACTOR_VERSION_DELETE,
         ]);
-        expect(toolCategoriesEnabledByDefault).not.toContain('source');
+        expect(toolCategoriesEnabledByDefault).not.toContain('versions');
     });
 
     describe('SOURCE_FILES', () => {

@@ -41,11 +41,6 @@ import { createSchedule } from './schedules/create_schedule.js';
 import { deleteSchedule } from './schedules/delete_schedule.js';
 import { getSchedule } from './schedules/get_schedule.js';
 import { updateSchedule } from './schedules/update_schedule.js';
-import { createActor } from './source/create_actor.js';
-import { createActorVersion } from './source/create_actor_version.js';
-import { deleteActorVersion } from './source/delete_actor_version.js';
-import { getActorVersion } from './source/get_actor_version.js';
-import { updateActorVersion } from './source/update_actor_version.js';
 import { getDataset } from './storage/get_dataset.js';
 import { getDatasetItems } from './storage/get_dataset_items.js';
 import { getDatasetList } from './storage/get_dataset_list.js';
@@ -59,6 +54,11 @@ import { getActorTask } from './tasks/get_actor_task.js';
 import { publishActorTask } from './tasks/publish_actor_task.js';
 import { unpublishActorTask } from './tasks/unpublish_actor_task.js';
 import { updateActorTask } from './tasks/update_actor_task.js';
+import { createActor } from './versions/create_actor.js';
+import { createActorVersion } from './versions/create_actor_version.js';
+import { deleteActorVersion } from './versions/delete_actor_version.js';
+import { getActorVersion } from './versions/get_actor_version.js';
+import { updateActorVersion } from './versions/update_actor_version.js';
 import { callActorWidget } from './widgets/call_actor_widget.js';
 import { fetchActorDetailsWidget } from './widgets/fetch_actor_details_widget.js';
 import { getActorRunWidget } from './widgets/get_actor_run_widget.js';
@@ -82,7 +82,7 @@ export const toolCategories = {
     tasks: [createActorTask, getActorTask, updateActorTask, publishActorTask, unpublishActorTask],
     schedules: [createSchedule, getSchedule, updateSchedule, deleteSchedule],
     builds: [getActorBuild, getActorBuildLog, getActorBuildList, buildActor],
-    source: [getActorVersion, createActor, updateActorVersion, createActorVersion, deleteActorVersion],
+    versions: [getActorVersion, createActor, updateActorVersion, createActorVersion, deleteActorVersion],
     api: [apifyApiSearch, apifyApiDetails, apifyApiRead],
     dev: [reportProblem],
 } satisfies Record<string, ToolEntry[]>;

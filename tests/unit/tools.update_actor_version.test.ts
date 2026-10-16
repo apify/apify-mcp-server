@@ -6,10 +6,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import { prepareToolCallContext } from '../../src/payments/helpers.js';
-import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
-import { buildFilesRevision } from '../../src/tools/source/source_files.js';
-import { updateActorVersion } from '../../src/tools/source/update_actor_version.js';
 import { updateActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
+import { getActorVersion } from '../../src/tools/versions/get_actor_version.js';
+import { buildFilesRevision } from '../../src/tools/versions/source_files.js';
+import { updateActorVersion } from '../../src/tools/versions/update_actor_version.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
@@ -897,8 +897,8 @@ describe('update-actor-version', () => {
                 changed: false,
                 changes: [],
             });
-            expect(result.content[1].text).toContain(
-                'Nothing changed in version 0.1 of john/my-actor, so nothing was written.',
+            expect(result.content[1].text).toBe(
+                'Nothing changed in version 0.1 of john/my-actor, so nothing was written.\nNo build was started.',
             );
         });
 
@@ -1938,8 +1938,9 @@ describe('update-actor-version', () => {
 
             expect(versionUpdateMock).not.toHaveBeenCalled();
             expect(result.structuredContent).toEqual({ revision: await readRevision(), changed: false, changes: [] });
+            // Nothing about runs: the stored files may already be in the build they use.
             expect(result.content[1].text).toBe(
-                'Nothing changed in version 0.1 of john/my-actor, so nothing was written.\nNo build was started; runs use these files only after the version is built.',
+                'Nothing changed in version 0.1 of john/my-actor, so nothing was written.\nNo build was started.',
             );
         });
 
@@ -2401,25 +2402,25 @@ describe('update-actor-version', () => {
             expect(result.content[2].text).toBe(`Apify Console: ${consoleUrl}\n${VERBATIM_LINKS_NUDGE}`);
         });
 
-        it('starts a build when nothing changed', async () => {
-            const result = await callTool({ autoBuild: true, operations: [] });
+        it.each([
+            ['no operations', []],
+            [
+                'a write that leaves the content as it was',
+                [write('src/main.js', MAIN_JS.content, { expectedHash: MAIN_JS_HASH })],
+            ],
+        ])('starts no build for %s, and says nothing changed', async (_, operations) => {
+            vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
 
+            const result = await callToolInConsole({ autoBuild: true, operations });
+
+            expectSchemaConformingStructuredContent(result, updateActorVersionToolOutputSchema);
             expect(versionUpdateMock).not.toHaveBeenCalled();
-            expect(result.structuredContent.build?.id).toBe('build-1');
-        });
-
-        it('starts a build of the version when a write leaves its content as it was', async () => {
-            const result = await callTool({
-                autoBuild: true,
-                operations: [write('src/main.js', MAIN_JS.content, { expectedHash: MAIN_JS_HASH })],
-            });
-
-            expect(versionUpdateMock).not.toHaveBeenCalled();
-            expect(buildMock.mock.calls).toEqual([['0.1', { useCache: true }]]);
-            expect(result.structuredContent.changed).toBe(false);
-            expect(result.structuredContent.build?.id).toBe('build-1');
-            expect(result.content[1].text).toContain(
-                'Nothing changed in version 0.1 of john/my-actor, so nothing was written.',
+            expect(buildMock).not.toHaveBeenCalled();
+            expect(getUserInfoCached).not.toHaveBeenCalled();
+            expect(result.structuredContent).toEqual({ revision: await readRevision(), changed: false, changes: [] });
+            expect(result.content).toHaveLength(2);
+            expect(result.content[1].text).toBe(
+                'Nothing changed in version 0.1 of john/my-actor, so nothing was written.\nNothing changed, so no build was started.',
             );
         });
 

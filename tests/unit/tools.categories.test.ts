@@ -72,7 +72,7 @@ describe('getCategoryTools', () => {
             'tasks',
             'schedules',
             'builds',
-            'source',
+            'versions',
             'api',
             'dev',
         ];
