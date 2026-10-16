@@ -54,6 +54,7 @@ export const HELPER_TOOLS = {
     ACTOR_BUILD_LOG: 'get-actor-build-log',
     ACTOR_BUILD_LIST_GET: 'get-actor-build-list',
     ACTOR_CALL: 'call-actor',
+    ACTOR_CREATE: 'create-actor',
     ACTOR_CALL_WIDGET: 'call-actor-widget',
     ACTOR_DELETE: 'delete-actor',
     ACTOR_GET_DETAILS: 'fetch-actor-details',
@@ -70,6 +71,7 @@ export const HELPER_TOOLS = {
     ACTOR_TASK_PUBLISH: 'publish-actor-task',
     ACTOR_TASK_UNPUBLISH: 'unpublish-actor-task',
     ACTOR_VERSION_GET: 'get-actor-version',
+    ACTOR_VERSION_UPDATE: 'update-actor-version',
     DATASET_GET: 'get-dataset',
     DATASET_LIST_GET: 'get-dataset-list',
     DATASET_GET_ITEMS: 'get-dataset-items',
@@ -96,16 +98,17 @@ export type HelperToolName = (typeof HELPER_TOOLS)[keyof typeof HELPER_TOOLS];
 
 /**
  * Retired tool selectors: `add-actor` and `experimental` (add-actor was deleted in the stateless
- * migration), the deprecated `preview` pseudo-category, and `get-actor-log` (renamed to
- * `get-actor-run-log`). They name neither a registry category nor a real tool anymore, so they
- * resolve to nothing — never loaded, never treated as an Actor ID, never requiring a token by
- * themselves.
+ * migration), the deprecated `preview` pseudo-category, `get-actor-log` (renamed to
+ * `get-actor-run-log`), and the `source` category (renamed to `versions`). They name neither a
+ * registry category nor a real tool anymore, so they resolve to nothing — never loaded, never
+ * treated as an Actor ID, never requiring a token by themselves.
  */
 export const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set([
     'add-actor',
     'experimental',
     'preview',
     'get-actor-log',
+    'source',
 ]);
 
 /**
@@ -283,6 +286,7 @@ export const APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED = 'memory-limit-exceeded';
 export const APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS = 'cannot-start-actor-runs';
 export const APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK = 'cannot-publish-actor-task';
 export const APIFY_ERROR_TYPE_INVALID_INPUT = 'invalid-input';
+export const APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE = 'actor-name-not-unique';
 export const APIFY_ERROR_TYPE_PAGE_NOT_FOUND = 'page-not-found';
 
 // HTTP status codes

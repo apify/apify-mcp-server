@@ -4,6 +4,7 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
+import { getResourceByIdOrName } from '../../utils/apify_resource_id.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { respondAborted, respondUserError } from '../../utils/mcp.js';
 import { ABORT } from '../actors/actor_run_response.js';
@@ -18,7 +19,12 @@ import {
 } from './build_helpers.js';
 
 const buildActorArgs = z.object({
-    actor: z.string().min(1).describe('Actor ID or username/name'),
+    actor: z
+        .string()
+        .min(1)
+        .describe(
+            'The Actor to build: its ID, its name (resolved against your own Actors), or its full name as username/name or username~name.',
+        ),
     // Format is not enforced by a regex: AJV here drops `pattern`, and the lookup against the Actor's
     // versions below rejects anything that is not an existing MAJOR.MINOR version with a soft fail.
     versionNumber: z
@@ -74,9 +80,11 @@ export const buildActor: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client, apifyToken, loadedToolNames, signal, progressTracker } = toolArgs;
         const parsed = buildActorArgs.parse(args);
-        const actor = await client.actor(parsed.actor).get();
+        const actor = await getResourceByIdOrName(parsed.actor, async (safeId) => client.actor(safeId).get());
         if (!actor) {
-            return respondUserError(`Actor '${parsed.actor}' not found.`);
+            return respondUserError(
+                `Actor '${parsed.actor}' not found. The actor argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.`,
+            );
         }
         const versionNumbers = listVersionNumbers(actor);
         if (versionNumbers.length === 0) {

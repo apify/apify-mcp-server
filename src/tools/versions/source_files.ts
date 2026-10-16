@@ -74,6 +74,8 @@ export type SourceFile = {
     contentBytes: number;
     /** The content as returned: the text for utf8, the base64 for base64. */
     content: string;
+    /** The entry as stored, which a write sends back for a file it leaves alone. */
+    entry: ActorVersionSourceFile;
 };
 
 export function hasBinaryExtension(path: string): boolean {
@@ -93,14 +95,14 @@ export function compareSourcePaths(a: string, b: string): number {
 }
 
 /**
- * Identifies the file set: one `path\0hash\n` line per regular file, sorted by path. The stored format does not go
- * in, so a file stored as TEXT or as BASE64 gives the same revision.
+ * Identifies the file set: the JSON array of `[path, hash]` pairs of its regular files, sorted by path. JSON quotes
+ * each path and escapes quotes and control characters in it, so two different file sets never give the same text, as
+ * a stored name with NUL and a line break once did. The stored format does not go in, so a file stored as TEXT or as
+ * BASE64 gives the same revision.
  */
 export function buildFilesRevision(files: readonly Pick<SourceFile, 'path' | 'hash'>[]): string {
-    const lines = [...files]
-        .sort((a, b) => compareSourcePaths(a.path, b.path))
-        .map(({ path, hash }) => `${path}\0${hash}\n`);
-    return getSha256Prefix(lines.join(''));
+    const pairs = [...files].sort((a, b) => compareSourcePaths(a.path, b.path)).map(({ path, hash }) => [path, hash]);
+    return getSha256Prefix(JSON.stringify(pairs));
 }
 
 /**
@@ -113,7 +115,7 @@ export function buildInlineSourceFile(file: ActorVersionSourceFile): SourceFile 
     const content = storedContent ?? '';
     const path = posix.normalize(name);
     const bytes = Buffer.from(content, format === 'BASE64' ? 'base64' : 'utf8');
-    const common = { path, sizeBytes: bytes.length, hash: getSha256Prefix(bytes) };
+    const common = { path, sizeBytes: bytes.length, hash: getSha256Prefix(bytes), entry: file };
     if (format !== 'BASE64') {
         return { ...common, encoding: 'utf8', contentBytes: bytes.length, content };
     }

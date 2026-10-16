@@ -9,9 +9,10 @@ import {
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
+import { getResourceByIdOrName } from '../../utils/apify_resource_id.js';
 import { toIsoString } from '../actors/actor_run_response.js';
 import { anyJsonObjectSchema } from '../structured_output_schemas.js';
-import { getResourceByIdOrName, getTaskByIdOrName } from '../tasks/task_helpers.js';
+import { getTaskByIdOrName } from '../tasks/task_helpers.js';
 
 /** A schedule action as the API accepts it on create and update (the server-assigned `id` is optional). */
 type ApiScheduleAction = NonNullable<ScheduleCreateOrUpdateData['actions']>[number];
