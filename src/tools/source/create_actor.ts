@@ -30,8 +30,12 @@ const createActorArgs = z.object({
     title: z.string().min(1).optional().describe('Display title, for example My Scraper.'),
     description: z.string().optional().describe('A short description of what the Actor does.'),
     files: z.array(sourceFileArgs).min(1).describe("The Actor's files, each with its whole content."),
-    // The platform refuses a version without a number, so this defaults to what `apify push` uses.
-    versionNumber: z.string().default('0.0').describe('Number of the version in MAJOR.MINOR form. Default: 0.0.'),
+    versionNumber: z
+        .string()
+        .optional()
+        .describe(
+            'Number of the version in MAJOR.MINOR form. Default: the version in .actor/actor.json, or 0.0 when it has none.',
+        ),
     buildTag: z
         .string()
         .min(1)
@@ -83,6 +87,18 @@ function buildSourceFileEntries(files: readonly z.infer<typeof sourceFileArgs>[]
     return entries;
 }
 
+/** The `version` of .actor/actor.json when the file is JSON and the value a string, as `apify push` reads it. */
+function readActorJsonVersion(entries: readonly ActorVersionSourceFile[]): string | undefined {
+    const actorJson = entries.find(({ name, format }) => name === '.actor/actor.json' && format === 'TEXT');
+    if (!actorJson) return undefined;
+    try {
+        const { version } = JSON.parse(actorJson.content) as { version?: unknown };
+        return typeof version === 'string' ? version : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 /**
  * https://docs.apify.com/api/v2/actors-post
  *  /v2/actors
@@ -106,7 +122,7 @@ export const createActor: ToolEntry = Object.freeze({
 
         USAGE EXAMPLES:
         - user_input: Create an Actor called hacker-news-scraper from these files`,
-    // `fixZodSchemaRequired` strips `versionNumber` and `autoBuild` from `required` because they have defaults.
+    // `fixZodSchemaRequired` strips `autoBuild` from `required` because it has a default.
     inputSchema: fixZodSchemaRequired(z.toJSONSchema(createActorArgs)) as ToolInputSchema,
     outputSchema: createActorToolOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(createActorArgs)),
@@ -131,16 +147,19 @@ export const createActor: ToolEntry = Object.freeze({
         // A cancel before the POST creates nothing; per the MCP spec the cancelled request gets no response.
         if (signal?.aborted) return respondAborted();
         try {
+            const sourceFiles = buildSourceFileEntries(parsed.files);
+            // The platform refuses a version without a number, so this defaults to what `apify push` uses.
+            const versionNumber = parsed.versionNumber ?? readActorJsonVersion(sourceFiles) ?? '0.0';
             const created = await client.actors().create({
                 name: parsed.name,
                 ...(parsed.title !== undefined && { title: parsed.title }),
                 ...(parsed.description !== undefined && { description: parsed.description }),
                 versions: [
                     {
-                        versionNumber: parsed.versionNumber,
+                        versionNumber,
                         ...(parsed.buildTag !== undefined && { buildTag: parsed.buildTag }),
                         sourceType: ActorSourceType.SourceFiles,
-                        sourceFiles: buildSourceFileEntries(parsed.files),
+                        sourceFiles,
                     },
                 ],
             } satisfies ActorCollectionCreateOptions);

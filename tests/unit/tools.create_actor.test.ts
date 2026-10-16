@@ -65,8 +65,8 @@ type SentVersion = {
 
 /**
  * What the platform stores on create: the only version gets the build tag latest when none is sent, and
- * `.actor/actor.json` gets `name` set to the Actor name. The version number is not defaulted: the platform refuses a
- * version without one.
+ * `.actor/actor.json` gets `name` set to the Actor name, or stays as sent when it is not JSON. The version number is
+ * not defaulted: the platform refuses a version without one.
  */
 function buildStoredVersions(body: { name: string; versions: SentVersion[] }) {
     return body.versions.map((version) => ({
@@ -74,7 +74,12 @@ function buildStoredVersions(body: { name: string; versions: SentVersion[] }) {
         ...version,
         sourceFiles: version.sourceFiles.map((file) => {
             if (file.name !== '.actor/actor.json') return file;
-            const config = JSON.parse(file.content) as { name?: string };
+            let config: { name?: string };
+            try {
+                config = JSON.parse(file.content) as { name?: string };
+            } catch {
+                return file;
+            }
             if (config.name === body.name) return file;
             return { ...file, content: JSON.stringify({ ...config, name: body.name }, null, 4) };
         }),
@@ -739,6 +744,47 @@ describe('create-actor', () => {
         actorsCreateMock.mockRejectedValue(error);
 
         await expect(callTool({ files: [ACTOR_JSON] })).rejects.toBe(error);
+    });
+
+    describe('version number from .actor/actor.json', () => {
+        const actorJsonWith = (content: string) => ({ path: '.actor/actor.json', content });
+
+        it('takes the version of .actor/actor.json when versionNumber is not given', async () => {
+            const result = await callTool({
+                autoBuild: true,
+                files: [actorJsonWith('{"actorSpecification": 1, "name": "my-actor", "version": "0.1"}')],
+            });
+
+            expect(getSentVersion().versionNumber).toBe('0.1');
+            expect(result.structuredContent.versionNumber).toBe('0.1');
+            expect(buildMock).toHaveBeenCalledWith('0.1', { useCache: true });
+        });
+
+        it.each<[string, { path: string; content: string }[]]>([
+            ['no .actor/actor.json', [MAIN_JS]],
+            ['an actor.json without a version', [ACTOR_JSON]],
+            ['an actor.json whose version is not a string', [actorJsonWith('{"version": 0.1}')]],
+            ['an actor.json that is not JSON', [actorJsonWith('{"version": "0.1",')]],
+        ])('sends version 0.0 for %s', async (_, files) => {
+            const result = await callTool({ files });
+
+            expect(getSentVersion().versionNumber).toBe('0.0');
+            expect(result.structuredContent.versionNumber).toBe('0.0');
+        });
+
+        it('sends versionNumber when .actor/actor.json has another version', async () => {
+            await callTool({ versionNumber: '0.2', files: [actorJsonWith('{"version": "0.1"}')] });
+
+            expect(getSentVersion().versionNumber).toBe('0.2');
+        });
+
+        it('sends a version of .actor/actor.json that is not MAJOR.MINOR as is, for the API to refuse', async () => {
+            const error = apiError(400, 'Invalid version number.', 'invalid-input');
+            actorsCreateMock.mockRejectedValue(error);
+
+            await expect(callTool({ files: [actorJsonWith('{"version": "1.0.0"}')] })).rejects.toBe(error);
+            expect(getSentVersion().versionNumber).toBe('1.0.0');
+        });
     });
 
     describe('autoBuild', () => {
