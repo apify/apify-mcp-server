@@ -46,9 +46,11 @@ const PRECONDITION_REASON = {
 } as const;
 type PRECONDITION_REASON = (typeof PRECONDITION_REASON)[keyof typeof PRECONDITION_REASON];
 
-// Each operation and edit works on the whole file text, which can be close to 3 MiB, and the work blocks the event loop.
+// Each edit searches the whole text of its file, which can be close to 3 MiB, and blocks the event loop meanwhile: up
+// to about 20 ms for an oldText over 250 characters, so 20 edits take up to about 0.4 s. Writes and deletes never
+// search a stored file.
 const MAX_OPERATIONS_PER_CALL = 100;
-const MAX_EDITS_PER_CALL = 100;
+const MAX_EDITS_PER_CALL = 20;
 
 // One flat object with an explicit `type`: AJV's `removeAdditional` drops the fields of all but one branch of a
 // union, so the field each type needs is checked in code.

@@ -289,7 +289,7 @@ describe('update-actor-version', () => {
         const LINES_JS = {
             name: 'src/lines.js',
             format: 'TEXT',
-            content: Array.from({ length: 101 }, (_, index) => `line ${index};\n`).join(''),
+            content: Array.from({ length: 21 }, (_, index) => `line ${index};\n`).join(''),
         };
         const renameLines = (from: number, to: number) =>
             edit(
@@ -317,26 +317,26 @@ describe('update-actor-version', () => {
             expect(versionUpdateMock).not.toHaveBeenCalled();
         });
 
-        it('takes 100 edits in total across the edit operations', async () => {
+        it('takes 20 edits in total across the edit operations', async () => {
             mockFiles(LINES_JS);
 
-            await callTool({ operations: [renameLines(0, 50), renameLines(50, 100)] });
+            await callTool({ operations: [renameLines(0, 10), renameLines(10, 20)] });
 
             const [saved] = getPutFiles() as { content: string }[];
-            expect(saved.content).toContain('row 99;\nline 100;\n');
-            expect(saved.content).not.toContain('line 99;');
+            expect(saved.content).toContain('row 19;\nline 20;\n');
+            expect(saved.content).not.toContain('line 19;');
         });
 
-        it('refuses 101 edits in total across the edit operations without reading or writing the version', async () => {
+        it('refuses 21 edits in total across the edit operations without reading or writing the version', async () => {
             mockFiles(LINES_JS);
 
             const text = await callToolExpectingUserError({
                 autoBuild: true,
-                operations: [renameLines(0, 50), write('src/new.js', 'x'), renameLines(50, 101)],
+                operations: [renameLines(0, 10), write('src/new.js', 'x'), renameLines(10, 21)],
             });
 
             expect(text).toBe(
-                'Nothing was written: the operations have 101 edits in total, and one call takes at most 100. ' +
+                'Nothing was written: the operations have 21 edits in total, and one call takes at most 20. ' +
                     'Split them across calls.',
             );
             expect(actorGetMock).not.toHaveBeenCalled();
@@ -356,6 +356,27 @@ describe('update-actor-version', () => {
             expect(text).toBe(
                 `${failedWith(0, 'edit', 'src/big.txt', 'NO_MATCH')} oldText of edits[0] is not in the file.`,
             );
+        });
+
+        it('applies 20 edits with an oldText over 250 characters to a file of almost 3 MiB within 3 seconds', async () => {
+            // Each oldText is 300 a's and its own suffix, so it matches once, and the search reads the whole file: over
+            // the runs of a it keeps 300 characters matched and steps back one on every character.
+            const oldTexts = Array.from({ length: 20 }, (_, index) => `${'a'.repeat(300)}#${index};`);
+            const tail = oldTexts.join('');
+            const content = `${'a'.repeat(3 * 1024 * 1024 - 20_000 - tail.length)}${tail}`;
+            mockFiles({ name: 'src/big.txt', format: 'TEXT', content });
+
+            const startedAt = performance.now();
+            await callTool({
+                operations: oldTexts.map((oldText) =>
+                    edit('src/big.txt', { oldText, newText: oldText.replace('#', '@') }),
+                ),
+            });
+
+            // CI runs this file about 4.5x slower than locally; 100 edits take about 10 s there, over this bound.
+            expect(performance.now() - startedAt).toBeLessThan(3000);
+            const [saved] = getPutFiles() as { content: string }[];
+            expect(saved.content.slice(-tail.length)).toBe(tail.replaceAll('#', '@'));
         });
     });
 
