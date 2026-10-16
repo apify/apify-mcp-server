@@ -10,6 +10,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { respondAborted, respondUserError } from '../../utils/mcp.js';
+import { respondWithBuild } from '../builds/build_helpers.js';
 import { updateActorVersionToolOutputSchema } from '../structured_output_schemas.js';
 import type { SourceFile } from './source_files.js';
 import {
@@ -374,30 +375,33 @@ export const updateActorVersion: ToolEntry = Object.freeze({
                 applyOperation({ files: after, folderPaths }, operation, index);
             }
             const revision = buildFilesRevision([...after.values()]);
-            const changed = revision !== previousRevision;
             // A cancel during the read writes nothing; per the MCP spec the cancelled request gets no response.
             if (signal?.aborted) return respondAborted();
-            if (changed) {
-                // Console keeps an empty folder as an entry of its own, which goes back as it was.
-                const sourceFiles = [
-                    ...storedEntries.filter(isFolderEntry),
-                    ...[...after.values()].map(({ entry }) => entry),
-                ];
-                await client
-                    .actor(actor.id)
-                    .version(versionNumber)
-                    .update({ sourceType: ActorSourceType.SourceFiles, sourceFiles });
+            // Nothing to write, so autoBuild starts no build; the stored files may already be in the build runs use.
+            if (revision === previousRevision) {
+                return respondWithBuild({
+                    structuredContent: { revision, changed: false, changes: [] },
+                    summary: `Nothing changed in version ${versionNumber} of ${fullName}, so nothing was written.`,
+                    nextStep: parsed.autoBuild ? 'Nothing changed, so no build was started.' : 'No build was started.',
+                });
             }
+            // Console keeps an empty folder as an entry of its own, which goes back as it was.
+            const sourceFiles = [
+                ...storedEntries.filter(isFolderEntry),
+                ...[...after.values()].map(({ entry }) => entry),
+            ];
+            await client
+                .actor(actor.id)
+                .version(versionNumber)
+                .update({ sourceType: ActorSourceType.SourceFiles, sourceFiles });
             const changes = buildFileChanges(before, after);
             const emptyPaths = changes.flatMap(({ path }) => (after.get(path)?.sizeBytes === 0 ? [path] : []));
             return await respondAfterWrite({
                 toolArgs,
                 autoBuild: parsed.autoBuild,
                 target: { actorId: actor.id, versionNumber },
-                structuredContent: { revision, changed, changes, ...buildEmptyFilesWarnings(emptyPaths) },
-                summary: changed
-                    ? `Updated version ${versionNumber} of ${fullName}.`
-                    : `Nothing changed in version ${versionNumber} of ${fullName}, so nothing was written.`,
+                structuredContent: { revision, changed: true, changes, ...buildEmptyFilesWarnings(emptyPaths) },
+                summary: `Updated version ${versionNumber} of ${fullName}.`,
             });
         } catch (error) {
             return respondToSourceToolError(error);
