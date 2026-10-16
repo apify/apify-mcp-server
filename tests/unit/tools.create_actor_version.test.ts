@@ -598,6 +598,18 @@ describe('create-actor-version', () => {
             expect(buildMock).not.toHaveBeenCalled();
         });
 
+        it('refuses a path with a lone UTF-16 surrogate, and creates nothing', async () => {
+            expect(
+                await callToolExpectingUserError({
+                    autoBuild: true,
+                    files: [MAIN_JS, { path: 'src/a\uD83D.js', content: 'x' }],
+                }),
+            ).toBe('files[1] has a lone UTF-16 surrogate in its path, which UTF-8 cannot store.');
+            expect(versionsCreateMock).not.toHaveBeenCalled();
+            expectNoOtherWrite();
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+
         it('checks 20,000 files for repeated and colliding paths within a second', async () => {
             const files = Array.from({ length: 20_000 }, (_, i) => ({ path: `src/d${i % 50}/f${i}.js`, content: 'x' }));
 
