@@ -115,7 +115,7 @@ describe('search-actors-widget response', () => {
         expect(_meta).toBeUndefined();
     });
 
-    it('says that no Actors are past the offset, without keyword guidance', async () => {
+    it('describes an empty page at a later offset without saying the results ended', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([]);
 
         const result = await (searchActorsWidget as HelperTool).call(
@@ -131,7 +131,7 @@ describe('search-actors-widget response', () => {
         };
         expect(structuredContent).toEqual({ actors: [], query: SEARCH_KEYWORDS, count: 0, widgetActors: [] });
         expect(content).toEqual([
-            { type: 'text', text: `No Actors past offset 1 for the search query "${SEARCH_KEYWORDS}".` },
+            { type: 'text', text: `No Actors returned at offset 1 for the search query "${SEARCH_KEYWORDS}".` },
         ]);
         expect(_meta).toBeUndefined();
     });

@@ -124,11 +124,12 @@ export function buildSearchActorsResult(
 
 /**
  * Builds the empty-results guidance message for when no Actors are found.
- * Past offset 0 the query may have matched and the page only lies past the last result, so keyword
- * guidance does not apply (see apify/apify-mcp-server#1276).
+ * Past offset 0 the query may have matched, so keyword guidance does not apply (see apify/apify-mcp-server#1276).
+ * The text does not say the results ended: the Store filters results after paging, so an empty page can come
+ * before non-empty ones (see apify/apify-mcp-server#1593).
  */
 export function buildNoActorsFoundInstructions(keywords: string, offset: number): string {
-    if (offset > 0) return `No Actors past offset ${offset} for the search query "${keywords}".`;
+    if (offset > 0) return `No Actors returned at offset ${offset} for the search query "${keywords}".`;
     return dedent`
         No Actors were found for the search query "${keywords}".
         Keywords can include the named platform and/or data type (e.g. "TikTok posts").
