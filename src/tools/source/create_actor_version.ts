@@ -59,14 +59,14 @@ function formatSecretEnvVarsWarning(
     const names = secretNames.join(', ');
     if (!startedBuild) {
         return (
-            `These secret environment variables were not copied, so set them on version ${versionNumber} ` +
-            `in Apify Console; only a build made after that includes them: ${names}.`
+            `These secret environment variables were not copied; they can be set on version ${versionNumber} ` +
+            `in Apify Console, and only a build made after that includes them: ${names}.`
         );
     }
     const tag = startedBuild.buildTag === undefined ? '' : ` and, if it succeeds, takes tag ${startedBuild.buildTag}`;
     return (
         `These secret environment variables were not copied, so the build this call started runs without them${tag}. ` +
-        `Set them on version ${versionNumber} in Apify Console; only a build made after that includes them: ${names}.`
+        `They can be set on version ${versionNumber} in Apify Console, and only a build made after that includes them: ${names}.`
     );
 }
 

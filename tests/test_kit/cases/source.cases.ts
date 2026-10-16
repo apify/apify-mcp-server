@@ -765,7 +765,7 @@ export const sourceCases: Case[] = [
                     files: read.files,
                     warnings: [
                         'These files are empty, and the build skips empty files, so they will not exist in the build: src/blank.js.',
-                        'These secret environment variables were not copied, so set them on version 0.1 in Apify Console; only a build made after that includes them: SECRET_MODE.',
+                        'These secret environment variables were not copied; they can be set on version 0.1 in Apify Console, and only a build made after that includes them: SECRET_MODE.',
                     ],
                 });
                 // The warning names the secret, never its value.

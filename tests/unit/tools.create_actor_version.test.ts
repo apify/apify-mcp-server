@@ -273,7 +273,7 @@ describe('create-actor-version', () => {
                 revision: buildFilesRevision(files),
                 files,
                 warnings: [
-                    'These secret environment variables were not copied, so set them on version 0.2 in Apify Console; only a build made after that includes them: API_KEY.',
+                    'These secret environment variables were not copied; they can be set on version 0.2 in Apify Console, and only a build made after that includes them: API_KEY.',
                 ],
             });
             expect(result.structuredContent.revision).toBe(read.structuredContent.revision);
@@ -335,7 +335,7 @@ describe('create-actor-version', () => {
             expectSchemaConformingStructuredContent(result, createActorVersionToolOutputSchema);
             expect(result.structuredContent.warnings).toEqual([
                 'These files are empty, and the build skips empty files, so they will not exist in the build: src/__init__.py.',
-                'These secret environment variables were not copied, so set them on version 0.2 in Apify Console; only a build made after that includes them: API_KEY, TOKEN.',
+                'These secret environment variables were not copied; they can be set on version 0.2 in Apify Console, and only a build made after that includes them: API_KEY, TOKEN.',
             ]);
             expect(JSON.stringify(result)).not.toMatch(/abc123|secret-value/);
         });
@@ -718,8 +718,8 @@ describe('create-actor-version', () => {
                 version: {},
                 ending:
                     'If it holds the files of version 0.1, this call created it; get-actor-version reads its files. ' +
-                    'These secret environment variables were not copied, so set them on version 0.2 in Apify ' +
-                    'Console; only a build made after that includes them: API_KEY.',
+                    'These secret environment variables were not copied; they can be set on version 0.2 in Apify ' +
+                    'Console, and only a build made after that includes them: API_KEY.',
             },
             {
                 source: 'a copy of a version without secret env vars',
@@ -863,7 +863,7 @@ describe('create-actor-version', () => {
             // The build started without the secret, so the warning says only a later build includes it.
             expect(result.structuredContent.warnings).toEqual([
                 'These secret environment variables were not copied, so the build this call started runs without ' +
-                    'them. Set them on version 0.2 in Apify Console; only a build made after that includes them: ' +
+                    'them. They can be set on version 0.2 in Apify Console, and only a build made after that includes them: ' +
                     'API_KEY.',
             ]);
         });
@@ -883,8 +883,8 @@ describe('create-actor-version', () => {
             expect(result.structuredContent.warnings).toEqual([
                 'These files are empty, and the build skips empty files, so they will not exist in the build: src/__init__.py.',
                 'These secret environment variables were not copied, so the build this call started runs without ' +
-                    'them and, if it succeeds, takes tag beta. Set them on version 0.2 in Apify Console; only a build ' +
-                    'made after that includes them: API_KEY.',
+                    'them and, if it succeeds, takes tag beta. They can be set on version 0.2 in Apify Console, and ' +
+                    'only a build made after that includes them: API_KEY.',
             ]);
         });
 
@@ -906,7 +906,7 @@ describe('create-actor-version', () => {
 
             expect(result.structuredContent).not.toHaveProperty('build');
             expect(result.structuredContent.warnings).toEqual([
-                'These secret environment variables were not copied, so set them on version 0.2 in Apify Console; only a build made after that includes them: API_KEY.',
+                'These secret environment variables were not copied; they can be set on version 0.2 in Apify Console, and only a build made after that includes them: API_KEY.',
             ]);
             expect(result.content[1].text).toBe(`Created version 0.2 of john/my-actor.\n${nextStep}`);
         });
