@@ -7,13 +7,8 @@ import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { apifyApiDetailsOutputSchema } from '../structured_output_schemas.js';
-import {
-    findPathOperations,
-    formatApiPath,
-    formatList,
-    normalizeApiPath,
-    redactApiCallArgs,
-} from './apify_api_request.js';
+import { normalizeApiPath } from './apify_api_path.js';
+import { findPathOperations, formatApiPath, formatList, redactApiCallArgs } from './apify_api_request.js';
 import { API_METHODS, fetchApiOperationIndex } from './apify_api_spec.js';
 
 const apifyApiDetailsArgs = z.object({

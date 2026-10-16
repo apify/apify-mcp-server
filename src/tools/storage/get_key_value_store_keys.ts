@@ -54,7 +54,7 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, apifyToken } = toolArgs;
+        const { args, apifyClient: client, apifyToken, loadedToolNames } = toolArgs;
         const parsed = getKeyValueStoreKeysArgs.parse(args);
         const keyValueStoreId = stripQuoteWrappers(parsed.keyValueStoreId);
         const keys = await catchNotFound(
@@ -72,6 +72,7 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
             isTruncated: keys.isTruncated,
             nextExclusiveStartKey: keys.nextExclusiveStartKey,
             firstKey: keys.items[0]?.key,
+            loadedToolNames,
         });
         return buildStorageResponse({
             structuredContent: { keyValueStoreId, ...keys },

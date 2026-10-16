@@ -112,7 +112,10 @@ describe('get-dataset-schema', () => {
         expect(isError).not.toBe(true);
         expect(structuredContent.schema).toEqual({});
         expect(structuredContent.summary).not.toContain('is empty');
-        expect(structuredContent.nextStep).toContain('clean=false');
+        // States what clean=false does rather than telling the agent to call again (TOOL_GUIDELINES.md).
+        expect(structuredContent.nextStep).toBe(
+            `clean=false includes those items. Use ${HELPER_TOOLS.DATASET_GET} with datasetId=ds-1 to check itemCount and stats.`,
+        );
         expectSchemaConformingStructuredContent(result, datasetSchemaOutputSchema);
     });
 
@@ -161,5 +164,42 @@ describe('get-dataset-schema', () => {
         expect(content[0].text).toContain("Failed to generate schema for dataset 'ds-1'");
         expect(toolTelemetry).toEqual(expect.objectContaining({ toolStatus: TOOL_STATUS.FAILED }));
         expect(toolTelemetry?.failureCategory).not.toBe(FAILURE_CATEGORY.INVALID_INPUT);
+    });
+});
+
+// Regression: #1296 — nextStep named a sibling tool the session was not served.
+describe('get-dataset-schema nextStep gating', () => {
+    it.each([
+        {
+            name: 'nonempty output',
+            args: { datasetId: 'ds-1' },
+            response: { items: MOCK_ITEMS, total: 2 },
+            sibling: HELPER_TOOLS.DATASET_GET_ITEMS,
+            fallback: 'No follow-up step.',
+        },
+        {
+            name: 'empty output',
+            args: { datasetId: 'ds-1', clean: false },
+            response: { items: [], total: 0 },
+            sibling: HELPER_TOOLS.DATASET_GET,
+            fallback: 'No follow-up step.',
+        },
+        {
+            name: 'clean-filtered output',
+            args: { datasetId: 'ds-1' },
+            response: { items: [], total: 3 },
+            sibling: HELPER_TOOLS.DATASET_GET,
+            fallback: 'clean=false includes those items.',
+        },
+    ])('falls back on $name when $sibling is not loaded', async ({ args, response, sibling, fallback }) => {
+        const result = (await (getDatasetSchema as HelperTool).call(
+            stubToolCallContext(args, stubApifyClient(response), {
+                loadedToolNames: [HELPER_TOOLS.DATASET_SCHEMA_GET],
+            }),
+        )) as TextToolResult & { structuredContent: Record<string, unknown> };
+
+        expect(result.structuredContent.nextStep).toBe(fallback);
+        expect(JSON.stringify([result.content, result.structuredContent])).not.toContain(sibling);
+        expectSchemaConformingStructuredContent(result, datasetSchemaOutputSchema);
     });
 });

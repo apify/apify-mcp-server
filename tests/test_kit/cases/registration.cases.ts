@@ -7,11 +7,7 @@ import {
     getCategoryTools,
     getExpectedToolNamesByCategories,
 } from '@apify/actors-mcp-server/internals.js';
-import {
-    HELPER_TOOLS,
-    RESOURCE_MIME_TYPE,
-    SERVER_MODE_AUTO_DETECTION_ENABLED,
-} from '@apify/actors-mcp-server/internals/test-kit.js';
+import { RESOURCE_MIME_TYPE, SERVER_MODE_AUTO_DETECTION_ENABLED } from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
     ACTOR_NORMAL_MODE,
@@ -34,31 +30,35 @@ const SINGLE_NORMAL_MODE_ACTOR = [ACTOR_NORMAL_MODE];
 const DOCS_CATEGORY = ['docs'] as ToolCategory[];
 const DOCS_RUNS_STORAGE_CATEGORIES = ['docs', 'runs', 'storage'] as ToolCategory[];
 
-// Claude-connector `?tools=` allowlist (ai-team#214/#229). No call-actor. Duplicated in
-// tests/unit/helpers/claude_connector_tools.ts, not imported from there: tests/test_kit is its own
-// `tsc -b` project (see its tsconfig's `rootDir`) and cannot import outside itself.
+// Claude-connector `?tools=` allowlist (ai-team#214/#229), the exact listed URL. No call-actor.
+// abort-actor-run is named because the loader injects it with any Actor tool anyway; the listed URL
+// must show every served tool. Duplicated in tests/unit/helpers/claude_connector_tools.ts, not
+// imported from there: tests/test_kit is its own `tsc -b` project (see its tsconfig's `rootDir`)
+// and cannot import outside itself.
 const CLAUDE_CONNECTOR_TOOLS = [
-    HELPER_TOOLS.STORE_SEARCH,
-    HELPER_TOOLS.STORE_SEARCH_WIDGET,
-    HELPER_TOOLS.ACTOR_GET_DETAILS,
-    HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
-    HELPER_TOOLS.DOCS_SEARCH,
-    HELPER_TOOLS.DOCS_FETCH,
-    HELPER_TOOLS.ACTOR_RUNS_GET,
-    HELPER_TOOLS.ACTOR_RUN_LIST_GET,
-    HELPER_TOOLS.ACTOR_RUNS_LOG,
-    HELPER_TOOLS.ACTOR_RUNS_ABORT,
-    HELPER_TOOLS.DATASET_GET,
-    HELPER_TOOLS.DATASET_GET_ITEMS,
-    HELPER_TOOLS.DATASET_SCHEMA_GET,
-    HELPER_TOOLS.DATASET_LIST_GET,
-    HELPER_TOOLS.KEY_VALUE_STORE_GET,
-    HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
-    HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
-    HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET,
+    'search-actors',
+    'search-actors-widget',
+    'fetch-actor-details',
+    'fetch-actor-details-widget',
+    'search-apify-docs',
+    'fetch-apify-docs',
+    'get-actor-run',
+    'get-actor-run-list',
+    'get-actor-run-log',
+    'abort-actor-run',
+    'get-dataset',
+    'get-dataset-items',
+    'get-dataset-schema',
+    'get-dataset-list',
+    'get-key-value-store',
+    'get-key-value-store-keys',
+    'get-key-value-store-record',
+    'get-key-value-store-list',
     'apify/rag-web-browser',
+    'apify/website-content-crawler',
+    'apify/screenshot-url',
     'apify/web-fetch',
-    HELPER_TOOLS.PROBLEM_REPORT,
+    'report-problem',
 ];
 // Served tool names differ from CLAUDE_CONNECTOR_TOOLS's Actor selectors — map them here.
 const CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES = CLAUDE_CONNECTOR_TOOLS.map((selector) =>
@@ -66,9 +66,10 @@ const CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES = CLAUDE_CONNECTOR_TOOLS.map((selecto
 );
 // telemetry: true is explicit — the deployed target defaults it off, unlike this package's own default.
 // clientName: real Claude handshake name — exercises the blocklist bypass (client= URL tag doesn't gate it).
+// client: the listed URL's attribution tag.
 const CLAUDE_CONNECTOR_CLIENT_OPTIONS: SuiteClientOptions = {
     tools: CLAUDE_CONNECTOR_TOOLS,
-    client: 'claude connector',
+    client: 'claude',
     clientName: 'claude-ai',
     telemetry: { enabled: true },
 };
@@ -104,7 +105,7 @@ export const registrationCases: Case[] = [
         run: withClient({ telemetry: { enabled: true } }, async (client) => {
             const names = getToolNames(await client.listTools());
             expect(names).toHaveLength(8 + AUTO_INJECTED_TOOL_NAMES.length);
-            expect(names).toContain(HELPER_TOOLS.PROBLEM_REPORT);
+            expect(names).toContain('report-problem');
         }),
     },
     {
@@ -112,14 +113,15 @@ export const registrationCases: Case[] = [
         isDeploymentTest: true,
         run: withClient({ telemetry: { enabled: false } }, async (client) => {
             const names = getToolNames(await client.listTools());
-            expect(names).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+            expect(names).not.toContain('report-problem');
         }),
     },
     {
         // Pinned ?tools= wins for call-actor even with report-problem auto-inject live.
         // No ?ui=: apps mode comes from the client's own UI-capability advertisement (serverMode 'auto'), not a URL override.
-        name: 'Claude connector: pinned tool surface excludes call-actor, includes report-problem, tagged ?client=claude+connector',
-        isDeploymentTest: true,
+        // Not a deployment test: the exact set needs every pinned Actor on the target Apify API, and staging lacks some.
+        name: 'Claude connector: pinned tool surface excludes call-actor, includes report-problem, tagged ?client=claude',
+        isDeploymentTest: false,
         skipIf: () => !SERVER_MODE_AUTO_DETECTION_ENABLED,
         run: withClient(
             {
@@ -134,7 +136,7 @@ export const registrationCases: Case[] = [
                 expect(new Set(names)).toEqual(new Set(CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES));
 
                 const url = buildClientUrl('http://placeholder/', CLAUDE_CONNECTOR_CLIENT_OPTIONS);
-                expect(url.search.endsWith('client=claude+connector')).toBe(true);
+                expect(url.search.endsWith('client=claude')).toBe(true);
             },
         ),
     },
@@ -150,7 +152,7 @@ export const registrationCases: Case[] = [
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
             expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
             // get-actor-run should be automatically included when call-actor is present
-            expect(names).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
+            expect(names).toContain('get-actor-run');
         }),
     },
     {
@@ -304,7 +306,7 @@ export const registrationCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['docs', ...RETIRED_SELECTORS] }, async (client) => {
             const names = getToolNames(await client.listTools());
-            expect(names).toEqual([HELPER_TOOLS.DOCS_SEARCH, HELPER_TOOLS.DOCS_FETCH]);
+            expect(names).toEqual(['search-apify-docs', 'fetch-apify-docs']);
         }),
     },
     {
@@ -404,10 +406,10 @@ export const registrationCases: Case[] = [
             const client = await ctx.createClientFn({ tools: ['docs'], useEnv: true });
             try {
                 const toolNames = getToolNames(await client.listTools());
-                expect(toolNames).toContain(HELPER_TOOLS.DOCS_SEARCH);
-                expect(toolNames).toContain(HELPER_TOOLS.DOCS_FETCH);
-                expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_CALL);
-                expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
+                expect(toolNames).toContain('search-apify-docs');
+                expect(toolNames).toContain('fetch-apify-docs');
+                expect(toolNames).not.toContain('call-actor');
+                expect(toolNames).not.toContain('get-actor-run');
             } finally {
                 await client.close();
             }
@@ -420,11 +422,11 @@ export const registrationCases: Case[] = [
             const tools = await client.listTools();
             const names = tools.tools.map((t) => t.name);
 
-            const callIndex = names.indexOf(HELPER_TOOLS.ACTOR_CALL);
-            const runIndex = names.indexOf(HELPER_TOOLS.ACTOR_RUNS_GET);
-            const datasetIndex = names.indexOf(HELPER_TOOLS.DATASET_GET_ITEMS);
-            const kvIndex = names.indexOf(HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET);
-            const abortIndex = names.indexOf(HELPER_TOOLS.ACTOR_RUNS_ABORT);
+            const callIndex = names.indexOf('call-actor');
+            const runIndex = names.indexOf('get-actor-run');
+            const datasetIndex = names.indexOf('get-dataset-items');
+            const kvIndex = names.indexOf('get-key-value-store-record');
+            const abortIndex = names.indexOf('abort-actor-run');
 
             expect(callIndex).toBeGreaterThanOrEqual(0);
             expect(callIndex).toBeLessThan(runIndex);
@@ -439,7 +441,7 @@ export const registrationCases: Case[] = [
         run: withClient({ tools: ['docs'] }, async (client) => {
             const names = getToolNames(await client.listTools());
             for (const name of AUTO_INJECTED_TOOL_NAMES) expect(names).not.toContain(name);
-            expect(names).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
+            expect(names).not.toContain('get-actor-run');
         }),
     },
     {
@@ -472,8 +474,8 @@ export const registrationCases: Case[] = [
                 expect(tools.tools.length).toBeGreaterThan(0);
 
                 // Verify that apps-only internal tools are present in apps mode
-                expect(toolNames).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
-                expect(toolNames).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+                expect(toolNames).toContain('fetch-actor-details-widget');
+                expect(toolNames).toContain('search-actors-widget');
 
                 // Verify that tools have widget metadata when UI mode is enabled
                 expectWidgetToolMeta(tools);
@@ -490,8 +492,8 @@ export const registrationCases: Case[] = [
             const toolNames = getToolNames(tools);
             expect(tools.tools.length).toBeGreaterThan(0);
 
-            expect(toolNames).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
-            expect(toolNames).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+            expect(toolNames).toContain('fetch-actor-details-widget');
+            expect(toolNames).toContain('search-actors-widget');
 
             // Verify that tools have widget metadata when UI mode is enabled via URL parameter
             expectWidgetToolMeta(tools);
@@ -505,8 +507,8 @@ export const registrationCases: Case[] = [
             const toolNames = getToolNames(tools);
             expect(tools.tools.length).toBeGreaterThan(0);
 
-            expect(toolNames).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET);
-            expect(toolNames).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
+            expect(toolNames).toContain('fetch-actor-details-widget');
+            expect(toolNames).toContain('search-actors-widget');
             expectWidgetToolMeta(tools);
         }),
     },
@@ -518,8 +520,8 @@ export const registrationCases: Case[] = [
             const toolNames = getToolNames(tools);
 
             // When serverMode is enabled, default tools include call-actor, so get-actor-run should be included
-            expect(toolNames).toContain(HELPER_TOOLS.ACTOR_CALL);
-            expect(toolNames).toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
+            expect(toolNames).toContain('call-actor');
+            expect(toolNames).toContain('get-actor-run');
         }),
     },
     {
@@ -530,13 +532,13 @@ export const registrationCases: Case[] = [
             const toolNames = getToolNames(tools);
 
             // No actor tools selected — get-actor-run and its widget must not appear
-            expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET);
-            expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
+            expect(toolNames).not.toContain('get-actor-run');
+            expect(toolNames).not.toContain('get-actor-run-widget');
             // Docs tools should be present
-            expect(toolNames).toContain(HELPER_TOOLS.DOCS_SEARCH);
-            expect(toolNames).toContain(HELPER_TOOLS.DOCS_FETCH);
+            expect(toolNames).toContain('search-apify-docs');
+            expect(toolNames).toContain('fetch-apify-docs');
             // call-actor should NOT be present since only 'docs' was selected
-            expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+            expect(toolNames).not.toContain('call-actor');
         }),
     },
 ];

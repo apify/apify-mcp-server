@@ -1,6 +1,7 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ApifyClient as ApifyClientBase } from 'apify-client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
@@ -17,6 +18,9 @@ import {
     REPORT_PROBLEM_NUDGE,
     reportProblem,
 } from '../../src/tools/dev/report_problem.js';
+import { getActorRunList } from '../../src/tools/runs/get_actor_run_list.js';
+import { getDatasetList } from '../../src/tools/storage/get_dataset_list.js';
+import { getKeyValueStoreList } from '../../src/tools/storage/get_key_value_store_list.js';
 import type { ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
@@ -275,6 +279,18 @@ describe('CallToolRequestSchema handler', () => {
                 expect('internalToolStatus' in result).toBe(false);
             });
         });
+
+        it('ends a 404 failure with the API message and no generic hint', async () => {
+            await withServer(async (server) => {
+                silenceLogs();
+                const error = Object.assign(new Error('Actor run was not found'), { statusCode: 404 });
+                const result = await runSync(server, makeThrowingTool({ error }));
+                expect(result.isError).toBe(true);
+                expect(result.content).toEqual([
+                    { type: 'text', text: 'Error calling tool "test-throwing-tool": Actor run was not found.' },
+                ]);
+            });
+        });
     });
 
     it('rejects a task-augmented call to a tool without taskSupport before dispatch', async () => {
@@ -328,6 +344,37 @@ describe('CallToolRequestSchema handler', () => {
                 ),
             ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
             expect(received.called).toBe(false);
+        });
+    });
+
+    // Regression: #1479 — the API reads limit=0 as no limit and returns up to 1,000 items.
+    it.each([
+        [HELPER_TOOLS.ACTOR_RUN_LIST_GET, getActorRunList, 'runs'],
+        [HELPER_TOOLS.DATASET_LIST_GET, getDatasetList, 'datasets'],
+        [HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET, getKeyValueStoreList, 'keyValueStores'],
+    ] as const)('rejects an invalid %s limit before any API request', async (name, tool, method) => {
+        await withServer(async (server) => {
+            silenceLogs();
+            server.upsertTools([tool]);
+            vi.spyOn(getLegacyServer(server), 'sendLoggingMessage').mockResolvedValue(undefined);
+            const listSpy = vi.spyOn(ApifyClientBase.prototype, method).mockImplementation(() => {
+                throw new Error('stubbed');
+            });
+            const handler = getRequestHandler(server, 'tools/call');
+            const callWithLimit = async (limit: number) =>
+                handler(
+                    { method: 'tools/call', params: { name, arguments: { limit }, _meta: { mcpSessionId: 's1' } } },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                );
+
+            for (const limit of [0, -1, 1.5]) {
+                await expect(callWithLimit(limit)).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+            }
+            expect(listSpy).not.toHaveBeenCalled();
+
+            // Control: a valid limit reaches the spied client method.
+            await callWithLimit(1);
+            expect(listSpy).toHaveBeenCalled();
         });
     });
 

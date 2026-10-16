@@ -303,8 +303,8 @@ Legend for the **Enabled by default** column:
 | `update-actor-version` | source | Write, edit, or delete files of an Actor version in one all-or-nothing write. |  |
 | `apify-api-search` | api | Search the Apify API reference for operations by keywords. Returns each one's method, path, and docs page. |  |
 | `apify-api-details` | api | Get the parameters and request body schema of the Apify API operations on a path. |  |
-| `apify-api-read` | api | Send a GET request to any Apify API path, such as `actor-runs` or `/v2/actor-runs`, like `apify api` in the Apify CLI. |  |
-| `apify-api-write` | none (select by name: `tools=apify-api-write`) | Send a POST, PUT, PATCH, or DELETE request to any Apify API path, with a JSON body, like `apify api` in the Apify CLI. |  |
+| `apify-api-read` | api | Send a GET request to an Apify API path, such as `actor-runs` or `/v2/actor-runs`, like `apify api` in the Apify CLI. Read-only: it refuses the `method` query parameter and a GET to the synchronous run endpoints, which starts a paid run. |  |
+| `apify-api-write` | none (select by name: `tools=apify-api-write`) | Send a POST, PUT, PATCH, or DELETE request to any Apify API path, with a JSON body, like `apify api` in the Apify CLI. It refuses the `method` query parameter. |  |
 
 > **Note:**
 >
@@ -317,8 +317,10 @@ Legend for the **Enabled by default** column:
 All tools include metadata annotations to help MCP clients and LLMs understand tool behavior:
 
 - **`title`**: Short display name for the tool (e.g., "Search Actors", "Call Actor", "apify/rag-web-browser")
-- **`readOnlyHint`**: `true` for tools that only read data without modifying state (e.g., `get-dataset`, `fetch-actor-details`). Actor tools get it only for Apify-maintained Actors with limited permissions and no secret, writable storage, MCP connector, or code input (e.g., `apify--web-fetch`); other Actor tools are marked destructive.
+- **`readOnlyHint`**: `true` for tools that only read data without modifying state (e.g., `get-dataset`, `fetch-actor-details`). Actor tools get it only for Apify-maintained Actors with limited permissions and no accepted secret, writable storage, MCP connector, or code input (e.g., `apify--web-fetch`). Direct tools can restrict the original Actor inputs: `apify--website-content-crawler` excludes and rejects `pageFunction` and `initialCookies`, so it is read-only. Other Actor tools are marked destructive.
 - **`openWorldHint`**: `true` for tools that access external resources outside the Apify platform (e.g., `call-actor` executes external Actors). Tools that interact only with the Apify platform (like `search-actors` or `fetch-apify-docs`) do not have this hint.
+
+The direct `apify--website-content-crawler` tool defaults `respectRobotsTxtFile` to `true`; an explicit `false` is preserved. These restrictions and defaults apply only to the direct tool. `call-actor`, `call-actor-widget`, and `fetch-actor-details` retain the original Actor input contract.
 
 ### Tools configuration
 

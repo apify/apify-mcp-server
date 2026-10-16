@@ -4,14 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
+import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
+import { API_BLOCK_RULES } from '../../src/tools/api/apify_api_blocklist.js';
 import { apifyApiDetails } from '../../src/tools/api/apify_api_details.js';
+import { normalizeApiPath } from '../../src/tools/api/apify_api_path.js';
 import { apifyApiRead } from '../../src/tools/api/apify_api_read.js';
-import {
-    findClosestApiPaths,
-    findPathOperations,
-    normalizeApiPath,
-    redactApiCallArgs,
-} from '../../src/tools/api/apify_api_request.js';
+import { findClosestApiPaths, findPathOperations, redactApiCallArgs } from '../../src/tools/api/apify_api_request.js';
 import { apifyApiSearch } from '../../src/tools/api/apify_api_search.js';
 import type * as ApifyApiSpecModule from '../../src/tools/api/apify_api_spec.js';
 import { buildApiOperationIndex, fetchApiOperationIndex } from '../../src/tools/api/apify_api_spec.js';
@@ -64,6 +62,17 @@ async function callTool(tool: unknown, args: Record<string, unknown>, loadedTool
     return (await (tool as HelperTool).call(context)) as TextToolResult & { toolTelemetry?: ToolTelemetrySnapshot };
 }
 
+/** Calls a tool while a test-only rule is in the published list, so the tool and the index it loads apply it. */
+async function callToolWithRule(tool: unknown, rule: ApiBlockRule, args: Record<string, unknown>) {
+    const rules = API_BLOCK_RULES as ApiBlockRule[];
+    rules.push(rule);
+    try {
+        return await callTool(tool, args);
+    } finally {
+        rules.pop();
+    }
+}
+
 beforeEach(() => {
     // The tools check every URL against the configured API origin; pin it so the shell's
     // APIFY_API_BASE_URL does not fail the tests.
@@ -75,6 +84,12 @@ beforeEach(() => {
 afterEach(() => {
     vi.unstubAllEnvs();
 });
+
+const SYNC_RUN_REFUSAL =
+    'A GET to the synchronous run endpoints starts a paid run, as a POST does, so the API tools do not send it.';
+
+const METHOD_PARAM_REFUSAL =
+    'The API tools do not send the method query parameter: the API would take it as the HTTP method of the request.';
 
 /** The URL axios sends for the last request, with the query parameters added. */
 function readSentUrl(): string {
@@ -171,6 +186,18 @@ describe('apify-api-search', () => {
         });
     });
 
+    it.each(['run actor synchronously', 'run sync get dataset items'])(
+        'offers only the POST of the synchronous run endpoints for %j',
+        async (query) => {
+            const result = await callTool(apifyApiSearch, { query });
+
+            const { operations } = result.structuredContent as { operations: { method: string; path: string }[] };
+            const syncRuns = operations.filter(({ path }) => path.includes('run-sync'));
+            expect(syncRuns.length).toBeGreaterThan(0);
+            expect(new Set(syncRuns.map(({ method }) => method))).toEqual(new Set(['POST']));
+        },
+    );
+
     it('says so when nothing matches', async () => {
         const result = await callTool(apifyApiSearch, { query: 'zebra' });
 
@@ -247,6 +274,47 @@ describe('apify-api-details', () => {
         }
     });
 
+    it.each(['/v2/actors/{actorId}/run-sync', 'acts/john~my-actor/run-sync-get-dataset-items', 'actors/abc/run-sync'])(
+        'says the synchronous run endpoint %s has no GET operation, only the POST',
+        async (path) => {
+            const result = await callTool(apifyApiDetails, { path, method: 'GET' });
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toBe(
+                `The path /v2/${normalizeApiPath(path)} has no GET operation; it matches method POST.`,
+            );
+        },
+    );
+
+    it.each([
+        [{ path: '/v2/actors/{actorId}/run-sync' }, '/v2/actors/{actorId}/run-sync: POST.'],
+        [{ path: 'acts/john~my-actor/run-sync' }, '/v2/actors/{actorId}/run-sync: POST.'],
+        [
+            { path: 'actors/abc/run-sync-get-dataset-items', method: 'POST' },
+            '/v2/actors/{actorId}/run-sync-get-dataset-items: POST.',
+        ],
+    ])('returns only the POST of the synchronous run endpoint for %j', async (args, summary) => {
+        const result = await callTool(apifyApiDetails, args);
+
+        expectSchemaConformingStructuredContent(result, apifyApiDetailsOutputSchema);
+        expect(result.content[1].text).toBe(summary);
+    });
+
+    it('returns only the methods a test-only endpoint rule does not match', async () => {
+        const rule: ApiBlockRule = { match: { method: 'GET', path: '/v2/datasets/{datasetId}' }, reason: 'No.' };
+
+        const refused = await callToolWithRule(apifyApiDetails, rule, { path: 'datasets/abc', method: 'GET' });
+        const allowed = await callToolWithRule(apifyApiDetails, rule, { path: 'datasets/abc', method: 'PUT' });
+        const withoutMethod = await callToolWithRule(apifyApiDetails, rule, { path: 'datasets/abc' });
+
+        expectSoftFailInvalidInput(refused);
+        expect(refused.content[0].text).toBe(
+            'The path /v2/datasets/abc has no GET operation; it matches methods PUT and DELETE.',
+        );
+        expect(allowed.content[1].text).toBe('/v2/datasets/{datasetId}: PUT.');
+        expect(withoutMethod.content[1].text).toBe('/v2/datasets/{datasetId}: PUT, DELETE.');
+    });
+
     it('names the search tool on a path not in the spec only when the session has it', async () => {
         const withSearch = await callTool(apifyApiDetails, { path: 'acts/john/my-actor' });
         const withoutSearch = await callTool(apifyApiDetails, { path: 'acts/john/my-actor' }, [
@@ -263,23 +331,101 @@ describe('apify-api-details', () => {
 });
 
 describe('apify-api-read', () => {
-    it('is annotated as not read-only, since a GET can start a run', () => {
+    it('is annotated as read-only, idempotent, and not open-world, since it refuses the GETs that start a run or write', () => {
         expect(apifyApiRead.annotations).toMatchObject({
-            readOnlyHint: false,
+            readOnlyHint: true,
             destructiveHint: false,
-            idempotentHint: false,
+            idempotentHint: true,
+            openWorldHint: false,
         });
     });
 
-    it('says a GET can start a paid run and names call-actor only when the session has it', () => {
+    it('says a GET to the synchronous run endpoints is refused and names call-actor only when the session has it', () => {
         const withCallActor = apifyApiRead.buildDescription!(ALL_TOOLS_PRESENT);
         const withoutCallActor = apifyApiRead.buildDescription!(only(HELPER_TOOLS.API_READ));
-        const paidRun = 'A GET can start a paid Actor run, as the synchronous run endpoints do.';
+        const refused = 'A GET to the synchronous run endpoints is refused.';
 
         expect(apifyApiRead.description).toBe(withCallActor);
-        expect(withCallActor).toContain(`${paidRun} Run an Actor with ${HELPER_TOOLS.ACTOR_CALL}.`);
-        expect(withoutCallActor).toContain(paidRun);
+        expect(withCallActor).toContain(`${refused} Run an Actor with ${HELPER_TOOLS.ACTOR_CALL}.`);
+        expect(withoutCallActor).toContain(refused);
         expect(withoutCallActor).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+    });
+
+    it('gives no advice about synchronous runs, which it refuses', () => {
+        expect(apifyApiRead.description).toContain('waitForFinish above');
+        expect(apifyApiRead.description).not.toContain('prefer asynchronous runs');
+    });
+
+    it.each([
+        'actors/apify~hello-world/run-sync',
+        '/v2/acts/abc/run-sync-get-dataset-items?token=x',
+        'actors\\abc\\run-sync',
+    ])('refuses a GET to the synchronous run endpoint %j without a request', async (path) => {
+        const result = await callTool(apifyApiRead, { path });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(
+            `${SYNC_RUN_REFUSAL} Use ${HELPER_TOOLS.ACTOR_CALL} or ${HELPER_TOOLS.API_WRITE} instead.`,
+        );
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it("refuses a GET to a task's synchronous run endpoint without a request or naming call-actor", async () => {
+        const result = await callTool(apifyApiRead, { path: 'actor-tasks/john~my-task/run-sync' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(`${SYNC_RUN_REFUSAL} Use ${HELPER_TOOLS.API_WRITE} instead.`);
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it.each(['actors/abc/runs', 'actors/abc/runs/last', 'key-value-stores/abc/records/run-sync', 'actor-runs/abc'])(
+        'sends a GET to %j, which does not start a run',
+        async (path) => {
+            requestMock.mockResolvedValue(mockResponse(200, { data: {} }));
+
+            await callTool(apifyApiRead, { path });
+
+            expect(requestMock).toHaveBeenCalledTimes(1);
+            expect(readSentUrl()).toBe(`${BASE_URL}/${path}`);
+        },
+    );
+
+    it.each([
+        { path: 'datasets/abc', query: { method: 'DELETE' } },
+        { path: 'datasets/abc', query: { '[method]': 'DELETE' } },
+        { path: 'datasets/abc?method%5B%5D=DELETE' },
+    ])('refuses the method query parameter in %j without a request', async (args) => {
+        const result = await callTool(apifyApiRead, args);
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(`${METHOD_PARAM_REFUSAL} Use ${HELPER_TOOLS.API_WRITE} instead.`);
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('names the write tool in the refusal of the method query parameter only when the session has it', async () => {
+        const result = await callTool(apifyApiRead, { path: 'datasets/abc?method=DELETE' }, [HELPER_TOOLS.API_READ]);
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(METHOD_PARAM_REFUSAL);
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('refuses a path a test-only endpoint rule names, written with the /v2 prefix, without a request', async () => {
+        const rule: ApiBlockRule = { match: { method: 'GET', path: '/v2/datasets/{datasetId}' }, reason: 'No.' };
+
+        const result = await callToolWithRule(apifyApiRead, rule, { path: '/v2/datasets/abc' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe('No.');
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('sends a query parameter whose name only starts with method', async () => {
+        requestMock.mockResolvedValue(mockResponse(200, { data: {} }));
+
+        await callTool(apifyApiRead, { path: 'datasets/abc?methods=a', query: { methodName: 'b' } });
+
+        expect(readSentUrl()).toBe(`${BASE_URL}/datasets/abc?methods=a&methodName=b`);
     });
 
     it('sends one GET to the path and returns the body as the API sends it', async () => {
@@ -454,6 +600,20 @@ describe('apify-api-read', () => {
         expect(JSON.stringify(result)).not.toContain('test-token');
     });
 
+    it('redacts the proxy password read from /v2/users/me', async () => {
+        requestMock.mockResolvedValue(
+            mockResponse(200, { data: { id: 'user-1', proxy: { password: 'fake-proxy-password', groups: [] } } }),
+        );
+
+        const result = await callTool(apifyApiRead, { path: '/v2/users/me' });
+
+        expect(result.structuredContent).toMatchObject({
+            data: { data: { id: 'user-1', proxy: { password: '[REDACTED]', groups: [] } } },
+        });
+        expect(result.content[0].text).toBe(JSON.stringify(result.structuredContent));
+        expect(JSON.stringify(result)).not.toContain('fake-proxy-password');
+    });
+
     it.each([
         ['a text body', '"urlSigningSecretKey": "abc123"', 'text/plain', '"urlSigningSecretKey": "abc123"'],
         ['a number', 42, 'application/json', 42],
@@ -521,6 +681,20 @@ describe('apify-api-read', () => {
             type: 'page-not-found',
             message: `${sentence} The closest paths in the API spec: ${findClosestApiPaths(INDEX, 'datasets/abc/itemz').join(', ')}`,
         });
+    });
+
+    it('names the POST template of a synchronous run endpoint among the closest paths of a 404', async () => {
+        requestMock.mockResolvedValue(
+            mockResponse(404, { error: { type: 'page-not-found', message: 'Page not found.' } }),
+        );
+
+        const error = await callTool(apifyApiRead, { path: 'actors/abc/run-syncs' }).catch((thrown: unknown) => thrown);
+
+        expect(error).toMatchObject({
+            statusCode: 404,
+            message: expect.stringContaining('The closest paths in the API spec: '),
+        });
+        expect((error as Error).message).toContain('/v2/actors/{actorId}/run-sync');
     });
 
     it.each([
@@ -695,6 +869,14 @@ describe('apify-api-write', () => {
         });
     });
 
+    it('advises an asynchronous run without saying a synchronous run is refused, since it sends the POST', () => {
+        expect(apifyApiWrite.description).toContain('waitForFinish above');
+        expect(apifyApiWrite.description).toContain(
+            'Synchronous runs also outlast the 60-second tool-call timeout, so prefer asynchronous runs.',
+        );
+        expect(apifyApiWrite.description).not.toContain('refused');
+    });
+
     it('sends one request with the body serialized as JSON and returns the response', async () => {
         const body = { data: { id: 'abc', name: 'leads-2026' } };
         requestMock.mockResolvedValue(mockResponse(200, body));
@@ -758,6 +940,91 @@ describe('apify-api-write', () => {
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toBe(message);
         expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        { path: 'actors/apify~hello-world/run-sync', method: 'POST' },
+        { path: 'acts/abc/run-sync-get-dataset-items', method: 'POST' },
+        { path: 'actors//abc/RUN-SYNC/', method: 'POST' },
+        { path: 'actor-tasks/john~my-task/run-sync', method: 'POST' },
+        { path: 'actor-tasks/abc/run-sync-get-dataset-items', method: 'POST' },
+        // Without a method: the index leaves out the GET, so the POST is the path's only method.
+        { path: 'actors/apify~hello-world/run-sync' },
+        { path: 'acts/abc/run-sync-get-dataset-items' },
+    ])('sends a POST to the synchronous run endpoint for %j', async (args) => {
+        requestMock.mockResolvedValue(mockResponse(201, { data: { id: 'run-1' } }));
+
+        await callTool(apifyApiWrite, { ...args, body: {} });
+
+        expect(requestMock).toHaveBeenCalledTimes(1);
+        expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST', data: '{}' }));
+        expect(readSentUrl()).toBe(`${BASE_URL}/${args.path}`);
+    });
+
+    it.each([
+        { path: 'datasets/abc', method: 'PUT', query: { method: 'DELETE' }, body: { name: 'x' } },
+        { path: 'datasets/abc', method: 'PUT', query: { '[METHOD]': 'DELETE' }, body: { name: 'x' } },
+        { path: 'datasets/abc?method=DELETE', method: 'PUT', body: { name: 'x' } },
+        { path: 'datasets/abc?%6Dethod%5B%5D=delete', method: 'PUT', body: { name: 'x' } },
+    ])('refuses the method query parameter in %j without a request or the spec', async (args) => {
+        const result = await callTool(apifyApiWrite, args);
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(METHOD_PARAM_REFUSAL);
+        expect(requestMock).not.toHaveBeenCalled();
+        expect(fetchApiOperationIndex).not.toHaveBeenCalled();
+    });
+
+    it('refuses the method query parameter after it chooses the method, without a request', async () => {
+        const result = await callTool(apifyApiWrite, { path: 'actor-runs/abc/abort?method=DELETE' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(METHOD_PARAM_REFUSAL);
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('refuses a method a test-only endpoint rule names, without a request or the spec', async () => {
+        const rule: ApiBlockRule = { match: { method: 'DELETE', path: '/v2/datasets/{datasetId}' }, reason: 'No.' };
+
+        const result = await callToolWithRule(apifyApiWrite, rule, { path: '/v2/datasets/abc', method: 'DELETE' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe('No.');
+        expect(requestMock).not.toHaveBeenCalled();
+        expect(fetchApiOperationIndex).not.toHaveBeenCalled();
+    });
+
+    it('asks only for a write method a test-only endpoint rule does not match', async () => {
+        const rule: ApiBlockRule = { match: { method: 'DELETE', path: '/v2/datasets/{datasetId}' }, reason: 'No.' };
+
+        const result = await callToolWithRule(apifyApiWrite, rule, { path: '/v2/datasets/abc' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toContain('Specify a method for this path: PUT.');
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it('asks for the method when a test-only endpoint rule blocks another write method of the path', async () => {
+        const rule: ApiBlockRule = {
+            match: { method: 'POST', path: '/v2/request-queues/{queueId}/requests/batch' },
+            reason: 'No.',
+        };
+
+        const result = await callToolWithRule(apifyApiWrite, rule, { path: 'request-queues/q/requests/batch' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe('Specify a method for this path: DELETE.');
+        expect(requestMock).not.toHaveBeenCalled();
+    });
+
+    it("uses the path's only write method when a test-only endpoint rule blocks its GET", async () => {
+        const rule: ApiBlockRule = { match: { method: 'GET', path: '/v2/actors/{actorId}/run-sync' }, reason: 'No.' };
+        requestMock.mockResolvedValue(mockResponse(201, { data: {} }));
+
+        await callToolWithRule(apifyApiWrite, rule, { path: 'actors/apify~hello-world/run-sync' });
+
+        expect(requestMock).toHaveBeenCalledTimes(1);
+        expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST' }));
     });
 
     it('does not need the spec when the method is given, even for a path the spec does not list', async () => {
@@ -861,6 +1128,7 @@ describe('apify-api-write', () => {
                 { path: '/v2/key-value-stores/s/records/a%2FK', method: 'PUT', body },
                 client,
             );
+            expect(apifyApiWrite.ajvValidate(context.args)).toBe(true);
             return (await (apifyApiWrite as HelperTool).call(context)) as TextToolResult;
         };
 
@@ -870,10 +1138,15 @@ describe('apify-api-write', () => {
             await call('{"name":"x"}'),
             await call(' [{"key":"a"}] '),
             await call('"text"'),
+            await call(true),
+            await call(false),
+            await call(null),
+            await call([{ key: 'a' }]),
+            await call(undefined),
         ];
 
         expect(results.map((result) => result.structuredContent)).toEqual(
-            Array(5).fill(expect.objectContaining({ statusCode: 201, data: { data: {} } })),
+            Array(10).fill(expect.objectContaining({ statusCode: 201, data: { data: {} } })),
         );
         const url = 'https://api.apify.com/v2/key-value-stores/s/records/a%2FK';
         expect(sent).toEqual([
@@ -882,13 +1155,20 @@ describe('apify-api-write', () => {
             { url, data: '{"name":"x"}', contentType: 'application/json' },
             { url, data: '[{"key":"a"}]', contentType: 'application/json' },
             { url, data: '"text"', contentType: 'application/json' },
+            { url, data: 'true', contentType: 'application/json' },
+            { url, data: 'false', contentType: 'application/json' },
+            { url, data: 'null', contentType: 'application/json' },
+            { url, data: '[{"key":"a"}]', contentType: 'application/json' },
+            { url, data: undefined, contentType: 'application/x-www-form-urlencoded' },
         ]);
     });
 
     it.each(['text', '', '{"name":'])(
         'refuses the string body %j, which is not JSON, without a request',
         async (body) => {
-            const result = await callTool(apifyApiWrite, { path: 'datasets/abc', method: 'PUT', body });
+            const args = { path: 'datasets/abc', method: 'PUT', body };
+            expect(apifyApiWrite.ajvValidate(args)).toBe(true);
+            const result = await callTool(apifyApiWrite, args);
 
             expectSoftFailInvalidInput(result);
             expect(result.content[0].text).toBe(
@@ -930,7 +1210,7 @@ describe('apify-api-write', () => {
     it.each([
         { statusCode: 300, hint: '' },
         { statusCode: 400, hint: '' },
-        { statusCode: 429, hint: ' Rate limit exceeded, wait before retrying.' },
+        { statusCode: 429, hint: ' The Apify API rate limit was reached.' },
     ])(
         'reports a failed write whose error body is over the inline limit with its status $statusCode',
         async ({ statusCode, hint }) => {

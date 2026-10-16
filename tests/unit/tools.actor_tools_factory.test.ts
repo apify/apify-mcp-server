@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
+import { RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import type { ActorInfo, SchemaProperties } from '../../src/types.js';
+import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
+import { only } from './helpers/tool_context.js';
 
 type MockActorOptions = {
     actorPermissionLevel?: string;
     inputProperties?: Record<string, Pick<SchemaProperties, 'type'> & Partial<SchemaProperties>>;
+    inputRequired?: string[];
 };
 
 function buildInputProperties(inputProperties: MockActorOptions['inputProperties'] = {}) {
@@ -15,7 +20,7 @@ function buildInputProperties(inputProperties: MockActorOptions['inputProperties
 }
 
 function createMockActorInfo(actorFullName: string, options: MockActorOptions = {}): ActorInfo {
-    const { actorPermissionLevel, inputProperties } = options;
+    const { actorPermissionLevel, inputProperties, inputRequired } = options;
     const [username, name] = actorFullName.split('/');
     return {
         webServerMcpPath: null,
@@ -31,6 +36,7 @@ function createMockActorInfo(actorFullName: string, options: MockActorOptions = 
                     url: { type: 'string', title: 'URL', description: 'The URL to process' },
                     ...buildInputProperties(inputProperties),
                 },
+                required: inputRequired,
             },
         },
         actor: { id: 'test-actor-id', name, username, actorPermissionLevel } as ActorInfo['actor'],
@@ -45,6 +51,90 @@ async function getAnnotations(actorInfo: ActorInfo) {
 const LIMITED = { actorPermissionLevel: 'LIMITED_PERMISSIONS' };
 
 describe('getNormalActorsAsTools()', () => {
+    // Regression: #1513 — the validator required a property the platform fills from its default.
+    describe('input validation', () => {
+        const actorInfo = createMockActorInfo('apify/screenshot-url', {
+            inputProperties: {
+                delay: { type: 'integer', default: 0 },
+                waitUntil: { type: 'string', enum: ['load', 'networkidle2'] },
+                mode: { type: 'string', enum: ['a', 'b'], default: 'a' },
+                proxy: { type: 'object', editor: 'proxy', default: { useApifyProxy: true } },
+            },
+            inputRequired: ['url', 'delay', 'waitUntil', 'mode', 'proxy'],
+        });
+
+        it('accepts a call that omits a required property with a default', async () => {
+            const upstream = structuredClone(actorInfo);
+            const [tool] = await getNormalActorsAsTools([actorInfo]);
+            const args = { url: 'https://example.com', waitUntil: 'load' };
+
+            expect(tool.ajvValidate(args)).toBe(true);
+            expect(args).toEqual({ url: 'https://example.com', waitUntil: 'load' });
+            expect(actorInfo).toEqual(upstream);
+            expect(tool.inputSchema.required).toEqual(['url', 'waitUntil']);
+            expect(getToolPublicFieldOnly(tool).inputSchema.required).toEqual(tool.inputSchema.required);
+        });
+
+        it.each<[string, Partial<SchemaProperties>, boolean]>([
+            ['zero', { type: 'integer', default: 0, prefill: 100 }, true],
+            ['false', { type: 'boolean', default: false }, true],
+            ['null', { type: 'string', default: null }, true],
+            ['empty string', { type: 'string', default: '' }, true],
+            ['empty array', { type: 'array', default: [] }, true],
+            ['empty object', { type: 'object', default: {} }, true],
+            ['undefined', { type: 'string', default: undefined }, false],
+            ['prefill only', { type: 'string', prefill: 'example' }, false],
+        ])('validates omission with %s through the compiled Actor tool', async (_label, property, isValid) => {
+            const [tool] = await getNormalActorsAsTools([
+                createMockActorInfo('someone/defaults', {
+                    inputProperties: { value: { type: 'string', ...property } },
+                    inputRequired: ['value'],
+                }),
+            ]);
+            const args = {};
+
+            expect(tool.ajvValidate(args)).toBe(isValid);
+            expect(args).toEqual({});
+        });
+
+        it('validates supplied nested objects instead of filling their missing fields', async () => {
+            const [tool] = await getNormalActorsAsTools([
+                createMockActorInfo('someone/nested-defaults', {
+                    inputProperties: {
+                        settings: {
+                            type: 'object',
+                            default: { mode: 'a' },
+                            properties: buildInputProperties({ mode: { type: 'string', default: 'a' } }),
+                            required: ['mode'],
+                        },
+                    },
+                    inputRequired: ['settings'],
+                }),
+            ]);
+
+            expect(tool.ajvValidate({})).toBe(true);
+            expect(tool.ajvValidate({ settings: {} })).toBe(false);
+            expect(tool.ajvValidate({ settings: { mode: 'b' } })).toBe(true);
+        });
+
+        it('rejects a call that omits a required property without a default', async () => {
+            const [tool] = await getNormalActorsAsTools([actorInfo]);
+
+            expect(tool.ajvValidate({ url: 'https://example.com' })).toBe(false);
+            expect(tool.ajvValidate({ waitUntil: 'load' })).toBe(false);
+        });
+
+        it('rejects supplied defaulted properties of the wrong type or outside the enum', async () => {
+            const [tool] = await getNormalActorsAsTools([actorInfo]);
+
+            expect(tool.ajvValidate({ url: 'https://example.com', waitUntil: 'load', delay: 'soon' })).toBe(false);
+            expect(tool.ajvValidate({ url: 'https://example.com', waitUntil: 'load', mode: 'c' })).toBe(false);
+            expect(tool.ajvValidate({ url: 'https://example.com', waitUntil: 'load', proxy: 'not-an-object' })).toBe(
+                false,
+            );
+        });
+    });
+
     describe('annotations', () => {
         it.each(['apify/web-fetch', 'compass/crawler-google-places'])(
             'marks the Apify-maintained Actor %s read-only',
@@ -101,5 +191,111 @@ describe('getNormalActorsAsTools()', () => {
                 openWorldHint: true,
             });
         });
+    });
+
+    describe('direct Actor contract', () => {
+        const actorInfo = createMockActorInfo('apify/website-content-crawler', {
+            ...LIMITED,
+            inputProperties: {
+                respectRobotsTxtFile: { type: 'boolean', default: false },
+                pageFunction: { type: 'string', editor: 'hidden', default: '' },
+                initialCookies: { type: 'array', editor: 'json', isSecret: true },
+            },
+        });
+
+        it('serves restricted inputs and derives read-only annotations without changing the source', async () => {
+            const original = structuredClone(actorInfo);
+            const [tool] = await getNormalActorsAsTools([actorInfo]);
+            expect(tool.inputSchema.properties).not.toHaveProperty('pageFunction');
+            expect(tool.inputSchema.properties).not.toHaveProperty('initialCookies');
+            expect(tool.inputSchema.properties?.respectRobotsTxtFile).toMatchObject({ default: true });
+            expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+            expect(tool.description).toContain('pageFunction');
+            expect(tool.description).toContain('initialCookies');
+            expect(actorInfo).toEqual(original);
+        });
+
+        it('serves a plain object schema without composition keywords', async () => {
+            // OpenAI rejects a function schema with allOf/anyOf/oneOf/not at the top level, strict or not.
+            const [tool] = await getNormalActorsAsTools([actorInfo]);
+            for (const keyword of ['allOf', 'anyOf', 'oneOf', 'not'])
+                expect(tool.inputSchema).not.toHaveProperty(keyword);
+            expect(tool.ajvValidate({ url: 'https://example.com', respectRobotsTxtFile: false })).toBe(true);
+        });
+
+        it('removes denied fields from required', async () => {
+            const info = structuredClone(actorInfo);
+            info.definition.input!.required = ['url', 'initialCookies'];
+            const [tool] = await getNormalActorsAsTools([info]);
+            expect(tool.inputSchema.required).toEqual(['url']);
+            expect(tool.ajvValidate({ url: 'https://example.com' })).toBe(true);
+        });
+
+        it('retains permission checks and other secret inputs', async () => {
+            const fullPermissions = structuredClone(actorInfo);
+            fullPermissions.actor.actorPermissionLevel = 'FULL_PERMISSIONS';
+            const otherSecret = structuredClone(actorInfo);
+            otherSecret.definition.input!.properties.password = {
+                type: 'string',
+                title: 'Password',
+                description: 'Password',
+                isSecret: true,
+            };
+            for (const info of [fullPermissions, otherSecret]) {
+                expect(await getAnnotations(info)).toMatchObject({ readOnlyHint: false, destructiveHint: true });
+            }
+        });
+    });
+
+    describe('existing Actor presentation policies', () => {
+        it.each([true, false])('preserves RAG exposure and validation with isDirectTool %s', async (isDirectTool) => {
+            const actorInfo = createMockActorInfo(RAG_WEB_BROWSER, {
+                ...LIMITED,
+                inputProperties: {
+                    query: { type: 'string' },
+                    maxResults: { type: 'integer', default: 3 },
+                    outputFormats: { type: 'array', default: ['markdown'] },
+                    hiddenSecret: { type: 'string', isSecret: true },
+                },
+                inputRequired: ['query', 'maxResults'],
+            });
+            const original = structuredClone(actorInfo);
+            const [tool] = await getNormalActorsAsTools([actorInfo], { isDirectTool });
+            expect(Object.keys(tool.inputSchema.properties ?? {})).toEqual([
+                'query',
+                'maxResults',
+                'outputFormats',
+                'waitSecs',
+            ]);
+            expect(tool.inputSchema.required).toEqual(['query']);
+            const input = { query: 'apify', hiddenSecret: 'original-input' };
+            expect(tool.ajvValidate(input)).toBe(true);
+            expect(input).toEqual({ query: 'apify', hiddenSecret: 'original-input' });
+            expect(tool.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true });
+            expect(actorInfo).toEqual(original);
+        });
+
+        it.each([true, false])('preserves Web Fetch descriptions with isDirectTool %s', async (isDirectTool) => {
+            const actorInfo = createMockActorInfo(WEB_FETCH, { ...LIMITED });
+            const original = structuredClone(actorInfo);
+            const [tool] = await getNormalActorsAsTools([actorInfo], { isDirectTool });
+            expect(tool.description).toContain('Use this tool to fetch a specific http(s) URL');
+            expect(tool.inputSchema.properties?.url).toMatchObject({
+                description:
+                    'The URL to process http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.',
+            });
+            expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+            expect(actorInfo).toEqual(original);
+        });
+    });
+
+    // Regression: #1532 — the RAG description named apify/web-fetch when the session did not serve it.
+    it('names apify/web-fetch in the RAG description only when its tool is served', async () => {
+        const [tool] = await getNormalActorsAsTools([createMockActorInfo(RAG_WEB_BROWSER)]);
+        const ragTool = actorNameToToolName(RAG_WEB_BROWSER);
+        expect(tool.buildDescription!(only(ragTool, actorNameToToolName(WEB_FETCH)))).toContain(
+            'prefer the dedicated apify/web-fetch tool',
+        );
+        expect(tool.buildDescription!(only(ragTool))).not.toContain('web-fetch');
     });
 });

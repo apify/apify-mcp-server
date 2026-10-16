@@ -1,11 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildRunSuffix, createRunId, isNameFromRun, parseRunIdArg, validateRunId } from '../../evals/run_id.js';
+import {
+    buildRunSuffix,
+    createRunId,
+    isNameFromRun,
+    parseRunIdArg,
+    RUN_ID_MAX_LENGTH,
+    validateRunId,
+} from '../../evals/run_id.js';
 
 /** The longest run id CI produces: `<github.run_id>-<github.run_attempt>`. */
 const CI_RUN_ID = '35014680476-1';
 /** The platform's cap on a schedule or task name. */
 const MAX_RESOURCE_NAME_LENGTH = 63;
+/** The static-part budget evals/README.md documents for a `{{uniq}}` name. */
+const MAX_STATIC_NAME_LENGTH = 34;
 
 describe('createRunId()', () => {
     it('builds an id of lowercase letters and digits only', () => {
@@ -18,38 +27,43 @@ describe('createRunId()', () => {
 });
 
 describe('buildRunSuffix()', () => {
-    it('joins the run id and the trial into a dash-and-alphanumeric token', () => {
-        expect(buildRunSuffix('r3k9f2qa7c', 2)).toBe('r3k9f2qa7c-n10-t2');
-        expect(buildRunSuffix(CI_RUN_ID, 1)).toMatch(/^[a-z0-9-]+$/);
+    it('joins the run id, the trial and the attempt into a dash-and-alphanumeric token', () => {
+        expect(buildRunSuffix('r3k9f2qa7c', 2, 1)).toBe('r3k9f2qa7c-n10-t2r1');
+        expect(buildRunSuffix(CI_RUN_ID, 1, 1)).toMatch(/^[a-z0-9-]+$/);
     });
 
     it('leaves room for the static part of a name under the platform limit', () => {
-        const suffix = buildRunSuffix(CI_RUN_ID, 3);
+        const suffix = buildRunSuffix(CI_RUN_ID, 3, 1);
         expect(`eval-sched-add-${suffix}`.length).toBeLessThanOrEqual(MAX_RESOURCE_NAME_LENGTH);
+        // The documented budget: the longest static part with the longest accepted id, trial 99, attempt 2.
+        const longest = buildRunSuffix('a'.repeat(RUN_ID_MAX_LENGTH), 99, 2);
+        expect(`${'x'.repeat(MAX_STATIC_NAME_LENGTH)}-${longest}`.length).toBeLessThanOrEqual(MAX_RESOURCE_NAME_LENGTH);
     });
 
-    it('builds a different suffix per trial and per run', () => {
-        expect(buildRunSuffix(CI_RUN_ID, 1)).not.toBe(buildRunSuffix(CI_RUN_ID, 2));
-        expect(buildRunSuffix('35014680476-2', 1)).not.toBe(buildRunSuffix(CI_RUN_ID, 1));
+    it('builds a different suffix per trial, per attempt and per run', () => {
+        expect(buildRunSuffix(CI_RUN_ID, 1, 1)).not.toBe(buildRunSuffix(CI_RUN_ID, 2, 1));
+        expect(buildRunSuffix(CI_RUN_ID, 1, 1)).not.toBe(buildRunSuffix(CI_RUN_ID, 1, 2));
+        expect(buildRunSuffix('35014680476-2', 1, 1)).not.toBe(buildRunSuffix(CI_RUN_ID, 1, 1));
     });
 });
 
 describe('isNameFromRun()', () => {
-    it('matches a name this run created', () => {
-        expect(isNameFromRun(`eval-sched-add-${buildRunSuffix(CI_RUN_ID, 1)}`, CI_RUN_ID)).toBe(true);
-        expect(isNameFromRun(`eval-sched-add-${buildRunSuffix(CI_RUN_ID, 12)}`, CI_RUN_ID)).toBe(true);
+    it('matches a name this run created, on any trial or attempt', () => {
+        expect(isNameFromRun(`eval-sched-add-${buildRunSuffix(CI_RUN_ID, 1, 1)}`, CI_RUN_ID)).toBe(true);
+        expect(isNameFromRun(`eval-sched-add-${buildRunSuffix(CI_RUN_ID, 12, 1)}`, CI_RUN_ID)).toBe(true);
+        expect(isNameFromRun(`eval-sched-add-${buildRunSuffix(CI_RUN_ID, 1, 2)}`, CI_RUN_ID)).toBe(true);
     });
 
     it('does not match a longer run id that starts with this one', () => {
-        expect(isNameFromRun(`eval-sched-add-${buildRunSuffix('35014680476-12', 1)}`, CI_RUN_ID)).toBe(false);
+        expect(isNameFromRun(`eval-sched-add-${buildRunSuffix('35014680476-12', 1, 1)}`, CI_RUN_ID)).toBe(false);
     });
 
     it('does not match a longer run id that ends with this one', () => {
-        expect(isNameFromRun(`eval-sched-add-${buildRunSuffix('a-1', 1)}`, '1')).toBe(false);
+        expect(isNameFromRun(`eval-sched-add-${buildRunSuffix('a-1', 1, 1)}`, '1')).toBe(false);
     });
 
     it('does not match another run or an unrelated name', () => {
-        expect(isNameFromRun(`eval-sched-add-${buildRunSuffix('r8m1p4bz2q', 1)}`, CI_RUN_ID)).toBe(false);
+        expect(isNameFromRun(`eval-sched-add-${buildRunSuffix('r8m1p4bz2q', 1, 1)}`, CI_RUN_ID)).toBe(false);
         expect(isNameFromRun('eval-nightly-sum', CI_RUN_ID)).toBe(false);
     });
 
@@ -70,9 +84,10 @@ describe('validateRunId()', () => {
         expect(() => validateRunId('')).toThrow(/--run-id/);
     });
 
-    it('rejects an id longer than 20 characters', () => {
-        expect(() => validateRunId('a'.repeat(20))).not.toThrow();
-        expect(() => validateRunId('my-feature-branch-experiment-2026-10-07')).toThrow(/at most 20 characters, got 39/);
+    it('rejects an id longer than RUN_ID_MAX_LENGTH', () => {
+        expect(() => validateRunId('a'.repeat(RUN_ID_MAX_LENGTH))).not.toThrow();
+        expect(() => validateRunId('a'.repeat(RUN_ID_MAX_LENGTH + 1))).toThrow(/at most 18 characters, got 19/);
+        expect(() => validateRunId('my-feature-branch-experiment-2026-10-07')).toThrow(/at most 18 characters, got 39/);
     });
 });
 

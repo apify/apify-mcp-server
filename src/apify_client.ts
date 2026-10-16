@@ -2,7 +2,7 @@ import type { ApifyClientOptions } from 'apify-client';
 import { ApifyClient as _ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 
-import { MAX_INLINE_BYTES } from './const.js';
+import { API_PUBLIC_BASE_URL, API_PUBLIC_BASE_URL_STAGING, MAX_INLINE_BYTES, STAGING_MCP_HOSTNAME } from './const.js';
 import type { PaymentHeaders } from './payments/types.js';
 
 // Appended to the client's User-Agent via apify-client's userAgentSuffix option.
@@ -32,6 +32,17 @@ export function getApifyAPIBaseUrl(): string {
     return process.env.APIFY_API_BASE_URL || 'https://api.apify.com';
 }
 
+/**
+ * Apify API origin for every API URL handed to clients. Separate from `getApifyAPIBaseUrl()`, where requests
+ * go — the hosted server reaches the API through an internal host clients cannot resolve. Mirrors
+ * `getConsoleBaseUrl()` (`utils/console_link.ts`): `APIFY_API_PUBLIC_BASE_URL` when set, the staging API on
+ * the staging MCP host, production otherwise.
+ */
+export function getApifyAPIPublicBaseUrl(): string {
+    if (process.env.APIFY_API_PUBLIC_BASE_URL) return process.env.APIFY_API_PUBLIC_BASE_URL;
+    return process.env.HOSTNAME === STAGING_MCP_HOSTNAME ? API_PUBLIC_BASE_URL_STAGING : API_PUBLIC_BASE_URL;
+}
+
 export class ApifyClient extends _ApifyClient {
     constructor(options: ExtendedApifyClientOptions) {
         /**
@@ -57,6 +68,8 @@ export class ApifyClient extends _ApifyClient {
             ...(clientOptions as ApifyClientOptions),
             // Explicit baseUrl wins over env default.
             baseUrl: clientOptions.baseUrl ?? getApifyAPIBaseUrl(),
+            // Signed storage links (`getRecordPublicUrl`) are handed to clients, so they take the client-facing origin.
+            publicBaseUrl: clientOptions.publicBaseUrl ?? getApifyAPIPublicBaseUrl(),
             userAgentSuffix: USER_AGENT_ORIGIN,
             requestInterceptors: [(config) => ({ ...config, headers: { ...config.headers, ...staticHeaders } })],
         });

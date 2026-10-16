@@ -32,11 +32,13 @@ function stubApifyClient(opts: {
     record: unknown;
     store?: unknown;
     onGetRecordPublicUrl?: () => void;
+    /** Egress base URL of the SDK client (ends with `/v2`); `url` is built on it, as apify-client does. */
+    baseUrl?: string;
 }): InternalToolArgs['apifyClient'] {
-    const { record, store, onGetRecordPublicUrl } = opts;
+    const { record, store, onGetRecordPublicUrl, baseUrl = 'https://api.apify.com/v2' } = opts;
     return mockApifyClient({
         keyValueStore: (id: string) => ({
-            url: `https://api.apify.com/v2/key-value-stores/${id}`,
+            url: `${baseUrl}/key-value-stores/${id}`,
             getRecord: async (_key: string) => record,
             get: async () => store,
             getRecordPublicUrl: async (key: string) => {
@@ -185,6 +187,24 @@ describe('get-key-value-store-record', () => {
                 mimeType: 'application/pdf',
             },
         });
+    });
+
+    it('builds the embedded-resource URI on the client-facing origin when requests go to another host', async () => {
+        const bytes = Buffer.from([0x25, 0x50, 0x44, 0x46]);
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'kv-1', recordKey: 'report.pdf' },
+                stubApifyClient({
+                    record: { key: 'report.pdf', value: bytes, contentType: 'application/pdf' },
+                    baseUrl: 'http://api.internal.example:3333/v2',
+                }),
+            ),
+        );
+        const { content } = result as CallToolResult;
+
+        expect((content[0] as { resource: { uri: string } }).resource.uri).toBe(
+            'https://api.apify.com/v2/key-value-stores/kv-1/records/report.pdf',
+        );
     });
 
     it('returns a resource_link instead of inlining a binary record over the size limit', async () => {

@@ -6,15 +6,18 @@ import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSche
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { storageListOutputSchema } from '../structured_output_schemas.js';
-import { buildStorageListSummaryNextStep, buildStorageResponse } from './storage_helpers.js';
+import { buildStorageListSummaryNextStep, buildStorageResponse, resolveSiblingNextStep } from './storage_helpers.js';
 
 const getUserDatasetsListArgs = z.object({
     offset: z
         .number()
         .describe('Number of array elements that should be skipped at the start. Default is 0.')
         .default(0),
+    // min(1): the API reads limit=0 as "no limit" and returns up to 1,000 items.
     limit: z
         .number()
+        .int()
+        .min(1)
         .max(20)
         .describe('Maximum number of array elements to return. Default is 10. Maximum is 20.')
         .default(10),
@@ -66,7 +69,7 @@ export const getDatasetList: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client } = toolArgs;
+        const { args, apifyClient: client, loadedToolNames } = toolArgs;
         const parsed = getUserDatasetsListArgs.parse(args);
         const datasets = await client.datasets().list({
             limit: parsed.limit,
@@ -80,7 +83,12 @@ export const getDatasetList: ToolEntry = Object.freeze({
             offset: datasets.offset,
             noun: 'datasets',
             listToolName: HELPER_TOOLS.DATASET_LIST_GET,
-            inspectHint: `Use ${HELPER_TOOLS.DATASET_GET} with a datasetId from the list to inspect a dataset.`,
+            inspectHint: resolveSiblingNextStep(
+                HELPER_TOOLS.DATASET_GET,
+                loadedToolNames,
+                `Use ${HELPER_TOOLS.DATASET_GET} with a datasetId from the list to inspect a dataset.`,
+            ),
+            isNamedOnly: !parsed.unnamed,
         });
         return buildStorageResponse({
             structuredContent: datasets as unknown as Record<string, unknown>,

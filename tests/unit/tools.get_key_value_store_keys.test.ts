@@ -188,4 +188,41 @@ describe('get-key-value-store-keys', () => {
             `Apify Console: https://console.apify.com/storage/key-value-stores/kv-1\n${VERBATIM_LINKS_NUDGE}`,
         );
     });
+
+    // Regression: #1296 — nextStep named a sibling tool the session was not served.
+    describe('in a session served only get-key-value-store-keys', () => {
+        const narrowContext = (response: unknown) =>
+            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(vi.fn().mockResolvedValue(response)), {
+                loadedToolNames: [HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET],
+            });
+
+        it.each([
+            { name: 'a nonempty listing', response: MOCK_KEYS, sibling: HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET },
+            {
+                name: 'an empty listing',
+                response: { ...MOCK_KEYS, items: [], count: 0 },
+                sibling: HELPER_TOOLS.KEY_VALUE_STORE_GET,
+            },
+        ])('falls back on $name without naming $sibling', async ({ response, sibling }) => {
+            const result = (await (getKeyValueStoreKeys as HelperTool).call(
+                narrowContext(response),
+            )) as TextToolResult & {
+                structuredContent: Record<string, unknown>;
+            };
+
+            expect(result.structuredContent.nextStep).toBe('No follow-up step.');
+            expect(JSON.stringify([result.content, result.structuredContent])).not.toContain(sibling);
+            expectSchemaConformingStructuredContent(result, keyValueStoreKeysOutputSchema);
+        });
+
+        it('keeps the next-page hint on a truncated listing', async () => {
+            const result = (await (getKeyValueStoreKeys as HelperTool).call(
+                narrowContext({ ...MOCK_KEYS, isTruncated: true, nextExclusiveStartKey: 'OUTPUT' }),
+            )) as TextToolResult & { structuredContent: Record<string, unknown> };
+
+            expect(result.structuredContent.nextStep).toBe(
+                `Call ${HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET} again with exclusiveStartKey=OUTPUT to fetch the next page.`,
+            );
+        });
+    });
 });
