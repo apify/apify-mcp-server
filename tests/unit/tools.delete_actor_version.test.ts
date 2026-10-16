@@ -166,7 +166,7 @@ describe('delete-actor-version', () => {
                 'such as one of another version made with build-actor and tag latest.',
         },
     ])(
-        'takes the next step about a tag from the build it points to, not from the build tag of version $versionNumber',
+        'takes the note about a tag from the build it points to, not from the build tag of version $versionNumber',
         async ({ versionNumber, taggedBuilds, text }) => {
             actorGetMock.mockResolvedValue(mockActor({ taggedBuilds }));
 
@@ -213,7 +213,7 @@ describe('delete-actor-version', () => {
         expect(result.content[1].text).toBe('Deleted version 0.1 of john/my-actor.');
     });
 
-    it('names build-actor in the next step about the build tag only when the session has it', async () => {
+    it('names build-actor in the note about the build tag only when the session has it', async () => {
         const loadedToolNames = Object.values(HELPER_TOOLS).filter((name) => name !== HELPER_TOOLS.ACTOR_BUILD);
         const context = stubToolCallContext({ actor: 'john/my-actor', versionNumber: '0.1' }, stubClient, {
             loadedToolNames,
