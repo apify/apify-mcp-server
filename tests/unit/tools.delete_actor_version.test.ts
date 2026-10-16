@@ -27,7 +27,7 @@ const actorMock = vi.fn(() => ({ get: actorGetMock, version: versionMock, ...act
 const stubClient = { actor: actorMock } as unknown as InternalToolArgs['apifyClient'];
 
 type DeleteResult = TextToolResult & {
-    structuredContent: { actorId: string; fullName: string; versionNumber: string; deleted: boolean };
+    structuredContent: { actorId: string; fullName: string; versionNumber: string; deleted: boolean; tags: string[] };
     toolTelemetry?: ToolTelemetrySnapshot;
 };
 
@@ -131,17 +131,19 @@ describe('delete-actor-version', () => {
         // Tag latest points to build 0.1.3, which stays after the delete.
         {
             versionNumber: '0.1',
+            tags: ['latest'],
             text:
                 'Deleted version 0.1 of john/my-actor.\n' +
                 "Runs with tag latest still use the deleted version's build until each tag points to another build, " +
                 'such as one of another version made with build-actor and tag latest.',
         },
-        { versionNumber: '0.2', text: 'Deleted version 0.2 of john/my-actor.' },
+        { versionNumber: '0.2', tags: [], text: 'Deleted version 0.2 of john/my-actor.' },
     ])(
         'deletes only version $versionNumber of the Actor it resolved, with one DELETE',
-        async ({ versionNumber, text }) => {
+        async ({ versionNumber, tags, text }) => {
             const result = await callTool({ versionNumber });
 
+            expect(deleteActorVersionToolOutputSchema.required).toContain('tags');
             expectSchemaConformingStructuredContent(result, deleteActorVersionToolOutputSchema);
             // The Actor GET by the name given, then the DELETE by the Actor ID it returned.
             expect(actorMock.mock.calls).toEqual([['john/my-actor'], ['actor-1']]);
@@ -153,6 +155,7 @@ describe('delete-actor-version', () => {
                 fullName: 'john/my-actor',
                 versionNumber,
                 deleted: true,
+                tags,
             });
             expect(result.content[1].text).toBe(text);
         },
@@ -163,26 +166,29 @@ describe('delete-actor-version', () => {
         {
             versionNumber: '0.1',
             taggedBuilds: { latest: { buildId: 'build-2', buildNumber: '0.2.1' } },
+            tags: [],
             text: 'Deleted version 0.1 of john/my-actor.',
         },
         // Version 0.1 has the build tag latest, but was never built.
-        { versionNumber: '0.1', taggedBuilds: undefined, text: 'Deleted version 0.1 of john/my-actor.' },
+        { versionNumber: '0.1', taggedBuilds: undefined, tags: [], text: 'Deleted version 0.1 of john/my-actor.' },
         // Version 0.2 has no build tag, but build-actor gave one of its builds the tag latest.
         {
             versionNumber: '0.2',
             taggedBuilds: { latest: { buildId: 'build-2', buildNumber: '0.2.1' } },
+            tags: ['latest'],
             text:
                 'Deleted version 0.2 of john/my-actor.\n' +
                 "Runs with tag latest still use the deleted version's build until each tag points to another build, " +
                 'such as one of another version made with build-actor and tag latest.',
         },
     ])(
-        'takes the note about a tag from the build it points to, not from the build tag of version $versionNumber',
-        async ({ versionNumber, taggedBuilds, text }) => {
+        'takes the tags and the note about them from the build each tag points to, not from the build tag of version $versionNumber',
+        async ({ versionNumber, taggedBuilds, tags, text }) => {
             actorGetMock.mockResolvedValue(mockActor({ taggedBuilds }));
 
             const result = await callTool({ versionNumber });
 
+            expect(result.structuredContent.tags).toEqual(tags);
             expect(result.content[1].text).toBe(text);
         },
     );
@@ -200,6 +206,7 @@ describe('delete-actor-version', () => {
 
         const result = await callTool({ versionNumber: '0.1' });
 
+        expect(result.structuredContent.tags).toEqual(['latest', 'beta']);
         // build-actor takes one tag, so each tag needs its own build.
         expect(result.content[1].text).toBe(
             'Deleted version 0.1 of john/my-actor.\n' +
@@ -221,6 +228,7 @@ describe('delete-actor-version', () => {
 
         const result = await callTool({ versionNumber: '0.1' });
 
+        expect(result.structuredContent.tags).toEqual([]);
         expect(result.content[1].text).toBe('Deleted version 0.1 of john/my-actor.');
     });
 

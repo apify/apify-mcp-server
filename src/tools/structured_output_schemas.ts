@@ -695,8 +695,14 @@ export const deleteActorVersionToolOutputSchema = {
         fullName: { type: 'string', description: 'Actor full name, username/name' },
         versionNumber: { type: 'string', description: 'Number of the deleted version' },
         deleted: { type: 'boolean', description: 'Always true' },
+        tags: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+                'Tags that point to a build of the deleted version, empty when none; runs with such a tag still use that build',
+        },
     },
-    required: ['actorId', 'fullName', 'versionNumber', 'deleted'],
+    required: ['actorId', 'fullName', 'versionNumber', 'deleted', 'tags'],
 };
 
 /** Schema for update-actor-version: the new revision and what changed. */

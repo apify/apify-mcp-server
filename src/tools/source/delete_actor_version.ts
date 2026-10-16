@@ -109,7 +109,6 @@ export const deleteActorVersion: ToolEntry = Object.freeze({
                 }
                 throw error;
             }
-            const structuredContent = { actorId: actor.id, fullName, versionNumber, deleted: true };
             const summary = `Deleted version ${versionNumber} of ${fullName}.`;
             const buildTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD)
                 ? `${HELPER_TOOLS.ACTOR_BUILD} and `
@@ -119,6 +118,7 @@ export const deleteActorVersion: ToolEntry = Object.freeze({
             const tags = Object.entries(actor.taggedBuilds ?? {})
                 .filter(([, { buildNumber }]) => buildNumber?.startsWith(`${versionNumber}.`))
                 .map(([tag]) => tag);
+            const structuredContent = { actorId: actor.id, fullName, versionNumber, deleted: true, tags };
             // build-actor takes one tag, so the text names one build per tag.
             const text =
                 tags.length > 0

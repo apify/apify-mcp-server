@@ -822,6 +822,7 @@ export const sourceCases: Case[] = [
                     fullName: `${seeded.username}/${name}`,
                     versionNumber: '0.1',
                     deleted: true,
+                    tags: [],
                 });
                 // No tag points to a build of version 0.1, so no next step about one follows.
                 expect(deleteResult.content?.[1]?.text).toBe(`Deleted version 0.1 of ${seeded.username}/${name}.`);
