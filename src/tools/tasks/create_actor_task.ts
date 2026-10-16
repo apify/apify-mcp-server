@@ -5,9 +5,10 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { toSafeResourceId } from '../../utils/apify_resource_id.js';
 import { respondOk } from '../../utils/mcp.js';
 import { actorTaskOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
-import { publicConfigSchema, taskNameSchema, taskResult, toSafeResourceId } from './task_helpers.js';
+import { publicConfigSchema, taskNameSchema, taskResult } from './task_helpers.js';
 
 const createActorTaskArgs = z.object({
     actorId: z
