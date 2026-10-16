@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.18.4 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Describe Apify Store neutrally instead of judging requests ([#1602](https://github.com/apify/apify-mcp-server/pull/1602)) ([21f2c4c](https://github.com/apify/apify-mcp-server/commit/21f2c4ca8df035f455594ed8ce223b0bc82edd52)) by [@jirispilka](https://github.com/jirispilka), closes [#1598](https://github.com/apify/apify-mcp-server/issues/1598)
+- Describe an empty search page without saying the results ended ([#1600](https://github.com/apify/apify-mcp-server/pull/1600)) ([1cbde22](https://github.com/apify/apify-mcp-server/commit/1cbde2233218b09ad050f7e88000ee935f056852)) by [@jirispilka](https://github.com/jirispilka), closes [#1593](https://github.com/apify/apify-mcp-server/issues/1593)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.18.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.18.3) (2026-10-15)
 
 ### 🐛 Bug Fixes
