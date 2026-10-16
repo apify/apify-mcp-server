@@ -166,7 +166,7 @@ describe('reportProblem', () => {
             expect(nudgeCount(result)).toBe(0);
         });
 
-        it('appends the friction sentence for an INVALID_INPUT failure, such as not found or invalid input', () => {
+        it('appends the bug-or-friction sentence for an INVALID_INPUT failure, such as not found or invalid input', () => {
             const result = appendReportProblemNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
@@ -176,7 +176,7 @@ describe('reportProblem', () => {
                 errorResult().content[0],
                 {
                     type: 'text',
-                    text: `If this error was unclear or took several attempts to get past, you can report it to the Apify team with ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and what made it hard).`,
+                    text: `If this error looks like a bug, or was unclear or took several attempts to get past, you can report it to the Apify team with ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and what went wrong).`,
                 },
             ]);
         });

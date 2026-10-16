@@ -21,9 +21,9 @@ const ACKNOWLEDGEMENT = `Problem reported. Thank you — this helps the Apify te
 export const REPORT_PROBLEM_NUDGE = `If you cannot resolve this yourself, you can report it to the Apify team with \
 ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and this error).`;
 
-/** For INVALID_INPUT failures: a confusing error or several attempts are friction worth reporting. */
-export const REPORT_PROBLEM_INVALID_INPUT_NUDGE = `If this error was unclear or took several attempts to get past, you can \
-report it to the Apify team with ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and what made it hard).`;
+/** For INVALID_INPUT failures: some are real bugs (an Actor rejecting input that matches its schema), others friction worth reporting. */
+export const REPORT_PROBLEM_INVALID_INPUT_NUDGE = `If this error looks like a bug, or was unclear or took several attempts to get \
+past, you can report it to the Apify team with ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and what went wrong).`;
 
 /** Auth and approval failures are expected states the user resolves, not problems to report. */
 const NON_NUDGE_FAILURE_CATEGORIES = new Set<string>([
