@@ -1,6 +1,7 @@
 /**
  * `./test-kit` export. Internal imports shared cases and runs `isDeploymentTest: true` against
- * its live deploy. `vitest` is an optional peer — only `./test-kit` consumers need it.
+ * its live deploy. Consumers install `vitest` themselves. It is not declared as a peer: an optional
+ * `vitest` peer crashes `npm install` on npm 10 (`Cannot read properties of null (reading 'edgesOut')`).
  */
 export { createMcpStatelessClient, createMcpStreamableClient } from './mcp_client.js';
 export type { SuiteClientOptions } from './mcp_client.js';
