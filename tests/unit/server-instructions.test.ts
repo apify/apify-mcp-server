@@ -22,7 +22,9 @@ describe('getServerInstructions()', () => {
     it('mentions report-problem with a gentle, non-mandatory nudge when feedback is available', () => {
         const instructions = getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT);
         expect(instructions).toContain(HELPER_TOOLS.PROBLEM_REPORT);
-        expect(instructions).toContain('you can report it');
+        expect(instructions).toContain(
+            `If a tool or Actor fails, or a step is confusing or takes several attempts, you can report it with \`${HELPER_TOOLS.PROBLEM_REPORT}\`.`,
+        );
         // No hard directive — the directory review rejects MUST-style solicitation.
         expect(instructions).not.toContain('MUST');
         expect(instructions).not.toContain('Reporting problems and feedback');
