@@ -4,6 +4,7 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { getResourceByIdOrName } from '../../utils/apify_resource_id.js';
 import { respondRaw, respondUserError } from '../../utils/mcp.js';
 import { catchNotFound } from '../storage/storage_helpers.js';
 import { actorRunListOutputSchema } from '../structured_output_schemas.js';
@@ -14,7 +15,7 @@ const getUserRunsListArgs = z.object({
         .min(1)
         .optional()
         .describe(
-            'Only list runs of this Actor: its ID, or its full name as username/name or username~name. A name without the username is not enough.',
+            'Only list runs of this Actor: its ID, its name (resolved against your own Actors), or its full name as username/name or username~name.',
         ),
     offset: z
         .number()
@@ -79,11 +80,18 @@ USAGE EXAMPLES:
             desc: parsed.desc,
             status: parsed.status,
         };
+        // The list endpoint takes the Actor as `~name` too, so a name is resolved without a separate Actor read.
         const runs = parsed.actorId
-            ? await catchNotFound(apifyClient.actor(parsed.actorId).runs().list(listOptions))
+            ? await getResourceByIdOrName(
+                  parsed.actorId,
+                  async (safeId) =>
+                      (await catchNotFound(apifyClient.actor(safeId).runs().list(listOptions))) ?? undefined,
+              )
             : await apifyClient.runs().list(listOptions);
         if (!runs) {
-            return respondUserError(`Actor '${parsed.actorId}' not found.`);
+            return respondUserError(
+                `Actor '${parsed.actorId}' not found. The actorId argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.`,
+            );
         }
         return respondRaw({
             content: [{ type: 'text', text: JSON.stringify(runs) }],
