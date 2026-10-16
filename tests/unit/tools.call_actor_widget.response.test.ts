@@ -12,7 +12,8 @@ import { mockApifyClient, stubToolCallContext, type TextToolResult } from './hel
  * (widget) that tracks progress. Carries widget `_meta` on both the tool definition and
  * the response.
  */
-vi.mock('../../src/utils/actor.js', () => ({
+vi.mock('../../src/utils/actor.js', async () => ({
+    ...(await vi.importActual<Record<string, unknown>>('../../src/utils/actor.js')),
     getActorToolResolutionCached: vi.fn(),
 }));
 

@@ -83,6 +83,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 - `../utils/apify_resource_id.ts` holds the helpers that resolve an Actor, task, or schedule given by ID or
   name, where a name alone means one of the caller's own. The task, schedule, and versions tools use them,
   and so do `build-actor` and the `actorId` filter of `get-actor-build-list` and `get-actor-run-list`.
+  `call-actor` (and `call-actor-widget`, which shares its pre-execution) and `fetch-actor-details` go through
+  `getActorByIdOrName` in `../utils/actor.ts`, which turns a name alone into `username/name` with an uncached
+  read, so `~name` never keys `actorDefinitionCache`, and resolves nothing under a payment provider.
 
 ## Rules when editing here
 

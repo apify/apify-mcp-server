@@ -11,6 +11,7 @@ import type {
     ToolInputSchema,
 } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
+import { getActorByIdOrName, isOwnActorLookup, OWN_ACTOR_NOT_FOUND_FACT } from '../../utils/actor.js';
 import {
     type ActorDetailsResult,
     buildCardOptions,
@@ -103,19 +104,20 @@ export const fetchActorDetailsToolArgsSchema = z.object({
     actor: z
         .string()
         .min(1)
-        .describe(`Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".`),
+        .describe(
+            'The Actor: its ID, its name (resolved against your own Actors), or its full name as username/name or username~name (e.g., "apify/rag-web-browser"). A name without a username always means one of your own Actors, never an Actor from Apify Store.',
+        ),
     output: actorDetailsOutputOptionsSchema
         .optional()
         .describe('Specify which information to include in the response to save tokens.'),
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    return dedent`Get detailed information about an Actor by its ID or full name (format: "username/name", e.g., "apify/rag-web-browser").
+    return dedent`Get detailed information about an Actor by its ID, its name (resolved against your own Actors), or its full name (format: "username/name", e.g., "apify/rag-web-browser").
 
-Requires the exact ID or full name — do not construct a plausible-looking name and call this tool with it.${
+A name without a username means one of your own Actors, never an Actor from Apify Store. Requires the exact ID or name — do not construct a plausible-looking name and call this tool with it.${
         hasTool(HELPER_TOOLS.STORE_SEARCH)
-            ? ` If you only have a description, a partial name, or a name you have not seen in this conversation, \
-find it with ${HELPER_TOOLS.STORE_SEARCH} first.`
+            ? ` ${HELPER_TOOLS.STORE_SEARCH} finds an Apify Store Actor from a description or a partial name.`
             : ''
     }
 
@@ -139,14 +141,21 @@ EXAMPLES:
  * tool that does not exist.
  * See apify/apify-mcp-server#1296.
  */
-export function buildActorNotFoundResponse(actorName: string, loadedToolNames: readonly string[]): ToolResponse {
+export function buildActorNotFoundResponse(
+    actorName: string,
+    loadedToolNames: readonly string[],
+    { isOwnActorName = false }: { isOwnActorName?: boolean } = {},
+): ToolResponse {
     const recovery = loadedToolNames.includes(HELPER_TOOLS.STORE_SEARCH)
         ? `\nSearch for the Actor by keyword with ${HELPER_TOOLS.STORE_SEARCH} rather than trying another spelling.`
         : '';
+    const reason = isOwnActorName
+        ? OWN_ACTOR_NOT_FOUND_FACT
+        : 'Please verify Actor ID or name format and ensure that the Actor exists.';
     return respondUserError(
         dedent`
             Actor information for '${actorName}' was not found.
-            Please verify Actor ID or name format and ensure that the Actor exists.
+            ${reason}
         ` + recovery,
     );
 }
@@ -256,7 +265,10 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         loadedActorIds,
     } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
-    const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_GET_DETAILS });
+    const requestedActorName = fixActorNameInputAndLog(parsed.actor, {
+        mcpSessionId,
+        route: HELPER_TOOLS.ACTOR_GET_DETAILS,
+    });
 
     const resolvedOutput = resolveOutputOptions(parsed.output);
     // Skip the /users/me round-trip when pricing isn't rendered (e.g. inputSchema-only
@@ -269,10 +281,20 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     // Console UI tokens hit the same cached users/me lookup; non-UI tokens short-circuit.
     const linkContext = await getConsoleLinkContext(apifyToken, apifyClient);
     const cardOptions = { ...buildCardOptions(resolvedOutput), userTier: userPlanTier, linkContext };
-    const details = await fetchActorDetailsFromApi(apifyClient, actorName, cardOptions);
-    if (!details) {
-        return buildActorNotFoundResponse(actorName, loadedToolNames);
+    const lookup = await getActorByIdOrName({
+        actorIdOrName: requestedActorName,
+        apifyClient,
+        paymentProvider,
+        fetch: async (actorKey) => fetchActorDetailsFromApi(apifyClient, actorKey, cardOptions),
+    });
+    if (!lookup) {
+        return buildActorNotFoundResponse(requestedActorName, loadedToolNames, {
+            isOwnActorName: isOwnActorLookup(requestedActorName, paymentProvider),
+        });
     }
+    // The MCP tool listing and the hosted server's output schema store get the key the Actor was found under: a name
+    // alone became `username/name`, and `~name` must not reach the shared definition cache.
+    const { actorKey: actorName, actor: details } = lookup;
 
     let actorOutputSchema: Record<string, unknown> | null | undefined;
     if (resolvedOutput.outputSchema) {

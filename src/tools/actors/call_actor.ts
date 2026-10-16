@@ -19,7 +19,13 @@ import { withRemoteMcpClient } from '../../mcp/remote_tool_call.js';
 import type { PaymentProvider } from '../../payments/types.js';
 import type { ApifyToken, InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ACTOR_TOOL_MODE, ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
-import { getActorDefinitionCached, getActorToolResolutionCached } from '../../utils/actor.js';
+import {
+    getActorByIdOrName,
+    getActorDefinitionCached,
+    getActorToolResolutionCached,
+    isOwnActorLookup,
+    OWN_ACTOR_NOT_FOUND_FACT,
+} from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
 import {
     ACTOR_RUN_LIMIT_MESSAGE,
@@ -137,7 +143,7 @@ export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOL
         ...(hasTool(HELPER_TOOLS.STORE_SEARCH)
             ? [
                   '',
-                  `If the actor name is not in "username/name" format, use ${HELPER_TOOLS.STORE_SEARCH} to resolve the correct Actor first.`,
+                  `A name without a username means one of your own Actors, never an Actor from Apify Store; ${HELPER_TOOLS.STORE_SEARCH} returns the full "username/name" of Store Actors.`,
               ]
             : []),
     ].join('\n');
@@ -188,17 +194,24 @@ function respondStandbyRejection(
  * Canonical "Actor not found" answer, shared by the run path and the `actor:toolName` route so an
  * unknown Actor gets the same response regardless of call shape.
  */
-function respondActorNotFound(actorName: string, loadedToolNames: readonly string[]): ToolResponse {
+function respondActorNotFound(
+    actorName: string,
+    loadedToolNames: readonly string[],
+    { isOwnActorName = false }: { isOwnActorName?: boolean } = {},
+): ToolResponse {
     // See apify/apify-mcp-server#1296.
     // Only search-actors: the Actor does not exist, so buildCallFailureRecoveryHint's second
     // offer (get Actor details) would send the model to a lookup that fails the same way.
     const recovery = loadedToolNames.includes(HELPER_TOOLS.STORE_SEARCH)
         ? `\nYou can search for available Actors using the tool: ${HELPER_TOOLS.STORE_SEARCH}.`
         : '';
+    const reason = isOwnActorName
+        ? OWN_ACTOR_NOT_FOUND_FACT
+        : 'Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.';
     return respondUserError(
         dedent`
             Actor '${actorName}' was not found.
-            Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
+            ${reason}
         ` + recovery,
         { httpStatus: 404, detail: `Actor '${actorName}' was not found` },
     );
@@ -308,7 +321,8 @@ export const callOptionsSchema = z.object({
 /** Zod schema for call-actor arguments — shared between default and apps variants. */
 export const callActorArgs = z.object({
     actor: z.string().describe(dedent`
-            The Actor to call: its ID, or its name in the "username/name" form (e.g., "apify/rag-web-browser").
+            The Actor to call: its ID, its name (resolved against your own Actors), or its full name as username/name or username~name (e.g., "apify/rag-web-browser").
+            A name without a username always means one of your own Actors, never an Actor from Apify Store.
 
             For MCP server Actors, use format "actorName:toolName" to call a specific tool (e.g., "username/name:tool-name").
         `),
@@ -348,7 +362,8 @@ export type CallActorParsedArgs = z.infer<typeof callActorArgs>;
  * generic payment-required short-circuit in the tool-call handler so the
  * agent receives the precise reason instead of a generic 402.
  *
- * Uses `actorDefinitionCache` — one definition fetch on a cold cache.
+ * Uses `actorDefinitionCache` — one definition fetch on a cold cache. Checks the name as given: under a payment
+ * provider `callActorPreExecute` does not resolve a name alone either (`isOwnActorLookup`), so both read the same Actor.
  */
 export async function checkPaymentProviderStandbyConflict(params: {
     actorName: string;
@@ -572,18 +587,31 @@ export async function callActorPreExecute(
           mcpToolName: string | undefined;
       }
 > {
-    const { args, apifyToken, mcpSessionId, loadedToolNames } = toolArgs;
+    const { args, apifyToken, apifyClient, paymentProvider, mcpSessionId, loadedToolNames } = toolArgs;
     const parsedArgs = callActorArgs.parse(args);
     const actorName = fixActorNameInputAndLog(parsedArgs.actor, { mcpSessionId, route: options.route });
     const parsed: CallActorParsedArgs = { ...parsedArgs, actor: actorName };
 
-    const { baseActorName, mcpToolName } = resolveActorContext(parsed.actor);
+    const { baseActorName: requestedActorName, mcpToolName } = resolveActorContext(parsed.actor);
 
     // For definition resolution we always use a token-based client; payment provider is only for actual Actor runs.
     // Standby/MCP-server Actors under a third-party payment provider are rejected upstream by
-    // `checkPaymentProviderStandbyConflict` — see src/mcp/tool_call_engine.ts.
+    // `checkPaymentProviderStandbyConflict` — see src/mcp/tool_call_engine.ts. `apifyClient` reads `~name` only
+    // without a payment provider, when it is token-based too.
     const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
-    const resolution = await getActorToolResolutionCached(baseActorName, apifyClientForDefinition);
+    const lookup = await getActorByIdOrName({
+        actorIdOrName: requestedActorName,
+        apifyClient,
+        paymentProvider,
+        fetch: async (actorKey) => getActorToolResolutionCached(actorKey, apifyClientForDefinition),
+    });
+    if (!lookup && isOwnActorLookup(requestedActorName, paymentProvider)) {
+        return { earlyResponse: respondActorNotFound(requestedActorName, loadedToolNames, { isOwnActorName: true }) };
+    }
+    // The run, the MCP tool call and their responses use the key the Actor was found under: a name alone became
+    // `username/name`, and `~name` must not reach the shared definition cache.
+    const baseActorName = lookup?.actorKey ?? requestedActorName;
+    const resolution = lookup?.actor ?? null;
 
     if (resolution?.toolMode === ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP) {
         return {
