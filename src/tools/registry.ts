@@ -80,7 +80,7 @@ export const toolCategories = {
     tasks: [createActorTask, getActorTask, updateActorTask, publishActorTask, unpublishActorTask],
     schedules: [createSchedule, getSchedule, updateSchedule, deleteSchedule],
     builds: [getActorBuild, getActorBuildLog, getActorBuildList, buildActor],
-    source: [getActorVersion, createActor, updateActorVersion],
+    versions: [getActorVersion, createActor, updateActorVersion],
     api: [apifyApiSearch, apifyApiDetails, apifyApiRead],
     dev: [reportProblem],
 } satisfies Record<string, ToolEntry[]>;

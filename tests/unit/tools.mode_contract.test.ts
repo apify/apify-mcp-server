@@ -139,14 +139,14 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             expect(toolNames(appsCategories.builds)).toEqual(expected);
         });
 
-        it('has correct tools in source category (both modes)', () => {
+        it('has correct tools in versions category (both modes)', () => {
             const expected = [
                 HELPER_TOOLS.ACTOR_VERSION_GET,
                 HELPER_TOOLS.ACTOR_CREATE,
                 HELPER_TOOLS.ACTOR_VERSION_UPDATE,
             ];
-            expect(toolNames(defaultCategories.source)).toEqual(expected);
-            expect(toolNames(appsCategories.source)).toEqual(expected);
+            expect(toolNames(defaultCategories.versions)).toEqual(expected);
+            expect(toolNames(appsCategories.versions)).toEqual(expected);
         });
 
         it('has correct tools in api category (both modes)', () => {
@@ -524,7 +524,7 @@ describe('tool descriptions never name a tool absent from the session', () => {
         { label: "tools: ['storage']", input: { tools: ['storage'] }, actorTools: [] },
         { label: "tools: ['actors']", input: { tools: ['actors'] }, actorTools: [] },
         { label: "tools: ['schedules']", input: { tools: ['schedules'] }, actorTools: [] },
-        { label: "tools: ['source']", input: { tools: ['source'] }, actorTools: [] },
+        { label: "tools: ['versions']", input: { tools: ['versions'] }, actorTools: [] },
         { label: "tools: ['api']", input: { tools: ['api'] }, actorTools: [] },
         ...ALL_TOOL_NAMES.map((name) => ({
             label: `tools: ['${name}']`,
