@@ -43,6 +43,9 @@ export const TIP_MESSAGE_LIMIT = 300;
 /** When `false`, `resolveServerMode('auto', ...)` forces {@link SERVER_MODE.DEFAULT} regardless of client capabilities. */
 export const SERVER_MODE_AUTO_DETECTION_ENABLED = true;
 
+/** Matches the Apify API's payload limit (`MAX_PAYLOAD_SIZE_BYTES` in `@apify/consts`): no larger body can reach it. */
+export const MAX_REQUEST_BODY_BYTES = 9 * 1024 * 1024;
+
 export const SERVER_NAME = 'apify-mcp-server';
 export const SERVER_TITLE = 'Apify MCP Server';
 export const HELPER_TOOLS = {

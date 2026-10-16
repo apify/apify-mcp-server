@@ -11,7 +11,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import log from '@apify/log';
 
-import { HELPER_TOOLS } from '../../src/const.js';
+import { HELPER_TOOLS, MAX_REQUEST_BODY_BYTES } from '../../src/const.js';
 import {
     createExpressApp,
     extractInitializeMessage,
@@ -20,7 +20,12 @@ import {
 } from '../../src/dev_server.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
 import { getActors } from '../../src/utils/tools_loader.js';
-import { makeArgsRecorderTool, readJsonRpcPayload, STATELESS_PROTOCOL_VERSION } from './helpers/mcp_server.js';
+import {
+    makeArgsRecorderTool,
+    makeRecorderTool,
+    readJsonRpcPayload,
+    STATELESS_PROTOCOL_VERSION,
+} from './helpers/mcp_server.js';
 
 vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
     const actual = await importOriginal<typeof ToolsLoaderModule>();
@@ -433,6 +438,40 @@ describe('createExpressApp() era routing', () => {
             // And it costs no Actor-metadata fetch: neither capabilities nor the configuration-level
             // instructions read the tool set.
             expect(getActorsMock).not.toHaveBeenCalled();
+        });
+    });
+
+    it('accepts a 4 MiB tool call body, the size of a 3 MiB version sent as base64', async () => {
+        const { tool, received } = makeRecorderTool('source-tool');
+        getActorsMock.mockResolvedValue([tool]);
+
+        await withDevServer(async (post) => {
+            const { body, headers } = statelessRequest('tools/call', {
+                name: tool.name,
+                arguments: { content: 'x'.repeat(4 * 1024 * 1024) },
+            });
+
+            const response = await post(DEV_URL, body, { ...headers, authorization: 'Bearer dev-token' });
+
+            expect(response.status).toBe(200);
+            expect(received.called).toBe(true);
+        });
+    });
+
+    it('rejects a body over MAX_REQUEST_BODY_BYTES with 413', async () => {
+        const { tool, received } = makeRecorderTool('source-tool');
+        getActorsMock.mockResolvedValue([tool]);
+
+        await withDevServer(async (post) => {
+            const { body, headers } = statelessRequest('tools/call', {
+                name: tool.name,
+                arguments: { content: 'x'.repeat(MAX_REQUEST_BODY_BYTES) },
+            });
+
+            const response = await post(DEV_URL, body, { ...headers, authorization: 'Bearer dev-token' });
+
+            expect(response.status).toBe(413);
+            expect(received.called).toBe(false);
         });
     });
 });

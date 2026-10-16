@@ -30,8 +30,10 @@ to two origins — the one clients are told to use (`getApifyAPIPublicBaseUrl()`
 and the egress one (`getApifyAPIBaseUrl()`), which differ on the hosted server — and rejects
 userinfo-bearing URLs (axios drops the `Authorization` header for those, silently degrading to
 unauthenticated). An accepted URI is sent on the egress origin and returned under the URI as given;
-templates, instructions, refusals and link-out URLs name only the client-facing origin. The API tools' `callApi`
-(`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`, `isMaxContentLengthAbort()`,
+templates, instructions, refusals and link-out URLs name only the client-facing origin. `readApiResource()`
+then refuses, without a request, what the API tools refuse (`validateApiBlocklist` in
+`../tools/api/apify_api_blocklist.ts`): the `method` query parameter and a GET to the synchronous run
+endpoints. The API tools' `callApi` (`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`, `isMaxContentLengthAbort()`,
 `maskSessionToken()`, `redactJsonSecrets()` and `REDACTED`, so a change to any changes the
 tools too. `get-key-value-store-record` builds its inlined-record URI with `buildUrlOnOrigin()`.
 

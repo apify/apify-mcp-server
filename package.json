@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.18.3",
+  "version": "0.18.4",
   "type": "module",
   "description": "Apify MCP Server",
   "mcpName": "com.apify/apify-mcp-server",
@@ -26,14 +26,10 @@
     "./manifest.json": "./manifest.json"
   },
   "peerDependencies": {
-    "@modelcontextprotocol/client": "2.0.0",
-    "vitest": "^4.1.0"
+    "@modelcontextprotocol/client": "2.0.0"
   },
   "peerDependenciesMeta": {
     "@modelcontextprotocol/client": {
-      "optional": true
-    },
-    "vitest": {
       "optional": true
     }
   },
