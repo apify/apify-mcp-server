@@ -20,11 +20,11 @@ vi.mock('../../src/tools/actors/actor_tools_factory.js', async () => {
     const actual = await vi.importActual<Record<string, unknown>>('../../src/tools/actors/actor_tools_factory.js');
     return {
         ...actual,
-        getActorsAsTools: vi.fn(),
+        fetchActorsAsTools: vi.fn(),
     };
 });
 
-const { getActorsAsTools } = await import('../../src/tools/actors/actor_tools_factory.js');
+const { fetchActorsAsTools } = await import('../../src/tools/actors/actor_tools_factory.js');
 
 const MOCK_ACTOR_TOOL: ToolEntry = {
     type: TOOL_TYPE.ACTOR,
@@ -60,8 +60,8 @@ describe('call-actor-widget response', () => {
             toolMode: ACTOR_TOOL_MODE.RUN,
             actorFullName: 'apify/rag-web-browser',
         });
-        vi.mocked(getActorsAsTools).mockReset();
-        vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [MOCK_ACTOR_TOOL], errors: [] });
+        vi.mocked(fetchActorsAsTools).mockReset();
+        vi.mocked(fetchActorsAsTools).mockResolvedValue({ tools: [MOCK_ACTOR_TOOL], errors: [] });
     });
 
     // This tool always starts the run and returns — it never waits, so it must not copy
