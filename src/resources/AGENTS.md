@@ -26,11 +26,14 @@ IDs that Actors and tools return. This is a deliberate deviation from the MCP sp
 scheme guidance (SHOULD only be used for client-fetchable URLs — ours are token-gated): the
 identity with the platform's own URLs is the feature. Revisit when tools start emitting
 `resource_link`s, where clients may fetch `https://` URIs directly. `isApifyApiUri()` gates reads
-to the configured API origin and rejects userinfo-bearing URLs (axios drops the `Authorization`
-header for those, silently degrading to unauthenticated). The API tools' `callApi`
+to two origins — the one clients are told to use (`getApifyAPIPublicBaseUrl()`, `../apify_client.ts`)
+and the egress one (`getApifyAPIBaseUrl()`), which differ on the hosted server — and rejects
+userinfo-bearing URLs (axios drops the `Authorization` header for those, silently degrading to
+unauthenticated). An accepted URI is sent on the egress origin and returned under the URI as given;
+templates, instructions, refusals and link-out URLs name only the client-facing origin. The API tools' `callApi`
 (`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`, `isMaxContentLengthAbort()`,
-`maskSessionToken()`, `redactUrlSigningSecretKey()` and `REDACTED`, so a change to any changes the
-tools too.
+`maskSessionToken()`, `redactJsonSecrets()` and `REDACTED`, so a change to any changes the
+tools too. `get-key-value-store-record` builds its inlined-record URI with `buildUrlOnOrigin()`.
 
 `sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through
 `httpClient.axios.request` with `maxContentLength: MAX_INLINE_BYTES`. `readApiResource()` sends
@@ -41,9 +44,9 @@ through to blob — lossless beats mangled text, same rule as apify-client's bod
 everything else (including no Content-Type) as a base64 `blob` with the base MIME type; empty body
 as empty text preserving the Content-Type. The body is never parsed, so bytes round-trip exactly,
 except: the session token becomes `[REDACTED]` (`maskSessionToken()`; `/v2/browser-info` echoes the
-`Authorization` header), and so does the `urlSigningSecretKey` value in an `application/json` body
-(`redactUrlSigningSecretKey()`). The key is redacted, not removed: removal means re-serializing, which
-loses formatting and big-number precision and cost about 1 GB on a crafted deep body.
+`Authorization` header), and so do the `urlSigningSecretKey` and `password` values in an
+`application/json` body (`redactJsonSecrets()`). The values are redacted, not removed: removal means
+re-serializing, which loses formatting and big-number precision and cost about 1 GB on a crafted deep body.
 axios enforces `MAX_INLINE_BYTES` (256 KB) mid-consumption on streamed
 responses (axios ≥1.16: byte-counting wrapper throws `ERR_BAD_RESPONSE`, counting decoded bytes) —
 after the request resolves, outside any retry wrapper. On trip, the proxy links out: a `text/plain`

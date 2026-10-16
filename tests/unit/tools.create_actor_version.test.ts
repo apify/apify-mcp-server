@@ -279,7 +279,7 @@ describe('create-actor-version', () => {
             expect(result.structuredContent.revision).toBe(read.structuredContent.revision);
             expect(result.structuredContent.files).toEqual(read.structuredContent.files);
             expect(result.content[1].text).toBe(
-                'Created version 0.2 of john/my-actor.\nBuild the version before running it.',
+                'Created version 0.2 of john/my-actor.\nNo build was started; runs use these files only after the version is built.',
             );
             expect(result.content.map(({ text }) => text).join('\n')).not.toContain(LOGO_BYTES.toString('base64'));
         });
@@ -544,12 +544,12 @@ describe('create-actor-version', () => {
             [
                 'a path outside the Actor root',
                 [MAIN_JS, { path: '../x.js', content: 'x' }],
-                'files[1] (../x.js) has a path outside the Actor root; give one relative to it, such as src/main.js.',
+                'files[1] (../x.js) has a path outside the Actor root; paths are relative to it, such as src/main.js.',
             ],
             [
                 'an absolute path',
                 [{ path: '/src/main.js', content: 'x' }],
-                'files[0] (/src/main.js) has a path outside the Actor root; give one relative to it, such as src/main.js.',
+                'files[0] (/src/main.js) has a path outside the Actor root; paths are relative to it, such as src/main.js.',
             ],
             [
                 'a folder path',
@@ -559,7 +559,7 @@ describe('create-actor-version', () => {
             [
                 'the same path twice',
                 [MAIN_JS, { path: './src/main.js', content: '2' }],
-                'files[1] (./src/main.js) repeats the path src/main.js; send each file once.',
+                'files[1] (./src/main.js) repeats the path src/main.js; each path can be sent only once.',
             ],
             [
                 'a file under another file',
@@ -569,7 +569,7 @@ describe('create-actor-version', () => {
             [
                 'text sent to a binary extension',
                 [{ path: 'assets/a.png', content: 'hello world' }],
-                'files[0] (assets/a.png) has content that is not valid base64; send binary content as base64, or text with encoding utf8.',
+                'files[0] (assets/a.png) has content that is not valid base64; encoding base64 takes binary content as base64, and text takes encoding utf8.',
             ],
             [
                 'text with a lone UTF-16 surrogate',
@@ -639,7 +639,7 @@ describe('create-actor-version', () => {
             actorGetMock.mockResolvedValue(undefined);
 
             expect(await callToolExpectingUserError({ actor: 'my-actor', files: [ACTOR_JSON] })).toBe(
-                "Actor 'my-actor' not found. Give its ID or its full name, username/name; a name without the username is not enough.",
+                "Actor 'my-actor' not found. The actor argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.",
             );
         });
 
@@ -880,11 +880,15 @@ describe('create-actor-version', () => {
         });
 
         it.each([
-            ['without autoBuild', { autoBuild: false }, 'Build the version before running it.'],
+            [
+                'without autoBuild',
+                { autoBuild: false },
+                'No build was started; runs use these files only after the version is built.',
+            ],
             [
                 'when the build failed to start',
                 { autoBuild: true },
-                'The build could not be started; start it again before running the version.',
+                'The build could not be started; runs use these files only after the version is built.',
             ],
         ])('keeps the warning to build the version once the secret env vars are set, %s', async (_, args, nextStep) => {
             buildMock.mockRejectedValue(apiError(402, 'Not enough credit'));
@@ -917,7 +921,7 @@ describe('create-actor-version', () => {
             expect(buildMock).not.toHaveBeenCalled();
             expect(result.structuredContent).not.toHaveProperty('build');
             expect(result.content[1].text).toBe(
-                'Created version 0.2 of john/my-actor.\nBuild the version before running it.',
+                'Created version 0.2 of john/my-actor.\nNo build was started; runs use these files only after the version is built.',
             );
         });
 

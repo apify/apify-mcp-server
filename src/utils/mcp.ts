@@ -282,16 +282,16 @@ export function computeToolResponseBytes(result: unknown): {
 }
 
 /**
- * Actionable hint for an HTTP failure status, or `undefined` when the status carries no specific
- * remedy. Shared by the tool-call and resources/read error paths so both differentiate auth, rate-limit
+ * Hint for an HTTP failure status (auth, access, rate limit, server failure), or `undefined` when the
+ * status has none. Shared by the tool-call and resources/read error paths so both differentiate auth, rate-limit
  * and server failures the same way (the model's only lever is the text it gets back).
  */
 export function getHttpErrorHint(status: number | undefined): string | undefined {
     if (status === 403) return 'The resource may be private or your token may lack access.';
     if (status === 401) return 'Authentication failed, check APIFY_TOKEN is set and valid.';
-    if (status === 429) return 'Rate limit exceeded, wait before retrying.';
+    if (status === 429) return 'The Apify API rate limit was reached.';
     if (status !== undefined && status >= 500 && status < 600) {
-        return 'The server failed to process the request, likely a temporary issue. Retry later.';
+        return 'The Apify API failed to process the request; this is usually temporary.';
     }
     return undefined;
 }
@@ -312,12 +312,15 @@ export function getToolCallErrorUserText(toolName: string, error: unknown): stri
         return (
             `Error calling tool "${toolName}": ${msg}.\n\n` +
             'The API validates supplied `publicConfig` fields on create and update, and all publication ' +
-            'requirements on publish. Fix the stated requirement before retrying. If `datasetView` is invalid, ' +
+            'requirements on publish. The error message names the requirement that is not met. If `datasetView` is invalid, ' +
             'ask the user for its key; no tool can list dataset views.'
         );
     }
-    const hint = getHttpErrorHint(getHttpStatusCode(error)) ?? 'Verify the tool name and input parameters.';
-    return `Error calling tool "${toolName}": ${msg}. ${hint}`;
+    // With an HTTP status, the API's message says what failed; the generic hint adds nothing and can
+    // blame valid input (#1561).
+    const statusCode = getHttpStatusCode(error);
+    const hint = statusCode === undefined ? 'Verify the tool name and input parameters.' : getHttpErrorHint(statusCode);
+    return `Error calling tool "${toolName}": ${msg}.${hint ? ` ${hint}` : ''}`;
 }
 
 /** Texts for a confirmed platform input-validation error — same shape wherever start() can throw one. */

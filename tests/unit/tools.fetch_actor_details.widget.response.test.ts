@@ -7,7 +7,7 @@ import type { HelperTool } from '../../src/types.js';
 import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
 import { fetchActorDetails } from '../../src/utils/actor_details.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockApifyClient, mockUserInfo, stubToolCallContext, textOf } from './helpers/tool_context.js';
+import { mockApifyClient, mockUserInfo, only, stubToolCallContext, textOf } from './helpers/tool_context.js';
 
 /**
  * Apps / UI mode: fetch-actor-details-widget renders an interactive UI element
@@ -197,5 +197,16 @@ describe('fetch-actor-details-widget response', () => {
                 stubToolCallContext({ actor: 'apify/web-scraper' }, mockApifyClient(), { loadedToolNames: [] }),
             ),
         ).rejects.toMatchObject({ statusCode: 401 });
+    });
+});
+
+// Regression: #1532 — the widget described fetching a schema before calling an Actor the session could not run.
+describe('fetch-actor-details-widget buildDescription()', () => {
+    it('mentions calling an Actor only when a tool can run one', () => {
+        const renderDescription = (...present: string[]) => fetchActorDetailsWidget.buildDescription!(only(...present));
+        const beforeCalling = 'fetching the input schema before calling an Actor';
+        const pair = [HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET, HELPER_TOOLS.ACTOR_GET_DETAILS];
+        expect(renderDescription(...pair)).not.toContain(beforeCalling);
+        expect(renderDescription(...pair, HELPER_TOOLS.ACTOR_CALL)).toContain(beforeCalling);
     });
 });

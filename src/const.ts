@@ -127,45 +127,7 @@ export const REPORT_PROBLEM_BLOCKED_CLIENTS: string[] = ['claude', 'anthropic', 
 export const APIFY_AI_CLIENT_NAME = 'apify-ai';
 
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
-export const RAG_WEB_BROWSER_WHITELISTED_FIELDS = ['query', 'maxResults', 'outputFormats'];
-export const RAG_WEB_BROWSER_ADDITIONAL_DESC = `Use this tool when user wants to GET or RETRIEVE actual data immediately (one-time data retrieval).
-This tool scrapes the data itself - it does NOT just find tools.
-
-Examples of when to use:
-- User wants current/immediate data (e.g., "Get flight prices for tomorrow", "What's the weather today?")
-- User needs to fetch specific content now (e.g., "Fetch news articles from CNN", "Get product info from Amazon")
-- User has time indicators like "today", "current", "latest", "recent", "now"
-
-This is for general web scraping and immediate data needs. For repeated/scheduled scraping of specific platforms (e-commerce, social media), consider suggesting a specialized Actor from the Store for better performance and reliability.
-When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated apify/web-fetch tool when it is available - this tool is for searching and scraping by query.`;
-
 export const WEB_FETCH = 'apify/web-fetch';
-/**
- * Appended to the `apify/web-fetch` Actor tool description. Client-agnostic on purpose:
- * no references to any specific client or its built-in tools, so the same text works
- * for every MCP client.
- */
-export const WEB_FETCH_ADDITIONAL_DESC = `Use this tool to fetch a specific http(s) URL and return its complete content (one URL per call; http and https only).
-It renders JavaScript and bypasses anti-bot protection, so it also retrieves pages where a plain HTTP fetch gets blocked, fails with an error such as 403 or 429, or returns incomplete content.
-The page comes back verbatim - full content, no summarization - as Markdown, plain text, HTML, the raw response body, or the list of links on the page.
-
-Examples of when to use:
-- User provides a URL and wants its content, its data or links, or an answer that requires reading that page
-- A previous attempt to fetch a page was blocked, returned an error or CAPTCHA, or came back incomplete because the page needs JavaScript rendering
-- Verbatim page content is needed, e.g. for quoting, extraction, or archiving
-
-This tool does not search the web - it needs a URL. To find pages by query, use a web search tool instead.
-If the exact URL cannot be fetched (e.g. a non-http(s) scheme), say so rather than silently substituting a different URL.`;
-
-/**
- * Appended to the `url` parameter description of the `apify/web-fetch` tool. Lives on the
- * parameter because that is what an agent reads while writing the argument: agents
- * silently rewrote ftp:// URLs to https:// instead of telling the user the scheme is
- * unsupported.
- */
-export const WEB_FETCH_URL_SCHEME_NOTE =
-    'http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.';
-
 export const defaults = {
     actors: [RAG_WEB_BROWSER, WEB_FETCH],
 };
@@ -277,6 +239,10 @@ export const APIFY_STORE_URL = 'https://apify.com';
 export const CONSOLE_BASE_URL = 'https://console.apify.com';
 /** Apify Console origin on the staging cluster, selected when running on the staging MCP host. */
 export const CONSOLE_BASE_URL_STAGING = 'https://console-securitybyobscurity.apify.com';
+/** Apify API origin clients are told to use (production); where requests go is `getApifyAPIBaseUrl()`. */
+export const API_PUBLIC_BASE_URL = 'https://api.apify.com';
+/** Apify API origin on the staging cluster, selected when running on the staging MCP host. */
+export const API_PUBLIC_BASE_URL_STAGING = 'https://api-securitybyobscurity.apify.com';
 /** Staging MCP host; mirrors the check in `getActorMCPServerURL` to pick staging vs production origins. */
 export const STAGING_MCP_HOSTNAME = 'mcp-securitybyobscurity.apify.com';
 export const APIFY_FAVICON_URL = `${APIFY_STORE_URL}/favicon.ico`;

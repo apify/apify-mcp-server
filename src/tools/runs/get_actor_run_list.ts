@@ -20,8 +20,11 @@ const getUserRunsListArgs = z.object({
         .number()
         .describe('Number of array elements that should be skipped at the start. The default value is 0.')
         .default(0),
+    // min(1): the API reads limit=0 as "no limit" and returns up to 1,000 items.
     limit: z
         .number()
+        .int()
+        .min(1)
         .max(10)
         .describe('Maximum number of array elements to return. The default value (as well as the maximum) is 10.')
         .default(10),

@@ -172,6 +172,14 @@ export async function runAgentConversation(options: AgentRunOptions): Promise<Ag
     const receivedAt: number[] = [];
     try {
         for await (const message of query({ prompt, options: sdkOptions })) {
+            // The CLI emits init before a slow server is up (`pending`); the first turn would then run without its tools.
+            if (message.type === 'system' && message.subtype === 'init') {
+                const status =
+                    message.mcp_servers.find((server) => server.name === MCP_SERVER_NAME)?.status ?? 'missing';
+                if (status !== 'connected') {
+                    throw new Error(`MCP server "${MCP_SERVER_NAME}" not connected at init (status: ${status})`);
+                }
+            }
             messages.push(message);
             receivedAt.push(Date.now());
         }

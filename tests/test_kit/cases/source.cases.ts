@@ -217,7 +217,7 @@ export const sourceCases: Case[] = [
                     files: expectedFiles,
                 });
                 expect(createResult.content?.[1]?.text).toBe(
-                    `Created the private Actor ${fullName}.\nBuild the version before running it.`,
+                    `Created the private Actor ${fullName}.\nNo build was started; runs use these files only after the version is built.`,
                 );
 
                 const read = expectToolSuccess<GetActorVersionResult>(
@@ -242,6 +242,12 @@ export const sourceCases: Case[] = [
                         { path: 'src/main.js', content: mainJs, encoding: 'utf8' },
                     ],
                 });
+                // A name without the username is resolved against the token's own Actors.
+                const readByName = expectToolSuccess<GetActorVersionResult>(
+                    await callTool(client, 'get-actor-version', { actor: name }),
+                    'get-actor-version',
+                );
+                expect(readByName).toMatchObject({ actorId: created.actorId, fullName, revision: created.revision });
                 // autoBuild defaults to false.
                 expect(await fetchBuildCount(api, created.actorId)).toBe(0);
             } finally {
@@ -360,7 +366,7 @@ export const sourceCases: Case[] = [
                 });
                 expect(updated.revision).not.toBe(before.revision);
                 expect(updateResult.content?.[1]?.text).toBe(
-                    `Updated version 0.0 of ${fullName}.\nBuild the version before running it.`,
+                    `Updated version 0.0 of ${fullName}.\nNo build was started; runs use these files only after the version is built.`,
                 );
                 expect(after.files).toEqual([
                     buildFileListing('README.md', newReadme),
@@ -457,7 +463,7 @@ export const sourceCases: Case[] = [
                         operations: [addFile, { type: 'write', path: 'src/main.js', content: 'console.log("x");\n' }],
                         text:
                             'Nothing was written: operations[1] (write src/main.js) failed with FILE_EXISTS. ' +
-                            `src/main.js exists with hash ${mainHash}; pass that as expectedHash to replace it.`,
+                            `src/main.js exists with hash ${mainHash}; a write with that hash as expectedHash replaces it.`,
                     },
                     {
                         operations: [
@@ -653,7 +659,7 @@ export const sourceCases: Case[] = [
                     ],
                 });
                 expect(createResult.content?.[1]?.text).toBe(
-                    `Created version 0.1 of ${fullName}.\nBuild the version before running it.`,
+                    `Created version 0.1 of ${fullName}.\nNo build was started; runs use these files only after the version is built.`,
                 );
 
                 const read = expectToolSuccess<GetActorVersionResult>(

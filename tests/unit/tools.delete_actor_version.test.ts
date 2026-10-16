@@ -241,9 +241,9 @@ describe('delete-actor-version', () => {
         actorGetMock.mockResolvedValue(undefined);
 
         expect(await callToolExpectingUserError({ actor: 'my-actor' })).toBe(
-            "Actor 'my-actor' not found. Give its ID or its full name, username/name; a name without the username is not enough.",
+            "Actor 'my-actor' not found. The actor argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.",
         );
-        expect(actorMock.mock.calls).toEqual([['my-actor']]);
+        expect(actorMock.mock.calls).toEqual([['~my-actor']]);
         expect(versionMock).not.toHaveBeenCalled();
         expectNoOtherWrite();
     });

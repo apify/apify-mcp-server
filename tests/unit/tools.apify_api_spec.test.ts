@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
 import {
     APIFY_API_OPENAPI_URL,
     buildApiOperationIndex,
@@ -15,7 +16,31 @@ describe('buildApiOperationIndex()', () => {
         expect(index.has('dataset_items_head')).toBe(false);
         expect(index.has('outside_get')).toBe(false);
         expect([...index.values()].every((operation) => operation.operationId)).toBe(true);
-        expect(index.size).toBe(38);
+        expect(index.size).toBe(37);
+    });
+
+    it('leaves out the GET of the synchronous run endpoints and keeps the POST', () => {
+        expect(index.has('actor_runSync_get')).toBe(false);
+        expect(index.has('actor_runSync_post')).toBe(true);
+        expect(index.has('actor_runSyncGetDatasetItems_post')).toBe(true);
+    });
+
+    it('leaves out the operations a rule matches', () => {
+        const rules: ApiBlockRule[] = [
+            { match: { method: 'GET', path: '/v2/datasets/{datasetId}' }, reason: 'No.' },
+            { match: { method: 'DELETE', path: '/v2/actors/{actorId}' }, reason: 'No.' },
+            // A literal segment matches only itself, not a parameter of the spec.
+            { match: { method: 'GET', path: '/v2/users/me' }, reason: 'No.' },
+            { match: { queryParam: 'limit' }, reason: 'No.' },
+        ];
+
+        const blockedIndex = buildApiOperationIndex(API_SPEC_FIXTURE, rules);
+
+        expect([...index.keys()].filter((operationId) => !blockedIndex.has(operationId))).toEqual([
+            'dataset_get',
+            'actor_delete',
+            'users_me_get',
+        ]);
     });
 
     it('indexes a PATCH operation, which the published spec does not have yet', () => {
@@ -77,7 +102,7 @@ describe('searchApiOperations()', () => {
     }
 
     it('matches word prefixes and ignores stop words', () => {
-        // Without the stop words, "with" would also match "Run Actor synchronously without input".
+        // Without the stop words, "with" would also match "Run Actor synchronously with input and return output".
         expect(searchIds('webhook with')).toEqual(['webhooks_get', 'webhooks_post', 'actor_webhooks_get']);
     });
 

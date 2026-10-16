@@ -18,15 +18,9 @@ import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondUserError } from '../../utils/mcp.js';
-import { ABORT } from '../actors/actor_run_response.js';
 import { isRecord } from '../api/apify_api_spec.js';
-import {
-    buildNextStepForBuild,
-    listVersionNumbers,
-    respondWithBuild,
-    startBuild,
-    toBuildResult,
-} from '../builds/build_helpers.js';
+import { buildNextStepForBuild, listVersionNumbers, respondWithBuild, toBuildResult } from '../builds/build_helpers.js';
+import { getResourceByIdOrName } from '../tasks/task_helpers.js';
 import { hasBinaryExtension } from './source_files.js';
 
 /** The input shape of one file sent whole. */
@@ -90,18 +84,19 @@ export function redactSourceToolArgs(
 }
 
 /**
- * The Actor by its ID or full name, `username/name` or `username~name` (apify-client turns username/name into the
- * API's username~name); throws `UserInputError` when there is none.
+ * The Actor by its ID, its name (resolved against the token's own Actors), or its full name, `username/name` or
+ * `username~name` (apify-client turns username/name into the API's username~name); throws `UserInputError` when there
+ * is none.
  */
 export async function fetchActor(
     client: ApifyClient,
     actorSelector: string,
 ): Promise<{ actor: Actor; fullName: string }> {
-    const actor = await client.actor(actorSelector).get();
+    const actor = await getResourceByIdOrName(actorSelector, async (safeId) => client.actor(safeId).get());
     // Extra path segments, such as username/name/runs/last, reach a sub-resource that is not an Actor.
     if (!actor || typeof actor.name !== 'string' || typeof actor.username !== 'string') {
         throw new UserInputError(
-            `Actor '${actorSelector}' not found. Give its ID or its full name, username/name; a name without the username is not enough.`,
+            `Actor '${actorSelector}' not found. The actor argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.`,
         );
     }
     return { actor, fullName: `${actor.username}/${actor.name}` };
@@ -114,7 +109,9 @@ export function resolveVersion(
     actorSelector: string,
 ): ActorVersion & { versionNumber: string } {
     const versionNumbers = listVersionNumbers(actor);
-    if (requestedVersionNumber === undefined && versionNumbers.length !== 1) {
+    // AJV turns a null versionNumber into an empty string, which no version has, so it counts as not given.
+    const requested = requestedVersionNumber || undefined;
+    if (requested === undefined && versionNumbers.length !== 1) {
         // The source type and build tag tell the caller which version holds the code it is after.
         const versions = actor.versions
             .filter((version) => version.versionNumber !== undefined)
@@ -124,7 +121,7 @@ export function resolveVersion(
             });
         throw new UserInputError(`Specify versionNumber; this Actor has versions: ${versions.join(', ')}.`);
     }
-    const versionNumber = requestedVersionNumber ?? versionNumbers[0];
+    const versionNumber = requested ?? versionNumbers[0];
     const version = actor.versions.find((candidate) => candidate.versionNumber === versionNumber);
     if (!version) {
         throw new UserInputError(
@@ -225,7 +222,7 @@ function isBase64(content: string): boolean {
 export function validateFileContent({ format, content }: ActorVersionSourceFile, label: string): void {
     if (format === 'BASE64' && !isBase64(content)) {
         throw new UserInputError(
-            `${label} has content that is not valid base64; send binary content as base64, or text with encoding utf8.`,
+            `${label} has content that is not valid base64; encoding base64 takes binary content as base64, and text takes encoding utf8.`,
         );
     }
     if (format === 'TEXT' && !content.isWellFormed()) {
@@ -234,10 +231,14 @@ export function validateFileContent({ format, content }: ActorVersionSourceFile,
 }
 
 /**
- * Throws `UserInputError` for a path with a control character, U+0000 to U+001F or U+007F. The build writes the files
- * to disk, where a file name cannot hold NUL.
+ * Throws `UserInputError` for a path with a control character, U+0000 to U+001F or U+007F, or with a lone UTF-16
+ * surrogate. The build writes the files to disk, where a file name cannot hold NUL, and UTF-8 stores a lone surrogate
+ * as U+FFFD.
  */
 export function validatePathCharacters(path: string, label: string): void {
+    if (!path.isWellFormed()) {
+        throw new UserInputError(`${label} has a lone UTF-16 surrogate in its path, which UTF-8 cannot store.`);
+    }
     const character = [...path].find((char) => char <= '\u001f' || char === '\u007f');
     if (character === undefined) return;
     const codePoint = `U+${character.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`;
@@ -253,7 +254,7 @@ export function validatePathCharacters(path: string, label: string): void {
 export function validateFilePath(path: string, label: string): void {
     if (path.startsWith('/') || path === '..' || path.startsWith('../')) {
         throw new UserInputError(
-            `${label} has a path outside the Actor root; give one relative to it, such as src/main.js.`,
+            `${label} has a path outside the Actor root; paths are relative to it, such as src/main.js.`,
         );
     }
     if (path === '.' || path.endsWith('/')) {
@@ -302,7 +303,7 @@ export function buildSourceFileEntries(files: readonly z.infer<typeof sourceFile
         validateFilePath(entry.name, label);
         validateFileContent(entry, label);
         if (filePaths.has(entry.name)) {
-            throw new UserInputError(`${label} repeats the path ${entry.name}; send each file once.`);
+            throw new UserInputError(`${label} repeats the path ${entry.name}; each path can be sent only once.`);
         }
         const folders = listFolders(entry.name);
         const collision = folders.find((folder) => filePaths.has(folder)) ?? firstFileByFolder.get(entry.name);
@@ -348,19 +349,18 @@ export async function respondAfterWrite(params: {
         return respondWithBuild({
             structuredContent,
             summary,
-            nextStep: 'Build the version before running it.',
+            nextStep: 'No build was started; runs use these files only after the version is built.',
         });
     }
     let linkContext: ConsoleLinkContext | undefined;
-    let build: Build | typeof ABORT;
+    let build: Build;
     try {
         // Resolved before the start, so a failed lookup leaves no build behind.
         linkContext = await getConsoleLinkContext(apifyToken, client);
         // Per the MCP spec a cancelled request gets no response; the write stands.
         if (signal?.aborted) return respondAborted();
-        // The signal is not passed on: startBuild aborts the build it started when the signal fires during the start,
-        // and a committed write never aborts the build it started.
-        build = await startBuild(client, target.actorId, target.versionNumber, { useCache: true, waitSecs: 0 });
+        // Started without the request's signal: a committed write never aborts the build it started.
+        build = await client.actor(target.actorId).build(target.versionNumber, { useCache: true });
     } catch (error) {
         // The API's refusal is the caller's to read; anything else, such as a network failure, is logged too.
         if (!(error instanceof ApifyApiError))
@@ -371,11 +371,9 @@ export async function respondAfterWrite(params: {
                 buildError: error instanceof Error ? error.message : String(error),
             },
             summary,
-            nextStep: 'The build could not be started; start it again before running the version.',
+            nextStep: 'The build could not be started; runs use these files only after the version is built.',
         });
     }
-    // startBuild returns ABORT only for a passed signal; the check narrows the type.
-    if (build === ABORT) return respondAborted();
     return respondWithBuild({
         structuredContent: {
             ...structuredContent,

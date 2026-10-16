@@ -169,10 +169,7 @@ describe('call-actor-widget response', () => {
         const apifyClient = stubApifyClient(startSpy);
 
         const result = await (callActorWidget as HelperTool).call(
-            stubToolCallContext(
-                { actor: 'apify/actors-mcp-server:fetch-apify-docs', input: { query: 'test' } },
-                apifyClient,
-            ),
+            stubToolCallContext({ actor: 'apify/example-mcp-server:add', input: { query: 'test' } }, apifyClient),
         );
 
         const { content, isError } = result as TextToolResult;

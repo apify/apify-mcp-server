@@ -65,8 +65,8 @@ type SentVersion = {
 
 /**
  * What the platform stores on create: the only version gets the build tag latest when none is sent, and
- * `.actor/actor.json` gets `name` set to the Actor name. The version number is not defaulted: the platform refuses a
- * version without one.
+ * `.actor/actor.json` gets `name` set to the Actor name, or stays as sent when it is not JSON. The version number is
+ * not defaulted: the platform refuses a version without one.
  */
 function buildStoredVersions(body: { name: string; versions: SentVersion[] }) {
     return body.versions.map((version) => ({
@@ -74,7 +74,12 @@ function buildStoredVersions(body: { name: string; versions: SentVersion[] }) {
         ...version,
         sourceFiles: version.sourceFiles.map((file) => {
             if (file.name !== '.actor/actor.json') return file;
-            const config = JSON.parse(file.content) as { name?: string };
+            let config: { name?: string };
+            try {
+                config = JSON.parse(file.content) as { name?: string };
+            } catch {
+                return file;
+            }
             if (config.name === body.name) return file;
             return { ...file, content: JSON.stringify({ ...config, name: body.name }, null, 4) };
         }),
@@ -242,14 +247,14 @@ describe('create-actor', () => {
         });
     });
 
-    it('is a non-destructive, non-idempotent, closed-world tool without payment', () => {
+    it('is a non-destructive, non-idempotent, open-world tool without payment, since autoBuild starts a build', () => {
         expect(createActor.name).toBe(HELPER_TOOLS.ACTOR_CREATE);
         expect(createActor.annotations).toEqual({
             title: 'Create Actor',
             readOnlyHint: false,
             destructiveHint: false,
             idempotentHint: false,
-            openWorldHint: false,
+            openWorldHint: true,
         });
         expect((createActor as HelperTool).paymentRequired).toBeUndefined();
     });
@@ -294,7 +299,7 @@ describe('create-actor', () => {
         expect(result.content).toHaveLength(2);
         expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
         expect(result.content[1].text).toBe(
-            'Created the private Actor john/my-actor.\nBuild the version before running it.',
+            'Created the private Actor john/my-actor.\nNo build was started; runs use these files only after the version is built.',
         );
         // No other call: nothing reads or updates an existing Actor, and no build starts.
         expect(actorMock).not.toHaveBeenCalled();
@@ -481,7 +486,7 @@ describe('create-actor', () => {
 
             expectSoftFailInvalidInput(result);
             expect(result.content[0].text).toBe(
-                `files[1] (${path}) has a path outside the Actor root; give one relative to it, such as src/main.js.`,
+                `files[1] (${path}) has a path outside the Actor root; paths are relative to it, such as src/main.js.`,
             );
             expect(actorsCreateMock).not.toHaveBeenCalled();
             expect(buildMock).not.toHaveBeenCalled();
@@ -501,6 +506,17 @@ describe('create-actor', () => {
         expect(result.content[0].text).toBe(
             `files[1] has the control character ${character} in its path; ` +
                 'a path cannot hold characters U+0000 to U+001F or U+007F.',
+        );
+        expect(actorsCreateMock).not.toHaveBeenCalled();
+        expect(buildMock).not.toHaveBeenCalled();
+    });
+
+    it('refuses a path with a lone UTF-16 surrogate, and creates nothing', async () => {
+        const result = await callTool({ autoBuild: true, files: [MAIN_JS, { path: 'src/a\uD83D.js', content: 'x' }] });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(
+            'files[1] has a lone UTF-16 surrogate in its path, which UTF-8 cannot store.',
         );
         expect(actorsCreateMock).not.toHaveBeenCalled();
         expect(buildMock).not.toHaveBeenCalled();
@@ -580,7 +596,9 @@ describe('create-actor', () => {
         });
 
         expectSoftFailInvalidInput(result);
-        expect(result.content[0].text).toBe(`files[1] (${second}) repeats the path ${path}; send each file once.`);
+        expect(result.content[0].text).toBe(
+            `files[1] (${second}) repeats the path ${path}; each path can be sent only once.`,
+        );
         expect(actorsCreateMock).not.toHaveBeenCalled();
     });
 
@@ -593,7 +611,7 @@ describe('create-actor', () => {
 
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toBe(
-            `files[1] (${file.path}) has content that is not valid base64; send binary content as base64, or text with encoding utf8.`,
+            `files[1] (${file.path}) has content that is not valid base64; encoding base64 takes binary content as base64, and text takes encoding utf8.`,
         );
         expect(actorsCreateMock).not.toHaveBeenCalled();
     });
@@ -706,9 +724,8 @@ describe('create-actor', () => {
                 type: 'text',
                 text:
                     'The platform refused the name my-actor as taken when the request was retried, so an earlier ' +
-                    'attempt of this call may have created the Actor. Read it with get-actor-version, as ' +
-                    'username/my-actor with your username, before calling create-actor again; if it holds the ' +
-                    'files you sent, this call created it.',
+                    'attempt of this call may have created the Actor my-actor. ' +
+                    'If it holds the files you sent, this call created it; get-actor-version reads its files.',
             },
         ]);
         expect(actorsCreateMock).toHaveBeenCalledTimes(1);
@@ -728,8 +745,7 @@ describe('create-actor', () => {
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toBe(
             'The platform refused the name my-actor as taken when the request was retried, so an earlier attempt ' +
-                'of this call may have created the Actor. Read it, as username/my-actor with your username, before ' +
-                'calling create-actor again; if it holds the files you sent, this call created it.',
+                'of this call may have created the Actor my-actor. If it holds the files you sent, this call created it.',
         );
     });
 
@@ -738,6 +754,60 @@ describe('create-actor', () => {
         actorsCreateMock.mockRejectedValue(error);
 
         await expect(callTool({ files: [ACTOR_JSON] })).rejects.toBe(error);
+    });
+
+    describe('version number from .actor/actor.json', () => {
+        const actorJsonWith = (content: string) => ({ path: '.actor/actor.json', content });
+
+        it('takes the version of .actor/actor.json when versionNumber is not given', async () => {
+            const result = await callTool({
+                autoBuild: true,
+                files: [actorJsonWith('{"actorSpecification": 1, "name": "my-actor", "version": "0.1"}')],
+            });
+
+            expect(getSentVersion().versionNumber).toBe('0.1');
+            expect(result.structuredContent.versionNumber).toBe('0.1');
+            expect(buildMock).toHaveBeenCalledWith('0.1', { useCache: true });
+        });
+
+        it.each<[string, { path: string; content: string }[]]>([
+            ['no .actor/actor.json', [MAIN_JS]],
+            ['an actor.json without a version', [ACTOR_JSON]],
+            ['an actor.json whose version is not a string', [actorJsonWith('{"version": 0.1}')]],
+            ['an actor.json with an empty version', [actorJsonWith('{"version": ""}')]],
+            ['an actor.json that is not JSON', [actorJsonWith('{"version": "0.1",')]],
+        ])('sends version 0.0 for %s', async (_, files) => {
+            const result = await callTool({ files });
+
+            expect(getSentVersion().versionNumber).toBe('0.0');
+            expect(result.structuredContent.versionNumber).toBe('0.0');
+        });
+
+        it.each([
+            ['the version of .actor/actor.json', actorJsonWith('{"version": "0.1"}'), '0.1'],
+            ['version 0.0 when .actor/actor.json has none', ACTOR_JSON, '0.0'],
+        ])('sends %s for a null versionNumber', async (_, file, versionNumber) => {
+            const args = { name: 'my-actor', versionNumber: null, files: [file] };
+
+            expect((createActor as HelperTool).ajvValidate(args)).toBe(true);
+            await callTool(args);
+
+            expect(getSentVersion().versionNumber).toBe(versionNumber);
+        });
+
+        it('sends versionNumber when .actor/actor.json has another version', async () => {
+            await callTool({ versionNumber: '0.2', files: [actorJsonWith('{"version": "0.1"}')] });
+
+            expect(getSentVersion().versionNumber).toBe('0.2');
+        });
+
+        it('sends a version of .actor/actor.json that is not MAJOR.MINOR as is, for the API to refuse', async () => {
+            const error = apiError(400, 'Invalid version number.', 'invalid-input');
+            actorsCreateMock.mockRejectedValue(error);
+
+            await expect(callTool({ files: [actorJsonWith('{"version": "1.0.0"}')] })).rejects.toBe(error);
+            expect(getSentVersion().versionNumber).toBe('1.0.0');
+        });
     });
 
     describe('autoBuild', () => {
@@ -796,7 +866,7 @@ describe('create-actor', () => {
             expect(result.structuredContent.actorId).toBe('actor-9');
             expect(result.structuredContent.buildError).toBe('socket hang up');
             expect(result.content[1].text).toBe(
-                'Created the private Actor john/my-actor.\nThe build could not be started; start it again before running the version.',
+                'Created the private Actor john/my-actor.\nThe build could not be started; runs use these files only after the version is built.',
             );
         });
 

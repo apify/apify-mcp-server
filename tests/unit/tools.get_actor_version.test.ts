@@ -847,7 +847,7 @@ describe('get-actor-version', () => {
             expect(structuredContent.files.map(({ path }) => path)).toEqual(['src/main.js']);
         });
 
-        it.each(['actor-1', 'john~my-actor'])(
+        it.each(['qGXMy0NAkWsIIb9LZ', 'john~my-actor'])(
             'names the Actor by the full name in its document when given as %s',
             async (actor) => {
                 const result = await callTool({ actor });
@@ -858,6 +858,35 @@ describe('get-actor-version', () => {
             },
         );
 
+        it('looks up a bare name once, as the name of one of your own Actors', async () => {
+            const result = await callTool({ actor: 'my-actor' });
+
+            expect(actorMock.mock.calls).toEqual([['~my-actor']]);
+            expect(result.structuredContent.fullName).toBe('john/my-actor');
+        });
+
+        it('looks up a bare value shaped like an ID as a name when no Actor has that ID', async () => {
+            actorGetMock
+                .mockResolvedValueOnce(undefined)
+                .mockResolvedValueOnce({ ...mockActor(), name: 'myscraperversion2' });
+
+            const result = await callTool({ actor: 'myscraperversion2' });
+
+            expect(actorMock.mock.calls).toEqual([['myscraperversion2'], ['~myscraperversion2']]);
+            expect(result.structuredContent.fullName).toBe('john/myscraperversion2');
+        });
+
+        it.each(['john/missing', 'john~missing', '~missing'])('looks up %s once', async (actor) => {
+            actorGetMock.mockResolvedValue(undefined);
+
+            const text = await callToolExpectingUserError({ actor });
+
+            expect(actorMock.mock.calls).toEqual([[actor]]);
+            expect(text).toBe(
+                `Actor '${actor}' not found. The actor argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.`,
+            );
+        });
+
         it('refuses a version the Actor does not have', async () => {
             const text = await callToolExpectingUserError({ versionNumber: '9.9' });
 
@@ -865,7 +894,6 @@ describe('get-actor-version', () => {
         });
 
         it.each([
-            ['a bare name the API does not find', 'my-actor', undefined],
             [
                 'a run reached by extra path segments',
                 'john/my-actor/runs/last',
@@ -884,14 +912,14 @@ describe('get-actor-version', () => {
                 'john/my-actor/runs/last/key-value-store',
                 { id: 'kvs-1', userId: 'user-secret', username: 'john' },
             ],
-        ])('reports %s as a missing Actor, and that a bare name is not enough', async (_, actor, document) => {
+        ])('reports %s as a missing Actor', async (_, actor, document) => {
             actorGetMock.mockResolvedValue(document);
 
             const text = await callToolExpectingUserError({ actor });
 
-            expect(actorMock).toHaveBeenCalledWith(actor);
+            expect(actorMock.mock.calls).toEqual([[actor]]);
             expect(text).toBe(
-                `Actor '${actor}' not found. Give its ID or its full name, username/name; a name without the username is not enough.`,
+                `Actor '${actor}' not found. The actor argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.`,
             );
         });
 

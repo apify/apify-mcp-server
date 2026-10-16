@@ -167,16 +167,23 @@ describe('update-actor-version', () => {
         });
     });
 
-    it('is a destructive, non-idempotent, closed-world tool without payment', () => {
+    it('is a destructive, non-idempotent, open-world tool without payment, since autoBuild starts a build', () => {
         expect(updateActorVersion.name).toBe(HELPER_TOOLS.ACTOR_VERSION_UPDATE);
         expect(updateActorVersion.annotations).toEqual({
             title: 'Update Actor version',
             readOnlyHint: false,
             destructiveHint: true,
             idempotentHint: false,
-            openWorldHint: false,
+            openWorldHint: true,
         });
         expect((updateActorVersion as HelperTool).paymentRequired).toBeUndefined();
+    });
+
+    it('names the reason codes of a failed check in its description without asking for a retry', () => {
+        expect(updateActorVersion.description).toContain(
+            'one of FILE_EXISTS, FILE_NOT_FOUND, HASH_MISMATCH, NO_MATCH, MULTIPLE_MATCHES, NOT_TEXT, or REVISION_MISMATCH.',
+        );
+        expect(updateActorVersion.description).not.toMatch(/retry/i);
     });
 
     it('reads the Actor once and sends one PUT with only sourceType and sourceFiles', async () => {
@@ -206,7 +213,7 @@ describe('update-actor-version', () => {
         expect(result.content).toHaveLength(2);
         expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
         expect(result.content[1].text).toBe(
-            'Updated version 0.1 of john/my-actor.\nBuild the version before running it.',
+            'Updated version 0.1 of john/my-actor.\nNo build was started; runs use these files only after the version is built.',
         );
         expect(buildMock).not.toHaveBeenCalled();
     });
@@ -289,7 +296,7 @@ describe('update-actor-version', () => {
         const LINES_JS = {
             name: 'src/lines.js',
             format: 'TEXT',
-            content: Array.from({ length: 101 }, (_, index) => `line ${index};\n`).join(''),
+            content: Array.from({ length: 21 }, (_, index) => `line ${index};\n`).join(''),
         };
         const renameLines = (from: number, to: number) =>
             edit(
@@ -317,27 +324,26 @@ describe('update-actor-version', () => {
             expect(versionUpdateMock).not.toHaveBeenCalled();
         });
 
-        it('takes 100 edits in total across the edit operations', async () => {
+        it('takes 20 edits in total across the edit operations', async () => {
             mockFiles(LINES_JS);
 
-            await callTool({ operations: [renameLines(0, 50), renameLines(50, 100)] });
+            await callTool({ operations: [renameLines(0, 10), renameLines(10, 20)] });
 
             const [saved] = getPutFiles() as { content: string }[];
-            expect(saved.content).toContain('row 99;\nline 100;\n');
-            expect(saved.content).not.toContain('line 99;');
+            expect(saved.content).toContain('row 19;\nline 20;\n');
+            expect(saved.content).not.toContain('line 19;');
         });
 
-        it('refuses 101 edits in total across the edit operations without reading or writing the version', async () => {
+        it('refuses 21 edits in total across the edit operations without reading or writing the version', async () => {
             mockFiles(LINES_JS);
 
             const text = await callToolExpectingUserError({
                 autoBuild: true,
-                operations: [renameLines(0, 50), write('src/new.js', 'x'), renameLines(50, 101)],
+                operations: [renameLines(0, 10), write('src/new.js', 'x'), renameLines(10, 21)],
             });
 
             expect(text).toBe(
-                'Nothing was written: the operations have 101 edits in total, and one call takes at most 100. ' +
-                    'Split them across calls.',
+                'Nothing was written: the operations have 21 edits in total, and one call takes at most 20.',
             );
             expect(actorGetMock).not.toHaveBeenCalled();
             expect(buildMock).not.toHaveBeenCalled();
@@ -356,6 +362,28 @@ describe('update-actor-version', () => {
             expect(text).toBe(
                 `${failedWith(0, 'edit', 'src/big.txt', 'NO_MATCH')} oldText of edits[0] is not in the file.`,
             );
+        });
+
+        it('applies 20 edits with an oldText over 250 characters to a file of almost 3 MiB within 6 seconds', async () => {
+            // Each oldText is 300 a's and its own suffix, so it matches once, and the search reads the whole file: over
+            // the runs of a it keeps 300 characters matched and steps back one on every character.
+            const oldTexts = Array.from({ length: 20 }, (_, index) => `${'a'.repeat(300)}#${index};`);
+            const tail = oldTexts.join('');
+            const content = `${'a'.repeat(3 * 1024 * 1024 - 20_000 - tail.length)}${tail}`;
+            mockFiles({ name: 'src/big.txt', format: 'TEXT', content });
+
+            const startedAt = performance.now();
+            await callTool({
+                operations: oldTexts.map((oldText) =>
+                    edit('src/big.txt', { oldText, newText: oldText.replace('#', '@') }),
+                ),
+            });
+
+            // Bounds the worst-case search times the cap; the 21-edit test pins the cap itself. About 0.5 s locally, and
+            // CI runs this file about 4.5x slower.
+            expect(performance.now() - startedAt).toBeLessThan(6000);
+            const [saved] = getPutFiles() as { content: string }[];
+            expect(saved.content.slice(-tail.length)).toBe(tail.replaceAll('#', '@'));
         });
     });
 
@@ -554,7 +582,7 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 `${failedWith(0, 'write', 'src/util.js', 'FILE_EXISTS')} ` +
-                    `src/util.js exists with hash ${UNNORMALIZED_HASH}; pass that as expectedHash to replace it.`,
+                    `src/util.js exists with hash ${UNNORMALIZED_HASH}; a write with that hash as expectedHash replaces it.`,
             );
         });
 
@@ -742,7 +770,7 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 'Nothing was written: operations[0] (write src/main.js) failed with FILE_EXISTS. ' +
-                    `src/main.js exists with hash ${MAIN_JS_HASH}; pass that as expectedHash to replace it.`,
+                    `src/main.js exists with hash ${MAIN_JS_HASH}; a write with that hash as expectedHash replaces it.`,
             );
         });
 
@@ -790,7 +818,7 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 `${failedWith(0, 'write', './src/main.js', 'FILE_EXISTS')} ` +
-                    `src/main.js exists with hash ${MAIN_JS_HASH}; pass that as expectedHash to replace it.`,
+                    `src/main.js exists with hash ${MAIN_JS_HASH}; a write with that hash as expectedHash replaces it.`,
             );
             expect(getPutFiles()).toStrictEqual([
                 FOLDER,
@@ -831,7 +859,7 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 `operations[0] (write ${path}) has content that is not valid base64; ` +
-                    'send binary content as base64, or text with encoding utf8.',
+                    'encoding base64 takes binary content as base64, and text takes encoding utf8.',
             );
             expect(buildMock).not.toHaveBeenCalled();
         });
@@ -1110,7 +1138,7 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 `${failedWith(0, 'edit', 'src/main.js', 'MULTIPLE_MATCHES')} ` +
-                    'oldText of edits[0] matches more than once; add surrounding lines so it matches once.',
+                    'oldText of edits[0] matches more than once; surrounding lines in oldText can narrow it to one match.',
             );
         });
 
@@ -1123,7 +1151,7 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 `${failedWith(0, 'edit', 'src/main.js', 'MULTIPLE_MATCHES')} ` +
-                    'oldText of edits[0] matches more than once; add surrounding lines so it matches once.',
+                    'oldText of edits[0] matches more than once; surrounding lines in oldText can narrow it to one match.',
             );
         });
 
@@ -1150,7 +1178,7 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 `${failedWith(0, 'edit', 'src/main.js', 'MULTIPLE_MATCHES')} ` +
-                    'oldText of edits[1] matches more than once; add surrounding lines so it matches once.',
+                    'oldText of edits[1] matches more than once; surrounding lines in oldText can narrow it to one match.',
             );
         });
 
@@ -1188,7 +1216,7 @@ describe('update-actor-version', () => {
             });
 
             expect(text).toBe(
-                `${failedWith(0, 'edit', 'assets/x.png', 'NOT_TEXT')} assets/x.png is not UTF-8 text; replace it with a write.`,
+                `${failedWith(0, 'edit', 'assets/x.png', 'NOT_TEXT')} assets/x.png is not UTF-8 text; only a write can replace it.`,
             );
         });
 
@@ -1272,7 +1300,7 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 'Nothing was written: operations[0] (edit src/main.js) failed with MULTIPLE_MATCHES. ' +
-                    'oldText of edits[0] matches more than once; add surrounding lines so it matches once.',
+                    'oldText of edits[0] matches more than once; surrounding lines in oldText can narrow it to one match.',
             );
         });
 
@@ -1398,7 +1426,7 @@ describe('update-actor-version', () => {
             });
 
             expect(text).toBe(
-                `${failedWith(0, 'edit', 'src/data.txt', 'NOT_TEXT')} src/data.txt is not UTF-8 text; replace it with a write.`,
+                `${failedWith(0, 'edit', 'src/data.txt', 'NOT_TEXT')} src/data.txt is not UTF-8 text; only a write can replace it.`,
             );
         });
 
@@ -1409,7 +1437,7 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 'Nothing was written: operations[0] (edit assets/logo.png) failed with NOT_TEXT. ' +
-                    'assets/logo.png is not UTF-8 text; replace it with a write.',
+                    'assets/logo.png is not UTF-8 text; only a write can replace it.',
             );
         });
 
@@ -1625,7 +1653,7 @@ describe('update-actor-version', () => {
             );
             expect(exists).toBe(
                 `${failedWith(1, 'write', 'src/new.js', 'FILE_EXISTS')} ` +
-                    `src/new.js exists with hash ${sha256Prefix('v1\n')}; pass that as expectedHash to replace it.`,
+                    `src/new.js exists with hash ${sha256Prefix('v1\n')}; a write with that hash as expectedHash replaces it.`,
             );
             expect(getPutFiles()).toContainEqual({ name: 'src/main.js', format: 'TEXT', content: 'v2\n' });
         });
@@ -1638,7 +1666,7 @@ describe('update-actor-version', () => {
                 const text = await callToolExpectingUserError({ autoBuild: true, operations: [write(path, 'x')] });
 
                 expect(text).toBe(
-                    `operations[0] (write ${path}) has a path outside the Actor root; give one relative to it, such as src/main.js.`,
+                    `operations[0] (write ${path}) has a path outside the Actor root; paths are relative to it, such as src/main.js.`,
                 );
                 expect(buildMock).not.toHaveBeenCalled();
             },
@@ -1671,6 +1699,21 @@ describe('update-actor-version', () => {
                 expect(buildMock).not.toHaveBeenCalled();
             },
         );
+
+        it('refuses a path with a lone UTF-16 surrogate in any operation, before any request', async () => {
+            const text = await callToolExpectingUserError({
+                autoBuild: true,
+                operations: [
+                    write('src/ok.js', 'x'),
+                    edit('src/a\uD83D.js', { oldText: 'a', newText: 'b' }),
+                    write('src/b\uDE42.js', 'x'),
+                ],
+            });
+
+            expect(text).toBe('operations[1] has a lone UTF-16 surrogate in its path, which UTF-8 cannot store.');
+            expect(actorGetMock).not.toHaveBeenCalled();
+            expect(buildMock).not.toHaveBeenCalled();
+        });
 
         it('refuses the delete, delete, and write whose file sets once gave one revision, before any request', async () => {
             // Joined as path, NUL, hash, and a line break per file, the files before and after read the same, so the
@@ -1896,7 +1939,7 @@ describe('update-actor-version', () => {
             expect(versionUpdateMock).not.toHaveBeenCalled();
             expect(result.structuredContent).toEqual({ revision: await readRevision(), changed: false, changes: [] });
             expect(result.content[1].text).toBe(
-                'Nothing changed in version 0.1 of john/my-actor, so nothing was written.\nBuild the version before running it.',
+                'Nothing changed in version 0.1 of john/my-actor, so nothing was written.\nNo build was started; runs use these files only after the version is built.',
             );
         });
 
@@ -1935,12 +1978,9 @@ describe('update-actor-version', () => {
             expect(versionUpdateMock).toHaveBeenCalledTimes(1);
         });
 
-        it.each<[string, (revision: string) => string]>([
-            ['an empty expectedRevision', () => ''],
-            ['the first 8 characters of the revision', (revision) => revision.slice(0, 8)],
-        ])('refuses %s, since it must match the whole revision (REVISION_MISMATCH)', async (_, getExpectedRevision) => {
+        it('refuses the first 8 characters of the revision, since it must match the whole revision (REVISION_MISMATCH)', async () => {
             const revision = await readRevision();
-            const expectedRevision = getExpectedRevision(revision);
+            const expectedRevision = revision.slice(0, 8);
 
             const text = await callToolExpectingUserError({
                 autoBuild: true,
@@ -1957,25 +1997,59 @@ describe('update-actor-version', () => {
 
         const hashPrefix = MAIN_JS_HASH.slice(0, 8);
         it.each([
-            ['write', 'an empty expectedHash', '', write('src/main.js', 'x', { expectedHash: '' })],
-            ['delete', 'an empty expectedHash', '', remove('src/main.js', '')],
-            [
-                'write',
-                "the first 8 characters of the file's hash",
-                hashPrefix,
-                write('src/main.js', 'x', { expectedHash: hashPrefix }),
-            ],
-            ['delete', "the first 8 characters of the file's hash", hashPrefix, remove('src/main.js', hashPrefix)],
+            ['write', write('src/main.js', 'x', { expectedHash: hashPrefix })],
+            ['delete', remove('src/main.js', hashPrefix)],
         ])(
-            'refuses a %s given %s, since it must match the whole hash (HASH_MISMATCH)',
-            async (type, _, expectedHash, operation) => {
+            "refuses a %s given the first 8 characters of the file's hash, since it must match the whole hash (HASH_MISMATCH)",
+            async (type, operation) => {
                 const text = await callToolExpectingUserError({ autoBuild: true, operations: [operation] });
 
                 expect(text).toBe(
                     `${failedWith(0, type, 'src/main.js', 'HASH_MISMATCH')} ` +
-                        `src/main.js has hash ${MAIN_JS_HASH}, not ${expectedHash}.`,
+                        `src/main.js has hash ${MAIN_JS_HASH}, not ${hashPrefix}.`,
                 );
                 expect(buildMock).not.toHaveBeenCalled();
+            },
+        );
+
+        it('takes a null versionNumber, expectedRevision, and expectedHash as not given', async () => {
+            const args = {
+                actor: 'john/my-actor',
+                versionNumber: null,
+                expectedRevision: null,
+                operations: [write('b.js', 'b', { expectedHash: null })],
+            };
+
+            expect((updateActorVersion as HelperTool).ajvValidate(args)).toBe(true);
+            const result = await callTool(args);
+
+            expect(versionMock).toHaveBeenCalledWith('0.1');
+            expect(result.structuredContent.changes).toEqual([
+                { path: 'b.js', action: 'created', hash: sha256Prefix('b') },
+            ]);
+        });
+
+        it.each([
+            [
+                'write',
+                write('src/main.js', 'x', { expectedHash: null }),
+                `${failedWith(0, 'write', 'src/main.js', 'FILE_EXISTS')} ` +
+                    `src/main.js exists with hash ${MAIN_JS_HASH}; a write with that hash as expectedHash replaces it.`,
+            ],
+            [
+                'delete',
+                { type: 'delete', path: 'src/main.js', expectedHash: null },
+                'operations[0] (delete src/main.js) needs expectedHash.',
+            ],
+        ])(
+            'refuses a %s of an existing file with a null expectedHash as one without it',
+            async (_, operation, message) => {
+                const args = { actor: 'john/my-actor', operations: [operation] };
+
+                expect((updateActorVersion as HelperTool).ajvValidate(args)).toBe(true);
+                const text = await callToolExpectingUserError(args);
+
+                expect(text).toBe(message);
             },
         );
 
@@ -2040,14 +2114,14 @@ describe('update-actor-version', () => {
             expect(buildMock).not.toHaveBeenCalled();
         });
 
-        it.each(['actor-1', 'john~my-actor'])(
+        it.each(['qGXMy0NAkWsIIb9LZ', 'john~my-actor'])(
             'names the Actor by the full name in its document when given as %s',
             async (actor) => {
                 const result = await callTool({ actor, operations: [write('a.js', 'a')] });
 
                 expect(actorMock.mock.calls).toEqual([[actor], ['actor-1']]);
                 expect(result.content[1].text).toBe(
-                    'Updated version 0.1 of john/my-actor.\nBuild the version before running it.',
+                    'Updated version 0.1 of john/my-actor.\nNo build was started; runs use these files only after the version is built.',
                 );
             },
         );
@@ -2063,8 +2137,9 @@ describe('update-actor-version', () => {
 
             const text = await callToolExpectingUserError({ actor: 'my-actor', operations: [write('a.js', 'a')] });
 
+            expect(actorMock.mock.calls).toEqual([['~my-actor']]);
             expect(text).toBe(
-                "Actor 'my-actor' not found. Give its ID or its full name, username/name; a name without the username is not enough.",
+                "Actor 'my-actor' not found. The actor argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.",
             );
         });
 
@@ -2083,7 +2158,7 @@ describe('update-actor-version', () => {
 
                 expectSoftFailInvalidInput(result);
                 expect(result.content[0].text).toBe(
-                    `Actor '${actor}' not found. Give its ID or its full name, username/name; a name without the username is not enough.`,
+                    `Actor '${actor}' not found. The actor argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.`,
                 );
                 expect(versionMock).not.toHaveBeenCalled();
                 expect(buildMock).not.toHaveBeenCalled();
@@ -2350,7 +2425,7 @@ describe('update-actor-version', () => {
             expect(result.structuredContent.buildError).toBe('Not enough credit');
             expect(result.structuredContent).not.toHaveProperty('build');
             expect(result.content[1].text).toContain(
-                'The build could not be started; start it again before running the version.',
+                'The build could not be started; runs use these files only after the version is built.',
             );
         });
 
@@ -2374,7 +2449,7 @@ describe('update-actor-version', () => {
                 buildError: error.message,
             });
             expect(result.content[1].text).toBe(
-                'Updated version 0.1 of john/my-actor.\nThe build could not be started; start it again before running the version.',
+                'Updated version 0.1 of john/my-actor.\nThe build could not be started; runs use these files only after the version is built.',
             );
         });
 
