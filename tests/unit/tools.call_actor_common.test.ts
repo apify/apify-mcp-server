@@ -37,7 +37,10 @@ describe('call_actor_common', () => {
             const description = buildCallActorDescription();
 
             expect(description).toContain(`Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} to get the Actor's input schema`);
-            expect(description).toContain(`use ${HELPER_TOOLS.STORE_SEARCH} to resolve the correct Actor first`);
+            expect(description).toContain('A name without a username means one of your own Actors');
+            expect(description).toContain(
+                `${HELPER_TOOLS.STORE_SEARCH} returns the full "username/name" of Store Actors`,
+            );
             expect(description).toContain('waitSecs');
             expect(description).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
             expect(description).not.toContain('always runs asynchronously');
@@ -377,6 +380,16 @@ describe('call_actor_common', () => {
             const allText = (response.content ?? []).map(textOf).join('\n');
             expect(allText).toContain('Input is not valid: bad JSON');
             expect(allText).not.toContain('verify the Actor name');
+        });
+    });
+
+    describe('callActorArgs.actor', () => {
+        // A name alone resolves against the caller's own Actors, so a Store Actor's bare name runs a same-named own
+        // Actor if there is one; the schema has to say so.
+        it("says a name without a username means one of your own Actors, never another account's Actor", () => {
+            expect(callActorArgs.shape.actor.description).toContain(
+                "A name without a username always means one of your own Actors, never another account's Actor.",
+            );
         });
     });
 

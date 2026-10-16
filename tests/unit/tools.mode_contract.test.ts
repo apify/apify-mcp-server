@@ -245,13 +245,25 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
     });
 
     describe('fetch-actor-details name-resolution guidance', () => {
-        it('sends the model to search-actors for an inexact name when that tool is served', () => {
+        it('names search-actors as the way to an inexact Store name when that tool is served', () => {
             const { description } = getToolPublicFieldOnly(fetchActorDetails, {
                 presentTools: new Set([HELPER_TOOLS.ACTOR_GET_DETAILS, HELPER_TOOLS.STORE_SEARCH]),
             });
 
-            expect(description).toContain('Requires the exact ID or full name');
-            expect(description).toContain(`find it with ${HELPER_TOOLS.STORE_SEARCH} first`);
+            expect(description).toContain('Requires the exact ID or name');
+            expect(description).toContain(
+                `${HELPER_TOOLS.STORE_SEARCH} finds an Apify Store Actor from a description or a partial name`,
+            );
+        });
+
+        it('says a name without a username means one of your own Actors', () => {
+            const { description } = getToolPublicFieldOnly(fetchActorDetails, {
+                presentTools: new Set([HELPER_TOOLS.ACTOR_GET_DETAILS]),
+            });
+
+            expect(description).toContain(
+                "A name without a username means one of your own Actors, never another account's Actor.",
+            );
         });
 
         // The half of the guidance that names no tool must survive a session without
