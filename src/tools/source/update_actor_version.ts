@@ -212,7 +212,7 @@ function applyTextEdits(originalText: string, edits: readonly TextEdit[], label:
             throw buildPreconditionError(label, PRECONDITION_REASON.NO_MATCH, detail);
         }
         if (nextOffset !== undefined) {
-            const detail = `oldText of edits[${editIndex}] matches more than once; add surrounding lines so it matches once.`;
+            const detail = `oldText of edits[${editIndex}] matches more than once; surrounding lines in oldText can narrow it to one match.`;
             throw buildPreconditionError(label, PRECONDITION_REASON.MULTIPLE_MATCHES, detail);
         }
         text = text.slice(0, offset) + newText + text.slice(offset + oldText.length);
@@ -237,7 +237,7 @@ function applyOperation(
         validateFilePath(path, label);
         const existing = files.get(path);
         if (existing && expectedHash === undefined) {
-            const detail = `${path} exists with hash ${existing.hash}; pass that as expectedHash to replace it.`;
+            const detail = `${path} exists with hash ${existing.hash}; a write with that hash as expectedHash replaces it.`;
             throw buildPreconditionError(label, PRECONDITION_REASON.FILE_EXISTS, detail);
         }
         if (expectedHash !== undefined) validateHash(findFile(files, path, label), expectedHash, label);
@@ -258,7 +258,7 @@ function applyOperation(
     if (expectedHash !== undefined) validateHash(existing, expectedHash, label);
     // The same rule get-actor-version returns text by, so a file it returned as utf8 can be edited.
     if (existing.encoding !== 'utf8') {
-        const detail = `${path} is not UTF-8 text; replace it with a write.`;
+        const detail = `${path} is not UTF-8 text; only a write can replace it.`;
         throw buildPreconditionError(label, PRECONDITION_REASON.NOT_TEXT, detail);
     }
     const text = applyTextEdits(existing.content, edits, label);
@@ -306,7 +306,7 @@ export const updateActorVersion: ToolEntry = Object.freeze({
         - edit {path, edits: [{oldText, newText}], expectedHash?}: replaces text in a UTF-8 file. Each oldText must match exactly once, byte for byte.
         - delete {path, expectedHash}: removes a file. To rename a file, delete it and write it at the new path.
         A call takes at most ${MAX_OPERATIONS_PER_CALL} operations and at most ${MAX_EDITS_PER_CALL} edits in total across its edit operations.
-        expectedHash and expectedRevision take the hash and revision from the version listing. A failed check names the operation, the file, and one of FILE_EXISTS, FILE_NOT_FOUND, HASH_MISMATCH, NO_MATCH, MULTIPLE_MATCHES, NOT_TEXT, or REVISION_MISMATCH; read the file again and retry.
+        expectedHash and expectedRevision take the hash and revision from the version listing. A failed check names the operation, the file, and one of FILE_EXISTS, FILE_NOT_FOUND, HASH_MISMATCH, NO_MATCH, MULTIPLE_MATCHES, NOT_TEXT, or REVISION_MISMATCH.
         Binary files take base64 content with encoding base64; files with a binary extension such as .png default to it.
         Only versions stored as files can be changed. Env vars and the build tag are never changed.
         autoBuild starts a build after the write and returns without waiting. Without it, runs keep using the previous build.
@@ -343,7 +343,7 @@ export const updateActorVersion: ToolEntry = Object.freeze({
             .reduce((count, { edits = [] }) => count + edits.length, 0);
         if (editCount > MAX_EDITS_PER_CALL) {
             return respondUserError(
-                `Nothing was written: the operations have ${editCount} edits in total, and one call takes at most ${MAX_EDITS_PER_CALL}. Split them across calls.`,
+                `Nothing was written: the operations have ${editCount} edits in total, and one call takes at most ${MAX_EDITS_PER_CALL}.`,
             );
         }
         try {

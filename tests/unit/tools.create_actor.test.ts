@@ -294,7 +294,7 @@ describe('create-actor', () => {
         expect(result.content).toHaveLength(2);
         expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
         expect(result.content[1].text).toBe(
-            'Created the private Actor john/my-actor.\nBuild the version before running it.',
+            'Created the private Actor john/my-actor.\nNo build was started; runs use these files only after the version is built.',
         );
         // No other call: nothing reads or updates an existing Actor, and no build starts.
         expect(actorMock).not.toHaveBeenCalled();
@@ -481,7 +481,7 @@ describe('create-actor', () => {
 
             expectSoftFailInvalidInput(result);
             expect(result.content[0].text).toBe(
-                `files[1] (${path}) has a path outside the Actor root; give one relative to it, such as src/main.js.`,
+                `files[1] (${path}) has a path outside the Actor root; paths are relative to it, such as src/main.js.`,
             );
             expect(actorsCreateMock).not.toHaveBeenCalled();
             expect(buildMock).not.toHaveBeenCalled();
@@ -580,7 +580,9 @@ describe('create-actor', () => {
         });
 
         expectSoftFailInvalidInput(result);
-        expect(result.content[0].text).toBe(`files[1] (${second}) repeats the path ${path}; send each file once.`);
+        expect(result.content[0].text).toBe(
+            `files[1] (${second}) repeats the path ${path}; each path can be sent only once.`,
+        );
         expect(actorsCreateMock).not.toHaveBeenCalled();
     });
 
@@ -593,7 +595,7 @@ describe('create-actor', () => {
 
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toBe(
-            `files[1] (${file.path}) has content that is not valid base64; send binary content as base64, or text with encoding utf8.`,
+            `files[1] (${file.path}) has content that is not valid base64; encoding base64 takes binary content as base64, and text takes encoding utf8.`,
         );
         expect(actorsCreateMock).not.toHaveBeenCalled();
     });
@@ -706,9 +708,8 @@ describe('create-actor', () => {
                 type: 'text',
                 text:
                     'The platform refused the name my-actor as taken when the request was retried, so an earlier ' +
-                    'attempt of this call may have created the Actor. Read it with get-actor-version, as ' +
-                    'username/my-actor with your username, before calling create-actor again; if it holds the ' +
-                    'files you sent, this call created it.',
+                    'attempt of this call may have created the Actor, username/my-actor with your username. ' +
+                    'If it holds the files you sent, this call created it; get-actor-version reads its files.',
             },
         ]);
         expect(actorsCreateMock).toHaveBeenCalledTimes(1);
@@ -728,8 +729,8 @@ describe('create-actor', () => {
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toBe(
             'The platform refused the name my-actor as taken when the request was retried, so an earlier attempt ' +
-                'of this call may have created the Actor. Read it, as username/my-actor with your username, before ' +
-                'calling create-actor again; if it holds the files you sent, this call created it.',
+                'of this call may have created the Actor, username/my-actor with your username. If it holds the ' +
+                'files you sent, this call created it.',
         );
     });
 
@@ -796,7 +797,7 @@ describe('create-actor', () => {
             expect(result.structuredContent.actorId).toBe('actor-9');
             expect(result.structuredContent.buildError).toBe('socket hang up');
             expect(result.content[1].text).toBe(
-                'Created the private Actor john/my-actor.\nThe build could not be started; start it again before running the version.',
+                'Created the private Actor john/my-actor.\nThe build could not be started; runs use these files only after the version is built.',
             );
         });
 

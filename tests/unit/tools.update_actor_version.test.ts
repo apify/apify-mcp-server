@@ -179,6 +179,13 @@ describe('update-actor-version', () => {
         expect((updateActorVersion as HelperTool).paymentRequired).toBeUndefined();
     });
 
+    it('names the reason codes of a failed check in its description without asking for a retry', () => {
+        expect(updateActorVersion.description).toContain(
+            'one of FILE_EXISTS, FILE_NOT_FOUND, HASH_MISMATCH, NO_MATCH, MULTIPLE_MATCHES, NOT_TEXT, or REVISION_MISMATCH.',
+        );
+        expect(updateActorVersion.description).not.toMatch(/retry/i);
+    });
+
     it('reads the Actor once and sends one PUT with only sourceType and sourceFiles', async () => {
         const result = await callTool({ operations: [write('src/util.js', 'export const b = 2;\n')] });
 
@@ -206,7 +213,7 @@ describe('update-actor-version', () => {
         expect(result.content).toHaveLength(2);
         expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
         expect(result.content[1].text).toBe(
-            'Updated version 0.1 of john/my-actor.\nBuild the version before running it.',
+            'Updated version 0.1 of john/my-actor.\nNo build was started; runs use these files only after the version is built.',
         );
         expect(buildMock).not.toHaveBeenCalled();
     });
@@ -336,8 +343,7 @@ describe('update-actor-version', () => {
             });
 
             expect(text).toBe(
-                'Nothing was written: the operations have 21 edits in total, and one call takes at most 20. ' +
-                    'Split them across calls.',
+                'Nothing was written: the operations have 21 edits in total, and one call takes at most 20.',
             );
             expect(actorGetMock).not.toHaveBeenCalled();
             expect(buildMock).not.toHaveBeenCalled();
@@ -575,7 +581,7 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 `${failedWith(0, 'write', 'src/util.js', 'FILE_EXISTS')} ` +
-                    `src/util.js exists with hash ${UNNORMALIZED_HASH}; pass that as expectedHash to replace it.`,
+                    `src/util.js exists with hash ${UNNORMALIZED_HASH}; a write with that hash as expectedHash replaces it.`,
             );
         });
 
@@ -763,7 +769,7 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 'Nothing was written: operations[0] (write src/main.js) failed with FILE_EXISTS. ' +
-                    `src/main.js exists with hash ${MAIN_JS_HASH}; pass that as expectedHash to replace it.`,
+                    `src/main.js exists with hash ${MAIN_JS_HASH}; a write with that hash as expectedHash replaces it.`,
             );
         });
 
@@ -811,7 +817,7 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 `${failedWith(0, 'write', './src/main.js', 'FILE_EXISTS')} ` +
-                    `src/main.js exists with hash ${MAIN_JS_HASH}; pass that as expectedHash to replace it.`,
+                    `src/main.js exists with hash ${MAIN_JS_HASH}; a write with that hash as expectedHash replaces it.`,
             );
             expect(getPutFiles()).toStrictEqual([
                 FOLDER,
@@ -852,7 +858,7 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 `operations[0] (write ${path}) has content that is not valid base64; ` +
-                    'send binary content as base64, or text with encoding utf8.',
+                    'encoding base64 takes binary content as base64, and text takes encoding utf8.',
             );
             expect(buildMock).not.toHaveBeenCalled();
         });
@@ -1131,7 +1137,7 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 `${failedWith(0, 'edit', 'src/main.js', 'MULTIPLE_MATCHES')} ` +
-                    'oldText of edits[0] matches more than once; add surrounding lines so it matches once.',
+                    'oldText of edits[0] matches more than once; surrounding lines in oldText can narrow it to one match.',
             );
         });
 
@@ -1144,7 +1150,7 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 `${failedWith(0, 'edit', 'src/main.js', 'MULTIPLE_MATCHES')} ` +
-                    'oldText of edits[0] matches more than once; add surrounding lines so it matches once.',
+                    'oldText of edits[0] matches more than once; surrounding lines in oldText can narrow it to one match.',
             );
         });
 
@@ -1171,7 +1177,7 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 `${failedWith(0, 'edit', 'src/main.js', 'MULTIPLE_MATCHES')} ` +
-                    'oldText of edits[1] matches more than once; add surrounding lines so it matches once.',
+                    'oldText of edits[1] matches more than once; surrounding lines in oldText can narrow it to one match.',
             );
         });
 
@@ -1209,7 +1215,7 @@ describe('update-actor-version', () => {
             });
 
             expect(text).toBe(
-                `${failedWith(0, 'edit', 'assets/x.png', 'NOT_TEXT')} assets/x.png is not UTF-8 text; replace it with a write.`,
+                `${failedWith(0, 'edit', 'assets/x.png', 'NOT_TEXT')} assets/x.png is not UTF-8 text; only a write can replace it.`,
             );
         });
 
@@ -1293,7 +1299,7 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 'Nothing was written: operations[0] (edit src/main.js) failed with MULTIPLE_MATCHES. ' +
-                    'oldText of edits[0] matches more than once; add surrounding lines so it matches once.',
+                    'oldText of edits[0] matches more than once; surrounding lines in oldText can narrow it to one match.',
             );
         });
 
@@ -1419,7 +1425,7 @@ describe('update-actor-version', () => {
             });
 
             expect(text).toBe(
-                `${failedWith(0, 'edit', 'src/data.txt', 'NOT_TEXT')} src/data.txt is not UTF-8 text; replace it with a write.`,
+                `${failedWith(0, 'edit', 'src/data.txt', 'NOT_TEXT')} src/data.txt is not UTF-8 text; only a write can replace it.`,
             );
         });
 
@@ -1430,7 +1436,7 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 'Nothing was written: operations[0] (edit assets/logo.png) failed with NOT_TEXT. ' +
-                    'assets/logo.png is not UTF-8 text; replace it with a write.',
+                    'assets/logo.png is not UTF-8 text; only a write can replace it.',
             );
         });
 
@@ -1646,7 +1652,7 @@ describe('update-actor-version', () => {
             );
             expect(exists).toBe(
                 `${failedWith(1, 'write', 'src/new.js', 'FILE_EXISTS')} ` +
-                    `src/new.js exists with hash ${sha256Prefix('v1\n')}; pass that as expectedHash to replace it.`,
+                    `src/new.js exists with hash ${sha256Prefix('v1\n')}; a write with that hash as expectedHash replaces it.`,
             );
             expect(getPutFiles()).toContainEqual({ name: 'src/main.js', format: 'TEXT', content: 'v2\n' });
         });
@@ -1659,7 +1665,7 @@ describe('update-actor-version', () => {
                 const text = await callToolExpectingUserError({ autoBuild: true, operations: [write(path, 'x')] });
 
                 expect(text).toBe(
-                    `operations[0] (write ${path}) has a path outside the Actor root; give one relative to it, such as src/main.js.`,
+                    `operations[0] (write ${path}) has a path outside the Actor root; paths are relative to it, such as src/main.js.`,
                 );
                 expect(buildMock).not.toHaveBeenCalled();
             },
@@ -1917,7 +1923,7 @@ describe('update-actor-version', () => {
             expect(versionUpdateMock).not.toHaveBeenCalled();
             expect(result.structuredContent).toEqual({ revision: await readRevision(), changed: false, changes: [] });
             expect(result.content[1].text).toBe(
-                'Nothing changed in version 0.1 of john/my-actor, so nothing was written.\nBuild the version before running it.',
+                'Nothing changed in version 0.1 of john/my-actor, so nothing was written.\nNo build was started; runs use these files only after the version is built.',
             );
         });
 
@@ -2068,7 +2074,7 @@ describe('update-actor-version', () => {
 
                 expect(actorMock.mock.calls).toEqual([[actor], ['actor-1']]);
                 expect(result.content[1].text).toBe(
-                    'Updated version 0.1 of john/my-actor.\nBuild the version before running it.',
+                    'Updated version 0.1 of john/my-actor.\nNo build was started; runs use these files only after the version is built.',
                 );
             },
         );
@@ -2371,7 +2377,7 @@ describe('update-actor-version', () => {
             expect(result.structuredContent.buildError).toBe('Not enough credit');
             expect(result.structuredContent).not.toHaveProperty('build');
             expect(result.content[1].text).toContain(
-                'The build could not be started; start it again before running the version.',
+                'The build could not be started; runs use these files only after the version is built.',
             );
         });
 
@@ -2395,7 +2401,7 @@ describe('update-actor-version', () => {
                 buildError: error.message,
             });
             expect(result.content[1].text).toBe(
-                'Updated version 0.1 of john/my-actor.\nThe build could not be started; start it again before running the version.',
+                'Updated version 0.1 of john/my-actor.\nThe build could not be started; runs use these files only after the version is built.',
             );
         });
 

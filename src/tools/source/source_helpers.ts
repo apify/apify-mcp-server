@@ -219,7 +219,7 @@ function isBase64(content: string): boolean {
 export function validateFileContent({ format, content }: ActorVersionSourceFile, label: string): void {
     if (format === 'BASE64' && !isBase64(content)) {
         throw new UserInputError(
-            `${label} has content that is not valid base64; send binary content as base64, or text with encoding utf8.`,
+            `${label} has content that is not valid base64; encoding base64 takes binary content as base64, and text takes encoding utf8.`,
         );
     }
     if (format === 'TEXT' && !content.isWellFormed()) {
@@ -247,7 +247,7 @@ export function validatePathCharacters(path: string, label: string): void {
 export function validateFilePath(path: string, label: string): void {
     if (path.startsWith('/') || path === '..' || path.startsWith('../')) {
         throw new UserInputError(
-            `${label} has a path outside the Actor root; give one relative to it, such as src/main.js.`,
+            `${label} has a path outside the Actor root; paths are relative to it, such as src/main.js.`,
         );
     }
     if (path === '.' || path.endsWith('/')) {
@@ -299,7 +299,7 @@ export async function respondAfterWrite(params: {
         return respondWithBuild({
             structuredContent,
             summary,
-            nextStep: 'Build the version before running it.',
+            nextStep: 'No build was started; runs use these files only after the version is built.',
         });
     }
     let linkContext: ConsoleLinkContext | undefined;
@@ -322,7 +322,7 @@ export async function respondAfterWrite(params: {
                 buildError: error instanceof Error ? error.message : String(error),
             },
             summary,
-            nextStep: 'The build could not be started; start it again before running the version.',
+            nextStep: 'The build could not be started; runs use these files only after the version is built.',
         });
     }
     // startBuild returns ABORT only for a passed signal; the check narrows the type.

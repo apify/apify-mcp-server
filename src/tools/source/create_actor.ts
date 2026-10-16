@@ -65,7 +65,7 @@ function buildSourceFileEntries(files: readonly z.infer<typeof sourceFileArgs>[]
         validateFilePath(entry.name, label);
         validateFileContent(entry, label);
         if (filePaths.has(entry.name)) {
-            throw new UserInputError(`${label} repeats the path ${entry.name}; send each file once.`);
+            throw new UserInputError(`${label} repeats the path ${entry.name}; each path can be sent only once.`);
         }
         const folders = listFolders(entry.name);
         const collision = folders.find((folder) => filePaths.has(folder)) ?? firstFileByFolder.get(entry.name);
@@ -174,13 +174,12 @@ export const createActor: ToolEntry = Object.freeze({
                 error.attempt > 1
             ) {
                 const readTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_GET)
-                    ? ` with ${HELPER_TOOLS.ACTOR_VERSION_GET}`
+                    ? `; ${HELPER_TOOLS.ACTOR_VERSION_GET} reads its files`
                     : '';
                 return respondUserError(
                     `The platform refused the name ${parsed.name} as taken when the request was retried, so an earlier ` +
-                        `attempt of this call may have created the Actor. Read it${readTool}, as username/${parsed.name} ` +
-                        `with your username, before calling ${HELPER_TOOLS.ACTOR_CREATE} again; if it holds the files ` +
-                        'you sent, this call created it.',
+                        `attempt of this call may have created the Actor, username/${parsed.name} with your username. ` +
+                        `If it holds the files you sent, this call created it${readTool}.`,
                     { httpStatus: error.statusCode },
                 );
             }
