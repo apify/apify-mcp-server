@@ -385,8 +385,6 @@ export const updateActorVersion: ToolEntry = Object.freeze({
                     .version(versionNumber)
                     .update({ sourceType: ActorSourceType.SourceFiles, sourceFiles });
             }
-            // Per the MCP spec a cancelled request gets no response; the write stands, and no build is started.
-            if (signal?.aborted) return respondAborted();
             const changes = buildFileChanges(before, after);
             const emptyPaths = changes.flatMap(({ path }) => (after.get(path)?.sizeBytes === 0 ? [path] : []));
             return await respondAfterWrite({

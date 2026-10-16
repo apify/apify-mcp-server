@@ -163,8 +163,6 @@ export const createActor: ToolEntry = Object.freeze({
                     },
                 ],
             } satisfies ActorCollectionCreateOptions);
-            // Per the MCP spec a cancelled request gets no response; the Actor stands, and no build is started.
-            if (signal?.aborted) return respondAborted();
             const fullName = `${created.username}/${created.name}`;
             // The platform sets the name in .actor/actor.json on create, so the stored files, not the sent ones, match
             // a later read.
