@@ -582,8 +582,7 @@ export const sourceCases: Case[] = [
                 // exact. In apify-core it reads `Some other Actor already has this name ("<name>").`, with status 409.
                 expect(expectToolFailure(result)).toMatch(
                     new RegExp(
-                        `^Error calling tool "create-actor": .*"${name}".* \\(API error type: actor-name-not-unique\\)\\. ` +
-                            'Verify the tool name and input parameters\\.$',
+                        `^Error calling tool "create-actor": .*"${name}".* \\(API error type: actor-name-not-unique\\)\\.$`,
                     ),
                 );
                 // The name still leads to the first Actor, stored as it was.
