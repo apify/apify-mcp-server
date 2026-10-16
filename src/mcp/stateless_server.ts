@@ -165,8 +165,9 @@ class StatelessMcpServer {
         this.server.setRequestHandler('tools/list', async (_request, ctx) => {
             const snapshot = await this.resolveSnapshot(ctx);
             const presentTools = new Set(snapshot.tools.keys());
+            const { clientParam } = this.host.options;
             const tools = Array.from(snapshot.tools.values()).map((tool) =>
-                getToolPublicFieldOnly(tool, { presentTools }),
+                getToolPublicFieldOnly(tool, { presentTools, clientParam }),
             );
             // Tool entries carry the same public fields as the SDK's `Tool`; type-boundary cast only.
             return { tools } as unknown as ListToolsResult;

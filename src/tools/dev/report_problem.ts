@@ -9,58 +9,29 @@ import { reportProblemToolOutputSchema } from '../structured_output_schemas.js';
 
 const REPORT_PROBLEM_DESCRIPTION = `Report a problem with Apify's MCP tools or Actors to the Apify team.
 
-Call it when:
-- A tool or Actor is missing, errors, times out, or returns a confusing, wrong, or empty result.
-- You cannot complete the user's request with the available tools.
+Reports can describe missing tools or Actors, errors, timeouts, confusing results, steps that took several attempts, \
+or tasks that the available tools could not complete. Reports help fix the problem for other users.
 
 Put what you were doing and what went wrong in "message". Do NOT include personal data, credentials, \
 secrets, or verbatim private conversation content — describe the issue in your own words.`;
 
 const ACKNOWLEDGEMENT = `Problem reported. Thank you — this helps the Apify team improve its tools.`;
 
-/**
- * Nudge appended to any failed (isError) tool result so the agent is prompted to report the blocker
- * at the moment it decides what to do next — the single most effective discovery point, since the
- * server-instructions line alone does not reliably trigger a proactive call. Phrased "if you cannot
- * resolve this yourself" so it does not discourage retrying fixable errors.
- */
-export const REPORT_PROBLEM_NUDGE = `If you cannot resolve this yourself, report it to the Apify team by calling ${HELPER_TOOLS.PROBLEM_REPORT} \
-(describe what you were doing and this error) before telling the user you could not complete the task.`;
+/** Offers reporting without ordering a call or putting it before the reply to the user; see apify/apify-mcp-server#1597. */
+export const REPORT_PROBLEM_NUDGE = `If you cannot resolve this yourself, you can report it to the Apify team with \
+${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and this error).`;
 
-/**
- * Softer nudge for INVALID_INPUT failures (payment/standby short-circuits, actor input rejected at
- * runtime, etc.). Most of these are the agent's own mistake, so this doesn't push it to report before
- * giving up — but some are a genuine schema/Actor mismatch the agent would otherwise never think to
- * report, so it still surfaces the tool's existence.
- */
-export const REPORT_PROBLEM_INVALID_INPUT_NUDGE = `If this looks like a bug rather than something fixable by adjusting your request, \
-report it by calling ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and this error).`;
+/** For INVALID_INPUT failures: some are real bugs (an Actor rejecting input that matches its schema), others friction worth reporting. */
+export const REPORT_PROBLEM_INVALID_INPUT_NUDGE = `If this error looks like a bug, or was unclear or took several attempts to get \
+past, you can report it to the Apify team with ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and what went wrong).`;
 
-/**
- * Failure categories that represent expected, user-resolvable control-flow states (pay, approve, fix
- * token) rather than potential Apify defects. The nudge is suppressed for these so it does not flood
- * the channel with paywalls/approvals or steer the agent to give up instead of surfacing the
- * payment/approval URL. `INVALID_INPUT` gets the softer {@link REPORT_PROBLEM_INVALID_INPUT_NUDGE}
- * instead of being suppressed outright — except when the failure carries a 402 HTTP status, a payment
- * (billing) state that is suppressed via `failureHttpStatus` in {@link appendReportProblemNudge} even
- * though 402 is classified `INVALID_INPUT`. `INTERNAL_ERROR` and an absent/unknown category still get
- * the full {@link REPORT_PROBLEM_NUDGE}.
- */
+/** Auth and approval failures are expected states the user resolves, not problems to report. */
 const NON_NUDGE_FAILURE_CATEGORIES = new Set<string>([
     FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
     FAILURE_CATEGORY.AUTH,
 ]);
 
-/**
- * Append a report-problem nudge to a failed tool result's text content, returning a shallow copy with
- * a new `content` array (never mutates the input). Returns the original unchanged unless the result is
- * an error with a text `content[]`, `report-problem` is actually served (`available`), the failing tool
- * is not `report-problem` itself, `failureHttpStatus` is not 402 (a payment/billing state, suppressed
- * even though it is classified `INVALID_INPUT`), and `failureCategory` is not an expected,
- * user-resolvable state (see {@link NON_NUDGE_FAILURE_CATEGORIES}). Uses
- * {@link REPORT_PROBLEM_INVALID_INPUT_NUDGE} for `INVALID_INPUT` and {@link REPORT_PROBLEM_NUDGE}
- * otherwise.
- */
+/** Returns a copy so appending the sentence does not mutate the original tool result. */
 export function appendReportProblemNudge<T>(
     result: T,
     opts: { failingToolName?: string; available: boolean; failureCategory?: string; failureHttpStatus?: number },

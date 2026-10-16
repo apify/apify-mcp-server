@@ -9,8 +9,8 @@
  */
 
 import { getApifyAPIPublicBaseUrl } from '../../apify_client.js';
-import { APIFY_MCP_URL, HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../const.js';
-import { actorNameToToolName, canRunAnyActor } from '../../tools/actor_tool_naming.js';
+import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../const.js';
+import { actorNameToToolName, canRunAnyActor, getOwnServerRemedy } from '../../tools/actor_tool_naming.js';
 import type { ToolDescriptionContext } from '../../types.js';
 import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../types.js';
 
@@ -63,7 +63,7 @@ ${dupWarning}${pollOkLine}`;
 /** Every cross-tool mention gates on `ctx.hasTool(...)`, so a session missing a tool is never told to call it. */
 export function getServerInstructions(
     mode: SERVER_MODE = SERVER_MODE.DEFAULT,
-    { hasTool }: ToolDescriptionContext = ALL_TOOLS_PRESENT,
+    { hasTool, clientParam }: ToolDescriptionContext = ALL_TOOLS_PRESENT,
 ): string {
     const isApps = mode === SERVER_MODE.APPS;
     // Client-facing origin, matching the templates and the read gate.
@@ -84,7 +84,7 @@ export function getServerInstructions(
     const runLimitationLine =
         canRunAnyActor(hasTool) || !(hasSearch || hasDetails)
             ? ''
-            : `- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, set up your own Apify MCP server at ${APIFY_MCP_URL}.\n`;
+            : `- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, ${getOwnServerRemedy(clientParam)}\n`;
 
     const apiReadLine = hasTool(HELPER_TOOLS.API_READ)
         ? `- Use \`${HELPER_TOOLS.API_READ}\` for API GETs. If your client can read resources, \`resources/read\` also returns binary records, such as key-value store files, which \`${HELPER_TOOLS.API_READ}\` does not.\n`
@@ -241,8 +241,7 @@ These tools are called **Actors**. They enable you to extract structured data fr
 - Choose the most appropriate Actor based on the conversation context.
 - Search the Apify Store first; a relevant Actor likely already exists.
 ${runLimitationLine}- When multiple options exist, prefer Actors with higher usage, ratings, or popularity.
-- Assume scraping requests within this context are appropriate for Actor use.
-- Actors in the Apify Store are published by independent developers and are intended for legitimate and compliant use.
+- Apify Store lists Actors published by Apify and by independent developers.
 
 ## Actor execution workflow
 - Actors take input and produce output.
@@ -263,7 +262,7 @@ ${actorTasksSection}${schedulesSection}
 ${apiReadLine}${widgetWorkflowSection}${dependenciesAndDisambiguation}${
         hasTool(HELPER_TOOLS.PROBLEM_REPORT)
             ? `
-If a tool or Actor fails and you cannot resolve it, you can report it with \`${HELPER_TOOLS.PROBLEM_REPORT}\`.
+If a tool or Actor fails, or a step is confusing or takes several attempts, you can report it with \`${HELPER_TOOLS.PROBLEM_REPORT}\`.
 `
             : ''
     }`;

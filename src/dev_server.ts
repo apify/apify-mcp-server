@@ -32,6 +32,7 @@ import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
 
 import { ApifyClient } from './apify_client.js';
+import { MAX_REQUEST_BODY_BYTES } from './const.js';
 import { buildMcpClientContext } from './mcp/client_context.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { createStatelessServer } from './mcp/stateless_server.js';
@@ -121,7 +122,7 @@ async function parseUrlParams(req: Request) {
             true,
         serverMode: uiParam !== null ? parseServerMode(uiParam) : parseServerMode(process.env.UI_MODE),
         paymentProvider: await resolvePaymentProvider(urlParams.get('payment')),
-        // Client attribution tag (e.g. ?client=cursor), for Segment.
+        // Client attribution tag (e.g. ?client=cursor), for Segment and tool wording.
         clientParam: urlParams.get('client') ?? undefined,
     };
 }
@@ -249,7 +250,8 @@ export function createExpressApp(): express.Express {
         if (validateHost(req, res) && validateOrigin(req, res)) next();
     });
 
-    app.use(express.json());
+    // Express's 100 KB default is too small for tool calls that carry files. See apify/apify-mcp-server#1610.
+    app.use(express.json({ limit: MAX_REQUEST_BODY_BYTES }));
     app.post('/', async (req: Request, res: Response) => {
         log.info('Received MCP request:', req.body);
         try {

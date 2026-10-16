@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.18.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.18.4) (2026-10-16)
+
+### 🚀 Features
+
+- Tell Claude users to add their own server as a custom connector ([#1595](https://github.com/apify/apify-mcp-server/pull/1595)) ([fea9a33](https://github.com/apify/apify-mcp-server/commit/fea9a333b36e14053cf42552bc3d6441293ac8d5)) by [@jirispilka](https://github.com/jirispilka), closes [#1599](https://github.com/apify/apify-mcp-server/issues/1599)
+
+### 🐛 Bug Fixes
+
+- Describe Apify Store neutrally instead of judging requests ([#1602](https://github.com/apify/apify-mcp-server/pull/1602)) ([21f2c4c](https://github.com/apify/apify-mcp-server/commit/21f2c4ca8df035f455594ed8ce223b0bc82edd52)) by [@jirispilka](https://github.com/jirispilka), closes [#1598](https://github.com/apify/apify-mcp-server/issues/1598)
+- Describe an empty search page without saying the results ended ([#1600](https://github.com/apify/apify-mcp-server/pull/1600)) ([1cbde22](https://github.com/apify/apify-mcp-server/commit/1cbde2233218b09ad050f7e88000ee935f056852)) by [@jirispilka](https://github.com/jirispilka), closes [#1593](https://github.com/apify/apify-mcp-server/issues/1593)
+- Refuse in resources&#x2F;read what the API tools refuse ([#1525](https://github.com/apify/apify-mcp-server/pull/1525)) ([9a406b2](https://github.com/apify/apify-mcp-server/commit/9a406b271348b56a57e4003d37233be85cb502fb)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1524](https://github.com/apify/apify-mcp-server/issues/1524)
+- Offer report-problem without ordering a call, including friction ([#1601](https://github.com/apify/apify-mcp-server/pull/1601)) ([63fc975](https://github.com/apify/apify-mcp-server/commit/63fc975b3eca9f77e8d215a78759a475cc4d3fbe)) by [@jirispilka](https://github.com/jirispilka), closes [#1597](https://github.com/apify/apify-mcp-server/issues/1597)
+- Remove optional vitest peer dependency ([#1613](https://github.com/apify/apify-mcp-server/pull/1613)) ([ad0673e](https://github.com/apify/apify-mcp-server/commit/ad0673e414998f03ef863f9cc695e1e3e0aa5b19)) by [@jirispilka](https://github.com/jirispilka)
+- Accept request bodies up to 9 MB in the dev server ([#1611](https://github.com/apify/apify-mcp-server/pull/1611)) ([b06cc11](https://github.com/apify/apify-mcp-server/commit/b06cc116747a284b1fa4622b6c4dbdbd6508c927)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1610](https://github.com/apify/apify-mcp-server/issues/1610)
+
+
 ## [0.18.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.18.3) (2026-10-15)
 
 ### 🐛 Bug Fixes

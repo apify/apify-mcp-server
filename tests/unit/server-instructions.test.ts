@@ -10,7 +10,7 @@ import { CLAUDE_CONNECTOR_TOOLS } from './helpers/claude_connector_tools.js';
 import { only } from './helpers/tool_context.js';
 
 const RUN_LIMITATION_LINE =
-    '- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, set up your own Apify MCP server at https://mcp.apify.com.\n';
+    '- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, create your own Apify MCP server configuration at https://mcp.apify.com and add it to your agent.\n';
 
 describe('getServerInstructions()', () => {
     it('defaults to ALL_TOOLS_PRESENT — no regression for the common case (every tool loaded)', () => {
@@ -22,7 +22,9 @@ describe('getServerInstructions()', () => {
     it('mentions report-problem with a gentle, non-mandatory nudge when feedback is available', () => {
         const instructions = getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT);
         expect(instructions).toContain(HELPER_TOOLS.PROBLEM_REPORT);
-        expect(instructions).toContain('you can report it');
+        expect(instructions).toContain(
+            `If a tool or Actor fails, or a step is confusing or takes several attempts, you can report it with \`${HELPER_TOOLS.PROBLEM_REPORT}\`.`,
+        );
         // No hard directive — the directory review rejects MUST-style solicitation.
         expect(instructions).not.toContain('MUST');
         expect(instructions).not.toContain('Reporting problems and feedback');

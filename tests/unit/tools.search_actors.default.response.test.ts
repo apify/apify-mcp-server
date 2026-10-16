@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { APIFY_STORE_URL, HELPER_TOOLS, MAX_INPUT_FIELDS_IN_ACTOR_CARD, RAG_WEB_BROWSER } from '../../src/const.js';
-import { ACTOR_CALLABILITY_CAVEAT, actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
+import { actorNameToToolName, getActorCallabilityCaveat } from '../../src/tools/actor_tool_naming.js';
 import { ACTOR_DETAILS_HINT, searchActors, searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors.js';
 import { actorInfoSchema } from '../../src/tools/structured_output_schemas.js';
 import type { ActorStoreInputSchema, ActorStoreList, HelperTool } from '../../src/types.js';
@@ -187,11 +187,11 @@ describe('search-actors without widget (searchActors)', () => {
         expect(content[0].text).toBe(NO_ACTORS_FOUND_TEXT);
     });
 
-    it('says that no Actors are past the offset, without keyword guidance', async () => {
+    it('describes an empty page at a later offset without saying the results ended', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([]);
 
         const result = await (searchActors as HelperTool).call(
-            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 1 }, mockApifyClient(), {
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 8 }, mockApifyClient(), {
                 loadedToolNames: [],
             }),
         );
@@ -200,7 +200,7 @@ describe('search-actors without widget (searchActors)', () => {
             structuredContent: Record<string, unknown>;
             content: { type: string; text: string }[];
         };
-        const text = `No Actors past offset 1 for the search query "${SEARCH_KEYWORDS}".`;
+        const text = `No Actors returned at offset 8 for the search query "${SEARCH_KEYWORDS}".`;
         expect(structuredContent).toEqual({ actors: [], query: SEARCH_KEYWORDS, count: 0, instructions: text });
         expect(content).toEqual([{ type: 'text', text }]);
     });
@@ -272,7 +272,7 @@ describe('search-actors without widget (searchActors)', () => {
         };
 
         expect(structuredContent.instructions).toBe(
-            `${ACTOR_DETAILS_HINT}\n${VERBATIM_LINKS_NUDGE}\n${ACTOR_CALLABILITY_CAVEAT}`,
+            `${ACTOR_DETAILS_HINT}\n${VERBATIM_LINKS_NUDGE}\n${getActorCallabilityCaveat()}`,
         );
         expect(content[0].text.endsWith(`\n\n${structuredContent.instructions}`)).toBe(true);
         expect(content[0].text.split(VERBATIM_LINKS_NUDGE)).toHaveLength(2);
@@ -402,7 +402,7 @@ describe('buildDescription()', () => {
     it('states the run limitation after the input-fields sentence when call-actor and its widget are absent', () => {
         const description = renderDescription(HELPER_TOOLS.STORE_SEARCH);
         expect(description).toContain(
-            `so you can see what input an Actor needs.\n${ACTOR_CALLABILITY_CAVEAT}\nThe search is limited to publicly available Actors`,
+            `so you can see what input an Actor needs.\n${getActorCallabilityCaveat()}\nThe search is limited to publicly available Actors`,
         );
         // No hard directive — the directory review rejects MUST-style solicitation.
         expect(description).not.toContain('MUST');
@@ -410,19 +410,19 @@ describe('buildDescription()', () => {
 
     it('keeps the run limitation and the details line on separate lines when fetch-actor-details is loaded', () => {
         expect(renderDescription(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS)).toContain(
-            `${ACTOR_CALLABILITY_CAVEAT}\nFor complete Actor details (per-field descriptions, defaults, README), use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool.\nThe search is limited to publicly available Actors`,
+            `${getActorCallabilityCaveat()}\nFor complete Actor details (per-field descriptions, defaults, README), use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool.\nThe search is limited to publicly available Actors`,
         );
     });
 
     it('omits the run limitation when the session has call-actor', () => {
         expect(renderDescription(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_CALL)).not.toContain(
-            ACTOR_CALLABILITY_CAVEAT,
+            getActorCallabilityCaveat(),
         );
     });
 
     it('states the run limitation when the session has only create-schedule', () => {
         expect(renderDescription(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.SCHEDULE_CREATE)).toContain(
-            ACTOR_CALLABILITY_CAVEAT,
+            getActorCallabilityCaveat(),
         );
     });
 
@@ -447,7 +447,7 @@ describe('buildDescription()', () => {
         expect(searchActors.description).toContain(
             'so you can construct an Actor call directly without another tool call.\nFor complete Actor details',
         );
-        expect(searchActors.description).not.toContain(ACTOR_CALLABILITY_CAVEAT);
+        expect(searchActors.description).not.toContain(getActorCallabilityCaveat());
     });
 
     // Regression: #1532 — the description named apify/rag-web-browser when the session did not serve it.

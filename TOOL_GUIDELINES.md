@@ -32,8 +32,10 @@ sentence can block a listing. Every configuration of this server must pass them.
   [src/tools/AGENTS.md](./src/tools/AGENTS.md).
 - Gate in place: a session that holds every tool gets byte-identical text.
 - When no general Actor-running tool is loaded, discovery responses say the Actor cannot be run in
-  this configuration. The only remedy to offer is "set up your own Apify MCP server at
-  https://mcp.apify.com". No `?tools=` instructions and no Actor page links in served text.
+  this configuration. The only remedy to offer is "create your own Apify MCP server configuration at
+  https://mcp.apify.com and add it to your agent" (`getOwnServerRemedy`). Tool descriptions and
+  instructions say "add it to Claude as a custom connector" for `?client=claude`; tool results keep
+  the neutral wording. No `?tools=` instructions and no Actor page links in served text.
 
 ## Never return a secret
 

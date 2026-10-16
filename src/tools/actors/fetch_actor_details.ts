@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { APIFY_MCP_URL, HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type {
     ConsoleLinkContext,
     HelperTool,
@@ -24,7 +24,7 @@ import { buildConsoleActorUrl, getConsoleLinkContext, VERBATIM_LINKS_NUDGE } fro
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import { canRunActor } from '../actor_tool_naming.js';
+import { canRunActor, getOwnServerRemedy } from '../actor_tool_naming.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 
@@ -160,7 +160,7 @@ export function buildActorNotRunnableGuidance(
     if (canRunActor(actorId, loadedToolNames, loadedActorIds)) return '';
     return dedent`
         This Actor is not exposed as a tool and cannot be run in this configuration. To use it,
-        set up your own Apify MCP server at ${APIFY_MCP_URL}.
+        ${getOwnServerRemedy()}
     `;
 }
 

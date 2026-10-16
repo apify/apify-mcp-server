@@ -746,6 +746,26 @@ describe('executeToolAndUpdateTask()', () => {
             expect(texts).not.toContain(REPORT_PROBLEM_INVALID_INPUT_NUDGE);
         });
     });
+
+    it.each([
+        ['an internal failure gets the general sentence', 500, REPORT_PROBLEM_NUDGE],
+        ['a 4xx failure gets the friction sentence', 404, REPORT_PROBLEM_INVALID_INPUT_NUDGE],
+    ])('appends one report-problem sentence to an ACTOR_MCP task failure: %s', async (_label, code, sentence) => {
+        await withServer(async (server) => {
+            silenceLogs();
+            const rejectingClient = {
+                callTool: vi.fn().mockRejectedValue(new McpError(code as ErrorCode, `remote ${code}`)),
+                close: vi.fn().mockResolvedValue(undefined),
+                setNotificationHandler: vi.fn(),
+            } as unknown as Client;
+            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(rejectingClient);
+            server.upsertTools([{ ...reportProblem }]);
+            const { result } = await runTaskAndReadBack(server, makeActorMcpTool());
+            const texts = (result.content as { text: string }[]).map((c) => c.text);
+            expect(texts).toHaveLength(2);
+            expect(texts[1]).toBe(sentence);
+        });
+    });
 });
 
 describe('ACTOR_MCP remote-McpError containment (sync tools/call catch)', () => {

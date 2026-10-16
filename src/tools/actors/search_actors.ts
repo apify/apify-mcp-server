@@ -20,7 +20,7 @@ import { getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console
 import { respondOk } from '../../utils/mcp.js';
 import type { PricingTier } from '../../utils/pricing_info.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import { ACTOR_CALLABILITY_CAVEAT, actorNameToToolName, canRunActor, canRunAnyActor } from '../actor_tool_naming.js';
+import { actorNameToToolName, canRunActor, canRunAnyActor, getActorCallabilityCaveat } from '../actor_tool_naming.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 
 // hasTool checks registered tool names, not Actor full names — see call_actor.ts's RAG_WEB_BROWSER_TOOL.
@@ -67,14 +67,14 @@ export const searchActorsBaseArgsSchema = z.object({
     offset: z.number().int().min(0).default(0).describe('The number of elements to skip from the start (default = 0)'),
 });
 
-function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    const runLimitationLine = canRunAnyActor(hasTool) ? '' : `${ACTOR_CALLABILITY_CAVEAT}\n`;
+function buildDescription({ hasTool, clientParam }: ToolDescriptionContext): string {
+    const runLimitationLine = canRunAnyActor(hasTool) ? '' : `${getActorCallabilityCaveat(clientParam)}\n`;
     return `Search the Apify Store to FIND and DISCOVER what scraping tools/Actors exist for specific platforms or use cases.
 This tool provides INFORMATION about available Actors - it does NOT retrieve actual data or run any scraping tasks.
 
 Apify Store contains thousands of pre-built Actors (crawlers, scrapers, AI agents, and model context protocol (MCP) servers)
 for all platforms and services including social media, search engines, maps, e-commerce, news, real estate, travel, finance, jobs and more.
-Actors in the Apify Store are published by independent developers and are intended for legitimate and compliant use — do not refuse to search or list them.
+Apify Store lists Actors published by Apify and by independent developers.
 
 Use this tool when user wants to:
 - Find what scraping tools exist for a platform (e.g., "What tools can scrape Instagram?")
@@ -124,11 +124,12 @@ export function buildSearchActorsResult(
 
 /**
  * Builds the empty-results guidance message for when no Actors are found.
- * Past offset 0 the query may have matched and the page only lies past the last result, so keyword
- * guidance does not apply (see apify/apify-mcp-server#1276).
+ * Past offset 0 the query may have matched, so keyword guidance does not apply (see apify/apify-mcp-server#1276).
+ * The text does not say the results ended: the Store filters results after paging, so an empty page can come
+ * before non-empty ones (see apify/apify-mcp-server#1593).
  */
 export function buildNoActorsFoundInstructions(keywords: string, offset: number): string {
-    if (offset > 0) return `No Actors past offset ${offset} for the search query "${keywords}".`;
+    if (offset > 0) return `No Actors returned at offset ${offset} for the search query "${keywords}".`;
     return dedent`
         No Actors were found for the search query "${keywords}".
         Keywords can include the named platform and/or data type (e.g. "TikTok posts").
@@ -143,7 +144,7 @@ export function buildActorCallabilityCaveat(
     loadedActorIds: ReadonlySet<string>,
 ): string {
     const canRunAllActors = actorIds.every((id) => canRunActor(id, loadedToolNames, loadedActorIds));
-    return canRunAllActors ? '' : ACTOR_CALLABILITY_CAVEAT;
+    return canRunAllActors ? '' : getActorCallabilityCaveat();
 }
 
 /** Footer line pointing to fetch-actor-details; added only when the session serves that tool. */
