@@ -8,13 +8,13 @@ import type { ApifyClient } from '../../apify_client.js';
 import { UserInputError } from '../../errors.js';
 import { REDACTED } from '../../resources/api_resources.js';
 import type { ConsoleLinkContext, InternalToolArgs } from '../../types.js';
+import { getResourceByIdOrName } from '../../utils/apify_resource_id.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondUserError } from '../../utils/mcp.js';
 import { isRecord } from '../api/apify_api_spec.js';
 import { buildNextStepForBuild, listVersionNumbers, respondWithBuild, toBuildResult } from '../builds/build_helpers.js';
-import { getResourceByIdOrName } from '../tasks/task_helpers.js';
 import { hasBinaryExtension } from './source_files.js';
 
 /** The input shape of one file sent whole. */
