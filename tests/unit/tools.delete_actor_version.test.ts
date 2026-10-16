@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import { deleteActorVersion } from '../../src/tools/source/delete_actor_version.js';
+import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
 import { deleteActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {
@@ -30,6 +31,8 @@ type DeleteResult = TextToolResult & {
     toolTelemetry?: ToolTelemetrySnapshot;
 };
 
+const MAIN_JS = { name: 'src/main.js', format: 'TEXT', content: 'console.log(1);\n' };
+
 function mockActor(overrides: Record<string, unknown> = {}) {
     return {
         id: 'actor-1',
@@ -43,7 +46,7 @@ function mockActor(overrides: Record<string, unknown> = {}) {
                 gitRepoUrl: 'https://github.com/john/repo',
                 buildTag: 'latest',
             },
-            { versionNumber: '0.2', sourceType: 'SOURCE_FILES' },
+            { versionNumber: '0.2', sourceType: 'SOURCE_FILES', sourceFiles: [MAIN_JS] },
         ],
         taggedBuilds: { latest: { buildId: 'build-1', buildNumber: '0.1.3' } },
         ...overrides,
@@ -65,6 +68,14 @@ async function callToolExpectingUserError(args: Record<string, unknown>) {
     expectSoftFailInvalidInput(result);
     expect(versionDeleteMock).not.toHaveBeenCalled();
     return result.content[0].text;
+}
+
+/** The revision get-actor-version returns for version 0.2. */
+async function readRevision(): Promise<string> {
+    const result = (await (getActorVersion as HelperTool).call(
+        stubToolCallContext({ actor: 'john/my-actor', versionNumber: '0.2' }, stubClient),
+    )) as { structuredContent: { revision: string } };
+    return result.structuredContent.revision;
 }
 
 function expectNoOtherWrite() {
@@ -226,6 +237,73 @@ describe('delete-actor-version', () => {
                 "Runs with tag latest still use the deleted version's build until each tag points to another build, " +
                 'such as one of another version made with tag latest.',
         );
+    });
+
+    it('describes expectedRevision as a check of the files against the revision read earlier', () => {
+        const { properties } = (deleteActorVersion as HelperTool).inputSchema as {
+            properties: Record<string, { description?: string }>;
+        };
+
+        expect(properties.expectedRevision.description).toBe(
+            'The revision of the version when you read it. When given, the delete is refused if any file of the ' +
+                'version changed since. Only a version stored as files has a revision.',
+        );
+    });
+
+    it.each([
+        ['as returned', (revision: string) => revision],
+        ['in upper case', (revision: string) => revision.toUpperCase()],
+    ])('deletes the version when expectedRevision is the revision get-actor-version returns, %s', async (_, toCase) => {
+        const expectedRevision = toCase(await readRevision());
+
+        const result = await callTool({ expectedRevision });
+
+        expect(versionMock.mock.calls).toEqual([['0.2']]);
+        expect(versionDeleteMock).toHaveBeenCalledTimes(1);
+        expect(result.structuredContent.deleted).toBe(true);
+    });
+
+    it('refuses a stale expectedRevision (REVISION_MISMATCH) before the DELETE', async () => {
+        const revision = await readRevision();
+
+        expect(await callToolExpectingUserError({ expectedRevision: 'aaaaaaaaaaaaaaaa' })).toBe(
+            'Nothing was deleted: expectedRevision failed with REVISION_MISMATCH. ' +
+                `The version's revision is ${revision}, not aaaaaaaaaaaaaaaa.`,
+        );
+        expect(versionMock).not.toHaveBeenCalled();
+        expectNoOtherWrite();
+    });
+
+    it('refuses expectedRevision for a version not stored as files, which has no revision, before the DELETE', async () => {
+        expect(await callToolExpectingUserError({ versionNumber: '0.1', expectedRevision: 'aaaaaaaaaaaaaaaa' })).toBe(
+            'Nothing was deleted: version 0.1 of john/my-actor has source type GIT_REPO, and only a version stored ' +
+                'as files has a revision to compare expectedRevision with.',
+        );
+        expect(versionMock).not.toHaveBeenCalled();
+        expectNoOtherWrite();
+    });
+
+    it('refuses expectedRevision for a version whose source the API hides, before the DELETE', async () => {
+        actorGetMock.mockResolvedValue(mockActor({ versions: [{ versionNumber: '0.2', sourceType: 'SOURCE_FILES' }] }));
+
+        expect(await callToolExpectingUserError({ expectedRevision: 'aaaaaaaaaaaaaaaa' })).toBe(
+            'Version 0.2 of john/my-actor came back without its source: the API hides it from accounts that cannot ' +
+                "modify the Actor. Ask the Actor's owner for the source.",
+        );
+        expect(versionMock).not.toHaveBeenCalled();
+        expectNoOtherWrite();
+    });
+
+    it.each(['0.1', '0.2'])('takes a null expectedRevision as not given for version %s', async (versionNumber) => {
+        const args = { actor: 'john/my-actor', versionNumber, expectedRevision: null };
+
+        expect((deleteActorVersion as HelperTool).ajvValidate(args)).toBe(true);
+        expect(args.expectedRevision).toBe('');
+        const result = await callTool(args);
+
+        expect(versionMock.mock.calls).toEqual([[versionNumber]]);
+        expect(versionDeleteMock).toHaveBeenCalledTimes(1);
+        expect(result.structuredContent.deleted).toBe(true);
     });
 
     it('refuses a version the Actor does not have, which apify-client would report as deleted', async () => {

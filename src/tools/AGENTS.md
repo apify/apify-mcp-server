@@ -51,7 +51,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     after a write, which starts the build for autoBuild. get-actor-version, update-actor-version, and a
     copy in create-actor-version refuse a version not stored as files (Git repository, gist, or zip);
     create-actor-version from files and delete-actor-version work whatever the Actor's versions are
-    stored as.
+    stored as, but delete-actor-version takes expectedRevision only for a version stored as files.
   - `api/` — the generic Apify API tools: search the operations of the published OpenAPI spec, get the
     operations on a path, and send a GET, or a POST, PUT, PATCH, or DELETE, to a path. The write tool is in
     no category (`UNCATEGORIZED_TOOLS`): `tools=api` serves the other three, and a session gets the write

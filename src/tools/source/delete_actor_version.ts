@@ -1,14 +1,17 @@
-import { ApifyApiError } from 'apify-client';
+import type { ActorVersion } from 'apify-client';
+import { ActorSourceType, ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
 import { APIFY_ERROR_TYPE_TOO_FEW_VERSIONS, HELPER_TOOLS } from '../../const.js';
+import { UserInputError } from '../../errors.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
 import { deleteActorVersionToolOutputSchema } from '../structured_output_schemas.js';
-import { fetchActor, resolveVersion, respondToSourceToolError } from './source_helpers.js';
+import { buildFilesManifest, buildFilesRevision } from './source_files.js';
+import { extractSourceFiles, fetchActor, resolveVersion, respondToSourceToolError } from './source_helpers.js';
 
 const deleteActorVersionArgs = z.object({
     actor: z
@@ -18,7 +21,39 @@ const deleteActorVersionArgs = z.object({
             'The Actor to delete the version from: its ID, its name (resolved against your own Actors), or its full name as username/name or username~name.',
         ),
     versionNumber: z.string().min(1).describe('The version to delete, in MAJOR.MINOR form, for example 0.2.'),
+    expectedRevision: z
+        .string()
+        .optional()
+        .describe(
+            'The revision of the version when you read it. When given, the delete is refused if any file of the ' +
+                'version changed since. Only a version stored as files has a revision.',
+        ),
 });
+
+/**
+ * Throws `UserInputError` unless the version's revision, computed as get-actor-version and the write tools compute it,
+ * is `expectedRevision`, ignoring case. A version not stored as files has no revision.
+ */
+function validateRevision(
+    version: ActorVersion & { versionNumber: string },
+    fullName: string,
+    expectedRevision: string,
+) {
+    if (version.sourceType !== ActorSourceType.SourceFiles) {
+        throw new UserInputError(
+            `Nothing was deleted: version ${version.versionNumber} of ${fullName} has source type ${version.sourceType}, ` +
+                'and only a version stored as files has a revision to compare expectedRevision with.',
+        );
+    }
+    const revision = buildFilesRevision(
+        buildFilesManifest(extractSourceFiles(version, `Version ${version.versionNumber} of ${fullName}`)),
+    );
+    if (expectedRevision.toLowerCase() === revision) return;
+    throw new UserInputError(
+        `Nothing was deleted: expectedRevision failed with REVISION_MISMATCH. The version's revision is ${revision}, ` +
+            `not ${expectedRevision}.`,
+    );
+}
 
 /**
  * https://docs.apify.com/api/v2/actor-get
@@ -57,7 +92,10 @@ export const deleteActorVersion: ToolEntry = Object.freeze({
         const parsed = deleteActorVersionArgs.parse(args);
         try {
             const { actor, fullName } = await fetchActor(client, parsed.actor);
-            const { versionNumber } = resolveVersion(actor, parsed.versionNumber, parsed.actor);
+            const version = resolveVersion(actor, parsed.versionNumber, parsed.actor);
+            const { versionNumber } = version;
+            // AJV turns a null expectedRevision into an empty string, which no version has, so it counts as not given.
+            if (parsed.expectedRevision) validateRevision(version, fullName, parsed.expectedRevision);
             // A cancel before the DELETE deletes nothing; per the MCP spec the cancelled request gets no response.
             if (signal?.aborted) return respondAborted();
             try {
