@@ -145,14 +145,14 @@ describe('create-actor-version', () => {
         });
     });
 
-    it('is a non-destructive, non-idempotent, closed-world tool without payment', () => {
+    it('is a non-destructive, non-idempotent, open-world tool without payment, since autoBuild starts a build', () => {
         expect(createActorVersion.name).toBe(HELPER_TOOLS.ACTOR_VERSION_CREATE);
         expect(createActorVersion.annotations).toEqual({
             title: 'Create Actor version',
             readOnlyHint: false,
             destructiveHint: false,
             idempotentHint: false,
-            openWorldHint: false,
+            openWorldHint: true,
         });
         expect((createActorVersion as HelperTool).paymentRequired).toBeUndefined();
     });
