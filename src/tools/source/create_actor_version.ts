@@ -152,8 +152,6 @@ export const createActorVersion: ToolEntry = Object.freeze({
                         applyEnvVarsToBuild: copied.applyEnvVarsToBuild,
                     }),
                 } satisfies ActorVersion);
-            // Per the MCP spec a cancelled request gets no response; the version stands, and no build is started.
-            if (signal?.aborted) return respondAborted();
             const files = buildFilesManifest(sourceFiles);
             const emptyPaths = files.filter(({ sizeBytes }) => sizeBytes === 0).map(({ path }) => path);
             const { warnings = [] } = buildEmptyFilesWarnings(emptyPaths);
