@@ -104,7 +104,8 @@ export const createActorVersion: ToolEntry = Object.freeze({
     annotations: {
         title: 'Create Actor version',
         readOnlyHint: false,
-        destructiveHint: false,
+        // With buildTag and autoBuild, the build it starts moves an existing tag, as build-actor does.
+        destructiveHint: true,
         // A second call with the same versionNumber is refused rather than repeated.
         idempotentHint: false,
         // autoBuild starts a build, like build-actor.
