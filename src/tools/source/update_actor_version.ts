@@ -93,7 +93,7 @@ const updateActorVersionArgs = z.object({
         .string()
         .min(1)
         .describe(
-            'The Actor to change: its ID, or its full name as username/name or username~name. A name without the username is not enough.',
+            'The Actor to change: its ID, its name (resolved against your own Actors), or its full name as username/name or username~name.',
         ),
     versionNumber: z
         .string()

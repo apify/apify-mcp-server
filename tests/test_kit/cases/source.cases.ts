@@ -235,6 +235,12 @@ export const sourceCases: Case[] = [
                         { path: 'src/main.js', content: mainJs, encoding: 'utf8' },
                     ],
                 });
+                // A name without the username is resolved against the token's own Actors.
+                const readByName = expectToolSuccess<GetActorVersionResult>(
+                    await callTool(client, 'get-actor-version', { actor: name }),
+                    'get-actor-version',
+                );
+                expect(readByName).toMatchObject({ actorId: created.actorId, fullName, revision: created.revision });
                 // autoBuild defaults to false.
                 expect(await fetchBuildCount(api, created.actorId)).toBe(0);
             } finally {

@@ -21,7 +21,7 @@ const getActorVersionArgs = z.object({
         .string()
         .min(1)
         .describe(
-            'The Actor to read: its ID, or its full name as username/name or username~name. A name without the username is not enough.',
+            'The Actor to read: its ID, its name (resolved against your own Actors), or its full name as username/name or username~name.',
         ),
     // Format is not enforced by a regex: the lookup against the Actor's versions rejects anything that is not an
     // existing version with a soft fail.

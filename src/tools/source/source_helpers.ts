@@ -14,6 +14,7 @@ import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondUserError } from '../../utils/mcp.js';
 import { isRecord } from '../api/apify_api_spec.js';
 import { buildNextStepForBuild, listVersionNumbers, respondWithBuild, toBuildResult } from '../builds/build_helpers.js';
+import { getResourceByIdOrName } from '../tasks/task_helpers.js';
 import { hasBinaryExtension } from './source_files.js';
 
 /** The input shape of one file sent whole. */
@@ -77,18 +78,19 @@ export function redactSourceToolArgs(
 }
 
 /**
- * The Actor by its ID or full name, `username/name` or `username~name` (apify-client turns username/name into the
- * API's username~name); throws `UserInputError` when there is none.
+ * The Actor by its ID, its name (resolved against the token's own Actors), or its full name, `username/name` or
+ * `username~name` (apify-client turns username/name into the API's username~name); throws `UserInputError` when there
+ * is none.
  */
 export async function fetchActor(
     client: ApifyClient,
     actorSelector: string,
 ): Promise<{ actor: Actor; fullName: string }> {
-    const actor = await client.actor(actorSelector).get();
+    const actor = await getResourceByIdOrName(actorSelector, async (safeId) => client.actor(safeId).get());
     // Extra path segments, such as username/name/runs/last, reach a sub-resource that is not an Actor.
     if (!actor || typeof actor.name !== 'string' || typeof actor.username !== 'string') {
         throw new UserInputError(
-            `Actor '${actorSelector}' not found. Give its ID or its full name, username/name; a name without the username is not enough.`,
+            `Actor '${actorSelector}' not found. The actor argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.`,
         );
     }
     return { actor, fullName: `${actor.username}/${actor.name}` };

@@ -197,7 +197,7 @@ export const createActor: ToolEntry = Object.freeze({
                     : '';
                 return respondUserError(
                     `The platform refused the name ${parsed.name} as taken when the request was retried, so an earlier ` +
-                        `attempt of this call may have created the Actor, username/${parsed.name} with your username. ` +
+                        `attempt of this call may have created the Actor ${parsed.name}. ` +
                         `If it holds the files you sent, this call created it${readTool}.`,
                     { httpStatus: error.statusCode },
                 );

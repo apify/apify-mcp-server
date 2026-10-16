@@ -2114,7 +2114,7 @@ describe('update-actor-version', () => {
             expect(buildMock).not.toHaveBeenCalled();
         });
 
-        it.each(['actor-1', 'john~my-actor'])(
+        it.each(['qGXMy0NAkWsIIb9LZ', 'john~my-actor'])(
             'names the Actor by the full name in its document when given as %s',
             async (actor) => {
                 const result = await callTool({ actor, operations: [write('a.js', 'a')] });
@@ -2137,8 +2137,9 @@ describe('update-actor-version', () => {
 
             const text = await callToolExpectingUserError({ actor: 'my-actor', operations: [write('a.js', 'a')] });
 
+            expect(actorMock.mock.calls).toEqual([['~my-actor']]);
             expect(text).toBe(
-                "Actor 'my-actor' not found. Give its ID or its full name, username/name; a name without the username is not enough.",
+                "Actor 'my-actor' not found. The actor argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.",
             );
         });
 
@@ -2157,7 +2158,7 @@ describe('update-actor-version', () => {
 
                 expectSoftFailInvalidInput(result);
                 expect(result.content[0].text).toBe(
-                    `Actor '${actor}' not found. Give its ID or its full name, username/name; a name without the username is not enough.`,
+                    `Actor '${actor}' not found. The actor argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.`,
                 );
                 expect(versionMock).not.toHaveBeenCalled();
                 expect(buildMock).not.toHaveBeenCalled();

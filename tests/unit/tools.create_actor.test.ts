@@ -724,7 +724,7 @@ describe('create-actor', () => {
                 type: 'text',
                 text:
                     'The platform refused the name my-actor as taken when the request was retried, so an earlier ' +
-                    'attempt of this call may have created the Actor, username/my-actor with your username. ' +
+                    'attempt of this call may have created the Actor my-actor. ' +
                     'If it holds the files you sent, this call created it; get-actor-version reads its files.',
             },
         ]);
@@ -745,8 +745,7 @@ describe('create-actor', () => {
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toBe(
             'The platform refused the name my-actor as taken when the request was retried, so an earlier attempt ' +
-                'of this call may have created the Actor, username/my-actor with your username. If it holds the ' +
-                'files you sent, this call created it.',
+                'of this call may have created the Actor my-actor. If it holds the files you sent, this call created it.',
         );
     });
 
