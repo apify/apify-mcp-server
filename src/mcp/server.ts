@@ -33,7 +33,7 @@ import { getRequestOriginForClient, isReportProblemBlockedForClient } from '../u
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
 import {
-    getActors,
+    getActorsFromInput,
     getToolsForServerMode,
     isReportProblemExplicitlySelected,
     resolveToolNamesFromInput,
@@ -465,7 +465,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         if (missingToolNames.length === 0) return;
 
         const restoreInput = toolNamesToInput(missingToolNames);
-        const actorTools = await getActors(restoreInput, apifyClient, {
+        const actorTools = await getActorsFromInput(restoreInput, apifyClient, {
             actorStore: this.actorStore,
             paymentProvider: this.options.paymentProvider,
         });
@@ -476,7 +476,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     /** Load tools from URL params. Used by SSE and HTTP entry points. */
     public async loadToolsFromUrl(url: string, apifyClient: ApifyClient) {
         const input = parseInputParamsFromUrl(url);
-        const actorTools = await getActors(input, apifyClient, {
+        const actorTools = await getActorsFromInput(input, apifyClient, {
             actorStore: this.actorStore,
             paymentProvider: this.options.paymentProvider,
         });
@@ -486,12 +486,12 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * Two-phase: getActors (async, client-agnostic fetch) then the buffer-or-compose gate.
-     * Don't move the getActors await into the initialize handler — clients time out waiting for
+     * Two-phase: getActorsFromInput (async, client-agnostic fetch) then the buffer-or-compose gate.
+     * Don't move the getActorsFromInput await into the initialize handler — clients time out waiting for
      * InitializeResult; the queue buffers already-fetched data, not network work. See #721.
      */
     public async loadToolsFromInput(input: Input, apifyClient: ApifyClient): Promise<void> {
-        const actorTools = await getActors(input, apifyClient, {
+        const actorTools = await getActorsFromInput(input, apifyClient, {
             actorStore: this.actorStore,
             paymentProvider: this.options.paymentProvider,
         });

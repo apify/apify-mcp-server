@@ -26,10 +26,10 @@ import { only, textOf, type TextToolResult } from './helpers/tool_context.js';
 
 vi.mock('../../src/tools/actors/actor_tools_factory.js', async () => {
     const actual = await vi.importActual<Record<string, unknown>>('../../src/tools/actors/actor_tools_factory.js');
-    return { ...actual, getActorsAsTools: vi.fn() };
+    return { ...actual, fetchActorsAsTools: vi.fn() };
 });
 
-const { getActorsAsTools } = await import('../../src/tools/actors/actor_tools_factory.js');
+const { fetchActorsAsTools } = await import('../../src/tools/actors/actor_tools_factory.js');
 
 describe('call_actor_common', () => {
     describe('buildCallActorDescription', () => {
@@ -425,7 +425,7 @@ describe('call_actor_common', () => {
         } as unknown as InternalToolArgs;
 
         beforeEach(() => {
-            vi.mocked(getActorsAsTools).mockReset();
+            vi.mocked(fetchActorsAsTools).mockReset();
         });
 
         function mockActorTool(ajvValidate: ((input: unknown) => boolean) & { errors?: unknown }): void {
@@ -437,11 +437,11 @@ describe('call_actor_common', () => {
                 inputSchema: INPUT_SCHEMA,
                 ajvValidate,
             } as unknown as ToolEntry;
-            vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [tool], errors: [] });
+            vi.mocked(fetchActorsAsTools).mockResolvedValue({ tools: [tool], errors: [] });
         }
 
         it('returns a SOFT_FAIL/404 not-found error when the Actor is missing', async () => {
-            vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [], errors: [] });
+            vi.mocked(fetchActorsAsTools).mockResolvedValue({ tools: [], errors: [] });
 
             const resolution = await resolveAndValidateActor({
                 actorName: 'apify/missing',
@@ -464,7 +464,7 @@ describe('call_actor_common', () => {
         // Result text has no `hasTool`, so tools.mode_contract.test.ts cannot see it: it renders
         // descriptions only. `?tools=call-actor` is served no search-actors.
         it('names no recovery tool in the not-found message when the session was served none', async () => {
-            vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [], errors: [] });
+            vi.mocked(fetchActorsAsTools).mockResolvedValue({ tools: [], errors: [] });
 
             const resolution = await resolveAndValidateActor({
                 actorName: 'apify/missing',
@@ -480,7 +480,7 @@ describe('call_actor_common', () => {
         });
 
         it('points at the search tool in the not-found message when the session was served it', async () => {
-            vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [], errors: [] });
+            vi.mocked(fetchActorsAsTools).mockResolvedValue({ tools: [], errors: [] });
 
             const resolution = await resolveAndValidateActor({
                 actorName: 'apify/missing',

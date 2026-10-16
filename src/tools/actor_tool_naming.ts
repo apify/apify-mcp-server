@@ -34,7 +34,7 @@ export function resolveActorToolMode(actorInfo: ActorInfo): ACTOR_TOOL_MODE {
 /**
  * Whether this Actor must be excluded from tool surfaces and rejected on
  * `call-actor` when the session uses a third-party payment provider (x402, Skyfire).
- * List-time filtering in `getActorsAsTools` and the call-time guard in
+ * List-time filtering in `fetchActorsAsTools` and the call-time guard in
  * `checkPaymentProviderStandbyConflict` must use this — not MCP URL presence alone.
  */
 export function isActorBlockedUnderPaymentProvider(actor: Pick<ActorInfo['actor'], 'actorStandby'>): boolean {

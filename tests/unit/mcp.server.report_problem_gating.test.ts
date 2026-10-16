@@ -9,11 +9,11 @@ import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
 import { getLegacyServer } from './helpers/mcp_server.js';
 import { mockApifyClient } from './helpers/tool_context.js';
 
-// Stub getActors so default-injection seeding needs no network.
+// Stub getActorsFromInput so default-injection seeding needs no network.
 // Default-resolves to [] so tests that never call loadReportProblemByDefault still get a valid array.
 vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
     const actual = await importOriginal<typeof ToolsLoaderModule>();
-    return { ...actual, getActors: vi.fn().mockResolvedValue([]) };
+    return { ...actual, getActorsFromInput: vi.fn().mockResolvedValue([]) };
 });
 
 type InitHandler = (req: InitializeRequest, ctx: unknown) => Promise<unknown>;

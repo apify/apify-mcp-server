@@ -36,7 +36,7 @@ directory you're editing.
 - `prompts/` — the prompt registry (`index.ts`) plus `prompt_service.ts`
   (`createPromptService`, throws protocol-neutral domain errors); no child doc.
 
-**Two-phase tool loading** (mode-agnostic `getActors()` vs mode-dependent
+**Two-phase tool loading** (mode-agnostic `getActorsFromInput()` vs mode-dependent
 `getToolsForServerMode()`) is documented once in
 [`../DEVELOPMENT.md`](../DEVELOPMENT.md) — read it before touching tool loading.
 
