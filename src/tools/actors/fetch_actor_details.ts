@@ -11,7 +11,12 @@ import type {
     ToolInputSchema,
 } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
-import { getActorByIdOrName, isOwnActorLookup, OWN_ACTOR_NOT_FOUND_FACT } from '../../utils/actor.js';
+import {
+    getActorByIdOrName,
+    isOwnActorLookup,
+    OWN_ACTOR_NOT_FOUND_FACT,
+    ownActorWithoutBuildFact,
+} from '../../utils/actor.js';
 import {
     type ActorDetailsResult,
     buildCardOptions,
@@ -290,6 +295,11 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     if (!lookup) {
         return buildActorNotFoundResponse(requestedActorName, loadedToolNames, {
             isOwnActorName: isOwnActorLookup(requestedActorName, paymentProvider),
+        });
+    }
+    if (lookup.actor === null) {
+        return respondUserError(ownActorWithoutBuildFact(lookup.actorKey), {
+            detail: 'own Actor has no default build',
         });
     }
     // The MCP tool listing and the hosted server's output schema store get the key the Actor was found under: a name

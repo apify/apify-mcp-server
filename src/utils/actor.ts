@@ -13,6 +13,11 @@ import { getUserInfoCached } from './userid_cache.js';
 export const OWN_ACTOR_NOT_FOUND_FACT =
     'A name without a username is looked up among your own Actors only; an Actor from Apify Store needs its full name as username/name (e.g., "apify/rag-web-browser").';
 
+/** Why a name alone that matched one of the caller's own Actors found nothing: `actorFullName` has no default build. */
+export function ownActorWithoutBuildFact(actorFullName: string): string {
+    return `Actor '${actorFullName}' exists in your account but has no successful build yet.`;
+}
+
 /**
  * Whether `getActorByIdOrName` looks `actorIdOrName` up among the caller's own Actors: a value without a username,
  * `name` or `~name` (an ID-shaped one is tried as an ID first). Never under a payment provider: the agent pays per
@@ -28,6 +33,8 @@ export function isOwnActorLookup(actorIdOrName: string, paymentProvider: Payment
  * Looks up the Actor that `actorIdOrName` names through `fetch`: by ID, by full name, or by a name alone, which means
  * one of the caller's own Actors, in the order `getResourceByIdOrName` uses. Returns what `fetch` found and the key it
  * was found under, which for a name alone is the Actor's `username/name`, so later steps see an absolute name too.
+ * `actor` is `null` when a name alone matched one of the caller's own Actors but `fetch` found nothing under its full
+ * name: an Actor definition comes from the default build, which an Actor has only after a successful build.
  *
  * `fetch` never gets a `~name` key. `~name` is a different Actor for each token, while `actorDefinitionCache`, which
  * most fetches read, is process-wide (see `resolveActorId` in `tools/schedules/schedule_helpers.ts`), so `~name` is
@@ -39,7 +46,7 @@ export async function getActorByIdOrName<T>(params: {
     apifyClient: ApifyClient;
     paymentProvider: PaymentProvider | undefined;
     fetch: (actorKey: string) => Promise<T | null>;
-}): Promise<{ actorKey: string; actor: T } | undefined> {
+}): Promise<{ actorKey: string; actor: T } | { actorKey: string; actor: null } | undefined> {
     const { actorIdOrName, apifyClient, paymentProvider, fetch } = params;
     const fetchByKey = async (actorKey: string) => {
         const actor = await fetch(actorKey);
@@ -49,7 +56,9 @@ export async function getActorByIdOrName<T>(params: {
     return getResourceByIdOrName(actorIdOrName, async (safeId) => {
         if (!safeId.startsWith('~')) return fetchByKey(safeId);
         const ownActor = await apifyClient.actor(safeId).get();
-        return ownActor ? fetchByKey(`${ownActor.username}/${ownActor.name}`) : undefined;
+        if (!ownActor) return undefined;
+        const actorKey = `${ownActor.username}/${ownActor.name}`;
+        return (await fetchByKey(actorKey)) ?? { actorKey, actor: null };
     });
 }
 

@@ -25,6 +25,7 @@ import {
     getActorToolResolutionCached,
     isOwnActorLookup,
     OWN_ACTOR_NOT_FOUND_FACT,
+    ownActorWithoutBuildFact,
 } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
 import {
@@ -605,6 +606,13 @@ export async function callActorPreExecute(
         paymentProvider,
         fetch: async (actorKey) => getActorToolResolutionCached(actorKey, apifyClientForDefinition),
     });
+    if (lookup?.actor === null) {
+        return {
+            earlyResponse: respondUserError(ownActorWithoutBuildFact(lookup.actorKey), {
+                detail: 'own Actor has no default build',
+            }),
+        };
+    }
     if (!lookup && isOwnActorLookup(requestedActorName, paymentProvider)) {
         return { earlyResponse: respondActorNotFound(requestedActorName, loadedToolNames, { isOwnActorName: true }) };
     }

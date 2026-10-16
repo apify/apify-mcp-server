@@ -237,6 +237,18 @@ describe('callActorPreExecute() Actor resolution', () => {
         expect(getActorDefinitionMock).not.toHaveBeenCalled();
     });
 
+    // The ~name read finds the Actor, but its definition comes from the default build, which an Actor gets only from
+    // its first successful build.
+    it('states that the own Actor a bare name found has no successful build when it has no definition', async () => {
+        const name = uniqueName('unbuilt');
+
+        const result = await preExecute(name, tenantClient('tenant-a', [name]).client);
+
+        const text = textOfResponse(earlyResponseOf(result));
+        expect(text).toBe(`Actor 'tenant-a/${name}' exists in your account but has no successful build yet.`);
+        expect(keysPassedTo(getActorDefinitionMock)).toEqual([`tenant-a/${name}`]);
+    });
+
     // There is no account behind a payment provider, so a bare name keeps today's lookup; the standby check in the
     // tool-call engine then reads the same name the call goes on with.
     it('looks a bare name up as given under a payment provider, as the standby check does', async () => {
@@ -352,6 +364,18 @@ describe('buildFetchActorDetailsResult() Actor resolution', () => {
         expect(text).toContain(`Actor information for '${name}' was not found.`);
         expect(text).toContain(OWN_ACTORS_FACT);
         expect(fetchActorDetailsMock).not.toHaveBeenCalled();
+    });
+
+    it('states that the own Actor a bare name found has no successful build when it has no details', async () => {
+        const name = uniqueName('unbuilt');
+
+        const result = await fetchDetails(name, tenantClient('tenant-a', [name]).client);
+
+        expect(result.isError).toBe(true);
+        expect(textOfResponse(result)).toBe(
+            `Actor 'tenant-a/${name}' exists in your account but has no successful build yet.`,
+        );
+        expect(keysPassedTo(fetchActorDetailsMock, 1)).toEqual([`tenant-a/${name}`]);
     });
 
     it('looks a bare name up as given under a payment provider', async () => {
