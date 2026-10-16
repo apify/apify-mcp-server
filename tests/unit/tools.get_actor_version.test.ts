@@ -847,6 +847,15 @@ describe('get-actor-version', () => {
             expect(structuredContent.files.map(({ path }) => path)).toEqual(['src/main.js']);
         });
 
+        it('reads the only version for a null versionNumber, which the input check turns into an empty string', async () => {
+            const args = { actor: 'john/my-actor', versionNumber: null };
+
+            expect((getActorVersion as HelperTool).ajvValidate(args)).toBe(true);
+            const { structuredContent } = await callTool(args);
+
+            expect(structuredContent.versionNumber).toBe('0.1');
+        });
+
         it.each(['qGXMy0NAkWsIIb9LZ', 'john~my-actor'])(
             'names the Actor by the full name in its document when given as %s',
             async (actor) => {
