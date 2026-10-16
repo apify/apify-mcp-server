@@ -40,7 +40,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     first, pointing at the newest failed one) and `build-actor` (start a build of one version and wait for it); `build_helpers.ts` holds the
     allowlisted build result shape, the build start and wait calls (the wait reports progress), the
     shared `waitSecs` field, the shared build response and the by-status next-step text.
-  - `source/`: `get-actor-version` (an Actor version's file manifest with hashes, revision, and
+  - `versions/`: `get-actor-version` (an Actor version's file manifest with hashes, revision, and
     requested content), `create-actor` (a new Actor with one version in a single POST), and
     `update-actor-version` (write, edit, and delete operations applied all-or-nothing to a fresh read,
     stored with one version PUT that carries only the source keys). `source_files.ts` holds the file

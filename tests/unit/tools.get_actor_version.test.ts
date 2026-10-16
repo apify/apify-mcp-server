@@ -6,9 +6,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { getCategoryTools, toolCategoriesEnabledByDefault } from '../../src/tools/index.js';
-import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
-import { buildFilesRevision, compareSourcePaths } from '../../src/tools/source/source_files.js';
 import { getActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
+import { getActorVersion } from '../../src/tools/versions/get_actor_version.js';
+import { buildFilesRevision, compareSourcePaths } from '../../src/tools/versions/source_files.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {
     expectSchemaConformingStructuredContent,

@@ -6,10 +6,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import { prepareToolCallContext } from '../../src/payments/helpers.js';
-import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
-import { buildFilesRevision } from '../../src/tools/source/source_files.js';
-import { updateActorVersion } from '../../src/tools/source/update_actor_version.js';
 import { updateActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
+import { getActorVersion } from '../../src/tools/versions/get_actor_version.js';
+import { buildFilesRevision } from '../../src/tools/versions/source_files.js';
+import { updateActorVersion } from '../../src/tools/versions/update_actor_version.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
