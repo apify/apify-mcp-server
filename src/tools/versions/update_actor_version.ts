@@ -382,7 +382,7 @@ export const updateActorVersion: ToolEntry = Object.freeze({
                 return respondWithBuild({
                     structuredContent: { revision, changed: false, changes: [] },
                     summary: `Nothing changed in version ${versionNumber} of ${fullName}, so nothing was written.`,
-                    nextStep: parsed.autoBuild ? 'Nothing changed, so no build was started.' : 'No build was started.',
+                    nextStep: 'No build was started.',
                 });
             }
             // Console keeps an empty folder as an entry of its own, which goes back as it was.
