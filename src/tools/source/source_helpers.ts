@@ -223,10 +223,14 @@ export function validateFileContent({ format, content }: ActorVersionSourceFile,
 }
 
 /**
- * Throws `UserInputError` for a path with a control character, U+0000 to U+001F or U+007F. The build writes the files
- * to disk, where a file name cannot hold NUL.
+ * Throws `UserInputError` for a path with a control character, U+0000 to U+001F or U+007F, or with a lone UTF-16
+ * surrogate. The build writes the files to disk, where a file name cannot hold NUL, and UTF-8 stores a lone surrogate
+ * as U+FFFD.
  */
 export function validatePathCharacters(path: string, label: string): void {
+    if (!path.isWellFormed()) {
+        throw new UserInputError(`${label} has a lone UTF-16 surrogate in its path, which UTF-8 cannot store.`);
+    }
     const character = [...path].find((char) => char <= '\u001f' || char === '\u007f');
     if (character === undefined) return;
     const codePoint = `U+${character.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`;

@@ -1700,6 +1700,21 @@ describe('update-actor-version', () => {
             },
         );
 
+        it('refuses a path with a lone UTF-16 surrogate in any operation, before any request', async () => {
+            const text = await callToolExpectingUserError({
+                autoBuild: true,
+                operations: [
+                    write('src/ok.js', 'x'),
+                    edit('src/a\uD83D.js', { oldText: 'a', newText: 'b' }),
+                    write('src/b\uDE42.js', 'x'),
+                ],
+            });
+
+            expect(text).toBe('operations[1] has a lone UTF-16 surrogate in its path, which UTF-8 cannot store.');
+            expect(actorGetMock).not.toHaveBeenCalled();
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+
         it('refuses the delete, delete, and write whose file sets once gave one revision, before any request', async () => {
             // Joined as path, NUL, hash, and a line break per file, the files before and after read the same, so the
             // call reported changes and sent no PUT.

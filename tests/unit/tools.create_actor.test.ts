@@ -511,6 +511,17 @@ describe('create-actor', () => {
         expect(buildMock).not.toHaveBeenCalled();
     });
 
+    it('refuses a path with a lone UTF-16 surrogate, and creates nothing', async () => {
+        const result = await callTool({ autoBuild: true, files: [MAIN_JS, { path: 'src/a\uD83D.js', content: 'x' }] });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(
+            'files[1] has a lone UTF-16 surrogate in its path, which UTF-8 cannot store.',
+        );
+        expect(actorsCreateMock).not.toHaveBeenCalled();
+        expect(buildMock).not.toHaveBeenCalled();
+    });
+
     it.each(['.', 'src/', 'src/..'])(
         'refuses a file at %s, which names a folder, and creates nothing',
         async (path) => {
