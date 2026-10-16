@@ -43,7 +43,7 @@ After `pnpm run build`, run `mcpc` (no args) to check sessions: if `@stdio` (def
 
 ## Testing
 
-- **Unit tests**: `pnpm run test:unit`. Before writing or editing one, read [tests/AGENTS.md](./tests/AGENTS.md).
+- **Unit tests**: `pnpm run test:unit`. **Before writing or editing any unit test, read [tests/UNIT_TESTING_GUIDE.md](./tests/UNIT_TESTING_GUIDE.md) in full**; [tests/AGENTS.md](./tests/AGENTS.md) says which test layer to use.
 - **Integration tests**: `pnpm run test:integration` (needs build + `APIFY_TOKEN`, humans only).
 - **Conformance tests**: `pnpm run test:conformance` (needs `APIFY_TOKEN`) builds and runs both protocol eras locally. `_integration_tests.yaml` calls `_conformance_tests.yaml` for the same `2026-07-28` and `2025-11-25` coverage in CI. Both eras always run; the command exits with the first non-zero code. Scenarios excluded from each era's gate are listed with reasons in `scripts/conformance_expected_failures_2026_07_28.yaml` and `scripts/conformance_expected_failures_2025_11_25.yaml`.
 - **Package manager**: this repo uses **pnpm 11+**. `devEngines.packageManager` is pinned with `onFail: "error"`, so npm / yarn refuse to run inside the checkout — use `pnpm install` only.
