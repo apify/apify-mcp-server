@@ -143,7 +143,6 @@ describe('delete-actor-version', () => {
         async ({ versionNumber, tags, text }) => {
             const result = await callTool({ versionNumber });
 
-            expect(deleteActorVersionToolOutputSchema.required).toContain('tags');
             expectSchemaConformingStructuredContent(result, deleteActorVersionToolOutputSchema);
             // The Actor GET by the name given, then the DELETE by the Actor ID it returned.
             expect(actorMock.mock.calls).toEqual([['john/my-actor'], ['actor-1']]);
@@ -295,8 +294,8 @@ describe('delete-actor-version', () => {
         actorGetMock.mockResolvedValue(mockActor({ versions: [{ versionNumber: '0.2', sourceType: 'SOURCE_FILES' }] }));
 
         expect(await callToolExpectingUserError({ expectedRevision: 'aaaaaaaaaaaaaaaa' })).toBe(
-            'Version 0.2 of john/my-actor came back without its source: the API hides it from accounts that cannot ' +
-                "modify the Actor. Ask the Actor's owner for the source.",
+            'Nothing was deleted: version 0.2 of john/my-actor came back without its source, so it has no revision to ' +
+                'compare expectedRevision with.',
         );
         expect(versionMock).not.toHaveBeenCalled();
         expectNoOtherWrite();

@@ -45,6 +45,12 @@ function validateRevision(
                 'and only a version stored as files has a revision to compare expectedRevision with.',
         );
     }
+    if (!version.sourceFiles) {
+        throw new UserInputError(
+            `Nothing was deleted: version ${version.versionNumber} of ${fullName} came back without its source, so it ` +
+                'has no revision to compare expectedRevision with.',
+        );
+    }
     const revision = buildFilesRevision(
         buildFilesManifest(extractSourceFiles(version, `Version ${version.versionNumber} of ${fullName}`)),
     );
