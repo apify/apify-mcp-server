@@ -87,13 +87,13 @@ function buildSourceFileEntries(files: readonly z.infer<typeof sourceFileArgs>[]
     return entries;
 }
 
-/** The `version` of .actor/actor.json when the file is JSON and the value a string, as `apify push` reads it. */
+/** The `version` of .actor/actor.json when it is a non-empty string in valid JSON, as `apify push` reads it. */
 function readActorJsonVersion(entries: readonly ActorVersionSourceFile[]): string | undefined {
     const actorJson = entries.find(({ name, format }) => name === '.actor/actor.json' && format === 'TEXT');
     if (!actorJson) return undefined;
     try {
         const { version } = JSON.parse(actorJson.content) as { version?: unknown };
-        return typeof version === 'string' ? version : undefined;
+        return typeof version === 'string' && version !== '' ? version : undefined;
     } catch {
         return undefined;
     }

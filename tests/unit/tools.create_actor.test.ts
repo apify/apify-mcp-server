@@ -764,6 +764,7 @@ describe('create-actor', () => {
             ['no .actor/actor.json', [MAIN_JS]],
             ['an actor.json without a version', [ACTOR_JSON]],
             ['an actor.json whose version is not a string', [actorJsonWith('{"version": 0.1}')]],
+            ['an actor.json with an empty version', [actorJsonWith('{"version": ""}')]],
             ['an actor.json that is not JSON', [actorJsonWith('{"version": "0.1",')]],
         ])('sends version 0.0 for %s', async (_, files) => {
             const result = await callTool({ files });
