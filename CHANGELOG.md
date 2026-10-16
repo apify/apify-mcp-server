@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - Refuse in resources&#x2F;read what the API tools refuse ([#1525](https://github.com/apify/apify-mcp-server/pull/1525)) ([9a406b2](https://github.com/apify/apify-mcp-server/commit/9a406b271348b56a57e4003d37233be85cb502fb)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1524](https://github.com/apify/apify-mcp-server/issues/1524)
 - Offer report-problem without ordering a call, including friction ([#1601](https://github.com/apify/apify-mcp-server/pull/1601)) ([63fc975](https://github.com/apify/apify-mcp-server/commit/63fc975b3eca9f77e8d215a78759a475cc4d3fbe)) by [@jirispilka](https://github.com/jirispilka), closes [#1597](https://github.com/apify/apify-mcp-server/issues/1597)
 - Remove optional vitest peer dependency ([#1613](https://github.com/apify/apify-mcp-server/pull/1613)) ([ad0673e](https://github.com/apify/apify-mcp-server/commit/ad0673e414998f03ef863f9cc695e1e3e0aa5b19)) by [@jirispilka](https://github.com/jirispilka)
+- Accept request bodies up to 9 MB in the dev server ([#1611](https://github.com/apify/apify-mcp-server/pull/1611)) ([b06cc11](https://github.com/apify/apify-mcp-server/commit/b06cc116747a284b1fa4622b6c4dbdbd6508c927)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1610](https://github.com/apify/apify-mcp-server/issues/1610)
 
 
 <!-- git-cliff-unreleased-end -->
