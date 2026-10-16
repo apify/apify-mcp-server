@@ -12,15 +12,8 @@ import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondUserError } from '../../utils/mcp.js';
-import { ABORT } from '../actors/actor_run_response.js';
 import { isRecord } from '../api/apify_api_spec.js';
-import {
-    buildNextStepForBuild,
-    listVersionNumbers,
-    respondWithBuild,
-    startBuild,
-    toBuildResult,
-} from '../builds/build_helpers.js';
+import { buildNextStepForBuild, listVersionNumbers, respondWithBuild, toBuildResult } from '../builds/build_helpers.js';
 import { hasBinaryExtension } from './source_files.js';
 
 /** The input shape of one file sent whole. */
@@ -303,15 +296,14 @@ export async function respondAfterWrite(params: {
         });
     }
     let linkContext: ConsoleLinkContext | undefined;
-    let build: Build | typeof ABORT;
+    let build: Build;
     try {
         // Resolved before the start, so a failed lookup leaves no build behind.
         linkContext = await getConsoleLinkContext(apifyToken, client);
         // Per the MCP spec a cancelled request gets no response; the write stands.
         if (signal?.aborted) return respondAborted();
-        // The signal is not passed on: startBuild aborts the build it started when the signal fires during the start,
-        // and a committed write never aborts the build it started.
-        build = await startBuild(client, target.actorId, target.versionNumber, { useCache: true, waitSecs: 0 });
+        // Started without the request's signal: a committed write never aborts the build it started.
+        build = await client.actor(target.actorId).build(target.versionNumber, { useCache: true });
     } catch (error) {
         // The API's refusal is the caller's to read; anything else, such as a network failure, is logged too.
         if (!(error instanceof ApifyApiError))
@@ -325,8 +317,6 @@ export async function respondAfterWrite(params: {
             nextStep: 'The build could not be started; runs use these files only after the version is built.',
         });
     }
-    // startBuild returns ABORT only for a passed signal; the check narrows the type.
-    if (build === ABORT) return respondAborted();
     return respondWithBuild({
         structuredContent: { ...structuredContent, build: toBuildResult(build, linkContext) },
         summary,
