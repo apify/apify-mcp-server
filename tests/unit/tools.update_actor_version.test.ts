@@ -423,6 +423,18 @@ describe('update-actor-version', () => {
                 );
             });
 
+            it('refuses an edit whose newText grows a file past the limit before searching for its oldText', async () => {
+                mockFiles(NEAR_LIMIT);
+
+                // #9; is not in the file, so a search for it would fail with NO_MATCH.
+                const text = await callToolExpectingUserError({ operations: [edit('src/big.txt', grow('#9;', 92))] });
+
+                expect(text).toBe(
+                    'Nothing was written: edits[0] of operations[0] (edit src/big.txt) can make the file longer than ' +
+                        '3145728 UTF-16 code units, the limit for an edited file.',
+                );
+            });
+
             it('refuses an edit whose newText grows a file past the limit once its LFs become CRLF', async () => {
                 // 93 code units under the limit; the newText is 83 code units, and 123 once each LF becomes CRLF.
                 mockFiles({
