@@ -288,10 +288,34 @@ export function buildEmptyFilesWarnings(paths: readonly string[]): { warnings?: 
 }
 
 /**
- * The response to a committed write. With autoBuild, a build of the version starts first, with no tag so the version's
- * buildTag applies, and is not waited for. The write stands either way, so a failed start goes to `buildError` rather
- * than being thrown: a caller told the call failed would retry writes that were saved. A cancel that arrives before
- * the start gets the cancelled-call response and starts no build.
+ * Starts a build of the version after a committed write, with no tag so the version's buildTag applies, and does not
+ * wait for it. The write stands either way, so a failed start is returned as `buildError` rather than thrown: a caller
+ * told the call failed would retry writes that were saved. A cancel that arrives before the start starts no build.
+ */
+async function startBuildAfterWrite(
+    toolArgs: Pick<InternalToolArgs, 'apifyClient' | 'apifyToken' | 'signal'>,
+    target: { actorId: string; versionNumber: string },
+): Promise<{ build: Build; linkContext: ConsoleLinkContext | undefined } | { buildError: string } | { aborted: true }> {
+    const { apifyClient: client, apifyToken, signal } = toolArgs;
+    try {
+        // Resolved before the start, so a failed lookup leaves no build behind.
+        const linkContext = await getConsoleLinkContext(apifyToken, client);
+        // Per the MCP spec a cancelled request gets no response; the write stands.
+        if (signal?.aborted) return { aborted: true };
+        // Started without the request's signal: a committed write never aborts the build it started.
+        const build = await client.actor(target.actorId).build(target.versionNumber, { useCache: true });
+        return { build, linkContext };
+    } catch (error) {
+        // The API's refusal is the caller's to read; anything else, such as a network failure, is logged too.
+        if (!(error instanceof ApifyApiError))
+            logHttpError(error, 'Failed to start a build after a source write', target);
+        return { buildError: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * The response to a committed write. With autoBuild, a build of the version starts first; a cancel that arrives before
+ * the start gets the cancelled-call response.
  */
 export async function respondAfterWrite(params: {
     toolArgs: Pick<InternalToolArgs, 'apifyClient' | 'apifyToken' | 'loadedToolNames' | 'signal'>;
@@ -301,7 +325,6 @@ export async function respondAfterWrite(params: {
     summary: string;
 }): Promise<ToolResponse> {
     const { toolArgs, autoBuild, target, structuredContent, summary } = params;
-    const { apifyClient: client, apifyToken, loadedToolNames, signal } = toolArgs;
     if (!autoBuild) {
         return respondWithBuild({
             structuredContent,
@@ -309,32 +332,19 @@ export async function respondAfterWrite(params: {
             nextStep: 'No build was started; runs use these files only after the version is built.',
         });
     }
-    let linkContext: ConsoleLinkContext | undefined;
-    let build: Build;
-    try {
-        // Resolved before the start, so a failed lookup leaves no build behind.
-        linkContext = await getConsoleLinkContext(apifyToken, client);
-        // Per the MCP spec a cancelled request gets no response; the write stands.
-        if (signal?.aborted) return respondAborted();
-        // Started without the request's signal: a committed write never aborts the build it started.
-        build = await client.actor(target.actorId).build(target.versionNumber, { useCache: true });
-    } catch (error) {
-        // The API's refusal is the caller's to read; anything else, such as a network failure, is logged too.
-        if (!(error instanceof ApifyApiError))
-            logHttpError(error, 'Failed to start a build after a source write', target);
+    const started = await startBuildAfterWrite(toolArgs, target);
+    if ('aborted' in started) return respondAborted();
+    if ('buildError' in started) {
         return respondWithBuild({
-            structuredContent: {
-                ...structuredContent,
-                buildError: error instanceof Error ? error.message : String(error),
-            },
+            structuredContent: { ...structuredContent, buildError: started.buildError },
             summary,
             nextStep: 'The build could not be started; runs use these files only after the version is built.',
         });
     }
     return respondWithBuild({
-        structuredContent: { ...structuredContent, build: toBuildResult(build, linkContext) },
+        structuredContent: { ...structuredContent, build: toBuildResult(started.build, started.linkContext) },
         summary,
-        nextStep: buildNextStepForBuild(build, { loadedToolNames }),
+        nextStep: buildNextStepForBuild(started.build, { loadedToolNames: toolArgs.loadedToolNames }),
     });
 }
 
