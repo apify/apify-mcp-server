@@ -2409,7 +2409,7 @@ describe('update-actor-version', () => {
         ];
 
         it.each(failures)(
-            'says after %s that the platform may have saved the change, and which revision shows whether it did',
+            'says after %s that the platform may have saved the change, which revision shows whether it did, and that no build was started',
             async (_, buildError, failure, telemetry) => {
                 const previousRevision = await readRevision();
                 versionUpdateMock.mockRejectedValue(buildError());
@@ -2432,7 +2432,7 @@ describe('update-actor-version', () => {
                         text:
                             `Saving version 0.1 of john/my-actor failed ${failure}. The platform may still have saved the change. ` +
                             `If the version's revision is ${savedRevision}, this call saved it, and if it is ${previousRevision}, ` +
-                            'it saved nothing; get-actor-version reads the revision.',
+                            'it saved nothing; get-actor-version reads the revision. No build was started.',
                     },
                 ]);
                 expect(savedRevision).not.toBe(previousRevision);

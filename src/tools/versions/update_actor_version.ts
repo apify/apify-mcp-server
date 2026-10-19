@@ -350,10 +350,11 @@ function respondToUnconfirmedSave(
         target: { actorId: string; versionNumber: string; fullName: string };
         previousRevision: string;
         revision: string;
+        autoBuild: boolean;
         loadedToolNames: readonly string[];
     },
 ): ToolResponse {
-    const { target, previousRevision, revision, loadedToolNames } = params;
+    const { target, previousRevision, revision, autoBuild, loadedToolNames } = params;
     const httpStatus = getHttpStatusCode(error);
     const isRetried = error instanceof ApifyApiError && error.attempt > 1;
     if (!isRetried && httpStatus !== undefined && httpStatus < 500) throw error;
@@ -370,11 +371,13 @@ function respondToUnconfirmedSave(
     const readTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_GET)
         ? `; ${HELPER_TOOLS.ACTOR_VERSION_GET} reads the revision`
         : '';
+    // autoBuild starts a build only after a confirmed save, so runs keep the previous build either way.
+    const buildNote = autoBuild ? ' No build was started.' : '';
     return respondServerError(
         `Saving version ${target.versionNumber} of ${target.fullName} failed ${failure}. ` +
             'The platform may still have saved the change. ' +
             `If the version's revision is ${revision}, this call saved it, and if it is ${previousRevision}, ` +
-            `it saved nothing${readTool}.`,
+            `it saved nothing${readTool}.${buildNote}`,
         // The status, category, and detail the tool-call engine records for a thrown error.
         { error, detail: message.slice(0, 200) },
     );
@@ -491,6 +494,7 @@ export const updateActorVersion: ToolEntry = Object.freeze({
                     target: { actorId: actor.id, versionNumber, fullName },
                     previousRevision,
                     revision,
+                    autoBuild: parsed.autoBuild,
                     loadedToolNames,
                 });
             }
