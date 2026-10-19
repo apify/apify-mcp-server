@@ -25,6 +25,8 @@ Conventional Commits for all three. Branch: `type/short-desc` (e.g. `fix/connect
 
 Use `git mv` (not `mv` + `rm`) when renaming files so git records a rename rather than delete+create.
 
+Working on several branches at once: one worktree per branch, run git as `git -C <worktree>`, and never run git commands for two worktrees in parallel. Before pushing, fetch the branch; if someone else pushed, merge or reapply on top. Never rebase, amend or force-push a branch someone else pushed to.
+
 ## Verification (mandatory)
 
 After every code change, run `pnpm run type-check`, `pnpm run lint`, `pnpm run test:unit`, `pnpm run format` and `pnpm run check:agents`.

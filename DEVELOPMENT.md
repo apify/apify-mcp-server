@@ -250,6 +250,12 @@ mcpc --json @stdio tools-call search-actors keywords:="scraper" | jq ‘.content
 - `get-dataset-items` — test field filtering with dot notation, non-existent dataset
 - `search-apify-docs` / `fetch-apify-docs` — test relevant and non-existent queries
 
+#### Before you compare results
+
+- **stdio env:** mcpc starts a stdio server with only the MCP SDK's default variables (`HOME`, `PATH`, …) plus the config's `env`. List `APIFY_TOKEN` and, behind a proxy, `HTTPS_PROXY` and `NODE_EXTRA_CA_CERTS` there.
+- **Expected tool list:** a `?tools=` selection with `get-actor-run` or an Actor tool also serves the auto-injected tools (⚡ in the [README tool list](./README.md)), including `abort-actor-run`.
+- **Comparing sessions:** on the hosted server, direct Actor tools' `outputSchema` embeds an item schema from the `ActorStore` (`enrichActorToolOutputSchemas`), and it can differ between requests. Compare `outputSchema` without `storages.datasets.default.itemsSchema`.
+
 
 ### Testing with MCPJam (optional)
 

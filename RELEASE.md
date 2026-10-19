@@ -39,4 +39,6 @@ That completes the package release. To roll the new version out to `mcp.apify.co
 ## Notes
 
 - The changelog commit carries `[skip ci]` so it does not retrigger CI.
+- Merge PRs to `master` one at a time: wait for the CI (master) run's **Update changelog** job before the next merge. That job commits only if `master` still points at the commit that triggered it, so a merge seconds later makes it fail and skips that run's beta publish. Re-running an older CI (master) run also cancels the queued run of a newer merge (concurrency group `release`).
+- To check a hosted rollout, read `serverInfo.version` from `initialize` on several new connections. During a rollout some connections still reach the previous version.
 - When you change a tool contract here, update the matching integration tests in the hosted-server repo in the same release window — drift there has broken hosted releases before.
