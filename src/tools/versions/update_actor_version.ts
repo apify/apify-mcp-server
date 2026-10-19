@@ -1,6 +1,6 @@
 import { posix } from 'node:path';
 
-import { ActorSourceType } from 'apify-client';
+import { ActorSourceType, ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -158,6 +158,15 @@ function convertToCrlf(text: string): string {
     return text.replace(/(?<!\r)\n/g, '\r\n');
 }
 
+/** The LFs convertToCrlf turns into CRLF: those without a CR before them. */
+function countLoneLineFeeds(text: string): number {
+    let count = 0;
+    for (let offset = text.indexOf('\n'); offset !== -1; offset = text.indexOf('\n', offset + 1)) {
+        if (text[offset - 1] !== '\r') count++;
+    }
+    return count;
+}
+
 // V8's indexOf keeps its Boyer-Moore shift tables for the last 250 characters of a pattern (kBMMaxShift in
 // https://github.com/v8/v8/blob/main/src/strings/string-search.h). For a longer pattern its time grows with the text
 // length times the pattern length: over 4 s for a 10,001-character pattern in 3 MiB.
@@ -214,13 +223,11 @@ function applyTextEdits(originalText: string, edits: readonly TextEdit[], label:
             );
         }
         // An upper bound of the length after this edit, taken before the CRLF conversion and the search: converting only
-        // lengthens oldText, and at most doubles newText.
-        if (text.length - edit.oldText.length + (isCrlfFile ? 2 : 1) * edit.newText.length > MAX_EDITED_TEXT_LENGTH) {
-            const crlfNote = isCrlfFile
-                ? ' In a file with CRLF line breaks, each character of newText counts as two, since each LF in it becomes CRLF.'
-                : '';
+        // lengthens oldText, and lengthens newText by one code unit for each LF it turns into CRLF.
+        const newTextLength = edit.newText.length + (isCrlfFile ? countLoneLineFeeds(edit.newText) : 0);
+        if (text.length - edit.oldText.length + newTextLength > MAX_EDITED_TEXT_LENGTH) {
             throw new UserInputError(
-                `Nothing was written: edits[${editIndex}] of ${label} can make the file longer than ${MAX_EDITED_TEXT_LENGTH} UTF-16 code units, the limit for an edited file.${crlfNote}`,
+                `Nothing was written: edits[${editIndex}] of ${label} can make the file longer than ${MAX_EDITED_TEXT_LENGTH} UTF-16 code units, the limit for an edited file.`,
             );
         }
         const oldText = isCrlfFile ? convertToCrlf(edit.oldText) : edit.oldText;
@@ -339,9 +346,10 @@ function buildFileChanges(
 }
 
 /**
- * The response to a version PUT that failed with a 5xx or without an HTTP response, such as on a timeout: the platform
- * may have saved the files of that attempt, or of an earlier one apify-client retried, so the reply gives the revisions
- * that show whether it did. Any other error, such as a 4xx, is rethrown.
+ * The response to a version PUT that failed with a 5xx, without an HTTP response, such as on a timeout, or on an attempt
+ * after the first, whatever its status: the platform may have saved the files of that attempt, or of an earlier one
+ * apify-client retried, so the reply gives the revisions that show whether it did. Any other error, such as a 4xx on
+ * the first attempt, is rethrown.
  */
 function respondToUnconfirmedSave(
     error: unknown,
@@ -349,12 +357,14 @@ function respondToUnconfirmedSave(
         target: { actorId: string; versionNumber: string; fullName: string };
         previousRevision: string;
         revision: string;
+        autoBuild: boolean;
         loadedToolNames: readonly string[];
     },
 ): ToolResponse {
-    const { target, previousRevision, revision, loadedToolNames } = params;
+    const { target, previousRevision, revision, autoBuild, loadedToolNames } = params;
     const httpStatus = getHttpStatusCode(error);
-    if (httpStatus !== undefined && httpStatus < 500) throw error;
+    const isRetried = error instanceof ApifyApiError && error.attempt > 1;
+    if (!isRetried && httpStatus !== undefined && httpStatus < 500) throw error;
     logHttpError(error, 'Failed to save the files of an Actor version', {
         actorId: target.actorId,
         versionNumber: target.versionNumber,
@@ -368,11 +378,13 @@ function respondToUnconfirmedSave(
     const readTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_GET)
         ? `; ${HELPER_TOOLS.ACTOR_VERSION_GET} reads the revision`
         : '';
+    // autoBuild starts a build only after a confirmed save, so runs keep the previous build either way.
+    const buildNote = autoBuild ? ' No build was started.' : '';
     return respondServerError(
         `Saving version ${target.versionNumber} of ${target.fullName} failed ${failure}. ` +
             'The platform may still have saved the change. ' +
             `If the version's revision is ${revision}, this call saved it, and if it is ${previousRevision}, ` +
-            `it saved nothing${readTool}.`,
+            `it saved nothing${readTool}.${buildNote}`,
         // The status, category, and detail the tool-call engine records for a thrown error.
         { error, detail: message.slice(0, 200) },
     );
@@ -489,6 +501,7 @@ export const updateActorVersion: ToolEntry = Object.freeze({
                     target: { actorId: actor.id, versionNumber, fullName },
                     previousRevision,
                     revision,
+                    autoBuild: parsed.autoBuild,
                     loadedToolNames,
                 });
             }

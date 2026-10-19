@@ -785,7 +785,7 @@ describe('create-actor', () => {
         });
 
         it('takes the version of an .actor/actor.json that starts with a byte order mark, and sends the file as given', async () => {
-            const content = '﻿{"actorSpecification": 1, "name": "my-actor", "version": "0.1"}';
+            const content = '\uFEFF{"actorSpecification": 1, "name": "my-actor", "version": "0.1"}';
 
             await callTool({ files: [actorJsonWith(content)] });
 

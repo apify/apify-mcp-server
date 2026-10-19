@@ -49,7 +49,7 @@ function readActorJsonVersion(entries: readonly ActorVersionSourceFile[]): strin
     const actorJson = entries.find(({ name, format }) => name === '.actor/actor.json' && format === 'TEXT');
     if (!actorJson) return undefined;
     try {
-        const { version } = JSON.parse(actorJson.content.replace(/^﻿/, '')) as { version?: unknown };
+        const { version } = JSON.parse(actorJson.content.replace(/^\uFEFF/, '')) as { version?: unknown };
         return typeof version === 'string' && version !== '' ? version : undefined;
     } catch {
         return undefined;
