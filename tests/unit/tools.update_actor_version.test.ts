@@ -1756,6 +1756,21 @@ describe('update-actor-version', () => {
             },
         );
 
+        it.each([
+            ['write', write('src/a\0.js', 'x')],
+            ['edit', edit('src/a\0.js', { oldText: 'a', newText: 'b' })],
+            ['delete', remove('src/a\0.js', MAIN_JS_HASH)],
+        ])('refuses a NUL in the path of a single %s operation, before any request', async (_, operation) => {
+            const text = await callToolExpectingUserError({ autoBuild: true, operations: [operation] });
+
+            expect(text).toBe(
+                'operations[0] has the control character U+0000 in its path; ' +
+                    'a path cannot hold characters U+0000 to U+001F or U+007F.',
+            );
+            expect(actorGetMock).not.toHaveBeenCalled();
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+
         it('refuses a path with a lone UTF-16 surrogate in any operation, before any request', async () => {
             const text = await callToolExpectingUserError({
                 autoBuild: true,
