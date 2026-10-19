@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - [**breaking**] Add create-actor and update-actor-version tools ([#1453](https://github.com/apify/apify-mcp-server/pull/1453)) ([e94ea8a](https://github.com/apify/apify-mcp-server/commit/e94ea8a3cbc25b5682bb6a44ccf190df097c6cf7)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1463](https://github.com/apify/apify-mcp-server/issues/1463)
+- Add create-actor-version and delete-actor-version tools ([#1454](https://github.com/apify/apify-mcp-server/pull/1454)) ([53dc34d](https://github.com/apify/apify-mcp-server/commit/53dc34dbec69d41d889b89270858e998d4630960)) by [@DaveHanns](https://github.com/DaveHanns), closes [#1475](https://github.com/apify/apify-mcp-server/issues/1475)
 
 
 <!-- git-cliff-unreleased-end -->
