@@ -1,29 +1,22 @@
 import type { ActorCollectionCreateOptions, ActorVersionSourceFile } from 'apify-client';
-import { ActorSourceType, ApifyApiError } from 'apify-client';
+import { ActorSourceType } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
 import { APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE, HELPER_TOOLS } from '../../const.js';
-import { UserInputError } from '../../errors.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
-import { respondAborted, respondUserError } from '../../utils/mcp.js';
+import { respondAborted } from '../../utils/mcp.js';
 import { createActorToolOutputSchema } from '../structured_output_schemas.js';
-import { buildFilesManifest, buildFilesRevision } from './source_files.js';
 import {
-    buildEmptyFilesWarnings,
-    buildSourceFileEntry,
+    buildSourceFileEntries,
     extractSourceFiles,
     redactSourceToolArgs,
     resolveVersion,
-    respondAfterWrite,
-    respondToSourceToolError,
-    SourcePathIndex,
+    respondAfterCreate,
+    respondToCreateError,
     sourceFileArgs,
-    validateFileContent,
-    validateFilePath,
-    validatePathCharacters,
 } from './source_helpers.js';
 
 const createActorArgs = z.object({
@@ -49,29 +42,6 @@ const createActorArgs = z.object({
 });
 
 /**
- * The entries to send, one per file; throws `UserInputError` for a path no file can be written at, and for a path
- * given twice, since the platform puts the Actor name in the first .actor/actor.json and the build uses the last.
- */
-function buildSourceFileEntries(files: readonly z.infer<typeof sourceFileArgs>[]): ActorVersionSourceFile[] {
-    const entries: ActorVersionSourceFile[] = [];
-    const pathIndex = new SourcePathIndex([]);
-    for (const [index, file] of files.entries()) {
-        validatePathCharacters(file.path, `files[${index}]`);
-        const entry = buildSourceFileEntry(file);
-        const label = `files[${index}] (${file.path})`;
-        validateFilePath(entry.name, label);
-        validateFileContent(entry, label);
-        if (pathIndex.hasFile(entry.name)) {
-            throw new UserInputError(`${label} repeats the path ${entry.name}; each path can be sent only once.`);
-        }
-        pathIndex.validateNewFilePath(entry.name, label);
-        pathIndex.addFile(entry.name);
-        entries.push(entry);
-    }
-    return entries;
-}
-
-/**
  * The `version` of .actor/actor.json when it is a non-empty string in valid JSON, as `apify push` reads it. A leading
  * byte order mark, which some editors write, is skipped, since JSON.parse refuses it.
  */
@@ -84,11 +54,6 @@ function readActorJsonVersion(entries: readonly ActorVersionSourceFile[]): strin
     } catch {
         return undefined;
     }
-}
-
-/** A refusal of the name as taken on a retry of the POST, which an earlier attempt of the same call may have caused. */
-function isRetriedNameTaken(error: unknown): error is ApifyApiError {
-    return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE && error.attempt > 1;
 }
 
 /**
@@ -160,35 +125,21 @@ export const createActor: ToolEntry = Object.freeze({
             // The platform sets the name in .actor/actor.json on create, so the stored files, not the sent ones, match
             // a later read.
             const version = resolveVersion(created, undefined, fullName);
-            const files = buildFilesManifest(
-                extractSourceFiles(version, `Version ${version.versionNumber} of ${fullName}`),
-            );
-            const emptyPaths = files.filter(({ sizeBytes }) => sizeBytes === 0).map(({ path }) => path);
-            return await respondAfterWrite({
+            return await respondAfterCreate({
                 toolArgs,
                 autoBuild: parsed.autoBuild,
-                target: { actorId: created.id, versionNumber: version.versionNumber },
-                structuredContent: {
-                    actorId: created.id,
-                    fullName,
-                    versionNumber: version.versionNumber,
-                    revision: buildFilesRevision(files),
-                    files: files.map(({ path, sizeBytes, hash }) => ({ path, sizeBytes, hash })),
-                    ...buildEmptyFilesWarnings(emptyPaths),
-                },
+                created: { actorId: created.id, fullName, versionNumber: version.versionNumber },
+                sourceFiles: extractSourceFiles(version, `Version ${version.versionNumber} of ${fullName}`),
                 summary: `Created the private Actor ${fullName}.`,
             });
         } catch (error) {
-            if (!isRetriedNameTaken(error)) return respondToSourceToolError(error);
-            const readTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_GET)
-                ? `; ${HELPER_TOOLS.ACTOR_VERSION_GET} reads its files`
-                : '';
-            return respondUserError(
-                `The platform refused the name ${parsed.name} as taken when the request was retried, so an earlier ` +
-                    `attempt of this call may have created the Actor ${parsed.name}. ` +
-                    `If it holds the files you sent, this call created it${readTool}.`,
-                { httpStatus: error.statusCode },
-            );
+            return respondToCreateError(error, {
+                takenErrorType: APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE,
+                loadedToolNames,
+                refused: `the name ${parsed.name}`,
+                created: `the Actor ${parsed.name}`,
+                sentFiles: 'the files you sent',
+            });
         }
     },
 } as const);

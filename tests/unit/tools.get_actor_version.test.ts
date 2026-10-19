@@ -185,6 +185,8 @@ describe('get-actor-version', () => {
             HELPER_TOOLS.ACTOR_VERSION_GET,
             HELPER_TOOLS.ACTOR_CREATE,
             HELPER_TOOLS.ACTOR_VERSION_UPDATE,
+            HELPER_TOOLS.ACTOR_VERSION_CREATE,
+            HELPER_TOOLS.ACTOR_VERSION_DELETE,
         ]);
         expect(toolCategoriesEnabledByDefault).not.toContain('versions');
     });
@@ -202,6 +204,7 @@ describe('get-actor-version', () => {
                     actorId: 'actor-1',
                     fullName: 'john/my-actor',
                     versionNumber: '0.1',
+                    buildTag: 'latest',
                     revision: expect.stringMatching(/^[0-9a-f]{16}$/),
                     files: [
                         { path: '.actor/actor.json', sizeBytes: 25, hash: sha256Prefix(ACTOR_JSON_SOURCE.content) },
@@ -212,7 +215,7 @@ describe('get-actor-version', () => {
                 });
                 expect(JSON.parse(result.content[0].text)).toEqual(structuredContent);
                 expect(result.content).toHaveLength(2);
-                expect(result.content[1].text).toBe('Read version 0.1 of john/my-actor.');
+                expect(result.content[1].text).toBe('Read version 0.1 (build tag latest) of john/my-actor.');
                 expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
                 const serialized = JSON.stringify(result);
                 for (const secret of LEAKABLE_VALUES) {
@@ -463,7 +466,7 @@ describe('get-actor-version', () => {
             ]);
             expect(structuredContent.notFoundPaths).toEqual(['./missing.js', 'src/']);
             expect(result.content[1].text).toBe(
-                'Read version 0.1 of john/my-actor. Not found: ./missing.js, src/; check the paths against files (folders are not files).',
+                'Read version 0.1 (build tag latest) of john/my-actor. Not found: ./missing.js, src/; check the paths against files (folders are not files).',
             );
         });
 
@@ -619,6 +622,7 @@ describe('get-actor-version', () => {
                 actorId: 'actor-1',
                 fullName: 'john/my-actor',
                 versionNumber: '0.1',
+                buildTag: 'latest',
                 revision: sha256Prefix('[]'),
                 files: [],
                 contents: [],
@@ -776,37 +780,37 @@ describe('get-actor-version', () => {
             {
                 outcome: 'only the read sentence when every file comes back',
                 args: { paths: ['file-00.txt'] },
-                summary: 'Read version 0.1 of john/my-actor.',
+                summary: 'Read version 0.1 (build tag latest) of john/my-actor.',
             },
             {
                 outcome: 'the files left out over the limit',
                 args: { paths: ['file-00.txt', 'file-01.txt', 'file-02.txt', 'file-03.txt'] },
                 summary:
-                    'Read version 0.1 of john/my-actor. Left out over the 256 KiB limit: file-02.txt, file-03.txt; ask for a file alone, or for part of it with startLine and lineCount.',
+                    'Read version 0.1 (build tag latest) of john/my-actor. Left out over the 256 KiB limit: file-02.txt, file-03.txt; ask for a file alone, or for part of it with startLine and lineCount.',
             },
             {
                 outcome: 'the paths with no file, a folder among them',
                 args: { paths: ['file-00.txt', 'missing.js', 'src'] },
                 summary:
-                    'Read version 0.1 of john/my-actor. Not found: missing.js, src; check the paths against files (folders are not files).',
+                    'Read version 0.1 (build tag latest) of john/my-actor. Not found: missing.js, src; check the paths against files (folders are not files).',
             },
             {
                 outcome: 'both the files left out and the paths with no file',
                 args: { paths: ['file-00.txt', 'file-01.txt', 'file-02.txt', 'missing.js'] },
                 summary:
-                    'Read version 0.1 of john/my-actor. Left out over the 256 KiB limit: file-02.txt; ask for a file alone, or for part of it with startLine and lineCount. Not found: missing.js; check the paths against files (folders are not files).',
+                    'Read version 0.1 (build tag latest) of john/my-actor. Left out over the 256 KiB limit: file-02.txt; ask for a file alone, or for part of it with startLine and lineCount. Not found: missing.js; check the paths against files (folders are not files).',
             },
             {
                 outcome: 'a line range left out over the limit, with a hint to ask for fewer lines',
                 args: { paths: ['big.js'], lineCount: 257 },
                 summary:
-                    'Read version 0.1 of john/my-actor. Left out over the 256 KiB limit: big.js; ask for fewer lines with lineCount.',
+                    'Read version 0.1 (build tag latest) of john/my-actor. Left out over the 256 KiB limit: big.js; ask for fewer lines with lineCount.',
             },
             {
                 outcome: 'a line range of a path with no file',
                 args: { paths: ['nope.js'], startLine: 1 },
                 summary:
-                    'Read version 0.1 of john/my-actor. Not found: nope.js; check the paths against files (folders are not files).',
+                    'Read version 0.1 (build tag latest) of john/my-actor. Not found: nope.js; check the paths against files (folders are not files).',
             },
         ])('says $outcome', async ({ args, summary }) => {
             const result = await callTool(args);
@@ -845,6 +849,33 @@ describe('get-actor-version', () => {
             expect(structuredContent.files.map(({ path }) => path)).toEqual(['src/main.js']);
         });
 
+        it('returns the build tag of the requested version and names it in the summary', async () => {
+            actorGetMock.mockResolvedValue(
+                mockActor([mockVersion(), mockVersion({ versionNumber: '0.2', buildTag: 'beta' })]),
+            );
+
+            const result = await callTool({ versionNumber: '0.2' });
+
+            expect(getActorVersionToolOutputSchema.properties.buildTag).toMatchObject({ type: 'string' });
+            expect(getActorVersionToolOutputSchema.required).not.toContain('buildTag');
+            expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
+            expect(result.structuredContent.buildTag).toBe('beta');
+            expect(result.content[1].text).toBe('Read version 0.2 (build tag beta) of john/my-actor.');
+        });
+
+        it.each([
+            ['without the field', { buildTag: undefined }],
+            ['with null', { buildTag: null }],
+        ])('leaves the build tag out for a version %s', async (_, overrides) => {
+            mockVersionRead(overrides);
+
+            const result = await callTool({});
+
+            expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
+            expect(result.structuredContent).not.toHaveProperty('buildTag');
+            expect(result.content[1].text).toBe('Read version 0.1 of john/my-actor.');
+        });
+
         it('reads the only version for a null versionNumber, which the input check turns into an empty string', async () => {
             const args = { actor: 'john/my-actor', versionNumber: null };
 
@@ -861,7 +892,7 @@ describe('get-actor-version', () => {
 
                 expect(actorMock.mock.calls).toEqual([[actor]]);
                 expect(result.structuredContent.fullName).toBe('john/my-actor');
-                expect(result.content[1].text).toBe('Read version 0.1 of john/my-actor.');
+                expect(result.content[1].text).toBe('Read version 0.1 (build tag latest) of john/my-actor.');
             },
         );
 

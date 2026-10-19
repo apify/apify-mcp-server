@@ -2393,6 +2393,25 @@ describe('update-actor-version', () => {
             expect(JSON.stringify(result)).not.toMatch(/API_KEY|secret-value/);
         });
 
+        it('reports the platform refusing the PUT with versions-size-exceeded', async () => {
+            const message =
+                'The limit on the combined size of all versions has been exceeded. Delete unused versions to free up ' +
+                'space or use another source type. See https://docs.apify.com/platform/actors/development/deployment/source-types.';
+            versionUpdateMock.mockRejectedValue(apiError(403, message, 'versions-size-exceeded'));
+
+            const result = await callTool({ autoBuild: true, operations: [write('b.js', 'b')] });
+
+            // The platform's reason, without the token-access hint the engine adds to a 403.
+            expectSoftFailInvalidInput(result);
+            expect(result.toolTelemetry).toEqual(expect.objectContaining({ failureHttpStatus: 403 }));
+            expect(result.content).toStrictEqual([
+                { type: 'text', text: `${message} (API error type: versions-size-exceeded)` },
+            ]);
+            expect(result.structuredContent).toBeUndefined();
+            expect(versionUpdateMock).toHaveBeenCalledTimes(1);
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+
         it('lets a 4xx API error from the first attempt of the PUT through unchanged', async () => {
             const error = apiError(400, 'Source files are too large.');
             versionUpdateMock.mockRejectedValue(error);

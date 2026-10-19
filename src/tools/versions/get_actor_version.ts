@@ -182,10 +182,12 @@ export const getActorVersion: ToolEntry = Object.freeze({
             const files = buildFilesManifest(
                 extractSourceFiles(version, `Version ${version.versionNumber} of ${fullName}`),
             );
+            const { buildTag } = version;
             const structuredContent = {
                 actorId: actor.id,
                 fullName,
                 versionNumber: version.versionNumber,
+                ...(buildTag && { buildTag }),
                 revision: buildFilesRevision(files),
                 files: files.map(({ path, sizeBytes, hash }) => ({ path, sizeBytes, hash })),
                 ...selectContents(files, paths, lineRange),
@@ -194,9 +196,10 @@ export const getActorVersion: ToolEntry = Object.freeze({
             const omittedHint = lineRange
                 ? 'ask for fewer lines with lineCount'
                 : 'ask for a file alone, or for part of it with startLine and lineCount';
+            const tag = buildTag ? ` (build tag ${buildTag})` : '';
             // Names the requested files that did not come back, for a caller that reads only the text.
             const summary = [
-                `Read version ${version.versionNumber} of ${fullName}.`,
+                `Read version ${version.versionNumber}${tag} of ${fullName}.`,
                 omittedPaths &&
                     `Left out over the ${INLINE_LIMIT_KIB} KiB limit: ${omittedPaths.join(', ')}; ${omittedHint}.`,
                 notFoundPaths &&

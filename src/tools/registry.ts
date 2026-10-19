@@ -55,6 +55,8 @@ import { publishActorTask } from './tasks/publish_actor_task.js';
 import { unpublishActorTask } from './tasks/unpublish_actor_task.js';
 import { updateActorTask } from './tasks/update_actor_task.js';
 import { createActor } from './versions/create_actor.js';
+import { createActorVersion } from './versions/create_actor_version.js';
+import { deleteActorVersion } from './versions/delete_actor_version.js';
 import { getActorVersion } from './versions/get_actor_version.js';
 import { updateActorVersion } from './versions/update_actor_version.js';
 import { callActorWidget } from './widgets/call_actor_widget.js';
@@ -80,7 +82,7 @@ export const toolCategories = {
     tasks: [createActorTask, getActorTask, updateActorTask, publishActorTask, unpublishActorTask],
     schedules: [createSchedule, getSchedule, updateSchedule, deleteSchedule],
     builds: [getActorBuild, getActorBuildLog, getActorBuildList, buildActor],
-    versions: [getActorVersion, createActor, updateActorVersion],
+    versions: [getActorVersion, createActor, updateActorVersion, createActorVersion, deleteActorVersion],
     api: [apifyApiSearch, apifyApiDetails, apifyApiRead],
     dev: [reportProblem],
 } satisfies Record<string, ToolEntry[]>;
