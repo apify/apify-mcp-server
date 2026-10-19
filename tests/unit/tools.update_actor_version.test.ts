@@ -88,8 +88,9 @@ function mockFiles(...sourceFiles: Record<string, unknown>[]) {
     mockVersionRead({ sourceFiles });
 }
 
-function apiError(status: number, message: string, type = 'some-error'): ApifyApiError {
-    return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, 1);
+/** `attempt` is the attempt of the request apify-client gave up on; above 1, it retried the request. */
+function apiError(status: number, message: string, type = 'some-error', attempt = 1): ApifyApiError {
+    return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, attempt);
 }
 
 async function callTool(args: Record<string, unknown>, signal?: AbortSignal): Promise<UpdateResult> {
@@ -2363,7 +2364,7 @@ describe('update-actor-version', () => {
             expect(JSON.stringify(result)).not.toMatch(/API_KEY|secret-value/);
         });
 
-        it('lets a 4xx API error from the PUT through unchanged', async () => {
+        it('lets a 4xx API error from the first attempt of the PUT through unchanged', async () => {
             const error = apiError(400, 'Source files are too large.');
             versionUpdateMock.mockRejectedValue(error);
 
@@ -2379,7 +2380,7 @@ describe('update-actor-version', () => {
         });
     });
 
-    describe('a PUT that failed with a 5xx or without an HTTP response', () => {
+    describe('a PUT that failed with a 5xx, without an HTTP response, or after a retry', () => {
         // apify-client retries such a PUT, and the platform may have saved an attempt it did not answer.
         const failures: [string, () => Error, string, Record<string, unknown>][] = [
             [
@@ -2387,6 +2388,17 @@ describe('update-actor-version', () => {
                 () => apiError(503, 'Service unavailable', 'service-unavailable'),
                 'with HTTP 503: Service unavailable (API error type: service-unavailable)',
                 { failureHttpStatus: 503, failureDetail: 'Service unavailable' },
+            ],
+            [
+                'a 429 on a retry',
+                () => apiError(429, 'Rate limit exceeded', 'rate-limit-exceeded', 2),
+                'with HTTP 429: Rate limit exceeded (API error type: rate-limit-exceeded)',
+                {
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                    failureHttpStatus: 429,
+                    failureDetail: 'Rate limit exceeded',
+                },
             ],
             [
                 'a network error',

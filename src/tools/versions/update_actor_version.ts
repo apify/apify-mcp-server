@@ -1,6 +1,6 @@
 import { posix } from 'node:path';
 
-import { ActorSourceType } from 'apify-client';
+import { ActorSourceType, ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -339,9 +339,10 @@ function buildFileChanges(
 }
 
 /**
- * The response to a version PUT that failed with a 5xx or without an HTTP response, such as on a timeout: the platform
- * may have saved the files of that attempt, or of an earlier one apify-client retried, so the reply gives the revisions
- * that show whether it did. Any other error, such as a 4xx, is rethrown.
+ * The response to a version PUT that failed with a 5xx, without an HTTP response, such as on a timeout, or on an attempt
+ * after the first, whatever its status: the platform may have saved the files of that attempt, or of an earlier one
+ * apify-client retried, so the reply gives the revisions that show whether it did. Any other error, such as a 4xx on
+ * the first attempt, is rethrown.
  */
 function respondToUnconfirmedSave(
     error: unknown,
@@ -354,7 +355,8 @@ function respondToUnconfirmedSave(
 ): ToolResponse {
     const { target, previousRevision, revision, loadedToolNames } = params;
     const httpStatus = getHttpStatusCode(error);
-    if (httpStatus !== undefined && httpStatus < 500) throw error;
+    const isRetried = error instanceof ApifyApiError && error.attempt > 1;
+    if (!isRetried && httpStatus !== undefined && httpStatus < 500) throw error;
     logHttpError(error, 'Failed to save the files of an Actor version', {
         actorId: target.actorId,
         versionNumber: target.versionNumber,
