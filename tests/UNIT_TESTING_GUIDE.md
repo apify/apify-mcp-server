@@ -6,19 +6,19 @@ Rules for writing unit tests that stay useful to human readers. The recurring fa
 
 Before writing anything, read the unit and separate what it **decides** from what it **delegates**. Test the decisions. For delegation, prove the wiring and stop.
 
-- **Do not re-enumerate a dependency's semantics.** If a helper has its own test file, one passing and one failing case through the caller is enough to prove it is called with the right arguments. Anything more duplicates the helper's suite and goes stale twice when the helper changes.
+- **Do not re-enumerate a dependency's semantics.** If a helper has its own suite, do not repeat it through every caller. Cover the caller's argument selection, defaults, use of results, error handling, and composition where relevant. There is no fixed number of wiring tests.
 - **Do not test the language or standard library.** Wrapping a predicate in `[...].filter(...)` and asserting that filtering returns matching elements, an empty array when nothing matches, and everything when everything matches tests `Array.prototype.filter`, not the unit. If callers filter with the predicate, that belongs to the caller's tests.
-- **Do not assert compile-time properties at runtime.** A test that checks `result[0].extra === 'data'` to show a generic "preserves the element type" verifies TypeScript, not behavior. If the types were wrong it would not compile.
+- **Separate type checks from runtime assertions.** Use type checks for inferred types and assignability. Use runtime tests for value preservation, transformations, and validation. Checking `result[0].extra === 'data'` can catch a lost or changed value even when the implementation compiles.
 - **Test through the public entry point of the unit, in the shape callers use it.** Do not invent wrapper scenarios the unit does not own.
 - **Do not re-assert fixture data.** When a unit passes a fixture through (a task tool forwarding `mockTask().input` to the API client), assert the pass-through once with `toHaveBeenCalledWith`. Re-typing the fixture's field values in further tests makes change detectors on data: any intentional edit to the fixture breaks them, and they can never catch a logic bug.
 
-## Test doubles: prefer real infrastructure, fake only true externals
+## Test doubles: prefer real infrastructure
 
 **Unit tests run in-process and need no credentials.** Use the real code the unit touches - `ActorsMcpServer`, the tool registry, Zod schemas, the MCP SDK - and reach for it before building an elaborate fake of it - the fake is where bugs hide. What still deserves a test double: the Apify API, other outbound HTTP calls, and anything slow or nondeterministic.
 
 [`tests/unit/helpers/`](./unit/helpers) is the toolbox for this:
 
-- **Apify API**: `mockApifyClient(methods)` (`tool_context.ts`) passes a stub client into the unit. `mockTaskApiClient` and `mockScheduleApiClient` are fakes that record every call, with `mockTask` and `mockSchedule` factories.
+- **Apify API**: `mockApifyClient(methods)` (`tool_context.ts`) passes a stub client into the unit. It casts the supplied methods to the client type; it does not check their signatures or return values. `mockTaskApiClient` and `mockScheduleApiClient` are fakes that record every call, with `mockTask` and `mockSchedule` factories.
 - **Server**: `withServer(run)` (`mcp_server.ts`) builds a real `ActorsMcpServer` and always closes it; `getRequestHandler` invokes an SDK request handler directly, without a transport.
 - **Tool calls**: `stubToolCallContext` builds the tool call arguments; `textOf` reads text content; `expectSchemaConformingStructuredContent` checks `structuredContent` against the tool's `outputSchema` the way the SDK client does; `expectSoftFailInvalidInput` asserts soft-fail responses.
 
@@ -33,11 +33,11 @@ When you fake anyway, follow these rules:
 - **Log wording is not a contract.** Substring assertions on log messages break on any copy edit while proving little. Asserting *that* a warning happened is legitimate when the warning is the observable behavior (a warn-and-skip path where the log line is the only outcome); pinning its phrasing, or substring-scanning a whole joined log stream for a summary table's contents, is testing presentation. Formatting belongs to the formatter's own unit, not to every caller. Text served to MCP clients is different: tool result text, descriptions, and errors are a contract (see [TOOL_GUIDELINES.md](../TOOL_GUIDELINES.md)). Assert the parts that carry it - a tool name, an ID, the instruction given - not whole sentences or paragraphs.
 - **Control time; do not bracket it.** Capturing `Date.now()` before and after the call and absorbing the slack with `toBeCloseTo` hides off-by-one bugs and eventually flakes. Use `vi.useFakeTimers()` / `vi.setSystemTime()` and assert exact values.
 
-## Coverage: branches before variations
+## Coverage: requirements and branches
 
-- **Enumerate the unit's branches from the source and give each outcome one test.** Only then consider variations. Padding obvious cases hides real gaps, because a reviewer sees a long file and assumes the function is covered.
-- **Distinguish boundaries from padding.** An empty list and an unknown (nullish) list take different paths when `[]` fails a required check but `null`/`undefined` skips it, so each deserves a test. But `null` vs `undefined` through a `??` fallback is the same path. When two inputs cannot take different paths, keep one.
-- **A positive and a negative case per rule** ("matches" / "does not match") is usually the right amount. Add a third only when it exercises a genuinely different path, such as one input satisfying two patterns at once.
+- **Start from the unit's promised behavior, then inspect its branches for gaps.** Cover meaningful outcomes, boundaries, and known regressions. Branch coverage helps find omissions; it does not determine how many tests are needed.
+- **Distinguish boundaries from padding.** Inputs on the same code path can protect different requirements. For example, `stripQuoteWrappers` uses one expression, but straight quotes, smart quotes, and nested wrappers can expose different bugs. Keep variations that protect distinct requirements; omit interchangeable examples that add no confidence.
+- **Use positive and negative cases as a starting point.** Add boundary, interaction, and regression cases when they protect additional behavior, even if they follow an already covered path.
 
 ## One behavior per test
 
@@ -58,10 +58,10 @@ When you fake anyway, follow these rules:
 
 ## Checklist before finishing a suite
 
-1. Every branch of the unit has a test; diff the source's conditionals against the describe blocks.
-2. No test re-proves a dependency that has its own test file (beyond one wiring pair).
-3. No test would still pass if the unit's body were replaced by the standard library call it wraps.
-4. No two tests have inputs that take the same code path.
-5. Test count roughly tracks the unit's branch count, not the input space's combination count.
-6. Code the unit touches is real unless it is external (the Apify API, the network); every remaining fake matches the real contract's shape, and no mocked module re-declares real constants.
+1. Tests cover the unit's requirements, meaningful branch outcomes, boundaries, and known regressions.
+2. Caller tests cover distinct uses of dependencies without repeating their full suites.
+3. Assert the behavior this unit promises; avoid enumerating the underlying library's behavior beyond that promise.
+4. Keep tests that protect distinct requirements, boundaries, or regressions, even when they take the same code path.
+5. Branch coverage helps find gaps; it does not set a test-count target.
+6. Prefer real code; use doubles for external effects and slow or nondeterministic dependencies. Every fake matches the real contract's shape, and no mocked module re-declares real constants.
 7. No test asserts on log or message wording unless that output is the behavior; no test mutates shared module-level mock state; time is controlled with fake timers, not bracketed.
