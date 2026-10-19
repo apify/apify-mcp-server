@@ -9,7 +9,10 @@ import { UserInputError } from '../../errors.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
-import { respondAborted, respondUserError } from '../../utils/mcp.js';
+import { getApifyErrorType } from '../../utils/apify_errors.js';
+import { getHttpStatusCode, logHttpError } from '../../utils/logging.js';
+import type { ToolResponse } from '../../utils/mcp.js';
+import { respondAborted, respondServerError, respondUserError } from '../../utils/mcp.js';
 import { respondWithBuild } from '../builds/build_helpers.js';
 import { updateActorVersionToolOutputSchema } from '../structured_output_schemas.js';
 import type { SourceFile } from './source_files.js';
@@ -302,6 +305,46 @@ function buildFileChanges(
 }
 
 /**
+ * The response to a version PUT that failed with a 5xx or without an HTTP response, such as on a timeout: the platform
+ * may have saved the files of that attempt, or of an earlier one apify-client retried, so the reply gives the revisions
+ * that show whether it did. Any other error, such as a 4xx, is rethrown.
+ */
+function respondToUnconfirmedSave(
+    error: unknown,
+    params: {
+        target: { actorId: string; versionNumber: string; fullName: string };
+        previousRevision: string;
+        revision: string;
+        loadedToolNames: readonly string[];
+    },
+): ToolResponse {
+    const { target, previousRevision, revision, loadedToolNames } = params;
+    const httpStatus = getHttpStatusCode(error);
+    if (httpStatus !== undefined && httpStatus < 500) throw error;
+    logHttpError(error, 'Failed to save the files of an Actor version', {
+        actorId: target.actorId,
+        versionNumber: target.versionNumber,
+    });
+    const message = error instanceof Error ? error.message : String(error);
+    const apiErrorType = getApifyErrorType(error);
+    const failure =
+        httpStatus === undefined
+            ? `without an HTTP response: ${message}`
+            : `with HTTP ${httpStatus}: ${message}${apiErrorType ? ` (API error type: ${apiErrorType})` : ''}`;
+    const readTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_GET)
+        ? `; ${HELPER_TOOLS.ACTOR_VERSION_GET} reads the revision`
+        : '';
+    return respondServerError(
+        `Saving version ${target.versionNumber} of ${target.fullName} failed ${failure}. ` +
+            'The platform may still have saved the change. ' +
+            `If the version's revision is ${revision}, this call saved it, and if it is ${previousRevision}, ` +
+            `it saved nothing${readTool}.`,
+        // The status, category, and detail the tool-call engine records for a thrown error.
+        { error, detail: message.slice(0, 200) },
+    );
+}
+
+/**
  * https://docs.apify.com/api/v2/actor-get
  *  /v2/actors/{actorId}
  * https://docs.apify.com/api/v2/actor-version-put
@@ -355,7 +398,7 @@ export const updateActorVersion: ToolEntry = Object.freeze({
             entryKeys: ['type', 'path', 'encoding', 'expectedHash'],
         }),
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, signal } = toolArgs;
+        const { args, apifyClient: client, signal, loadedToolNames } = toolArgs;
         const parsed = updateActorVersionArgs.parse(args);
         const editCount = parsed.operations
             .filter(({ type }) => type === 'edit')
@@ -405,10 +448,19 @@ export const updateActorVersion: ToolEntry = Object.freeze({
                 ...storedEntries.filter(isFolderEntry),
                 ...[...after.values()].map(({ entry }) => entry),
             ];
-            await client
-                .actor(actor.id)
-                .version(versionNumber)
-                .update({ sourceType: ActorSourceType.SourceFiles, sourceFiles });
+            try {
+                await client
+                    .actor(actor.id)
+                    .version(versionNumber)
+                    .update({ sourceType: ActorSourceType.SourceFiles, sourceFiles });
+            } catch (error) {
+                return respondToUnconfirmedSave(error, {
+                    target: { actorId: actor.id, versionNumber, fullName },
+                    previousRevision,
+                    revision,
+                    loadedToolNames,
+                });
+            }
             const changes = buildFileChanges(before, after);
             const emptyPaths = changes.flatMap(({ path }) => (after.get(path)?.sizeBytes === 0 ? [path] : []));
             return await respondAfterWrite({

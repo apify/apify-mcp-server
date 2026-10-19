@@ -4,7 +4,7 @@ import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { HELPER_TOOLS } from '../../src/const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import { prepareToolCallContext } from '../../src/payments/helpers.js';
 import { updateActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { getActorVersion } from '../../src/tools/versions/get_actor_version.js';
@@ -88,8 +88,8 @@ function mockFiles(...sourceFiles: Record<string, unknown>[]) {
     mockVersionRead({ sourceFiles });
 }
 
-function apiError(status: number, message: string): ApifyApiError {
-    return new ApifyApiError({ data: { error: { type: 'some-error', message } }, status } as AxiosResponse, 1);
+function apiError(status: number, message: string, type = 'some-error'): ApifyApiError {
+    return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, 1);
 }
 
 async function callTool(args: Record<string, unknown>, signal?: AbortSignal): Promise<UpdateResult> {
@@ -2321,11 +2321,87 @@ describe('update-actor-version', () => {
             expect(JSON.stringify(result)).not.toMatch(/API_KEY|secret-value/);
         });
 
-        it('lets an API error from the PUT through unchanged', async () => {
+        it('lets a 4xx API error from the PUT through unchanged', async () => {
             const error = apiError(400, 'Source files are too large.');
             versionUpdateMock.mockRejectedValue(error);
 
             await expect(callTool({ operations: [write('b.js', 'b')] })).rejects.toBe(error);
+        });
+
+        it('lets a 5xx API error from the read through unchanged, since nothing was sent', async () => {
+            const error = apiError(503, 'Service unavailable');
+            actorGetMock.mockRejectedValue(error);
+
+            await expect(callTool({ operations: [write('b.js', 'b')] })).rejects.toBe(error);
+            expect(versionUpdateMock).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('a PUT that failed with a 5xx or without an HTTP response', () => {
+        // apify-client retries such a PUT, and the platform may have saved an attempt it did not answer.
+        const failures: [string, () => Error, string, Record<string, unknown>][] = [
+            [
+                'a 5xx',
+                () => apiError(503, 'Service unavailable', 'service-unavailable'),
+                'with HTTP 503: Service unavailable (API error type: service-unavailable)',
+                { failureHttpStatus: 503, failureDetail: 'Service unavailable' },
+            ],
+            [
+                'a network error',
+                () => Object.assign(new Error('socket hang up'), { request: {}, config: {}, code: 'ECONNRESET' }),
+                'without an HTTP response: socket hang up',
+                { failureDetail: 'socket hang up' },
+            ],
+        ];
+
+        it.each(failures)(
+            'says after %s that the platform may have saved the change, and which revision shows whether it did',
+            async (_, buildError, failure, telemetry) => {
+                const previousRevision = await readRevision();
+                versionUpdateMock.mockRejectedValue(buildError());
+
+                const result = await callTool({ autoBuild: true, operations: [write('b.js', 'b')] });
+                // What get-actor-version returns once the platform stored the PUT.
+                mockFiles(...getPutFiles());
+                const savedRevision = await readRevision();
+
+                expect(result.isError).toBe(true);
+                expect(result.toolTelemetry).toStrictEqual({
+                    toolStatus: TOOL_STATUS.FAILED,
+                    failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
+                    ...telemetry,
+                });
+                expect(result.structuredContent).toBeUndefined();
+                expect(result.content).toStrictEqual([
+                    {
+                        type: 'text',
+                        text:
+                            `Saving version 0.1 of john/my-actor failed ${failure}. The platform may still have saved the change. ` +
+                            `If the version's revision is ${savedRevision}, this call saved it, and if it is ${previousRevision}, ` +
+                            'it saved nothing; get-actor-version reads the revision.',
+                    },
+                ]);
+                expect(savedRevision).not.toBe(previousRevision);
+                expect(buildMock).not.toHaveBeenCalled();
+            },
+        );
+
+        it.each(failures)('names get-actor-version after %s only when the session has it', async (_, buildError) => {
+            versionUpdateMock.mockRejectedValue(buildError());
+            const loadedToolNames = Object.values(HELPER_TOOLS).filter(
+                (name) => name !== HELPER_TOOLS.ACTOR_VERSION_GET,
+            );
+            const context = stubToolCallContext(
+                { actor: 'john/my-actor', operations: [write('b.js', 'b')] },
+                stubClient,
+                { loadedToolNames },
+            );
+
+            const result = (await (updateActorVersion as HelperTool).call(context)) as UpdateResult;
+
+            expect(result.isError).toBe(true);
+            expect(result.content[0].text).toMatch(/, and if it is [0-9a-f]+, it saved nothing\.$/);
+            expect(result.content[0].text).not.toContain(HELPER_TOOLS.ACTOR_VERSION_GET);
         });
     });
 
