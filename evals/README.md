@@ -360,6 +360,8 @@ Results are recorded in Langfuse, not to a local file. Each run:
 - **Scores** each agent item: `mcp_agent_judge` (`1` on a PASS verdict, comment = judge reason) and `tool_errors` (count of unexpected failed tool calls, comment lists every failure with expected ones marked, `0` on a clean item) together form the gate, and `total_tokens` is the agent tokens billed (omitted when the provider reported no usage so an unmeasured run cannot look like a free one; an item whose agent run was retried reports only the second attempt). Each tool-call item scores `first_tool_match` alone (`1`/`0`, comment names the captured call and the verdict).
 - **Scores the run** with `pass_rate`: passed trials over requested trials (`requestedIds.length * iterations`), so runs stay comparable even when trials were dropped.
 
+To read scores outside the UI, call `GET /api/public/v3/scores?name=<score>&fields=core,details` on `LANGFUSE_BASE_URL` with the public and secret key as basic auth. The v1 and v2 score endpoints return 404 on that instance.
+
 ### Concurrency
 
 `--concurrency` maps to the SDK's `maxConcurrency`, which runs **sequential batches** of that size rather than a rolling window: one slow test stalls the rest of its batch.
@@ -443,6 +445,15 @@ above). The snapshot holds the same fields flattened, one object per case, in th
 - Check tool results are helpful
 - Reduce `maxTurns` to fail faster
 - Try a different agent model
+
+### Eval runs send real problem reports
+**Symptom:** `report-problem` calls from an eval run reach the production Segment source.<br>
+**Cause:** The eval server inherits the runner's environment, and telemetry defaults to `PROD` (`src/telemetry.ts`).<br>
+**Solution:** Run cases where the agent can call `report-problem` (e.g. cases with `failTools`) with `TELEMETRY_ENV=DEV`.
+
+### A case expects behavior your change removes on purpose
+**Symptom:** A case fails because it checks for behavior the PR removes on purpose, e.g. a call that tool texts no longer ask for.<br>
+**Solution:** Don't change the case in the same PR. Name the case and the reason in the PR, and open an issue for the case owner ([#1603](https://github.com/apify/apify-mcp-server/issues/1603) is an example).
 
 ## CI
 
