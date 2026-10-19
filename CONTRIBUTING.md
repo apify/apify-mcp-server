@@ -379,6 +379,7 @@ For local development setup, scripts, and manual testing, see [DEVELOPMENT.md](.
 
 ## Testing
 
+- Unit test rules are in the [unit testing guide](./tests/UNIT_TESTING_GUIDE.md); [tests/AGENTS.md](./tests/AGENTS.md) says which test layer to use.
 - Write tests for new features and bug fixes.
 - Ensure all tests pass before submitting a PR.
 - Aim for good test coverage, especially for critical paths.

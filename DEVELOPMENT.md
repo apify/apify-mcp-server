@@ -145,6 +145,8 @@ Restart Claude Code for the change to take effect. This token is picked up by bo
 
 ## Testing
 
+Unit test rules are in the [unit testing guide](./tests/UNIT_TESTING_GUIDE.md); which layer to use is in [tests/AGENTS.md](./tests/AGENTS.md).
+
 | Layer | Command | What it covers |
 |---|---|---|
 | **Unit tests** | `pnpm run test:unit` | Individual modules in isolation — no credentials needed |
@@ -170,6 +172,8 @@ Integration tests run against two purpose-built Actors defined in [apify/mcp-ser
 
 ### Test structure
 
+- `tests/AGENTS.md` — testing conventions and which test layer to use
+- `tests/UNIT_TESTING_GUIDE.md` — rules for unit tests
 - `tests/unit/` — unit tests for individual modules
 - `tests/integration/` — integration tests for MCP server functionality
   - `tests/integration/suite.ts` — wires the transport dimensions into one shared suite; add new cases to the matching group in `tests/test_kit/cases/*.cases.ts`, not here
