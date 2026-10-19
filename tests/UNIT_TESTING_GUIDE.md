@@ -4,7 +4,7 @@ Rules for writing unit tests that stay useful to human readers. The recurring fa
 
 ## Scope: test the unit's own logic
 
-Before writing anything, read the unit and separate what it **decides** from what it **delegates**. Test the decisions. For delegation, prove the wiring and stop.
+Before writing anything, read the unit and separate what it **decides** from what it **delegates**. Test the decisions. For delegation, test the caller's own behavior without repeating the dependency's full suite.
 
 - **Do not re-enumerate a dependency's semantics.** If a helper has its own suite, do not repeat it through every caller. Cover the caller's argument selection, defaults, use of results, error handling, and composition where relevant. There is no fixed number of wiring tests.
 - **Do not test the language or standard library.** Wrapping a predicate in `[...].filter(...)` and asserting that filtering returns matching elements, an empty array when nothing matches, and everything when everything matches tests `Array.prototype.filter`, not the unit. If callers filter with the predicate, that belongs to the caller's tests.
@@ -42,7 +42,7 @@ When you fake anyway, follow these rules:
 ## One behavior per test
 
 - Before adding a test, answer: **what does this prove that no existing test proves?** If nothing, do not add it. Two tests with the same inputs and assertions under different names prove one thing.
-- **Do not expand combinatorially.** Independent dimensions (URL match × required names × flags) do not need a test per combination; test each dimension where it branches, plus one composed case if the composition itself is a behavior ("multiple flags must all match").
+- **Do not expand combinatorially.** Independent dimensions (URL match × required names × flags) do not need a test per combination; test each dimension where it branches, plus composed cases where interactions affect the result ("multiple flags must all match").
 - When a test fails, its name plus its body should identify the broken rule without reading other tests.
 
 ## Readability
@@ -51,8 +51,7 @@ When you fake anyway, follow these rules:
 - **`describe` blocks named after behaviors**, not method names: `explicit allowlist takes priority over discovered defaults`, not the function's name.
 - **Test names are behavior statements** that read as documentation: `is not eligible when the allowlist excludes the required tool`.
 - **Each test is self-contained**: arrange, act, assert visible in one screen, no shared mutable state, no hidden setup in `beforeEach`.
-- **Comment only non-obvious expectations.** A one-line note explaining *why* the expected value is `false` (which rule fired, which spec default applies) earns its place; comments restating the test name do not.
-- **Comments that state intent, not mechanics**: `// Best-effort: one failed step must not abort the whole run` tells the reader which product rule the test protects.
+- **Comment only non-obvious intent or expectations.** Explain which rule fired or which spec default applies; do not restate the test name or mechanics. For example, `// Best-effort: one failed step must not abort the whole run` identifies the product rule the test protects.
 - **Realistic domain data** (`apify/rag-web-browser`, `get-dataset-items`) over `foo`/`bar` - it makes the scenario legible to someone who knows the domain.
 - **Derive expectations from the unit's own exported source of truth.** Assert a truncated name against `MAX_TOOL_NAME_LENGTH` exported by the unit instead of a hardcoded `64`, so changing the limit does not break unrelated tests. (Deriving *structure* is good; re-asserting the fixture's *values* is the anti-pattern above.)
 
@@ -62,6 +61,5 @@ When you fake anyway, follow these rules:
 2. Caller tests cover distinct uses of dependencies without repeating their full suites.
 3. Assert the behavior this unit promises; avoid enumerating the underlying library's behavior beyond that promise.
 4. Keep tests that protect distinct requirements, boundaries, or regressions, even when they take the same code path.
-5. Branch coverage helps find gaps; it does not set a test-count target.
-6. Prefer real code; use doubles for external effects and slow or nondeterministic dependencies. Every fake matches the real contract's shape, and no mocked module re-declares real constants.
-7. No test asserts on log or message wording unless that output is the behavior; no test mutates shared module-level mock state; time is controlled with fake timers, not bracketed.
+5. Prefer real code; use doubles for external effects and slow or nondeterministic dependencies. Every fake matches the real contract's shape, and no mocked module re-declares real constants.
+6. No test asserts on log or message wording unless that output is the behavior; no test mutates shared module-level mock state; time is controlled with fake timers, not bracketed.
