@@ -88,8 +88,9 @@ function mockFiles(...sourceFiles: Record<string, unknown>[]) {
     mockVersionRead({ sourceFiles });
 }
 
-function apiError(status: number, message: string, type = 'some-error'): ApifyApiError {
-    return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, 1);
+/** `attempt` is the attempt of the request apify-client gave up on; above 1, it retried the request. */
+function apiError(status: number, message: string, type = 'some-error', attempt = 1): ApifyApiError {
+    return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, attempt);
 }
 
 async function callTool(args: Record<string, unknown>, signal?: AbortSignal): Promise<UpdateResult> {
@@ -422,23 +423,52 @@ describe('update-actor-version', () => {
                 );
             });
 
-            it('refuses an edit whose newText grows a file past the limit once its LFs become CRLF', async () => {
-                // 93 code units under the limit; the newText is 83 code units, and 123 once each LF becomes CRLF.
-                mockFiles({
-                    name: 'src/big.txt',
-                    format: 'TEXT',
-                    content: `${'a'.repeat(MAX_LENGTH - 100)}\r\n#0;\r\n`,
-                });
+            it('refuses an edit whose newText grows a file past the limit before searching for its oldText', async () => {
+                mockFiles(NEAR_LIMIT);
 
-                const text = await callToolExpectingUserError({
-                    operations: [edit('src/big.txt', { oldText: '#0;', newText: `${'b\n'.repeat(40)}#0;` })],
-                });
+                // #9; is not in the file, so a search for it would fail with NO_MATCH.
+                const text = await callToolExpectingUserError({ operations: [edit('src/big.txt', grow('#9;', 92))] });
 
                 expect(text).toBe(
                     'Nothing was written: edits[0] of operations[0] (edit src/big.txt) can make the file longer than ' +
-                        '3145728 UTF-16 code units, the limit for an edited file. In a file with CRLF line breaks, ' +
-                        'each character of newText counts as two, since each LF in it becomes CRLF.',
+                        '3145728 UTF-16 code units, the limit for an edited file.',
                 );
+            });
+
+            describe('with CRLF line breaks', () => {
+                // 93 UTF-16 code units under the limit.
+                const CRLF_NEAR_LIMIT = {
+                    name: 'src/big.txt',
+                    format: 'TEXT',
+                    content: `${'a'.repeat(MAX_LENGTH - 100)}\r\n#0;\r\n`,
+                };
+
+                it.each([
+                    ['LFs, each of which becomes CRLF', 'b\n'.repeat(32)],
+                    ['CRLFs, which stay as they are', 'b\r\n'.repeat(32)],
+                    ['no line break', 'b'.repeat(96)],
+                ])('takes an edit that grows the file to exactly 3 MiB with a newText of %s', async (_, newText) => {
+                    mockFiles(CRLF_NEAR_LIMIT);
+
+                    await callTool({ operations: [edit('src/big.txt', { oldText: '#0;', newText })] });
+
+                    const [saved] = getPutFiles() as { content: string }[];
+                    expect(saved.content).toHaveLength(MAX_LENGTH);
+                });
+
+                it('refuses an edit whose newText grows the file past the limit once its LFs become CRLF', async () => {
+                    mockFiles(CRLF_NEAR_LIMIT);
+
+                    // 65 code units, and 97 once each LF becomes CRLF.
+                    const text = await callToolExpectingUserError({
+                        operations: [edit('src/big.txt', { oldText: '#0;', newText: `${'b\n'.repeat(32)}b` })],
+                    });
+
+                    expect(text).toBe(
+                        'Nothing was written: edits[0] of operations[0] (edit src/big.txt) can make the file longer than ' +
+                            '3145728 UTF-16 code units, the limit for an edited file.',
+                    );
+                });
             });
         });
     });
@@ -2363,7 +2393,7 @@ describe('update-actor-version', () => {
             expect(JSON.stringify(result)).not.toMatch(/API_KEY|secret-value/);
         });
 
-        it('lets a 4xx API error from the PUT through unchanged', async () => {
+        it('lets a 4xx API error from the first attempt of the PUT through unchanged', async () => {
             const error = apiError(400, 'Source files are too large.');
             versionUpdateMock.mockRejectedValue(error);
 
@@ -2379,7 +2409,7 @@ describe('update-actor-version', () => {
         });
     });
 
-    describe('a PUT that failed with a 5xx or without an HTTP response', () => {
+    describe('a PUT that failed with a 5xx, without an HTTP response, or after a retry', () => {
         // apify-client retries such a PUT, and the platform may have saved an attempt it did not answer.
         const failures: [string, () => Error, string, Record<string, unknown>][] = [
             [
@@ -2387,6 +2417,17 @@ describe('update-actor-version', () => {
                 () => apiError(503, 'Service unavailable', 'service-unavailable'),
                 'with HTTP 503: Service unavailable (API error type: service-unavailable)',
                 { failureHttpStatus: 503, failureDetail: 'Service unavailable' },
+            ],
+            [
+                'a 429 on a retry',
+                () => apiError(429, 'Rate limit exceeded', 'rate-limit-exceeded', 2),
+                'with HTTP 429: Rate limit exceeded (API error type: rate-limit-exceeded)',
+                {
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                    failureHttpStatus: 429,
+                    failureDetail: 'Rate limit exceeded',
+                },
             ],
             [
                 'a network error',
@@ -2397,7 +2438,7 @@ describe('update-actor-version', () => {
         ];
 
         it.each(failures)(
-            'says after %s that the platform may have saved the change, and which revision shows whether it did',
+            'says after %s that the platform may have saved the change, which revision shows whether it did, and that no build was started',
             async (_, buildError, failure, telemetry) => {
                 const previousRevision = await readRevision();
                 versionUpdateMock.mockRejectedValue(buildError());
@@ -2420,7 +2461,7 @@ describe('update-actor-version', () => {
                         text:
                             `Saving version 0.1 of john/my-actor failed ${failure}. The platform may still have saved the change. ` +
                             `If the version's revision is ${savedRevision}, this call saved it, and if it is ${previousRevision}, ` +
-                            'it saved nothing; get-actor-version reads the revision.',
+                            'it saved nothing; get-actor-version reads the revision. No build was started.',
                     },
                 ]);
                 expect(savedRevision).not.toBe(previousRevision);
