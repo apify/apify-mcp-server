@@ -81,7 +81,8 @@ export const buildActor: ToolEntry = Object.freeze({
         const { args, apifyClient: client, apifyToken, loadedToolNames, signal, progressTracker } = toolArgs;
         const parsed = buildActorArgs.parse(args);
         const actor = await getResourceByIdOrName(parsed.actor, async (safeId) => client.actor(safeId).get());
-        if (!actor) {
+        // Extra path segments, such as username/name/runs/last, reach a sub-resource that is not an Actor.
+        if (!actor || typeof actor.name !== 'string' || typeof actor.username !== 'string') {
             return respondUserError(
                 `Actor '${parsed.actor}' not found. The actor argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.`,
             );

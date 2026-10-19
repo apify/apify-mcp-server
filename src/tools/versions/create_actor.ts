@@ -19,6 +19,7 @@ import {
     resolveVersion,
     respondAfterWrite,
     respondToSourceToolError,
+    SourcePathIndex,
     sourceFileArgs,
     validateFileContent,
     validateFilePath,
@@ -47,56 +48,47 @@ const createActorArgs = z.object({
         .describe('Start a build of the version after creating the Actor, and return without waiting. Default: false.'),
 });
 
-/** The folders above a file, outermost first: `a` and `a/b` for `a/b/c.js`. */
-function listFolders(path: string): string[] {
-    const segments = path.split('/');
-    return segments.slice(1).map((_, index) => segments.slice(0, index + 1).join('/'));
-}
-
 /**
  * The entries to send, one per file; throws `UserInputError` for a path no file can be written at, and for a path
  * given twice, since the platform puts the Actor name in the first .actor/actor.json and the build uses the last.
- * Paths are checked through a set and a map, since comparing each file with every earlier one took 8 s for 20,000.
  */
 function buildSourceFileEntries(files: readonly z.infer<typeof sourceFileArgs>[]): ActorVersionSourceFile[] {
     const entries: ActorVersionSourceFile[] = [];
-    const filePaths = new Set<string>();
-    const firstFileByFolder = new Map<string, string>();
+    const pathIndex = new SourcePathIndex([]);
     for (const [index, file] of files.entries()) {
         validatePathCharacters(file.path, `files[${index}]`);
         const entry = buildSourceFileEntry(file);
         const label = `files[${index}] (${file.path})`;
         validateFilePath(entry.name, label);
         validateFileContent(entry, label);
-        if (filePaths.has(entry.name)) {
+        if (pathIndex.hasFile(entry.name)) {
             throw new UserInputError(`${label} repeats the path ${entry.name}; each path can be sent only once.`);
         }
-        const folders = listFolders(entry.name);
-        const collision = folders.find((folder) => filePaths.has(folder)) ?? firstFileByFolder.get(entry.name);
-        if (collision !== undefined) {
-            throw new UserInputError(
-                `${label} collides with ${collision}; one path cannot be both a file and a folder.`,
-            );
-        }
-        filePaths.add(entry.name);
-        for (const folder of folders) {
-            if (!firstFileByFolder.has(folder)) firstFileByFolder.set(folder, entry.name);
-        }
+        pathIndex.validateNewFilePath(entry.name, label);
+        pathIndex.addFile(entry.name);
         entries.push(entry);
     }
     return entries;
 }
 
-/** The `version` of .actor/actor.json when it is a non-empty string in valid JSON, as `apify push` reads it. */
+/**
+ * The `version` of .actor/actor.json when it is a non-empty string in valid JSON, as `apify push` reads it. A leading
+ * byte order mark, which some editors write, is skipped, since JSON.parse refuses it.
+ */
 function readActorJsonVersion(entries: readonly ActorVersionSourceFile[]): string | undefined {
     const actorJson = entries.find(({ name, format }) => name === '.actor/actor.json' && format === 'TEXT');
     if (!actorJson) return undefined;
     try {
-        const { version } = JSON.parse(actorJson.content) as { version?: unknown };
+        const { version } = JSON.parse(actorJson.content.replace(/^﻿/, '')) as { version?: unknown };
         return typeof version === 'string' && version !== '' ? version : undefined;
     } catch {
         return undefined;
     }
+}
+
+/** A refusal of the name as taken on a retry of the POST, which an earlier attempt of the same call may have caused. */
+function isRetriedNameTaken(error: unknown): error is ApifyApiError {
+    return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE && error.attempt > 1;
 }
 
 /**
@@ -187,22 +179,16 @@ export const createActor: ToolEntry = Object.freeze({
                 summary: `Created the private Actor ${fullName}.`,
             });
         } catch (error) {
-            if (
-                error instanceof ApifyApiError &&
-                error.type === APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE &&
-                error.attempt > 1
-            ) {
-                const readTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_GET)
-                    ? `; ${HELPER_TOOLS.ACTOR_VERSION_GET} reads its files`
-                    : '';
-                return respondUserError(
-                    `The platform refused the name ${parsed.name} as taken when the request was retried, so an earlier ` +
-                        `attempt of this call may have created the Actor ${parsed.name}. ` +
-                        `If it holds the files you sent, this call created it${readTool}.`,
-                    { httpStatus: error.statusCode },
-                );
-            }
-            return respondToSourceToolError(error);
+            if (!isRetriedNameTaken(error)) return respondToSourceToolError(error);
+            const readTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_GET)
+                ? `; ${HELPER_TOOLS.ACTOR_VERSION_GET} reads its files`
+                : '';
+            return respondUserError(
+                `The platform refused the name ${parsed.name} as taken when the request was retried, so an earlier ` +
+                    `attempt of this call may have created the Actor ${parsed.name}. ` +
+                    `If it holds the files you sent, this call created it${readTool}.`,
+                { httpStatus: error.statusCode },
+            );
         }
     },
 } as const);

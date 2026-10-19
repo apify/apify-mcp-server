@@ -4,7 +4,7 @@ import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { HELPER_TOOLS } from '../../src/const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import { prepareToolCallContext } from '../../src/payments/helpers.js';
 import { updateActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { getActorVersion } from '../../src/tools/versions/get_actor_version.js';
@@ -88,8 +88,8 @@ function mockFiles(...sourceFiles: Record<string, unknown>[]) {
     mockVersionRead({ sourceFiles });
 }
 
-function apiError(status: number, message: string): ApifyApiError {
-    return new ApifyApiError({ data: { error: { type: 'some-error', message } }, status } as AxiosResponse, 1);
+function apiError(status: number, message: string, type = 'some-error'): ApifyApiError {
+    return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, 1);
 }
 
 async function callTool(args: Record<string, unknown>, signal?: AbortSignal): Promise<UpdateResult> {
@@ -384,6 +384,62 @@ describe('update-actor-version', () => {
             expect(performance.now() - startedAt).toBeLessThan(6000);
             const [saved] = getPutFiles() as { content: string }[];
             expect(saved.content.slice(-tail.length)).toBe(tail.replaceAll('#', '@'));
+        });
+
+        describe('length of an edited file', () => {
+            const MAX_LENGTH = 3 * 1024 * 1024;
+            // 91 UTF-16 code units under the limit.
+            const NEAR_LIMIT = {
+                name: 'src/big.txt',
+                format: 'TEXT',
+                content: `${'a'.repeat(MAX_LENGTH - 100)}#0;#1;#2;`,
+            };
+            const grow = (marker: string, by: number) => ({ oldText: marker, newText: `${marker}${'x'.repeat(by)}` });
+
+            it('takes edits that grow a file to exactly 3 MiB of UTF-16 code units', async () => {
+                mockFiles(NEAR_LIMIT);
+
+                await callTool({ operations: [edit('src/big.txt', grow('#0;', 50), grow('#1;', 41))] });
+
+                const [saved] = getPutFiles() as { content: string }[];
+                expect(saved.content).toHaveLength(MAX_LENGTH);
+            });
+
+            it('refuses the edit that grows a file past 3 MiB of UTF-16 code units, before searching for the next one', async () => {
+                mockFiles(NEAR_LIMIT);
+
+                const text = await callToolExpectingUserError({
+                    operations: [
+                        edit('src/big.txt', grow('#0;', 50)),
+                        // #9; is not in the file, so a search for it would fail with NO_MATCH.
+                        edit('src/big.txt', grow('#1;', 42), grow('#9;', 1)),
+                    ],
+                });
+
+                expect(text).toBe(
+                    'Nothing was written: edits[0] of operations[1] (edit src/big.txt) can make the file longer than ' +
+                        '3145728 UTF-16 code units, the limit for an edited file.',
+                );
+            });
+
+            it('refuses an edit whose newText grows a file past the limit once its LFs become CRLF', async () => {
+                // 93 code units under the limit; the newText is 83 code units, and 123 once each LF becomes CRLF.
+                mockFiles({
+                    name: 'src/big.txt',
+                    format: 'TEXT',
+                    content: `${'a'.repeat(MAX_LENGTH - 100)}\r\n#0;\r\n`,
+                });
+
+                const text = await callToolExpectingUserError({
+                    operations: [edit('src/big.txt', { oldText: '#0;', newText: `${'b\n'.repeat(40)}#0;` })],
+                });
+
+                expect(text).toBe(
+                    'Nothing was written: edits[0] of operations[0] (edit src/big.txt) can make the file longer than ' +
+                        '3145728 UTF-16 code units, the limit for an edited file. In a file with CRLF line breaks, ' +
+                        'each character of newText counts as two, since each LF in it becomes CRLF.',
+                );
+            });
         });
     });
 
@@ -1672,6 +1728,18 @@ describe('update-actor-version', () => {
             },
         );
 
+        it.each(['src\\main.js', '.\\Dockerfile'])(
+            'refuses a write to %s, whose backslash the build takes as part of the file name',
+            async (path) => {
+                const text = await callToolExpectingUserError({ autoBuild: true, operations: [write(path, 'x')] });
+
+                expect(text).toBe(
+                    `operations[0] (write ${path}) has a backslash in its path; paths use / as the separator.`,
+                );
+                expect(buildMock).not.toHaveBeenCalled();
+            },
+        );
+
         it.each([
             ['U+0000', 'src/a\0.js'],
             ['U+000A', 'src/\nmain.js'],
@@ -1699,6 +1767,21 @@ describe('update-actor-version', () => {
                 expect(buildMock).not.toHaveBeenCalled();
             },
         );
+
+        it.each([
+            ['write', write('src/a\0.js', 'x')],
+            ['edit', edit('src/a\0.js', { oldText: 'a', newText: 'b' })],
+            ['delete', remove('src/a\0.js', MAIN_JS_HASH)],
+        ])('refuses a NUL in the path of a single %s operation, before any request', async (_, operation) => {
+            const text = await callToolExpectingUserError({ autoBuild: true, operations: [operation] });
+
+            expect(text).toBe(
+                'operations[0] has the control character U+0000 in its path; ' +
+                    'a path cannot hold characters U+0000 to U+001F or U+007F.',
+            );
+            expect(actorGetMock).not.toHaveBeenCalled();
+            expect(buildMock).not.toHaveBeenCalled();
+        });
 
         it('refuses a path with a lone UTF-16 surrogate in any operation, before any request', async () => {
             const text = await callToolExpectingUserError({
@@ -1839,6 +1922,21 @@ describe('update-actor-version', () => {
             await callTool({ operations: [remove('/src/main.js', sha256Prefix('x'))] });
 
             expect(getPutFiles()).toStrictEqual([MAIN_JS]);
+        });
+
+        it('edits and deletes stored files with a backslash in the path, so such files can be fixed or removed', async () => {
+            const util = { name: 'src\\util.js', format: 'TEXT', content: 'x' };
+            const dockerfile = { name: '.\\Dockerfile', format: 'TEXT', content: 'FROM node' };
+            mockFiles(dockerfile, util, MAIN_JS);
+
+            await callTool({
+                operations: [
+                    edit('src\\util.js', { oldText: 'x', newText: 'y' }),
+                    remove('.\\Dockerfile', sha256Prefix('FROM node')),
+                ],
+            });
+
+            expect(getPutFiles()).toStrictEqual([MAIN_JS, { name: 'src\\util.js', format: 'TEXT', content: 'y' }]);
         });
 
         it('matches a path the way get-actor-version lists it', async () => {
@@ -2265,11 +2363,87 @@ describe('update-actor-version', () => {
             expect(JSON.stringify(result)).not.toMatch(/API_KEY|secret-value/);
         });
 
-        it('lets an API error from the PUT through unchanged', async () => {
+        it('lets a 4xx API error from the PUT through unchanged', async () => {
             const error = apiError(400, 'Source files are too large.');
             versionUpdateMock.mockRejectedValue(error);
 
             await expect(callTool({ operations: [write('b.js', 'b')] })).rejects.toBe(error);
+        });
+
+        it('lets a 5xx API error from the read through unchanged, since nothing was sent', async () => {
+            const error = apiError(503, 'Service unavailable');
+            actorGetMock.mockRejectedValue(error);
+
+            await expect(callTool({ operations: [write('b.js', 'b')] })).rejects.toBe(error);
+            expect(versionUpdateMock).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('a PUT that failed with a 5xx or without an HTTP response', () => {
+        // apify-client retries such a PUT, and the platform may have saved an attempt it did not answer.
+        const failures: [string, () => Error, string, Record<string, unknown>][] = [
+            [
+                'a 5xx',
+                () => apiError(503, 'Service unavailable', 'service-unavailable'),
+                'with HTTP 503: Service unavailable (API error type: service-unavailable)',
+                { failureHttpStatus: 503, failureDetail: 'Service unavailable' },
+            ],
+            [
+                'a network error',
+                () => Object.assign(new Error('socket hang up'), { request: {}, config: {}, code: 'ECONNRESET' }),
+                'without an HTTP response: socket hang up',
+                { failureDetail: 'socket hang up' },
+            ],
+        ];
+
+        it.each(failures)(
+            'says after %s that the platform may have saved the change, and which revision shows whether it did',
+            async (_, buildError, failure, telemetry) => {
+                const previousRevision = await readRevision();
+                versionUpdateMock.mockRejectedValue(buildError());
+
+                const result = await callTool({ autoBuild: true, operations: [write('b.js', 'b')] });
+                // What get-actor-version returns once the platform stored the PUT.
+                mockFiles(...getPutFiles());
+                const savedRevision = await readRevision();
+
+                expect(result.isError).toBe(true);
+                expect(result.toolTelemetry).toStrictEqual({
+                    toolStatus: TOOL_STATUS.FAILED,
+                    failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
+                    ...telemetry,
+                });
+                expect(result.structuredContent).toBeUndefined();
+                expect(result.content).toStrictEqual([
+                    {
+                        type: 'text',
+                        text:
+                            `Saving version 0.1 of john/my-actor failed ${failure}. The platform may still have saved the change. ` +
+                            `If the version's revision is ${savedRevision}, this call saved it, and if it is ${previousRevision}, ` +
+                            'it saved nothing; get-actor-version reads the revision.',
+                    },
+                ]);
+                expect(savedRevision).not.toBe(previousRevision);
+                expect(buildMock).not.toHaveBeenCalled();
+            },
+        );
+
+        it.each(failures)('names get-actor-version after %s only when the session has it', async (_, buildError) => {
+            versionUpdateMock.mockRejectedValue(buildError());
+            const loadedToolNames = Object.values(HELPER_TOOLS).filter(
+                (name) => name !== HELPER_TOOLS.ACTOR_VERSION_GET,
+            );
+            const context = stubToolCallContext(
+                { actor: 'john/my-actor', operations: [write('b.js', 'b')] },
+                stubClient,
+                { loadedToolNames },
+            );
+
+            const result = (await (updateActorVersion as HelperTool).call(context)) as UpdateResult;
+
+            expect(result.isError).toBe(true);
+            expect(result.content[0].text).toMatch(/, and if it is [0-9a-f]+, it saved nothing\.$/);
+            expect(result.content[0].text).not.toContain(HELPER_TOOLS.ACTOR_VERSION_GET);
         });
     });
 
@@ -2367,6 +2541,22 @@ describe('update-actor-version', () => {
             expect(result.content[1].text).toContain(`Check progress with ${HELPER_TOOLS.ACTOR_BUILD_GET}`);
             expect(result.content).toHaveLength(2);
             expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+        });
+
+        it('says the build is still running without naming get-actor-build when the session lacks it', async () => {
+            const loadedToolNames = Object.values(HELPER_TOOLS).filter((name) => name !== HELPER_TOOLS.ACTOR_BUILD_GET);
+            const context = stubToolCallContext(
+                { actor: 'john/my-actor', autoBuild: true, operations: [write('b.js', 'b')] },
+                stubClient,
+                { loadedToolNames },
+            );
+
+            const result = (await (updateActorVersion as HelperTool).call(context)) as UpdateResult;
+
+            expect(buildMock).toHaveBeenCalledWith('0.1', { useCache: true });
+            expect(result.content[1].text).toBe(
+                'Updated version 0.1 of john/my-actor.\nThe build is still running; check its status again in a few seconds.',
+            );
         });
 
         it('adds the build Console link for an Apify Console session', async () => {

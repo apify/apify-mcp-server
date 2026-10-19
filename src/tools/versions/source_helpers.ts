@@ -45,6 +45,14 @@ function maskLoggedValues(record: Record<string, unknown>, keys: readonly string
     return Object.fromEntries(keys.filter((key) => record[key] !== undefined).map((key) => [key, REDACTED]));
 }
 
+/** The logged copy of an entry's edits, each with its oldText and newText as `REDACTED`. */
+function redactEdits(edits: unknown): unknown {
+    if (!Array.isArray(edits)) return REDACTED;
+    return edits.map((textEdit) =>
+        isRecord(textEdit) ? maskLoggedValues(textEdit, ['oldText', 'newText']) : REDACTED,
+    );
+}
+
 /**
  * The logged copy of a source tool's arguments (`redactArgs`), built as an allowlist: `keys`, and each entry of the
  * list under `listKey` with its `entryKeys`, and with its content and its edits' oldText and newText as `REDACTED`.
@@ -61,13 +69,7 @@ export function redactSourceToolArgs(
         return {
             ...pickLoggedValues(entry, entryKeys),
             ...maskLoggedValues(entry, ['content']),
-            ...(edits !== undefined && {
-                edits: Array.isArray(edits)
-                    ? edits.map((textEdit) =>
-                          isRecord(textEdit) ? maskLoggedValues(textEdit, ['oldText', 'newText']) : REDACTED,
-                      )
-                    : REDACTED,
-            }),
+            ...(edits !== undefined && { edits: redactEdits(edits) }),
         };
     };
     const list = args[listKey];
@@ -243,9 +245,13 @@ export function validatePathCharacters(path: string, label: string): void {
 
 /**
  * Throws `UserInputError` for a normalized path no file can be written at. The build worker refuses a version with a
- * path outside the Actor root, so every build of it would fail; `.` and a path ending in a slash name a folder.
+ * path outside the Actor root, so every build of it would fail; `.` and a path ending in a slash name a folder. A
+ * backslash is refused too: the build takes it as part of the file name, so src\main.js would land in the Actor root.
  */
 export function validateFilePath(path: string, label: string): void {
+    if (path.includes('\\')) {
+        throw new UserInputError(`${label} has a backslash in its path; paths use / as the separator.`);
+    }
     if (path.startsWith('/') || path === '..' || path.startsWith('../')) {
         throw new UserInputError(
             `${label} has a path outside the Actor root; paths are relative to it, such as src/main.js.`,
@@ -256,22 +262,63 @@ export function validateFilePath(path: string, label: string): void {
     }
 }
 
+/** The folders above a file, outermost first: `a` and `a/b` for `a/b/c.js`. */
+function listFolders(path: string): string[] {
+    const folders: string[] = [];
+    for (let slashIndex = path.indexOf('/'); slashIndex !== -1; slashIndex = path.indexOf('/', slashIndex + 1)) {
+        folders.push(path.slice(0, slashIndex));
+    }
+    return folders;
+}
+
 /**
- * Throws `UserInputError` when a new file at `path` collides with another file or folder, since one path cannot be
- * both: a file at a folder of `path`, or a file or folder at or under `path`. The build worker fails to write such a
- * file. A file at `path` itself is for the caller to check.
+ * The paths of a version's files and folder entries, to check where a new file can go: one path cannot be both a file
+ * and a folder, and the build worker fails to write such a file. Each check and change looks up only the folders of
+ * its path, since comparing each file with every other took 8 s for 20,000 files.
  */
-export function validateNewFilePath(
-    path: string,
-    takenPaths: { filePaths: Iterable<string>; folderPaths: Iterable<string> },
-    label: string,
-): void {
-    const collision =
-        [...takenPaths.filePaths].find(
-            (filePath) => path.startsWith(`${filePath}/`) || filePath.startsWith(`${path}/`),
-        ) ?? [...takenPaths.folderPaths].find((folderPath) => folderPath === path || folderPath.startsWith(`${path}/`));
-    if (collision === undefined) return;
-    throw new UserInputError(`${label} collides with ${collision}; one path cannot be both a file and a folder.`);
+export class SourcePathIndex {
+    private readonly filePaths = new Set<string>();
+
+    /** The files under each folder, at any depth, in the order they were added. */
+    private readonly filePathsByFolder = new Map<string, Set<string>>();
+
+    private readonly folderPaths: readonly string[];
+
+    constructor(filePaths: Iterable<string>, folderPaths: readonly string[] = []) {
+        this.folderPaths = folderPaths;
+        for (const path of filePaths) this.addFile(path);
+    }
+
+    hasFile(path: string): boolean {
+        return this.filePaths.has(path);
+    }
+
+    /** A file added again keeps its place in the order. */
+    addFile(path: string): void {
+        this.filePaths.add(path);
+        for (const folder of listFolders(path)) {
+            this.filePathsByFolder.set(folder, (this.filePathsByFolder.get(folder) ?? new Set<string>()).add(path));
+        }
+    }
+
+    deleteFile(path: string): void {
+        this.filePaths.delete(path);
+        for (const folder of listFolders(path)) this.filePathsByFolder.get(folder)?.delete(path);
+    }
+
+    /**
+     * Throws `UserInputError` when a new file at `path` collides with another file or folder: a file at a folder of
+     * `path`, or else the first file added under `path`, or else the first folder entry at or under `path`. A file at
+     * `path` itself is for the caller to check.
+     */
+    validateNewFilePath(path: string, label: string): void {
+        const collision =
+            listFolders(path).find((folder) => this.filePaths.has(folder)) ??
+            this.filePathsByFolder.get(path)?.values().next().value ??
+            this.folderPaths.find((folderPath) => folderPath === path || folderPath.startsWith(`${path}/`));
+        if (collision === undefined) return;
+        throw new UserInputError(`${label} collides with ${collision}; one path cannot be both a file and a folder.`);
+    }
 }
 
 /** The build worker skips a file whose content is empty, so the caller hears of such files. */
@@ -282,10 +329,34 @@ export function buildEmptyFilesWarnings(paths: readonly string[]): { warnings?: 
 }
 
 /**
- * The response to a committed write. With autoBuild, a build of the version starts first, with no tag so the version's
- * buildTag applies, and is not waited for. The write stands either way, so a failed start goes to `buildError` rather
- * than being thrown: a caller told the call failed would retry writes that were saved. A cancel that arrives before
- * the start gets the cancelled-call response and starts no build.
+ * Starts a build of the version after a committed write, with no tag so the version's buildTag applies, and does not
+ * wait for it. The write stands either way, so a failed start is returned as `buildError` rather than thrown: a caller
+ * told the call failed would retry writes that were saved. A cancel that arrives before the start starts no build.
+ */
+async function startBuildAfterWrite(
+    toolArgs: Pick<InternalToolArgs, 'apifyClient' | 'apifyToken' | 'signal'>,
+    target: { actorId: string; versionNumber: string },
+): Promise<{ build: Build; linkContext: ConsoleLinkContext | undefined } | { buildError: string } | { aborted: true }> {
+    const { apifyClient: client, apifyToken, signal } = toolArgs;
+    try {
+        // Resolved before the start, so a failed lookup leaves no build behind.
+        const linkContext = await getConsoleLinkContext(apifyToken, client);
+        // Per the MCP spec a cancelled request gets no response; the write stands.
+        if (signal?.aborted) return { aborted: true };
+        // Started without the request's signal: a committed write never aborts the build it started.
+        const build = await client.actor(target.actorId).build(target.versionNumber, { useCache: true });
+        return { build, linkContext };
+    } catch (error) {
+        // The API's refusal is the caller's to read; anything else, such as a network failure, is logged too.
+        if (!(error instanceof ApifyApiError))
+            logHttpError(error, 'Failed to start a build after a source write', target);
+        return { buildError: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/**
+ * The response to a committed write. With autoBuild, a build of the version starts first; a cancel that arrives before
+ * the start gets the cancelled-call response.
  */
 export async function respondAfterWrite(params: {
     toolArgs: Pick<InternalToolArgs, 'apifyClient' | 'apifyToken' | 'loadedToolNames' | 'signal'>;
@@ -295,7 +366,6 @@ export async function respondAfterWrite(params: {
     summary: string;
 }): Promise<ToolResponse> {
     const { toolArgs, autoBuild, target, structuredContent, summary } = params;
-    const { apifyClient: client, apifyToken, loadedToolNames, signal } = toolArgs;
     if (!autoBuild) {
         return respondWithBuild({
             structuredContent,
@@ -303,32 +373,19 @@ export async function respondAfterWrite(params: {
             nextStep: 'No build was started; runs use these files only after the version is built.',
         });
     }
-    let linkContext: ConsoleLinkContext | undefined;
-    let build: Build;
-    try {
-        // Resolved before the start, so a failed lookup leaves no build behind.
-        linkContext = await getConsoleLinkContext(apifyToken, client);
-        // Per the MCP spec a cancelled request gets no response; the write stands.
-        if (signal?.aborted) return respondAborted();
-        // Started without the request's signal: a committed write never aborts the build it started.
-        build = await client.actor(target.actorId).build(target.versionNumber, { useCache: true });
-    } catch (error) {
-        // The API's refusal is the caller's to read; anything else, such as a network failure, is logged too.
-        if (!(error instanceof ApifyApiError))
-            logHttpError(error, 'Failed to start a build after a source write', target);
+    const started = await startBuildAfterWrite(toolArgs, target);
+    if ('aborted' in started) return respondAborted();
+    if ('buildError' in started) {
         return respondWithBuild({
-            structuredContent: {
-                ...structuredContent,
-                buildError: error instanceof Error ? error.message : String(error),
-            },
+            structuredContent: { ...structuredContent, buildError: started.buildError },
             summary,
             nextStep: 'The build could not be started; runs use these files only after the version is built.',
         });
     }
     return respondWithBuild({
-        structuredContent: { ...structuredContent, build: toBuildResult(build, linkContext) },
+        structuredContent: { ...structuredContent, build: toBuildResult(started.build, started.linkContext) },
         summary,
-        nextStep: buildNextStepForBuild(build, { loadedToolNames }),
+        nextStep: buildNextStepForBuild(started.build, { loadedToolNames: toolArgs.loadedToolNames }),
     });
 }
 

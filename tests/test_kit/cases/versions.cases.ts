@@ -14,9 +14,9 @@ import type { Case, SuiteClient } from '../types.js';
  * client, so it checks the stored source, not only what the tool reported.
  *
  * Names are `test-source-<random>-<purpose>`, never `eval-`, so the eval harness's `eval-*` sweep on the same account
- * never deletes an Actor mid-case. No case sets autoBuild, since builds cost time and money, and the one build-actor
- * call aborts its build. Every case deletes its Actor by name in `finally`, so an Actor a failed call left behind goes
- * too; apify-client swallows the 404 when there is none.
+ * never deletes an Actor mid-case. No case sets autoBuild, since builds cost time and money, and the build of the one
+ * build-actor call is aborted in `finally`. Every case deletes its Actor by name in `finally`, so an Actor a failed
+ * call left behind goes too; apify-client swallows the 404 when there is none.
  *
  * Tool names are hardcoded, not read from `HELPER_TOOLS`, so a rename fails these tests (CONTRIBUTING.md).
  */
@@ -151,6 +151,7 @@ export const versionsCases: Case[] = [
             const actorJson = '{\n    "actorSpecification": 1,\n    "version": "0.0"\n}\n';
             const mainJs = 'import { greet } from "./lib/greet.js";\n\nconsole.log(greet("Grüße 🌍"));\n';
             const greetJs = 'export const greet = (who) => "Hello, " + who;\n';
+            let buildId: string | undefined;
             try {
                 const createResult = await callTool(client, 'create-actor', {
                     name,
@@ -246,14 +247,18 @@ export const versionsCases: Case[] = [
                 // autoBuild defaults to false.
                 expect(await fetchBuildCount(api, created.actorId)).toBe(0);
                 // build-actor resolves a name without the username the same way.
-                const { build } = expectToolSuccess<BuildActorResult>(
-                    await callTool(client, 'build-actor', { actor: name, waitSecs: 0 }),
-                    'build-actor',
-                );
+                const buildResult = await callTool(client, 'build-actor', { actor: name, waitSecs: 0 });
+                // Taken before the checks, so the build is aborted when one of them fails.
+                buildId = (buildResult.structuredContent as Partial<BuildActorResult> | undefined)?.build?.id;
+                const { build } = expectToolSuccess<BuildActorResult>(buildResult, 'build-actor');
                 expect(build.actorId).toBe(created.actorId);
-                await api.build(build.id).abort();
             } finally {
-                await api.actor(selector).delete();
+                // The Actor is deleted even when the abort fails.
+                try {
+                    if (buildId !== undefined) await api.build(buildId).abort();
+                } finally {
+                    await api.actor(selector).delete();
+                }
             }
         }),
     },
