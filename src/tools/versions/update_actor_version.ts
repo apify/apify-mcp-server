@@ -239,41 +239,35 @@ function applyTextEdits(originalText: string, edits: readonly TextEdit[], label:
     return text;
 }
 
-/** Applies one operation to `version.files`; throws `UserInputError` when it cannot, before anything is written. */
-function applyOperation(
+/** The file an operation names, with the expectedHash it gives and the label its errors start with. */
+type OperationTarget = { path: string; expectedHash: string | undefined; label: string };
+
+/** Writes the file at `target.path` into `version.files`; throws `UserInputError` when it cannot. */
+function applyWrite(
     version: { files: Map<string, SourceFile>; folderPaths: readonly string[] },
-    operation: OperationArgs,
-    index: number,
+    target: OperationTarget,
+    { content, encoding }: Pick<OperationArgs, 'content' | 'encoding'>,
 ): void {
     const { files, folderPaths } = version;
-    const { type, content, edits } = operation;
-    // AJV turns a null expectedHash into an empty string, which no file has, so it counts as not given.
-    const expectedHash = operation.expectedHash || undefined;
-    const label = `operations[${index}] (${type} ${operation.path})`;
-    // Normalized the way get-actor-version lists paths, so a listed path always matches.
-    const path = posix.normalize(operation.path);
-    if (type === 'write') {
-        if (content === undefined) throw new UserInputError(`${label} needs content.`);
-        // Only a write is checked, so a stored file at such a path can still be edited or deleted.
-        validateFilePath(path, label);
-        const existing = files.get(path);
-        if (existing && expectedHash === undefined) {
-            const detail = `${path} exists with hash ${existing.hash}; a write with that hash as expectedHash replaces it.`;
-            throw buildPreconditionError(label, PRECONDITION_REASON.FILE_EXISTS, detail);
-        }
-        if (expectedHash !== undefined) validateHash(findFile(files, path, label), expectedHash, label);
-        if (!existing) validateNewFilePath(path, { filePaths: files.keys(), folderPaths }, label);
-        const entry = buildSourceFileEntry({ path, content, encoding: operation.encoding });
-        validateFileContent(entry, label);
-        files.set(path, buildInlineSourceFile(entry));
-        return;
+    const { path, expectedHash, label } = target;
+    if (content === undefined) throw new UserInputError(`${label} needs content.`);
+    // Only a write is checked, so a stored file at such a path can still be edited or deleted.
+    validateFilePath(path, label);
+    const existing = files.get(path);
+    if (existing && expectedHash === undefined) {
+        const detail = `${path} exists with hash ${existing.hash}; a write with that hash as expectedHash replaces it.`;
+        throw buildPreconditionError(label, PRECONDITION_REASON.FILE_EXISTS, detail);
     }
-    if (type === 'delete') {
-        if (expectedHash === undefined) throw new UserInputError(`${label} needs expectedHash.`);
-        validateHash(findFile(files, path, label), expectedHash, label);
-        files.delete(path);
-        return;
-    }
+    if (expectedHash !== undefined) validateHash(findFile(files, path, label), expectedHash, label);
+    if (!existing) validateNewFilePath(path, { filePaths: files.keys(), folderPaths }, label);
+    const entry = buildSourceFileEntry({ path, content, encoding });
+    validateFileContent(entry, label);
+    files.set(path, buildInlineSourceFile(entry));
+}
+
+/** Applies `edits` to the file at `target.path` in `files`; throws `UserInputError` when they cannot apply. */
+function applyEdit(files: Map<string, SourceFile>, target: OperationTarget, edits: OperationArgs['edits']): void {
+    const { path, expectedHash, label } = target;
     if (edits === undefined) throw new UserInputError(`${label} needs edits.`);
     const existing = findFile(files, path, label);
     if (expectedHash !== undefined) validateHash(existing, expectedHash, label);
@@ -287,6 +281,39 @@ function applyOperation(
     const isBase64 = existing.entry.format === 'BASE64';
     const newContent = isBase64 ? Buffer.from(text).toString('base64') : text;
     files.set(path, buildInlineSourceFile({ name: path, format: isBase64 ? 'BASE64' : 'TEXT', content: newContent }));
+}
+
+/** Deletes the file at `target.path` from `files`; throws `UserInputError` when it cannot. */
+function applyDelete(files: Map<string, SourceFile>, target: OperationTarget): void {
+    const { path, expectedHash, label } = target;
+    if (expectedHash === undefined) throw new UserInputError(`${label} needs expectedHash.`);
+    validateHash(findFile(files, path, label), expectedHash, label);
+    files.delete(path);
+}
+
+/**
+ * The files after the operations, each applied to the files the previous ones left; throws `UserInputError` for the
+ * first operation that cannot apply, before anything is written.
+ */
+function applyOperations(
+    version: { files: ReadonlyMap<string, SourceFile>; folderPaths: readonly string[] },
+    operations: readonly OperationArgs[],
+): Map<string, SourceFile> {
+    const files = new Map(version.files);
+    for (const [index, operation] of operations.entries()) {
+        const { type } = operation;
+        const target = {
+            // Normalized the way get-actor-version lists paths, so a listed path always matches.
+            path: posix.normalize(operation.path),
+            // AJV turns a null expectedHash into an empty string, which no file has, so it counts as not given.
+            expectedHash: operation.expectedHash || undefined,
+            label: `operations[${index}] (${type} ${operation.path})`,
+        };
+        if (type === 'write') applyWrite({ files, folderPaths: version.folderPaths }, target, operation);
+        if (type === 'edit') applyEdit(files, target, operation.edits);
+        if (type === 'delete') applyDelete(files, target);
+    }
+    return files;
 }
 
 /** One entry per file the operations created, updated, or deleted, sorted by path. */
@@ -427,11 +454,8 @@ export const updateActorVersion: ToolEntry = Object.freeze({
                 const detail = `The version's revision is ${previousRevision}, not ${parsed.expectedRevision}.`;
                 throw buildPreconditionError('expectedRevision', PRECONDITION_REASON.REVISION_MISMATCH, detail);
             }
-            const after = new Map(before);
             const folderPaths = storedEntries.filter(isFolderEntry).map(({ name }) => posix.normalize(name));
-            for (const [index, operation] of parsed.operations.entries()) {
-                applyOperation({ files: after, folderPaths }, operation, index);
-            }
+            const after = applyOperations({ files: before, folderPaths }, parsed.operations);
             const revision = buildFilesRevision([...after.values()]);
             // A cancel during the read writes nothing; per the MCP spec the cancelled request gets no response.
             if (signal?.aborted) return respondAborted();
