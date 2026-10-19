@@ -493,6 +493,20 @@ describe('create-actor', () => {
         },
     );
 
+    it.each(['src\\main.js', '.\\Dockerfile'])(
+        'refuses a file at %s, whose backslash the build takes as part of the file name, and creates nothing',
+        async (path) => {
+            const result = await callTool({ autoBuild: true, files: [MAIN_JS, { path, content: 'x' }] });
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toBe(
+                `files[1] (${path}) has a backslash in its path; paths use / as the separator.`,
+            );
+            expect(actorsCreateMock).not.toHaveBeenCalled();
+            expect(buildMock).not.toHaveBeenCalled();
+        },
+    );
+
     it.each([
         ['U+0000', 'src/a\0.js'],
         ['U+000A', 'src/\nmain.js'],
@@ -768,6 +782,15 @@ describe('create-actor', () => {
             expect(getSentVersion().versionNumber).toBe('0.1');
             expect(result.structuredContent.versionNumber).toBe('0.1');
             expect(buildMock).toHaveBeenCalledWith('0.1', { useCache: true });
+        });
+
+        it('takes the version of an .actor/actor.json that starts with a byte order mark, and sends the file as given', async () => {
+            const content = '﻿{"actorSpecification": 1, "name": "my-actor", "version": "0.1"}';
+
+            await callTool({ files: [actorJsonWith(content)] });
+
+            expect(getSentVersion().versionNumber).toBe('0.1');
+            expect(getSentVersion().sourceFiles[0].content).toBe(content);
         });
 
         it.each<[string, { path: string; content: string }[]]>([

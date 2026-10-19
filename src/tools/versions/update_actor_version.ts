@@ -9,7 +9,10 @@ import { UserInputError } from '../../errors.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
-import { respondAborted, respondUserError } from '../../utils/mcp.js';
+import { getApifyErrorType } from '../../utils/apify_errors.js';
+import { getHttpStatusCode, logHttpError } from '../../utils/logging.js';
+import type { ToolResponse } from '../../utils/mcp.js';
+import { respondAborted, respondServerError, respondUserError } from '../../utils/mcp.js';
 import { respondWithBuild } from '../builds/build_helpers.js';
 import { updateActorVersionToolOutputSchema } from '../structured_output_schemas.js';
 import type { SourceFile } from './source_files.js';
@@ -29,9 +32,9 @@ import {
     resolveVersion,
     respondAfterWrite,
     respondToSourceToolError,
+    SourcePathIndex,
     validateFileContent,
     validateFilePath,
-    validateNewFilePath,
     validatePathCharacters,
 } from './source_helpers.js';
 
@@ -47,11 +50,16 @@ const PRECONDITION_REASON = {
 } as const;
 type PRECONDITION_REASON = (typeof PRECONDITION_REASON)[keyof typeof PRECONDITION_REASON];
 
-// Each edit searches the whole text of its file, which can be close to 3 MiB, and blocks the event loop meanwhile: up
-// to about 20 ms for an oldText over 250 characters, so 20 edits take up to about 0.4 s. Writes and deletes never
-// search a stored file.
+// Each edit searches the whole text of its file, which is at most MAX_EDITED_TEXT_LENGTH long, and blocks the event loop
+// meanwhile: up to about 20 ms for an oldText over 250 characters, so 20 edits take up to about 0.4 s. Writes and deletes
+// never search a stored file.
 const MAX_OPERATIONS_PER_CALL = 100;
 const MAX_EDITS_PER_CALL = 20;
+// In UTF-16 code units, which a string's length gives at no cost and the search time grows with. The platform refuses
+// a version whose stored file contents pass 3 MiB in total, in UTF-8 bytes (MAX_MULTIFILE_BYTES in @apify/consts), but
+// checks that only at the PUT, after the edits ran. UTF-8 takes at least one byte per code unit, so no file the platform
+// stored is longer than this; a file within it can still be over the platform's limit, which the PUT then refuses.
+const MAX_EDITED_TEXT_LENGTH = 3 * 1024 * 1024;
 
 // One flat object with an explicit `type`: AJV's `removeAdditional` drops the fields of all but one branch of a
 // union, so the field each type needs is checked in code.
@@ -205,6 +213,16 @@ function applyTextEdits(originalText: string, edits: readonly TextEdit[], label:
                 `${label} has a lone UTF-16 surrogate in edits[${editIndex}], which UTF-8 cannot store.`,
             );
         }
+        // An upper bound of the length after this edit, taken before the CRLF conversion and the search: converting only
+        // lengthens oldText, and at most doubles newText.
+        if (text.length - edit.oldText.length + (isCrlfFile ? 2 : 1) * edit.newText.length > MAX_EDITED_TEXT_LENGTH) {
+            const crlfNote = isCrlfFile
+                ? ' In a file with CRLF line breaks, each character of newText counts as two, since each LF in it becomes CRLF.'
+                : '';
+            throw new UserInputError(
+                `Nothing was written: edits[${editIndex}] of ${label} can make the file longer than ${MAX_EDITED_TEXT_LENGTH} UTF-16 code units, the limit for an edited file.${crlfNote}`,
+            );
+        }
         const oldText = isCrlfFile ? convertToCrlf(edit.oldText) : edit.oldText;
         const newText = isCrlfFile ? convertToCrlf(edit.newText) : edit.newText;
         const [offset, nextOffset] = findMatchOffsets(text, oldText);
@@ -221,41 +239,36 @@ function applyTextEdits(originalText: string, edits: readonly TextEdit[], label:
     return text;
 }
 
-/** Applies one operation to `version.files`; throws `UserInputError` when it cannot, before anything is written. */
-function applyOperation(
-    version: { files: Map<string, SourceFile>; folderPaths: readonly string[] },
-    operation: OperationArgs,
-    index: number,
+/** The file an operation names, with the expectedHash it gives and the label its errors start with. */
+type OperationTarget = { path: string; expectedHash: string | undefined; label: string };
+
+/** Writes the file at `target.path` into `version.files`; throws `UserInputError` when it cannot. */
+function applyWrite(
+    version: { files: Map<string, SourceFile>; pathIndex: SourcePathIndex },
+    target: OperationTarget,
+    { content, encoding }: Pick<OperationArgs, 'content' | 'encoding'>,
 ): void {
-    const { files, folderPaths } = version;
-    const { type, content, edits } = operation;
-    // AJV turns a null expectedHash into an empty string, which no file has, so it counts as not given.
-    const expectedHash = operation.expectedHash || undefined;
-    const label = `operations[${index}] (${type} ${operation.path})`;
-    // Normalized the way get-actor-version lists paths, so a listed path always matches.
-    const path = posix.normalize(operation.path);
-    if (type === 'write') {
-        if (content === undefined) throw new UserInputError(`${label} needs content.`);
-        // Only a write is checked, so a stored file at such a path can still be edited or deleted.
-        validateFilePath(path, label);
-        const existing = files.get(path);
-        if (existing && expectedHash === undefined) {
-            const detail = `${path} exists with hash ${existing.hash}; a write with that hash as expectedHash replaces it.`;
-            throw buildPreconditionError(label, PRECONDITION_REASON.FILE_EXISTS, detail);
-        }
-        if (expectedHash !== undefined) validateHash(findFile(files, path, label), expectedHash, label);
-        if (!existing) validateNewFilePath(path, { filePaths: files.keys(), folderPaths }, label);
-        const entry = buildSourceFileEntry({ path, content, encoding: operation.encoding });
-        validateFileContent(entry, label);
-        files.set(path, buildInlineSourceFile(entry));
-        return;
+    const { files, pathIndex } = version;
+    const { path, expectedHash, label } = target;
+    if (content === undefined) throw new UserInputError(`${label} needs content.`);
+    // Only a write is checked, so a stored file at such a path can still be edited or deleted.
+    validateFilePath(path, label);
+    const existing = files.get(path);
+    if (existing && expectedHash === undefined) {
+        const detail = `${path} exists with hash ${existing.hash}; a write with that hash as expectedHash replaces it.`;
+        throw buildPreconditionError(label, PRECONDITION_REASON.FILE_EXISTS, detail);
     }
-    if (type === 'delete') {
-        if (expectedHash === undefined) throw new UserInputError(`${label} needs expectedHash.`);
-        validateHash(findFile(files, path, label), expectedHash, label);
-        files.delete(path);
-        return;
-    }
+    if (expectedHash !== undefined) validateHash(findFile(files, path, label), expectedHash, label);
+    if (!existing) pathIndex.validateNewFilePath(path, label);
+    const entry = buildSourceFileEntry({ path, content, encoding });
+    validateFileContent(entry, label);
+    files.set(path, buildInlineSourceFile(entry));
+    pathIndex.addFile(path);
+}
+
+/** Applies `edits` to the file at `target.path` in `files`; throws `UserInputError` when they cannot apply. */
+function applyEdit(files: Map<string, SourceFile>, target: OperationTarget, edits: OperationArgs['edits']): void {
+    const { path, expectedHash, label } = target;
     if (edits === undefined) throw new UserInputError(`${label} needs edits.`);
     const existing = findFile(files, path, label);
     if (expectedHash !== undefined) validateHash(existing, expectedHash, label);
@@ -271,6 +284,45 @@ function applyOperation(
     files.set(path, buildInlineSourceFile({ name: path, format: isBase64 ? 'BASE64' : 'TEXT', content: newContent }));
 }
 
+/** Deletes the file at `target.path` from `version.files`; throws `UserInputError` when it cannot. */
+function applyDelete(
+    version: { files: Map<string, SourceFile>; pathIndex: SourcePathIndex },
+    target: OperationTarget,
+): void {
+    const { files, pathIndex } = version;
+    const { path, expectedHash, label } = target;
+    if (expectedHash === undefined) throw new UserInputError(`${label} needs expectedHash.`);
+    validateHash(findFile(files, path, label), expectedHash, label);
+    files.delete(path);
+    pathIndex.deleteFile(path);
+}
+
+/**
+ * The files after the operations, each applied to the files the previous ones left; throws `UserInputError` for the
+ * first operation that cannot apply, before anything is written.
+ */
+function applyOperations(
+    version: { files: ReadonlyMap<string, SourceFile>; folderPaths: readonly string[] },
+    operations: readonly OperationArgs[],
+): Map<string, SourceFile> {
+    const files = new Map(version.files);
+    const pathIndex = new SourcePathIndex(files.keys(), version.folderPaths);
+    for (const [index, operation] of operations.entries()) {
+        const { type } = operation;
+        const target = {
+            // Normalized the way get-actor-version lists paths, so a listed path always matches.
+            path: posix.normalize(operation.path),
+            // AJV turns a null expectedHash into an empty string, which no file has, so it counts as not given.
+            expectedHash: operation.expectedHash || undefined,
+            label: `operations[${index}] (${type} ${operation.path})`,
+        };
+        if (type === 'write') applyWrite({ files, pathIndex }, target, operation);
+        if (type === 'edit') applyEdit(files, target, operation.edits);
+        if (type === 'delete') applyDelete({ files, pathIndex }, target);
+    }
+    return files;
+}
+
 /** One entry per file the operations created, updated, or deleted, sorted by path. */
 function buildFileChanges(
     before: ReadonlyMap<string, SourceFile>,
@@ -284,6 +336,46 @@ function buildFileChanges(
         if (previousHash === file.hash) return [];
         return [{ path, action: previousHash === undefined ? 'created' : 'updated', hash: file.hash }];
     });
+}
+
+/**
+ * The response to a version PUT that failed with a 5xx or without an HTTP response, such as on a timeout: the platform
+ * may have saved the files of that attempt, or of an earlier one apify-client retried, so the reply gives the revisions
+ * that show whether it did. Any other error, such as a 4xx, is rethrown.
+ */
+function respondToUnconfirmedSave(
+    error: unknown,
+    params: {
+        target: { actorId: string; versionNumber: string; fullName: string };
+        previousRevision: string;
+        revision: string;
+        loadedToolNames: readonly string[];
+    },
+): ToolResponse {
+    const { target, previousRevision, revision, loadedToolNames } = params;
+    const httpStatus = getHttpStatusCode(error);
+    if (httpStatus !== undefined && httpStatus < 500) throw error;
+    logHttpError(error, 'Failed to save the files of an Actor version', {
+        actorId: target.actorId,
+        versionNumber: target.versionNumber,
+    });
+    const message = error instanceof Error ? error.message : String(error);
+    const apiErrorType = getApifyErrorType(error);
+    const failure =
+        httpStatus === undefined
+            ? `without an HTTP response: ${message}`
+            : `with HTTP ${httpStatus}: ${message}${apiErrorType ? ` (API error type: ${apiErrorType})` : ''}`;
+    const readTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_GET)
+        ? `; ${HELPER_TOOLS.ACTOR_VERSION_GET} reads the revision`
+        : '';
+    return respondServerError(
+        `Saving version ${target.versionNumber} of ${target.fullName} failed ${failure}. ` +
+            'The platform may still have saved the change. ' +
+            `If the version's revision is ${revision}, this call saved it, and if it is ${previousRevision}, ` +
+            `it saved nothing${readTool}.`,
+        // The status, category, and detail the tool-call engine records for a thrown error.
+        { error, detail: message.slice(0, 200) },
+    );
 }
 
 /**
@@ -340,7 +432,7 @@ export const updateActorVersion: ToolEntry = Object.freeze({
             entryKeys: ['type', 'path', 'encoding', 'expectedHash'],
         }),
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, signal } = toolArgs;
+        const { args, apifyClient: client, signal, loadedToolNames } = toolArgs;
         const parsed = updateActorVersionArgs.parse(args);
         const editCount = parsed.operations
             .filter(({ type }) => type === 'edit')
@@ -369,11 +461,8 @@ export const updateActorVersion: ToolEntry = Object.freeze({
                 const detail = `The version's revision is ${previousRevision}, not ${parsed.expectedRevision}.`;
                 throw buildPreconditionError('expectedRevision', PRECONDITION_REASON.REVISION_MISMATCH, detail);
             }
-            const after = new Map(before);
             const folderPaths = storedEntries.filter(isFolderEntry).map(({ name }) => posix.normalize(name));
-            for (const [index, operation] of parsed.operations.entries()) {
-                applyOperation({ files: after, folderPaths }, operation, index);
-            }
+            const after = applyOperations({ files: before, folderPaths }, parsed.operations);
             const revision = buildFilesRevision([...after.values()]);
             // A cancel during the read writes nothing; per the MCP spec the cancelled request gets no response.
             if (signal?.aborted) return respondAborted();
@@ -390,10 +479,19 @@ export const updateActorVersion: ToolEntry = Object.freeze({
                 ...storedEntries.filter(isFolderEntry),
                 ...[...after.values()].map(({ entry }) => entry),
             ];
-            await client
-                .actor(actor.id)
-                .version(versionNumber)
-                .update({ sourceType: ActorSourceType.SourceFiles, sourceFiles });
+            try {
+                await client
+                    .actor(actor.id)
+                    .version(versionNumber)
+                    .update({ sourceType: ActorSourceType.SourceFiles, sourceFiles });
+            } catch (error) {
+                return respondToUnconfirmedSave(error, {
+                    target: { actorId: actor.id, versionNumber, fullName },
+                    previousRevision,
+                    revision,
+                    loadedToolNames,
+                });
+            }
             const changes = buildFileChanges(before, after);
             const emptyPaths = changes.flatMap(({ path }) => (after.get(path)?.sizeBytes === 0 ? [path] : []));
             return await respondAfterWrite({

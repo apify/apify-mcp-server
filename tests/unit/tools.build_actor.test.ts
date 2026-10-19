@@ -199,6 +199,24 @@ describe('build-actor', () => {
             expect(structuredContent).toBeUndefined();
             expect(buildMock).not.toHaveBeenCalled();
         });
+
+        it.each([
+            ['a run', 'john/my-actor/runs/last', { id: 'run-1', actId: 'actor-1', status: 'SUCCEEDED' }],
+            // Has a name but no username.
+            ['an env var', 'john/my-actor/versions/0.1/env-vars/API_KEY', { name: 'API_KEY', value: 'secret-value' }],
+            // Has a username but no name, as a run's default storage does.
+            ["a run's key-value store", 'john/my-actor/runs/last/key-value-store', { id: 'kvs-1', username: 'john' }],
+        ])('reports %s, reached by extra path segments, as a missing Actor', async (_, actor, document) => {
+            getMock.mockResolvedValue(document);
+
+            const { text, structuredContent } = await callToolExpectingUserError({ actor });
+
+            expect(text).toBe(
+                `Actor '${actor}' not found. The actor argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.`,
+            );
+            expect(structuredContent).toBeUndefined();
+            expect(buildMock).not.toHaveBeenCalled();
+        });
     });
 
     it('returns an error when the Actor has no versions', async () => {
