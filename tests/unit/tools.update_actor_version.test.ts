@@ -385,6 +385,62 @@ describe('update-actor-version', () => {
             const [saved] = getPutFiles() as { content: string }[];
             expect(saved.content.slice(-tail.length)).toBe(tail.replaceAll('#', '@'));
         });
+
+        describe('length of an edited file', () => {
+            const MAX_LENGTH = 3 * 1024 * 1024;
+            // 91 UTF-16 code units under the limit.
+            const NEAR_LIMIT = {
+                name: 'src/big.txt',
+                format: 'TEXT',
+                content: `${'a'.repeat(MAX_LENGTH - 100)}#0;#1;#2;`,
+            };
+            const grow = (marker: string, by: number) => ({ oldText: marker, newText: `${marker}${'x'.repeat(by)}` });
+
+            it('takes edits that grow a file to exactly 3 MiB of UTF-16 code units', async () => {
+                mockFiles(NEAR_LIMIT);
+
+                await callTool({ operations: [edit('src/big.txt', grow('#0;', 50), grow('#1;', 41))] });
+
+                const [saved] = getPutFiles() as { content: string }[];
+                expect(saved.content).toHaveLength(MAX_LENGTH);
+            });
+
+            it('refuses the edit that grows a file past 3 MiB of UTF-16 code units, before searching for the next one', async () => {
+                mockFiles(NEAR_LIMIT);
+
+                const text = await callToolExpectingUserError({
+                    operations: [
+                        edit('src/big.txt', grow('#0;', 50)),
+                        // #9; is not in the file, so a search for it would fail with NO_MATCH.
+                        edit('src/big.txt', grow('#1;', 42), grow('#9;', 1)),
+                    ],
+                });
+
+                expect(text).toBe(
+                    'Nothing was written: edits[0] of operations[1] (edit src/big.txt) can make the file longer than ' +
+                        '3145728 UTF-16 code units, the limit for an edited file.',
+                );
+            });
+
+            it('refuses an edit whose newText grows a file past the limit once its LFs become CRLF', async () => {
+                // 93 code units under the limit; the newText is 83 code units, and 123 once each LF becomes CRLF.
+                mockFiles({
+                    name: 'src/big.txt',
+                    format: 'TEXT',
+                    content: `${'a'.repeat(MAX_LENGTH - 100)}\r\n#0;\r\n`,
+                });
+
+                const text = await callToolExpectingUserError({
+                    operations: [edit('src/big.txt', { oldText: '#0;', newText: `${'b\n'.repeat(40)}#0;` })],
+                });
+
+                expect(text).toBe(
+                    'Nothing was written: edits[0] of operations[0] (edit src/big.txt) can make the file longer than ' +
+                        '3145728 UTF-16 code units, the limit for an edited file. In a file with CRLF line breaks, ' +
+                        'each character of newText counts as two, since each LF in it becomes CRLF.',
+                );
+            });
+        });
     });
 
     describe('logged arguments', () => {

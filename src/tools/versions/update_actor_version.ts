@@ -47,11 +47,16 @@ const PRECONDITION_REASON = {
 } as const;
 type PRECONDITION_REASON = (typeof PRECONDITION_REASON)[keyof typeof PRECONDITION_REASON];
 
-// Each edit searches the whole text of its file, which can be close to 3 MiB, and blocks the event loop meanwhile: up
-// to about 20 ms for an oldText over 250 characters, so 20 edits take up to about 0.4 s. Writes and deletes never
-// search a stored file.
+// Each edit searches the whole text of its file, which is at most MAX_EDITED_TEXT_LENGTH long, and blocks the event loop
+// meanwhile: up to about 20 ms for an oldText over 250 characters, so 20 edits take up to about 0.4 s. Writes and deletes
+// never search a stored file.
 const MAX_OPERATIONS_PER_CALL = 100;
 const MAX_EDITS_PER_CALL = 20;
+// In UTF-16 code units, which a string's length gives at no cost and the search time grows with. The platform refuses
+// a version whose stored file contents pass 3 MiB in total, in UTF-8 bytes (MAX_MULTIFILE_BYTES in @apify/consts), but
+// checks that only at the PUT, after the edits ran. UTF-8 takes at least one byte per code unit, so no file the platform
+// stored is longer than this; a file within it can still be over the platform's limit, which the PUT then refuses.
+const MAX_EDITED_TEXT_LENGTH = 3 * 1024 * 1024;
 
 // One flat object with an explicit `type`: AJV's `removeAdditional` drops the fields of all but one branch of a
 // union, so the field each type needs is checked in code.
@@ -203,6 +208,16 @@ function applyTextEdits(originalText: string, edits: readonly TextEdit[], label:
         if (!edit.oldText.isWellFormed() || !edit.newText.isWellFormed()) {
             throw new UserInputError(
                 `${label} has a lone UTF-16 surrogate in edits[${editIndex}], which UTF-8 cannot store.`,
+            );
+        }
+        // An upper bound of the length after this edit, taken before the CRLF conversion and the search: converting only
+        // lengthens oldText, and at most doubles newText.
+        if (text.length - edit.oldText.length + (isCrlfFile ? 2 : 1) * edit.newText.length > MAX_EDITED_TEXT_LENGTH) {
+            const crlfNote = isCrlfFile
+                ? ' In a file with CRLF line breaks, each character of newText counts as two, since each LF in it becomes CRLF.'
+                : '';
+            throw new UserInputError(
+                `Nothing was written: edits[${editIndex}] of ${label} can make the file longer than ${MAX_EDITED_TEXT_LENGTH} UTF-16 code units, the limit for an edited file.${crlfNote}`,
             );
         }
         const oldText = isCrlfFile ? convertToCrlf(edit.oldText) : edit.oldText;
