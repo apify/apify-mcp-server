@@ -4,15 +4,15 @@ Rules for writing unit tests that stay useful to human readers. The recurring fa
 
 ## Scope: test the unit's own logic
 
-Before writing anything, read the unit and separate what it **decides** from what it **delegates**. Test the decisions. For delegation, test the caller's own behavior without repeating the dependency's full suite.
+Before writing anything, read the unit and separate what it **decides** from what it **delegates**. Test the decisions. For delegation, prove the wiring and stop.
 
-- **Do not re-enumerate a dependency's semantics.** If a helper has its own suite, do not repeat it through every caller. Cover the caller's argument selection, defaults, use of results, error handling, and composition where relevant. There is no fixed number of wiring tests.
+- **Do not re-enumerate a dependency's semantics.** If a helper has its own test file, one passing and one failing case through the caller is enough to prove it is called with the right arguments. Anything more duplicates the helper's suite and goes stale twice when the helper changes.
 - **Do not test the language or standard library.** Wrapping a predicate in `[...].filter(...)` and asserting that filtering returns matching elements, an empty array when nothing matches, and everything when everything matches tests `Array.prototype.filter`, not the unit. If callers filter with the predicate, that belongs to the caller's tests.
-- **Separate type checks from runtime assertions.** Use type checks for inferred types and assignability. Use runtime tests for value preservation, transformations, and validation. Checking `result[0].extra === 'data'` can catch a lost or changed value even when the implementation compiles.
+- **Do not assert compile-time properties at runtime.** A test that checks `result[0].extra === 'data'` to show a generic "preserves the element type" verifies TypeScript, not behavior. If the types were wrong it would not compile.
 - **Test through the public entry point of the unit, in the shape callers use it.** Do not invent wrapper scenarios the unit does not own.
 - **Do not re-assert fixture data.** When a unit passes a fixture through (a task tool forwarding `mockTask().input` to the API client), assert the pass-through once with `toHaveBeenCalledWith`. Re-typing the fixture's field values in further tests makes change detectors on data: any intentional edit to the fixture breaks them, and they can never catch a logic bug.
 
-## Test doubles: prefer real infrastructure
+## Test doubles: prefer real infrastructure, fake only true externals
 
 **Unit tests run in-process and need no credentials.** Use the real code the unit touches - `ActorsMcpServer`, the tool registry, Zod schemas, the MCP SDK - and reach for it before building an elaborate fake of it - the fake is where bugs hide. What still deserves a test double: the Apify API, other outbound HTTP calls, and anything slow or nondeterministic.
 
@@ -33,16 +33,16 @@ When you fake anyway, follow these rules:
 - **Log wording is not a contract.** Substring assertions on log messages break on any copy edit while proving little. Asserting *that* a warning happened is legitimate when the warning is the observable behavior (a warn-and-skip path where the log line is the only outcome); pinning its phrasing, or substring-scanning a whole joined log stream for a summary table's contents, is testing presentation. Formatting belongs to the formatter's own unit, not to every caller. Text served to MCP clients is different: tool result text, descriptions, and errors are a contract (see [TOOL_GUIDELINES.md](../TOOL_GUIDELINES.md)). Assert the parts that carry it - a tool name, an ID, the instruction given - not whole sentences or paragraphs.
 - **Control time; do not bracket it.** Capturing `Date.now()` before and after the call and absorbing the slack with `toBeCloseTo` hides off-by-one bugs and eventually flakes. Use `vi.useFakeTimers()` / `vi.setSystemTime()` and assert exact values.
 
-## Coverage: requirements and branches
+## Coverage: branches before variations
 
-- **Start from the unit's promised behavior, then inspect its branches for gaps.** Cover meaningful outcomes, boundaries, and known regressions. Branch coverage helps find omissions; it does not determine how many tests are needed.
-- **Distinguish boundaries from padding.** Inputs on the same code path can protect different requirements. For example, `stripQuoteWrappers` uses one expression, but straight quotes, smart quotes, and nested wrappers can expose different bugs. Keep variations that protect distinct requirements; omit interchangeable examples that add no confidence.
-- **Use positive and negative cases as a starting point.** Add boundary, interaction, and regression cases when they protect additional behavior, even if they follow an already covered path.
+- **Enumerate the unit's branches from the source and give each outcome one test.** Only then consider variations. Padding obvious cases hides real gaps, because a reviewer sees a long file and assumes the function is covered.
+- **Distinguish boundaries from padding.** An empty list and an unknown (nullish) list take different paths when `[]` fails a required check but `null`/`undefined` skips it, so each deserves a test. But `null` vs `undefined` through a `??` fallback is the same path. When two inputs cannot take different paths, keep one.
+- **A positive and a negative case per rule** ("matches" / "does not match") is usually the right amount. Add a third only when it exercises a genuinely different path, such as one input satisfying two patterns at once.
 
 ## One behavior per test
 
 - Before adding a test, answer: **what does this prove that no existing test proves?** If nothing, do not add it. Two tests with the same inputs and assertions under different names prove one thing.
-- **Do not expand combinatorially.** Independent dimensions (URL match × required names × flags) do not need a test per combination; test each dimension where it branches, plus composed cases where interactions affect the result ("multiple flags must all match").
+- **Do not expand combinatorially.** Independent dimensions (URL match × required names × flags) do not need a test per combination; test each dimension where it branches, plus one composed case if the composition itself is a behavior ("multiple flags must all match").
 - When a test fails, its name plus its body should identify the broken rule without reading other tests.
 
 ## Readability
@@ -57,9 +57,10 @@ When you fake anyway, follow these rules:
 
 ## Checklist before finishing a suite
 
-1. Tests cover the unit's requirements, meaningful branch outcomes, boundaries, and known regressions.
-2. Caller tests cover distinct uses of dependencies without repeating their full suites.
-3. Assert the behavior this unit promises; avoid enumerating the underlying library's behavior beyond that promise.
-4. Keep tests that protect distinct requirements, boundaries, or regressions, even when they take the same code path.
-5. Prefer real code; use doubles for external effects and slow or nondeterministic dependencies. Every fake matches the real contract's shape, and no mocked module re-declares real constants.
-6. No test asserts on log or message wording unless that output is the behavior; no test mutates shared module-level mock state; time is controlled with fake timers, not bracketed.
+1. Every branch of the unit has a test; diff the source's conditionals against the describe blocks.
+2. No test re-proves a dependency that has its own test file (beyond one wiring pair).
+3. No test would still pass if the unit's body were replaced by the standard library call it wraps.
+4. No two tests have inputs that take the same code path.
+5. Test count roughly tracks the unit's branch count, not the input space's combination count.
+6. Code the unit touches is real unless it is external (the Apify API, the network); every remaining fake matches the real contract's shape, and no mocked module re-declares real constants.
+7. No test asserts on log or message wording unless that output is the behavior; no test mutates shared module-level mock state; time is controlled with fake timers, not bracketed.
