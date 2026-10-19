@@ -435,23 +435,40 @@ describe('update-actor-version', () => {
                 );
             });
 
-            it('refuses an edit whose newText grows a file past the limit once its LFs become CRLF', async () => {
-                // 93 code units under the limit; the newText is 83 code units, and 123 once each LF becomes CRLF.
-                mockFiles({
+            describe('with CRLF line breaks', () => {
+                // 93 UTF-16 code units under the limit.
+                const CRLF_NEAR_LIMIT = {
                     name: 'src/big.txt',
                     format: 'TEXT',
                     content: `${'a'.repeat(MAX_LENGTH - 100)}\r\n#0;\r\n`,
+                };
+
+                it.each([
+                    ['LFs, each of which becomes CRLF', 'b\n'.repeat(32)],
+                    ['CRLFs, which stay as they are', 'b\r\n'.repeat(32)],
+                    ['no line break', 'b'.repeat(96)],
+                ])('takes an edit that grows the file to exactly 3 MiB with a newText of %s', async (_, newText) => {
+                    mockFiles(CRLF_NEAR_LIMIT);
+
+                    await callTool({ operations: [edit('src/big.txt', { oldText: '#0;', newText })] });
+
+                    const [saved] = getPutFiles() as { content: string }[];
+                    expect(saved.content).toHaveLength(MAX_LENGTH);
                 });
 
-                const text = await callToolExpectingUserError({
-                    operations: [edit('src/big.txt', { oldText: '#0;', newText: `${'b\n'.repeat(40)}#0;` })],
-                });
+                it('refuses an edit whose newText grows the file past the limit once its LFs become CRLF', async () => {
+                    mockFiles(CRLF_NEAR_LIMIT);
 
-                expect(text).toBe(
-                    'Nothing was written: edits[0] of operations[0] (edit src/big.txt) can make the file longer than ' +
-                        '3145728 UTF-16 code units, the limit for an edited file. In a file with CRLF line breaks, ' +
-                        'each character of newText counts as two, since each LF in it becomes CRLF.',
-                );
+                    // 65 code units, and 97 once each LF becomes CRLF.
+                    const text = await callToolExpectingUserError({
+                        operations: [edit('src/big.txt', { oldText: '#0;', newText: `${'b\n'.repeat(32)}b` })],
+                    });
+
+                    expect(text).toBe(
+                        'Nothing was written: edits[0] of operations[0] (edit src/big.txt) can make the file longer than ' +
+                            '3145728 UTF-16 code units, the limit for an edited file.',
+                    );
+                });
             });
         });
     });

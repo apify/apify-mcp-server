@@ -158,6 +158,15 @@ function convertToCrlf(text: string): string {
     return text.replace(/(?<!\r)\n/g, '\r\n');
 }
 
+/** The LFs convertToCrlf turns into CRLF: those without a CR before them. */
+function countLoneLineFeeds(text: string): number {
+    let count = 0;
+    for (let offset = text.indexOf('\n'); offset !== -1; offset = text.indexOf('\n', offset + 1)) {
+        if (text[offset - 1] !== '\r') count++;
+    }
+    return count;
+}
+
 // V8's indexOf keeps its Boyer-Moore shift tables for the last 250 characters of a pattern (kBMMaxShift in
 // https://github.com/v8/v8/blob/main/src/strings/string-search.h). For a longer pattern its time grows with the text
 // length times the pattern length: over 4 s for a 10,001-character pattern in 3 MiB.
@@ -214,13 +223,11 @@ function applyTextEdits(originalText: string, edits: readonly TextEdit[], label:
             );
         }
         // An upper bound of the length after this edit, taken before the CRLF conversion and the search: converting only
-        // lengthens oldText, and at most doubles newText.
-        if (text.length - edit.oldText.length + (isCrlfFile ? 2 : 1) * edit.newText.length > MAX_EDITED_TEXT_LENGTH) {
-            const crlfNote = isCrlfFile
-                ? ' In a file with CRLF line breaks, each character of newText counts as two, since each LF in it becomes CRLF.'
-                : '';
+        // lengthens oldText, and lengthens newText by one code unit for each LF it turns into CRLF.
+        const newTextLength = edit.newText.length + (isCrlfFile ? countLoneLineFeeds(edit.newText) : 0);
+        if (text.length - edit.oldText.length + newTextLength > MAX_EDITED_TEXT_LENGTH) {
             throw new UserInputError(
-                `Nothing was written: edits[${editIndex}] of ${label} can make the file longer than ${MAX_EDITED_TEXT_LENGTH} UTF-16 code units, the limit for an edited file.${crlfNote}`,
+                `Nothing was written: edits[${editIndex}] of ${label} can make the file longer than ${MAX_EDITED_TEXT_LENGTH} UTF-16 code units, the limit for an edited file.`,
             );
         }
         const oldText = isCrlfFile ? convertToCrlf(edit.oldText) : edit.oldText;
