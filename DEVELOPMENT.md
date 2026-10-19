@@ -145,7 +145,7 @@ Restart Claude Code for the change to take effect. This token is picked up by bo
 
 ## Testing
 
-Before writing or editing a unit test, read the [unit testing guide](./tests/UNIT_TESTING_GUIDE.md). Which layer to use is in [tests/AGENTS.md](./tests/AGENTS.md).
+Unit test rules are in the [unit testing guide](./tests/UNIT_TESTING_GUIDE.md); which layer to use is in [tests/AGENTS.md](./tests/AGENTS.md).
 
 | Layer | Command | What it covers |
 |---|---|---|
