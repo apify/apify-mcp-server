@@ -133,6 +133,7 @@ const BASE_TELEMETRY_KEYS = [
     'tool_response_file_bytes',
     'tool_response_structured_content_bytes',
     'tool_status',
+    'trace_id',
     'transport_type',
 ];
 

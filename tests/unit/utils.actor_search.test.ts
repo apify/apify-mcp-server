@@ -66,6 +66,20 @@ describe('searchActorsByKeywords', () => {
         expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: 5, offset: 0 });
     });
 
+    it('forwards the call tracking of the client as `_traceId` and `_useCase` for agent-safe searches only', async () => {
+        const trackedClient = Object.assign(Object.create(stubApifyClient), {
+            storeSearchTracking: { traceId: 'thread-1', useCase: 'find a scraper' },
+        });
+        listMock.mockResolvedValueOnce({ items: [] });
+        await searchActorsByKeywords({ search: 'foo', apifyClient: trackedClient, limit: 5 });
+        expect(paramsHolder.params).not.toHaveProperty('_traceId');
+        expect(paramsHolder.params).not.toHaveProperty('_useCase');
+
+        listMock.mockResolvedValueOnce({ items: [] });
+        await searchAgentSafeActors({ keywords: 'foo', apifyClient: trackedClient, limit: 5, offset: 0 });
+        expect(paramsHolder.params).toMatchObject({ _traceId: 'thread-1', _useCase: 'find a scraper' });
+    });
+
     it('omits both flags when not provided', async () => {
         listMock.mockResolvedValueOnce({ items: [] });
         await searchActorsByKeywords({ search: 'foo', apifyClient: stubApifyClient, limit: 5 });

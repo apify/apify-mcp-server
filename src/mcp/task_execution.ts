@@ -161,6 +161,8 @@ export async function executeToolAndUpdateTask(params: {
         clientParam,
         paymentProvider,
     });
+    const traceId = apifyClient.storeSearchTracking?.traceId;
+    if (telemetryData && traceId) telemetryData.trace_id = traceId;
 
     const finishTaskTracking = (status: ToolStatus, diagnostics?: CallDiagnostics, result?: unknown) => {
         logToolCallAndTelemetry({

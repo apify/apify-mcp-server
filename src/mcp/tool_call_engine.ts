@@ -25,7 +25,7 @@ import type { ActorStore, CallDiagnostics, ToolCallTelemetryProperties, ToolEntr
 import { TOOL_TYPE } from '../types.js';
 import { logHttpError } from '../utils/logging.js';
 import { respondOk } from '../utils/mcp.js';
-import { getRequestOriginForClient } from '../utils/mcp_clients.js';
+import { getRequestOriginForClient, resolveStoreSearchTracking } from '../utils/mcp_clients.js';
 import type { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { extractAjvErrorDetails, isMcpError } from '../utils/tool_status.js';
@@ -177,6 +177,13 @@ export async function prepareToolCall(params: {
     if (telemetryData) {
         telemetryData.tool_name = resolvedToolName;
     }
+    const requestOrigin = getRequestOriginForClient(clientContext);
+    const storeSearchTracking = telemetryData
+        ? resolveStoreSearchTracking(requestOrigin, meta, params.mcpSessionId)
+        : undefined;
+    if (telemetryData && storeSearchTracking?.traceId) {
+        telemetryData.trace_id = storeSearchTracking.traceId;
+    }
 
     const actorName = extractActorName(tool, args as Record<string, unknown>);
     const actorId = extractActorId(tool);
@@ -224,8 +231,9 @@ export async function prepareToolCall(params: {
             apifyToken,
             meta,
             requestHeaders,
-            requestOrigin: getRequestOriginForClient(clientContext),
+            requestOrigin,
         });
+        apifyClient.storeSearchTracking = storeSearchTracking;
 
         log.debug('Validate arguments for tool', {
             toolName: tool.name,

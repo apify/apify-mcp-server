@@ -136,6 +136,38 @@ describe('prepareToolCall()', () => {
         });
     });
 
+    it('carries the call tracking on the client and in telemetry only when telemetry is on', async () => {
+        await withServer(async (server) => {
+            const { tool } = makeRecorderTool('recorder-tool');
+            server.upsertTools([tool]);
+            const call = (telemetryData: ToolCallTelemetryProperties | null) =>
+                prepareToolCall({
+                    ...prepareFields(server),
+                    apifyToken: 'fake-token',
+                    name: 'recorder-tool',
+                    args: {},
+                    meta: { 'com.apify/traceId': 'thread-1', 'com.apify/useCase': 'find a scraper' },
+                    requestHeaders: undefined,
+                    isTaskRequest: false,
+                    mcpSessionId: 's1',
+                    telemetryData,
+                    clientContext: {
+                        protocolVersion: '2025-06-18',
+                        clientInfo: { name: 'apify-ai', version: '1' },
+                        capabilities: {},
+                    },
+                }) as Promise<PreparedCall>;
+
+            const telemetryData = { tool_name: 'recorder-tool' } as unknown as ToolCallTelemetryProperties;
+            const tracked = await call(telemetryData);
+            expect(tracked.apifyClient.storeSearchTracking).toEqual({ traceId: 'thread-1', useCase: 'find a scraper' });
+            expect(telemetryData.trace_id).toBe('thread-1');
+
+            const untracked = await call(null);
+            expect(untracked.apifyClient.storeSearchTracking).toBeUndefined();
+        });
+    });
+
     describe('argument failure hint', () => {
         const STRICT_SCHEMA = {
             type: 'object',

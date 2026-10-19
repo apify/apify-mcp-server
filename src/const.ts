@@ -138,6 +138,10 @@ export const defaults = {
 
 /** API rejects `includeInputSchema=true` above this; mirrors apify-core `MAX_LIMIT_WITH_INPUT_SCHEMA`. */
 export const MAX_LIMIT_WITH_INPUT_SCHEMA = 10;
+/** Max `_useCase` length (UTF-16 code units) the API accepts. */
+export const STORE_USE_CASE_MAX_LENGTH = 1024;
+/** Max `_traceId` length (UTF-16 code units) the API accepts. */
+export const STORE_TRACE_ID_MAX_LENGTH = 256;
 /** Max input fields shown inline in text and structured Actor cards. */
 export const MAX_INPUT_FIELDS_IN_ACTOR_CARD = 20;
 

@@ -379,6 +379,7 @@ export type ToolCallTelemetryProperties = {
     mcp_protocol_version: string;
     mcp_client_capabilities: Record<string, unknown> | null;
     mcp_session_id: string;
+    trace_id?: string;
     transport_type: string;
     /** Raw `?client=` URL query-param value, when the connecting request carried one. */
     mcp_url_client: string;

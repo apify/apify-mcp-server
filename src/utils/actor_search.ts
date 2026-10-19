@@ -20,6 +20,8 @@ export type SearchActorsByKeywordsOptions = {
     allowsAgenticUsers?: boolean;
     /** API rejects values above `MAX_LIMIT_WITH_INPUT_SCHEMA` (apify-core cap). */
     includeInputSchema?: boolean;
+    /** Sent as `_traceId` and `_useCase`. */
+    tracking?: ApifyClient['storeSearchTracking'];
 };
 
 export type SearchAgentSafeActorsOptions = {
@@ -31,10 +33,13 @@ export type SearchAgentSafeActorsOptions = {
 };
 
 export async function searchActorsByKeywords(options: SearchActorsByKeywordsOptions): Promise<ActorStoreList[]> {
-    const { search, apifyClient, limit, offset, allowsAgenticUsers, includeInputSchema } = options;
+    const { search, apifyClient, limit, offset, allowsAgenticUsers, includeInputSchema, tracking } = options;
     const storeClient = apifyClient.store();
     if (allowsAgenticUsers !== undefined) storeClient.params = { ...storeClient.params, allowsAgenticUsers };
     if (includeInputSchema !== undefined) storeClient.params = { ...storeClient.params, includeInputSchema };
+    const { traceId, useCase } = tracking ?? {};
+    if (traceId) storeClient.params = { ...storeClient.params, _traceId: traceId };
+    if (useCase) storeClient.params = { ...storeClient.params, _useCase: useCase };
 
     const results = await storeClient.list({ search, limit, offset });
     return results.items as ActorStoreList[];
@@ -54,6 +59,7 @@ export async function searchAgentSafeActors(options: SearchAgentSafeActorsOption
         apifyClient,
         limit,
         offset,
+        tracking: apifyClient.storeSearchTracking,
         allowsAgenticUsers: paymentProvider ? true : undefined,
         includeInputSchema: true,
     });
