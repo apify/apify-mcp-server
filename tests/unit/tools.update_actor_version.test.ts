@@ -2516,6 +2516,22 @@ describe('update-actor-version', () => {
             expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
         });
 
+        it('says the build is still running without naming get-actor-build when the session lacks it', async () => {
+            const loadedToolNames = Object.values(HELPER_TOOLS).filter((name) => name !== HELPER_TOOLS.ACTOR_BUILD_GET);
+            const context = stubToolCallContext(
+                { actor: 'john/my-actor', autoBuild: true, operations: [write('b.js', 'b')] },
+                stubClient,
+                { loadedToolNames },
+            );
+
+            const result = (await (updateActorVersion as HelperTool).call(context)) as UpdateResult;
+
+            expect(buildMock).toHaveBeenCalledWith('0.1', { useCache: true });
+            expect(result.content[1].text).toBe(
+                'Updated version 0.1 of john/my-actor.\nThe build is still running; check its status again in a few seconds.',
+            );
+        });
+
         it('adds the build Console link for an Apify Console session', async () => {
             vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
 
