@@ -253,12 +253,15 @@ export const versionsCases: Case[] = [
                 const { build } = expectToolSuccess<BuildActorResult>(buildResult, 'build-actor');
                 expect(build.actorId).toBe(created.actorId);
             } finally {
-                // The Actor is deleted even when the abort fails.
-                try {
-                    if (buildId !== undefined) await api.build(buildId).abort();
-                } finally {
-                    await api.actor(selector).delete();
+                // A failed abort is only logged, so it cannot hide the error of a failed check, and the Actor is still
+                // deleted.
+                if (buildId !== undefined) {
+                    await api
+                        .build(buildId)
+                        .abort()
+                        .catch((error: unknown) => console.error(`Failed to abort build ${buildId}:`, error));
                 }
+                await api.actor(selector).delete();
             }
         }),
     },
