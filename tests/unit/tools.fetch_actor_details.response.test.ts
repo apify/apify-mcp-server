@@ -8,6 +8,7 @@ import {
     buildActorNotRunnableGuidance,
     buildFetchActorDetailsResult,
 } from '../../src/tools/actors/fetch_actor_details.js';
+import { OWN_ACTOR_NOT_FOUND_FACT } from '../../src/utils/actor.js';
 import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
 import { fetchActorDetails } from '../../src/utils/actor_details.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
@@ -311,5 +312,15 @@ describe('buildActorNotFoundResponse()', () => {
         const text = (buildActorNotFoundResponse('jane.doe/typo', []).content ?? []).map(textOf).join('\n');
         expect(text).toContain('was not found');
         expect(text).not.toContain(HELPER_TOOLS.STORE_SEARCH);
+    });
+
+    it('says where a name without a username was looked up, and only for such a name', () => {
+        const ownName = (buildActorNotFoundResponse('typo', [], { isOwnActorName: true }).content ?? [])
+            .map(textOf)
+            .join('\n');
+        const fullName = (buildActorNotFoundResponse('jane.doe/typo', []).content ?? []).map(textOf).join('\n');
+
+        expect(ownName).toContain(OWN_ACTOR_NOT_FOUND_FACT);
+        expect(fullName).not.toContain(OWN_ACTOR_NOT_FOUND_FACT);
     });
 });

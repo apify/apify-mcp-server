@@ -11,22 +11,25 @@ import { ACTOR_TOOL_MODE } from '../../src/types.js';
 import { getActorDefinitionCached, getActorToolResolutionCached } from '../../src/utils/actor.js';
 import { mockApifyClient, stubToolCallContext } from './helpers/tool_context.js';
 
-vi.mock('../../src/utils/actor.js', () => ({
+vi.mock('../../src/utils/actor.js', async () => ({
+    ...(await vi.importActual<Record<string, unknown>>('../../src/utils/actor.js')),
     getActorDefinitionCached: vi.fn(),
     getActorToolResolutionCached: vi.fn(),
 }));
 
 const ACTOR_FULL_NAME = 'apify/website-content-crawler';
+/** ID-shaped (17 alphanumeric characters), so it is looked up as an ID, not as one of the caller's own names. */
+const ACTOR_ID = 'wccActorId0000001';
 const actorInfo: ActorInfo = {
     webServerMcpPath: null,
     actor: {
-        id: 'wcc-id',
+        id: ACTOR_ID,
         username: 'apify',
         name: 'website-content-crawler',
         actorPermissionLevel: 'LIMITED_PERMISSIONS',
     } as ActorInfo['actor'],
     definition: {
-        id: 'wcc-id',
+        id: ACTOR_ID,
         actorFullName: ACTOR_FULL_NAME,
         buildTag: 'latest',
         readme: '',
@@ -68,12 +71,12 @@ describe.each([
     ['call-actor', callActor, { waitSecs: 0 }],
     ['call-actor-widget', callActorWidget, {}],
 ])('%s original Actor contract', (_name, tool, options) => {
-    it.each([ACTOR_FULL_NAME, 'wcc-id'])('keeps original inputs and omitted defaults for %s', async (actor) => {
+    it.each([ACTOR_FULL_NAME, ACTOR_ID])('keeps original inputs and omitted defaults for %s', async (actor) => {
         // Constructing a direct tool first must not contaminate cached definitions or generic validation.
         await getNormalActorsAsTools([actorInfo]);
         const start = vi.fn().mockResolvedValue({
             id: 'run-id',
-            actId: 'wcc-id',
+            actId: ACTOR_ID,
             status: 'RUNNING',
             startedAt: new Date(),
             defaultDatasetId: 'dataset-id',

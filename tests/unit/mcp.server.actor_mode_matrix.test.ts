@@ -33,10 +33,13 @@ const RUN_ONLY_STALE_PATH = 'acme/run-only-stale-path';
 const STANDBY_MCP = 'acme/standby-mcp';
 const STANDBY_INPUT = 'acme/standby-input';
 const STANDBY_EMPTY = 'acme/standby-empty';
-/** The unsupported cell addressed by its Actor ID — an identifier that is not the canonical `username/name`. */
-const STANDBY_EMPTY_ID = 'aBcD1234';
+/**
+ * The unsupported cell addressed by its Actor ID — an identifier that is not the canonical `username/name`. IDs are
+ * 17 alphanumeric characters; a shorter bare value would be looked up as one of the caller's own Actor names.
+ */
+const STANDBY_EMPTY_ID = 'aBcD1234aBcD12345';
 /** A run-only Actor addressed by its Actor ID. */
-const RUN_ONLY_ID = 'zXyW9876';
+const RUN_ONLY_ID = 'zXyW9876zXyW98765';
 
 function seedActor(
     name: string,

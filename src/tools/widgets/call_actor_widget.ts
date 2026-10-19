@@ -33,7 +33,9 @@ const callActorWidgetArgsSchema = z
     .object({
         actor: z
             .string()
-            .describe('The name of the Actor to call. Format: "username/name" (e.g., "apify/rag-web-browser").'),
+            .describe(
+                'The Actor to call: its ID, its name (resolved against your own Actors), or its full name as username/name (e.g., "apify/rag-web-browser"). A name without a username always means one of your own Actors, never another account\'s Actor.',
+            ),
         input: anyJsonObjectSchema.describe('The input JSON to pass to the Actor. Required.'),
         callOptions: callOptionsSchema
             .optional()
@@ -55,7 +57,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         ...(hasTool(HELPER_TOOLS.STORE_SEARCH)
             ? [
                   '',
-                  `If the actor name is not in "username/name" format, use ${HELPER_TOOLS.STORE_SEARCH} to resolve the correct Actor first.`,
+                  `A name without a username means one of your own Actors, never another account's Actor; ${HELPER_TOOLS.STORE_SEARCH} returns the full "username/name" of Store Actors.`,
               ]
             : []),
     ].join('\n');
