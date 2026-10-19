@@ -243,9 +243,13 @@ export function validatePathCharacters(path: string, label: string): void {
 
 /**
  * Throws `UserInputError` for a normalized path no file can be written at. The build worker refuses a version with a
- * path outside the Actor root, so every build of it would fail; `.` and a path ending in a slash name a folder.
+ * path outside the Actor root, so every build of it would fail; `.` and a path ending in a slash name a folder. A
+ * backslash is refused too: the build takes it as part of the file name, so src\main.js would land in the Actor root.
  */
 export function validateFilePath(path: string, label: string): void {
+    if (path.includes('\\')) {
+        throw new UserInputError(`${label} has a backslash in its path; paths use / as the separator.`);
+    }
     if (path.startsWith('/') || path === '..' || path.startsWith('../')) {
         throw new UserInputError(
             `${label} has a path outside the Actor root; paths are relative to it, such as src/main.js.`,

@@ -1728,6 +1728,18 @@ describe('update-actor-version', () => {
             },
         );
 
+        it.each(['src\\main.js', '.\\Dockerfile'])(
+            'refuses a write to %s, whose backslash the build takes as part of the file name',
+            async (path) => {
+                const text = await callToolExpectingUserError({ autoBuild: true, operations: [write(path, 'x')] });
+
+                expect(text).toBe(
+                    `operations[0] (write ${path}) has a backslash in its path; paths use / as the separator.`,
+                );
+                expect(buildMock).not.toHaveBeenCalled();
+            },
+        );
+
         it.each([
             ['U+0000', 'src/a\0.js'],
             ['U+000A', 'src/\nmain.js'],
@@ -1910,6 +1922,21 @@ describe('update-actor-version', () => {
             await callTool({ operations: [remove('/src/main.js', sha256Prefix('x'))] });
 
             expect(getPutFiles()).toStrictEqual([MAIN_JS]);
+        });
+
+        it('edits and deletes stored files with a backslash in the path, so such files can be fixed or removed', async () => {
+            const util = { name: 'src\\util.js', format: 'TEXT', content: 'x' };
+            const dockerfile = { name: '.\\Dockerfile', format: 'TEXT', content: 'FROM node' };
+            mockFiles(dockerfile, util, MAIN_JS);
+
+            await callTool({
+                operations: [
+                    edit('src\\util.js', { oldText: 'x', newText: 'y' }),
+                    remove('.\\Dockerfile', sha256Prefix('FROM node')),
+                ],
+            });
+
+            expect(getPutFiles()).toStrictEqual([MAIN_JS, { name: 'src\\util.js', format: 'TEXT', content: 'y' }]);
         });
 
         it('matches a path the way get-actor-version lists it', async () => {

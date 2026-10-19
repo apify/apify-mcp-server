@@ -493,6 +493,20 @@ describe('create-actor', () => {
         },
     );
 
+    it.each(['src\\main.js', '.\\Dockerfile'])(
+        'refuses a file at %s, whose backslash the build takes as part of the file name, and creates nothing',
+        async (path) => {
+            const result = await callTool({ autoBuild: true, files: [MAIN_JS, { path, content: 'x' }] });
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toBe(
+                `files[1] (${path}) has a backslash in its path; paths use / as the separator.`,
+            );
+            expect(actorsCreateMock).not.toHaveBeenCalled();
+            expect(buildMock).not.toHaveBeenCalled();
+        },
+    );
+
     it.each([
         ['U+0000', 'src/a\0.js'],
         ['U+000A', 'src/\nmain.js'],
