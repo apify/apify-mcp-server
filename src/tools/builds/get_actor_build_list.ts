@@ -5,6 +5,7 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
+import { getResourceByIdOrName } from '../../utils/apify_resource_id.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { catchNotFound } from '../storage/storage_helpers.js';
 import { getActorBuildListToolOutputSchema } from '../structured_output_schemas.js';
@@ -16,7 +17,7 @@ const getActorBuildListArgs = z.object({
         .min(1)
         .optional()
         .describe(
-            'Only list builds of this Actor: its ID, or its full name as username/name or username~name. A name without the username is not enough.',
+            'Only list builds of this Actor: its ID, its name (resolved against your own Actors), or its full name as username/name or username~name.',
         ),
     offset: z.number().int().min(0).describe('Number of builds to skip at the start. Default: 0.').default(0),
     limit: z
@@ -116,11 +117,17 @@ export const getActorBuildList: ToolEntry = Object.freeze({
         const { args, apifyClient: client, loadedToolNames } = toolArgs;
         const parsed = getActorBuildListArgs.parse(args);
         const listOptions = { offset: parsed.offset, limit: parsed.limit, desc: parsed.desc };
+        // The list endpoint takes the Actor as `~name` too, so a name is resolved without a separate Actor read.
         const builds = parsed.actorId
-            ? await catchNotFound(client.actor(parsed.actorId).builds().list(listOptions))
+            ? await getResourceByIdOrName(
+                  parsed.actorId,
+                  async (safeId) => (await catchNotFound(client.actor(safeId).builds().list(listOptions))) ?? undefined,
+              )
             : await client.builds().list(listOptions);
         if (!builds) {
-            return respondUserError(`Actor '${parsed.actorId}' not found.`);
+            return respondUserError(
+                `Actor '${parsed.actorId}' not found. The actorId argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.`,
+            );
         }
         // Cast because the client's item type omits fields the API returns (see `BuildListItem`).
         const items = builds.items as BuildListItem[];

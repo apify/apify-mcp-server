@@ -23,6 +23,7 @@ export { schedulesCases } from './cases/schedules.cases.js';
 export { storageCases } from './cases/storage.cases.js';
 export { tasksCases } from './cases/tasks.cases.js';
 export { toolsCases } from './cases/tools.cases.js';
+export { versionsCases } from './cases/versions.cases.js';
 
 import { actorsCases } from './cases/actors.cases.js';
 import { appsCases } from './cases/apps.cases.js';
@@ -32,6 +33,7 @@ import { schedulesCases } from './cases/schedules.cases.js';
 import { storageCases } from './cases/storage.cases.js';
 import { tasksCases } from './cases/tasks.cases.js';
 import { toolsCases } from './cases/tools.cases.js';
+import { versionsCases } from './cases/versions.cases.js';
 import type { Case } from './types.js';
 
 /** All cases from every capability group. */
@@ -43,5 +45,6 @@ export const allCases: Case[] = [
     ...tasksCases,
     ...storageCases,
     ...schedulesCases,
+    ...versionsCases,
     ...paymentsCases,
 ];
