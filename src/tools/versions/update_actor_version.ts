@@ -32,9 +32,9 @@ import {
     resolveVersion,
     respondAfterWrite,
     respondToSourceToolError,
+    SourcePathIndex,
     validateFileContent,
     validateFilePath,
-    validateNewFilePath,
     validatePathCharacters,
 } from './source_helpers.js';
 
@@ -244,11 +244,11 @@ type OperationTarget = { path: string; expectedHash: string | undefined; label: 
 
 /** Writes the file at `target.path` into `version.files`; throws `UserInputError` when it cannot. */
 function applyWrite(
-    version: { files: Map<string, SourceFile>; folderPaths: readonly string[] },
+    version: { files: Map<string, SourceFile>; pathIndex: SourcePathIndex },
     target: OperationTarget,
     { content, encoding }: Pick<OperationArgs, 'content' | 'encoding'>,
 ): void {
-    const { files, folderPaths } = version;
+    const { files, pathIndex } = version;
     const { path, expectedHash, label } = target;
     if (content === undefined) throw new UserInputError(`${label} needs content.`);
     // Only a write is checked, so a stored file at such a path can still be edited or deleted.
@@ -259,10 +259,11 @@ function applyWrite(
         throw buildPreconditionError(label, PRECONDITION_REASON.FILE_EXISTS, detail);
     }
     if (expectedHash !== undefined) validateHash(findFile(files, path, label), expectedHash, label);
-    if (!existing) validateNewFilePath(path, { filePaths: files.keys(), folderPaths }, label);
+    if (!existing) pathIndex.validateNewFilePath(path, label);
     const entry = buildSourceFileEntry({ path, content, encoding });
     validateFileContent(entry, label);
     files.set(path, buildInlineSourceFile(entry));
+    pathIndex.addFile(path);
 }
 
 /** Applies `edits` to the file at `target.path` in `files`; throws `UserInputError` when they cannot apply. */
@@ -283,12 +284,17 @@ function applyEdit(files: Map<string, SourceFile>, target: OperationTarget, edit
     files.set(path, buildInlineSourceFile({ name: path, format: isBase64 ? 'BASE64' : 'TEXT', content: newContent }));
 }
 
-/** Deletes the file at `target.path` from `files`; throws `UserInputError` when it cannot. */
-function applyDelete(files: Map<string, SourceFile>, target: OperationTarget): void {
+/** Deletes the file at `target.path` from `version.files`; throws `UserInputError` when it cannot. */
+function applyDelete(
+    version: { files: Map<string, SourceFile>; pathIndex: SourcePathIndex },
+    target: OperationTarget,
+): void {
+    const { files, pathIndex } = version;
     const { path, expectedHash, label } = target;
     if (expectedHash === undefined) throw new UserInputError(`${label} needs expectedHash.`);
     validateHash(findFile(files, path, label), expectedHash, label);
     files.delete(path);
+    pathIndex.deleteFile(path);
 }
 
 /**
@@ -300,6 +306,7 @@ function applyOperations(
     operations: readonly OperationArgs[],
 ): Map<string, SourceFile> {
     const files = new Map(version.files);
+    const pathIndex = new SourcePathIndex(files.keys(), version.folderPaths);
     for (const [index, operation] of operations.entries()) {
         const { type } = operation;
         const target = {
@@ -309,9 +316,9 @@ function applyOperations(
             expectedHash: operation.expectedHash || undefined,
             label: `operations[${index}] (${type} ${operation.path})`,
         };
-        if (type === 'write') applyWrite({ files, folderPaths: version.folderPaths }, target, operation);
+        if (type === 'write') applyWrite({ files, pathIndex }, target, operation);
         if (type === 'edit') applyEdit(files, target, operation.edits);
-        if (type === 'delete') applyDelete(files, target);
+        if (type === 'delete') applyDelete({ files, pathIndex }, target);
     }
     return files;
 }

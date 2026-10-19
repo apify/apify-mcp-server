@@ -19,6 +19,7 @@ import {
     resolveVersion,
     respondAfterWrite,
     respondToSourceToolError,
+    SourcePathIndex,
     sourceFileArgs,
     validateFileContent,
     validateFilePath,
@@ -47,41 +48,24 @@ const createActorArgs = z.object({
         .describe('Start a build of the version after creating the Actor, and return without waiting. Default: false.'),
 });
 
-/** The folders above a file, outermost first: `a` and `a/b` for `a/b/c.js`. */
-function listFolders(path: string): string[] {
-    const segments = path.split('/');
-    return segments.slice(1).map((_, index) => segments.slice(0, index + 1).join('/'));
-}
-
 /**
  * The entries to send, one per file; throws `UserInputError` for a path no file can be written at, and for a path
  * given twice, since the platform puts the Actor name in the first .actor/actor.json and the build uses the last.
- * Paths are checked through a set and a map, since comparing each file with every earlier one took 8 s for 20,000.
  */
 function buildSourceFileEntries(files: readonly z.infer<typeof sourceFileArgs>[]): ActorVersionSourceFile[] {
     const entries: ActorVersionSourceFile[] = [];
-    const filePaths = new Set<string>();
-    const firstFileByFolder = new Map<string, string>();
+    const pathIndex = new SourcePathIndex([]);
     for (const [index, file] of files.entries()) {
         validatePathCharacters(file.path, `files[${index}]`);
         const entry = buildSourceFileEntry(file);
         const label = `files[${index}] (${file.path})`;
         validateFilePath(entry.name, label);
         validateFileContent(entry, label);
-        if (filePaths.has(entry.name)) {
+        if (pathIndex.hasFile(entry.name)) {
             throw new UserInputError(`${label} repeats the path ${entry.name}; each path can be sent only once.`);
         }
-        const folders = listFolders(entry.name);
-        const collision = folders.find((folder) => filePaths.has(folder)) ?? firstFileByFolder.get(entry.name);
-        if (collision !== undefined) {
-            throw new UserInputError(
-                `${label} collides with ${collision}; one path cannot be both a file and a folder.`,
-            );
-        }
-        filePaths.add(entry.name);
-        for (const folder of folders) {
-            if (!firstFileByFolder.has(folder)) firstFileByFolder.set(folder, entry.name);
-        }
+        pathIndex.validateNewFilePath(entry.name, label);
+        pathIndex.addFile(entry.name);
         entries.push(entry);
     }
     return entries;

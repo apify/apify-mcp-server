@@ -262,22 +262,63 @@ export function validateFilePath(path: string, label: string): void {
     }
 }
 
+/** The folders above a file, outermost first: `a` and `a/b` for `a/b/c.js`. */
+function listFolders(path: string): string[] {
+    const folders: string[] = [];
+    for (let slashIndex = path.indexOf('/'); slashIndex !== -1; slashIndex = path.indexOf('/', slashIndex + 1)) {
+        folders.push(path.slice(0, slashIndex));
+    }
+    return folders;
+}
+
 /**
- * Throws `UserInputError` when a new file at `path` collides with another file or folder, since one path cannot be
- * both: a file at a folder of `path`, or a file or folder at or under `path`. The build worker fails to write such a
- * file. A file at `path` itself is for the caller to check.
+ * The paths of a version's files and folder entries, to check where a new file can go: one path cannot be both a file
+ * and a folder, and the build worker fails to write such a file. Each check and change looks up only the folders of
+ * its path, since comparing each file with every other took 8 s for 20,000 files.
  */
-export function validateNewFilePath(
-    path: string,
-    takenPaths: { filePaths: Iterable<string>; folderPaths: Iterable<string> },
-    label: string,
-): void {
-    const collision =
-        [...takenPaths.filePaths].find(
-            (filePath) => path.startsWith(`${filePath}/`) || filePath.startsWith(`${path}/`),
-        ) ?? [...takenPaths.folderPaths].find((folderPath) => folderPath === path || folderPath.startsWith(`${path}/`));
-    if (collision === undefined) return;
-    throw new UserInputError(`${label} collides with ${collision}; one path cannot be both a file and a folder.`);
+export class SourcePathIndex {
+    private readonly filePaths = new Set<string>();
+
+    /** The files under each folder, at any depth, in the order they were added. */
+    private readonly filePathsByFolder = new Map<string, Set<string>>();
+
+    private readonly folderPaths: readonly string[];
+
+    constructor(filePaths: Iterable<string>, folderPaths: readonly string[] = []) {
+        this.folderPaths = folderPaths;
+        for (const path of filePaths) this.addFile(path);
+    }
+
+    hasFile(path: string): boolean {
+        return this.filePaths.has(path);
+    }
+
+    /** A file added again keeps its place in the order. */
+    addFile(path: string): void {
+        this.filePaths.add(path);
+        for (const folder of listFolders(path)) {
+            this.filePathsByFolder.set(folder, (this.filePathsByFolder.get(folder) ?? new Set<string>()).add(path));
+        }
+    }
+
+    deleteFile(path: string): void {
+        this.filePaths.delete(path);
+        for (const folder of listFolders(path)) this.filePathsByFolder.get(folder)?.delete(path);
+    }
+
+    /**
+     * Throws `UserInputError` when a new file at `path` collides with another file or folder: a file at a folder of
+     * `path`, or else the first file added under `path`, or else the first folder entry at or under `path`. A file at
+     * `path` itself is for the caller to check.
+     */
+    validateNewFilePath(path: string, label: string): void {
+        const collision =
+            listFolders(path).find((folder) => this.filePaths.has(folder)) ??
+            this.filePathsByFolder.get(path)?.values().next().value ??
+            this.folderPaths.find((folderPath) => folderPath === path || folderPath.startsWith(`${path}/`));
+        if (collision === undefined) return;
+        throw new UserInputError(`${label} collides with ${collision}; one path cannot be both a file and a folder.`);
+    }
 }
 
 /** The build worker skips a file whose content is empty, so the caller hears of such files. */
