@@ -557,6 +557,11 @@ describe('create-actor-version', () => {
                 'files[0] (src/) has a path that names a folder, not a file.',
             ],
             [
+                'a backslash in the path, which the build takes as part of the file name',
+                [ACTOR_JSON, { path: 'src\\main.js', content: 'x' }],
+                'files[1] (src\\main.js) has a backslash in its path; paths use / as the separator.',
+            ],
+            [
                 'the same path twice',
                 [MAIN_JS, { path: './src/main.js', content: '2' }],
                 'files[1] (./src/main.js) repeats the path src/main.js; each path can be sent only once.',
