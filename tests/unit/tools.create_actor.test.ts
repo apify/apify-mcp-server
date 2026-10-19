@@ -770,6 +770,15 @@ describe('create-actor', () => {
             expect(buildMock).toHaveBeenCalledWith('0.1', { useCache: true });
         });
 
+        it('takes the version of an .actor/actor.json that starts with a byte order mark, and sends the file as given', async () => {
+            const content = '﻿{"actorSpecification": 1, "name": "my-actor", "version": "0.1"}';
+
+            await callTool({ files: [actorJsonWith(content)] });
+
+            expect(getSentVersion().versionNumber).toBe('0.1');
+            expect(getSentVersion().sourceFiles[0].content).toBe(content);
+        });
+
         it.each<[string, { path: string; content: string }[]]>([
             ['no .actor/actor.json', [MAIN_JS]],
             ['an actor.json without a version', [ACTOR_JSON]],
