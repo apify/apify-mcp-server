@@ -45,6 +45,14 @@ function maskLoggedValues(record: Record<string, unknown>, keys: readonly string
     return Object.fromEntries(keys.filter((key) => record[key] !== undefined).map((key) => [key, REDACTED]));
 }
 
+/** The logged copy of an entry's edits, each with its oldText and newText as `REDACTED`. */
+function redactEdits(edits: unknown): unknown {
+    if (!Array.isArray(edits)) return REDACTED;
+    return edits.map((textEdit) =>
+        isRecord(textEdit) ? maskLoggedValues(textEdit, ['oldText', 'newText']) : REDACTED,
+    );
+}
+
 /**
  * The logged copy of a source tool's arguments (`redactArgs`), built as an allowlist: `keys`, and each entry of the
  * list under `listKey` with its `entryKeys`, and with its content and its edits' oldText and newText as `REDACTED`.
@@ -61,13 +69,7 @@ export function redactSourceToolArgs(
         return {
             ...pickLoggedValues(entry, entryKeys),
             ...maskLoggedValues(entry, ['content']),
-            ...(edits !== undefined && {
-                edits: Array.isArray(edits)
-                    ? edits.map((textEdit) =>
-                          isRecord(textEdit) ? maskLoggedValues(textEdit, ['oldText', 'newText']) : REDACTED,
-                      )
-                    : REDACTED,
-            }),
+            ...(edits !== undefined && { edits: redactEdits(edits) }),
         };
     };
     const list = args[listKey];
