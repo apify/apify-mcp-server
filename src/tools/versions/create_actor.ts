@@ -102,6 +102,11 @@ function readActorJsonVersion(entries: readonly ActorVersionSourceFile[]): strin
     }
 }
 
+/** A refusal of the name as taken on a retry of the POST, which an earlier attempt of the same call may have caused. */
+function isRetriedNameTaken(error: unknown): error is ApifyApiError {
+    return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE && error.attempt > 1;
+}
+
 /**
  * https://docs.apify.com/api/v2/actors-post
  *  /v2/actors
@@ -190,22 +195,16 @@ export const createActor: ToolEntry = Object.freeze({
                 summary: `Created the private Actor ${fullName}.`,
             });
         } catch (error) {
-            if (
-                error instanceof ApifyApiError &&
-                error.type === APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE &&
-                error.attempt > 1
-            ) {
-                const readTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_GET)
-                    ? `; ${HELPER_TOOLS.ACTOR_VERSION_GET} reads its files`
-                    : '';
-                return respondUserError(
-                    `The platform refused the name ${parsed.name} as taken when the request was retried, so an earlier ` +
-                        `attempt of this call may have created the Actor ${parsed.name}. ` +
-                        `If it holds the files you sent, this call created it${readTool}.`,
-                    { httpStatus: error.statusCode },
-                );
-            }
-            return respondToSourceToolError(error);
+            if (!isRetriedNameTaken(error)) return respondToSourceToolError(error);
+            const readTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_VERSION_GET)
+                ? `; ${HELPER_TOOLS.ACTOR_VERSION_GET} reads its files`
+                : '';
+            return respondUserError(
+                `The platform refused the name ${parsed.name} as taken when the request was retried, so an earlier ` +
+                    `attempt of this call may have created the Actor ${parsed.name}. ` +
+                    `If it holds the files you sent, this call created it${readTool}.`,
+                { httpStatus: error.statusCode },
+            );
         }
     },
 } as const);
