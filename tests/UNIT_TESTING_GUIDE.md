@@ -2,11 +2,13 @@
 
 Rules for writing unit tests that stay useful to human readers. The recurring failure mode in generated suites is volume without value: many overlapping cases, tests that re-verify dependencies or the language itself, and whole branches of the unit left uncovered. A large suite reads as "thoroughly tested" while proving less than a small, deliberate one.
 
+Applies to new and edited tests. Existing tests predate it and often break its rules; when a neighboring file conflicts with the guide, the guide wins.
+
 ## Scope: test the unit's own logic
 
 Before writing anything, read the unit and separate what it **decides** from what it **delegates**. Test the decisions. For delegation, prove the wiring and stop.
 
-- **Do not re-enumerate a dependency's semantics.** If a helper has its own test file, one passing and one failing case through the caller is enough to prove it is called with the right arguments. Anything more duplicates the helper's suite and goes stale twice when the helper changes.
+- **Do not re-enumerate a dependency's semantics.** If a helper has its own test file, one case where the helper accepts and one where it rejects, each asserting the caller's reaction, is enough to prove it is called with the right arguments. Anything more duplicates the helper's suite and goes stale twice when the helper changes.
 - **Do not test the language or standard library.** Wrapping a predicate in `[...].filter(...)` and asserting that filtering returns matching elements, an empty array when nothing matches, and everything when everything matches tests `Array.prototype.filter`, not the unit. If callers filter with the predicate, that belongs to the caller's tests.
 - **Do not assert compile-time properties at runtime.** A test that checks `result[0].extra === 'data'` to show a generic "preserves the element type" verifies TypeScript, not behavior. If the types were wrong it would not compile.
 - **Test through the public entry point of the unit, in the shape callers use it.** Do not invent wrapper scenarios the unit does not own.
@@ -14,7 +16,7 @@ Before writing anything, read the unit and separate what it **decides** from wha
 
 ## Test doubles: prefer real infrastructure, fake only true externals
 
-**Unit tests run in-process and need no credentials.** Use the real code the unit touches - `ActorsMcpServer`, the tool registry, Zod schemas, the MCP SDK - and reach for it before building an elaborate fake of it - the fake is where bugs hide. What still deserves a test double: the Apify API, other outbound HTTP calls, and anything slow or nondeterministic.
+**Unit tests run in-process and need no credentials.** Use the real code the unit touches — `ActorsMcpServer`, the tool registry, Zod schemas, the MCP SDK — and reach for it before building an elaborate fake of it; the fake is where bugs hide. What still deserves a test double: the Apify API, other outbound HTTP calls, and anything slow or nondeterministic.
 
 [`tests/unit/helpers/`](./unit/helpers) is the toolbox for this:
 
@@ -25,12 +27,12 @@ Before writing anything, read the unit and separate what it **decides** from wha
 When you fake anyway, follow these rules:
 
 - **Do not `vi.mock` a module and re-declare its constants.** A test that imports a constant from the module it mocked compares the mock to itself and keeps passing if the real default changes. Mock the smallest thing that needs replacing, and let real constants stay real.
-- **No shared mutable mock state.** A module-level mock object that tests mutate and `afterEach` resets field by field leaks on the first forgotten reset, and `as any` escapes on it show the mock does not match its own type. Build a fresh mock per test from a small factory (`mockTask(overrides)`) instead - and if faking a dependency requires module-mocking gymnastics, consider whether the unit should accept it as a parameter.
+- **No shared mutable mock state.** A module-level mock object that tests mutate and `afterEach` resets field by field leaks on the first forgotten reset, and `as any` escapes on it show the mock does not match its own type. Build a fresh mock per test from a small factory (`mockTask(overrides)`) instead — and if faking a dependency requires module-mocking gymnastics, consider whether the unit should accept it as a parameter.
 - **Keep fake return values shaped like the real contract.** A fake that returns two fields where the real response carries six silently exercises only the fallback paths and keeps passing if the real response shape changes. Derive the fake's type from the real signature (`Awaited<ReturnType<...>>`) so drift becomes a compile error.
 
 ## Assert contracts, not incidental output
 
-- **Log wording is not a contract.** Substring assertions on log messages break on any copy edit while proving little. Asserting *that* a warning happened is legitimate when the warning is the observable behavior (a warn-and-skip path where the log line is the only outcome); pinning its phrasing, or substring-scanning a whole joined log stream for a summary table's contents, is testing presentation. Formatting belongs to the formatter's own unit, not to every caller. Text served to MCP clients is different: tool result text, descriptions, and errors are a contract (see [TOOL_GUIDELINES.md](../TOOL_GUIDELINES.md)). Assert the parts that carry it - a tool name, an ID, the instruction given - not whole sentences or paragraphs.
+- **Log wording is not a contract.** Substring assertions on log messages break on any copy edit while proving little. Asserting *that* a warning happened is legitimate when the warning is the observable behavior (a warn-and-skip path where the log line is the only outcome); pinning its phrasing, or substring-scanning a whole joined log stream for a summary table's contents, is testing presentation. Formatting belongs to the formatter's own unit, not to every caller. Text served to MCP clients is different: tool result text, descriptions, and errors are a contract (see [TOOL_GUIDELINES.md](../TOOL_GUIDELINES.md)). Assert the parts that carry it — a tool name, an ID, the instruction given — not whole sentences or paragraphs.
 - **Control time; do not bracket it.** Capturing `Date.now()` before and after the call and absorbing the slack with `toBeCloseTo` hides off-by-one bugs and eventually flakes. Use `vi.useFakeTimers()` / `vi.setSystemTime()` and assert exact values.
 
 ## Coverage: branches before variations
@@ -52,15 +54,14 @@ When you fake anyway, follow these rules:
 - **Test names are behavior statements** that read as documentation: `is not eligible when the allowlist excludes the required tool`.
 - **Each test is self-contained**: arrange, act, assert visible in one screen, no shared mutable state, no hidden setup in `beforeEach`.
 - **Comment only non-obvious intent or expectations.** Explain which rule fired or which spec default applies; do not restate the test name or mechanics. For example, `// Best-effort: one failed step must not abort the whole run` identifies the product rule the test protects.
-- **Realistic domain data** (`apify/rag-web-browser`, `get-dataset-items`) over `foo`/`bar` - it makes the scenario legible to someone who knows the domain.
+- **Realistic domain data** (`apify/rag-web-browser`, `get-dataset-items`) over `foo`/`bar` — it makes the scenario legible to someone who knows the domain.
 - **Derive expectations from the unit's own exported source of truth.** Assert a truncated name against `MAX_TOOL_NAME_LENGTH` exported by the unit instead of a hardcoded `64`, so changing the limit does not break unrelated tests. (Deriving *structure* is good; re-asserting the fixture's *values* is the anti-pattern above.)
 
 ## Checklist before finishing a suite
 
 1. Every branch of the unit has a test; diff the source's conditionals against the describe blocks.
 2. No test re-proves a dependency that has its own test file (beyond one wiring pair).
-3. No test would still pass if the unit's body were replaced by the standard library call it wraps.
-4. No two tests have inputs that take the same code path.
-5. Test count roughly tracks the unit's branch count, not the input space's combination count.
-6. Code the unit touches is real unless it is external (the Apify API, the network); every remaining fake matches the real contract's shape, and no mocked module re-declares real constants.
-7. No test asserts on log or message wording unless that output is the behavior; no test mutates shared module-level mock state; time is controlled with fake timers, not bracketed.
+3. No two tests have inputs that take the same code path.
+4. Test count roughly tracks the unit's branch count, not the input space's combination count.
+5. Code the unit touches is real unless it is external (the Apify API, the network); every remaining fake matches the real contract's shape, and no mocked module re-declares real constants.
+6. No test asserts on log or message wording unless that output is the behavior; no test mutates shared module-level mock state; time is controlled with fake timers, not bracketed.

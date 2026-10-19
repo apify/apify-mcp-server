@@ -10,7 +10,7 @@
 
 - Fix tests that your change breaks.
 - Add unit tests for self-contained logic changes: cover the unit's own branches, one behavior per test, and do not re-test dependencies that have their own suites.
-- Unit tests fake the Apify API - pass a stub client with `mockApifyClient` from [`unit/helpers/tool_context.ts`](./unit/helpers/tool_context.ts), which also has other test helpers. Prefer that over building elaborate fakes.
+- Unit tests fake only the Apify API; helpers for that live in [`unit/helpers/`](./unit/helpers) (see the guide's test doubles section).
 - Add integration coverage for behavior that depends on the real Apify API or a transport: a case in `test_kit/cases/*.cases.ts` (see the root [Testing](../AGENTS.md) section).
 - Vitest runs with globals enabled.
 
