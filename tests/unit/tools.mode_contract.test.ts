@@ -72,6 +72,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
                 HELPER_TOOLS.STORE_SEARCH,
                 HELPER_TOOLS.ACTOR_GET_DETAILS,
                 HELPER_TOOLS.ACTOR_CALL,
+                HELPER_TOOLS.ACTOR_LIST_GET,
                 HELPER_TOOLS.ACTOR_DELETE,
             ];
             expect(toolNames(defaultCategories.actors)).toEqual(expected);

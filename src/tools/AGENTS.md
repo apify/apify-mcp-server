@@ -11,7 +11,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 ## Files
 
 - `registry.ts` — tool categories and the tools in each (`index.ts` re-exports them), plus tools in no
-  category (`ALL_WIDGET_TOOLS`, `UNCATEGORIZED_TOOLS`).
+  category (`ALL_WIDGET_TOOLS`, and `UNCATEGORIZED_TOOLS`, which is empty).
 - `structured_output_schemas.ts` — shared JSON-schema definitions for structured
   output across tools.
 - `utils.ts` — shared tool helpers (schema property shaping, AJV compile).

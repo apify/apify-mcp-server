@@ -112,7 +112,7 @@ describe('toolNamesToInput', () => {
         });
     });
 
-    it('classifies get-actor-list (in no category) as an internal tool, not an actor ID', () => {
+    it('classifies get-actor-list as an internal tool, not an actor ID', () => {
         expect(toolNamesToInput([HELPER_TOOLS.ACTOR_LIST_GET])).toEqual({
             tools: [HELPER_TOOLS.ACTOR_LIST_GET],
         });
@@ -234,7 +234,7 @@ describe('getToolsForServerMode report-problem default injection', () => {
     });
 });
 
-describe('get-actor-list selection (in no category)', () => {
+describe('get-actor-list selection (in the actors category)', () => {
     it('does not treat tools=get-actor-list as an Actor name', () => {
         expect(resolveActorsToLoad({ tools: [HELPER_TOOLS.ACTOR_LIST_GET] })).toEqual([]);
     });
@@ -244,9 +244,9 @@ describe('get-actor-list selection (in no category)', () => {
         expect(toolNames).toEqual([HELPER_TOOLS.ACTOR_LIST_GET]);
     });
 
-    it.each(['default', 'apps'] as const)('excludes get-actor-list from the default set in %s mode', (mode) => {
+    it.each(['default', 'apps'] as const)('serves get-actor-list in the default set in %s mode', (mode) => {
         const toolNames = getToolsForServerMode({}, [], mode).map((t) => t.name);
-        expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_LIST_GET);
+        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_LIST_GET);
     });
 
     it.each(['default', 'apps'] as const)(
