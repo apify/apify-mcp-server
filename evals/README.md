@@ -150,15 +150,16 @@ The web-search family covers `apify/web-search`: 5 tool-call items (`pr/web-sear
 topic, an official site's URL, a "published this month" request, a domain-restricted search, and a
 web question that is neither Store discovery nor a fetch) and 5 of the web-selection agent items
 (`links-easy-1`, `search-then-read-medium-1`, `domain-filter-medium-1`, `date-filter-medium-1`,
-`no-results-hard-1`). Until web-search is a default Actor tool (#1653), these items, the other
+`no-results-hard-1`). Until web-search is a default Actor tool
+([#1653](https://github.com/apify/apify-mcp-server/issues/1653)), these items, the other
 web-selection items, `pr/apify--rag-web-browser/*` and `pr/web-fetch/example-com` set
 `metadata.tools` to `["actors", "docs", "apify/rag-web-browser", "apify/web-fetch", "apify/web-search"]`;
 an omitted `tools` loads the defaults only. The judge never sees the run date, so the date-filter
 reference accepts a `dateFrom` of the form `YYYY-MM-01` no earlier than 2026-10-01. Platform
 behavior the cases are built on (probed 2026-10-20): a call is one run storing one dataset item
-(`query`, `search`, `results`); `search.totalResults` reads 0 while `results` holds entries; 7 of
-30 runs during the first ladder failed with `SEARCH_TIMEOUT` after about 57 s and 10 ran past the
-30 s default wait, so a web-search case can fail on Actor latency — check the run log before
+(`query`, `search`, `results`); `search.totalResults` reads 0 while `results` holds entries; of 30
+runs that day, 7 failed with `SEARCH_TIMEOUT` after about 57 s and 10 (those 7 included) ran past
+the 30 s default wait, so a web-search case can fail on Actor latency — check the run log before
 blaming the case or the description.
 
 ### Tool-call mode
