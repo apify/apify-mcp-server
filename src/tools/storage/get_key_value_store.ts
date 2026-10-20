@@ -9,10 +9,16 @@ import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { respondUserError } from '../../utils/mcp.js';
 import { keyValueStoreOutputSchema } from '../structured_output_schemas.js';
-import { buildStorageResponse, resolveSiblingNextStep } from './storage_helpers.js';
+import {
+    buildStorageResponse,
+    fetchStorageByIdOrName,
+    resolveSiblingNextStep,
+    storageIdArgDescription,
+    storageNotFoundText,
+} from './storage_helpers.js';
 
 const getKeyValueStoreArgs = z.object({
-    keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name.'),
+    keyValueStoreId: z.string().min(1).describe(storageIdArgDescription('keyValueStore')),
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
@@ -52,9 +58,11 @@ export const getKeyValueStore: ToolEntry = Object.freeze({
         const { args, apifyClient: client, apifyToken, loadedToolNames } = toolArgs;
         const parsed = getKeyValueStoreArgs.parse(args);
         const keyValueStoreId = stripQuoteWrappers(parsed.keyValueStoreId);
-        const kvStore = await client.keyValueStore(keyValueStoreId).get();
+        const kvStore = (
+            await fetchStorageByIdOrName(keyValueStoreId, async (safeId) => client.keyValueStore(safeId).get())
+        )?.result;
         if (!kvStore) {
-            return respondUserError(`Key-value store '${keyValueStoreId}' not found.`);
+            return respondUserError(storageNotFoundText('keyValueStore', keyValueStoreId));
         }
         const linkContext = await getConsoleLinkContext(apifyToken, client);
         const bytes = (kvStore.stats as { storageBytes?: number } | undefined)?.storageBytes;
