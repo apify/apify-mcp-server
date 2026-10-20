@@ -270,7 +270,7 @@ Legend for the **Enabled by default** column:
 | `get-dataset-items` | storage | Retrieve items from a dataset with support for filtering and pagination. | ⚡ |
 | `get-key-value-store-record`| storage | Get the value associated with a specific key in a key-value store. | ⚡ |
 | `abort-actor-run` | runs | Abort a running Actor run, optionally gracefully. | ⚡ |
-| `delete-actor` | none (select by name: `tools=delete-actor`) | Delete an Actor from your account permanently. Public Actors must be unpublished first. |  |
+| `delete-actor` | actors | Delete an Actor from your account permanently. Public Actors must be unpublished first. | ✅ |
 | `search-apify-docs` | docs | Search the Apify documentation for relevant pages. | ✅ |
 | `fetch-apify-docs` | docs | Fetch the full content of an Apify documentation page by its URL. | ✅ |
 | [`apify--rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see [tool configuration](#tools-configuration)) | An Actor tool to browse the web. | ✅ |

@@ -193,6 +193,7 @@ export const registrationCases: Case[] = [
             expect(names).not.toContain('fetch-actor-details');
             expect(names).not.toContain('call-actor');
             expect(names).not.toContain('get-actor-list');
+            expect(names).not.toContain('delete-actor');
             expect(names).not.toContain('search-apify-docs');
             expect(names).not.toContain('fetch-apify-docs');
         }),
