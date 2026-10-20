@@ -19,19 +19,13 @@ import { compileSchema } from '../../utils/ajv.js';
 import { getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { respondOk } from '../../utils/mcp.js';
 import type { PricingTier } from '../../utils/pricing_info.js';
-import { isUnstableStoreSearchEnabled } from '../../utils/store_unstable.js';
+import { IS_UNSTABLE_STORE_SEARCH_ENABLED } from '../../utils/store_unstable.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { actorNameToToolName, canRunActor, canRunAnyActor, getActorCallabilityCaveat } from '../actor_tool_naming.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 
 // hasTool checks registered tool names, not Actor full names — see call_actor.ts's RAG_WEB_BROWSER_TOOL.
 const RAG_WEB_BROWSER_TOOL = actorNameToToolName(RAG_WEB_BROWSER);
-
-/**
- * Store search through `/unstable/store` pages by cursor, so the tool takes `cursor` and returns
- * `nextCursor` only then. Read once, so a process serves one tool contract.
- */
-const IS_UNSTABLE_STORE_SEARCH = isUnstableStoreSearchEnabled();
 
 /**
  * Shared schema for search-actors arguments. Used by both the default and
@@ -71,13 +65,15 @@ export const searchActorsBaseArgsSchema = z.object({
         .max(MAX_LIMIT_WITH_INPUT_SCHEMA)
         .default(5)
         .describe(`The maximum number of Actors to return (max = ${MAX_LIMIT_WITH_INPUT_SCHEMA}, default = 5).`),
-    offset: IS_UNSTABLE_STORE_SEARCH
+    offset: IS_UNSTABLE_STORE_SEARCH_ENABLED
         ? z.number().int().min(0).default(0).describe('Deprecated and ignored: use `cursor` to get the next page.')
         : z.number().int().min(0).default(0).describe('The number of elements to skip from the start (default = 0)'),
-    ...(IS_UNSTABLE_STORE_SEARCH && {
+    // `/unstable/store` pages by cursor, so only then the tool takes `cursor` and returns `nextCursor`.
+    ...(IS_UNSTABLE_STORE_SEARCH_ENABLED && {
         cursor: z
             .string()
             .min(1)
+            .max(512)
             .optional()
             .describe('The `nextCursor` of a previous result with the same keywords, to get its next page.'),
     }),
@@ -145,7 +141,7 @@ export function buildSearchActorsResult(
  * before non-empty ones (see apify/apify-mcp-server#1593).
  */
 export function buildNoActorsFoundInstructions(keywords: string, offset: number, cursor?: string): string {
-    if (cursor) return `No more Actors returned for the search query "${keywords}".`;
+    if (cursor) return `No Actors returned on this page of the search query "${keywords}".`;
     if (offset > 0) return `No Actors returned at offset ${offset} for the search query "${keywords}".`;
     return dedent`
         No Actors were found for the search query "${keywords}".
@@ -201,7 +197,7 @@ export const searchActors: ToolEntry = Object.freeze({
     description: buildDescription(ALL_TOOLS_PRESENT),
     buildDescription,
     inputSchema: z.toJSONSchema(searchActorsBaseArgsSchema) as ToolInputSchema,
-    outputSchema: IS_UNSTABLE_STORE_SEARCH
+    outputSchema: IS_UNSTABLE_STORE_SEARCH_ENABLED
         ? {
               ...actorSearchOutputSchema,
               properties: {
@@ -226,7 +222,7 @@ export const searchActors: ToolEntry = Object.freeze({
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
         // `/unstable/store` ignores the offset, so it must not show up in the result text either.
-        const offset = IS_UNSTABLE_STORE_SEARCH ? 0 : parsed.offset;
+        const offset = IS_UNSTABLE_STORE_SEARCH_ENABLED ? 0 : parsed.offset;
         const [{ actors, nextCursor }, { userPlanTier }] = await Promise.all([
             searchAgentSafeActors({
                 keywords: parsed.keywords,

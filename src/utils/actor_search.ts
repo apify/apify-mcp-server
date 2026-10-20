@@ -11,7 +11,7 @@ import type { ApifyClient } from '../apify_client.js';
 import type { PaymentProvider } from '../payments/types.js';
 import type { ActorStoreList } from '../types.js';
 import {
-    isUnstableStoreSearchEnabled,
+    IS_UNSTABLE_STORE_SEARCH_ENABLED,
     searchActorsViaUnstableEndpoint,
     type UnstableStoreSearchPage,
 } from './store_unstable.js';
@@ -51,7 +51,8 @@ export async function searchActorsByKeywords(options: SearchActorsByKeywordsOpti
 }
 
 /**
- * Preset around `searchActorsByKeywords` for the agent-facing search tool:
+ * Preset around `searchActorsByKeywords` for the agent-facing search tool, or the `/unstable/store`
+ * search when `APIFY_STORE_UNSTABLE_ENDPOINT` is on:
  * always sets `includeInputSchema=true` and forwards `allowsAgenticUsers`
  * when a `paymentProvider` is in play. The public arg schema caps `limit`
  * at apify-core's hard cap (`MAX_LIMIT_WITH_INPUT_SCHEMA`).
@@ -60,7 +61,7 @@ export async function searchAgentSafeActors(options: SearchAgentSafeActorsOption
     const { keywords, apifyClient, limit, offset, cursor, paymentProvider } = options;
     const allowsAgenticUsers = paymentProvider ? true : undefined;
 
-    if (isUnstableStoreSearchEnabled()) {
+    if (IS_UNSTABLE_STORE_SEARCH_ENABLED) {
         return searchActorsViaUnstableEndpoint({ search: keywords, apifyClient, limit, cursor, allowsAgenticUsers });
     }
 

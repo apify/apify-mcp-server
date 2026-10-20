@@ -6,15 +6,17 @@
  */
 import { z } from 'zod';
 
+import log from '@apify/log';
+
 import type { ApifyClient } from '../apify_client.js';
 import { getApifyAPIBaseUrl } from '../apify_client.js';
 import type { ActorStoreList } from '../types.js';
 
-/** `true` or `1` routes `search-actors` through `GET /unstable/store`. Read once per process. */
-export function isUnstableStoreSearchEnabled(): boolean {
-    const flag = process.env.APIFY_STORE_UNSTABLE_ENDPOINT;
-    return flag === 'true' || flag === '1';
-}
+/**
+ * `APIFY_STORE_UNSTABLE_ENDPOINT=true` (or `1`) routes `search-actors` through `GET /unstable/store`.
+ * Read once at import, so the tool schema and the routing always agree.
+ */
+export const IS_UNSTABLE_STORE_SEARCH_ENABLED = ['true', '1'].includes(process.env.APIFY_STORE_UNSTABLE_ENDPOINT ?? '');
 
 /** The item fields the Actor card renders. `id` comes with every item. */
 export const UNSTABLE_STORE_CARD_FIELDS = [
@@ -83,7 +85,7 @@ export type UnstableStoreSearchOptions = {
 
 export type UnstableStoreSearchPage = {
     actors: ActorStoreList[];
-    /** Continues the same search; absent when the page is empty. */
+    /** Continues the same search; absent when the store failed to rank the page. */
     nextCursor?: string;
 };
 
@@ -142,10 +144,21 @@ export async function searchActorsViaUnstableEndpoint(
         method: 'GET',
     });
     if (response.status >= 300) {
-        throw new Error(`GET /unstable/store failed with status ${response.status}: ${JSON.stringify(response.data)}`);
+        const apiMessage = (response.data as { error?: { message?: unknown } } | undefined)?.error?.message;
+        const message = typeof apiMessage === 'string' ? apiMessage : `Request failed with status ${response.status}`;
+        throw Object.assign(new Error(`Store search failed: ${message}`), { statusCode: response.status });
     }
 
-    const page = unstableStorePageSchema.parse(response.data).data;
-    const actors = page.items.map(mapUnstableStoreItem);
-    return { actors, ...(actors.length > 0 && page.recommId ? { nextCursor: page.recommId } : {}) };
+    const parsed = unstableStorePageSchema.safeParse(response.data);
+    if (!parsed.success) {
+        // A contract break on the server side, not bad tool input, so it must not read as a client error.
+        log.error('Store search: GET /unstable/store returned an unexpected response', { issues: parsed.error.issues });
+        throw new Error('Store search failed: the store returned an unexpected response.');
+    }
+    const page = parsed.data.data;
+    return {
+        actors: page.items.map(mapUnstableStoreItem),
+        // An empty page does not end the results: the store drops Actors that are no longer public after ranking.
+        ...(page.recommId ? { nextCursor: page.recommId } : {}),
+    };
 }

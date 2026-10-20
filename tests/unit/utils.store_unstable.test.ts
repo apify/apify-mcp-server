@@ -6,7 +6,6 @@ import {
     formatActorToActorCard,
     formatActorToStructuredCard,
 } from '../../src/utils/actor_card.js';
-import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
 import {
     buildUnstableStoreSearchUrl,
     mapUnstableStoreItem,
@@ -124,9 +123,11 @@ describe('the Actor card renders an /unstable/store item exactly like the /v2/st
             ...bareV2Item
         } = V2_STORE_ITEM as ActorStoreList & Record<string, unknown>;
 
-        expect(formatActorToActorCard(mapUnstableStoreItem(bareItem))).toBe(
-            formatActorToActorCard({ ...bareV2Item, stats: {} } as unknown as ActorStoreList),
-        );
+        const card = formatActorToActorCard(mapUnstableStoreItem(bareItem));
+
+        expect(card).not.toContain('**Stats:**');
+        expect(card).not.toContain('**Rating:**');
+        expect(card).toBe(formatActorToActorCard({ ...bareV2Item, stats: {} } as unknown as ActorStoreList));
     });
 });
 
@@ -177,39 +178,49 @@ describe('paging /unstable/store by cursor', () => {
         expect(next.nextCursor).toBe('recomm-2');
     });
 
-    it('returns no cursor for an empty page', async () => {
+    it('keeps the cursor on an empty page, which does not end the results', async () => {
         const { apifyClient } = mockUnstableStoreClient(page([], 'recomm-1'));
 
         expect(await searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient, limit: 5 })).toEqual({
             actors: [],
+            nextCursor: 'recomm-1',
         });
     });
 
-    it('throws on an error response', async () => {
+    it('throws the API message with the HTTP status on an error response', async () => {
         const { apifyClient } = mockUnstableStoreClient({
             status: 400,
             data: { error: { type: 'invalid-parameter', message: "Parameter 'recommId' is invalid." } },
         });
 
-        await expect(searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient, limit: 5 })).rejects.toThrow(
-            /status 400.*invalid-parameter/,
-        );
+        await expect(
+            searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient, limit: 5 }),
+        ).rejects.toMatchObject({ statusCode: 400, message: "Store search failed: Parameter 'recommId' is invalid." });
     });
 
-    it('rejects a response that does not match the contract', async () => {
+    it('throws a server-side error when the response does not match the contract', async () => {
         const { apifyClient } = mockUnstableStoreClient({ status: 200, data: { data: { items: [{ id: 1 }] } } });
 
-        await expect(searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient, limit: 5 })).rejects.toThrow();
+        const error = await searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient, limit: 5 }).catch(
+            (caught: unknown) => caught,
+        );
+        expect(error).toBeInstanceOf(Error);
+        expect(error).not.toHaveProperty('statusCode');
+        expect(error).not.toHaveProperty('issues');
     });
 });
 
 describe('searchAgentSafeActors data source', () => {
     afterEach(() => {
         vi.unstubAllEnvs();
+        vi.resetModules();
     });
 
     it('uses /unstable/store when APIFY_STORE_UNSTABLE_ENDPOINT is on, ignoring the offset', async () => {
         vi.stubEnv('APIFY_STORE_UNSTABLE_ENDPOINT', 'true');
+        vi.resetModules();
+        // The flag is read once, when the module loads.
+        const { searchAgentSafeActors: searchWithFlag } = await import('../../src/utils/actor_search.js');
         const store = vi.fn();
         const request = vi.fn().mockResolvedValue({
             status: 200,
@@ -217,7 +228,7 @@ describe('searchAgentSafeActors data source', () => {
         });
         const apifyClient = mockApifyClient({ store, httpClient: { axios: { request } } });
 
-        const result = await searchAgentSafeActors({ keywords: 'instagram', apifyClient, limit: 5, offset: 20 });
+        const result = await searchWithFlag({ keywords: 'instagram', apifyClient, limit: 5, offset: 20 });
 
         expect(store).not.toHaveBeenCalled();
         expect(requestedUrl(request).searchParams.has('offset')).toBe(false);
