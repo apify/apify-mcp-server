@@ -1,4 +1,4 @@
-import { RAG_WEB_BROWSER, WEB_FETCH } from '../../const.js';
+import { RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../const.js';
 import type { ActorInputSchema, ToolDescriptionContext } from '../../types.js';
 import { actorNameToToolName } from '../actor_tool_naming.js';
 
@@ -12,12 +12,16 @@ For detailed data from a specific platform (e.g. Amazon products with prices, In
 
 /** Follows RAG_WEB_BROWSER_ADDITIONAL_DESC on its own line when the session serves the apify/web-fetch tool. */
 const RAG_WEB_BROWSER_WEB_FETCH_HINT = `When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated ${WEB_FETCH} tool - this tool is for searching and scraping by query.`;
+/** Follows RAG_WEB_BROWSER_WEB_FETCH_HINT on its own line when the session serves the apify/web-search tool. */
+const RAG_WEB_BROWSER_WEB_SEARCH_HINT = `When the user wants a list of search results (links, titles, snippets) rather than page text, prefer the dedicated ${WEB_SEARCH} tool.`;
 /**
  * Appended to the `apify/web-fetch` Actor tool description. Client-agnostic on purpose:
  * no references to any specific client or its built-in tools, so the same text works
- * for every MCP client.
+ * for every MCP client. `findPagesHint` says where to find pages by query.
  */
-const WEB_FETCH_ADDITIONAL_DESC = `Use this tool to fetch a specific http(s) URL and return its complete content (one URL per call; http and https only).
+const buildWebFetchDescription = (
+    findPagesHint: string,
+) => `Use this tool to fetch a specific http(s) URL and return its complete content (one URL per call; http and https only).
 It renders JavaScript and bypasses anti-bot protection, so it also retrieves pages where a plain HTTP fetch gets blocked, fails with an error such as 403 or 429, or returns incomplete content.
 The page comes back verbatim - full content, no summarization - as Markdown, plain text, HTML, the raw response body, or the list of links on the page.
 
@@ -26,7 +30,7 @@ Examples of when to use:
 - A previous attempt to fetch a page was blocked, returned an error or CAPTCHA, or came back incomplete because the page needs JavaScript rendering
 - Verbatim page content is needed, e.g. for quoting, extraction, or archiving
 
-This tool does not search the web - it needs a URL. To find pages by query, use a web search tool instead.
+This tool does not search the web - it needs a URL. ${findPagesHint}
 If the exact URL cannot be fetched (e.g. a non-http(s) scheme), say so rather than silently substituting a different URL.`;
 
 /**
@@ -37,6 +41,20 @@ If the exact URL cannot be fetched (e.g. a non-http(s) scheme), say so rather th
  */
 const WEB_FETCH_URL_SCHEME_NOTE =
     'http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.';
+
+/** Appended to the `apify/web-search` Actor tool description. */
+const WEB_SEARCH_ADDITIONAL_DESC = `Use this tool to search the web by query and get one page of organic results: title, URL, snippet and position (up to about 10 results; links and snippets only, no page content).
+countryCode and languageCode set the locale, dateFrom and dateTo bound the publication date, allowedDomains and blockedDomains restrict or exclude sites.
+
+Examples of when to use:
+- The user wants links to choose from or to know which pages exist for a topic (e.g., "find the official docs for X", "recent articles about Y, with links")
+- A question that a result title or snippet answers
+
+This tool does not fetch page content.`;
+
+/** Follow WEB_SEARCH_ADDITIONAL_DESC, each on its own line, when the session serves the named tool. */
+const WEB_SEARCH_WEB_FETCH_HINT = `When the user needs the content of a page found here, the dedicated ${WEB_FETCH} tool returns one URL's full content.`;
+const WEB_SEARCH_RAG_WEB_BROWSER_HINT = `When the user wants the text of the top results in one step rather than a list of links, prefer the dedicated ${RAG_WEB_BROWSER} tool.`;
 
 type DirectActorPolicyConfig = {
     /** Sent with the run input when the caller omits the field; the served schema shows it as the default. */
@@ -71,12 +89,26 @@ const ACTOR_TOOL_POLICIES: Readonly<Record<string, ActorToolPolicyConfig>> = {
         buildDescription: ({ hasTool }) => {
             let description = RAG_WEB_BROWSER_ADDITIONAL_DESC;
             if (hasTool(actorNameToToolName(WEB_FETCH))) description += `\n${RAG_WEB_BROWSER_WEB_FETCH_HINT}`;
+            if (hasTool(actorNameToToolName(WEB_SEARCH))) description += `\n${RAG_WEB_BROWSER_WEB_SEARCH_HINT}`;
             return description;
         },
     },
     [WEB_FETCH]: {
         inputDescriptionSuffixes: { url: WEB_FETCH_URL_SCHEME_NOTE },
-        buildDescription: () => WEB_FETCH_ADDITIONAL_DESC,
+        buildDescription: ({ hasTool }) =>
+            buildWebFetchDescription(
+                hasTool(actorNameToToolName(WEB_SEARCH))
+                    ? `To find pages by query, the dedicated ${WEB_SEARCH} tool returns links and snippets.`
+                    : 'To find pages by query, use a web search tool instead.',
+            ),
+    },
+    [WEB_SEARCH]: {
+        buildDescription: ({ hasTool }) => {
+            let description = WEB_SEARCH_ADDITIONAL_DESC;
+            if (hasTool(actorNameToToolName(WEB_FETCH))) description += `\n${WEB_SEARCH_WEB_FETCH_HINT}`;
+            if (hasTool(actorNameToToolName(RAG_WEB_BROWSER))) description += `\n${WEB_SEARCH_RAG_WEB_BROWSER_HINT}`;
+            return description;
+        },
     },
 };
 

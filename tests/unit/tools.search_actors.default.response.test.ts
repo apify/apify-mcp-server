@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { APIFY_STORE_URL, HELPER_TOOLS, MAX_INPUT_FIELDS_IN_ACTOR_CARD, RAG_WEB_BROWSER } from '../../src/const.js';
+import {
+    APIFY_STORE_URL,
+    HELPER_TOOLS,
+    MAX_INPUT_FIELDS_IN_ACTOR_CARD,
+    RAG_WEB_BROWSER,
+    WEB_SEARCH,
+} from '../../src/const.js';
 import { actorNameToToolName, getActorCallabilityCaveat } from '../../src/tools/actor_tool_naming.js';
 import { ACTOR_DETAILS_HINT, searchActors, searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors.js';
 import { actorInfoSchema } from '../../src/tools/structured_output_schemas.js';
@@ -457,6 +463,24 @@ describe('buildDescription()', () => {
         const withoutRag = renderDescription(HELPER_TOOLS.STORE_SEARCH);
         expect(withoutRag).toContain('This tool discovers Actors; it does not retrieve their output.');
         expect(withoutRag).not.toContain('rag-web-browser');
+    });
+
+    it('names whichever of apify/web-search and apify/rag-web-browser is served, Web Search first', () => {
+        const ragTool = actorNameToToolName(RAG_WEB_BROWSER);
+        const webSearchTool = actorNameToToolName(WEB_SEARCH);
+        const ragOnly = renderDescription(HELPER_TOOLS.STORE_SEARCH, ragTool);
+        expect(ragOnly).not.toContain(WEB_SEARCH);
+        expect(renderDescription(HELPER_TOOLS.STORE_SEARCH, ragTool, webSearchTool)).toBe(
+            ragOnly.replace(
+                '— use apify/rag-web-browser instead.',
+                '— use apify/web-search or apify/rag-web-browser instead.',
+            ),
+        );
+        const webSearchOnly = renderDescription(HELPER_TOOLS.STORE_SEARCH, webSearchTool);
+        expect(webSearchOnly).toContain(
+            'Do NOT use this tool for generic web content (news, articles, general questions) — use apify/web-search instead.',
+        );
+        expect(webSearchOnly).not.toContain('rag-web-browser');
     });
 
     // Regression: #1532 — "prefer searching the Store first" sent named-Actor questions to search (evals: typo-actor-name 7/10 → 2/10).

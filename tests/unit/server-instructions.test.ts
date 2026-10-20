@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
+import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
 import { parseInputParamsFromUrl } from '../../src/mcp/utils.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../src/types.js';
@@ -363,6 +363,22 @@ describe('getServerInstructions()', () => {
                 only(actorNameToToolName(WEB_FETCH), actorNameToToolName(RAG_WEB_BROWSER)),
             );
             expect(instructions).toContain(`${HEADING}\n\n- **${WEB_FETCH} vs ${RAG_WEB_BROWSER}:**`);
+        });
+
+        it('compares apify/web-search with apify/rag-web-browser only when both are served', () => {
+            const ragTool = actorNameToToolName(RAG_WEB_BROWSER);
+            const webFetchTool = actorNameToToolName(WEB_FETCH);
+            const webSearchTool = actorNameToToolName(WEB_SEARCH);
+            const bullet =
+                '- **apify/web-search vs apify/rag-web-browser:**\n' +
+                '  apify/web-search returns one page of search results (links and snippets, no page content); apify/rag-web-browser searches and returns the text of the top results in one call.\n';
+            const withoutWebSearch = getServerInstructions(SERVER_MODE.DEFAULT, only(webFetchTool, ragTool));
+            const allThree = getServerInstructions(SERVER_MODE.DEFAULT, only(webFetchTool, ragTool, webSearchTool));
+
+            expect(allThree).toContain(`returns content from the top results.\n${bullet}`);
+            expect(allThree.replace(bullet, '')).toBe(withoutWebSearch);
+            expect(getServerInstructions(SERVER_MODE.DEFAULT, only(webSearchTool))).not.toContain(RAG_WEB_BROWSER);
+            expect(getServerInstructions(SERVER_MODE.DEFAULT, only(ragTool))).not.toContain(WEB_SEARCH);
         });
     });
 

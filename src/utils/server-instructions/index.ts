@@ -9,7 +9,7 @@
  */
 
 import { getApifyAPIPublicBaseUrl } from '../../apify_client.js';
-import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../const.js';
+import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../const.js';
 import { actorNameToToolName, canRunAnyActor, getOwnServerRemedy } from '../../tools/actor_tool_naming.js';
 import type { ToolDescriptionContext } from '../../types.js';
 import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../types.js';
@@ -17,6 +17,7 @@ import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../types.js';
 // hasTool checks registered tool names, not Actor full names — see call_actor.ts's RAG_WEB_BROWSER_TOOL.
 const RAG_WEB_BROWSER_TOOL = actorNameToToolName(RAG_WEB_BROWSER);
 const WEB_FETCH_TOOL = actorNameToToolName(WEB_FETCH);
+const WEB_SEARCH_TOOL = actorNameToToolName(WEB_SEARCH);
 
 const asCodeList = (names: string[]): string => names.map((n) => `\`${n}\``).join(' or ');
 
@@ -164,6 +165,13 @@ export function getServerInstructions(
 `
             : '';
 
+    const webSearchVsRagWebBrowser =
+        hasTool(WEB_SEARCH_TOOL) && hasTool(RAG_WEB_BROWSER_TOOL)
+            ? `- **${WEB_SEARCH} vs ${RAG_WEB_BROWSER}:**
+  ${WEB_SEARCH} returns one page of search results (links and snippets, no page content); ${RAG_WEB_BROWSER} searches and returns the text of the top results in one call.
+`
+            : '';
+
     const dedicatedToolsVsCallActor = hasCall
         ? `- **Dedicated Actor tools${hasTool(RAG_WEB_BROWSER_TOOL) ? ` (e.g. ${RAG_WEB_BROWSER})` : ''} vs \`${HELPER_TOOLS.ACTOR_CALL}\`:**
   Prefer dedicated tools when available; use \`${HELPER_TOOLS.ACTOR_CALL}\` only when no specialized tool exists in the Apify store.
@@ -177,6 +185,7 @@ export function getServerInstructions(
         widgetToolDisambiguation,
         searchVsRagWebBrowser,
         webFetchVsRagWebBrowser,
+        webSearchVsRagWebBrowser,
         dedicatedToolsVsCallActor,
     ].filter((block) => block !== '');
 

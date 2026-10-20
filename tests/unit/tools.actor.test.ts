@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
-import { HELPER_TOOLS } from '../../src/const.js';
+import { HELPER_TOOLS, WEB_SEARCH } from '../../src/const.js';
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../../src/mcp/const.js';
 import {
     actorNameToToolName,
@@ -86,10 +86,15 @@ function makeActorInfo(opts: {
     isStandbyEnabled?: boolean;
     webServerMcpPath?: string | null;
     input?: unknown;
+    actorFullName?: string;
 }): ActorInfo {
     return {
         webServerMcpPath: opts.webServerMcpPath ?? null,
-        definition: { id: 'actor-id', actorFullName: 'acme/actor', input: opts.input as ActorInputSchema | undefined },
+        definition: {
+            id: 'actor-id',
+            actorFullName: opts.actorFullName ?? 'acme/actor',
+            input: opts.input as ActorInputSchema | undefined,
+        },
         actor: opts.isStandbyEnabled ? { actorStandby: { isEnabled: true } } : {},
     } as unknown as ActorInfo;
 }
@@ -104,6 +109,11 @@ describe('resolveActorToolMode()', () => {
         ['standby disabled, leftover MCP path', { webServerMcpPath: '/mcp' }, ACTOR_TOOL_MODE.RUN],
         ['standby disabled, empty input schema', { input: undefined }, ACTOR_TOOL_MODE.RUN],
         ['standby enabled, MCP path', { isStandbyEnabled: true, webServerMcpPath: '/mcp' }, ACTOR_TOOL_MODE.MCP],
+        [
+            'standby enabled, MCP path, input-interface Actor',
+            { isStandbyEnabled: true, webServerMcpPath: '/mcp', actorFullName: WEB_SEARCH },
+            ACTOR_TOOL_MODE.RUN,
+        ],
         ['standby enabled, no MCP path, non-empty input', { isStandbyEnabled: true }, ACTOR_TOOL_MODE.RUN],
         [
             'missing input counts as empty',
