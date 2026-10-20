@@ -8,7 +8,12 @@ import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { respondUserError } from '../../utils/mcp.js';
-import { datasetSizeNextStepHint, normalizeDatasetFields } from '../actors/actor_run_response.js';
+import {
+    buildDatasetShape,
+    datasetSizeNextStepHint,
+    fieldsProjectionHint,
+    normalizeDatasetFields,
+} from '../actors/actor_run_response.js';
 import { datasetMetadataOutputSchema } from '../structured_output_schemas.js';
 import { DEFAULT_DATASET_ITEMS_LIMIT } from './get_dataset_items.js';
 import { buildStorageResponse, resolveSiblingNextStep } from './storage_helpers.js';
@@ -91,10 +96,11 @@ export const getDataset: ToolEntry = Object.freeze({
         // response today (only the dataset-list endpoint returns it), so read it defensively.
         const inflatedBytes = (dataset.stats as { inflatedBytes?: number } | undefined)?.inflatedBytes;
         const summary = `Dataset '${normalized.name ?? datasetId}' has ${normalized.itemCount ?? 0} items${fieldCount !== undefined ? `, ${fieldCount} fields` : ''}.`;
+        // The shape reads the raw `metadata.fields`: the array indices `normalized.fields` strips are what mark arrays.
         const nextStep = resolveSiblingNextStep(
             HELPER_TOOLS.DATASET_GET_ITEMS,
             loadedToolNames,
-            `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}`,
+            `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}${fieldsProjectionHint(metadata.fields?.length ? buildDatasetShape(metadata.fields) : undefined)}`,
         );
         return buildStorageResponse({
             structuredContent: normalized,

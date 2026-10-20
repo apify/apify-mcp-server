@@ -52,6 +52,7 @@ describe('get-dataset', () => {
         expect(structuredContent.summary).toBe("Dataset 'my-dataset' has 42 items, 2 fields.");
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
         expect(structuredContent.nextStep).toContain('datasetId=ds-1');
+        expect(structuredContent.nextStep).toContain('Item shape ([] marks an array): { title, url }');
         // content[0] is the data-only JSON dump (no narrative); content[1] is the narrative.
         const { summary, nextStep, ...data } = structuredContent;
         expect(JSON.parse(content[0].text)).toEqual(data);
@@ -201,6 +202,21 @@ describe('get-dataset fields normalization', () => {
             'latestComments.owner.username',
             'images',
         ]);
+    });
+
+    it('marks arrays in the nextStep item shape, which the collapsed fields list cannot', async () => {
+        const result = await (getDataset as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'ds-1' },
+                stubApifyClient({
+                    id: 'ds-1',
+                    itemCount: 1,
+                    fields: ['latestComments/0/id', 'latestComments/1/owner/username', 'images/0', 'images/1'],
+                }),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: { nextStep: string } };
+        expect(structuredContent.nextStep).toContain('{ latestComments: { id, owner: { username } }[], images[] }');
     });
 
     it('preserves non-`fields` keys from the raw API response unchanged', async () => {
