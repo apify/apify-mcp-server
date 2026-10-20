@@ -118,7 +118,7 @@ describe('toolNamesToInput', () => {
         });
     });
 
-    it('classifies delete-actor (in no category) as an internal tool, not an actor ID', () => {
+    it('classifies delete-actor as an internal tool, not an actor ID', () => {
         expect(toolNamesToInput([HELPER_TOOLS.ACTOR_DELETE])).toEqual({
             tools: [HELPER_TOOLS.ACTOR_DELETE],
         });
@@ -265,7 +265,7 @@ describe('get-actor-list selection (in no category)', () => {
 });
 
 // It deletes Actors permanently, so a session gets it only by naming it.
-describe('delete-actor selection (in no category)', () => {
+describe('delete-actor selection (in the actors category)', () => {
     it('does not treat tools=delete-actor as an Actor name', () => {
         expect(resolveActorsToLoad({ tools: [HELPER_TOOLS.ACTOR_DELETE] })).toEqual([]);
     });
@@ -276,23 +276,12 @@ describe('delete-actor selection (in no category)', () => {
     });
 
     it.each(['default', 'apps'] as const)(
-        'excludes delete-actor from the default set and the actors category in %s mode',
+        'serves delete-actor in the default set and the actors category in %s mode',
         (mode) => {
-            expect(getToolsForServerMode({}, [], mode).map((t) => t.name)).not.toContain(HELPER_TOOLS.ACTOR_DELETE);
-            expect(getToolsForServerMode({ tools: ['actors'] }, [], mode).map((t) => t.name)).not.toContain(
+            expect(getToolsForServerMode({}, [], mode).map((t) => t.name)).toContain(HELPER_TOOLS.ACTOR_DELETE);
+            expect(getToolsForServerMode({ tools: ['actors'] }, [], mode).map((t) => t.name)).toContain(
                 HELPER_TOOLS.ACTOR_DELETE,
             );
-        },
-    );
-
-    it.each(['default', 'apps'] as const)(
-        'serves the actors tools and delete-actor for tools=actors,delete-actor in %s mode',
-        (mode) => {
-            const toolNames = getToolsForServerMode({ tools: ['actors', HELPER_TOOLS.ACTOR_DELETE] }, [], mode).map(
-                (t) => t.name,
-            );
-            const actorsToolNames = getToolsForServerMode({ tools: ['actors'] }, [], mode).map((t) => t.name);
-            expect(toolNames).toEqual(expect.arrayContaining([...actorsToolNames, HELPER_TOOLS.ACTOR_DELETE]));
         },
     );
 });
