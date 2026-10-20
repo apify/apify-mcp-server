@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.19.1 - **not yet released**
+## [0.19.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.1) (2026-10-20)
 
 ### 🚀 Features
 
@@ -11,7 +10,6 @@ All notable changes to this project will be documented in this file.
 - Move apify-api-write into the api category ([#1657](https://github.com/apify/apify-mcp-server/pull/1657)) ([5e83c47](https://github.com/apify/apify-mcp-server/commit/5e83c47fc63554eb2126c15638231ff05a02ef3b)) by [@DaveHanns](https://github.com/DaveHanns)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.19.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.0) (2026-10-19)
 
 ### 🚀 Features
