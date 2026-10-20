@@ -450,13 +450,11 @@ describe('buildDescription()', () => {
         expect(searchActors.description).not.toContain(getActorCallabilityCaveat());
     });
 
-    // Regression: #1532 — the description named apify/rag-web-browser when the session did not serve it.
-    it('names apify/rag-web-browser only when its tool is served', () => {
-        const ragClause = '— use apify/rag-web-browser instead.';
-        expect(renderDescription(HELPER_TOOLS.STORE_SEARCH, actorNameToToolName(RAG_WEB_BROWSER))).toContain(ragClause);
-        const withoutRag = renderDescription(HELPER_TOOLS.STORE_SEARCH);
-        expect(withoutRag).toContain('This tool discovers Actors; it does not retrieve their output.');
-        expect(withoutRag).not.toContain('rag-web-browser');
+    // The search-actors vs apify/rag-web-browser bullet of the server instructions owns that routing.
+    it('names no web content Actor when apify/rag-web-browser is served', () => {
+        const withRag = renderDescription(HELPER_TOOLS.STORE_SEARCH, actorNameToToolName(RAG_WEB_BROWSER));
+        expect(withRag).not.toContain(RAG_WEB_BROWSER);
+        expect(withRag).toBe(renderDescription(HELPER_TOOLS.STORE_SEARCH));
     });
 
     // Regression: #1532 — "prefer searching the Store first" sent named-Actor questions to search (evals: typo-actor-name 7/10 → 2/10).
