@@ -213,11 +213,7 @@ function renderShapeNode(node: ShapeNode): string {
     return `{ ${keys.join(', ')} }${'[]'.repeat(node.arrayDepth)}`;
 }
 
-/**
- * Item shape from an Apify-returned `dataset.fields` array, with arrays marked `[]`:
- * `results/0/url`, `results/1/title`, `tags/0` give `{ results: { url, title }[], tags[] }`.
- * The index segments that `normalizeDatasetFields` strips are what mark the arrays.
- */
+/** Renders slash-separated dataset fields as an item shape, preserving array depth. */
 export function buildDatasetShape(fields: string[]): string {
     const root: ShapeNode = { arrayDepth: 0, children: new Map() };
     for (const field of fields) {
@@ -684,7 +680,6 @@ export function buildStatusSummaryNextStep(params: {
     dataset?: RunDataset;
     keyValueStore?: RunKeyValueStore;
     datasetMetadataFetched?: boolean;
-    /** {@link buildDatasetShape} of the default dataset; names its fields in the nextStep. */
     datasetShape?: string;
 }): { summary: string; nextStep: string } {
     const { run, dataset, keyValueStore, datasetMetadataFetched = true, datasetShape } = params;
@@ -993,8 +988,6 @@ export async function fetchActorRunData(params: {
     const datasetIds = buildStorageAliasIds(run.storageIds?.datasets, run.defaultDatasetId ?? undefined);
     const kvIds = buildStorageAliasIds(run.storageIds?.keyValueStores, run.defaultKeyValueStoreId ?? undefined);
 
-    // The structured `fields` list strips array indices; the shape keeps them as `[]` for the nextStep,
-    // which names the default dataset only.
     let defaultDatasetShape: string | undefined;
     const [datasets, keyValueStores] = await Promise.all([
         buildStorageEntriesFromIds(datasetIds, async (id) => {

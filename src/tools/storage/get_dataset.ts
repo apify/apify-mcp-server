@@ -96,7 +96,7 @@ export const getDataset: ToolEntry = Object.freeze({
         // response today (only the dataset-list endpoint returns it), so read it defensively.
         const inflatedBytes = (dataset.stats as { inflatedBytes?: number } | undefined)?.inflatedBytes;
         const summary = `Dataset '${normalized.name ?? datasetId}' has ${normalized.itemCount ?? 0} items${fieldCount !== undefined ? `, ${fieldCount} fields` : ''}.`;
-        // The shape reads the raw `metadata.fields`: the array indices `normalized.fields` strips are what mark arrays.
+        // Use raw fields to preserve array indices.
         const nextStep = resolveSiblingNextStep(
             HELPER_TOOLS.DATASET_GET_ITEMS,
             loadedToolNames,
