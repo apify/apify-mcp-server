@@ -83,7 +83,6 @@ export const toolCategories = {
     schedules: [createSchedule, getSchedule, updateSchedule, deleteSchedule],
     builds: [getActorBuild, getActorBuildLog, getActorBuildList, buildActor],
     versions: [getActorVersion, createActor, updateActorVersion, createActorVersion, deleteActorVersion],
-    // `api` is not a default category, so a session gets `apify-api-write` only with `tools=api` or by name.
     api: [apifyApiSearch, apifyApiDetails, apifyApiRead, apifyApiWrite],
     dev: [reportProblem],
 } satisfies Record<string, ToolEntry[]>;
