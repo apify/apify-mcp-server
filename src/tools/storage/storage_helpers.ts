@@ -127,11 +127,14 @@ export function buildDatasetItemsSummaryNextStep(params: {
     offset: number;
     /** Active loaded tool set; gates the terminal get-dataset reference (see #1007). */
     loadedToolNames: readonly string[];
+    /** Requested `fields` that matched no item on this page; named so a missed projection is not read as empty data. */
+    unmatchedFields?: string[];
 }): { summary: string; nextStep: string } {
-    const { datasetId, itemCount, totalItemCount, offset, loadedToolNames } = params;
+    const { datasetId, itemCount, totalItemCount, offset, loadedToolNames, unmatchedFields = [] } = params;
+    const unmatchedNote = unmatchedFields.length > 0 ? ` No item on this page has ${unmatchedFields.join(', ')}.` : '';
     if (offset + itemCount < totalItemCount) {
         return {
-            summary: `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}).`,
+            summary: `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}).${unmatchedNote}`,
             nextStep: `Call ${HELPER_TOOLS.DATASET_GET_ITEMS} again with offset=${offset + itemCount} to fetch the next page.`,
         };
     }
@@ -140,7 +143,7 @@ export function buildDatasetItemsSummaryNextStep(params: {
             ? `Fetched all ${itemCount} items.`
             : `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}); no more pages.`;
     return {
-        summary,
+        summary: `${summary}${unmatchedNote}`,
         nextStep: suggestTool(HELPER_TOOLS.DATASET_GET, loadedToolNames)
             ? `Use ${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} to see the field list if you need the data structure.`
             : `No more pages. Inspect the returned items directly.`,

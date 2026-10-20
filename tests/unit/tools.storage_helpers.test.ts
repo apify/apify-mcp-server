@@ -13,6 +13,27 @@ import {
 // unit test in `tests/unit/utils.mcp.test.ts`.
 
 describe('buildDatasetItemsSummaryNextStep()', () => {
+    it('names unmatched fields in the summary on a middle and on the last page', () => {
+        const middle = buildDatasetItemsSummaryNextStep({
+            datasetId: 'ds-1',
+            itemCount: 20,
+            totalItemCount: 100,
+            offset: 0,
+            loadedToolNames: [],
+            unmatchedFields: ['results.link'],
+        });
+        const last = buildDatasetItemsSummaryNextStep({
+            datasetId: 'ds-1',
+            itemCount: 5,
+            totalItemCount: 5,
+            offset: 0,
+            loadedToolNames: [],
+            unmatchedFields: ['results.link'],
+        });
+        expect(middle.summary).toContain('No item on this page has results.link.');
+        expect(last.summary).toContain('No item on this page has results.link.');
+    });
+
     it('suggests get-dataset on the terminal page when loaded', () => {
         const t = buildDatasetItemsSummaryNextStep({
             datasetId: 'ds-1',
