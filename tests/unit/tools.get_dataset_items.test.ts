@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
-import { getApiFields, getDatasetItems, projectFields } from '../../src/tools/storage/get_dataset_items.js';
+import { getApiFields, getDatasetItems, omitFields, projectFields } from '../../src/tools/storage/get_dataset_items.js';
 import { datasetItemsOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
@@ -118,6 +118,41 @@ describe('projectFields keeps the item nesting', () => {
     it('returns a literal dotted key the item holds instead of the nested path', () => {
         const item = { 'metadata.url': 'https://apify.com/', metadata: { url: 'https://docs.apify.com/' } };
         expect(projectFields(item, ['metadata.url'])).toEqual({ 'metadata.url': 'https://apify.com/' });
+    });
+});
+
+describe('omitFields removes paths with the projection rules', () => {
+    it('removes a nested object path', () => {
+        expect(omitFields(WEB_SEARCH_ITEM, ['search.page'])).toEqual({
+            ...WEB_SEARCH_ITEM,
+            search: { provider: 'google' },
+        });
+    });
+
+    it('removes a path from every element of an array of objects', () => {
+        expect(omitFields(WEB_SEARCH_ITEM, ['results.snippet', 'results.position']).results).toEqual([
+            { url: 'https://mcp.apify.com/', title: 'Apify MCP' },
+            { url: 'https://docs.apify.com/', title: 'Docs' },
+        ]);
+    });
+
+    it('removes one array element by a numeric segment', () => {
+        expect(omitFields(WEB_SEARCH_ITEM, ['results.0']).results).toEqual([WEB_SEARCH_ITEM.results[1]]);
+    });
+
+    it('removes both a literal dotted key and the nested path', () => {
+        const item = { 'metadata.url': 'https://apify.com/', metadata: { url: 'https://docs.apify.com/', title: 'T' } };
+        expect(omitFields(item, ['metadata.url'])).toEqual({ metadata: { title: 'T' } });
+    });
+
+    it('applies an index path and an every-element path on the same array', () => {
+        expect(omitFields(WEB_SEARCH_ITEM, ['results.0.title', 'results.snippet', 'results.position']).results).toEqual(
+            [{ url: 'https://mcp.apify.com/' }, { url: 'https://docs.apify.com/', title: 'Docs' }],
+        );
+    });
+
+    it('keeps the item when the path is absent', () => {
+        expect(omitFields(WEB_SEARCH_ITEM, ['results.link', 'query.length'])).toEqual(WEB_SEARCH_ITEM);
     });
 });
 
@@ -245,6 +280,28 @@ describe('get-dataset-items', () => {
         ]);
     });
 
+    it('sends the API top-level omit fields and removes dotted ones from the items', async () => {
+        const listItemsSpy = vi.fn().mockResolvedValue({ items: [WEB_SEARCH_ITEM], total: 1 });
+
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'ds-1', fields: 'results', omit: 'query,results.snippet,results.position' },
+                stubApifyClient(listItemsSpy),
+            ),
+        );
+
+        expect(listItemsSpy.mock.calls[0][0]).toEqual(expect.objectContaining({ omit: ['query'] }));
+        const { structuredContent } = result as { structuredContent: { items: unknown[] } };
+        expect(structuredContent.items).toEqual([
+            {
+                results: [
+                    { url: 'https://mcp.apify.com/', title: 'Apify MCP' },
+                    { url: 'https://docs.apify.com/', title: 'Docs' },
+                ],
+            },
+        ]);
+    });
+
     it('names in the summary, once, only the fields that matched no item on the page', async () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext(
@@ -274,10 +331,10 @@ describe('get-dataset-items', () => {
         const listItemsSpy = vi.fn().mockResolvedValue({ items: [WEB_SEARCH_ITEM], total: 1 });
 
         const result = await (getDatasetItems as HelperTool).call(
-            stubToolCallContext({ datasetId: 'ds-1', fields: '.,query' }, stubApifyClient(listItemsSpy)),
+            stubToolCallContext({ datasetId: 'ds-1', fields: '.,query', omit: '..' }, stubApifyClient(listItemsSpy)),
         );
 
-        expect(listItemsSpy.mock.calls[0][0]).toEqual(expect.objectContaining({ fields: ['query'] }));
+        expect(listItemsSpy.mock.calls[0][0]).toEqual(expect.objectContaining({ fields: ['query'], omit: [] }));
         const { structuredContent } = result as { structuredContent: { items: unknown[]; summary: string } };
         expect(structuredContent.items).toEqual([{ query: 'apify mcp' }]);
         expect(structuredContent.summary).not.toContain('No item on this page has');

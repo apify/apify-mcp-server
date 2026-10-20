@@ -419,8 +419,8 @@ export const storageCases: Case[] = [
         }),
     },
     {
-        // #1656: arrays of objects map element-wise; a literal dotted key returns as that key.
-        name: 'projects array and literal dotted fields via get-dataset-items',
+        // #1656: arrays of objects map element-wise in fields and omit; a literal dotted key returns as that key.
+        name: 'projects and omits array and literal dotted fields via get-dataset-items',
         isDeploymentTest: false,
         run: withClient({ tools: ['storage'] }, async (client, ctx) => {
             const api = ctx.createApifyClient();
@@ -450,6 +450,16 @@ export const storageCases: Case[] = [
                         ],
                     },
                     { 'metadata.url': 'https://apify.com/' },
+                ]);
+
+                const omitResult = await client.callTool({
+                    name: 'get-dataset-items',
+                    arguments: { datasetId: dataset.id, fields: 'results', omit: 'results.snippet,results.title' },
+                });
+                expect(omitResult.isError).not.toBe(true);
+                expect((omitResult as { structuredContent?: { items?: unknown[] } }).structuredContent?.items).toEqual([
+                    { results: [{ url: 'https://mcp.apify.com/' }, { url: 'https://docs.apify.com/' }] },
+                    {},
                 ]);
             } finally {
                 await api.dataset(dataset.id).delete();
