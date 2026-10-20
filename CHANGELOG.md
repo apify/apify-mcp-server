@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Let the Actor store provide proxied Actor picture URLs ([#1467](https://github.com/apify/apify-mcp-server/pull/1467)) ([647b9b0](https://github.com/apify/apify-mcp-server/commit/647b9b09ba4d726ab8894462426e464322afa63e)) by [@MQ37](https://github.com/MQ37), closes [#804](https://github.com/apify/apify-mcp-server/issues/804)
+- Move apify-api-write into the api category ([#1657](https://github.com/apify/apify-mcp-server/pull/1657)) ([5e83c47](https://github.com/apify/apify-mcp-server/commit/5e83c47fc63554eb2126c15638231ff05a02ef3b)) by [@DaveHanns](https://github.com/DaveHanns)
 
 
 <!-- git-cliff-unreleased-end -->
