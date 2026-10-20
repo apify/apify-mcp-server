@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
 import * as mcpClient from '../../src/mcp/client.js';
@@ -402,6 +402,8 @@ function mockWebSearchClient() {
 }
 
 describe('getActorsAsTools()', () => {
+    afterEach(() => vi.restoreAllMocks());
+
     it('serves the input-interface Actor apify/web-search as a run tool despite its MCP path', async () => {
         const connectSpy = vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(null);
         const { tools, errors } = await getActorsAsTools([WEB_SEARCH], mockWebSearchClient());
@@ -425,6 +427,5 @@ describe('getActorsAsTools()', () => {
         );
         expect(tools[0].annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
         expect(connectSpy).not.toHaveBeenCalled();
-        connectSpy.mockRestore();
     });
 });

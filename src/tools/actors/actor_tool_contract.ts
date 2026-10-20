@@ -12,12 +12,12 @@ For detailed data from a specific platform (e.g. Amazon products with prices, In
 
 /** Follows RAG_WEB_BROWSER_ADDITIONAL_DESC on its own line when the session serves the apify/web-fetch tool. */
 const RAG_WEB_BROWSER_WEB_FETCH_HINT = `When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated ${WEB_FETCH} tool - this tool is for searching and scraping by query.`;
-/** Follows RAG_WEB_BROWSER_WEB_FETCH_HINT on its own line when the session serves the apify/web-search tool. */
+/** Follows RAG_WEB_BROWSER_ADDITIONAL_DESC and any Web Fetch hint on its own line when the session serves the apify/web-search tool. */
 const RAG_WEB_BROWSER_WEB_SEARCH_HINT = `When the user wants a list of search results (links, titles, snippets) rather than page text, prefer the dedicated ${WEB_SEARCH} tool.`;
 /**
  * Appended to the `apify/web-fetch` Actor tool description. Client-agnostic on purpose:
  * no references to any specific client or its built-in tools, so the same text works
- * for every MCP client. `findPagesHint` says where to find pages by query.
+ * for every MCP client.
  */
 const buildWebFetchDescription = (
     findPagesHint: string,
