@@ -127,7 +127,6 @@ export function buildDatasetItemsSummaryNextStep(params: {
     offset: number;
     /** Active loaded tool set; gates the terminal get-dataset reference (see #1007). */
     loadedToolNames: readonly string[];
-    /** Requested `fields` that matched no item on this page; named so a missed projection is not read as empty data. */
     unmatchedFields?: string[];
 }): { summary: string; nextStep: string } {
     const { datasetId, itemCount, totalItemCount, offset, loadedToolNames, unmatchedFields = [] } = params;
