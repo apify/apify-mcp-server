@@ -94,11 +94,40 @@ function applyFieldTree(value: unknown, tree: FieldTree): unknown {
     return Object.keys(result).length > 0 ? result : undefined;
 }
 
+function removeFieldTree(value: unknown, tree: FieldTree): unknown {
+    if (Array.isArray(value)) {
+        const { everyElement, byIndex } = splitArrayTree(tree);
+        return value.flatMap((element, i) => {
+            const elementTree = getElementTree(everyElement, byIndex, i);
+            if (elementTree === true) return [];
+            return [elementTree.size > 0 ? removeFieldTree(element, elementTree) : element];
+        });
+    }
+    if (!isRecord(value)) return value;
+    const result: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value)) {
+        const subtree = tree.get(key);
+        if (subtree === true) continue;
+        result[key] = subtree ? removeFieldTree(child, subtree) : child;
+    }
+    return result;
+}
+
 /** Projects dot paths without flattening objects or arrays; literal dotted keys take precedence. */
 export function projectFields(item: Record<string, unknown>, fields: string[]): Record<string, unknown> {
     const tree = buildFieldTree(fields, (field) => field.includes('.') && Object.hasOwn(item, field));
     const projected = applyFieldTree(item, tree);
     return isRecord(projected) ? projected : {};
+}
+
+/** Removes dot paths, including both literal keys and nested matches. */
+export function omitFields(item: Record<string, unknown>, omit: string[]): Record<string, unknown> {
+    const tree = buildFieldTree(omit);
+    for (const field of omit) {
+        if (Object.hasOwn(item, field)) tree.set(field, true);
+    }
+    const result = removeFieldTree(item, tree);
+    return isRecord(result) ? result : item;
 }
 
 /** The API picks top-level keys; full paths also preserve literal dotted keys. */
@@ -141,7 +170,10 @@ const getDatasetItemsArgs = z.object({
                 'a number picks one array element (e.g. "results.0.url"). ' +
                 "The output keeps the item's nesting, and arrays keep their positions: an element without the field is {} or null.",
         ),
-    omit: z.string().optional().describe('Comma-separated list of fields to exclude from results.'),
+    omit: z
+        .string()
+        .optional()
+        .describe('Comma-separated list of fields to exclude from results. Dot notation works as in fields.'),
     desc: z.boolean().optional().describe('If true, results are returned in reverse order (newest to oldest).'),
 });
 
@@ -180,7 +212,9 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         const parsed = getDatasetItemsArgs.parse(args);
 
         const fields = [...new Set(parseCommaSeparatedList(parsed.fields).filter((field) => /[^.]/.test(field)))];
-        const omit = parseCommaSeparatedList(parsed.omit);
+        const omit = parseCommaSeparatedList(parsed.omit).filter((field) => /[^.]/.test(field));
+        // The API's `omit` does not reach into arrays of objects, so dotted paths are removed here.
+        const dottedOmit = omit.filter((field) => field.includes('.'));
 
         const effectiveLimit = parsed.limit ?? DEFAULT_DATASET_ITEMS_LIMIT;
         const datasetId = stripQuoteWrappers(parsed.datasetId);
@@ -190,7 +224,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
                 offset: parsed.offset,
                 limit: effectiveLimit,
                 fields: getApiFields(fields),
-                omit,
+                omit: omit.filter((field) => !field.includes('.')),
                 desc: parsed.desc,
             }),
         );
@@ -198,7 +232,10 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             return respondUserError(`Dataset '${datasetId}' not found.`);
         }
 
-        const items = fields.length > 0 ? v.items.map((item) => projectFields(item, fields)) : v.items;
+        const items = v.items.map((item) => {
+            const projected = fields.length > 0 ? projectFields(item, fields) : item;
+            return dottedOmit.length > 0 ? omitFields(projected, dottedOmit) : projected;
+        });
         const unmatchedFields = getUnmatchedFields(v.items, fields, omit);
         const offset = parsed.offset ?? 0;
         const apifyConsoleUrl = buildConsoleDatasetUrl(await getConsoleLinkContext(apifyToken, client), datasetId);
