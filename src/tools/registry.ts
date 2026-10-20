@@ -83,7 +83,7 @@ export const toolCategories = {
     schedules: [createSchedule, getSchedule, updateSchedule, deleteSchedule],
     builds: [getActorBuild, getActorBuildLog, getActorBuildList, buildActor],
     versions: [getActorVersion, createActor, updateActorVersion, createActorVersion, deleteActorVersion],
-    api: [apifyApiSearch, apifyApiDetails, apifyApiRead],
+    api: [apifyApiSearch, apifyApiDetails, apifyApiRead, apifyApiWrite],
     dev: [reportProblem],
 } satisfies Record<string, ToolEntry[]>;
 
@@ -117,10 +117,8 @@ export const ALL_WIDGET_TOOLS: readonly ToolEntry[] = [
  * Non-widget tools in no category: never served by default or by a category, only when named in
  * `tools=`, in every mode. Temporary: `get-actor-list` returns to a category once evals cover it.
  * `delete-actor` stays here: it deletes Actors permanently, so a session gets it only by asking for it.
- * `apify-api-write` stays here: it changes or deletes data at any API path, so a session gets it only
- * by asking for it, as in `tools=api,apify-api-write`.
  */
-export const UNCATEGORIZED_TOOLS: readonly ToolEntry[] = [getActorList, deleteActor, apifyApiWrite];
+export const UNCATEGORIZED_TOOLS: readonly ToolEntry[] = [getActorList, deleteActor];
 
 /**
  * Apps-mode auto-pairing: a widget is added iff its base tool is present — see
