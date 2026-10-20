@@ -7,9 +7,11 @@ import {
     paymentsCases,
     registerCases,
     registrationCases,
+    schedulesCases,
     storageCases,
     tasksCases,
     toolsCases,
+    versionsCases,
 } from '../test_kit/index.js';
 import type { SuiteClientOptions } from '../test_kit/index.js';
 import type { CaseCtx, SuiteClient, Transport } from '../test_kit/types.js';
@@ -56,6 +58,8 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             registerCases('apps', appsCases, ctx);
             registerCases('tasks', tasksCases, ctx);
             registerCases('storage', storageCases, ctx);
+            registerCases('schedules', schedulesCases, ctx);
+            registerCases('versions', versionsCases, ctx);
             registerCases('payments', paymentsCases, ctx);
         },
     );

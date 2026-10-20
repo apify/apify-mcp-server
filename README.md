@@ -242,14 +242,15 @@ One of the most powerful features of using MCP with Apify is dynamic tool discov
 It allows an AI agent to find new tools (Actors) as needed and incorporate them.
 Here are some special MCP operations and how the Apify MCP Server supports them:
 
-- **Apify Actors**: Search for Actors, list the Actors in your account, view their details, and use them as tools for the AI.
+- **Apify Actors**: Search for Actors, list the Actors in your account, view their details, use them as tools for the AI, and delete your own Actors.
 - **Apify documentation**: Search the Apify documentation and fetch specific documents to provide context to the AI.
 - **Actor runs**: Get lists of your Actor runs, inspect their details, and retrieve logs.
 - **Apify storage**: Access data from your datasets and key-value stores.
 - **Actor tasks**: Create, inspect, and update your saved Actor tasks, and publish or unpublish their public landing pages.
 - **Schedules**: Create, inspect, update, and delete schedules that run your Actors and tasks automatically.
 - **Builds**: Build an Actor version, list builds, check the status of a build, and retrieve its build log.
-- **Actor source**: Read an Actor version's files, with a hash for each file and a revision for the whole set.
+- **Actor versions**: Read an Actor version's files with a hash for each file and a revision for the whole set, create an Actor from files, change a version's files with checks that catch changes made since your last read, add a version from files or as a copy of another version, and delete a version.
+- **Apify API**: Search the Apify API reference, inspect an operation, and send requests to the API to read or change data.
 
 ### Overview of available tools
 
@@ -269,6 +270,7 @@ Legend for the **Enabled by default** column:
 | `get-dataset-items` | storage | Retrieve items from a dataset with support for filtering and pagination. | ⚡ |
 | `get-key-value-store-record`| storage | Get the value associated with a specific key in a key-value store. | ⚡ |
 | `abort-actor-run` | runs | Abort a running Actor run, optionally gracefully. | ⚡ |
+| `delete-actor` | none (select by name: `tools=delete-actor`) | Delete an Actor from your account permanently. Public Actors must be unpublished first. |  |
 | `search-apify-docs` | docs | Search the Apify documentation for relevant pages. | ✅ |
 | `fetch-apify-docs` | docs | Fetch the full content of an Apify documentation page by its URL. | ✅ |
 | [`apify--rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see [tool configuration](#tools-configuration)) | An Actor tool to browse the web. | ✅ |
@@ -296,7 +298,15 @@ Legend for the **Enabled by default** column:
 | `get-actor-build-log` | builds | Retrieve the logs for a specific Actor build. |  |
 | `get-actor-build-list` | builds | List the account's builds, or one Actor's, in every status, newest first. |  |
 | `build-actor` | builds | Build an Actor version and wait a bounded time for the build to finish. |  |
-| `get-actor-version` | source | Get an Actor version's file listing with hashes and the content of the files you ask for. |  |
+| `get-actor-version` | versions | Get an Actor version's file listing with hashes and the content of the files you ask for. |  |
+| `create-actor` | versions | Create a private Actor in your account from files, optionally starting a build. |  |
+| `update-actor-version` | versions | Write, edit, or delete files of an Actor version in one all-or-nothing write. |  |
+| `create-actor-version` | versions | Add a version to an Actor, from files or as a copy of another version, optionally starting a build. |  |
+| `delete-actor-version` | versions | Delete an Actor version; its builds and their tags stay. |  |
+| `apify-api-search` | api | Search the Apify API reference for operations by keywords. Returns each one's method, path, and docs page. |  |
+| `apify-api-details` | api | Get the parameters and request body schema of the Apify API operations on a path. |  |
+| `apify-api-read` | api | Send a GET request to an Apify API path, such as `actor-runs` or `/v2/actor-runs`, like `apify api` in the Apify CLI. Read-only: it refuses the `method` query parameter and a GET to the synchronous run endpoints, which starts a paid run. |  |
+| `apify-api-write` | api | Send a POST, PUT, PATCH, or DELETE request to any Apify API path, with a JSON body, like `apify api` in the Apify CLI. It refuses the `method` query parameter. |  |
 
 > **Note:**
 >
@@ -309,8 +319,10 @@ Legend for the **Enabled by default** column:
 All tools include metadata annotations to help MCP clients and LLMs understand tool behavior:
 
 - **`title`**: Short display name for the tool (e.g., "Search Actors", "Call Actor", "apify/rag-web-browser")
-- **`readOnlyHint`**: `true` for tools that only read data without modifying state (e.g., `get-dataset`, `fetch-actor-details`)
+- **`readOnlyHint`**: `true` for tools that only read data without modifying state (e.g., `get-dataset`, `fetch-actor-details`). Actor tools get it only for Apify-maintained Actors with limited permissions and no accepted secret, writable storage, MCP connector, or code input (e.g., `apify--web-fetch`). Direct tools can restrict the original Actor inputs: `apify--website-content-crawler` excludes and rejects `pageFunction` and `initialCookies`, so it is read-only. Other Actor tools are marked destructive.
 - **`openWorldHint`**: `true` for tools that access external resources outside the Apify platform (e.g., `call-actor` executes external Actors). Tools that interact only with the Apify platform (like `search-actors` or `fetch-apify-docs`) do not have this hint.
+
+The direct `apify--website-content-crawler` tool defaults `respectRobotsTxtFile` to `true`; an explicit `false` is preserved. These restrictions and defaults apply only to the direct tool. `call-actor`, `call-actor-widget`, and `fetch-actor-details` retain the original Actor input contract.
 
 ### Tools configuration
 
@@ -416,6 +428,7 @@ The v2 configuration preserves backward compatibility with v1 usage. Notes:
 - `call-actor` is now included by default via the `actors` category (additive change). To exclude it, specify an explicit `tools` list without `actors`.
 - `tools=add-actor`, `tools=experimental`, and `tools=preview` are retired: they are ignored and load no tools. Use `tools=call-actor` (or the default `actors` category) instead.
 - `tools=get-actor-log` is retired: the tool was renamed to `get-actor-run-log`. The old selector is ignored and loads no tools. Use `tools=get-actor-run-log` (or the `runs` category) instead.
+- `tools=source` is retired: the category was renamed to `versions`. The old selector is ignored and loads no tools. Use `tools=versions` instead.
 
 Existing URLs and commands using `?actors=...` or `--actors` continue to work unchanged.
 
@@ -533,7 +546,7 @@ Upon launching, the Inspector will display a URL that you can open in your brows
 ## Unauthenticated access
 
 When the `tools` query parameter includes only tools explicitly enabled for unauthenticated use, the hosted server allows access without an API token.
-Currently allowed tools: `search-actors`, `fetch-actor-details`, `search-apify-docs`, `fetch-apify-docs`.
+Currently allowed tools: `search-actors`, `fetch-actor-details`, `search-apify-docs`, `fetch-apify-docs`, `apify-api-search`, `apify-api-details`.
 Example: `https://mcp.apify.com?tools=search-actors`.
 
 ## 🐦 Canary PR releases

@@ -11,8 +11,9 @@ Three files serving the MCP `resources/*` surface:
   payment-only session (x402/Skyfire) gets no client and every read fails with `InvalidParamsError`.
   Routes every http(s) URI to `readApiResource()`, which owns the single origin gate; non-http
   schemes fall through to widgets/usage-guide/fallback. Throws protocol-neutral domain errors
-  (`InvalidParamsError`/`InternalError` from `src/mcp/errors.ts`), never `McpError` — the `server.ts`
-  boundary maps them 1:1 to `McpError` before serialization.
+  (`InvalidParamsError`/`InternalError` from `src/mcp/errors.ts`), never `McpError`. The protocol
+  adapters map them 1:1 before serialization: `legacy_server.ts` to v1 `McpError`,
+  `stateless_server.ts` to v2 `ProtocolError`.
 - `api_resources.ts` — a thin streaming MCP-resource proxy: any Apify API GET endpoint is
   readable as a resource, identified by its real API URL.
 - `widgets.ts` — the registry of UI widgets; the widgets themselves are built in
@@ -25,27 +26,41 @@ IDs that Actors and tools return. This is a deliberate deviation from the MCP sp
 scheme guidance (SHOULD only be used for client-fetchable URLs — ours are token-gated): the
 identity with the platform's own URLs is the feature. Revisit when tools start emitting
 `resource_link`s, where clients may fetch `https://` URIs directly. `isApifyApiUri()` gates reads
-to the configured API origin and rejects userinfo-bearing URLs (axios drops the `Authorization`
-header for those, silently degrading to unauthenticated).
+to two origins — the one clients are told to use (`getApifyAPIPublicBaseUrl()`, `../apify_client.ts`)
+and the egress one (`getApifyAPIBaseUrl()`), which differ on the hosted server — and rejects
+userinfo-bearing URLs (axios drops the `Authorization` header for those, silently degrading to
+unauthenticated). An accepted URI is sent on the egress origin and returned under the URI as given;
+templates, instructions, refusals and link-out URLs name only the client-facing origin. `readApiResource()`
+then refuses, without a request, what the API tools refuse (`validateApiBlocklist` in
+`../tools/api/apify_api_blocklist.ts`): the `method` query parameter and a GET to the synchronous run
+endpoints. The API tools' `callApi` (`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`, `isMaxContentLengthAbort()`,
+`maskSessionToken()`, `redactJsonSecrets()` and `REDACTED`, so a change to any changes the
+tools too. `get-key-value-store-record` builds its inlined-record URI with `buildUrlOnOrigin()`.
 
-`readApiResource()` streams the body verbatim —
-`httpClient.axios.request({ method: 'GET', responseType: 'stream', maxContentLength: MAX_INLINE_BYTES })`
-— and branches on the declared Content-Type: textual base types (text/*, JSON, XML) as `text` with
-the full header, decoded with the declared charset (default utf-8; a charset Node cannot decode
-falls through to blob — lossless beats mangled text, same rule as apify-client's body_parser);
+`sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through
+`httpClient.axios.request` with `maxContentLength: MAX_INLINE_BYTES`. `readApiResource()` sends
+`{ method: 'GET', responseType: 'stream' }` through it, streams the body, and branches
+on the declared Content-Type: textual base types (text/*, JSON, XML) as `text` with the full
+header, decoded with the declared charset (default utf-8; a charset Node cannot decode falls
+through to blob — lossless beats mangled text, same rule as apify-client's body_parser);
 everything else (including no Content-Type) as a base64 `blob` with the base MIME type; empty body
-as empty text preserving the Content-Type. The body is never parsed, so bytes round-trip exactly. axios enforces `MAX_INLINE_BYTES` (256 KB) mid-consumption on streamed
+as empty text preserving the Content-Type. The body is never parsed, so bytes round-trip exactly,
+except: the session token becomes `[REDACTED]` (`maskSessionToken()`; `/v2/browser-info` echoes the
+`Authorization` header), and so do the `urlSigningSecretKey` and `password` values in an
+`application/json` body (`redactJsonSecrets()`). The values are redacted, not removed: removal means
+re-serializing, which loses formatting and big-number precision and cost about 1 GB on a crafted deep body.
+axios enforces `MAX_INLINE_BYTES` (256 KB) mid-consumption on streamed
 responses (axios ≥1.16: byte-counting wrapper throws `ERR_BAD_RESPONSE`, counting decoded bytes) —
 after the request resolves, outside any retry wrapper. On trip, the proxy links out: a `text/plain`
 block carrying the store's signed `recordPublicUrl` for a KVS record, else the token-gated API URL,
-plus a `limit`/`offset` paging hint. It calls the client's axios instance directly, not
-`httpClient.call()`: with a stream body, `call()` hands non-2xx responses to `ApifyApiError`
-unconsumed (junk message, stranded socket per retry) — one attempt, no retries; the error body is
-read here to surface the API's message.
+plus a `limit`/`offset` paging hint. `sendApifyApiRequest()` calls the client's axios instance
+directly, not `httpClient.call()`: with a stream body, `call()` hands non-2xx responses to
+`ApifyApiError` unconsumed (junk message, stranded socket per retry) — one attempt, no retries; the
+error body is read here to surface the API's message.
 
 Genuine failures **throw** a domain error carrying `data: { uri }` (SEP-2164 / draft spec: the
-`server.ts` boundary turns it into a JSON-RPC error, never success-shaped content): 3xx/4xx except
-429 → `InvalidParamsError`; 429, 5xx, no status (network, mid-stream drop) → `InternalError`. 401/403
+protocol adapters turn it into a JSON-RPC error, never success-shaped content): 3xx/4xx except
+429 → `InvalidParamsError`; 429, 5xx, no status (network, mid-stream drop) → `InternalError`. 401/403/429/5xx
 append a hint via `getHttpErrorHint()`
 (shared with `tools/call`); failures are logged via `logHttpError` (5xx → exception). Size
 link-outs are **successful** reads returning a download pointer, not failures. Discovery is the

@@ -117,6 +117,12 @@ describe('toolNamesToInput', () => {
             tools: [HELPER_TOOLS.ACTOR_LIST_GET],
         });
     });
+
+    it('classifies delete-actor (in no category) as an internal tool, not an actor ID', () => {
+        expect(toolNamesToInput([HELPER_TOOLS.ACTOR_DELETE])).toEqual({
+            tools: [HELPER_TOOLS.ACTOR_DELETE],
+        });
+    });
 });
 
 describe('storage tool auto-injection', () => {
@@ -254,6 +260,76 @@ describe('get-actor-list selection (in no category)', () => {
             const searchActorsTool = tools.find((t) => t.name === HELPER_TOOLS.STORE_SEARCH);
             const { description } = getToolPublicFieldOnly(searchActorsTool!, { presentTools: new Set(toolNames) });
             expect(description).toContain(`Use ${HELPER_TOOLS.ACTOR_LIST_GET} for those.`);
+        },
+    );
+});
+
+// It deletes Actors permanently, so a session gets it only by naming it.
+describe('delete-actor selection (in no category)', () => {
+    it('does not treat tools=delete-actor as an Actor name', () => {
+        expect(resolveActorsToLoad({ tools: [HELPER_TOOLS.ACTOR_DELETE] })).toEqual([]);
+    });
+
+    it.each(['default', 'apps'] as const)('serves only delete-actor for tools=delete-actor in %s mode', (mode) => {
+        const toolNames = getToolsForServerMode({ tools: [HELPER_TOOLS.ACTOR_DELETE] }, [], mode).map((t) => t.name);
+        expect(toolNames).toEqual([HELPER_TOOLS.ACTOR_DELETE]);
+    });
+
+    it.each(['default', 'apps'] as const)(
+        'excludes delete-actor from the default set and the actors category in %s mode',
+        (mode) => {
+            expect(getToolsForServerMode({}, [], mode).map((t) => t.name)).not.toContain(HELPER_TOOLS.ACTOR_DELETE);
+            expect(getToolsForServerMode({ tools: ['actors'] }, [], mode).map((t) => t.name)).not.toContain(
+                HELPER_TOOLS.ACTOR_DELETE,
+            );
+        },
+    );
+
+    it.each(['default', 'apps'] as const)(
+        'serves the actors tools and delete-actor for tools=actors,delete-actor in %s mode',
+        (mode) => {
+            const toolNames = getToolsForServerMode({ tools: ['actors', HELPER_TOOLS.ACTOR_DELETE] }, [], mode).map(
+                (t) => t.name,
+            );
+            const actorsToolNames = getToolsForServerMode({ tools: ['actors'] }, [], mode).map((t) => t.name);
+            expect(toolNames).toEqual(expect.arrayContaining([...actorsToolNames, HELPER_TOOLS.ACTOR_DELETE]));
+        },
+    );
+});
+
+// `api` is not a default category, so a session gets apify-api-write only with tools=api or by naming it.
+describe('api category selection', () => {
+    const API_CATEGORY_TOOL_NAMES = [
+        HELPER_TOOLS.API_SEARCH,
+        HELPER_TOOLS.API_DETAILS,
+        HELPER_TOOLS.API_READ,
+        HELPER_TOOLS.API_WRITE,
+    ];
+
+    it.each(['default', 'apps'] as const)('excludes apify-api-write from the default set in %s mode', (mode) => {
+        expect(getToolsForServerMode({}, [], mode).map((t) => t.name)).not.toContain(HELPER_TOOLS.API_WRITE);
+    });
+
+    it.each(['default', 'apps'] as const)(
+        'serves search, details, read, and write for tools=api in %s mode',
+        (mode) => {
+            const tools = getToolsForServerMode({ tools: ['api'] }, [], mode);
+            const toolNames = tools.map((t) => t.name);
+            expect(toolNames).toEqual(API_CATEGORY_TOOL_NAMES);
+
+            const searchTool = tools.find((t) => t.name === HELPER_TOOLS.API_SEARCH);
+            const { description } = getToolPublicFieldOnly(searchTool!, { presentTools: new Set(toolNames) });
+            expect(description).toContain(`${HELPER_TOOLS.API_WRITE} for a POST, PUT, PATCH, or DELETE`);
+        },
+    );
+
+    it.each(['default', 'apps'] as const)(
+        'serves apify-api-write once for tools=api,apify-api-write in %s mode',
+        (mode) => {
+            const toolNames = getToolsForServerMode({ tools: ['api', HELPER_TOOLS.API_WRITE] }, [], mode).map(
+                (t) => t.name,
+            );
+            expect(toolNames).toEqual(API_CATEGORY_TOOL_NAMES);
         },
     );
 });

@@ -24,7 +24,7 @@ import { buildConsoleActorUrl, getConsoleLinkContext, VERBATIM_LINKS_NUDGE } fro
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import { canRunActor } from '../actor_tool_naming.js';
+import { canRunActor, getOwnServerRemedy } from '../actor_tool_naming.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 
@@ -128,9 +128,9 @@ The 'readme' field returns the summary when available, full README otherwise.
 Use when querying Actor details, documentation, input requirements, or MCP tools.
 
 EXAMPLES:
-- What does apify/rag-web-browser do?
+- What does apify/web-fetch do?
 - What is the input schema for apify/web-scraper?
-- What tools does apify/actors-mcp-server provide?`;
+- What tools does this MCP server Actor provide?`;
 }
 
 /**
@@ -159,8 +159,8 @@ export function buildActorNotRunnableGuidance(
 ): string {
     if (canRunActor(actorId, loadedToolNames, loadedActorIds)) return '';
     return dedent`
-        This Actor is not exposed as a tool and cannot be run in this configuration. Open its
-        Apify page or configure it separately to use it.
+        This Actor is not exposed as a tool and cannot be run in this configuration. To use it,
+        ${getOwnServerRemedy()}
     `;
 }
 
@@ -269,7 +269,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     // Console UI tokens hit the same cached users/me lookup; non-UI tokens short-circuit.
     const linkContext = await getConsoleLinkContext(apifyToken, apifyClient);
     const cardOptions = { ...buildCardOptions(resolvedOutput), userTier: userPlanTier, linkContext };
-    const details = await fetchActorDetailsFromApi(apifyClient, actorName, cardOptions);
+    const details = await fetchActorDetailsFromApi(apifyClient, actorName, { cardOptions, actorStore });
     if (!details) {
         return buildActorNotFoundResponse(actorName, loadedToolNames);
     }

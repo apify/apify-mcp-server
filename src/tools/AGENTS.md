@@ -16,9 +16,13 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   output across tools.
 - `utils.ts` — shared tool helpers (schema property shaping, AJV compile).
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
-  - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), the
-    actor-tools factory, the direct actor-tool executor (`actor_executor.ts`), `actor_definition.ts` (fetches and
-    prunes an Actor's definition, `getActorDefinition`), and `actor_run_response.ts` —
+  - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), delete
+    (`delete_actor.ts`), the actor-tools factory, the direct actor-tool executor (`actor_executor.ts`),
+    `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`),
+    `actor_tool_contract.ts` (Actor-specific presentation policies plus direct-tool input restrictions
+    and defaults, shared by schema generation, the call engine's denied-input check and execution;
+    generic calls skip direct-only restrictions and defaults), and
+    `actor_run_response.ts` —
     the one canonical run shape `call-actor` and `get-actor-run` share across sync, task
     and wait-timeout modes: storage IDs plus a `summary` (past) / `nextStep` (one primary
     action) pair, never inline dataset items or KV bodies — except the reserved `TIP` key,
@@ -28,28 +32,71 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public
     landing page (`task_helpers.ts` holds the shared task response shape and the publication call).
   - `schedules/` — schedule create/get/update/delete for Actors and tasks; `schedule_helpers.ts`
-    converts the flat action shape to the API shape and back, and reuses the id helpers from
+    converts the flat action shape to the API shape and back, and reuses `getTaskByIdOrName` from
     `tasks/task_helpers.ts`.
   - `builds/` — `get-actor-build` (build status), `get-actor-build-log` (build log tail),
     `get-actor-build-list` (the account's builds, or one Actor's with `actorId`, in every status, newest
     first, pointing at the newest failed one) and `build-actor` (start a build of one version and wait for it); `build_helpers.ts` holds the
     allowlisted build result shape, the build start and wait calls (the wait reports progress), the
     shared `waitSecs` field, the shared build response and the by-status next-step text.
-  - `source/`: `get-actor-version` (an Actor version's file manifest with hashes, revision, and
-    requested content). `source_files.ts` holds the file shape, the manifest builder, the hash and
-    revision rules, and the text-or-base64 detection. Versions not stored as files (Git repository,
-    gist, or zip) are refused.
+  - `versions/`: `get-actor-version` (an Actor version's build tag, file manifest with hashes, revision,
+    and requested content), `create-actor` (a new Actor with one version in a single POST),
+    `update-actor-version` (write, edit, and delete operations applied all-or-nothing to a fresh read,
+    stored with one version PUT that carries only the source keys), `create-actor-version` (a new
+    version in one POST, from files or as a copy of another version's files and non-secret env vars,
+    with no default buildTag), and `delete-actor-version` (reads the Actor first, since apify-client
+    reports a delete of a missing version as done, and returns the tags still on its builds). `source_files.ts` holds the file shape, the
+    manifest builder, the hash and revision rules, and the text-or-base64 detection;
+    `source_helpers.ts` holds the Actor and version lookup, the file input shape, and the response
+    after a write, which starts the build for autoBuild. get-actor-version, update-actor-version, and a
+    copy in create-actor-version refuse a version not stored as files (Git repository, gist, or zip);
+    create-actor-version from files and delete-actor-version work whatever the Actor's versions are
+    stored as, but delete-actor-version takes expectedRevision only for a version stored as files.
+  - `api/` — the generic Apify API tools: search the operations of the published OpenAPI spec, get the
+    operations on a path, and send a GET, or a POST, PUT, PATCH, or DELETE, to a path. All four are in the
+    `api` category, which is not served by default, so a session gets the write tool only with `tools=api`
+    or by naming it. The call tools are proxies to the API, like `apify api` in the Apify CLI.
+    They refuse what `API_BLOCK_RULES` in `apify_api_blocklist.ts` lists: the `method` query parameter,
+    which the API takes as the HTTP method, and a GET to the synchronous run endpoints of Actors and tasks,
+    which starts a paid run (the write tool still sends the POST). So the read tool is annotated read-only.
+    `callApi` checks every call (`validateApiBlocklist`), fail-closed, as the API reads the request URL, and
+    refuses a path whose dot segments climb out of `/v2/`; the index leaves out each operation a rule matches
+    (`isEndpointBlocked`), so search, details, the closest-path hints, and the write tool's method
+    choice never offer it.
+    `apify_api_spec.ts` builds the operation index from the spec (cached for a day); search and
+    details use it, the write tool uses it to choose a method that was not given, and a call uses it
+    otherwise only for hints, waiting at most a few seconds, so a failed download does not stop a
+    call. `apify_api_request.ts` normalizes the path as the CLI does (`actors`, `v2/actors`, and
+    `/v2/actors` are the same), sends it as written with the query added after any query string in
+    it, and looks up a legacy `acts` path as `actors`, the prefix the spec lists. It asserts that the
+    URL stays on the API origin, sends one request with no retries, masks the session token in the
+    response, redacts the `urlSigningSecretKey` and `password` values in a JSON body, keeps a query in
+    the path out of the error it throws, and adds the closest spec paths to a `page-not-found` 404 (a
+    wrong path), not to a missing record.
+    The one capped request (`sendApifyApiRequest`) is in `../apify_client.ts`. The origin check
+    (`isApifyApiUri`), the detection of a body over `MAX_INLINE_BYTES` (`isMaxContentLengthAbort`),
+    the binary token mask (`maskSessionToken`), the secret redaction (`redactJsonSecrets`) and
+    `REDACTED` are the API resource's own, imported from `../resources/api_resources.ts`
+    ([`../resources/AGENTS.md`](../resources/AGENTS.md#api-resources-api_resourcests)).
+    A request failure is thrown as `toPlainError` (`../utils/logging.ts`), without the axios config.
+    The details and call tools log their arguments through `redactApiCallArgs` (`redactArgs`): an
+    allowlist of path, method, query, and body, with the body and the `token`, `signature`, and
+    `webhooks` query values redacted, and a query written into the path cut to `?[REDACTED]`.
   - `docs/` — search and fetch Apify docs.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).
+- `../utils/apify_resource_id.ts` holds the helpers that resolve an Actor, task, or schedule given by ID or
+  name, where a name alone means one of the caller's own. The task, schedule, and versions tools use them,
+  and so do `build-actor` and the `actorId` filter of `get-actor-build-list` and `get-actor-run-list`.
 
 ## Rules when editing here
 
 - **Validate inputs with Zod**; no ad-hoc shape checks. AJV + Zod already validate
   before a tool runs — don't re-check the same constraint inside the tool body.
 - **Reference tool names via the `HELPER_TOOLS` `as const` object**, never hardcoded strings
-  (exception: integration tests).
+  (exception: the integration suite, `tests/integration/` and the shared `tests/test_kit/` cases and helpers, which hardcode them so a renamed tool fails).
 - Keep a new tool mode-agnostic unless it is genuinely a widget variant.
+- Descriptions, result text, annotations and the tool set follow [TOOL_GUIDELINES.md](../../TOOL_GUIDELINES.md); the gating mechanics below implement its "name only what the session has" rule.
 
 **Storage tool description skeleton** (`storage/`, all 8 tools): lead sentence stating what the tool
 returns, then a disambiguation line naming the sibling tool(s) it's confused with via
@@ -73,8 +120,9 @@ renders it per session — so never name a tool there; put the guidance in `buil
 auto-injects the `get-actor-run` it names.
 
 Result text (`summary` / `nextStep` in `content[1]`) has no `hasTool`, but it does have a per-session
-gate: `InternalToolArgs.loadedToolNames` (see `suggestTool` in `storage/storage_helpers.ts`). Name a
-tool there only through that gate, or when it is the calling tool itself (the "call it again with the
+gate: `InternalToolArgs.loadedToolNames`. A `nextStep` that names a sibling tool goes through
+`resolveSiblingNextStep` in `storage/storage_helpers.ts`. Name a tool there only through that gate,
+or when it is the calling tool itself (the "call it again with the
 next offset" pagination hint); otherwise leave the cross-tool guidance to the gated description.
 An `AUTO_INJECTED_TOOLS` member is no exception — the injection is conditional on `call-actor`, an
 Actor tool, or `get-actor-run` being loaded, so a session that loaded only `abort-actor-run` gets

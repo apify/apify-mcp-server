@@ -15,7 +15,6 @@ import type { SERVER_MODE, ToolEntry } from '@apify/actors-mcp-server/internals/
 import {
     APIFY_ACTOR_RUN_META_KEY,
     AUTO_INJECTED_TOOLS,
-    HELPER_TOOLS,
     toolCategoriesEnabledByDefault,
     UNCATEGORIZED_TOOLS,
 } from '@apify/actors-mcp-server/internals/test-kit.js';
@@ -28,7 +27,7 @@ export const ACTOR_EXAMPLE_MCP_SERVER = 'apify/example-mcp-server';
 
 const STDIO_TRANSPORT: Transport = 'stdio';
 
-export const RETIRED_SELECTORS = ['add-actor', 'experimental', 'preview', 'get-actor-log'] as const;
+export const RETIRED_SELECTORS = ['add-actor', 'experimental', 'preview', 'get-actor-log', 'source'] as const;
 export const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
 export const DEFAULT_ACTOR_NAMES = defaults.actors.map((actor) => actorNameToToolName(actor));
 
@@ -153,7 +152,7 @@ export function expectReadmeInStructuredContent(result: unknown, expectedActorFu
 
 /** Assert apps-mode widget tools carry MCP Apps `_meta.ui` (SEP-1865). */
 export function expectWidgetToolMeta(tools: { tools: { name: string; _meta?: Record<string, unknown> }[] }): void {
-    const toolNames = [HELPER_TOOLS.STORE_SEARCH_WIDGET, HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET];
+    const toolNames = ['search-actors-widget', 'fetch-actor-details-widget'];
     for (const toolName of toolNames) {
         const tool = tools.tools.find((t) => t.name === toolName);
         expect(tool).toBeDefined();

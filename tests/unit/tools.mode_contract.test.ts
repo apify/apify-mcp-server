@@ -5,12 +5,17 @@
  * - Each mode produces the expected set of tools per category
  * - Mode-variant tools share identical inputSchema (same args accepted)
  * - Tool definitions are frozen (immutable)
- * - _meta stripping works for non-apps modes
  */
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { ALLOWED_TASK_TOOL_EXECUTION_MODES, HELPER_TOOLS, type HelperToolName } from '../../src/const.js';
+import {
+    ALLOWED_TASK_TOOL_EXECUTION_MODES,
+    HELPER_TOOLS,
+    type HelperToolName,
+    RAG_WEB_BROWSER,
+    WEB_FETCH,
+} from '../../src/const.js';
 import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
 import { searchActorsBaseArgsSchema } from '../../src/tools/actors/search_actors.js';
@@ -46,6 +51,11 @@ function buildFixtureActorInfo(actorFullName: string): ActorInfo {
 
 // Real getNormalActorsAsTools output, not a hand-written stand-in — exercises the gated description.
 const [actorToolStub] = await getNormalActorsAsTools([buildFixtureActorInfo('apify/test-actor')]);
+// Real dedicated Actor tools that other descriptions refer to.
+const [ragToolStub, webFetchToolStub] = await getNormalActorsAsTools([
+    buildFixtureActorInfo(RAG_WEB_BROWSER),
+    buildFixtureActorInfo(WEB_FETCH),
+]);
 
 /** Helper to extract tool names from a category. */
 function toolNames(tools: ToolEntry[]): string[] {
@@ -129,10 +139,27 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             expect(toolNames(appsCategories.builds)).toEqual(expected);
         });
 
-        it('has correct tools in source category (both modes)', () => {
-            const expected = [HELPER_TOOLS.ACTOR_VERSION_GET];
-            expect(toolNames(defaultCategories.source)).toEqual(expected);
-            expect(toolNames(appsCategories.source)).toEqual(expected);
+        it('has correct tools in versions category (both modes)', () => {
+            const expected = [
+                HELPER_TOOLS.ACTOR_VERSION_GET,
+                HELPER_TOOLS.ACTOR_CREATE,
+                HELPER_TOOLS.ACTOR_VERSION_UPDATE,
+                HELPER_TOOLS.ACTOR_VERSION_CREATE,
+                HELPER_TOOLS.ACTOR_VERSION_DELETE,
+            ];
+            expect(toolNames(defaultCategories.versions)).toEqual(expected);
+            expect(toolNames(appsCategories.versions)).toEqual(expected);
+        });
+
+        it('has correct tools in api category (both modes)', () => {
+            const expected = [
+                HELPER_TOOLS.API_SEARCH,
+                HELPER_TOOLS.API_DETAILS,
+                HELPER_TOOLS.API_READ,
+                HELPER_TOOLS.API_WRITE,
+            ];
+            expect(toolNames(defaultCategories.api)).toEqual(expected);
+            expect(toolNames(appsCategories.api)).toEqual(expected);
         });
 
         it('has correct tools in dev category (both modes)', () => {
@@ -437,66 +464,9 @@ describe('taskSupport contract across tool categories', () => {
     }
 });
 
-describe('getToolPublicFieldOnly _meta filtering', () => {
-    const toolWithOpenAiMeta = {
-        name: 'test-tool',
-        description: 'Test',
-        inputSchema: { type: 'object' as const, properties: {} },
-        ajvValidate: (() => true) as never,
-        _meta: {
-            'openai/widget': { type: 'test' },
-            'openai/config': { key: 'value' },
-            ui: { resourceUri: 'ui://widget/test.html' },
-            'regular-key': { data: 123 },
-        },
-    };
-
-    it('strips openai/ and ui _meta keys when filterWidgetMeta is true and not in apps mode', () => {
-        const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
-            filterWidgetMeta: true,
-            mode: 'default',
-        });
-        expect(result._meta).toBeDefined();
-        expect(result._meta).toEqual({ 'regular-key': { data: 123 } });
-        expect(result._meta).not.toHaveProperty('openai/widget');
-        expect(result._meta).not.toHaveProperty('openai/config');
-        expect(result._meta).not.toHaveProperty('ui');
-    });
-
-    it('preserves all _meta keys in apps mode', () => {
-        const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
-            filterWidgetMeta: true,
-            mode: 'apps',
-        });
-        expect(result._meta).toEqual(toolWithOpenAiMeta._meta);
-    });
-
-    it('preserves all _meta keys when filterWidgetMeta is false', () => {
-        const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
-            filterWidgetMeta: false,
-        });
-        expect(result._meta).toEqual(toolWithOpenAiMeta._meta);
-    });
-
-    it('returns undefined _meta when all keys are widget-specific and mode is not apps', () => {
-        const toolWithOnlyWidgetMeta = {
-            ...toolWithOpenAiMeta,
-            _meta: {
-                'openai/widget': { type: 'test' },
-                ui: { resourceUri: 'ui://widget/test.html' },
-            },
-        };
-        const result = getToolPublicFieldOnly(toolWithOnlyWidgetMeta, {
-            filterWidgetMeta: true,
-            mode: 'default',
-        });
-        expect(result._meta).toBeUndefined();
-    });
-});
-
 describe('getToolPublicFieldOnly inputSchema normalization', () => {
     it('does not expose Zod-defaulted fields as JSON Schema required (search-apify-docs)', () => {
-        const { inputSchema } = getToolPublicFieldOnly(searchApifyDocs, { filterWidgetMeta: false });
+        const { inputSchema } = getToolPublicFieldOnly(searchApifyDocs);
         const schema = inputSchema as { required?: string[]; properties?: Record<string, { default?: unknown }> };
 
         expect(schema.required).toEqual(['query']);
@@ -520,7 +490,7 @@ describe('getToolPublicFieldOnly inputSchema normalization', () => {
             },
         } as unknown as ToolBase;
 
-        const { inputSchema } = getToolPublicFieldOnly(actorShapeTool, { filterWidgetMeta: false });
+        const { inputSchema } = getToolPublicFieldOnly(actorShapeTool);
         const schema = inputSchema as { required?: string[] };
 
         expect(schema.required).toEqual(['query']);
@@ -561,7 +531,8 @@ describe('tool descriptions never name a tool absent from the session', () => {
         { label: "tools: ['storage']", input: { tools: ['storage'] }, actorTools: [] },
         { label: "tools: ['actors']", input: { tools: ['actors'] }, actorTools: [] },
         { label: "tools: ['schedules']", input: { tools: ['schedules'] }, actorTools: [] },
-        { label: "tools: ['source']", input: { tools: ['source'] }, actorTools: [] },
+        { label: "tools: ['versions']", input: { tools: ['versions'] }, actorTools: [] },
+        { label: "tools: ['api']", input: { tools: ['api'] }, actorTools: [] },
         ...ALL_TOOL_NAMES.map((name) => ({
             label: `tools: ['${name}']`,
             input: { tools: [name] },
@@ -588,6 +559,25 @@ describe('tool descriptions never name a tool absent from the session', () => {
             input: { tools: ['docs', HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET] },
             actorTools: [],
         },
+        // Dedicated Actor tools with and without discovery tools and each other.
+        { label: 'RAG Web Browser only', input: { tools: [RAG_WEB_BROWSER] }, actorTools: [ragToolStub] },
+        {
+            label: 'search-actors, fetch-actor-details and RAG Web Browser',
+            input: { tools: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS, RAG_WEB_BROWSER] },
+            actorTools: [ragToolStub],
+        },
+        {
+            label: 'RAG Web Browser and Web Fetch',
+            input: { tools: [RAG_WEB_BROWSER, WEB_FETCH] },
+            actorTools: [ragToolStub, webFetchToolStub],
+        },
+    ];
+    // A dedicated Actor is named by its tool name, or by its full name in a tool reference
+    // ("use apify/rag-web-browser", "prefer the dedicated apify/web-fetch tool"); a full name given as
+    // an example Actor (e.g. "apify/rag-web-browser" as a call-actor input) is not a tool reference.
+    const DEDICATED_ACTORS = [
+        { name: ragToolStub.name, actorFullName: RAG_WEB_BROWSER },
+        { name: webFetchToolStub.name, actorFullName: WEB_FETCH },
     ];
 
     for (const mode of SERVER_MODES) {
@@ -596,6 +586,8 @@ describe('tool descriptions never name a tool absent from the session', () => {
                 const tools = getToolsForServerMode(input, actorTools, mode);
                 const present = new Set(tools.map((t) => t.name));
                 const absent = ALL_TOOL_NAMES.filter((name) => !present.has(name));
+
+                const absentDedicatedActors = DEDICATED_ACTORS.filter(({ name }) => !present.has(name));
 
                 const violations: string[] = [];
                 for (const tool of tools) {
@@ -607,10 +599,18 @@ describe('tool descriptions never name a tool absent from the session', () => {
                         for (const name of absent) {
                             // Boundary guard so `get-dataset` does not match inside `get-dataset-items`,
                             // nor `call-actor` inside `call-actor-widget`. `:` is excluded too — it
-                            // marks a remote MCP-Actor tool ("apify/actors-mcp-server:fetch-apify-docs"),
+                            // marks a remote MCP-Actor tool ("apify/example-mcp-server:add"),
                             // not a tool served from this session.
                             if (new RegExp(`(?<![\\w-:])${name}(?![\\w-])`).test(line)) {
                                 violations.push(`${tool.name} names absent ${name}: ${line.trim()}`);
+                            }
+                        }
+                        for (const { name, actorFullName } of absentDedicatedActors) {
+                            if (
+                                line.includes(name) ||
+                                new RegExp(`\\b(?:use|prefer|dedicated) (?:the )?${actorFullName}\\b`).test(line)
+                            ) {
+                                violations.push(`${tool.name} names absent ${actorFullName}: ${line.trim()}`);
                             }
                         }
                     }

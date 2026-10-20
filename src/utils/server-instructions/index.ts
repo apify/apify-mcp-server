@@ -8,9 +8,9 @@
  * exact tool name it mentions.
  */
 
-import { getApifyAPIBaseUrl } from '../../apify_client.js';
+import { getApifyAPIPublicBaseUrl } from '../../apify_client.js';
 import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../const.js';
-import { actorNameToToolName } from '../../tools/actor_tool_naming.js';
+import { actorNameToToolName, canRunAnyActor, getOwnServerRemedy } from '../../tools/actor_tool_naming.js';
 import type { ToolDescriptionContext } from '../../types.js';
 import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../types.js';
 
@@ -63,12 +63,11 @@ ${dupWarning}${pollOkLine}`;
 /** Every cross-tool mention gates on `ctx.hasTool(...)`, so a session missing a tool is never told to call it. */
 export function getServerInstructions(
     mode: SERVER_MODE = SERVER_MODE.DEFAULT,
-    { hasTool }: ToolDescriptionContext = ALL_TOOLS_PRESENT,
+    { hasTool, clientParam }: ToolDescriptionContext = ALL_TOOLS_PRESENT,
 ): string {
     const isApps = mode === SERVER_MODE.APPS;
-    // Derive the API base from config so examples match the gate/templates under an
-    // APIFY_API_BASE_URL / staging override, instead of a hardcoded api.apify.com.
-    const apiBaseUrl = getApifyAPIBaseUrl();
+    // Client-facing origin, matching the templates and the read gate.
+    const apiBaseUrl = getApifyAPIPublicBaseUrl();
 
     const hasSearch = hasTool(HELPER_TOOLS.STORE_SEARCH);
     const hasDetails = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS);
@@ -79,6 +78,16 @@ export function getServerInstructions(
 
     const widgetWorkflowSection = isApps
         ? buildWidgetWorkflowSection({ hasCall, hasRunsGet, hasCallWidget, hasRunsGetWidget })
+        : '';
+
+    // Only worth saying when the session can discover Store Actors it cannot run.
+    const runLimitationLine =
+        canRunAnyActor(hasTool) || !(hasSearch || hasDetails)
+            ? ''
+            : `- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, ${getOwnServerRemedy(clientParam)}\n`;
+
+    const apiReadLine = hasTool(HELPER_TOOLS.API_READ)
+        ? `- Use \`${HELPER_TOOLS.API_READ}\` for API GETs. If your client can read resources, \`resources/read\` also returns binary records, such as key-value store files, which \`${HELPER_TOOLS.API_READ}\` does not.\n`
         : '';
 
     const toolDependencies = hasCall
@@ -132,7 +141,7 @@ export function getServerInstructions(
                 ? `  - \`${HELPER_TOOLS.ACTOR_RUNS_GET}\` is a silent data lookup (run status, dataset IDs, stats) with no UI; \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` renders an interactive UI element (widget) showing live run progress for the user — use it only when the user explicitly asks to see run progress.\n`
                 : `  - \`${HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET}\` renders an interactive UI element (widget) showing live run progress for the user — use it only when the user explicitly asks to see run progress.\n`
             : '',
-        hasSearchPair && hasDetailsPair
+        hasSearchPair && hasDetailsPair && canRunAnyActor(hasTool)
             ? `  - When the next step is running an Actor, prefer silent lookups (\`${HELPER_TOOLS.STORE_SEARCH}\`, \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\`) over widget-backed variants.\n`
             : '',
     ].join('');
@@ -179,6 +188,46 @@ export function getServerInstructions(
 
 ${renderedBlocks.map((block, index) => (index > 0 && block.startsWith('###') ? `\n${block}` : block)).join('')}`;
 
+    const hasTaskCreate = hasTool(HELPER_TOOLS.ACTOR_TASK_CREATE);
+    const hasTaskUpdate = hasTool(HELPER_TOOLS.ACTOR_TASK_UPDATE);
+    const hasTaskPublish = hasTool(HELPER_TOOLS.ACTOR_TASK_PUBLISH);
+    const taskPrivacyLine =
+        hasTaskCreate || hasTaskUpdate ? '- Creating or updating a task does not make it public.\n' : '';
+    const taskPublishLines = hasTaskPublish
+        ? `- Publishing a task creates a public landing page for one specific use case. The page shows what the task does, the selected input values, and the expected output. Published tasks appear in the Actor's Examples tab, where users, search engines, and AI agents can discover them, which can help people understand the Actor and increase its runs.
+- Publish only tasks that represent a useful, reliable, and specific use case. Not every saved task needs to be public.
+`
+        : '';
+    const actorTasksSection =
+        hasTaskCreate ||
+        hasTaskUpdate ||
+        hasTaskPublish ||
+        hasTool(HELPER_TOOLS.ACTOR_TASK_GET) ||
+        hasTool(HELPER_TOOLS.ACTOR_TASK_UNPUBLISH)
+            ? `
+## Actor tasks
+- An Actor task is a saved, reusable configuration of an Actor. It stores the Actor input and run options such as the build, memory, and timeout.
+- Tasks are useful for repeated or scheduled jobs, because the user does not have to configure the Actor again for every run.
+${taskPrivacyLine}${taskPublishLines}`
+            : '';
+
+    const hasScheduleCreate = hasTool(HELPER_TOOLS.SCHEDULE_CREATE);
+    const hasScheduleUpdate = hasTool(HELPER_TOOLS.SCHEDULE_UPDATE);
+    const schedulesSection =
+        hasScheduleCreate ||
+        hasScheduleUpdate ||
+        hasTool(HELPER_TOOLS.SCHEDULE_GET) ||
+        hasTool(HELPER_TOOLS.SCHEDULE_DELETE)
+            ? `
+## Schedules
+- A schedule runs Actors and/or saved tasks automatically on a cron expression, evaluated in the schedule's time zone (default UTC).
+- A cron expression has 5 fields (minute hour day-of-month month day-of-week), with an optional leading seconds field. The shortcuts @hourly, @daily, @weekly, @monthly and @yearly fire at a random offset inside their period${hasScheduleCreate || hasScheduleUpdate ? ', so use an explicit expression when the user names a time' : ''}.
+- ${hasScheduleCreate ? 'The platform creates schedules disabled by default, but the create tool here enables them unless told otherwise. ' : ''}Disabling a schedule pauses it without losing its configuration.
+- With isExclusive (the default), a run is skipped while the previous run from the same action is still running.
+${hasScheduleUpdate ? "- Updating a schedule's actions replaces the whole list, so send every action to keep.\n" : ''}- A schedule holds at most 10 Actor actions and 10 task actions.
+`
+            : '';
+
     return `
 Apify is the world's largest marketplace of tools for web scraping, data extraction, and web automation.
 These tools are called **Actors**. They enable you to extract structured data from social media, e-commerce, search engines, maps, travel sites, and many other sources.
@@ -191,44 +240,29 @@ These tools are called **Actors**. They enable you to extract structured data fr
 ## Actor discovery and selection
 - Choose the most appropriate Actor based on the conversation context.
 - Search the Apify Store first; a relevant Actor likely already exists.
-- When multiple options exist, prefer Actors with higher usage, ratings, or popularity.
-- Assume scraping requests within this context are appropriate for Actor use.
-- Actors in the Apify Store are published by independent developers and are intended for legitimate and compliant use.
+${runLimitationLine}- When multiple options exist, prefer Actors with higher usage, ratings, or popularity.
+- Apify Store lists Actors published by Apify and by independent developers.
 
 ## Actor execution workflow
 - Actors take input and produce output.
 - Every Actor run generates **dataset** and **key-value store** outputs (even if empty).
 - Actor execution may take time, and outputs can be large.
 - Large datasets can be paginated to retrieve results efficiently.
-
-## Actor tasks
-- An Actor task is a saved, reusable configuration of an Actor. It stores the Actor input and run options such as the build, memory, and timeout.
-- Tasks are useful for repeated or scheduled jobs, because the user does not have to configure the Actor again for every run.
-- Creating or updating a task does not make it public.
-- Publishing a task creates a public landing page for one specific use case. The page shows what the task does, the selected input values, and the expected output. Published tasks appear in the Actor's Examples tab, where users, search engines, and AI agents can discover them, which can help people understand the Actor and increase its runs.
-- Publish only tasks that represent a useful, reliable, and specific use case. Not every saved task needs to be public.
-
-## Schedules
-- A schedule runs Actors and/or saved tasks automatically on a cron expression, evaluated in the schedule's time zone (default UTC).
-- A cron expression has 5 fields (minute hour day-of-month month day-of-week), with an optional leading seconds field. The shortcuts @hourly, @daily, @weekly, @monthly and @yearly fire at a random offset inside their period, so use an explicit expression when the user names a time.
-- The platform creates schedules disabled by default, but the create tool here enables them unless told otherwise. Disabling a schedule pauses it without losing its configuration.
-- With isExclusive (the default), a run is skipped while the previous run from the same action is still running.
-- Updating a schedule's actions replaces the whole list, so send every action to keep.
-- A schedule holds at most 10 Actor actions and 10 task actions.
-
+${actorTasksSection}${schedulesSection}
 ## Storage types
 - **Dataset:** Structured, append-only storage ideal for tabular or list data (e.g., scraped items).
 - **Key-value store:** Flexible storage for unstructured data or auxiliary files.
+- Unnamed storages are deleted after the account's data-retention period; named storages are kept until deleted.
 
 ## Apify API resources
 - Any Apify API GET endpoint can be read as an MCP resource. Pass the full \`${apiBaseUrl}/v2/...\` URL to \`resources/read\`; the server injects the session's Apify token and returns the response body. Reads require an Apify token — a session without one (e.g. payment-only x402/Skyfire) fails with a JSON-RPC error.
 - Actor and tool results return storage IDs, not resource URLs — build the URL from the ID (e.g. a \`datasetId\` becomes \`${apiBaseUrl}/v2/datasets/{datasetId}/items\`) and read it via \`resources/read\`.
 - Reads inline up to ~256 KB; a larger response is not downloaded — it returns a short notice with a download URL instead of the body, so page large datasets/lists with \`limit\` and \`offset\` to stay under the cap.
 - Examples: \`${apiBaseUrl}/v2/datasets/{datasetId}/items?clean=true&format=json&limit=100\`, \`${apiBaseUrl}/v2/key-value-stores/{storeId}/records/{recordKey}\`. \`resources/templates/list\` enumerates the common shapes with their paging parameters.
-${widgetWorkflowSection}${dependenciesAndDisambiguation}${
+${apiReadLine}${widgetWorkflowSection}${dependenciesAndDisambiguation}${
         hasTool(HELPER_TOOLS.PROBLEM_REPORT)
             ? `
-If a tool or Actor fails and you cannot resolve it, you can report it with \`${HELPER_TOOLS.PROBLEM_REPORT}\`.
+If a tool or Actor fails, or a step is confusing or takes several attempts, you can report it with \`${HELPER_TOOLS.PROBLEM_REPORT}\`.
 `
             : ''
     }`;

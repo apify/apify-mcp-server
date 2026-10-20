@@ -1,6 +1,5 @@
 import { ACTOR_PRICING_MODEL } from '../../src/const.js';
-import type { ActorStoreList, InternalToolArgs } from '../../src/types.js';
-import { mockApifyClient } from './helpers/tool_context.js';
+import type { ActorStoreList } from '../../src/types.js';
 
 /** Minimal store-list row for formatActorToStructuredCard / formatActorForWidget. */
 export const MOCK_STORE_ACTOR = {
@@ -27,18 +26,7 @@ export const MOCK_STORE_ACTOR = {
 
 export const SEARCH_KEYWORDS = 'web scraper';
 
-export function stubInternalToolArgs(
-    args: Record<string, unknown>,
-    loadedToolNames: readonly string[] = [],
-    loadedActorIds: readonly string[] = [],
-): InternalToolArgs {
-    return {
-        args,
-        apifyToken: 'test-token',
-        apifyClient: mockApifyClient(),
-        signal: new AbortController().signal,
-        paymentProvider: undefined,
-        loadedToolNames,
-        loadedActorIds: new Set(loadedActorIds),
-    };
-}
+/** Zero-results guidance both search-actors variants return for SEARCH_KEYWORDS. */
+export const NO_ACTORS_FOUND_TEXT = `No Actors were found for the search query "${SEARCH_KEYWORDS}".
+Keywords can include the named platform and/or data type (e.g. "TikTok posts").
+A platform-only query such as "TikTok" is an option if more specific results do not fit.`;

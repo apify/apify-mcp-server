@@ -5,9 +5,12 @@ import { parseInputParamsFromUrl } from '../../src/mcp/utils.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../src/types.js';
 import { getServerInstructions } from '../../src/utils/server-instructions/index.js';
-import { getToolsForServerMode } from '../../src/utils/tools_loader.js';
+import { AUTO_INJECTED_TOOLS, getToolsForServerMode, resolveToolNamesFromInput } from '../../src/utils/tools_loader.js';
 import { CLAUDE_CONNECTOR_TOOLS } from './helpers/claude_connector_tools.js';
 import { only } from './helpers/tool_context.js';
+
+const RUN_LIMITATION_LINE =
+    '- This session can run only Actors exposed as dedicated tools, not other Apify Store Actors. To use another Actor, create your own Apify MCP server configuration at https://mcp.apify.com and add it to your agent.\n';
 
 describe('getServerInstructions()', () => {
     it('defaults to ALL_TOOLS_PRESENT — no regression for the common case (every tool loaded)', () => {
@@ -19,7 +22,9 @@ describe('getServerInstructions()', () => {
     it('mentions report-problem with a gentle, non-mandatory nudge when feedback is available', () => {
         const instructions = getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT);
         expect(instructions).toContain(HELPER_TOOLS.PROBLEM_REPORT);
-        expect(instructions).toContain('you can report it');
+        expect(instructions).toContain(
+            `If a tool or Actor fails, or a step is confusing or takes several attempts, you can report it with \`${HELPER_TOOLS.PROBLEM_REPORT}\`.`,
+        );
         // No hard directive — the directory review rejects MUST-style solicitation.
         expect(instructions).not.toContain('MUST');
         expect(instructions).not.toContain('Reporting problems and feedback');
@@ -208,21 +213,131 @@ describe('getServerInstructions()', () => {
         });
     });
 
-    describe('"## Schedules" section', () => {
-        const instructions = getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT);
+    /** The `## <heading>` block, up to the next `## ` heading; '' when the heading is absent. */
+    const sectionOf = (instructions: string, heading: string): string => {
+        const start = instructions.indexOf(heading);
+        if (start === -1) return '';
+        const end = instructions.indexOf('\n## ', start + 1);
+        return instructions.slice(start, end === -1 ? undefined : end);
+    };
 
-        it('renders for ALL_TOOLS_PRESENT', () => {
-            expect(instructions).toContain('## Schedules');
+    it.each([SERVER_MODE.DEFAULT, SERVER_MODE.APPS])(
+        'preserves all-tools task and schedule text in %s mode',
+        (mode) => {
+            const instructions = getServerInstructions(mode, ALL_TOOLS_PRESENT);
+            const sections = instructions.slice(
+                instructions.indexOf('## Actor tasks'),
+                instructions.indexOf('\n## Storage types'),
+            );
+            expect(sections).toBe(
+                [
+                    '## Actor tasks',
+                    '- An Actor task is a saved, reusable configuration of an Actor. It stores the Actor input and run options such as the build, memory, and timeout.',
+                    '- Tasks are useful for repeated or scheduled jobs, because the user does not have to configure the Actor again for every run.',
+                    '- Creating or updating a task does not make it public.',
+                    "- Publishing a task creates a public landing page for one specific use case. The page shows what the task does, the selected input values, and the expected output. Published tasks appear in the Actor's Examples tab, where users, search engines, and AI agents can discover them, which can help people understand the Actor and increase its runs.",
+                    '- Publish only tasks that represent a useful, reliable, and specific use case. Not every saved task needs to be public.',
+                    '',
+                    '## Schedules',
+                    "- A schedule runs Actors and/or saved tasks automatically on a cron expression, evaluated in the schedule's time zone (default UTC).",
+                    '- A cron expression has 5 fields (minute hour day-of-month month day-of-week), with an optional leading seconds field. The shortcuts @hourly, @daily, @weekly, @monthly and @yearly fire at a random offset inside their period, so use an explicit expression when the user names a time.',
+                    '- The platform creates schedules disabled by default, but the create tool here enables them unless told otherwise. Disabling a schedule pauses it without losing its configuration.',
+                    '- With isExclusive (the default), a run is skipped while the previous run from the same action is still running.',
+                    "- Updating a schedule's actions replaces the whole list, so send every action to keep.",
+                    '- A schedule holds at most 10 Actor actions and 10 task actions.',
+                    '',
+                ].join('\n'),
+            );
+        },
+    );
+
+    it.each(['## Actor tasks', '## Schedules'])('omits %s when its tools are absent', (heading) => {
+        expect(getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.STORE_SEARCH))).not.toContain(heading);
+    });
+
+    describe('"## Actor tasks" section', () => {
+        it.each([
+            [HELPER_TOOLS.ACTOR_TASK_CREATE, true, false],
+            [HELPER_TOOLS.ACTOR_TASK_GET, false, false],
+            [HELPER_TOOLS.ACTOR_TASK_UPDATE, true, false],
+            [HELPER_TOOLS.ACTOR_TASK_PUBLISH, false, true],
+            [HELPER_TOOLS.ACTOR_TASK_UNPUBLISH, false, false],
+        ] as const)('gates task guidance with %s alone', (toolName, hasPrivacy, hasPublish) => {
+            const section = sectionOf(getServerInstructions(SERVER_MODE.DEFAULT, only(toolName)), '## Actor tasks');
+            expect(section).toContain('- An Actor task is a saved, reusable configuration of an Actor.');
+            expect(section).toContain('Tasks are useful for repeated or scheduled jobs');
+            expect(section.includes('Creating or updating a task')).toBe(hasPrivacy);
+            expect(section.includes('Publishing a task')).toBe(hasPublish);
+            expect(section.includes('Publish only tasks')).toBe(hasPublish);
+        });
+    });
+
+    describe('"## Schedules" section', () => {
+        it.each([
+            [HELPER_TOOLS.SCHEDULE_CREATE, true, false, true],
+            [HELPER_TOOLS.SCHEDULE_GET, false, false, false],
+            [HELPER_TOOLS.SCHEDULE_UPDATE, false, true, true],
+            [HELPER_TOOLS.SCHEDULE_DELETE, false, false, false],
+        ] as const)('gates schedule guidance with %s alone', (toolName, hasCreate, hasUpdate, hasCronAdvice) => {
+            const section = sectionOf(getServerInstructions(SERVER_MODE.DEFAULT, only(toolName)), '## Schedules');
+            expect(section).toContain('- A schedule runs Actors and/or saved tasks automatically on a cron expression');
+            expect(section).toContain('Disabling a schedule pauses it without losing its configuration.');
+            expect(section).toContain('- A schedule holds at most 10 Actor actions and 10 task actions.');
+            expect(section.includes('the create tool here')).toBe(hasCreate);
+            expect(section.includes("Updating a schedule's actions")).toBe(hasUpdate);
+            expect(section.includes('so use an explicit expression')).toBe(hasCronAdvice);
+        });
+    });
+
+    // Group-level gating must not expose names of individual tools that may be absent.
+    it.each(['## Actor tasks', '## Schedules'])('names no tool in %s', (heading) => {
+        const block = sectionOf(getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT), heading);
+        expect(block).not.toBe('');
+        for (const toolName of Object.values(HELPER_TOOLS)) {
+            expect(block).not.toContain(toolName);
+        }
+    });
+
+    it('separates the read-only task and schedule sections with blank lines', () => {
+        const instructions = getServerInstructions(
+            SERVER_MODE.DEFAULT,
+            only(HELPER_TOOLS.ACTOR_TASK_GET, HELPER_TOOLS.SCHEDULE_GET),
+        );
+        for (const heading of ['## Actor tasks', '## Schedules', '## Storage types']) {
+            expect(instructions).toContain(`\n\n${heading}\n`);
+        }
+    });
+
+    describe('"## Storage types" section', () => {
+        it('states the retention of unnamed and named storages', () => {
+            const block = sectionOf(getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT), '## Storage types');
+            expect(block).toContain(
+                "- Unnamed storages are deleted after the account's data-retention period; named storages are kept until deleted.",
+            );
+        });
+    });
+
+    describe('"## Apify API resources" section', () => {
+        const API_READ_LINE =
+            `- Use \`${HELPER_TOOLS.API_READ}\` for API GETs. If your client can read resources, \`resources/read\` ` +
+            `also returns binary records, such as key-value store files, which \`${HELPER_TOOLS.API_READ}\` does not.\n`;
+
+        it('sends API GETs to apify-api-read when the session has it', () => {
+            const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.API_READ));
+            const start = instructions.indexOf('## Apify API resources');
+            const end = instructions.indexOf('\n## ', start + 1);
+            expect(instructions.slice(start, end === -1 ? undefined : end)).toContain(API_READ_LINE);
         });
 
-        // The section is static and ungated, so a tool name slipping in would reach sessions without that tool.
-        it('names no tool', () => {
-            const start = instructions.indexOf('## Schedules');
-            const end = instructions.indexOf('\n## ', start + 1);
-            const block = instructions.slice(start, end === -1 ? undefined : end);
-            for (const toolName of Object.values(HELPER_TOOLS)) {
-                expect(block).not.toContain(toolName);
-            }
+        it('adds only that line, and nothing when the session lacks apify-api-read', () => {
+            const withRead = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.API_READ));
+            const withoutRead = getServerInstructions(
+                SERVER_MODE.DEFAULT,
+                only(HELPER_TOOLS.API_SEARCH, HELPER_TOOLS.API_DETAILS),
+            );
+            expect(withoutRead).not.toContain(HELPER_TOOLS.API_READ);
+            expect(withRead).not.toBe(withoutRead);
+            expect(withRead.replace(API_READ_LINE, '')).toBe(withoutRead);
         });
     });
 
@@ -250,23 +365,113 @@ describe('getServerInstructions()', () => {
             expect(instructions).toContain(`${HEADING}\n\n- **${WEB_FETCH} vs ${RAG_WEB_BROWSER}:**`);
         });
     });
+
+    describe('run limitation without call-actor', () => {
+        it('states the limitation right after the search-first bullet when the session has an Actor tool but no call-actor', () => {
+            const instructions = getServerInstructions(
+                SERVER_MODE.APPS,
+                only(HELPER_TOOLS.STORE_SEARCH, actorNameToToolName(RAG_WEB_BROWSER)),
+            );
+            expect(instructions).toContain(
+                `- Search the Apify Store first; a relevant Actor likely already exists.\n${RUN_LIMITATION_LINE}- When multiple options exist`,
+            );
+            // No hard directive — the directory review rejects MUST-style solicitation.
+            expect(instructions).not.toContain('MUST');
+        });
+
+        it('states the limitation when the session can only fetch Actor details', () => {
+            const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.ACTOR_GET_DETAILS));
+            expect(instructions).toContain(RUN_LIMITATION_LINE);
+            expect(instructions).not.toContain('MUST');
+        });
+
+        it('omits the limitation when the session cannot discover Store Actors', () => {
+            const instructions = getServerInstructions(
+                SERVER_MODE.DEFAULT,
+                only(HELPER_TOOLS.DOCS_SEARCH, actorNameToToolName(RAG_WEB_BROWSER)),
+            );
+            expect(instructions).not.toContain(RUN_LIMITATION_LINE);
+        });
+
+        it('omits the limitation when every tool is loaded', () => {
+            expect(getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT)).not.toContain(RUN_LIMITATION_LINE);
+            expect(getServerInstructions(SERVER_MODE.APPS, ALL_TOOLS_PRESENT)).not.toContain(RUN_LIMITATION_LINE);
+        });
+
+        it('omits the limitation when the session has call-actor', () => {
+            const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.ACTOR_CALL));
+            expect(instructions).not.toContain(RUN_LIMITATION_LINE);
+        });
+
+        it('states the limitation when the session has only create-schedule', () => {
+            const instructions = getServerInstructions(
+                SERVER_MODE.DEFAULT,
+                only(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.SCHEDULE_CREATE),
+            );
+            expect(instructions).toContain(RUN_LIMITATION_LINE);
+        });
+
+        // Regression: #1532 — apps mode advised silent lookups before running an Actor the session could not run.
+        it('omits the silent-lookup bullet in apps mode when no tool can run an Actor', () => {
+            const discoveryTools = [
+                HELPER_TOOLS.STORE_SEARCH,
+                HELPER_TOOLS.STORE_SEARCH_WIDGET,
+                HELPER_TOOLS.ACTOR_GET_DETAILS,
+                HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
+            ];
+            const silentLookup = 'When the next step is running an Actor, prefer silent lookups';
+            expect(getServerInstructions(SERVER_MODE.APPS, only(...discoveryTools))).not.toContain(silentLookup);
+            expect(getServerInstructions(SERVER_MODE.APPS, only(...discoveryTools, HELPER_TOOLS.ACTOR_CALL))).toContain(
+                silentLookup,
+            );
+        });
+    });
 });
 
 /** Pins the Claude-connector tool surface (no call-actor); offline, no network or fixture. */
 describe('Claude-connector tool surface (no call-actor)', () => {
-    const url = `https://mcp.apify.com/?tools=${CLAUDE_CONNECTOR_TOOLS.join(',')}`;
+    const listedUrl = `https://mcp.apify.com/?tools=${CLAUDE_CONNECTOR_TOOLS.join(',')}&client=claude`;
 
-    // Actor-tool selectors (contain '/') need a live fetch to resolve; checks the internal-tool subset only.
+    // Internal-tool subset of the fixture: Actor selectors (contain '/') resolve only with pre-fetched Actor tools.
     const expectedInternalToolNames = CLAUDE_CONNECTOR_TOOLS.filter((tool) => !tool.includes('/'));
 
+    const resolveToolNames = (url: string) =>
+        getToolsForServerMode(parseInputParamsFromUrl(url), [], SERVER_MODE.APPS).map((tool) => tool.name);
+
     it('resolves to exactly the expected internal tools, no call-actor, and instructions mention it nowhere', () => {
-        const resolved = new Set(
-            getToolsForServerMode(parseInputParamsFromUrl(url), [], SERVER_MODE.APPS).map((tool) => tool.name),
-        );
+        const resolved = new Set(resolveToolNames(listedUrl));
         expect(resolved).toEqual(new Set(expectedInternalToolNames));
         expect(resolved.has(HELPER_TOOLS.ACTOR_CALL)).toBe(false);
 
         const instructions = getServerInstructions(SERVER_MODE.APPS, { hasTool: (name) => resolved.has(name) });
         expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+    });
+
+    it('names every auto-injected tool explicitly, so the listed URL shows the whole served surface', () => {
+        for (const tool of AUTO_INJECTED_TOOLS) expect(CLAUDE_CONNECTOR_TOOLS).toContain(tool.name);
+    });
+
+    it('serves the same tools with and without ?client=claude', () => {
+        expect(resolveToolNames(listedUrl)).toEqual(resolveToolNames(listedUrl.replace('&client=claude', '')));
+    });
+
+    it('states the run limitation in the discovery section once Actor tools are resolved offline', () => {
+        const resolved = resolveToolNamesFromInput(parseInputParamsFromUrl(listedUrl), SERVER_MODE.APPS);
+        expect(resolved.has(actorNameToToolName(RAG_WEB_BROWSER))).toBe(true);
+        expect(resolved.has(HELPER_TOOLS.ACTOR_CALL)).toBe(false);
+
+        const instructions = getServerInstructions(SERVER_MODE.APPS, { hasTool: (name) => resolved.has(name) });
+        expect(instructions).toContain(
+            `- Search the Apify Store first; a relevant Actor likely already exists.\n${RUN_LIMITATION_LINE}- When multiple options exist`,
+        );
+        expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+        expect(instructions).not.toContain('MUST');
+    });
+
+    it('omits the task and schedule sections', () => {
+        const resolved = resolveToolNamesFromInput(parseInputParamsFromUrl(listedUrl), SERVER_MODE.APPS);
+        const instructions = getServerInstructions(SERVER_MODE.APPS, { hasTool: (name) => resolved.has(name) });
+        expect(instructions).not.toContain('## Actor tasks');
+        expect(instructions).not.toContain('## Schedules');
     });
 });

@@ -155,14 +155,68 @@ describe('build-actor', () => {
         expectSchemaConformingStructuredContent(result, buildActorToolOutputSchema);
     });
 
-    it('returns a not-found error when the Actor does not exist', async () => {
-        getMock.mockResolvedValue(undefined);
+    describe('Actor lookup', () => {
+        it('looks up a bare name once, as the name of one of your own Actors', async () => {
+            await callTool({ actor: 'my-actor' });
 
-        const { text, structuredContent } = await callToolExpectingUserError({ actor: 'john/missing' });
+            // The second call starts the build by the resolved Actor ID.
+            expect(actorMock.mock.calls).toEqual([['~my-actor'], ['actor-1']]);
+            expect(buildMock).toHaveBeenCalledWith('0.1', { useCache: true });
+        });
 
-        expect(text).toBe("Actor 'john/missing' not found.");
-        expect(structuredContent).toBeUndefined();
-        expect(buildMock).not.toHaveBeenCalled();
+        it('looks up a bare value shaped like an ID as a name when no Actor has that ID', async () => {
+            getMock.mockResolvedValueOnce(undefined).mockResolvedValueOnce(mockActor());
+
+            await callTool({ actor: 'myscraperversion2' });
+
+            expect(actorMock.mock.calls).toEqual([['myscraperversion2'], ['~myscraperversion2'], ['actor-1']]);
+            expect(buildMock).toHaveBeenCalledTimes(1);
+        });
+
+        it.each(['qGXMy0NAkWsIIb9LZ', 'john/my-actor', 'john~my-actor'])(
+            'looks up %s once, as given',
+            async (actor) => {
+                await callTool({ actor });
+
+                expect(actorMock.mock.calls).toEqual([[actor], ['actor-1']]);
+            },
+        );
+
+        it.each([
+            ['a bare name', 'missing', ['~missing']],
+            ['a bare value shaped like an ID', 'myscraperversion2', ['myscraperversion2', '~myscraperversion2']],
+            ['a full name', 'john/missing', ['john/missing']],
+            ['a full name with a tilde', 'john~missing', ['john~missing']],
+        ])('returns a not-found error for %s that matches no Actor', async (_, actor, lookups) => {
+            getMock.mockResolvedValue(undefined);
+
+            const { text, structuredContent } = await callToolExpectingUserError({ actor });
+
+            expect(actorMock.mock.calls).toEqual(lookups.map((lookup) => [lookup]));
+            expect(text).toBe(
+                `Actor '${actor}' not found. The actor argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.`,
+            );
+            expect(structuredContent).toBeUndefined();
+            expect(buildMock).not.toHaveBeenCalled();
+        });
+
+        it.each([
+            ['a run', 'john/my-actor/runs/last', { id: 'run-1', actId: 'actor-1', status: 'SUCCEEDED' }],
+            // Has a name but no username.
+            ['an env var', 'john/my-actor/versions/0.1/env-vars/API_KEY', { name: 'API_KEY', value: 'secret-value' }],
+            // Has a username but no name, as a run's default storage does.
+            ["a run's key-value store", 'john/my-actor/runs/last/key-value-store', { id: 'kvs-1', username: 'john' }],
+        ])('reports %s, reached by extra path segments, as a missing Actor', async (_, actor, document) => {
+            getMock.mockResolvedValue(document);
+
+            const { text, structuredContent } = await callToolExpectingUserError({ actor });
+
+            expect(text).toBe(
+                `Actor '${actor}' not found. The actor argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.`,
+            );
+            expect(structuredContent).toBeUndefined();
+            expect(buildMock).not.toHaveBeenCalled();
+        });
     });
 
     it('returns an error when the Actor has no versions', async () => {

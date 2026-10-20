@@ -40,6 +40,11 @@ const MOCK_RUNS = {
     ],
 };
 
+/** What the list endpoint rejects with when no Actor matches. */
+function buildNotFoundError() {
+    return Object.assign(new Error('Actor was not found'), { statusCode: 404 });
+}
+
 describe('get-actor-run-list', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -94,17 +99,65 @@ describe('get-actor-run-list', () => {
         expectSchemaConformingStructuredContent(result, actorRunListOutputSchema);
     });
 
-    it('returns isError with a not-found message when the Actor does not exist', async () => {
-        actorListMock.mockRejectedValue(Object.assign(new Error('Actor was not found'), { statusCode: 404 }));
+    describe('actorId lookup', () => {
+        const callTool = async (args: Record<string, unknown>) =>
+            (await (getActorRunList as HelperTool).call(stubToolCallContext(args, stubClient))) as TextToolResult;
 
-        const result = await (getActorRunList as HelperTool).call(
-            stubToolCallContext({ actorId: 'missing' }, stubClient),
+        it('lists the runs of a bare name once, as the name of one of your own Actors', async () => {
+            actorListMock.mockResolvedValue(MOCK_RUNS);
+
+            const { structuredContent } = await callTool({ actorId: 'my-actor' });
+
+            expect(actorMock.mock.calls).toEqual([['~my-actor']]);
+            expect(actorListMock).toHaveBeenCalledTimes(1);
+            expect(structuredContent).toEqual(MOCK_RUNS);
+        });
+
+        it('lists the runs of a bare value shaped like an ID as a name when no Actor has that ID', async () => {
+            actorListMock.mockRejectedValueOnce(buildNotFoundError()).mockResolvedValueOnce(MOCK_RUNS);
+
+            const { structuredContent } = await callTool({ actorId: 'myscraperversion2' });
+
+            expect(actorMock.mock.calls).toEqual([['myscraperversion2'], ['~myscraperversion2']]);
+            expect(structuredContent).toEqual(MOCK_RUNS);
+        });
+
+        it('lists an empty page for an ID without retrying it as a name', async () => {
+            actorListMock.mockResolvedValue({ ...MOCK_RUNS, total: 0, count: 0, items: [] });
+
+            await callTool({ actorId: 'qGXMy0NAkWsIIb9LZ' });
+
+            expect(actorMock.mock.calls).toEqual([['qGXMy0NAkWsIIb9LZ']]);
+        });
+
+        it.each(['qGXMy0NAkWsIIb9LZ', 'john/my-actor', 'john~my-actor'])(
+            'lists the runs of %s once, as given',
+            async (actorId) => {
+                actorListMock.mockResolvedValue(MOCK_RUNS);
+
+                await callTool({ actorId });
+
+                expect(actorMock.mock.calls).toEqual([[actorId]]);
+            },
         );
-        const { content, structuredContent } = result as TextToolResult & { structuredContent?: unknown };
 
-        expectSoftFailInvalidInput(result);
-        expect(structuredContent).toBeUndefined();
-        expect(content[0].text).toContain("Actor 'missing' not found");
+        it.each([
+            ['a bare name', 'missing', ['~missing']],
+            ['a bare value shaped like an ID', 'myscraperversion2', ['myscraperversion2', '~myscraperversion2']],
+            ['a full name', 'john/missing', ['john/missing']],
+        ])('returns isError with a not-found message for %s that matches no Actor', async (_, actorId, lookups) => {
+            actorListMock.mockRejectedValue(buildNotFoundError());
+
+            const result = await (getActorRunList as HelperTool).call(stubToolCallContext({ actorId }, stubClient));
+            const { content, structuredContent } = result as TextToolResult & { structuredContent?: unknown };
+
+            expectSoftFailInvalidInput(result);
+            expect(actorMock.mock.calls).toEqual(lookups.map((lookup) => [lookup]));
+            expect(structuredContent).toBeUndefined();
+            expect(content[0].text).toBe(
+                `Actor '${actorId}' not found. The actorId argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.`,
+            );
+        });
     });
 
     it('rethrows non-404 errors from the Actor run list', async () => {
@@ -123,9 +176,12 @@ describe('get-actor-run-list', () => {
         expect(tool.ajvValidate({})).toBe(true);
     });
 
-    it('rejects limit above 10 via ajv validation', () => {
-        const tool = getActorRunList as HelperTool;
-        expect(tool.ajvValidate({ limit: 11 })).toBe(false);
-        expect(tool.ajvValidate({ limit: 10 })).toBe(true);
+    // Regression: #1479 — the API reads limit=0 as no limit and returns up to 1,000 items.
+    it.each([0, -1, 1.5, 11])('rejects limit %s via ajv validation', (limit) => {
+        expect((getActorRunList as HelperTool).ajvValidate({ limit })).toBe(false);
+    });
+
+    it.each([{ limit: 1 }, { limit: 10 }, {}])('accepts %j via ajv validation', (args) => {
+        expect((getActorRunList as HelperTool).ajvValidate(args)).toBe(true);
     });
 });

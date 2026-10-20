@@ -145,6 +145,8 @@ Restart Claude Code for the change to take effect. This token is picked up by bo
 
 ## Testing
 
+Unit test rules are in the [unit testing guide](./tests/UNIT_TESTING_GUIDE.md); which layer to use is in [tests/AGENTS.md](./tests/AGENTS.md).
+
 | Layer | Command | What it covers |
 |---|---|---|
 | **Unit tests** | `pnpm run test:unit` | Individual modules in isolation — no credentials needed |
@@ -170,6 +172,8 @@ Integration tests run against two purpose-built Actors defined in [apify/mcp-ser
 
 ### Test structure
 
+- `tests/AGENTS.md` — testing conventions and which test layer to use
+- `tests/UNIT_TESTING_GUIDE.md` — rules for unit tests
 - `tests/unit/` — unit tests for individual modules
 - `tests/integration/` — integration tests for MCP server functionality
   - `tests/integration/suite.ts` — wires the transport dimensions into one shared suite; add new cases to the matching group in `tests/test_kit/cases/*.cases.ts`, not here
@@ -188,7 +192,7 @@ merging the two codebases — it's a non-standard cross-repo dependency injectio
 (each side supplies its own client/environment for the same case logic), accepted
 deliberately for this trade-off.
 
-This package is also used by the hosted server in `apify-mcp-server-internal`. Every integration case is a `Case` object (`{ name, isDeploymentTest, run, ... }`) defined in `tests/test_kit/cases/*.cases.ts` — published behind the package's `./test-kit` export (`vitest` optional peerDependency). This repo's own `suite.ts` runs every case via `registerCases(name, allGroupCases, ctx)`; internal imports the same case arrays via `@apify/actors-mcp-server/test-kit` and calls `registerCases(name, allCases, { ...ctx, isDeploymentTestOnly: true })` against its own live staging/prod deploy — cases with `isDeploymentTest: false` register as `it.skip` there, so nothing needs re-registering by hand.
+This package is also used by the hosted server in `apify-mcp-server-internal`. Every integration case is a `Case` object (`{ name, isDeploymentTest, run, ... }`) defined in `tests/test_kit/cases/*.cases.ts` — published behind the package's `./test-kit` export (consumers install `vitest` themselves; it is deliberately not a peer, see `tests/test_kit/index.ts`). This repo's own `suite.ts` runs every case via `registerCases(name, allGroupCases, ctx)`; internal imports the same case arrays via `@apify/actors-mcp-server/test-kit` and calls `registerCases(name, allCases, { ...ctx, isDeploymentTestOnly: true })` against its own live staging/prod deploy — cases with `isDeploymentTest: false` register as `it.skip` there, so nothing needs re-registering by hand.
 
 Cases that share expensive setup (one seeded Actor run, say) do it via `ctx.getFixture(fixture)` (`Fixture<T> = { key, setup(ctx) }`) instead of a vitest `beforeAll` — `setup` runs at most once per `registerCases` call (once per transport dimension), memoized by `fixture.key`, no matter how many or few of the cases sharing it actually run (e.g. under `isDeploymentTestOnly`). This is what lets `storage.cases.ts`'s 13 cases built on one seeded run stay ordinary, individually eligible-for-`isDeploymentTest` `Case` objects instead of a separate non-flattenable group. See `tests/test_kit/register.ts` and `storage.cases.ts`'s `normalModeRunFixture`.
 

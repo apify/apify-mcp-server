@@ -24,7 +24,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import type { InitializeRequestParams } from '@modelcontextprotocol/sdk/types.js';
 import { InitializeRequestParamsSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { AuthInfo } from '@modelcontextprotocol/server';
-import { createMcpHandler, isLegacyRequest } from '@modelcontextprotocol/server';
+import { createMcpHandler, isLegacyRequest, SUPPORTED_PROTOCOL_VERSIONS } from '@modelcontextprotocol/server';
 import type { Request, Response } from 'express';
 import express from 'express';
 
@@ -32,11 +32,13 @@ import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
 
 import { ApifyClient } from './apify_client.js';
+import { MAX_REQUEST_BODY_BYTES } from './const.js';
 import { buildMcpClientContext } from './mcp/client_context.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { createStatelessServer } from './mcp/stateless_server.js';
+import type { PaymentProvider } from './payments/index.js';
 import { resolvePaymentProvider } from './payments/index.js';
-import { sanitizeMezmoMessage } from './utils/logging.js';
+import { sanitizeMezmoMessage, toPlainError } from './utils/logging.js';
 import { injectMcpSessionId } from './utils/mcp.js';
 import { getRequestOriginForClient } from './utils/mcp_clients.js';
 import { parseServerMode } from './utils/server_mode.js';
@@ -52,15 +54,8 @@ import { parseServerMode } from './utils/server_mode.js';
 process.env.TELEMETRY_ENV ??= 'DEV';
 
 /**
- * Extracts the Apify API token from the incoming request.
- *
- * Mirrors `apify-mcp-server-internal`'s `extractApiTokenFromRequest` so the
- * dev server behaves identically to production for auth/payment routing:
- *   1. `authorization: Bearer <token>` header
- *   2. `?token=<token>` query parameter
- *
- * Returns `undefined` if no valid token is present. The caller decides whether
- * a missing token is an error (no payment provider) or expected (payment mode).
+ * Mirrors `apify-mcp-server-internal`'s `extractApiTokenFromRequest`: the `Authorization: Bearer`
+ * header, then the `?token=` query parameter.
  */
 function extractApiTokenFromRequest(req: Request): string | undefined {
     const value = req.headers.authorization;
@@ -80,24 +75,19 @@ function extractApiTokenFromRequest(req: Request): string | undefined {
     }
 }
 
+function buildJsonRpcError(code: number, message: string) {
+    return { jsonrpc: '2.0', error: { code, message }, id: null };
+}
+
 /** The 401 body both eras send for a missing token, JSON-RPC-shaped like production's. */
-const UNAUTHORIZED_RESPONSE_BODY = {
-    jsonrpc: '2.0',
-    error: {
-        code: -32001,
-        message:
-            'Unauthorized: Apify API token is missing. Pass it as `Authorization: Bearer <token>`, or set `?payment=<provider>` to use a third-party payment provider.',
-    },
-    id: null,
-} as const;
+const UNAUTHORIZED_RESPONSE_BODY = buildJsonRpcError(
+    -32001,
+    'Unauthorized: Apify API token is missing. Pass it as `Authorization: Bearer <token>`, or set `?payment=<provider>` to use a third-party payment provider.',
+);
 
 /**
- * `WWW-Authenticate` challenge sent with that 401 (RFC 6750 §3), so a client is told how to
- * authenticate and not merely that it failed. Same shape the SDK's `bearerAuthChallengeResponse`
- * emits for a missing header, hand-written because that helper needs an OAuth token verifier and a
- * protected-resource-metadata URL, and this server takes plain Apify API tokens with no PRM endpoint.
- * Limitation: no `resource_metadata` parameter, so the token source is discoverable only by a human
- * reading the description.
+ * `WWW-Authenticate` challenge sent with that 401 (RFC 6750 §3). Hand-written because the SDK's
+ * `bearerAuthChallengeResponse` answers with an OAuth error body, not the JSON-RPC body production sends.
  */
 const UNAUTHORIZED_CHALLENGE =
     'Bearer error="invalid_token", error_description="Apify API token missing. Create one at https://console.apify.com/settings/integrations"';
@@ -109,7 +99,7 @@ const UNAUTHORIZED_CHALLENGE =
 function resolveRequestAuth(
     req: Request,
     res: Response,
-    paymentProvider: Awaited<ReturnType<typeof resolvePaymentProvider>>,
+    paymentProvider: PaymentProvider | undefined,
 ): { apifyToken: string | undefined } | null {
     if (paymentProvider) return { apifyToken: undefined };
 
@@ -119,6 +109,22 @@ function resolveRequestAuth(
     log.softFail('Apify API token missing on unauthenticated request', { statusCode: 401 });
     res.status(401).set('WWW-Authenticate', UNAUTHORIZED_CHALLENGE).json(UNAUTHORIZED_RESPONSE_BODY);
     return null;
+}
+
+/** Server settings both eras read from URL params, falling back to env vars like production does. */
+async function parseUrlParams(req: Request) {
+    const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
+    const uiParam = urlParams.get('ui');
+    return {
+        telemetryEnabled:
+            parseBooleanOrNull(urlParams.get('telemetry-enabled')) ??
+            parseBooleanOrNull(process.env.TELEMETRY_ENABLED) ??
+            true,
+        serverMode: uiParam !== null ? parseServerMode(uiParam) : parseServerMode(process.env.UI_MODE),
+        paymentProvider: await resolvePaymentProvider(urlParams.get('payment')),
+        // Client attribution tag (e.g. ?client=cursor), for Segment and tool wording.
+        clientParam: urlParams.get('client') ?? undefined,
+    };
 }
 
 /** The request fields era routing reads. Narrow so it can be exercised without an HTTP server. */
@@ -142,28 +148,28 @@ export async function isStatelessRequest(req: EraRoutableRequest): Promise<boole
 }
 
 /**
+ * Whether a `GET`/`DELETE` came from a client on a revision that dropped the GET stream and
+ * protocol-level sessions, leaving `405` as the only answer. Those methods carry no body for era
+ * routing to read, so the version header decides; a request that still names a session keeps its
+ * stateful handling. Mirrors `apify-mcp-server-internal`'s `isSessionlessEraRequest`.
+ */
+function isSessionlessEraRequest(req: Pick<Request, 'headers'>): boolean {
+    const version = req.headers['mcp-protocol-version'];
+    if (typeof version !== 'string' || SUPPORTED_PROTOCOL_VERSIONS.includes(version)) return false;
+
+    return req.headers['mcp-session-id'] === undefined;
+}
+
+/**
  * Serves one 2026-07-28 request: no session id, no handshake, nothing retained afterwards.
- * URL-parameter handling is deliberately a copy of the stateful branch's, so that branch stays
- * untouched by this change.
  *
  * The missing-token 401 is resolved inside the server factory, not up front: SEP-2243 requires
- * framing rejections (400/-32020) regardless of auth state, and the SDK entry runs its validation
- * ladder before invoking the factory.
- *
- * Dev-only shape: a facade is built per request, so `?actors=` re-fetches Actor metadata every time
- * (bar a `server/discover` probe, which loads no tools). A host may share one facade across requests
- * instead — snapshots are per-request either way.
+ * framing rejections (400/-32020) regardless of auth state, and the SDK runs that validation
+ * before invoking the factory. A server is built per request, so `?actors=` re-fetches Actor
+ * metadata every time.
  */
 async function serveStatelessRequest(req: Request, res: Response, taskStore: InMemoryTaskStore): Promise<void> {
-    const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
-    const telemetryEnabled =
-        parseBooleanOrNull(urlParams.get('telemetry-enabled')) ??
-        parseBooleanOrNull(process.env.TELEMETRY_ENABLED) ??
-        true;
-    const uiParam = urlParams.get('ui');
-    const serverMode = uiParam !== null ? parseServerMode(uiParam) : parseServerMode(process.env.UI_MODE);
-    const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
-    const clientParam = urlParams.get('client') ?? undefined;
+    const { telemetryEnabled, serverMode, paymentProvider, clientParam } = await parseUrlParams(req);
 
     // No token required in payment mode, mirroring `resolveRequestAuth`.
     const apifyToken = paymentProvider ? undefined : extractApiTokenFromRequest(req);
@@ -171,15 +177,9 @@ async function serveStatelessRequest(req: Request, res: Response, taskStore: InM
 
     const handler = createMcpHandler(
         async ({ requestInfo }) => {
-            // The SDK calls this factory before answering any modern method, `server/discover`
-            // included — so gating it on auth would make a client need a token to learn which
-            // revisions and capabilities this endpoint serves. Let discovery through, and skip the
-            // Actor-metadata fetch for it: discovery reports capabilities and configuration-level
-            // instructions, neither of which reads the tool set. The revision requires the method in
-            // a header, cross-checked against the body before this factory runs, so it is
-            // authoritative here.
+            // `server/discover` needs no token and no tools: it reports only capabilities and
+            // instructions. The SDK has already checked the `mcp-method` header against the body.
             const isDiscoverProbe = requestInfo?.headers.get('mcp-method') === 'server/discover';
-            // Reached only after the validation ladder passed (see the doc comment above).
             if (!isDiscoverProbe && !paymentProvider && !apifyToken) {
                 unauthorized = true;
                 throw new Error('Apify API token missing on unauthenticated request');
@@ -194,8 +194,7 @@ async function serveStatelessRequest(req: Request, res: Response, taskStore: InM
                 token: apifyToken,
                 clientParam,
             });
-            // Client identity arrives per request in the `_meta` envelope (there is no initialize
-            // handshake), so this fetch carries no request-origin tag.
+            // No initialize handshake, so this fetch carries no request-origin tag.
             if (!isDiscoverProbe) {
                 await mcpServer.loadToolsFromUrl(req.url, new ApifyClient({ token: apifyToken }));
             }
@@ -233,33 +232,15 @@ async function serveStatelessRequest(req: Request, res: Response, taskStore: InM
 
 export function createExpressApp(): express.Express {
     const app = express();
-    const mcpServers: { [sessionId: string]: ActorsMcpServer } = {};
-    const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+    const transports = new Map<string, StreamableHTTPServerTransport>();
     const taskStore = new InMemoryTaskStore();
     const validateHost = localhostHostValidation();
     const validateOrigin = localhostOriginValidation();
 
-    function respondWithError(res: Response, error: unknown, logMessage: string, statusCode = 500) {
-        if (statusCode >= 500) {
-            // Server errors (>= 500) - log as exception
-            log.exception(error instanceof Error ? error : new Error(String(error)), 'Error in request', {
-                logMessage,
-                statusCode,
-            });
-        } else {
-            // Client errors (< 500) - log as softFail without stack trace
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            log.softFail('Error in request', { logMessage, errMessage: errorMessage, statusCode });
-        }
+    function respondWithError(res: Response, error: unknown, logMessage: string) {
+        log.exception(toPlainError(error), 'Error in request', { logMessage, statusCode: 500 });
         if (!res.headersSent) {
-            res.status(statusCode).json({
-                jsonrpc: '2.0',
-                error: {
-                    code: statusCode === 500 ? -32603 : -32000,
-                    message: statusCode === 500 ? 'Internal server error' : 'Bad Request',
-                },
-                id: null,
-            });
+            res.status(500).json(buildJsonRpcError(-32603, 'Internal server error'));
         }
     }
 
@@ -269,179 +250,104 @@ export function createExpressApp(): express.Express {
         if (validateHost(req, res) && validateOrigin(req, res)) next();
     });
 
-    // express.json() middleware to parse JSON bodies, before the POST / route.
-    app.use(express.json());
+    // Express's 100 KB default is too small for tool calls that carry files. See apify/apify-mcp-server#1610.
+    app.use(express.json({ limit: MAX_REQUEST_BODY_BYTES }));
     app.post('/', async (req: Request, res: Response) => {
         log.info('Received MCP request:', req.body);
         try {
-            // Both protocol eras are served on this one endpoint; everything the stateless path does
-            // not claim falls through to the stateful path below, unchanged.
             if (await isStatelessRequest(req)) {
                 await serveStatelessRequest(req, res, taskStore);
                 return;
             }
 
-            // Check for existing session ID
             const sessionId = req.headers['mcp-session-id'] as string | undefined;
-            const initializeMessage = extractInitializeMessage(req.body);
-            let transport: StreamableHTTPServerTransport;
-
-            if (sessionId && transports[sessionId]) {
-                // Reuse existing transport
-                transport = transports[sessionId];
-            } else if (!sessionId && initializeMessage) {
-                // Extract telemetry query parameters
-                const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
-                const telemetryEnabledParam = urlParams.get('telemetry-enabled');
-                // URL param > env var > default (true)
-                const telemetryEnabled =
-                    parseBooleanOrNull(telemetryEnabledParam) ??
-                    parseBooleanOrNull(process.env.TELEMETRY_ENABLED) ??
-                    true;
-
-                const uiParam = urlParams.get('ui');
-                const serverMode = uiParam !== null ? parseServerMode(uiParam) : parseServerMode(process.env.UI_MODE);
-
-                // Resolve payment provider from URL parameter (e.g., ?payment=skyfire)
-                const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
-
-                // Client attribution tag (e.g. ?client=cursor), for Segment — see mcp_url_client.
-                const clientParam = urlParams.get('client') ?? undefined;
-
-                // Mirror production: no token required in payment mode, else require Bearer header
-                const auth = resolveRequestAuth(req, res, paymentProvider);
-                if (!auth) return;
-                const { apifyToken } = auth;
-
-                const mcpServer = new ActorsMcpServer({
-                    taskStore,
-                    setupSigintHandler: false,
-                    transportType: 'http',
-                    telemetry: {
-                        enabled: telemetryEnabled,
-                    },
-                    serverMode,
-                    paymentProvider,
-                    token: apifyToken,
-                    clientParam,
-                });
-
-                // Client info is already available here — unlike stdio.ts, which loads tools
-                // before initialization.
-                const requestOrigin = getRequestOriginForClient(
-                    buildMcpClientContext(parseInitializeParams(initializeMessage.params)),
-                );
-                const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin });
-                // Fetch actor metadata and queue mode-agnostic sources. Composed with
-                // the final mode inside the initialize request handler.
-                await mcpServer.loadToolsFromUrl(req.url, apifyClient);
-
-                // SDK awaits onsessioninitialized before flushing InitializeResult, so registering
-                // the maps here closes the (single-process, narrow) window where a follow-up
-                // request could arrive before post-handleRequest map population runs.
-                transport = new StreamableHTTPServerTransport({
-                    sessionIdGenerator: () => randomUUID(),
-                    enableJsonResponse: false, // Use SSE response mode
-                    onsessioninitialized: (newSessionId) => {
-                        transports[newSessionId] = transport;
-                        mcpServers[newSessionId] = mcpServer;
-                    },
-                    onsessionclosed: (closedSessionId) => {
-                        delete transports[closedSessionId];
-                        delete mcpServers[closedSessionId];
-                    },
-                });
-
-                await mcpServer.connect(transport);
+            if (sessionId) {
+                const transport = transports.get(sessionId);
+                if (!transport) {
+                    res.status(404).json(buildJsonRpcError(-32001, 'Session not found'));
+                    return;
+                }
+                if (req.body) {
+                    req.body.params = injectMcpSessionId(req.body.params, sessionId);
+                }
                 await transport.handleRequest(req, res, req.body);
-                return; // Already handled
-            } else if (!sessionId) {
-                // Non-initialization requests without a session ID must be 400 Bad Request.
-                res.status(400).json({
-                    jsonrpc: '2.0',
-                    error: {
-                        code: -32000,
-                        message: 'Bad Request: Mcp-Session-Id header is required',
-                    },
-                    id: null,
-                });
-                return;
-            } else {
-                // Invalid request - session ID is unknown.
-                res.status(404).json({
-                    jsonrpc: '2.0',
-                    error: {
-                        code: -32001,
-                        message: 'Session not found',
-                    },
-                    id: null,
-                });
                 return;
             }
 
-            // Inject session ID into request params for the reused existing session
-            if (sessionId && req.body) {
-                req.body.params = injectMcpSessionId(req.body.params, sessionId);
+            const initializeMessage = extractInitializeMessage(req.body);
+            if (!initializeMessage) {
+                res.status(400).json(buildJsonRpcError(-32000, 'Bad Request: Mcp-Session-Id header is required'));
+                return;
             }
 
-            // Handle the request with existing transport - no need to reconnect
+            const { telemetryEnabled, serverMode, paymentProvider, clientParam } = await parseUrlParams(req);
+            const auth = resolveRequestAuth(req, res, paymentProvider);
+            if (!auth) return;
+            const { apifyToken } = auth;
+
+            const mcpServer = new ActorsMcpServer({
+                taskStore,
+                setupSigintHandler: false,
+                transportType: 'http',
+                telemetry: { enabled: telemetryEnabled },
+                serverMode,
+                paymentProvider,
+                token: apifyToken,
+                clientParam,
+            });
+
+            const requestOrigin = getRequestOriginForClient(
+                buildMcpClientContext(parseInitializeParams(initializeMessage.params)),
+            );
+            // Tools are composed with the final server mode inside the initialize handler.
+            await mcpServer.loadToolsFromUrl(req.url, new ApifyClient({ token: apifyToken, requestOrigin }));
+
+            // The SDK awaits onsessioninitialized before sending InitializeResult, so the session is
+            // registered before any follow-up request can arrive.
+            const transport = new StreamableHTTPServerTransport({
+                sessionIdGenerator: () => randomUUID(),
+                enableJsonResponse: false,
+                onsessioninitialized: (newSessionId) => {
+                    transports.set(newSessionId, transport);
+                },
+                onsessionclosed: (closedSessionId) => {
+                    transports.delete(closedSessionId);
+                },
+            });
+
+            await mcpServer.connect(transport);
             await transport.handleRequest(req, res, req.body);
         } catch (error) {
             respondWithError(res, error, 'Error handling MCP request');
         }
     });
 
-    // Handle GET requests
-    // Clients open this to receive server-initiated notifications (e.g. notifications/tasks/status)
-    // that are not tied to a specific POST request.  Without this, session-level notifications
-    // are silently dropped by the transport.
-    app.get('/', async (req: Request, res: Response) => {
+    // GET opens the stream for server-initiated notifications not tied to a POST (e.g.
+    // notifications/tasks/status); without it the transport drops them. DELETE ends the session.
+    async function handleSessionRequest(req: Request, res: Response) {
+        if (isSessionlessEraRequest(req)) {
+            res.set('Allow', 'POST').status(405).json(buildJsonRpcError(-32000, 'Method not allowed.'));
+            return;
+        }
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
-        const transport = transports[sessionId || ''] as StreamableHTTPServerTransport | undefined;
+        const transport = sessionId ? transports.get(sessionId) : undefined;
         if (!transport) {
-            log.softFail('Session not found for GET SSE stream', { mcpSessionId: sessionId, statusCode: 404 });
-            res.status(404).send('Not Found: Session not found').end();
+            log.softFail('Session not found', { mth: req.method, mcpSessionId: sessionId, statusCode: 404 });
+            res.status(404).send('Not Found: Session not found');
             return;
         }
-        log.info('MCP API', {
-            mth: req.method,
-            rt: '/',
-            mcpSessionId: sessionId,
-        });
+        log.info('MCP API', { mth: req.method, rt: '/', mcpSessionId: sessionId });
         try {
-            await transport.handleRequest(req, res);
+            await transport.handleRequest(req, res, req.body);
         } catch (error) {
-            respondWithError(res, error, 'Error handling GET SSE stream');
+            respondWithError(res, error, `Error handling ${req.method} request`);
         }
-    });
+    }
+    app.get('/', handleSessionRequest);
+    app.delete('/', handleSessionRequest);
 
-    app.delete('/', async (req: Request, res: Response) => {
-        const sessionId = req.headers['mcp-session-id'] as string | undefined;
-
-        const transport = transports[sessionId || ''] as StreamableHTTPServerTransport | undefined;
-        if (transport) {
-            log.info('MCP API', {
-                mth: req.method,
-                rt: '/',
-                mcpSessionId: sessionId,
-            });
-            try {
-                await transport.handleRequest(req, res, req.body);
-            } catch (error) {
-                respondWithError(res, error, 'Error handling DELETE request');
-            }
-            return;
-        }
-
-        log.softFail('Session not found', { mcpSessionId: sessionId, statusCode: 404 });
-        res.status(404).send('Not Found: Session not found').end();
-    });
-
-    // Catch-all for undefined routes
     app.use((req: Request, res: Response) => {
-        res.status(404)
-            .json({ message: `There is nothing at route ${req.method} ${req.originalUrl}.` })
-            .end();
+        res.status(404).json({ message: `There is nothing at route ${req.method} ${req.originalUrl}.` });
     });
 
     return app;
@@ -460,17 +366,11 @@ export function extractInitializeMessage(body: unknown): { method: string; param
     );
 }
 
-/**
- * Type-safe extraction of `initialize` params for `buildMcpClientContext`/request-origin.
- * Malformed params parse to `undefined` (client context stays unset) rather than being cast
- * unchecked — the SDK validates the full request separately once it takes over below.
- */
+/** Malformed params parse to `undefined`; the SDK validates the full request itself. */
 export function parseInitializeParams(params: unknown): InitializeRequestParams | undefined {
     const result = InitializeRequestParamsSchema.safeParse(params);
     return result.success ? result.data : undefined;
 }
-
-// --- Entry point: start the server when run directly ---
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const HOST = process.env.HOST ?? 'http://localhost';

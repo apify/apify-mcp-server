@@ -22,7 +22,8 @@ type PromptService = {
 /**
  * Prompt list/get logic, mirroring `createResourceService`'s factory + explicit-dependency shape.
  * Throws {@link InvalidParamsError} for an unknown prompt name or arguments that fail AJV validation;
- * the `server.ts` boundary maps that to the v1 InvalidParams JSON-RPC error at the wire seam.
+ * the protocol adapters (`legacy_server.ts`, `stateless_server.ts`) map that to an InvalidParams
+ * JSON-RPC error at the wire seam.
  */
 export function createPromptService(prompts: PromptBase[]): PromptService {
     const listPrompts = (): { prompts: PromptBase[] } => {

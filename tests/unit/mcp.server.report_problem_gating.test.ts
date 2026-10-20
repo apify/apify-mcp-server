@@ -67,7 +67,6 @@ describe('report-problem client gating', () => {
     afterEach(async () => {
         while (servers.length > 0) {
             const server = servers.pop();
-            server?.tools.clear();
             await server?.close();
         }
     });

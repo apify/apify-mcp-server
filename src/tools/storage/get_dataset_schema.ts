@@ -9,7 +9,7 @@ import { stripQuoteWrappers } from '../../utils/generic.js';
 import { respondServerError, respondUserError } from '../../utils/mcp.js';
 import { generateSchemaFromItems } from '../../utils/schema_generation.js';
 import { datasetSchemaOutputSchema } from '../structured_output_schemas.js';
-import { buildStorageResponse, catchNotFound } from './storage_helpers.js';
+import { buildStorageResponse, catchNotFound, resolveSiblingNextStep } from './storage_helpers.js';
 
 const getDatasetSchemaArgs = z.object({
     datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
@@ -63,7 +63,7 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client } = toolArgs;
+        const { args, apifyClient: client, loadedToolNames } = toolArgs;
         const parsed = getDatasetSchemaArgs.parse(args);
         const datasetId = stripQuoteWrappers(parsed.datasetId);
 
@@ -78,10 +78,22 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
         const datasetItems = datasetResponse.items;
 
         if (datasetItems.length === 0) {
-            // Empty dataset: no items to infer from, but still emit a schema-conforming
-            // response (empty schema = "any") rather than bare text.
-            const summary = `Dataset '${datasetId}' is empty; no schema to infer.`;
-            const nextStep = `Use ${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} to check itemCount and stats.`;
+            // No items to infer from, but still emit a schema-conforming response (empty schema =
+            // "any") rather than bare text. Under clean=true, items=[] does not mean empty: a dataset
+            // whose items hold only #-prefixed or empty fields is filtered out entirely, which `total`
+            // (counted before the filter) tells apart from a truly empty one.
+            const isCleanFiltered = parsed.clean && datasetResponse.total > 0;
+            const checkStats = `${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} to check itemCount and stats.`;
+            const summary = isCleanFiltered
+                ? `Dataset '${datasetId}' returned no items with clean=true, which skips empty items and hidden (#) fields; no schema to infer.`
+                : `Dataset '${datasetId}' is empty; no schema to infer.`;
+            const cleanFalseFact = 'clean=false includes those items.';
+            const nextStep = resolveSiblingNextStep(
+                HELPER_TOOLS.DATASET_GET,
+                loadedToolNames,
+                isCleanFiltered ? `${cleanFalseFact} Use ${checkStats}` : `Use ${checkStats}`,
+                isCleanFiltered ? cleanFalseFact : undefined,
+            );
             return buildStorageResponse({ structuredContent: { datasetId, schema: {} }, summary, nextStep });
         }
 
@@ -97,7 +109,11 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
 
         const fieldCount = Object.keys(schema.items.properties ?? {}).length;
         const summary = `Schema inferred from ${datasetItems.length} ${datasetItems.length === 1 ? 'item' : 'items'}, ${fieldCount} ${fieldCount === 1 ? 'field' : 'fields'}.`;
-        const nextStep = `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and fields="..." to project specific fields.`;
+        const nextStep = resolveSiblingNextStep(
+            HELPER_TOOLS.DATASET_GET_ITEMS,
+            loadedToolNames,
+            `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and fields="..." to project specific fields.`,
+        );
         return buildStorageResponse({ structuredContent: { datasetId, schema }, summary, nextStep });
     },
 } as const);

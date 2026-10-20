@@ -13,7 +13,7 @@ import type z from 'zod';
 
 import type { ApifyClient } from './apify_client.js';
 import type { FAILURE_CATEGORY, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
-import type { PaymentProvider } from './payments/types.js';
+import type { PaymentProvider, PaymentProviderId } from './payments/types.js';
 import type { CATEGORY_NAMES } from './tools/registry.js';
 import type { ToolResponse } from './utils/mcp.js';
 import type { PricingTier, StructuredPricingInfo } from './utils/pricing_info.js';
@@ -33,6 +33,9 @@ export type SchemaProperties = {
     items?: SchemaProperties;
     editor?: string;
     examples?: unknown[];
+    isSecret?: boolean;
+    resourceType?: string;
+    resourcePermissions?: string[];
 
     properties?: Record<string, SchemaProperties>;
     required?: string[];
@@ -87,6 +90,8 @@ export type ActorDefinitionWithInfo = {
 export type ToolDescriptionContext = {
     /** Whether the named tool is served in the same tools/list as this tool. */
     hasTool: (name: string) => boolean;
+    /** Raw `?client=` URL query-param value; picks wording only, never the tool set. */
+    clientParam?: string;
 };
 
 /** Renders every cross-tool reference as present — for building `description` at module load. */
@@ -205,6 +210,12 @@ export type HelperTool = ToolBase & {
      * @returns Promise resolving to the tool's output
      */
     call: (toolArgs: InternalToolArgs) => Promise<ToolResponse>;
+    /**
+     * Returns the copy of the arguments that is logged, for a tool whose arguments carry secrets. It runs in
+     * `prepareToolCallContext`, before AJV validation, so it must accept any shape and not mutate the
+     * arguments; it also sees undeclared keys, so build the copy as an allowlist.
+     */
+    redactArgs?: (args: Record<string, unknown>) => Record<string, unknown>;
 };
 
 /**
@@ -216,7 +227,7 @@ export type ActorMcpTool = ToolBase & {
     type: typeof TOOL_TYPE.ACTOR_MCP;
     /** Origin MCP server tool name is needed for the tool call */
     originToolName: string;
-    /** ID of the Actorized MCP server - for example, apify/actors-mcp-server */
+    /** ID of the Actorized MCP server - for example, apify/example-mcp-server */
     actorId: string;
     /** Connection URL of the Actorized MCP server */
     serverUrl: string;
@@ -371,6 +382,8 @@ export type ToolCallTelemetryProperties = {
     transport_type: string;
     /** Raw `?client=` URL query-param value, when the connecting request carried one. */
     mcp_url_client: string;
+    /** Payment provider the connection was opened with (`?payment=`), absent without one. Marks the mode, not that this call was paid. */
+    payment_provider?: PaymentProviderId;
     tool_name: string;
     tool_status: ToolStatus;
     tool_exec_time_ms: number;
@@ -526,6 +539,8 @@ export type ActorExecutionParams = {
      * task mode would let the task complete before the Actor has produced output.
      */
     taskMode?: boolean;
+    /** Whether the session serves call-actor; without it, an Actor's tip gets the callability caveat. */
+    hasCallActorTool?: boolean;
 };
 
 /**
@@ -579,6 +594,9 @@ export type ActorStore = {
      * @param actorFullName - Full Actor name in "username/name" format (e.g., "apify/rag-web-browser")
      */
     getActorOutputSchemaAsTypeObject(actorFullName: string): Promise<Record<string, unknown> | null>;
+
+    /** Returns the Actor picture URL via the image proxy (CORS-enabled). Without it, the Store search is used. */
+    getProxiedPictureUrl?(pictureUrl: string): string;
 };
 
 /**
@@ -639,7 +657,7 @@ export type ActorsMcpServerOptions = {
      * - 'http': Remote HTTP streamable connection
      */
     transportType?: TransportType;
-    /** Raw `?client=` value from the connecting URL, for Segment attribution; independent of `clientInfo.name`, HTTP-only (undefined on stdio). */
+    /** Raw `?client=` value from the connecting URL, for Segment attribution and tool wording; independent of `clientInfo.name`, HTTP-only (undefined on stdio). */
     clientParam?: string;
     /**
      * Apify API token for authentication

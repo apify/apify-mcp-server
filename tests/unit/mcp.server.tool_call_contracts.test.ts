@@ -1,6 +1,7 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ApifyClient as ApifyClientBase } from 'apify-client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
@@ -10,7 +11,6 @@ import * as mcpClient from '../../src/mcp/client.js';
 import type { McpClientContext } from '../../src/mcp/client_context.js';
 import { getMCPServerTools } from '../../src/mcp/proxy.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
-import type { PaymentProvider } from '../../src/payments/types.js';
 import * as telemetry from '../../src/telemetry.js';
 import * as callActor from '../../src/tools/actors/call_actor.js';
 import {
@@ -18,6 +18,9 @@ import {
     REPORT_PROBLEM_NUDGE,
     reportProblem,
 } from '../../src/tools/dev/report_problem.js';
+import { getActorRunList } from '../../src/tools/runs/get_actor_run_list.js';
+import { getDatasetList } from '../../src/tools/storage/get_dataset_list.js';
+import { getKeyValueStoreList } from '../../src/tools/storage/get_key_value_store_list.js';
 import type { ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
@@ -28,6 +31,7 @@ import {
     getTaskStore,
     makePaymentRequiredError,
     makePermissionApprovalError,
+    makePaymentProvider,
     makeRecorderTool,
     makeThrowingTool,
     PERMISSION_HTTP_STATUS,
@@ -193,10 +197,13 @@ const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled']);
 function expectFailureClassTelemetry(
     trackSpy: { mock: { calls: [unknown, unknown, Record<string, unknown>][] } },
     fc: FailureClass,
+    extraKeys: string[] = [],
 ): void {
     expect(trackSpy.mock.calls).toHaveLength(1);
     const properties = trackSpy.mock.calls[0][2];
-    expect(Object.keys(properties).sort()).toEqual([...BASE_TELEMETRY_KEYS, ...fc.telemetryExtraKeys].sort());
+    expect(Object.keys(properties).sort()).toEqual(
+        [...BASE_TELEMETRY_KEYS, ...fc.telemetryExtraKeys, ...extraKeys].sort(),
+    );
     expect(properties.tool_status).toBe(fc.telemetry.tool_status);
     expect(properties.failure_category).toBe(fc.telemetry.failure_category);
     if (fc.telemetry.failure_http_status === undefined) {
@@ -272,6 +279,18 @@ describe('CallToolRequestSchema handler', () => {
                 expect('internalToolStatus' in result).toBe(false);
             });
         });
+
+        it('ends a 404 failure with the API message and no generic hint', async () => {
+            await withServer(async (server) => {
+                silenceLogs();
+                const error = Object.assign(new Error('Actor run was not found'), { statusCode: 404 });
+                const result = await runSync(server, makeThrowingTool({ error }));
+                expect(result.isError).toBe(true);
+                expect(result.content).toEqual([
+                    { type: 'text', text: 'Error calling tool "test-throwing-tool": Actor run was not found.' },
+                ]);
+            });
+        });
     });
 
     it('rejects a task-augmented call to a tool without taskSupport before dispatch', async () => {
@@ -325,6 +344,37 @@ describe('CallToolRequestSchema handler', () => {
                 ),
             ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
             expect(received.called).toBe(false);
+        });
+    });
+
+    // Regression: #1479 — the API reads limit=0 as no limit and returns up to 1,000 items.
+    it.each([
+        [HELPER_TOOLS.ACTOR_RUN_LIST_GET, getActorRunList, 'runs'],
+        [HELPER_TOOLS.DATASET_LIST_GET, getDatasetList, 'datasets'],
+        [HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET, getKeyValueStoreList, 'keyValueStores'],
+    ] as const)('rejects an invalid %s limit before any API request', async (name, tool, method) => {
+        await withServer(async (server) => {
+            silenceLogs();
+            server.upsertTools([tool]);
+            vi.spyOn(getLegacyServer(server), 'sendLoggingMessage').mockResolvedValue(undefined);
+            const listSpy = vi.spyOn(ApifyClientBase.prototype, method).mockImplementation(() => {
+                throw new Error('stubbed');
+            });
+            const handler = getRequestHandler(server, 'tools/call');
+            const callWithLimit = async (limit: number) =>
+                handler(
+                    { method: 'tools/call', params: { name, arguments: { limit }, _meta: { mcpSessionId: 's1' } } },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                );
+
+            for (const limit of [0, -1, 1.5]) {
+                await expect(callWithLimit(limit)).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+            }
+            expect(listSpy).not.toHaveBeenCalled();
+
+            // Control: a valid limit reaches the spied client method.
+            await callWithLimit(1);
+            expect(listSpy).toHaveBeenCalled();
         });
     });
 
@@ -386,6 +436,31 @@ describe('CallToolRequestSchema handler', () => {
         );
 
         expect(trackSpy.mock.calls[0][2]).toMatchObject({ mcp_url_client: '' });
+    });
+
+    it.each(['skyfire', 'x402'] as const)('tags tool-call telemetry with payment_provider %s', async (id) => {
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        await withServer(
+            async (server) => {
+                // A free tool, called without any payment: the tag marks the connection's mode, not a paid call.
+                await runSync(server, makeRecorderTool('payment-provider-tool').tool);
+            },
+            { token: undefined, telemetry: { enabled: true }, paymentProvider: makePaymentProvider(id) },
+        );
+
+        expect(trackSpy.mock.calls[0][2]).toMatchObject({ payment_provider: id });
+    });
+
+    it('omits payment_provider from tool-call telemetry without a payment provider', async () => {
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        await withServer(
+            async (server) => {
+                await runSync(server, makeRecorderTool('no-payment-provider-tool').tool);
+            },
+            { token: undefined, telemetry: { enabled: true }, allowUnauthMode: true },
+        );
+
+        expect(trackSpy.mock.calls[0][2]).not.toHaveProperty('payment_provider');
     });
 });
 
@@ -671,6 +746,26 @@ describe('executeToolAndUpdateTask()', () => {
             expect(texts).not.toContain(REPORT_PROBLEM_INVALID_INPUT_NUDGE);
         });
     });
+
+    it.each([
+        ['an internal failure gets the general sentence', 500, REPORT_PROBLEM_NUDGE],
+        ['a 4xx failure gets the friction sentence', 404, REPORT_PROBLEM_INVALID_INPUT_NUDGE],
+    ])('appends one report-problem sentence to an ACTOR_MCP task failure: %s', async (_label, code, sentence) => {
+        await withServer(async (server) => {
+            silenceLogs();
+            const rejectingClient = {
+                callTool: vi.fn().mockRejectedValue(new McpError(code as ErrorCode, `remote ${code}`)),
+                close: vi.fn().mockResolvedValue(undefined),
+                setNotificationHandler: vi.fn(),
+            } as unknown as Client;
+            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(rejectingClient);
+            server.upsertTools([{ ...reportProblem }]);
+            const { result } = await runTaskAndReadBack(server, makeActorMcpTool());
+            const texts = (result.content as { text: string }[]).map((c) => c.text);
+            expect(texts).toHaveLength(2);
+            expect(texts[1]).toBe(sentence);
+        });
+    });
 });
 
 describe('ACTOR_MCP remote-McpError containment (sync tools/call catch)', () => {
@@ -907,27 +1002,6 @@ describe('ACTOR_MCP dispatch by exposed tool name', () => {
 describe('CallToolRequestSchema handler — task-augmented pre-flight failures', () => {
     afterEach(() => vi.restoreAllMocks());
 
-    // x402 payload the payment provider returns; asserted intact in the stored structuredContent.
-    const X402_PAYLOAD = { x402Version: 1, accepts: [{ scheme: 'exact', resource: 'test' }] };
-
-    /** Skyfire-like provider whose getPaymentRequiredData populates the x402 structuredContent. */
-    function makePaymentProvider(): PaymentProvider {
-        return {
-            id: 'skyfire',
-            allowsUnauthenticated: true,
-            decorateToolSchema: (tool) => tool,
-            validatePayment: (args) => (args['skyfire-pay-id'] ? null : 'Missing skyfire-pay-id'),
-            getPaymentRequiredData: () => X402_PAYLOAD,
-            getPaymentHeaders: (args): Record<string, string> =>
-                args['skyfire-pay-id'] ? { 'skyfire-pay-id': args['skyfire-pay-id'] as string } : {},
-            removePaymentFields: (args) => {
-                const { 'skyfire-pay-id': _removed, ...rest } = args;
-                return rest;
-            },
-            redactForLogging: (args) => ({ ...(args as Record<string, unknown>), 'skyfire-pay-id': '[REDACTED]' }),
-        };
-    }
-
     /** Drives a task-augmented call and returns the CreateTaskResult (already terminal on pre-flight failure). */
     async function callTask(
         server: ActorsMcpServer,
@@ -978,7 +1052,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 // Stored result carries the x402 payload intact.
                 const stored = (await getTaskStore(server).getTaskResult(res.task.taskId)) as Record<string, unknown>;
                 expect(stored.isError).toBe(true);
-                expect(stored.structuredContent).toEqual(X402_PAYLOAD);
+                expect(stored.structuredContent).toEqual(X402_PAYMENT_DATA);
                 // Exactly one status notification, `completed`, emitted after the response.
                 expect(statusNotificationStatuses(notifySpy)).toEqual([]);
                 await flushDeferredNotification();
@@ -1084,8 +1158,9 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 paymentProvider: makePaymentProvider(),
             },
         );
-        // Same properties the sync 402 pre-flight path records (FAILURE_CLASSES[0]).
-        expectFailureClassTelemetry(trackSpy, FAILURE_CLASSES[0]);
+        // Same properties the sync 402 pre-flight path records (FAILURE_CLASSES[0]), plus the payment provider.
+        expectFailureClassTelemetry(trackSpy, FAILURE_CLASSES[0], ['payment_provider']);
+        expect(trackSpy.mock.calls[0][2]).toMatchObject({ payment_provider: 'skyfire' });
         expect(trackSpy.mock.calls[0][2]).not.toHaveProperty('taskId');
     });
 

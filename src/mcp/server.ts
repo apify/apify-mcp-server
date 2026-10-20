@@ -281,7 +281,10 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      * Read by the legacy adapter after `applyInitialize`, when the tool set is final.
      */
     public getServerInstructions(): string {
-        return getServerInstructions(this.serverMode, { hasTool: (name) => this.tools.has(name) });
+        return getServerInstructions(this.serverMode, {
+            hasTool: (name) => this.tools.has(name),
+            clientParam: this.options.clientParam,
+        });
     }
 
     /**
@@ -301,7 +304,10 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
             return getServerInstructions(mode, { hasTool: notReportProblem });
         }
         const toolNames = resolveToolNamesFromInput(parseInputParamsFromUrl(requestUrl), mode);
-        return getServerInstructions(mode, { hasTool: (name) => notReportProblem(name) && toolNames.has(name) });
+        return getServerInstructions(mode, {
+            hasTool: (name) => notReportProblem(name) && toolNames.has(name),
+            clientParam: this.options.clientParam,
+        });
     }
 
     /**
@@ -418,7 +424,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * Returns the unique Actor IDs registered as MCP servers (e.g., 'apify/actors-mcp-server').
+     * Returns the unique Actor IDs registered as MCP servers (e.g., 'apify/example-mcp-server').
      */
     private listActorMcpServerToolIds(): string[] {
         const ids = Array.from(this.tools.values())

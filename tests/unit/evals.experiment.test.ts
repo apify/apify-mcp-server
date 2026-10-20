@@ -7,9 +7,11 @@ import {
     EVALUATORS,
     expandIterations,
     formatRunSummary,
+    formatTeardownHint,
     isTransientAgentError,
     resolveExitCode,
     resolveGitBranch,
+    substituteUniqMarker,
     validateConcurrency,
     validateIterations,
     validatePassThreshold,
@@ -21,6 +23,7 @@ const mocks = vi.hoisted(() => ({
     runAgentConversation: vi.fn(async (): Promise<unknown> => {
         throw new Error('spawn ENOENT');
     }),
+    buildAgentObservations: vi.fn(() => ({})),
     emitObservations: vi.fn(),
     evaluateConversation: vi.fn(async () => ({ verdict: 'PASS', reason: 'looks good', rawResponse: '' })),
 }));
@@ -30,7 +33,7 @@ vi.mock('../../evals/agent/claude_agent.js', () => ({
 }));
 
 vi.mock('../../evals/langfuse/observations.js', () => ({
-    buildAgentObservations: () => ({}),
+    buildAgentObservations: mocks.buildAgentObservations,
     emitObservations: mocks.emitObservations,
 }));
 
@@ -179,16 +182,21 @@ describe('isTransientAgentError()', () => {
         'read ECONNRESET',
         'API error: 529 overloaded_error',
         'Request failed with status 503',
+        'MCP server "apify" not connected at init (status: pending)',
+        'MCP server "apify" not connected at init (status: failed)',
     ])('treats "%s" as transient', (message) => {
         expect(isTransientAgentError(new Error(message))).toBe(true);
     });
 
-    it.each(['spawn ENOENT', 'Prompt is too long', 'stdio binary not found', 'Invalid model name'])(
-        'treats "%s" as permanent',
-        (message) => {
-            expect(isTransientAgentError(new Error(message))).toBe(false);
-        },
-    );
+    it.each([
+        'spawn ENOENT',
+        'Prompt is too long',
+        'stdio binary not found',
+        'Invalid model name',
+        'MCP server "apify" not connected at init (status: disabled)',
+    ])('treats "%s" as permanent', (message) => {
+        expect(isTransientAgentError(new Error(message))).toBe(false);
+    });
 });
 
 describe('createExperimentTask()', () => {
@@ -216,6 +224,7 @@ describe('createExperimentTask()', () => {
             toolTimeout: 1,
             mcpToolsOnly: false,
             totalTrials: 1,
+            runId: 'r3k9f2qa7c',
         });
 
     beforeEach(() => {
@@ -246,6 +255,19 @@ describe('createExperimentTask()', () => {
             judgeResult: { verdict: 'PASS' },
         });
         expect(mocks.runAgentConversation).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries once and never judges when the MCP server stays unconnected', async () => {
+        mocks.runAgentConversation.mockRejectedValue(
+            new Error('MCP server "apify" not connected at init (status: pending)'),
+        );
+
+        await expect(makeMcpAgentTask()(makeItem())).rejects.toThrow(
+            'Item "search-001": MCP server "apify" not connected at init (status: pending)',
+        );
+        expect(mocks.runAgentConversation).toHaveBeenCalledTimes(2);
+        expect(mocks.evaluateConversation).not.toHaveBeenCalled();
+        expect(mocks.emitObservations).not.toHaveBeenCalled();
     });
 
     it('still scores the item when emitting the agent trace throws', async () => {
@@ -352,6 +374,7 @@ describe('createExperimentTask()', () => {
             toolTimeout: 1,
             mcpToolsOnly: true,
             totalTrials: 1,
+            runId: 'r3k9f2qa7c',
         });
 
         await task(makeToolCallItem());
@@ -363,6 +386,69 @@ describe('createExperimentTask()', () => {
         const item = makeItem({ metadata: { category: 'search', kind: 'agent', iteration: 2 } });
 
         await expect(makeMcpAgentTask()(item)).resolves.toMatchObject({ iteration: 2 });
+    });
+
+    it('resolves {{uniq}} to the run, trial and attempt before the agent and the judge see the item', async () => {
+        mocks.runAgentConversation.mockResolvedValue(makeAgentRun());
+        const item = makeItem({
+            input: { query: 'Create eval-sched-{{uniq}}' },
+            expectedOutput: 'PASS only if eval-sched-{{uniq}} was created.',
+            metadata: { category: 'create', kind: 'agent', iteration: 2 },
+        });
+
+        await makeMcpAgentTask()(item);
+
+        expect(mocks.runAgentConversation).toHaveBeenCalledWith(
+            expect.objectContaining({ prompt: 'Create eval-sched-r3k9f2qa7c-n10-t2r1' }),
+        );
+        expect(mocks.evaluateConversation).toHaveBeenCalledWith(
+            'PASS only if eval-sched-r3k9f2qa7c-n10-t2r1 was created.',
+            expect.anything(),
+            expect.anything(),
+            'judge',
+        );
+    });
+
+    it('resolves {{uniq}} to a fresh name on the retry attempt of the same trial', async () => {
+        mocks.runAgentConversation
+            .mockRejectedValueOnce(new Error('Connection error.'))
+            .mockResolvedValueOnce(makeAgentRun());
+        const item = makeItem({
+            input: { query: 'Create eval-sched-{{uniq}}' },
+            expectedOutput: 'eval-sched-{{uniq}}',
+        });
+
+        await makeMcpAgentTask()(item);
+
+        expect(mocks.runAgentConversation).toHaveBeenNthCalledWith(
+            1,
+            expect.objectContaining({ prompt: 'Create eval-sched-r3k9f2qa7c-n10-t1r1' }),
+        );
+        expect(mocks.runAgentConversation).toHaveBeenNthCalledWith(
+            2,
+            expect.objectContaining({ prompt: 'Create eval-sched-r3k9f2qa7c-n10-t1r2' }),
+        );
+        // The judge and the trace both read the name the attempt that ran actually used.
+        expect(mocks.evaluateConversation).toHaveBeenCalledWith(
+            'eval-sched-r3k9f2qa7c-n10-t1r2',
+            expect.anything(),
+            expect.anything(),
+            'judge',
+        );
+        expect(mocks.buildAgentObservations).toHaveBeenCalledWith(
+            expect.objectContaining({ prompt: 'Create eval-sched-r3k9f2qa7c-n10-t1r2' }),
+        );
+    });
+
+    it('resolves {{uniq}} in a tool-call item the same way', async () => {
+        mocks.runAgentConversation.mockResolvedValue(makeAgentRun());
+        const item = makeToolCallItem({ input: { query: 'Create eval-sched-{{uniq}}' } });
+
+        await makeMcpAgentTask()(item);
+
+        expect(mocks.runAgentConversation).toHaveBeenCalledWith(
+            expect.objectContaining({ prompt: 'Create eval-sched-r3k9f2qa7c-n10-t1r1' }),
+        );
     });
 });
 
@@ -497,14 +583,77 @@ describe('resolveExitCode()', () => {
     });
 });
 
+describe('substituteUniqMarker()', () => {
+    const makeItem = (query: string, expectedOutput?: string) =>
+        ({
+            id: 'merge/schedules/add-action-medium-1',
+            input: { query },
+            ...(expectedOutput !== undefined && { expectedOutput }),
+            metadata: { category: 'create', kind: 'agent' },
+        }) as unknown as Parameters<typeof substituteUniqMarker>[0];
+
+    it('rewrites every marker in the query and the reference to the same value', () => {
+        const item = makeItem(
+            'Create eval-sched-add-{{uniq}}, then rename it to eval-sched-add-{{uniq}}',
+            'PASS only if create-schedule created eval-sched-add-{{uniq}}.',
+        ) as unknown as { input: { query: string }; expectedOutput: string };
+
+        const resolved = substituteUniqMarker(item as never, 'r3k9f2qa7c-n10-t2r1') as unknown as {
+            input: { query: string };
+            expectedOutput: string;
+        };
+
+        expect(resolved.input.query).toBe(
+            'Create eval-sched-add-r3k9f2qa7c-n10-t2r1, then rename it to eval-sched-add-r3k9f2qa7c-n10-t2r1',
+        );
+        expect(resolved.expectedOutput).toBe(
+            'PASS only if create-schedule created eval-sched-add-r3k9f2qa7c-n10-t2r1.',
+        );
+    });
+
+    it('returns an item without the marker unchanged, metadata and all', () => {
+        const item = makeItem('Pause my schedule eval-nightly-sum', 'PASS only if update-schedule was called.');
+
+        expect(substituteUniqMarker(item, 'r3k9f2qa7c-n10-t1r1')).toEqual(item);
+    });
+
+    it('keeps a reference containing $& and backtick-$ intact', () => {
+        const reference = 'PASS only if the agent runs `echo $&` and reports $` verbatim for {{uniq}}.';
+        const item = makeItem('Run it', reference);
+
+        const resolved = substituteUniqMarker(item, 'r3k9f2qa7c-n10-t1r1') as unknown as { expectedOutput: string };
+
+        expect(resolved.expectedOutput).toBe(
+            'PASS only if the agent runs `echo $&` and reports $` verbatim for r3k9f2qa7c-n10-t1r1.',
+        );
+    });
+
+    it('leaves fields other than the query and the reference untouched', () => {
+        const item = {
+            id: 'pr/create-schedule/daily',
+            input: { query: 'Create eval-sched-{{uniq}}' },
+            metadata: { category: 'create', kind: 'tool-call', expectedArgs: { name: 'eval-sched-{{uniq}}' } },
+        } as unknown as Parameters<typeof substituteUniqMarker>[0];
+
+        const resolved = substituteUniqMarker(item, 'r3k9f2qa7c-n10-t1r1') as unknown as {
+            metadata: { expectedArgs: { name: string } };
+        };
+
+        expect(resolved.metadata.expectedArgs.name).toBe('eval-sched-{{uniq}}');
+    });
+});
+
 describe('expandIterations()', () => {
     it('repeats items with an iteration without mutating their metadata', () => {
         const items = [
-            { id: 'a', metadata: { category: 'x' } },
-            { id: 'b', metadata: { category: 'y' } },
+            { id: 'a', input: { query: 'List my Actors' }, metadata: { category: 'x' } },
+            { id: 'b', input: { query: 'List my tasks' }, metadata: { category: 'y' } },
         ] as unknown as Parameters<typeof expandIterations>[0];
 
-        const data = expandIterations(items, 3) as unknown as { id: string; metadata: { iteration: number } }[];
+        const data = expandIterations(items, 3) as unknown as {
+            id: string;
+            metadata: { iteration: number };
+        }[];
 
         expect(data).toHaveLength(6);
         const iterationsFor = (id: string) =>
@@ -513,6 +662,29 @@ describe('expandIterations()', () => {
         expect(iterationsFor('b')).toEqual([1, 2, 3]);
         expect(data[0].metadata).toEqual({ category: 'x', iteration: 1 });
         expect(items[0].metadata).toEqual({ category: 'x' });
+    });
+
+    it('leaves the {{uniq}} marker in place for the task to resolve per attempt', () => {
+        const items = [
+            { id: 'a', input: { query: 'Create eval-sched-{{uniq}}' }, expectedOutput: 'eval-sched-{{uniq}}' },
+        ] as unknown as Parameters<typeof expandIterations>[0];
+
+        const data = expandIterations(items, 2) as unknown as {
+            input: { query: string };
+            expectedOutput: string;
+        }[];
+
+        expect(data[0].input.query).toBe('Create eval-sched-{{uniq}}');
+        expect(data[1].expectedOutput).toBe('eval-sched-{{uniq}}');
+    });
+});
+
+describe('formatTeardownHint()', () => {
+    it("prints the run id and the command that deletes this run's schedules and tasks", () => {
+        expect(formatTeardownHint('r3k9f2qa7c')).toEqual([
+            "🧹 Run id r3k9f2qa7c — delete this run's schedules and tasks:",
+            '   pnpm run evals:mcp-agent:fixtures -- --run-id r3k9f2qa7c',
+        ]);
     });
 });
 

@@ -1,6 +1,8 @@
 import type { ApifyClientOptions } from 'apify-client';
 import { ApifyClient as _ApifyClient } from 'apify-client';
+import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 
+import { API_PUBLIC_BASE_URL, API_PUBLIC_BASE_URL_STAGING, MAX_INLINE_BYTES, STAGING_MCP_HOSTNAME } from './const.js';
 import type { PaymentHeaders } from './payments/types.js';
 
 // Appended to the client's User-Agent via apify-client's userAgentSuffix option.
@@ -30,6 +32,17 @@ export function getApifyAPIBaseUrl(): string {
     return process.env.APIFY_API_BASE_URL || 'https://api.apify.com';
 }
 
+/**
+ * Apify API origin for every API URL handed to clients. Separate from `getApifyAPIBaseUrl()`, where requests
+ * go — the hosted server reaches the API through an internal host clients cannot resolve. Mirrors
+ * `getConsoleBaseUrl()` (`utils/console_link.ts`): `APIFY_API_PUBLIC_BASE_URL` when set, the staging API on
+ * the staging MCP host, production otherwise.
+ */
+export function getApifyAPIPublicBaseUrl(): string {
+    if (process.env.APIFY_API_PUBLIC_BASE_URL) return process.env.APIFY_API_PUBLIC_BASE_URL;
+    return process.env.HOSTNAME === STAGING_MCP_HOSTNAME ? API_PUBLIC_BASE_URL_STAGING : API_PUBLIC_BASE_URL;
+}
+
 export class ApifyClient extends _ApifyClient {
     constructor(options: ExtendedApifyClientOptions) {
         /**
@@ -55,8 +68,25 @@ export class ApifyClient extends _ApifyClient {
             ...(clientOptions as ApifyClientOptions),
             // Explicit baseUrl wins over env default.
             baseUrl: clientOptions.baseUrl ?? getApifyAPIBaseUrl(),
+            // Signed storage links (`getRecordPublicUrl`) are handed to clients, so they take the client-facing origin.
+            publicBaseUrl: clientOptions.publicBaseUrl ?? getApifyAPIPublicBaseUrl(),
             userAgentSuffix: USER_AGENT_ORIGIN,
             requestInterceptors: [(config) => ({ ...config, headers: { ...config.headers, ...staticHeaders } })],
         });
     }
+}
+
+/**
+ * Sends one request, with no retries, through apify-client's axios instance, which adds the token and the
+ * request-origin and payment headers. Check the URL with `isApifyApiUri` (`resources/api_resources.ts`)
+ * first and the status after: a non-2xx response resolves. It skips `httpClient.call()`, which retries (a
+ * write could apply twice, and a body over the size cap is downloaded again) and turns a streamed error
+ * body into a junk message; that also skips its `HTTPS_PROXY` support and User-Agent. axios aborts a body
+ * over `MAX_INLINE_BYTES` mid-stream (checked in axios 1.16.1), so it is never buffered whole.
+ */
+export async function sendApifyApiRequest(
+    apifyClient: ApifyClient,
+    config: Pick<AxiosRequestConfig, 'url' | 'method' | 'params' | 'data' | 'headers' | 'responseType' | 'signal'>,
+): Promise<AxiosResponse<unknown>> {
+    return apifyClient.httpClient.axios.request<unknown>({ ...config, maxContentLength: MAX_INLINE_BYTES });
 }

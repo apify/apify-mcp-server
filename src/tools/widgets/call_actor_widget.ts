@@ -17,7 +17,7 @@ import {
     callOptionsSchema,
     resolveAndValidateActor,
 } from '../actors/call_actor.js';
-import { actorRunOutputSchema } from '../structured_output_schemas.js';
+import { actorRunOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
 
 /**
  * Widget-only input: `actor` + `input` + optional `callOptions`.
@@ -34,7 +34,7 @@ const callActorWidgetArgsSchema = z
         actor: z
             .string()
             .describe('The name of the Actor to call. Format: "username/name" (e.g., "apify/rag-web-browser").'),
-        input: z.object({}).passthrough().describe('The input JSON to pass to the Actor. Required.'),
+        input: anyJsonObjectSchema.describe('The input JSON to pass to the Actor. Required.'),
         callOptions: callOptionsSchema
             .optional()
             .describe(

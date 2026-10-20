@@ -28,6 +28,16 @@ function suggestTool(toolName: string, loadedToolNames: readonly string[]): stri
     return loadedToolNames.includes(toolName) ? toolName : undefined;
 }
 
+/** `nextStep` when the session was served the sibling tool it names, otherwise `fallback`, which names no tool (see #1296). */
+export function resolveSiblingNextStep(
+    toolName: string,
+    loadedToolNames: readonly string[],
+    nextStep: string,
+    fallback = 'No follow-up step.',
+): string {
+    return suggestTool(toolName, loadedToolNames) ? nextStep : fallback;
+}
+
 /**
  * The "Apify Console: <url>" line plus the verbatim-links nudge, or `undefined` when there is no
  * link (non-Console session). Single source for both the text-channel suffix in `buildStorageResponse`
@@ -74,7 +84,8 @@ export function buildStorageResponse(params: {
 
 /**
  * {summary, nextStep} for paginated storage listings (datasets, key-value stores).
- * When more items remain, nextStep points at the next page; otherwise at inspecting an entry.
+ * When more items remain, nextStep points at the next page; on an empty last page, at what
+ * `unnamed=true` adds when it is not set; otherwise at inspecting an entry.
  */
 export function buildStorageListSummaryNextStep(params: {
     count: number;
@@ -83,15 +94,26 @@ export function buildStorageListSummaryNextStep(params: {
     noun: string;
     listToolName: string;
     inspectHint: string;
+    /** The API's default `unnamed=false` lists only named storages; Actor runs write to unnamed ones. */
+    isNamedOnly: boolean;
 }): { summary: string; nextStep: string } {
-    const { count, total, offset, noun, listToolName, inspectHint } = params;
-    return {
-        summary: `Listed ${count} of ${total} ${noun}.`,
-        nextStep:
-            offset + count < total
-                ? `Call ${listToolName} again with offset=${offset + count} to fetch the next page.`
-                : inspectHint,
-    };
+    const { count, total, offset, noun, listToolName, inspectHint, isNamedOnly } = params;
+    const summary = `Listed ${count} of ${total} ${isNamedOnly ? 'named ' : ''}${noun}.`;
+    if (offset + count < total) {
+        return {
+            summary,
+            nextStep: `Call ${listToolName} again with offset=${offset + count} to fetch the next page.`,
+        };
+    }
+    if (count === 0) {
+        return {
+            summary,
+            nextStep: isNamedOnly
+                ? `unnamed=true includes the unnamed ${noun} that Actor runs create.`
+                : 'No follow-up step.',
+        };
+    }
+    return { summary, nextStep: inspectHint };
 }
 
 /**
@@ -135,8 +157,10 @@ export function buildKvsKeysSummaryNextStep(params: {
     isTruncated: boolean;
     nextExclusiveStartKey?: string;
     firstKey?: string;
+    /** Active loaded tool set; gates the terminal record and store references (see #1296). */
+    loadedToolNames: readonly string[];
 }): { summary: string; nextStep: string } {
-    const { keyValueStoreId, count, isTruncated, nextExclusiveStartKey, firstKey } = params;
+    const { keyValueStoreId, count, isTruncated, nextExclusiveStartKey, firstKey, loadedToolNames } = params;
     const noun = count === 1 ? 'key' : 'keys';
     const summary = `Listed ${count} ${noun}${isTruncated ? ' (more available)' : ''}.`;
     if (isTruncated && nextExclusiveStartKey) {
@@ -148,8 +172,16 @@ export function buildKvsKeysSummaryNextStep(params: {
     return {
         summary,
         nextStep: firstKey
-            ? `Use ${HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=${keyValueStoreId} and recordKey=${firstKey} to read a value.`
-            : `Use ${HELPER_TOOLS.KEY_VALUE_STORE_GET} with keyValueStoreId=${keyValueStoreId} to inspect the store.`,
+            ? resolveSiblingNextStep(
+                  HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
+                  loadedToolNames,
+                  `Use ${HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=${keyValueStoreId} and recordKey=${firstKey} to read a value.`,
+              )
+            : resolveSiblingNextStep(
+                  HELPER_TOOLS.KEY_VALUE_STORE_GET,
+                  loadedToolNames,
+                  `Use ${HELPER_TOOLS.KEY_VALUE_STORE_GET} with keyValueStoreId=${keyValueStoreId} to inspect the store.`,
+              ),
     };
 }
 

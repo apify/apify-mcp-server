@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import { TIP_MESSAGE_LIMIT } from '../const.js';
 
 /**
@@ -6,7 +8,28 @@ import { TIP_MESSAGE_LIMIT } from '../const.js';
  *
  * The `type: '...' as const` assertions throughout narrow the string to a literal,
  * which the MCP SDK's schema types require (a plain `string` won't type-check).
+ *
+ * Some MCP clients refuse a `type` array or a keyword-less `{}` subschema, so nullable
+ * and free-form values are spelled with `anyOf` branches of a single `type` each.
  */
+
+/** A string or `null`. Spread it next to a `description`. */
+export const stringOrNullSchema = { anyOf: [{ type: 'string' }, { type: 'null' }] };
+
+/** Any JSON value. Spread it next to a `description`, or pass it to a Zod `.meta()`. */
+export const anyJsonValueSchema = {
+    anyOf: [
+        { type: 'object' },
+        { type: 'array' },
+        { type: 'string' },
+        { type: 'number' },
+        { type: 'boolean' },
+        { type: 'null' },
+    ],
+};
+
+/** Zod schema for any JSON object; emits `additionalProperties: true` instead of Zod's `{}`. */
+export const anyJsonObjectSchema = z.looseObject({}).meta({ additionalProperties: true });
 
 /**
  * Schema for developer information
@@ -166,7 +189,10 @@ export const actorInfoSchema = {
                     additionalProperties: {
                         type: 'object' as const,
                         properties: {
-                            type: { description: 'JSON Schema field type — string or array of strings.' },
+                            type: {
+                                anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
+                                description: 'JSON Schema field type — string or array of strings.',
+                            },
                         },
                         required: ['type'],
                     },
@@ -361,25 +387,32 @@ export const actorTaskOutputSchema = {
         taskId: { type: 'string', description: 'ID of the task' },
         actorId: { type: 'string', description: 'ID of the Actor the task belongs to' },
         name: { type: 'string', description: 'Name of the task' },
-        title: { type: ['string', 'null'], description: 'Human-readable title of the task' },
-        description: { type: ['string', 'null'], description: 'Short description of the task' },
+        title: { ...stringOrNullSchema, description: 'Human-readable title of the task' },
+        description: { ...stringOrNullSchema, description: 'Short description of the task' },
         publishedAt: {
-            type: ['string', 'null'],
+            ...stringOrNullSchema,
             description: 'When the task was published (ISO 8601); null when the task is not published',
         },
         publicConfig: {
-            type: ['object', 'null'],
+            anyOf: [
+                {
+                    type: 'object',
+                    properties: {
+                        seoTitle: stringOrNullSchema,
+                        seoDescription: stringOrNullSchema,
+                        inputSchemaFields: {
+                            anyOf: [{ type: 'array', items: { type: 'string' } }, { type: 'null' }],
+                        },
+                        datasetName: stringOrNullSchema,
+                        datasetView: stringOrNullSchema,
+                    },
+                },
+                { type: 'null' },
+            ],
             description: 'Public display configuration of the task landing page',
-            properties: {
-                seoTitle: { type: ['string', 'null'] },
-                seoDescription: { type: ['string', 'null'] },
-                inputSchemaFields: { type: ['array', 'null'], items: { type: 'string' } },
-                datasetName: { type: ['string', 'null'] },
-                datasetView: { type: ['string', 'null'] },
-            },
         },
         input: {
-            type: ['object', 'array', 'null'],
+            anyOf: [{ type: 'object' }, { type: 'array' }, { type: 'null' }],
             description:
                 'The stored task input, as the API returns it; fields the Actor declares as secret are ' +
                 'encrypted placeholders, never plaintext. Its keys are what `publicConfig.inputSchemaFields` can use.',
@@ -395,7 +428,7 @@ const scheduleActionOutputSchema = {
         actorId: { type: 'string', description: 'ID of the Actor this action runs (Actor actions only)' },
         taskId: { type: 'string', description: 'ID of the task this action runs (task actions only)' },
         input: {
-            type: ['object', 'array', 'string', 'number', 'boolean', 'null'],
+            ...anyJsonValueSchema,
             description:
                 'The Actor input, or the overrides applied on top of the stored task input; secret fields are ' +
                 'encrypted placeholders. A non-JSON Actor input body is returned as a string.',
@@ -413,8 +446,8 @@ export const scheduleOutputSchema = {
     properties: {
         scheduleId: { type: 'string', description: 'ID of the schedule' },
         name: { type: 'string', description: 'Name of the schedule' },
-        title: { type: ['string', 'null'], description: 'Human-readable title of the schedule' },
-        description: { type: ['string', 'null'], description: 'Description of the schedule' },
+        title: { ...stringOrNullSchema, description: 'Human-readable title of the schedule' },
+        description: { ...stringOrNullSchema, description: 'Description of the schedule' },
         cronExpression: { type: 'string', description: 'When the schedule fires, as a cron expression' },
         timezone: { type: 'string', description: 'Time zone the cron expression is evaluated in' },
         isEnabled: { type: 'boolean', description: 'Whether the schedule fires' },
@@ -423,15 +456,15 @@ export const scheduleOutputSchema = {
             description: 'Whether an action is skipped while its previous scheduled run is still running',
         },
         nextRunAt: {
-            type: ['string', 'null'],
+            ...stringOrNullSchema,
             description: 'Next firing time (ISO 8601); null while the schedule is disabled',
         },
         lastRunAt: {
-            type: ['string', 'null'],
+            ...stringOrNullSchema,
             description: 'Last firing time (ISO 8601); null when the schedule has not fired yet',
         },
-        createdAt: { type: ['string', 'null'], description: 'When the schedule was created (ISO 8601)' },
-        modifiedAt: { type: ['string', 'null'], description: 'When the schedule was last changed (ISO 8601)' },
+        createdAt: { ...stringOrNullSchema, description: 'When the schedule was created (ISO 8601)' },
+        modifiedAt: { ...stringOrNullSchema, description: 'When the schedule was last changed (ISO 8601)' },
         actions: {
             type: 'array',
             items: scheduleActionOutputSchema,
@@ -496,8 +529,8 @@ const actorBuildItemSchema = {
         actorId: { type: 'string', description: 'ID of the Actor the build belongs to' },
         buildNumber: { type: 'string', description: 'Build number, e.g. 0.1.12' },
         status: { type: 'string', description: 'Build status, e.g. RUNNING, SUCCEEDED, FAILED' },
-        startedAt: { type: ['string', 'null'], description: 'ISO timestamp' },
-        finishedAt: { type: ['string', 'null'], description: 'ISO timestamp; null while the build is running' },
+        startedAt: { ...stringOrNullSchema, description: 'ISO timestamp' },
+        finishedAt: { ...stringOrNullSchema, description: 'ISO timestamp; null while the build is running' },
     },
     required: ['id', 'actorId', 'buildNumber', 'status', 'startedAt', 'finishedAt'],
 };
@@ -531,6 +564,22 @@ export const buildActorToolOutputSchema = {
     required: ['build'],
 };
 
+/** Schema for delete-actor. */
+export const deleteActorToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'ID of the deleted Actor' },
+        fullName: { type: 'string', description: 'Full name of the deleted Actor, username/name' },
+        deleted: { type: 'boolean', description: 'Always true; the Actor no longer exists' },
+        abortedRunCount: {
+            type: 'integer',
+            description:
+                'Unfinished runs found just before the deletion. The platform aborts them; a run that starts in between is aborted and not included.',
+        },
+    },
+    required: ['actorId', 'fullName', 'deleted', 'abortedRunCount'],
+};
+
 /** Schema for get-actor-version: the version's file manifest, its revision, and the content returned. */
 export const getActorVersionToolOutputSchema = {
     type: 'object' as const,
@@ -538,6 +587,10 @@ export const getActorVersionToolOutputSchema = {
         actorId: { type: 'string', description: 'Actor ID' },
         fullName: { type: 'string', description: 'Actor full name, username/name' },
         versionNumber: { type: 'string', description: 'Version number, e.g. 0.1' },
+        buildTag: {
+            type: 'string',
+            description: 'Tag that new builds of this version get, e.g. latest; absent when the version has none',
+        },
         revision: { type: 'string', description: 'Identifies the whole file set; changes when any file changes' },
         files: {
             type: 'array',
@@ -583,6 +636,100 @@ export const getActorVersionToolOutputSchema = {
         },
     },
     required: ['actorId', 'fullName', 'versionNumber', 'revision', 'files', 'contents'],
+};
+
+/** The build a source write started with autoBuild: the same allowlisted subset (`toBuildResult`) as get-actor-build. */
+const sourceWriteBuildProperties = {
+    build: getActorBuildToolOutputSchema.properties.build,
+    buildError: {
+        type: 'string',
+        description: 'Why the build did not start; set when autoBuild was true and the write succeeded without a build',
+    },
+    warnings: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Things to know about the written version, such as empty files the build skips',
+    },
+};
+
+/** Schema for create-actor: the new Actor, its one version, and the files as the platform stored them. */
+export const createActorToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'ID of the new Actor' },
+        fullName: { type: 'string', description: 'Actor full name, username/name' },
+        versionNumber: { type: 'string', description: 'Version number, e.g. 0.0' },
+        revision: {
+            type: 'string',
+            description: 'Identifies the stored file set; the same value a later read of the version returns',
+        },
+        files: {
+            type: 'array',
+            description: 'The files as stored, sorted by path',
+            items: getActorVersionToolOutputSchema.properties.files.items,
+        },
+        ...sourceWriteBuildProperties,
+    },
+    required: ['actorId', 'fullName', 'versionNumber', 'revision', 'files'],
+};
+
+/** Schema for create-actor-version: the new version and its files. */
+export const createActorVersionToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'Actor ID' },
+        fullName: { type: 'string', description: 'Actor full name, username/name' },
+        versionNumber: { type: 'string', description: 'Number of the new version, e.g. 0.2' },
+        revision: createActorToolOutputSchema.properties.revision,
+        files: createActorToolOutputSchema.properties.files,
+        ...sourceWriteBuildProperties,
+    },
+    required: ['actorId', 'fullName', 'versionNumber', 'revision', 'files'],
+};
+
+/** Schema for delete-actor-version: the version that was deleted. */
+export const deleteActorVersionToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'Actor ID' },
+        fullName: { type: 'string', description: 'Actor full name, username/name' },
+        versionNumber: { type: 'string', description: 'Number of the deleted version' },
+        deleted: { type: 'boolean', description: 'Always true' },
+        tags: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+                'Tags that point to a build of the deleted version, empty when none; runs with such a tag still use that build',
+        },
+    },
+    required: ['actorId', 'fullName', 'versionNumber', 'deleted', 'tags'],
+};
+
+/** Schema for update-actor-version: the new revision and what changed. */
+export const updateActorVersionToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        revision: {
+            type: 'string',
+            description: 'Revision after the update, the value expectedRevision takes in a later update',
+        },
+        changed: { type: 'boolean', description: 'False when the operations changed nothing, so nothing was written' },
+        changes: {
+            type: 'array',
+            description: 'One entry per file the operations created, updated, or deleted, sorted by path',
+            items: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'Path relative to the Actor root' },
+                    action: { type: 'string', enum: ['created', 'updated', 'deleted'] },
+                    hash: { type: 'string', description: 'Hash of the file after the update; absent for deleted' },
+                },
+                required: ['path', 'action'],
+            },
+        },
+        ...sourceWriteBuildProperties,
+    },
+    required: ['revision', 'changed', 'changes'],
 };
 
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
@@ -711,8 +858,11 @@ export const actorRunOutputSchema = {
                 },
                 recommendedActorId: {
                     type: 'string',
-                    description:
-                        'Apify Actor ID the tip recommends running next, when it names one — pass directly as `actor` to call-actor or fetch-actor-details',
+                    description: 'Apify Actor ID the tip recommends, when it names one',
+                },
+                caveat: {
+                    type: 'string',
+                    description: 'Present when this session cannot run the Actor the tip recommends',
                 },
             },
             required: ['message'],
@@ -799,9 +949,9 @@ const actorRunListItemSchema = {
             description:
                 'Run status: READY | RUNNING | SUCCEEDED | FAILED | TIMING-OUT | TIMED-OUT | ABORTING | ABORTED.',
         },
-        startedAt: { type: ['string', 'null'], description: 'ISO timestamp when the run started.' },
+        startedAt: { ...stringOrNullSchema, description: 'ISO timestamp when the run started.' },
         finishedAt: {
-            type: ['string', 'null'],
+            ...stringOrNullSchema,
             description: 'ISO timestamp when the run finished; null while still running.',
         },
         buildId: { type: 'string', description: 'ID of the Actor build used for the run.' },
@@ -824,11 +974,11 @@ const actorListItemSchema = {
         id: { type: 'string', description: 'Actor ID.' },
         name: { type: 'string', description: 'Actor name, unique within the owner account.' },
         fullName: { type: 'string', description: 'Full Actor name, username/name; the username is the owner.' },
-        title: { type: ['string', 'null'], description: 'Display title; null when the Actor has none.' },
-        createdAt: { type: ['string', 'null'], description: 'ISO timestamp when the Actor was created.' },
-        modifiedAt: { type: ['string', 'null'], description: 'ISO timestamp when the Actor was last modified.' },
+        title: { ...stringOrNullSchema, description: 'Display title; null when the Actor has none.' },
+        createdAt: { ...stringOrNullSchema, description: 'ISO timestamp when the Actor was created.' },
+        modifiedAt: { ...stringOrNullSchema, description: 'ISO timestamp when the Actor was last modified.' },
         lastRunStartedAt: {
-            type: ['string', 'null'],
+            ...stringOrNullSchema,
             description: 'ISO timestamp when the last run of the Actor started; null when it has never run.',
         },
     },
@@ -883,7 +1033,7 @@ export const datasetMetadataOutputSchema = {
     type: 'object' as const,
     properties: {
         id: { type: 'string', description: 'Dataset ID' },
-        name: { type: ['string', 'null'], description: 'Dataset name (null for unnamed datasets)' },
+        name: { ...stringOrNullSchema, description: 'Dataset name (null for unnamed datasets)' },
         itemCount: { type: 'number', description: 'Number of items in the dataset' },
         fields: {
             type: 'array' as const,
@@ -941,7 +1091,7 @@ export const keyValueStoreOutputSchema = {
     type: 'object' as const,
     properties: {
         id: { type: 'string', description: 'Key-value store ID' },
-        name: { type: ['string', 'null'], description: 'Store name (null for unnamed stores)' },
+        name: { ...stringOrNullSchema, description: 'Store name (null for unnamed stores)' },
         summary: summaryProperty,
         nextStep: nextStepProperty,
     },
@@ -970,7 +1120,7 @@ export const keyValueStoreKeysOutputSchema = {
         count: { type: 'number', description: 'Number of keys returned' },
         isTruncated: { type: 'boolean', description: 'Whether more keys are available' },
         nextExclusiveStartKey: {
-            type: ['string', 'null'],
+            ...stringOrNullSchema,
             description: 'Pass as exclusiveStartKey to fetch the next page of keys; null when not truncated',
         },
         summary: summaryProperty,
@@ -987,9 +1137,106 @@ export const keyValueStoreRecordOutputSchema = {
     properties: {
         keyValueStoreId: { type: 'string', description: 'Key-value store ID' },
         key: { type: 'string', description: 'Record key' },
-        value: { description: 'The stored value (JSON, text, or binary)' },
+        value: {
+            ...anyJsonValueSchema,
+            description: 'The stored value (JSON, text, or binary)',
+        },
         contentType: { type: 'string', description: 'MIME type of the stored value' },
         summary: summaryProperty,
     },
     required: ['keyValueStoreId', 'key', 'value', 'summary'],
+};
+
+/**
+ * Schema for the operations found by apify-api-search.
+ */
+export const apifyApiSearchOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        operations: {
+            type: 'array' as const,
+            items: {
+                type: 'object' as const,
+                properties: {
+                    method: { type: 'string', description: 'HTTP method' },
+                    path: { type: 'string', description: 'Path template; each {name} is a path parameter' },
+                    summary: { type: 'string', description: 'What the operation does' },
+                    docsUrl: { type: 'string', description: "The operation's page in the API reference" },
+                },
+                required: ['method', 'path', 'summary', 'docsUrl'],
+            },
+        },
+    },
+    required: ['operations'],
+};
+
+/** One operation in the apify-api-details response. */
+const apiOperationDetailsSchema = {
+    type: 'object' as const,
+    properties: {
+        method: { type: 'string', description: 'HTTP method' },
+        path: { type: 'string', description: 'Path template; each {name} is a path parameter' },
+        summary: { type: 'string', description: 'What the operation does' },
+        description: { type: 'string', description: 'Full description from the API reference' },
+        parameters: {
+            type: 'array' as const,
+            items: {
+                type: 'object' as const,
+                properties: {
+                    name: { type: 'string', description: 'Parameter name' },
+                    in: { type: 'string', enum: ['path', 'query'], description: 'Where the parameter goes' },
+                    isRequired: { type: 'boolean', description: 'Whether the parameter is required' },
+                    description: { type: 'string', description: 'What the parameter does' },
+                    schema: { type: 'object', description: 'JSON schema of the value' },
+                },
+                required: ['name', 'in', 'isRequired'],
+            },
+            description: 'Path and query parameters',
+        },
+        requestBody: {
+            type: 'object' as const,
+            properties: {
+                isRequired: { type: 'boolean', description: 'Whether the body is required' },
+                schema: { type: 'object', description: 'JSON schema of the body, sent as JSON' },
+            },
+            required: ['isRequired', 'schema'],
+            description: 'Only when the operation takes a body',
+        },
+    },
+    required: ['method', 'path', 'summary', 'description', 'parameters'],
+};
+
+/**
+ * Schema for the operations on one path (apify-api-details).
+ */
+export const apifyApiDetailsOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        operations: {
+            type: 'array' as const,
+            items: apiOperationDetailsSchema,
+            description: 'The operations on the path, or only the one with the given method',
+        },
+    },
+    required: ['operations'],
+};
+
+/**
+ * Schema for the response of an API call (apify-api-read, apify-api-write).
+ */
+export const apifyApiCallOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        method: { type: 'string', description: 'HTTP method' },
+        path: { type: 'string', description: 'Request path as it was sent' },
+        statusCode: { type: 'integer', description: 'HTTP status code' },
+        contentType: { type: 'string', description: 'Content-Type of the response' },
+        data: {
+            ...anyJsonValueSchema,
+            description:
+                'Response body: parsed JSON, text, or null for an empty or binary body, or for a write response ' +
+                'over the inline limit',
+        },
+    },
+    required: ['method', 'path', 'statusCode', 'data'],
 };

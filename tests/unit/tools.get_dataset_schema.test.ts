@@ -81,7 +81,7 @@ describe('get-dataset-schema', () => {
 
     it('returns a schema-conforming structured response when the dataset has no items', async () => {
         const result = await (getDatasetSchema as HelperTool).call(
-            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: [], total: 0 })),
+            stubToolCallContext({ datasetId: 'ds-1', clean: false }, stubApifyClient({ items: [], total: 0 })),
         );
         const { content, isError, structuredContent } = result as TextToolResult & {
             structuredContent: Record<string, unknown>;
@@ -91,10 +91,42 @@ describe('get-dataset-schema', () => {
         expect(structuredContent.datasetId).toBe('ds-1');
         expect(structuredContent.schema).toEqual({});
         expect(structuredContent.summary).toBe("Dataset 'ds-1' is empty; no schema to infer.");
-        expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET);
+        expect(structuredContent.nextStep).toBe(
+            `Use ${HELPER_TOOLS.DATASET_GET} with datasetId=ds-1 to check itemCount and stats.`,
+        );
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
         // The required `schema` is still present (empty object) and the emit conforms to the schema.
         expectSchemaConformingStructuredContent(result, datasetSchemaOutputSchema);
+    });
+
+    // clean=true skips empty items and #-prefixed fields, so a dataset of hidden-field items comes
+    // back as items=[] and must not be reported as empty.
+    it('suggests clean=false instead of reporting empty when clean filtering returned no items', async () => {
+        const result = await (getDatasetSchema as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: [], total: 3 })),
+        );
+        const { isError, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
+
+        expect(isError).not.toBe(true);
+        expect(structuredContent.schema).toEqual({});
+        expect(structuredContent.summary).not.toContain('is empty');
+        // States what clean=false does rather than telling the agent to call again (TOOL_GUIDELINES.md).
+        expect(structuredContent.nextStep).toBe(
+            `clean=false includes those items. Use ${HELPER_TOOLS.DATASET_GET} with datasetId=ds-1 to check itemCount and stats.`,
+        );
+        expectSchemaConformingStructuredContent(result, datasetSchemaOutputSchema);
+    });
+
+    it('reports empty without the clean=false hint when the dataset has no items under clean=true', async () => {
+        const result = await (getDatasetSchema as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: [], total: 0 })),
+        );
+        const { structuredContent } = result as TextToolResult & { structuredContent: Record<string, unknown> };
+
+        expect(structuredContent.summary).toContain('is empty');
+        expect(structuredContent.nextStep).not.toContain('clean=false');
     });
 
     it('returns isError with a not-found message when listItems throws 404', async () => {
@@ -132,5 +164,42 @@ describe('get-dataset-schema', () => {
         expect(content[0].text).toContain("Failed to generate schema for dataset 'ds-1'");
         expect(toolTelemetry).toEqual(expect.objectContaining({ toolStatus: TOOL_STATUS.FAILED }));
         expect(toolTelemetry?.failureCategory).not.toBe(FAILURE_CATEGORY.INVALID_INPUT);
+    });
+});
+
+// Regression: #1296 — nextStep named a sibling tool the session was not served.
+describe('get-dataset-schema nextStep gating', () => {
+    it.each([
+        {
+            name: 'nonempty output',
+            args: { datasetId: 'ds-1' },
+            response: { items: MOCK_ITEMS, total: 2 },
+            sibling: HELPER_TOOLS.DATASET_GET_ITEMS,
+            fallback: 'No follow-up step.',
+        },
+        {
+            name: 'empty output',
+            args: { datasetId: 'ds-1', clean: false },
+            response: { items: [], total: 0 },
+            sibling: HELPER_TOOLS.DATASET_GET,
+            fallback: 'No follow-up step.',
+        },
+        {
+            name: 'clean-filtered output',
+            args: { datasetId: 'ds-1' },
+            response: { items: [], total: 3 },
+            sibling: HELPER_TOOLS.DATASET_GET,
+            fallback: 'clean=false includes those items.',
+        },
+    ])('falls back on $name when $sibling is not loaded', async ({ args, response, sibling, fallback }) => {
+        const result = (await (getDatasetSchema as HelperTool).call(
+            stubToolCallContext(args, stubApifyClient(response), {
+                loadedToolNames: [HELPER_TOOLS.DATASET_SCHEMA_GET],
+            }),
+        )) as TextToolResult & { structuredContent: Record<string, unknown> };
+
+        expect(result.structuredContent.nextStep).toBe(fallback);
+        expect(JSON.stringify([result.content, result.structuredContent])).not.toContain(sibling);
+        expectSchemaConformingStructuredContent(result, datasetSchemaOutputSchema);
     });
 });

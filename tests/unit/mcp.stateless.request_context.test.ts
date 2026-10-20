@@ -17,7 +17,13 @@ import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
 import { getActors } from '../../src/utils/tools_loader.js';
-import { getRequestHandler, makeRecorderTool, withServer, withStatelessServer } from './helpers/mcp_server.js';
+import {
+    getRequestHandler,
+    makePaymentProvider,
+    makeRecorderTool,
+    withServer,
+    withStatelessServer,
+} from './helpers/mcp_server.js';
 import { mockApifyClient } from './helpers/tool_context.js';
 
 // Stub getActors so a facade can be given tool sources without a network fetch. The compose path
@@ -128,6 +134,22 @@ describe('createStatelessServer() request context', () => {
                     });
                 },
                 { token: undefined, allowUnauthMode: true, telemetry: { enabled: true } },
+            );
+        });
+
+        it('tags telemetry with the payment provider the connection was opened with', async () => {
+            const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+            await withStatelessServer(
+                async ({ server, call }) => {
+                    const { tool } = makeRecorderTool('probe-tool');
+                    await loadSource(server, [tool]);
+
+                    await call('tools/call', { name: 'probe-tool', arguments: {} });
+
+                    expect(trackSpy.mock.calls).toHaveLength(1);
+                    expect(trackSpy.mock.calls[0][2]).toMatchObject({ payment_provider: 'x402' });
+                },
+                { token: undefined, telemetry: { enabled: true }, paymentProvider: makePaymentProvider('x402') },
             );
         });
 

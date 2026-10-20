@@ -2,15 +2,21 @@ import { Readable } from 'node:stream';
 
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError } from 'axios';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ApifyClient } from '../../src/apify_client.js';
+import { ApifyClient } from '../../src/apify_client.js';
 import { MAX_INLINE_BYTES } from '../../src/const.js';
 import { InternalError, InvalidParamsError } from '../../src/mcp/errors.js';
-import { isApifyApiUri, readApiResource } from '../../src/resources/api_resources.js';
+import { isApifyApiUri, readApiResource, redactJsonSecrets } from '../../src/resources/api_resources.js';
 import { mockApifyClient } from './helpers/tool_context.js';
 
 const API = 'https://api.apify.com';
+
+const METHOD_PARAM_REFUSAL =
+    'The method query parameter is not allowed because it can turn a read request into a write request.';
+
+const SYNC_RUN_REFUSAL =
+    'A GET to the synchronous run endpoints starts a paid run, as a POST does, so the API tools do not send it.';
 
 // `contents[0]` is a text|blob union; narrow it in tests that read one shape.
 function firstContent(result: ReadResourceResult): { mimeType?: string; text?: string; blob?: string } {
@@ -22,6 +28,16 @@ async function expectReadError(promise: Promise<unknown>): Promise<InvalidParams
     const error = await promise.catch((e: unknown) => e);
     expect(error).toBeInstanceOf(Error);
     return error as InvalidParamsError | InternalError;
+}
+
+/** Captures what the logger prints. */
+function captureLogOutput(): () => string {
+    const spies = [
+        vi.spyOn(console, 'log').mockImplementation(() => {}),
+        vi.spyOn(console, 'warn').mockImplementation(() => {}),
+        vi.spyOn(console, 'error').mockImplementation(() => {}),
+    ];
+    return () => spies.flatMap((spy) => spy.mock.calls.flat()).join('\n');
 }
 
 /** Body stream the stubbed request returns; chunked to prove multi-chunk reassembly. */
@@ -49,6 +65,7 @@ type StubOptions = {
     request?: (config: RequestConfig) => Promise<RequestResult>;
     /** Throw from getRecordPublicUrl to exercise the download-link fallback. */
     recordPublicUrlThrows?: boolean;
+    token?: string;
 };
 
 /** Signed public URL the stubbed getRecordPublicUrl returns for a (storeId, key) pair. */
@@ -58,6 +75,7 @@ function signedUrl(storeId: string, key: string): string {
 
 function stubApifyClient(opts: StubOptions = {}): ApifyClient {
     return mockApifyClient({
+        token: opts.token,
         keyValueStore: (storeId: string) => ({
             getRecordPublicUrl: async (key: string) => {
                 if (opts.recordPublicUrlThrows) throw new Error('boom');
@@ -94,6 +112,16 @@ function requestFailing(status: number, statusText: string, body?: object) {
 }
 
 describe('isApifyApiUri()', () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it('accepts both the client-facing and the egress origin when they differ', () => {
+        // The hosted server sends requests to an internal host; URIs on that host stay readable.
+        vi.stubEnv('APIFY_API_BASE_URL', 'http://api.internal.example:3333');
+        expect(isApifyApiUri(`${API}/v2/datasets/ds-1/items`)).toBe(true);
+        expect(isApifyApiUri('http://api.internal.example:3333/v2/datasets/ds-1/items')).toBe(true);
+        expect(isApifyApiUri('https://example.com/v2/datasets/ds-1/items')).toBe(false);
+    });
+
     it('returns true for Apify API URLs', () => {
         expect(isApifyApiUri(`${API}/v2/datasets/ds-1/items`)).toBe(true);
         expect(isApifyApiUri(`${API}/v2/key-value-stores/kv-1/records/INPUT`)).toBe(true);
@@ -115,7 +143,58 @@ describe('isApifyApiUri()', () => {
     });
 });
 
+describe('redactJsonSecrets()', () => {
+    it.each([
+        [
+            'in pretty-printed JSON',
+            JSON.stringify({ data: { id: 'ds-1', urlSigningSecretKey: 'Xq9abc' } }, null, 2),
+            JSON.stringify({ data: { id: 'ds-1', urlSigningSecretKey: '[REDACTED]' } }, null, 2),
+        ],
+        [
+            'in compact JSON, at depth and in arrays, with a space before the colon',
+            '[{"urlSigningSecretKey":"s","items":[{"urlSigningSecretKey" : "t"}]}]',
+            '[{"urlSigningSecretKey":"[REDACTED]","items":[{"urlSigningSecretKey" : "[REDACTED]"}]}]',
+        ],
+        [
+            'with an escaped quote and backslash in the value',
+            '{"urlSigningSecretKey":"a\\"b\\\\","n":1}',
+            '{"urlSigningSecretKey":"[REDACTED]","n":1}',
+        ],
+        [
+            'beside an integer above 2^53',
+            '{"rowId":12345678901234567890,"urlSigningSecretKey":"a\\"b","items":[{"urlSigningSecretKey" : "c"}]}',
+            '{"rowId":12345678901234567890,"urlSigningSecretKey":"[REDACTED]","items":[{"urlSigningSecretKey" : "[REDACTED]"}]}',
+        ],
+        ['when it is empty', '{"urlSigningSecretKey":""}', '{"urlSigningSecretKey":"[REDACTED]"}'],
+        [
+            'with line breaks around the colon',
+            '{"urlSigningSecretKey"\n:\n"s"}',
+            '{"urlSigningSecretKey"\n:\n"[REDACTED]"}',
+        ],
+        [
+            'of the password key, at depth and in arrays',
+            '{"proxy":{"password":"fake-password","groups":[]},"items":[{"password" : "p"}]}',
+            '{"proxy":{"password":"[REDACTED]","groups":[]},"items":[{"password" : "[REDACTED]"}]}',
+        ],
+    ])('redacts the value %s', (_kind, json, expected) => {
+        expect(redactJsonSecrets(json)).toBe(expected);
+    });
+
+    it.each([
+        ['a null value', '{"urlSigningSecretKey":null}'],
+        ['the name as a value', '{"note":"urlSigningSecretKey","fields":["urlSigningSecretKey"]}'],
+        ['a number or object value', '{"urlSigningSecretKey":1,"o":{"urlSigningSecretKey":{"a":"b"}}}'],
+        ['a longer name', '{"myurlSigningSecretKey":"s","urlSigningSecretKeyX":"s"}'],
+        ['a longer password name', '{"mypassword":"s","passwordX":"s"}'],
+        ['the name inside a string value', '{"note":"\\"urlSigningSecretKey\\": \\"s\\""}'],
+    ])('returns JSON with %s as it is', (_kind, json) => {
+        expect(redactJsonSecrets(json)).toBe(json);
+    });
+});
+
 describe('readApiResource()', () => {
+    afterEach(() => vi.restoreAllMocks());
+
     it('throws InvalidParams when there is no token', async () => {
         const error = await expectReadError(readApiResource(`${API}/v2/datasets/ds-1/items`, undefined));
 
@@ -130,6 +209,23 @@ describe('readApiResource()', () => {
         expect(error.message).toContain('only Apify API URLs');
         // Spec error shape: the failing URI rides in error.data, not only in the message text.
         expect(error.data).toEqual({ uri: 'https://example.com/steal-my-token' });
+    });
+
+    it.each([
+        [`${API}/v2/datasets/ds-1?method=DELETE`, METHOD_PARAM_REFUSAL],
+        [`${API}/v2/datasets/ds-1?%6Dethod=DELETE`, METHOD_PARAM_REFUSAL],
+        [`${API}/v2/acts/apify~hello-world/run-sync`, SYNC_RUN_REFUSAL],
+        [`${API}/v2/actor-tasks/abc/run-sync-get-dataset-items`, SYNC_RUN_REFUSAL],
+    ])('throws InvalidParams without a request for %s, as the API tools refuse it', async (uri, refusal) => {
+        const { request, captured } = requestReturning(streamOf('{}'), 'application/json');
+
+        const error = await expectReadError(readApiResource(uri, stubApifyClient({ request })));
+
+        expect(error).toBeInstanceOf(InvalidParamsError);
+        // readApiResource does not know the session's tools, so the refusal names none.
+        expect(error.message).toBe(`Failed to read ${uri}: ${refusal}`);
+        expect(error.data).toEqual({ uri });
+        expect(captured.url).toBe('');
     });
 
     it('requests the full URL as a stream capped at MAX_INLINE_BYTES', async () => {
@@ -393,6 +489,7 @@ describe('readApiResource()', () => {
 
         expect(error).toBeInstanceOf(InternalError);
         expect(error.message).toContain(`Failed to read ${uri}: HTTP 500: Internal Server Error`);
+        expect(error.message).toContain('this is usually temporary');
     });
 
     it('falls back to statusText when a non-2xx error body itself crosses the limit', async () => {
@@ -425,6 +522,19 @@ describe('readApiResource()', () => {
         expect(error.message).toContain('check APIFY_TOKEN');
     });
 
+    it('appends the back-off hint for a 429 response and classifies it as transient', async () => {
+        const uri = `${API}/v2/datasets/ds-1/items`;
+        const client = stubApifyClient({
+            request: requestFailing(429, 'Too Many Requests', { error: { message: 'Too many requests' } }),
+        });
+
+        const error = await expectReadError(readApiResource(uri, client));
+
+        expect(error).toBeInstanceOf(InternalError);
+        expect(error.message).toContain('HTTP 429: Too many requests');
+        expect(error.message).toContain('rate limit was reached');
+    });
+
     it('appends the private-resource hint for a 403 response', async () => {
         const uri = `${API}/v2/datasets/ds-1/items`;
         const client = stubApifyClient({
@@ -453,5 +563,220 @@ describe('readApiResource()', () => {
         expect(contents.text).toHaveLength(MAX_INLINE_BYTES);
         expect(contents.text).not.toContain('exceeds');
         expect(contents.mimeType).toBe('text/plain; charset=utf-8');
+    });
+
+    it.each([
+        ['/v2/datasets/ds-1', { id: 'ds-1', itemsPublicUrl: `${API}/v2/datasets/ds-1/items?signature=sig-1` }],
+        [
+            '/v2/actor-runs/run-1/key-value-store',
+            {
+                id: 'kv-1',
+                keysPublicUrl: `${API}/v2/key-value-stores/kv-1/keys?signature=sig-1`,
+                recordsPublicUrl: `${API}/v2/key-value-stores/kv-1/records?signature=sig-1`,
+            },
+        ],
+    ])('redacts the URL signing key in the storage object read from %s', async (path, fields) => {
+        const storage = { ...fields, name: null, stats: { readCount: 1, writeCount: 2 }, generalAccess: 'RESTRICTED' };
+        const body = JSON.stringify({ data: { ...storage, urlSigningSecretKey: 'mock-signing-secret' } }, null, 2);
+        // Split inside the name, so the text is redacted only after the chunks are joined.
+        const splitAt = body.indexOf('urlSigning') + 'urlSigning'.length;
+        const { request } = requestReturning(
+            streamOf(body.slice(0, splitAt), body.slice(splitAt)),
+            'application/json; charset=utf-8',
+        );
+
+        const result = await readApiResource(`${API}${path}`, stubApifyClient({ request }));
+
+        expect(firstContent(result).text).toBe(body.replace('"mock-signing-secret"', '"[REDACTED]"'));
+        expect(firstContent(result).mimeType).toBe('application/json; charset=utf-8');
+        expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
+    });
+
+    it('redacts the proxy password read from /v2/users/me', async () => {
+        const body = JSON.stringify({
+            data: { id: 'user-1', username: 'test-user', proxy: { password: 'fake-proxy-password', groups: [] } },
+        });
+        const { request } = requestReturning(streamOf(body), 'application/json; charset=utf-8');
+
+        const result = await readApiResource(`${API}/v2/users/me`, stubApifyClient({ request }));
+
+        expect(firstContent(result).text).toBe(body.replace('"fake-proxy-password"', '"[REDACTED]"'));
+        expect(JSON.stringify(result)).not.toContain('fake-proxy-password');
+    });
+
+    it('keeps the URL signing key in a binary body', async () => {
+        const body = Buffer.from('{"urlSigningSecretKey": "abc123"}');
+        const { request } = requestReturning(streamOf(body), 'application/octet-stream');
+
+        const result = await readApiResource(
+            `${API}/v2/key-value-stores/kv-1/records/ENV`,
+            stubApifyClient({ request }),
+        );
+
+        expect(firstContent(result).blob).toBe(body.toString('base64'));
+    });
+
+    it('redacts the URL signing key and masks the session token in a malformed JSON body', async () => {
+        const uri = `${API}/v2/key-value-stores/kv-1/records/BROKEN`;
+        const { request } = requestReturning(
+            streamOf('{"urlSigningSecretKey": "abc123", "token": "test-token",'),
+            'application/json',
+        );
+
+        const result = await readApiResource(uri, stubApifyClient({ request, token: 'test-token' }));
+
+        expect(firstContent(result)).toEqual({
+            uri,
+            mimeType: 'application/json',
+            text: '{"urlSigningSecretKey": "[REDACTED]", "token": "[REDACTED]",',
+        });
+    });
+
+    it.each([
+        ['application/json', '[REDACTED]'],
+        ['application/json; charset=utf-8', '[REDACTED]'],
+        ['text/plain', 'signing-secret'],
+        ['text/csv', 'signing-secret'],
+        ['application/xml', 'signing-secret'],
+        ['application/ld+json', 'signing-secret'],
+    ])('masks the token across chunks and respects the %s content type', async (contentType, expectedKey) => {
+        const body =
+            '{"urlSigningSecretKey":"signing-secret","authorization":"Bearer test-token","token":"test-token"}';
+        const splitAt = body.indexOf('test-token') + 4;
+        const { request } = requestReturning(streamOf(body.slice(0, splitAt), body.slice(splitAt)), contentType);
+
+        const result = await readApiResource(
+            `${API}/v2/browser-info`,
+            stubApifyClient({ request, token: 'test-token' }),
+        );
+
+        expect(firstContent(result).text).toBe(
+            body.replace('signing-secret', expectedKey).replaceAll('test-token', '[REDACTED]'),
+        );
+        expect(firstContent(result).mimeType).toBe(contentType);
+    });
+
+    it('masks the session token in a binary body split across chunks and keeps every other byte', async () => {
+        const body = Buffer.concat([Buffer.from([0xff, 0x00]), Buffer.from('token=test-token'), Buffer.from([0x80])]);
+        const { request } = requestReturning(
+            streamOf(body.subarray(0, 10), body.subarray(10)),
+            'application/octet-stream',
+        );
+
+        const result = await readApiResource(
+            `${API}/v2/key-value-stores/kv-1/records/ENV`,
+            stubApifyClient({ request, token: 'test-token' }),
+        );
+
+        expect(Buffer.from(firstContent(result).blob as string, 'base64')).toEqual(
+            Buffer.concat([Buffer.from([0xff, 0x00]), Buffer.from('token=[REDACTED]'), Buffer.from([0x80])]),
+        );
+    });
+
+    it.each([
+        [
+            'a JSON',
+            'application/json',
+            '[{"rowId":12345678901234567890, "f":1.50}]',
+            { text: '[{"rowId":12345678901234567890, "f":1.50}]' },
+        ],
+        ['a binary', 'application/octet-stream', Buffer.from([0xff, 0x00, 0x80]), { blob: '/wCA' }],
+    ])('returns %s body without the session token as it is', async (_kind, contentType, body, expected) => {
+        const uri = `${API}/v2/key-value-stores/kv-1/records/DATA`;
+        const { request } = requestReturning(streamOf(body), contentType);
+
+        const result = await readApiResource(uri, stubApifyClient({ request, token: 'test-token' }));
+
+        expect(firstContent(result)).toEqual({ uri, mimeType: contentType, ...expected });
+    });
+
+    it.each([
+        [400, InvalidParamsError],
+        [500, InternalError],
+    ])('masks the session token in the API error message of an HTTP %s response', async (status, ErrorClass) => {
+        const client = stubApifyClient({
+            request: requestFailing(status, 'Status', { error: { message: 'Bearer test-token rejected' } }),
+            token: 'test-token',
+        });
+
+        const error = await expectReadError(readApiResource(`${API}/v2/datasets/ds-1`, client));
+
+        expect(error).toBeInstanceOf(ErrorClass);
+        expect(error.message).toContain(`HTTP ${status}: Bearer [REDACTED] rejected`);
+        expect(JSON.stringify({ message: error.message, data: error.data })).not.toContain('test-token');
+    });
+
+    it('masks the token the client sends in its Authorization header, not another one', async () => {
+        const client = new ApifyClient({ token: 'sent-token' });
+        // Echo the Authorization header apify-client adds, as GET /v2/browser-info does.
+        client.httpClient.axios.defaults.adapter = async (config) => ({
+            data: streamOf(`authorization: ${String(config.headers.Authorization)}; configured: other-token`),
+            status: 200,
+            statusText: 'OK',
+            headers: { 'content-type': 'text/plain' },
+            config,
+        });
+
+        const result = await readApiResource(`${API}/v2/browser-info`, client);
+
+        expect(firstContent(result).text).toBe('authorization: Bearer [REDACTED]; configured: other-token');
+    });
+
+    it('logs a failed request without the session token', async () => {
+        const client = new ApifyClient({ token: 'test-token' });
+        // axios rejects a connection failure with the request config, which holds the Authorization header.
+        client.httpClient.axios.defaults.adapter = async (config) => {
+            throw new AxiosError('connect ECONNREFUSED 127.0.0.1:443', 'ECONNREFUSED', config);
+        };
+        const logOutput = captureLogOutput();
+
+        await expectReadError(readApiResource(`${API}/v2/datasets/ds-1`, client));
+
+        expect(logOutput()).toContain('resources/read request failed');
+        expect(logOutput()).not.toContain('test-token');
+    });
+
+    it('logs a failed signed-link request without the session token', async () => {
+        const uri = `${API}/v2/key-value-stores/kv-1/records/BIG`;
+        const client = new ApifyClient({ token: 'test-token', maxRetries: 0 });
+        // The record crosses the inline limit, then the store request for its signing key fails to connect.
+        client.httpClient.axios.defaults.adapter = async (config) => {
+            if (config.responseType === 'stream') {
+                return { data: abortingStream(), status: 200, statusText: 'OK', headers: {}, config };
+            }
+            throw new AxiosError('connect ECONNREFUSED 127.0.0.1:443', 'ECONNREFUSED', config);
+        };
+        const logOutput = captureLogOutput();
+
+        const result = await readApiResource(uri, client);
+
+        expect(firstContent(result).text).toContain(uri);
+        expect(logOutput()).toContain('Failed to mint signed download URL');
+        expect(logOutput()).not.toContain('test-token');
+    });
+
+    describe('with the egress origin separate from the client-facing one', () => {
+        const EGRESS = 'http://api.internal.example:3333';
+        beforeEach(() => vi.stubEnv('APIFY_API_BASE_URL', EGRESS));
+        afterEach(() => vi.unstubAllEnvs());
+
+        it('sends a client-facing URI to the egress origin and returns it under the URI as given', async () => {
+            const { request, captured } = requestReturning(streamOf('[]'), 'application/json');
+            const uri = `${API}/v2/datasets/ds-1/items?limit=5`;
+
+            const result = await readApiResource(uri, stubApifyClient({ request }));
+
+            expect(captured.url).toBe(`${EGRESS}/v2/datasets/ds-1/items?limit=5`);
+            expect(result.contents[0].uri).toBe(uri);
+        });
+
+        it('links an oversized body read on the egress origin to its client-facing URL', async () => {
+            const { request } = requestReturning(abortingStream(), 'application/json');
+
+            const result = await readApiResource(`${EGRESS}/v2/datasets/ds-1/items`, stubApifyClient({ request }));
+
+            expect(firstContent(result).text).toContain(`${API}/v2/datasets/ds-1/items`);
+            expect(firstContent(result).text).not.toContain('api.internal.example');
+        });
     });
 });

@@ -2,11 +2,20 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
 
-import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { InvalidToolCall, PreparedCall } from '../../src/mcp/tool_call_engine.js';
-import { executeSyncToolCall, prepareToolCall } from '../../src/mcp/tool_call_engine.js';
-import type { ToolCallTelemetryProperties } from '../../src/types.js';
+import { classifyToolCallError, executeSyncToolCall, prepareToolCall } from '../../src/mcp/tool_call_engine.js';
+import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
+import {
+    REPORT_PROBLEM_INVALID_INPUT_NUDGE,
+    REPORT_PROBLEM_NUDGE,
+    reportProblem,
+} from '../../src/tools/dev/report_problem.js';
+import type { ToolCallTelemetryProperties, ToolEntry, ToolInputSchema } from '../../src/types.js';
+import { TOOL_TYPE } from '../../src/types.js';
+import { compileSchema } from '../../src/utils/ajv.js';
+import { respondRaw } from '../../src/utils/mcp.js';
 import { makePaymentRequiredError, makeRecorderTool, makeThrowingTool, withServer } from './helpers/mcp_server.js';
 
 /** An abort signal for direct engine tests, optionally already aborted. */
@@ -126,6 +135,75 @@ describe('prepareToolCall()', () => {
             expect(telemetryData.tool_name).toBe('recorder-tool');
         });
     });
+
+    describe('argument failure hint', () => {
+        const STRICT_SCHEMA = {
+            type: 'object',
+            properties: { query: { type: 'string', minLength: 1 } },
+            required: ['query'],
+        };
+
+        function makeStrictTool(type: typeof TOOL_TYPE.INTERNAL | typeof TOOL_TYPE.ACTOR): ToolEntry {
+            const base = {
+                name: 'strict-tool',
+                description: 'requires a non-empty query',
+                inputSchema: STRICT_SCHEMA as ToolInputSchema,
+                ajvValidate: compileSchema(STRICT_SCHEMA),
+            };
+            return type === TOOL_TYPE.ACTOR
+                ? { ...base, type, actorId: 'actor-id-1', actorFullName: 'apify/strict-actor' }
+                : { ...base, type, call: async () => respondRaw({ content: [] }) };
+        }
+
+        // The map is built per case, so each one controls exactly whether fetch-actor-details is served.
+        async function failureMessage(
+            tool: ToolEntry,
+            fetchActorDetailsServed: boolean,
+            args: Record<string, unknown> | undefined,
+        ): Promise<string> {
+            const tools = new Map<string, ToolEntry>([[tool.name, tool]]);
+            if (fetchActorDetailsServed) tools.set(HELPER_TOOLS.ACTOR_GET_DETAILS, fetchActorDetails);
+            const result = await prepareToolCall({
+                tools,
+                apifyToken: 'fake-token',
+                name: tool.name,
+                args,
+                meta: undefined,
+                requestHeaders: undefined,
+                isTaskRequest: false,
+                mcpSessionId: 's1',
+                telemetryData: null,
+                clientContext: undefined,
+            });
+            expect('message' in result).toBe(true);
+            return (result as InvalidToolCall).message;
+        }
+
+        describe.each([
+            ['invalid', { query: '' }],
+            ['missing', undefined],
+        ])('%s arguments', (_label, args) => {
+            it('points a non-Actor tool at its tools/list schema, not fetch-actor-details', async () => {
+                const message = await failureMessage(makeStrictTool(TOOL_TYPE.INTERNAL), true, args);
+
+                expect(message).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+                expect(message).toContain('tools/list');
+            });
+
+            it('points an Actor tool at fetch-actor-details when the session serves it', async () => {
+                const message = await failureMessage(makeStrictTool(TOOL_TYPE.ACTOR), true, args);
+
+                expect(message).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+            });
+
+            it('points an Actor tool at tools/list when fetch-actor-details is not served', async () => {
+                const message = await failureMessage(makeStrictTool(TOOL_TYPE.ACTOR), false, args);
+
+                expect(message).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+                expect(message).toContain('tools/list');
+            });
+        });
+    });
 });
 
 describe('executeSyncToolCall()', () => {
@@ -196,5 +274,32 @@ describe('executeSyncToolCall()', () => {
             expect(outcome.result.isError).toBe(true);
             expect(outcome.result.toolTelemetry).toEqual({ toolStatus: TOOL_STATUS.ABORTED });
         });
+    });
+});
+
+describe('classifyToolCallError()', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it.each([
+        ['an internal failure gets the general sentence', new Error('boom'), REPORT_PROBLEM_NUDGE],
+        [
+            'a 4xx failure gets the friction sentence',
+            Object.assign(new Error('Not found'), { statusCode: 404 }),
+            REPORT_PROBLEM_INVALID_INPUT_NUDGE,
+        ],
+    ])('appends one report-problem sentence to an execution error: %s', (_label, error, sentence) => {
+        silenceLogs();
+        const outcome = classifyToolCallError(error, {
+            tools: new Map<string, ToolEntry>([[HELPER_TOOLS.PROBLEM_REPORT, reportProblem]]),
+            toolName: 'some-tool',
+            failingToolName: 'some-tool',
+            actorName: undefined,
+            actorId: undefined,
+            isAborted: false,
+            mcpSessionId: 's1',
+        });
+        const texts = (outcome.result.content as { text: string }[]).map((c) => c.text);
+        expect(texts).toHaveLength(2);
+        expect(texts[1]).toBe(sentence);
     });
 });

@@ -6,14 +6,18 @@ import type {
 import { isAxiosError } from 'axios';
 
 import type { ApifyClient } from '../apify_client.js';
-import { getApifyAPIBaseUrl } from '../apify_client.js';
+import { getApifyAPIBaseUrl, getApifyAPIPublicBaseUrl, sendApifyApiRequest } from '../apify_client.js';
 import { MAX_INLINE_BYTES } from '../const.js';
 import { InternalError, InvalidParamsError } from '../mcp/errors.js';
+import { validateApiBlocklist } from '../tools/api/apify_api_blocklist.js';
+import { normalizeApiPath } from '../tools/api/apify_api_path.js';
 import { parseBaseMimeType } from '../tools/storage/storage_helpers.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 import { getHttpErrorHint } from '../utils/mcp.js';
 
 const TEXT_MIME_TYPE = 'text/plain';
+
+export const REDACTED = '[REDACTED]';
 
 /** Textual base MIME types (returned as `text`); everything else becomes a base64 `blob`. */
 function isTextualMimeType(baseMimeType: string | undefined): boolean {
@@ -28,7 +32,7 @@ function isTextualMimeType(baseMimeType: string | undefined): boolean {
     );
 }
 
-/** Domain error class the boundary maps to the matching v1 JSON-RPC error code. */
+/** Domain error class the protocol adapters map to the matching JSON-RPC error code. */
 type DomainErrorClass = new (message: string, data?: unknown) => Error;
 
 /**
@@ -53,23 +57,34 @@ function throwReadFailure(uri: string, status: number | undefined, message: stri
 }
 
 /**
- * True when the URI is an Apify API URL (same origin as the configured API base).
+ * True when the URI is an Apify API URL: on the origin clients are told to use (`getApifyAPIPublicBaseUrl()`)
+ * or on the egress origin (`getApifyAPIBaseUrl()`), which differ on the hosted server.
  *
  * This is the security gate for the generic read proxy: the apify-client attaches the
  * session token as an `Authorization` header to every outbound request, so we must only
  * hand it Apify API URLs — never an arbitrary host. Userinfo-bearing URLs
  * (`user@api.apify.com`) are rejected even when the host is genuinely ours: axios drops
  * the default `Authorization` header for credentials-bearing URLs, so the read would
- * silently run unauthenticated.
+ * silently run unauthenticated. The API tools' `callApi` asserts its request URL with it too.
  */
 export function isApifyApiUri(uri: string): boolean {
     try {
         const url = new URL(uri);
         if (url.username || url.password) return false;
-        return url.origin === new URL(getApifyAPIBaseUrl()).origin;
+        return [getApifyAPIPublicBaseUrl(), getApifyAPIBaseUrl()].some((base) => url.origin === new URL(base).origin);
     } catch {
         return false;
     }
+}
+
+/** `uri` with the scheme, host and port of `base`; the path, query and fragment stay. */
+export function buildUrlOnOrigin(uri: string, base: string): string {
+    const url = new URL(uri);
+    const { protocol, hostname, port } = new URL(base);
+    url.protocol = protocol;
+    url.hostname = hostname;
+    url.port = port;
+    return url.href;
 }
 
 /**
@@ -90,24 +105,19 @@ function safeDecodeURIComponent(segment: string): string {
 /**
  * Download URL for a body too large to inline. For a key-value-store record URI, returns the
  * store's signed `recordPublicUrl` — fetchable without an API token when the client can read the
- * store's URL signing key. Falls back to the original API URL for any other endpoint, or if minting
- * the signed URL fails (fetching that link then needs a token).
+ * store's URL signing key. Falls back to the API URL on the client-facing origin for any other
+ * endpoint, or if minting the signed URL fails (fetching that link then needs a token).
  */
 async function fetchRecordDownloadUrl(uri: string, apifyClient: ApifyClient): Promise<string> {
-    let pathname: string;
-    try {
-        pathname = new URL(uri).pathname;
-    } catch {
-        return uri;
-    }
-    const match = KV_RECORD_PATH_RE.exec(pathname);
-    if (!match) return uri;
+    const apiUrl = buildUrlOnOrigin(uri, getApifyAPIPublicBaseUrl());
+    const match = KV_RECORD_PATH_RE.exec(new URL(uri).pathname);
+    if (!match) return apiUrl;
     try {
         const store = apifyClient.keyValueStore(safeDecodeURIComponent(match[1]));
         return await store.getRecordPublicUrl(safeDecodeURIComponent(match[2]));
     } catch (err) {
         logHttpError(err, `Failed to mint signed download URL for ${uri}; falling back to API URL`);
-        return uri;
+        return apiUrl;
     }
 }
 
@@ -137,8 +147,8 @@ async function buildLinkOutResult(uri: string, apifyClient: ApifyClient): Promis
     );
 }
 
-/** The mid-consumption abort axios raises when a streamed body crosses `maxContentLength`. */
-function isMaxContentLengthAbort(err: unknown): boolean {
+/** The mid-consumption abort axios raises when a body crosses `maxContentLength`. */
+export function isMaxContentLengthAbort(err: unknown): boolean {
     return isAxiosError(err) && err.code === 'ERR_BAD_RESPONSE' && err.message.includes('maxContentLength');
 }
 
@@ -168,33 +178,51 @@ function parseApiErrorMessage(body: Buffer | undefined): string | undefined {
     }
 }
 
+/** A response can echo the session token, as `GET /v2/browser-info` echoes the request headers. */
+export function maskSessionToken(body: Buffer, token: string | undefined): Buffer {
+    if (!token) return body;
+    // The token is ASCII, so a latin1 round trip keeps every other byte as it is.
+    const bytes = body.toString('latin1');
+    return bytes.includes(token) ? Buffer.from(bytes.replaceAll(token, REDACTED), 'latin1') : body;
+}
+
+/**
+ * The unescaped closing quote and colon distinguish keys from string contents.
+ * Disjoint value branches keep the scan linear.
+ */
+const SECRET_VALUE_RE = /("(?:urlSigningSecretKey|password)"\s*:\s*)"(?:[^"\\]|\\[\s\S])*"/g;
+
+/**
+ * Hide storage signing keys and passwords, such as the proxy password in `/v2/users/me`, without parsing JSON,
+ * preserving formatting and large integers (apify/ai-team#330, apify/ai-team#334).
+ * Parsing and re-indenting deeply nested bodies can exhaust memory. Null values and escaped key names stay as is.
+ */
+export function redactJsonSecrets(json: string): string {
+    return json.replace(SECRET_VALUE_RE, `$1"${REDACTED}"`);
+}
+
 /**
  * Read any Apify API GET endpoint as an MCP resource.
  *
  * A thin streaming proxy: the apify-client injects the session token (and the MCP-origin header),
- * the body streams in verbatim and is returned by its declared Content-Type — textual types
+ * the body streams in and is returned by its declared Content-Type — textual types
  * (text/*, JSON, XML) as `text`, anything else as a base64 `blob`. The body is never parsed, so
- * JSON primitives, formatting, and bytes round-trip exactly.
+ * JSON primitives, formatting, and bytes round-trip exactly, except that the session token and
+ * `urlSigningSecretKey` and `password` values in JSON become `[REDACTED]`.
  *
- * Genuine failures (no token, bad origin, a missing resource, a bad token, a 5xx, a network error)
- * throw a domain error (`InvalidParamsError`/`InternalError`) that the `server.ts` boundary maps to a
- * JSON-RPC error, so the SDK returns an error rather than success-shaped content for an unreadable
- * resource (see SEP-2164). A body over `MAX_INLINE_BYTES` is NOT a failure — it is a
- * successful read returning a download pointer.
+ * Genuine failures (no token, bad origin, a request the API tools refuse, a missing resource, a bad token,
+ * a 5xx, a network error) throw a domain error (`InvalidParamsError`/`InternalError`) that the protocol adapters
+ * (`legacy_server.ts`, `stateless_server.ts`) map to a JSON-RPC error, so the SDK returns an error
+ * rather than success-shaped content for an unreadable resource (see SEP-2164). A body over
+ * `MAX_INLINE_BYTES` is NOT a failure — it is a successful read returning a download pointer.
  *
- * The request goes straight through `apifyClient.httpClient.axios` (the same axios instance
- * apify-client builds internally, so token/origin headers still apply) instead of
- * `httpClient.call()`: with `responseType: 'stream'`, a non-2xx reaches `call()` as an unconsumed
- * stream — its `ApifyApiError` message degrades to junk and each retry attempt strands an unread
- * socket. One attempt, no retries. `maxContentLength` is enforced by axios itself mid-consumption
- * (verified in axios@1.16.1: the adapter wraps streamed responses in a byte-counting generator
- * that throws `ERR_BAD_RESPONSE` when the decoded size crosses the limit), so an oversized body
- * is aborted at ~`MAX_INLINE_BYTES`, never buffered whole.
+ * It makes one attempt through `sendApifyApiRequest` (`../apify_client.ts`), which says why it skips
+ * `httpClient.call()`.
  */
 export async function readApiResource(uri: string, apifyClient?: ApifyClient): Promise<ReadResourceResult> {
     if (!isApifyApiUri(uri)) {
         throw new InvalidParamsError(
-            `Failed to read ${uri}: only Apify API URLs (${getApifyAPIBaseUrl()}) are readable as resources.`,
+            `Failed to read ${uri}: only Apify API URLs (${getApifyAPIPublicBaseUrl()}) are readable as resources.`,
             { uri },
         );
     }
@@ -203,17 +231,23 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
             uri,
         });
     }
+    // A GET with the method query parameter can delete, and one to a synchronous run endpoint starts a paid run;
+    // see apify/apify-mcp-server#1524.
+    const { pathname, search } = new URL(uri);
+    const refusal = validateApiBlocklist({
+        method: 'GET',
+        normalizedPath: normalizeApiPath(`${pathname}${search}`),
+        loadedToolNames: [],
+    });
+    if (refusal) throw new InvalidParamsError(`Failed to read ${uri}: ${refusal}`, { uri });
 
     let response: { data: unknown; headers: Record<string, unknown>; status: number; statusText: string };
     try {
-        // The raw axios instance skips `httpClient.call()` → `ensureNodeInit()`, so reads do NOT honor
-        // `HTTPS_PROXY` (auth + MCP-origin headers are instance defaults and still apply — not a leak).
-        // Fine for direct egress; a proxy-mandatory deployment needs an apify-client init hook.
-        response = await apifyClient.httpClient.axios.request<unknown>({
-            url: uri,
+        // Sent on the egress origin; the result and the errors keep the URI as given.
+        response = await sendApifyApiRequest(apifyClient, {
+            url: buildUrlOnOrigin(uri, getApifyAPIBaseUrl()),
             method: 'GET',
             responseType: 'stream',
-            maxContentLength: MAX_INLINE_BYTES,
         });
     } catch (err) {
         logHttpError(err, `resources/read request failed`, { uri });
@@ -223,7 +257,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     let body: Buffer | undefined;
     let overLimit = false;
     try {
-        body = await collectStream(response.data);
+        body = maskSessionToken(await collectStream(response.data), apifyClient.token);
     } catch (err) {
         if (isMaxContentLengthAbort(err)) {
             overLimit = true;
@@ -269,7 +303,9 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     // base64 beats text in a wrong encoding), the same rule as apify-client's body_parser. The full
     // Content-Type — charset included — rides along on the text result.
     if (isTextualMimeType(baseMimeType) && Buffer.isEncoding(charset)) {
-        return buildTextResult(uri, body.toString(charset), contentType);
+        const text = body.toString(charset);
+        // apify-client parses only `application/json`, so both proxies redact the same bodies.
+        return buildTextResult(uri, baseMimeType === 'application/json' ? redactJsonSecrets(text) : text, contentType);
     }
     // Binary or undecodable text: base MIME type only (parameters are meaningless for a blob).
     return {

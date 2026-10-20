@@ -41,7 +41,7 @@ pnpm run build
 pnpm run evals:mcp-agent
 ```
 
-Run `pnpm run evals:mcp-agent --help` for all options. `--dataset` selects the dataset, `--id` and `--category` filter it, `--concurrency` controls parallel agents, and `--iterations` repeats cases. `--pass-threshold` gates the aggregate pass rate (default `0.9`); `--tool-timeout` caps each MCP tool call (default 60 s); `--mcp-tools-only` removes Claude Code built-ins. Use `--subscription` for local Claude Code credentials and `--claude-judge` to avoid an OpenRouter key.
+Run `pnpm run evals:mcp-agent --help` for all options. `--dataset` selects the dataset, `--id` and `--category` filter it, `--concurrency` controls parallel agents, and `--iterations` repeats cases. `--pass-threshold` gates the aggregate pass rate (default `0.9`); `--tool-timeout` caps each MCP tool call (default 60 s); `--mcp-tools-only` removes Claude Code built-ins; `--run-id` names the resources this run creates (below). Use `--subscription` for local Claude Code credentials and `--claude-judge` to avoid an OpenRouter key.
 
 ### Two datasets: kind, id scheme, and expectedErrors
 
@@ -64,15 +64,15 @@ Read-only probes count too, which is the point: the gate is what keeps the tool 
 enough that an agent resolves a loose Actor reference with `search-actors` instead of guessing a slug.
 
 One caveat when reading a failure: a transient agent failure is retried once, and the retry replays the
-whole prompt, so a fixed-name create case can hit a name collision the second time round and fail the
-gate on it. The console prints a `retrying once` line for those items.
+whole prompt. An item that names its resources with `{{uniq}}` gets a fresh name on the retry (its
+`r<attempt>` part), so a create that succeeded before the failure does not collide with its replay; a
+fixed-name create case still can, and fails the gate on it. The console prints a `retrying once` line for
+those items.
 
-The tasks family (`merge/tasks/*`, 10 items: 7 proper + 3 with `expectedErrors`) uses fixed `eval-*`
-task names, which are unique per account, and the create cases never clean up — so every run
-leaves debris that collides on the next one. Run `pnpm run evals:mcp-agent:tasks-fixtures`
-before every run: it deletes leftover `eval-*` tasks and seeds the permanent fixture task. It
-deletes on whatever account `APIFY_TOKEN` points at and prints that account first; pass
-`--dry-run` to see what it would delete before it does. Three cases (`publish-discovery`,
+The tasks family (`merge/tasks/*`, 10 items: 7 proper + 3 with `expectedErrors`) ends every task name
+it creates with `-{{uniq}}` in the query and in the reference (see "Unique resource names" below), so its
+trials and any concurrent run work on separate tasks. Run `pnpm run evals:mcp-agent:fixtures` before
+every run (see the schedules family below for what it does). Three cases (`publish-discovery`,
 `publish-medium-1`, `chain-hard-1`) publish task examples on `apify/normal-mode-test-actor`, and
 publishing needs write access to the Actor, so only those three depend on an account that has it.
 
@@ -97,24 +97,31 @@ single red run, and blame a tool description only after checking the case still 
 The schedules family (`merge/schedules/*`, 10 items: 7 proper + 3 with `expectedErrors`) covers the
 schedule tools: create for a task and for an Actor, cron and time-zone translation from user language,
 pausing, adding an action (an update replaces the whole list), deleting, a name collision, and a
-not-found read. It uses fixed `eval-sched-*` names plus two permanent, disabled fixture schedules that
-run the `eval-sum-nightly` task fixture: `eval-nightly-sum`, which the pure read cases assert on and no
-case may modify, and `eval-sched-target`, which the add-an-action case edits. They are separate because
-items run concurrently against one account — a case that edits the schedule a read case asserts on makes
-that read pass or fail depending on which item finished first. For the same reason,
-`merge/schedules/add-action-medium-1` is not safe under `--iterations N` above 1 unless you also pass
-`--concurrency 1`: its trials all edit `eval-sched-target`, so a trial can read the schedule after
-another trial has already added to it and get judged against a starting state that is no longer there.
-CI runs each item once, so this affects local repeat runs only. Run
-`pnpm run evals:mcp-agent:tasks-fixtures && pnpm run evals:mcp-agent:schedules-fixtures` before every
-run: the second script deletes leftover `eval-*` schedules and resets the fixture (disabled, `0 3 * * *`
-UTC, one task action), since an eval agent may have enabled it or replaced its actions. The fixture stays
-disabled on purpose; an enabled one would start a run on the eval account every night.
+not-found read. Every item that creates a schedule names it `eval-sched-<what>-{{uniq}}` in the query
+and in the reference (see "Unique resource names" below), so its trials and any concurrent run work on
+separate schedules and `--iterations N` is safe. One permanent, disabled fixture schedule,
+`eval-nightly-sum`, runs the `eval-sum-nightly` task fixture; the pure read cases and the collision case
+point at it and no case may modify it. It stays disabled on purpose; an enabled one would start a run on
+the eval account every night.
 
-Run `evals:mcp-agent:schedules-fixtures` again **after** a run as well. The create cases leave enabled
-schedules behind, and an enabled schedule keeps firing on the eval account until something deletes it —
-seeding at the start of the next run is too late. CI does this in a `Tear down schedule fixtures` step
-guarded by `always()`, so a failed or cancelled run still cleans up.
+Run `pnpm run evals:mcp-agent:fixtures` before a run: it deletes `eval-*` schedules and tasks older
+than 6 hours, then resets the task fixture and the schedule fixture (disabled, `0 3 * * *` UTC, one
+task action), creating them if missing. It deletes on whatever account `APIFY_TOKEN` points at and
+prints that account first; pass `--dry-run` to see what it would delete before it does.
+
+**After** a run, delete the schedules and tasks that run created, with the command it printed:
+
+```bash
+pnpm run evals:mcp-agent:fixtures -- --run-id <the run id from the summary>
+```
+
+`--run-id` deletes only that run's names at any age. Without it, the next seed sweep deletes
+`eval-*` schedules and tasks older than 6 hours. CI tears down its own run's schedules and tasks in
+an `always()` step.
+
+The deterministic platform facts the judge used to score here live in
+`tests/test_kit/cases/schedules.cases.ts` instead, asserted against the live API. Those cases name their
+schedules `test-sched-*`; the sweep only ever touches `eval-*`.
 
 The web-fetch family (`merge/web-fetch/*`, 11 items: 8 proper + 3 with `expectedErrors`) covers the
 `apify/web-fetch` default Actor tool: fetching, output formats, HTTP status reporting, tool
@@ -131,9 +138,9 @@ status message telling the agent to add `raw`; `ftp://` fails with "Unsupported 
 The web-selection family (`merge/web-selection/*`, 9 items: 7 proper + 2 with `expectedErrors`) covers
 the clash between the default web tools: web search by query (`apify/rag-web-browser`) vs
 single-URL verbatim fetch (`apify/web-fetch`) vs Actor discovery (`search-actors`) vs a
-specialized Actor for structured platform data, plus rag→web-fetch escalation when a page
-blocks rag's crawler (reddit) and coexistence with a client's built-in, summarizing fetch. Also
-stateless — no fixtures script. Known residual (2026-08-21): on `merge/web-fetch/unsupported-protocol`,
+specialized Actor for structured platform data, plus coexistence with a client's built-in,
+summarizing fetch. Also stateless — no fixtures script.
+Known residual (2026-08-21): on `merge/web-fetch/unsupported-protocol`,
 claude-haiku-4-5 reproducibly rewrites the ftp:// URL to https:// without telling the user,
 despite the scheme note in both the tool description and the `url` parameter — a model-level
 limit the case documents on purpose; stronger models pass.
@@ -156,7 +163,35 @@ The harness uses `canUseTool` instead of root-incompatible permission bypass fla
 
 ### `--iterations` on stateful agent items
 
-`--iterations N` repeats each item in one experiment and reports `pass@k` and `pass^k`. It is safe for tool-call and stateless agent items. Stateful cases such as `merge/tasks/*` can collide with their own leftovers.
+`--iterations N` repeats each item in one experiment and reports `pass@k` and `pass^k`. It is safe for tool-call and stateless agent items, and for agent items that name their resources with `{{uniq}}` (below). Stateful cases without the marker can collide with their own leftovers.
+
+### Unique resource names: `{{uniq}}` and `--run-id`
+
+An item that creates a named account resource writes `{{uniq}}` where the run-specific part of the
+name belongs, in the query **and** in the reference:
+
+```
+query:     ... and call it eval-sched-add-{{uniq}}
+reference: PASS only if create-schedule created eval-sched-add-{{uniq}}.
+```
+
+The runner rewrites every `{{uniq}}` to `<run-id>-n<run-id length>-t<trial>r<attempt>` before the item reaches the
+agent and the judge; `attempt` is `1`, or `2` on the transient-failure retry. Keep the static part of the name at
+34 characters or fewer: a schedule or task name is capped at 63, and a run id of up to 18 characters with its
+`-n<length>-t<trial>r<attempt>` tail takes the rest.
+
+Substitute both or neither — a marker in the query alone makes the judge demand a name the agent never
+used. An unmarked item keeps colliding exactly as before, so the fix is per item, not automatic.
+`metadata.expectedArgs` is never substituted.
+
+`--run-id` overrides the generated id (lowercase letters, digits and dashes, at most 18 characters); CI passes
+`<github.run_id>-<github.run_attempt>` to the run and to its teardown step. A run prints its id and its
+teardown command when it finishes:
+
+```
+🧹 Run id r3k9f2qa7c — delete this run's schedules and tasks:
+   pnpm run evals:mcp-agent:fixtures -- --run-id r3k9f2qa7c
+```
 
 **Exit codes:**
 - `0` = the aggregate pass rate (passed trials / requested trials) meets `--pass-threshold`
@@ -210,7 +245,7 @@ rationale in `runner/run.ts`). `requestedTrials = requestedIds.length * iteratio
 - A calibrated suite gates on an aggregate rate instead of one flaky item blocking every PR; `--pass-threshold 1.0` restores strict all-pass
 - The trial count matters as much as the scores: the Langfuse SDK drops an item whose task throws, so gating on the results it returns would report `7/7 passed` on a run where three trials never executed
 
-Harness failures (MCP spawn, OpenRouter, judge) are therefore left to throw rather than being converted into a `FAIL` verdict. A broken harness shows up as a shortfall, not as a failing eval.
+Harness failures (MCP spawn, an MCP server not connected at init, OpenRouter, judge) are therefore left to throw rather than being converted into a `FAIL` verdict. A broken harness shows up as a shortfall, not as a failing eval.
 
 **Location:** `runner/experiment.ts` (`buildRunSummary`, `resolveExitCode`)
 
@@ -281,6 +316,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 
 - `config.ts` - Models and the MCP tool-name prefix, shared across responsibilities
 - `environment.ts` - Env var sanitization and missing-var reporting
+- `run_id.ts` - The `<static>-<runId>-n<runId length>-t<trial>r<attempt>` name grammar and `--run-id` parsing, shared by the runner and the fixtures script
 - `runner/run.ts` - Main CLI entry, runner defaults
 - `runner/experiment.ts` - Experiment task (agent + tool-call dispatch), `EVALUATORS`, run summary, exit gate
 - `runner/filters.ts` - Test case filtering by category and id
@@ -295,8 +331,8 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `langfuse/observations.ts` - Builds and emits the item's span tree (agent, usage, tool calls)
 - `langfuse/tracing.ts` - OpenTelemetry span processor init/shutdown
 - `scripts/export_dataset.ts` - Snapshot CLI entry (`pnpm run evals:mcp-agent:export-dataset`)
-- `scripts/tasks_fixtures.ts` - Task-suite fixture CLI entry (`pnpm run evals:mcp-agent:tasks-fixtures`)
-- `scripts/schedules_fixtures.ts` - Schedule-suite fixture CLI entry (`pnpm run evals:mcp-agent:schedules-fixtures`)
+- `scripts/fixtures.ts` - Task and schedule fixture CLI entry (`pnpm run evals:mcp-agent:fixtures`)
+- `scripts/sweep.ts` - The fixtures' delete rule; side-effect free, so a unit test can import it
 - `dataset_snapshot_<dataset>.json` - Local export of a dataset, not read at runtime and gitignored
 
 ## Configuration
@@ -323,6 +359,8 @@ Results are recorded in Langfuse, not to a local file. Each run:
 - **Traces** every item as one trace. Its root output is the judge verdict (agent items) or the first-attempted-call comment (tool-call items) plus the agent's narration, thinking, and tool names; nested under it are an `agent` span (prompt in, final answer out), a generation carrying the run's tokens and cost, one span per tool call (arguments in, result out, `ERROR` when the call failed or was denied), and - agent items only - a generation for the judge call. See design decision 9.
 - **Scores** each agent item: `mcp_agent_judge` (`1` on a PASS verdict, comment = judge reason) and `tool_errors` (count of unexpected failed tool calls, comment lists every failure with expected ones marked, `0` on a clean item) together form the gate, and `total_tokens` is the agent tokens billed (omitted when the provider reported no usage so an unmeasured run cannot look like a free one; an item whose agent run was retried reports only the second attempt). Each tool-call item scores `first_tool_match` alone (`1`/`0`, comment names the captured call and the verdict).
 - **Scores the run** with `pass_rate`: passed trials over requested trials (`requestedIds.length * iterations`), so runs stay comparable even when trials were dropped.
+
+To read scores outside the UI, call `GET /api/public/v3/scores?name=<score>&fields=core,details` on `LANGFUSE_BASE_URL` with the public and secret key as basic auth. The v1 and v2 score endpoints return 404 on that instance.
 
 ### Concurrency
 
@@ -386,13 +424,10 @@ above). The snapshot holds the same fields flattened, one object per case, in th
 **Symptom:** Test 2 fails after Test 1, passes alone.<br>
 **Solution:** ✅ Isolated agent + MCP instance per test.
 
-### Agent claims the Apify MCP server is "still connecting" (remote/sandboxed environments)
-**Symptom:** A transcript shows the agent reading a system notice that MCP servers are still
-connecting, concluding the Apify tools are unavailable, and falling back to a built-in tool.<br>
-**Cause:** In sandboxed remote Claude Code environments the MCP handshake can race the first
-turn; a fast model sometimes doesn't wait or retry. On a local machine the CLI completes the
-handshake before the first turn, so this doesn't reproduce there.<br>
-**Solution:** Retry the item once; a repeat failure on a local machine is real.
+### Apify MCP server not connected at init
+**Symptom:** `MCP server "apify" not connected at init (status: pending)`, then `retrying once`; a failed retry shows `🔥` and counts as a failed trial.<br>
+**Cause:** The CLI waits 5 s (`MCP_CONNECT_TIMEOUT_MS`) for the server, then emits `init` with it `pending` and runs the first turn without its tools. Common on a loaded machine (high `--concurrency`, few CPUs).<br>
+**Solution:** Automatic: the run aborts at `init`; `pending`/`failed` retry once, other statuses fail at once. If it recurs, lower `--concurrency`.
 
 ### Agent answers from memory or shells out instead of using our tools
 **Symptom:** The judge reports the agent used `Bash`, `WebSearch`, or its own knowledge.<br>
@@ -411,6 +446,15 @@ handshake before the first turn, so this doesn't reproduce there.<br>
 - Reduce `maxTurns` to fail faster
 - Try a different agent model
 
+### Eval runs send real problem reports
+**Symptom:** `report-problem` calls from an eval run reach the production Segment source.<br>
+**Cause:** The eval server inherits the runner's environment, and telemetry defaults to `PROD` (`src/telemetry.ts`).<br>
+**Solution:** Run cases where the agent can call `report-problem` (e.g. cases with `failTools`) with `TELEMETRY_ENV=DEV`.
+
+### A case expects behavior your change removes on purpose
+**Symptom:** A case fails because it checks for behavior the PR removes on purpose, e.g. a call that tool texts no longer ask for.<br>
+**Solution:** Don't change the case in the same PR. Name the case and the reason in the PR, and open an issue for the case owner ([#1603](https://github.com/apify/apify-mcp-server/issues/1603) is an example).
+
 ## CI
 
 CI runs two Langfuse tiers:
@@ -424,7 +468,7 @@ Fork PRs cannot run evals because GitHub withholds repository secrets. Push the 
 
 Both tiers need `ANTHROPIC_API_KEY`, the three `LANGFUSE_*` keys, and `APIFY_TOKEN` (mapped from the `APIFY_TEST_USER_API_TOKEN` repository secret). `OPENROUTER_API_KEY` is required only by the merge judge. The three publish cases also need write access to `apify/normal-mode-test-actor`.
 
-The pr tier has run on a hosted runner in 4m31s, inside its ten-minute target; the merge tier's threshold and 90-minute timeout are still provisional. Transient network and provider failures retry once; the handshake race above does not, because it produces a wrong answer rather than an error.
+The pr tier has run on a hosted runner in 4m31s, inside its ten-minute target; the merge tier's threshold and 90-minute timeout are still provisional. Transient network and provider failures retry once, as does an MCP server `pending` or `failed` at init (see Common issues).
 
 ## Writing tool descriptions
 

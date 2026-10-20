@@ -7,10 +7,8 @@ import {
     ACTOR_MAX_MEMORY_MBYTES,
     FAILURE_CATEGORY,
     HELPER_TOOLS,
-    RAG_WEB_BROWSER,
-    RAG_WEB_BROWSER_ADDITIONAL_DESC,
-    WEB_FETCH,
-    WEB_FETCH_ADDITIONAL_DESC,
+    OFFICIAL_ACTORS_WITH_SIDE_EFFECTS,
+    OFFICIAL_APIFY_USERNAMES,
 } from '../../const.js';
 import { ActorLoadError } from '../../errors.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
@@ -38,6 +36,7 @@ import { buildActorInputSchema, fixedAjvCompile } from '../actor_input_schema.js
 import { actorNameToToolName, isActorBlockedUnderPaymentProvider, resolveActorToolMode } from '../actor_tool_naming.js';
 import { buildEnrichedDirectActorOutputSchema, actorRunOutputSchema } from '../structured_output_schemas.js';
 import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from './actor_run_response.js';
+import { buildDirectActorContract, getActorToolPolicy } from './actor_tool_contract.js';
 
 /**
  * MCP-only opt-in injected next to the Actor's own input fields. Same contract as `call-actor`'s
@@ -90,6 +89,30 @@ export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStor
 }
 
 /**
+ * Clients such as Claude run read-only tools without asking each time (see apify/apify-mcp-server#973).
+ * An Actor counts as read-only only when Apify maintains it and nothing lets it act outside its run
+ * storages: limited permissions keep it out of the user's other Apify data, and it has no secret input
+ * (credentials for other services), writable storage input (writes to the user's existing storages),
+ * MCP connector input (writes to connected apps) or code input.
+ */
+function isReadOnlyActor({ actor, definition }: ActorInfo): boolean {
+    if (!OFFICIAL_APIFY_USERNAMES.has(actor.username)) return false;
+    if (OFFICIAL_ACTORS_WITH_SIDE_EFFECTS.has(definition.actorFullName)) return false;
+    if (actor.actorPermissionLevel !== 'LIMITED_PERMISSIONS') return false;
+
+    const inputProperties = Object.values(definition.input?.properties ?? {});
+    return !inputProperties.some(
+        (property) =>
+            property.isSecret ||
+            (['dataset', 'keyValueStore', 'requestQueue'].includes(property.resourceType ?? '') &&
+                property.resourcePermissions?.includes('WRITE')) ||
+            property.resourceType === 'mcpConnector' ||
+            property.editor === 'javascript' ||
+            property.editor === 'python',
+    );
+}
+
+/**
  * Fetches input schemas for normal (non-MCP-server) Actors by ID or full name and compiles them
  * into MCP tools, using AJV to validate the input schemas. Tool name can't contain /, so it is
  * replaced with _.
@@ -107,9 +130,9 @@ export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStor
  */
 export async function getNormalActorsAsTools(
     actorsInfo: ActorInfo[],
-    options?: { mcpSessionId?: string; actorStore?: ActorStore },
+    options?: { mcpSessionId?: string; actorStore?: ActorStore; isDirectTool?: boolean },
 ): Promise<ToolEntry[]> {
-    const { mcpSessionId, actorStore } = options ?? {};
+    const { mcpSessionId, actorStore, isDirectTool = true } = options ?? {};
     const tools: ToolEntry[] = [];
 
     for (const actorInfo of actorsInfo) {
@@ -118,9 +141,11 @@ export async function getNormalActorsAsTools(
         if (!definition) continue;
 
         const { actorFullName, description: actorDescription } = definition;
-        const isRag = actorFullName === RAG_WEB_BROWSER;
-        const isWebFetch = actorFullName === WEB_FETCH;
-        const { inputSchema } = buildActorInputSchema(definition.actorFullName, definition.input, isRag);
+        const contract = isDirectTool
+            ? buildDirectActorContract(actorFullName, definition.input)
+            : { input: definition.input, description: '' };
+        const isReadOnly = isReadOnlyActor({ ...actorInfo, definition: { ...definition, input: contract.input } });
+        const { inputSchema } = buildActorInputSchema(definition.actorFullName, contract.input);
 
         // Inject the MCP-only `waitSecs` opt-in before AJV compile so the LLM can cap the wait.
         const inputSchemaWithWaitSecs = inputSchema as { properties?: Record<string, unknown> };
@@ -130,14 +155,13 @@ export async function getNormalActorsAsTools(
         };
 
         // Names call-actor only when the session actually has it.
-        const buildDescription = ({ hasTool }: ToolDescriptionContext): string => {
+        const buildDescription = (context: ToolDescriptionContext): string => {
+            const { hasTool } = context;
             let description = `This tool calls the Actor "${actorFullName}" and retrieves its output results.
 ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this specific Actor.\n` : ''}Actor description: ${actorDescription}`;
-            if (isRag) {
-                description += `\n\n${RAG_WEB_BROWSER_ADDITIONAL_DESC}`;
-            } else if (isWebFetch) {
-                description += `\n\n${WEB_FETCH_ADDITIONAL_DESC}`;
-            }
+            const policyDescription = getActorToolPolicy(actorFullName)?.buildDescription?.(context);
+            if (policyDescription) description += `\n\n${policyDescription}`;
+            if (contract.description) description += `\n\n${contract.description}`;
             return description;
         };
 
@@ -178,8 +202,8 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
             icons: definition.pictureUrl ? [{ src: definition.pictureUrl, mimeType: 'image/png' }] : undefined,
             annotations: {
                 title: definition.actorFullName,
-                readOnlyHint: false,
-                destructiveHint: true,
+                readOnlyHint: isReadOnly,
+                destructiveHint: !isReadOnly,
                 openWorldHint: true,
             },
             // Allow long-running tasks for Actor tools, make it optional for now
@@ -321,9 +345,10 @@ export async function getActorsAsTools(
         mcpSessionId?: string;
         actorStore?: ActorStore;
         paymentProvider?: PaymentProvider;
+        isDirectTool?: boolean;
     },
 ): Promise<ActorsAsToolsResult> {
-    const { mcpSessionId, actorStore, paymentProvider } = options ?? {};
+    const { mcpSessionId, actorStore, paymentProvider, isDirectTool = true } = options ?? {};
     log.debug('Fetching Actors as tools', {
         actorNames: actorIdsOrNames,
         mcpSessionId,
@@ -400,7 +425,7 @@ export async function getActorsAsTools(
     }
 
     const [normalTools, mcpServerTools] = await Promise.all([
-        getNormalActorsAsTools(normalActorsInfo, { mcpSessionId, actorStore }),
+        getNormalActorsAsTools(normalActorsInfo, { mcpSessionId, actorStore, isDirectTool }),
         getMCPServersAsTools(actorMCPServersInfo, apifyClient.token, mcpSessionId),
     ]);
 

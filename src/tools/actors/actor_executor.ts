@@ -8,6 +8,7 @@ import { redactSkyfirePayId } from '../../utils/logging.js';
 import { buildInvalidInputTexts, respondUserError } from '../../utils/mcp.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
 import { abortRunOnSignal, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './actor_run_response.js';
+import { buildDirectActorRunInput } from './actor_tool_contract.js';
 
 /**
  * Direct actor tool executor. Mode-agnostic — used in both default and apps modes.
@@ -18,7 +19,8 @@ import { abortRunOnSignal, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } fro
  */
 export const actorExecutor: ActorExecutor = {
     async executeActorTool(params: ActorExecutionParams): Promise<ActorExecutionResult> {
-        const { actorFullName, apifyClient, mcpSessionId, abortSignal, progressTracker, taskMode } = params;
+        const { actorFullName, apifyClient, mcpSessionId, abortSignal, progressTracker, taskMode, hasCallActorTool } =
+            params;
         // Strip `waitSecs` from the Actor's input — it's an MCP-injected opt-in, not an
         // Actor field — so `actor.start()` doesn't reject or silently pass it through.
         const { waitSecs: argsWaitSecs, ...actorInput } = params.input as { waitSecs?: number } & Record<
@@ -42,7 +44,9 @@ export const actorExecutor: ActorExecutor = {
 
         let actorRun;
         try {
-            actorRun = await apifyClient.actor(actorFullName).start(actorInput, params.callOptions);
+            actorRun = await apifyClient
+                .actor(actorFullName)
+                .start(buildDirectActorRunInput(actorFullName, actorInput), params.callOptions);
         } catch (error) {
             // Platform can reject input our own AJV gate passed (see isActorInputValidationError).
             if (!isActorInputValidationError(error)) throw error;
@@ -107,6 +111,7 @@ export const actorExecutor: ActorExecutor = {
         return buildGetActorRunResponse({
             ...fetchResult.result,
             linkContext: await getConsoleLinkContext(apifyClient.token, apifyClient),
+            hasCallActorTool,
         }) as ActorExecutionResult;
     },
 };

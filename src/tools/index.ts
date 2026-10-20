@@ -18,6 +18,9 @@ export const unauthEnabledTools: string[] = [
     HELPER_TOOLS.DOCS_FETCH,
     HELPER_TOOLS.STORE_SEARCH,
     HELPER_TOOLS.ACTOR_GET_DETAILS,
+    // They read only the public API spec from docs.apify.com, never the API itself.
+    HELPER_TOOLS.API_SEARCH,
+    HELPER_TOOLS.API_DETAILS,
 ];
 
 // Re-export from registry.ts

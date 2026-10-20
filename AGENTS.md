@@ -2,7 +2,7 @@
 
 TypeScript, ES modules. Runs in two modes: **stdio** (local CLI clients, `stdio.ts`) and **HTTP Streamable** (`dev_server.ts`).
 
-**Before implementing**: work from an issue that is assigned or explicitly agreed. An open issue is not an invitation — many are stale or unrefined, and the fix isn't settled. If nobody asked for this change, open an issue instead of a PR (docs fixes excepted). Disclose AI use in the PR; never add a model as co-author. See [CONTRIBUTING.md](./CONTRIBUTING.md#before-you-write-code).
+**Before implementing**: work from an issue that is assigned or explicitly agreed. An open issue is not an invitation — many are stale or unrefined, and the fix isn't settled. If nobody asked for this change, open an issue instead of a PR (docs fixes excepted). Disclose AI use in the PR. See [CONTRIBUTING.md](./CONTRIBUTING.md#before-you-write-code).
 
 ### Communication style — MANDATORY
 
@@ -25,6 +25,8 @@ Conventional Commits for all three. Branch: `type/short-desc` (e.g. `fix/connect
 
 Use `git mv` (not `mv` + `rm`) when renaming files so git records a rename rather than delete+create.
 
+Working on several branches at once: one worktree per branch, run git as `git -C <worktree>`, and never run git commands for two worktrees in parallel. Before pushing, fetch the branch; if someone else pushed, merge or reapply on top. Never rebase, amend or force-push a branch someone else pushed to.
+
 ## Verification (mandatory)
 
 After every code change, run `pnpm run type-check`, `pnpm run lint`, `pnpm run test:unit`, `pnpm run format` and `pnpm run check:agents`.
@@ -43,13 +45,13 @@ After `pnpm run build`, run `mcpc` (no args) to check sessions: if `@stdio` (def
 
 ## Testing
 
-- **Unit tests**: `pnpm run test:unit`.
+- **Unit tests**: `pnpm run test:unit`. **Before writing or editing any unit test, read [tests/UNIT_TESTING_GUIDE.md](./tests/UNIT_TESTING_GUIDE.md) in full**; [tests/AGENTS.md](./tests/AGENTS.md) says which test layer to use.
 - **Integration tests**: `pnpm run test:integration` (needs build + `APIFY_TOKEN`, humans only).
 - **Conformance tests**: `pnpm run test:conformance` (needs `APIFY_TOKEN`) builds and runs both protocol eras locally. `_integration_tests.yaml` calls `_conformance_tests.yaml` for the same `2026-07-28` and `2025-11-25` coverage in CI. Both eras always run; the command exits with the first non-zero code. Scenarios excluded from each era's gate are listed with reasons in `scripts/conformance_expected_failures_2026_07_28.yaml` and `scripts/conformance_expected_failures_2025_11_25.yaml`.
 - **Package manager**: this repo uses **pnpm 11+**. `devEngines.packageManager` is pinned with `onFail: "error"`, so npm / yarn refuse to run inside the checkout — use `pnpm install` only.
-- `tests/integration/suite.ts` wires the `stdio`, `2025-11-25` (streamable HTTP) and `2026-07-28` (stateless HTTP) transport dimensions into one shared suite. Add new integration cases to the matching capability array in `tests/test_kit/cases/*.cases.ts` (registration, tools, actors, apps, tasks, storage, payments) — each is a plain `Case[]` (`{ name, isDeploymentTest, run, ... }`), registered via `registerCases(name, cases, ctx)`. Mark a case `isDeploymentTest: true` only if it's worth running against `apify-mcp-server-internal`'s live staging and production deploys — the flag doesn't just share the case, it makes internal execute it for real on every release (see [DEVELOPMENT.md](./DEVELOPMENT.md#test-organization-across-repos)). Shared assertion helpers live in `tests/test_kit/helpers.ts`. Cases that share expensive setup (e.g. one seeded Actor run, see `storage.cases.ts`'s `normalModeRunFixture`) do so via `ctx.getFixture(fixture)`, memoized once per transport dimension — not a vitest `beforeAll`, so any subset of cases can share it while staying flat `Case` objects.
+- `tests/integration/suite.ts` wires the `stdio`, `2025-11-25` (streamable HTTP) and `2026-07-28` (stateless HTTP) transport dimensions into one shared suite. Add new integration cases to the matching capability array in `tests/test_kit/cases/*.cases.ts` (registration, tools, actors, apps, tasks, storage, schedules, versions, payments) — each is a plain `Case[]` (`{ name, isDeploymentTest, run, ... }`), registered via `registerCases(name, cases, ctx)`. Mark a case `isDeploymentTest: true` only if it's worth running against `apify-mcp-server-internal`'s live staging and production deploys — the flag doesn't just share the case, it makes internal execute it for real on every release (see [DEVELOPMENT.md](./DEVELOPMENT.md#test-organization-across-repos)). Shared assertion helpers live in `tests/test_kit/helpers.ts`. Cases that share expensive setup (e.g. one seeded Actor run, see `storage.cases.ts`'s `normalModeRunFixture`) do so via `ctx.getFixture(fixture)`, memoized once per transport dimension — not a vitest `beforeAll`, so any subset of cases can share it while staying flat `Case` objects.
 - Follow existing test patterns (names, structure) — check neighboring files.
-- **Test naming**: `describe('fnName()')`, plain-verb `it()` names (no `should` prefix). Group with nested `describe()` per method when a factory/class exposes several.
+- **Test naming**: `describe()` blocks named after behaviors, plain-verb `it()` names (no `should` prefix). See [tests/UNIT_TESTING_GUIDE.md](./tests/UNIT_TESTING_GUIDE.md#readability).
 
 ## External dependencies
 
@@ -75,14 +77,19 @@ Breaking changes must be coordinated; check whether updates are needed in `apify
 
 - **Follow [CONTRIBUTING.md](./CONTRIBUTING.md) for all naming and coding standards.** It is the single source of truth for naming rules (function verbs, boolean prefixes, type suffixes, enumerations, file names, etc.), string formatting, parameters, error handling, and anti-patterns. Read it before writing code.
 - **Validate tool inputs with Zod.** No ad-hoc shape checks.
-- **Reference tool names via the `HELPER_TOOLS` `as const` object**, not hardcoded strings (exception: integration tests).
+- **Reference tool names via the `HELPER_TOOLS` `as const` object**, not hardcoded strings. Exception: the integration suite (`tests/integration/` and the shared `tests/test_kit/` cases and helpers) uses hardcoded strings, so a renamed tool fails it.
 - **Apps vs default mode**: only `*-widget` tools differ between modes. All non-widget tools (`call-actor`, `get-actor-run`, direct actor tools, `search-actors`, `fetch-actor-details`) share a single implementation across modes.
 - Per-directory detail lives in the child `AGENTS.md` files (see Child docs below).
 - Always follow the latest [MCP spec](https://modelcontextprotocol.io/specification/2025-11-25) and [MCP Apps spec](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx).
 
+## Tool guidelines
+
+Descriptions, `.describe()` text, server instructions, result text and errors are reviewed by client directories. Never instruct a tool call the user did not ask for, never name a tool the session was not served, never return a secret. Full rules: [TOOL_GUIDELINES.md](./TOOL_GUIDELINES.md).
+
 ## Child docs — read the one for the directory you're editing
 
 - **[src/AGENTS.md](./src/AGENTS.md)** — source map: entry points + the `mcp` / `tools` / `payments` / `resources` / `web` child docs.
+- **[tests/AGENTS.md](./tests/AGENTS.md)** — which test layer to use, unit test conventions, and the [unit testing guide](./tests/UNIT_TESTING_GUIDE.md).
 
 ## Further reading
 

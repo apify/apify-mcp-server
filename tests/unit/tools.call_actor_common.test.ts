@@ -16,6 +16,7 @@ import {
     buildCallActorDescription,
     buildCallActorErrorResponse,
     callActorArgs,
+    callOptionsSchema,
     handleMcpToolCall,
     resolveAndValidateActor,
 } from '../../src/tools/actors/call_actor.js';
@@ -260,8 +261,11 @@ describe('call_actor_common', () => {
             expect(response.isError).toBe(true);
             const allText = (response.content ?? []).map(textOf).join('\n');
             expect(allText).toContain('memory limit of 8192MB');
-            expect(allText).toContain('Account memory quota exceeded');
-            expect(allText).toContain('callOptions.memory');
+            expect(allText).toContain(
+                'Account memory quota exceeded for your plan. A smaller callOptions.memory may fit the remaining ' +
+                    'quota; memory is freed when current runs finish.',
+            );
+            expect(allText).not.toMatch(/retry/i);
             // Regression: must not nudge the LLM toward aborting unrelated runs to free capacity.
             expect(allText).not.toContain(HELPER_TOOLS.ACTOR_RUNS_ABORT);
             expect(allText).not.toContain('verify the Actor name');
@@ -400,6 +404,15 @@ describe('call_actor_common', () => {
                 callOptions: { maxItems: -1 },
             });
             expect(result.success).toBe(false);
+        });
+
+        it('states the account memory quota without asking for a retry', () => {
+            const { description } = callOptionsSchema.shape.memory;
+            expect(description).toContain(
+                'Apify also caps total memory across all your concurrent runs (account plan limit); a run that ' +
+                    'would exceed that quota is rejected.',
+            );
+            expect(description).not.toMatch(/retry/i);
         });
     });
 

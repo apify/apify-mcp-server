@@ -148,6 +148,21 @@ describe('actorExecutor', () => {
         });
     });
 
+    describe('direct Actor defaults', () => {
+        it.each([
+            [{}, true],
+            [{ respectRobotsTxtFile: false }, false],
+            [{ respectRobotsTxtFile: true }, true],
+        ])('prepares WCC input %j with robots.txt %s', async (input, expected) => {
+            const { params, spies } = buildParams(
+                { url: 'https://example.com', ...input },
+                { actorFullName: 'apify/website-content-crawler' },
+            );
+            await actorExecutor.executeActorTool(params);
+            expect(spies.startInput).toEqual({ url: 'https://example.com', respectRobotsTxtFile: expected });
+        });
+    });
+
     describe('platform input-validation error', () => {
         function invalidInputError(message: string): ApifyApiError {
             return new ApifyApiError(

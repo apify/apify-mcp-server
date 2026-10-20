@@ -7,11 +7,14 @@ import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../../src/mcp/const
 import {
     actorNameToToolName,
     canRunActor,
+    canRunAnyActor,
+    getOwnServerRemedy,
     legacyToolNameToNew,
     resolveActorToolMode,
 } from '../../src/tools/actor_tool_naming.js';
 import type { ActorInfo, ActorInputSchema } from '../../src/types.js';
 import { ACTOR_TOOL_MODE } from '../../src/types.js';
+import { only } from './helpers/tool_context.js';
 
 describe('actors', () => {
     describe('actorNameToToolName', () => {
@@ -144,5 +147,27 @@ describe('canRunActor()', () => {
     it('returns false when call-actor is absent and the Actor ID is not in loadedActorIds', () => {
         expect(canRunActor('actor-id-1', [], new Set(['other-actor-id']))).toBe(false);
         expect(canRunActor('actor-id-1', [], new Set())).toBe(false);
+    });
+});
+
+describe('getOwnServerRemedy()', () => {
+    it('names the Claude custom connector only for ?client=claude', () => {
+        expect(getOwnServerRemedy('claude')).toContain('add it to Claude as a custom connector.');
+        for (const clientParam of [undefined, 'cursor', 'claude-code']) {
+            expect(getOwnServerRemedy(clientParam)).toContain('add it to your agent.');
+        }
+    });
+});
+
+describe('canRunAnyActor()', () => {
+    it.each([HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.ACTOR_CALL_WIDGET, HELPER_TOOLS.API_WRITE])(
+        'returns true when only %s is loaded',
+        (toolName) => {
+            expect(canRunAnyActor(only(toolName).hasTool)).toBe(true);
+        },
+    );
+
+    it('returns false when no tool can run an arbitrary Actor', () => {
+        expect(canRunAnyActor(only(HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS).hasTool)).toBe(false);
     });
 });

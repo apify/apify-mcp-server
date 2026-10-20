@@ -8,6 +8,7 @@ import {
     HELPER_TOOLS,
     KV_KEYS_LIMIT,
     NARROW_OUTPUT_HINT,
+    RAG_WEB_BROWSER,
     TIP_MESSAGE_LIMIT,
 } from '../../const.js';
 import { buildActorRunWidgetMeta } from '../../resources/widgets.js';
@@ -26,9 +27,6 @@ import { DEFAULT_DATASET_ITEMS_LIMIT } from '../storage/get_dataset_items.js';
 
 /** Reserved key-value store key some Actors use to advertise advisory guidance about the run. */
 const TIP_KVS_KEY = 'TIP';
-
-/** Limit the TIP pilot to RAG Web Browser, including calls made by Actor ID. */
-const RAG_WEB_BROWSER_ID = '3ox4R101TgZz67sLr';
 
 /** nextStep text for widget-rendered responses: suppresses LLM polling. */
 export const WIDGET_NO_POLL_NEXT_STEP =
@@ -157,7 +155,7 @@ export type RunResponse = {
     };
     storages: RunStorages;
     /** Advisory guidance an Actor wrote under the reserved {@link TIP_KVS_KEY}, if any. */
-    tip?: { message: string; level?: 'info' | 'warning'; recommendedActorId?: string };
+    tip?: { message: string; level?: 'info' | 'warning'; recommendedActorId?: string; caveat?: string };
     summary: string;
     nextStep: string;
 };
@@ -601,12 +599,12 @@ function buildSucceededSummaryNextStep(
     // so we don't recommend it as `nextStep` — but `kv.summarySuffix` keeps it visible in the summary
     // when records exist, so callers can still discover them. Surface the upstream statusMessage so
     // a text-only reader sees the actor's own diagnostic (often the only signal here). The nextStep
-    // stays generic ("re-run the Actor"): this builder is shared by get-actor-run / abort-actor-run,
-    // which only have a runId and can't know whether the run came from call-actor or a native Actor
-    // tool — naming a specific tool would mislead callers (see #1007).
+    // keeps any retry conditional on the user's intent (see #1559).
     return {
         summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items found.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
-        nextStep: `Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run the Actor with adjusted input.`,
+        nextStep:
+            'Inspect statusMessage and stats in this response. ' +
+            'If the user wants another attempt, adjust the input before retrying.',
     };
 }
 
@@ -688,12 +686,16 @@ export function buildStatusSummaryNextStep(params: {
         case 'FAILED':
             return {
                 summary: `FAILED after ${runTimeSecs}s.${statusMessageLine(statusMessage)}`,
-                nextStep: `Diagnose using statusMessage and exitCode in this response; re-run the Actor with adjusted input if the cause is fixable.`,
+                nextStep:
+                    'Diagnose using statusMessage and exitCode in this response. ' +
+                    'If the user wants another attempt, fix the cause before retrying.',
             };
         case 'ABORTED':
             return {
                 summary: `ABORTED after ${runTimeSecs}s.${statusMessageLine(statusMessage)}`,
-                nextStep: `Re-run the Actor if you want to retry.`,
+                nextStep:
+                    `Items written before the abort, if any, remain in the run's default dataset${dataset ? ` (datasetId=${dataset.id})` : ''}. ` +
+                    'Retry only if the user wants another run.',
             };
         case 'TIMED-OUT':
             return buildTimedOutSummaryNextStep(runTimeSecs, dataset, keyValueStore);
@@ -974,7 +976,7 @@ export async function fetchActorRunData(params: {
 
     const defaultKv = keyValueStores?.default;
     const tip =
-        isTerminal && run.actId === RAG_WEB_BROWSER_ID && defaultKv
+        isTerminal && defaultKv && actorName === RAG_WEB_BROWSER
             ? await fetchRunTip(client, defaultKv, mcpSessionId)
             : undefined;
 
