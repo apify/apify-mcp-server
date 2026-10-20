@@ -11,10 +11,16 @@ import { respondUserError } from '../../utils/mcp.js';
 import { datasetSizeNextStepHint, normalizeDatasetFields } from '../actors/actor_run_response.js';
 import { datasetMetadataOutputSchema } from '../structured_output_schemas.js';
 import { DEFAULT_DATASET_ITEMS_LIMIT } from './get_dataset_items.js';
-import { buildStorageResponse, resolveSiblingNextStep } from './storage_helpers.js';
+import {
+    buildStorageResponse,
+    fetchStorageByIdOrName,
+    resolveSiblingNextStep,
+    storageIdArgDescription,
+    storageNotFoundText,
+} from './storage_helpers.js';
 
 const getDatasetArgs = z.object({
-    datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
+    datasetId: z.string().min(1).describe(storageIdArgDescription('dataset')),
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
@@ -66,9 +72,10 @@ export const getDataset: ToolEntry = Object.freeze({
         const { args, apifyClient: client, apifyToken, loadedToolNames } = toolArgs;
         const parsed = getDatasetArgs.parse(args);
         const datasetId = stripQuoteWrappers(parsed.datasetId);
-        const dataset = await client.dataset(datasetId).get();
+        const dataset = (await fetchStorageByIdOrName(datasetId, async (safeId) => client.dataset(safeId).get()))
+            ?.result;
         if (!dataset) {
-            return respondUserError(`Dataset '${datasetId}' not found.`);
+            return respondUserError(storageNotFoundText('dataset', datasetId));
         }
         const linkContext = await getConsoleLinkContext(apifyToken, client);
         // The API also returns a raw `schema` (untyped in apify-client). It is 93–95% of the
