@@ -68,14 +68,17 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyClient, paymentProvider, loadedToolNames, loadedActorIds } = toolArgs;
         const parsed = searchActorsWidgetArgsSchema.parse(args);
+        // Only in the schema when the store search runs on `/unstable/store`.
+        const cursor = typeof parsed.cursor === 'string' ? parsed.cursor : undefined;
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
-        const [actors, { userPlanTier }] = await Promise.all([
+        const [{ actors }, { userPlanTier }] = await Promise.all([
             searchAgentSafeActors({
                 keywords: parsed.keywords,
                 apifyClient,
                 limit: parsed.limit,
                 offset: parsed.offset,
+                cursor,
                 paymentProvider,
             }),
             getUserInfoCached(apifyToken, apifyClient),
@@ -84,7 +87,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
         if (actors.length === 0) {
             // Honor the widget tool's declared outputSchema: widgetActors is required, so
             // emit an empty array rather than dropping the field.
-            const instructions = buildNoActorsFoundInstructions(parsed.keywords, parsed.offset);
+            const instructions = buildNoActorsFoundInstructions(parsed.keywords, parsed.offset, cursor);
             return respondOk(instructions, {
                 structuredContent: {
                     actors: [],

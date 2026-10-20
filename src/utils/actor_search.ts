@@ -10,7 +10,11 @@
 import type { ApifyClient } from '../apify_client.js';
 import type { PaymentProvider } from '../payments/types.js';
 import type { ActorStoreList } from '../types.js';
-import { isUnstableStoreSearchEnabled, searchActorsViaUnstableEndpoint } from './store_unstable.js';
+import {
+    isUnstableStoreSearchEnabled,
+    searchActorsViaUnstableEndpoint,
+    type UnstableStoreSearchPage,
+} from './store_unstable.js';
 
 export type SearchActorsByKeywordsOptions = {
     search: string;
@@ -27,9 +31,14 @@ export type SearchAgentSafeActorsOptions = {
     keywords: string;
     apifyClient: ApifyClient;
     limit: number;
+    /** Pages `GET /v2/store`; ignored on `/unstable/store`, which pages by `cursor`. */
     offset: number;
+    /** The `nextCursor` of the previous page; only `/unstable/store` returns one. */
+    cursor?: string;
     paymentProvider?: PaymentProvider;
 };
+
+export type AgentSafeActorsPage = UnstableStoreSearchPage;
 
 export async function searchActorsByKeywords(options: SearchActorsByKeywordsOptions): Promise<ActorStoreList[]> {
     const { search, apifyClient, limit, offset, allowsAgenticUsers, includeInputSchema } = options;
@@ -47,25 +56,21 @@ export async function searchActorsByKeywords(options: SearchActorsByKeywordsOpti
  * when a `paymentProvider` is in play. The public arg schema caps `limit`
  * at apify-core's hard cap (`MAX_LIMIT_WITH_INPUT_SCHEMA`).
  */
-export async function searchAgentSafeActors(options: SearchAgentSafeActorsOptions): Promise<ActorStoreList[]> {
-    const { keywords, apifyClient, limit, offset, paymentProvider } = options;
+export async function searchAgentSafeActors(options: SearchAgentSafeActorsOptions): Promise<AgentSafeActorsPage> {
+    const { keywords, apifyClient, limit, offset, cursor, paymentProvider } = options;
+    const allowsAgenticUsers = paymentProvider ? true : undefined;
 
     if (isUnstableStoreSearchEnabled()) {
-        return searchActorsViaUnstableEndpoint({
-            search: keywords,
-            apifyClient,
-            limit,
-            offset,
-            allowsAgenticUsers: paymentProvider ? true : undefined,
-        });
+        return searchActorsViaUnstableEndpoint({ search: keywords, apifyClient, limit, cursor, allowsAgenticUsers });
     }
 
-    return searchActorsByKeywords({
+    const actors = await searchActorsByKeywords({
         search: keywords,
         apifyClient,
         limit,
         offset,
-        allowsAgenticUsers: paymentProvider ? true : undefined,
+        allowsAgenticUsers,
         includeInputSchema: true,
     });
+    return { actors };
 }

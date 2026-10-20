@@ -90,7 +90,7 @@ describe('searchAgentSafeActors', () => {
         });
         expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: 3, offset: 0 });
         expect(paramsHolder.params).toMatchObject({ includeInputSchema: true });
-        expect(result).toHaveLength(3);
+        expect(result.actors).toHaveLength(3);
     });
 
     it('forwards allowsAgenticUsers when paymentProvider is set', async () => {

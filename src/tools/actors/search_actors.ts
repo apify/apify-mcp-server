@@ -19,12 +19,19 @@ import { compileSchema } from '../../utils/ajv.js';
 import { getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { respondOk } from '../../utils/mcp.js';
 import type { PricingTier } from '../../utils/pricing_info.js';
+import { isUnstableStoreSearchEnabled } from '../../utils/store_unstable.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { actorNameToToolName, canRunActor, canRunAnyActor, getActorCallabilityCaveat } from '../actor_tool_naming.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 
 // hasTool checks registered tool names, not Actor full names — see call_actor.ts's RAG_WEB_BROWSER_TOOL.
 const RAG_WEB_BROWSER_TOOL = actorNameToToolName(RAG_WEB_BROWSER);
+
+/**
+ * Store search through `/unstable/store` pages by cursor, so the tool takes `cursor` and returns
+ * `nextCursor` only then. Read once, so a process serves one tool contract.
+ */
+const IS_UNSTABLE_STORE_SEARCH = isUnstableStoreSearchEnabled();
 
 /**
  * Shared schema for search-actors arguments. Used by both the default and
@@ -64,7 +71,16 @@ export const searchActorsBaseArgsSchema = z.object({
         .max(MAX_LIMIT_WITH_INPUT_SCHEMA)
         .default(5)
         .describe(`The maximum number of Actors to return (max = ${MAX_LIMIT_WITH_INPUT_SCHEMA}, default = 5).`),
-    offset: z.number().int().min(0).default(0).describe('The number of elements to skip from the start (default = 0)'),
+    offset: IS_UNSTABLE_STORE_SEARCH
+        ? z.number().int().min(0).default(0).describe('Deprecated and ignored: use `cursor` to get the next page.')
+        : z.number().int().min(0).default(0).describe('The number of elements to skip from the start (default = 0)'),
+    ...(IS_UNSTABLE_STORE_SEARCH && {
+        cursor: z
+            .string()
+            .min(1)
+            .optional()
+            .describe('The `nextCursor` of a previous result with the same keywords, to get its next page.'),
+    }),
 });
 
 function buildDescription({ hasTool, clientParam }: ToolDescriptionContext): string {
@@ -128,7 +144,8 @@ export function buildSearchActorsResult(
  * The text does not say the results ended: the Store filters results after paging, so an empty page can come
  * before non-empty ones (see apify/apify-mcp-server#1593).
  */
-export function buildNoActorsFoundInstructions(keywords: string, offset: number): string {
+export function buildNoActorsFoundInstructions(keywords: string, offset: number, cursor?: string): string {
+    if (cursor) return `No more Actors returned for the search query "${keywords}".`;
     if (offset > 0) return `No Actors returned at offset ${offset} for the search query "${keywords}".`;
     return dedent`
         No Actors were found for the search query "${keywords}".
@@ -184,7 +201,15 @@ export const searchActors: ToolEntry = Object.freeze({
     description: buildDescription(ALL_TOOLS_PRESENT),
     buildDescription,
     inputSchema: z.toJSONSchema(searchActorsBaseArgsSchema) as ToolInputSchema,
-    outputSchema: actorSearchOutputSchema,
+    outputSchema: IS_UNSTABLE_STORE_SEARCH
+        ? {
+              ...actorSearchOutputSchema,
+              properties: {
+                  ...actorSearchOutputSchema.properties,
+                  nextCursor: { type: 'string', description: 'Pass as `cursor` to get the next page of this search.' },
+              },
+          }
+        : actorSearchOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(searchActorsBaseArgsSchema)),
     annotations: {
         title: 'Search Actors',
@@ -196,21 +221,26 @@ export const searchActors: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyClient, paymentProvider, loadedToolNames, loadedActorIds } = toolArgs;
         const parsed = searchActorsBaseArgsSchema.parse(args);
+        // Only in the schema when the store search runs on `/unstable/store`.
+        const cursor = typeof parsed.cursor === 'string' ? parsed.cursor : undefined;
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
-        const [actors, { userPlanTier }] = await Promise.all([
+        // `/unstable/store` ignores the offset, so it must not show up in the result text either.
+        const offset = IS_UNSTABLE_STORE_SEARCH ? 0 : parsed.offset;
+        const [{ actors, nextCursor }, { userPlanTier }] = await Promise.all([
             searchAgentSafeActors({
                 keywords: parsed.keywords,
                 apifyClient,
                 limit: parsed.limit,
-                offset: parsed.offset,
+                offset,
+                cursor,
                 paymentProvider,
             }),
             getUserInfoCached(apifyToken, apifyClient),
         ]);
 
         if (actors.length === 0) {
-            const instructions = buildNoActorsFoundInstructions(parsed.keywords, parsed.offset);
+            const instructions = buildNoActorsFoundInstructions(parsed.keywords, offset, cursor);
             return respondOk(instructions, {
                 structuredContent: { actors: [], query: parsed.keywords, count: 0, instructions },
             });
@@ -228,6 +258,7 @@ export const searchActors: ToolEntry = Object.freeze({
             count: actors.length,
             userTier: userPlanTier,
             ...(footer && { instructions: footer }),
+            ...(nextCursor && { nextCursor }),
         };
 
         // The header is built with `dedent`; `actorCardText` is joined after it, not interpolated.
@@ -240,6 +271,9 @@ export const searchActors: ToolEntry = Object.freeze({
 
             # Actors:
         `;
-        return respondOk([header, actorCardText, footer].filter(Boolean).join('\n\n'), { structuredContent });
+        const nextPage = nextCursor ? `- **Next page cursor:** \`${nextCursor}\`` : '';
+        return respondOk([header, actorCardText, nextPage, footer].filter(Boolean).join('\n\n'), {
+            structuredContent,
+        });
     },
 } as const satisfies HelperTool);

@@ -49,7 +49,7 @@ describe('search-actors without widget (searchActors)', () => {
     });
 
     it('returns structured actors and markdown text; no widget payload', async () => {
-        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+        vi.mocked(searchAgentSafeActors).mockResolvedValue({ actors: [MOCK_STORE_ACTOR] });
 
         const result = await (searchActors as HelperTool).call(
             stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
@@ -110,7 +110,7 @@ describe('search-actors without widget (searchActors)', () => {
                 inputSchema: buildInputSchema(total),
             },
         ] as ActorStoreList[];
-        vi.mocked(searchAgentSafeActors).mockResolvedValue(actors);
+        vi.mocked(searchAgentSafeActors).mockResolvedValue({ actors: actors });
 
         const result = await (searchActors as HelperTool).call(
             stubToolCallContext(
@@ -152,7 +152,7 @@ describe('search-actors without widget (searchActors)', () => {
     });
 
     it('returns empty structured content and keyword guidance when no actors match', async () => {
-        vi.mocked(searchAgentSafeActors).mockResolvedValue([]);
+        vi.mocked(searchAgentSafeActors).mockResolvedValue({ actors: [] });
 
         const result = await (searchActors as HelperTool).call(
             stubToolCallContext(
@@ -188,7 +188,7 @@ describe('search-actors without widget (searchActors)', () => {
     });
 
     it('describes an empty page at a later offset without saying the results ended', async () => {
-        vi.mocked(searchAgentSafeActors).mockResolvedValue([]);
+        vi.mocked(searchAgentSafeActors).mockResolvedValue({ actors: [] });
 
         const result = await (searchActors as HelperTool).call(
             stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 8 }, mockApifyClient(), {
@@ -221,7 +221,7 @@ describe('search-actors without widget (searchActors)', () => {
     });
 
     it('searches using the request-scoped apifyClient, not a token-only client', async () => {
-        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+        vi.mocked(searchAgentSafeActors).mockResolvedValue({ actors: [MOCK_STORE_ACTOR] });
         const taggedApifyClient = mockApifyClient({ marker: 'tagged-client' });
 
         await (searchActors as HelperTool).call(
@@ -237,7 +237,7 @@ describe('search-actors without widget (searchActors)', () => {
     // the get-actor-run response tests.
     it('mints Console links for a Console UI token', async () => {
         vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
-        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+        vi.mocked(searchAgentSafeActors).mockResolvedValue({ actors: [MOCK_STORE_ACTOR] });
 
         const result = await (searchActors as HelperTool).call({
             ...stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
@@ -258,7 +258,7 @@ describe('search-actors without widget (searchActors)', () => {
 
     it('places the verbatim-links nudge on its own line between the details hint and the caveat for a Console UI token', async () => {
         vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
-        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+        vi.mocked(searchAgentSafeActors).mockResolvedValue({ actors: [MOCK_STORE_ACTOR] });
 
         const result = await (searchActors as HelperTool).call({
             ...stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
@@ -281,7 +281,7 @@ describe('search-actors without widget (searchActors)', () => {
     // The footer is result text, which `tools.mode_contract.test.ts` cannot see — it renders
     // descriptions only. A `?tools=search-actors` session is served no fetch-actor-details.
     it('names no follow-up tool in the footer when the session was not served one', async () => {
-        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+        vi.mocked(searchAgentSafeActors).mockResolvedValue({ actors: [MOCK_STORE_ACTOR] });
 
         const result = await (searchActors as HelperTool).call(
             stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
@@ -299,7 +299,7 @@ describe('search-actors without widget (searchActors)', () => {
 
     // `?tools=search-actors,call-actor` with an API token: no details hint, no caveat, no nudge.
     it('omits instructions and ends the text at the last card when no footer part applies', async () => {
-        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+        vi.mocked(searchAgentSafeActors).mockResolvedValue({ actors: [MOCK_STORE_ACTOR] });
 
         const result = await (searchActors as HelperTool).call(
             stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
@@ -323,7 +323,7 @@ describe('search-actors without widget (searchActors)', () => {
     });
 
     it('adds the not-runnable caveat to text and structured content when call-actor is absent', async () => {
-        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+        vi.mocked(searchAgentSafeActors).mockResolvedValue({ actors: [MOCK_STORE_ACTOR] });
 
         const result = await (searchActors as HelperTool).call(
             stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
@@ -340,7 +340,7 @@ describe('search-actors without widget (searchActors)', () => {
     });
 
     it('omits the not-runnable caveat when call-actor is loaded', async () => {
-        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+        vi.mocked(searchAgentSafeActors).mockResolvedValue({ actors: [MOCK_STORE_ACTOR] });
 
         const result = await (searchActors as HelperTool).call(
             stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
@@ -358,7 +358,7 @@ describe('search-actors without widget (searchActors)', () => {
     });
 
     it('omits the not-runnable caveat when call-actor is absent but every result is already loaded', async () => {
-        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+        vi.mocked(searchAgentSafeActors).mockResolvedValue({ actors: [MOCK_STORE_ACTOR] });
 
         const result = await (searchActors as HelperTool).call(
             stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
@@ -378,7 +378,7 @@ describe('search-actors without widget (searchActors)', () => {
 
     it('adds the not-runnable caveat for mixed results when call-actor is absent and only one result is loaded', async () => {
         const otherActor = { ...MOCK_STORE_ACTOR, id: 'actor-id-2' };
-        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR, otherActor]);
+        vi.mocked(searchAgentSafeActors).mockResolvedValue({ actors: [MOCK_STORE_ACTOR, otherActor] });
 
         const result = await (searchActors as HelperTool).call(
             stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
