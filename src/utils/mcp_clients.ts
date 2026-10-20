@@ -6,6 +6,14 @@ import {
     STORE_USE_CASE_MAX_LENGTH,
 } from '../const.js';
 import type { McpClientContext } from '../mcp/client_context.js';
+import { REDACTED } from '../resources/api_resources.js';
+import { APIFY_TRACE_ID_META_KEY, APIFY_USE_CASE_META_KEY } from './mcp.js';
+
+const APIFY_API_TOKEN_REGEX = /apify_api_[A-Za-z0-9]+/g;
+
+function redactApifyTokens(text: string): string {
+    return text.replace(APIFY_API_TOKEN_REGEX, REDACTED);
+}
 
 /** True when `report-problem` is blocklisted for the connecting client (substring match on {@link REPORT_PROBLEM_BLOCKED_CLIENTS}). */
 export function isReportProblemBlockedForClient(context: McpClientContext | undefined): boolean {
@@ -27,8 +35,10 @@ export function resolveStoreSearchTracking(
 ) {
     const asString = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
     const isApifyAi = requestOrigin === REQUEST_ORIGIN.APIFY_AI;
-    const traceId = (isApifyAi && asString(meta?.['com.apify/traceId'])) || asString(mcpSessionId);
-    let useCase = isApifyAi ? asString(meta?.['com.apify/useCase']).slice(0, STORE_USE_CASE_MAX_LENGTH) : '';
+    const traceId = (isApifyAi && asString(meta?.[APIFY_TRACE_ID_META_KEY])) || asString(mcpSessionId);
+    let useCase = isApifyAi
+        ? redactApifyTokens(asString(meta?.[APIFY_USE_CASE_META_KEY])).slice(0, STORE_USE_CASE_MAX_LENGTH)
+        : '';
     // Do not end on half of a surrogate pair.
     if (/[\uD800-\uDBFF]$/.test(useCase)) useCase = useCase.slice(0, -1);
     return {

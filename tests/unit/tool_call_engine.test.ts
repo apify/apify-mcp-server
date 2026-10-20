@@ -47,6 +47,7 @@ describe('prepareToolCall()', () => {
 
     it('returns InvalidToolCall with AUTH category when no token is provided', async () => {
         await withServer(async (server) => {
+            const telemetryData = {} as ToolCallTelemetryProperties;
             const result = await prepareToolCall({
                 ...prepareFields(server),
                 apifyToken: '',
@@ -56,7 +57,7 @@ describe('prepareToolCall()', () => {
                 requestHeaders: undefined,
                 isTaskRequest: false,
                 mcpSessionId: 's1',
-                telemetryData: null,
+                telemetryData,
                 clientContext: undefined,
             });
             expect('message' in result).toBe(true);
@@ -64,11 +65,13 @@ describe('prepareToolCall()', () => {
             expect(invalid.toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
             expect(invalid.callDiagnostics.failure_category).toBe(FAILURE_CATEGORY.AUTH);
             expect(invalid.message).toContain('Apify API token is required');
+            expect(telemetryData.trace_id).toBe('s1');
         });
     });
 
     it('returns InvalidToolCall for an unknown tool name', async () => {
         await withServer(async (server) => {
+            const telemetryData = {} as ToolCallTelemetryProperties;
             const result = await prepareToolCall({
                 ...prepareFields(server),
                 apifyToken: 'fake-token',
@@ -78,13 +81,14 @@ describe('prepareToolCall()', () => {
                 requestHeaders: undefined,
                 isTaskRequest: false,
                 mcpSessionId: 's1',
-                telemetryData: null,
+                telemetryData,
                 clientContext: undefined,
             });
             expect('message' in result).toBe(true);
             const invalid = result as InvalidToolCall;
             expect(invalid.callDiagnostics.failure_category).toBe(FAILURE_CATEGORY.INVALID_INPUT);
             expect(invalid.message).toContain('was not found');
+            expect(telemetryData.trace_id).toBe('s1');
         });
     });
 

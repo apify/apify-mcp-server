@@ -81,10 +81,11 @@ describe('resolveStoreSearchTracking()', () => {
         });
     });
 
-    it('omits a trace id over 256 UTF-16 units', () => {
-        expect(
-            resolveStoreSearchTracking('APIFY_AI', { 'com.apify/traceId': 'x'.repeat(257) }, undefined).traceId,
-        ).toBe(undefined);
+    it('keeps a trace id of 256 UTF-16 units and omits a longer one', () => {
+        const traceId = (length: number) =>
+            resolveStoreSearchTracking('APIFY_AI', { 'com.apify/traceId': 'x'.repeat(length) }, undefined).traceId;
+        expect(traceId(256)).toBe('x'.repeat(256));
+        expect(traceId(257)).toBe(undefined);
     });
 
     it('omits an empty session id as the trace id', () => {
@@ -95,6 +96,13 @@ describe('resolveStoreSearchTracking()', () => {
         const useCase = `${'a'.repeat(1023)}😀`;
         expect(resolveStoreSearchTracking('APIFY_AI', { 'com.apify/useCase': useCase }, undefined).useCase).toBe(
             'a'.repeat(1023),
+        );
+    });
+
+    it('redacts Apify API tokens from the use case before cutting it', () => {
+        const useCase = `${'a'.repeat(1013)} apify_api_${'x'.repeat(36)}`;
+        expect(resolveStoreSearchTracking('APIFY_AI', { 'com.apify/useCase': useCase }, undefined).useCase).toBe(
+            `${'a'.repeat(1013)} [REDACTED]`,
         );
     });
 });

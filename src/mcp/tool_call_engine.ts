@@ -144,6 +144,13 @@ export async function prepareToolCall(params: {
         allowUnauthMode,
     } = params;
     let { args } = params;
+    const requestOrigin = getRequestOriginForClient(clientContext);
+    const storeSearchTracking = telemetryData
+        ? resolveStoreSearchTracking(requestOrigin, meta, params.mcpSessionId)
+        : undefined;
+    if (telemetryData && storeSearchTracking?.traceId) {
+        telemetryData.trace_id = storeSearchTracking.traceId;
+    }
 
     if (!apifyToken && !paymentProvider?.allowsUnauthenticated && !allowUnauthMode) {
         return {
@@ -176,13 +183,6 @@ export async function prepareToolCall(params: {
     const resolvedToolName = getToolFullName(tool);
     if (telemetryData) {
         telemetryData.tool_name = resolvedToolName;
-    }
-    const requestOrigin = getRequestOriginForClient(clientContext);
-    const storeSearchTracking = telemetryData
-        ? resolveStoreSearchTracking(requestOrigin, meta, params.mcpSessionId)
-        : undefined;
-    if (telemetryData && storeSearchTracking?.traceId) {
-        telemetryData.trace_id = storeSearchTracking.traceId;
     }
 
     const actorName = extractActorName(tool, args as Record<string, unknown>);
