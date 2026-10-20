@@ -135,8 +135,9 @@ the item; an unreachable domain either fails the run ("Could not connect…") or
 empty 502 item, depending on unblocker routing; JSON content fails `text`/`markdown` formats with a
 status message telling the agent to add `raw`; `ftp://` fails with "Unsupported URL protocol".
 
-The web-selection family (`merge/web-selection/*`, 9 items: 7 proper + 2 with `expectedErrors`) covers
-the clash between the default web tools: web search by query (`apify/rag-web-browser`) vs
+The web-selection family (`merge/web-selection/*`, 14 items: 12 proper + 2 with `expectedErrors`) covers
+the clash between the web tools: web search by query (`apify/web-search` for a page of links and
+snippets, `apify/rag-web-browser` for the text of the top results) vs
 single-URL verbatim fetch (`apify/web-fetch`) vs Actor discovery (`search-actors`) vs a
 specialized Actor for structured platform data, plus coexistence with a client's built-in,
 summarizing fetch. Also stateless — no fixtures script.
@@ -144,6 +145,21 @@ Known residual (2026-08-21): on `merge/web-fetch/unsupported-protocol`,
 claude-haiku-4-5 reproducibly rewrites the ftp:// URL to https:// without telling the user,
 despite the scheme note in both the tool description and the `url` parameter — a model-level
 limit the case documents on purpose; stronger models pass.
+
+The web-search family covers `apify/web-search`: 5 tool-call items (`pr/web-search/*`: links for a
+topic, an official site's URL, a "published this month" request, a domain-restricted search, and a
+web question that is neither Store discovery nor a fetch) and 5 of the web-selection agent items
+(`links-easy-1`, `search-then-read-medium-1`, `domain-filter-medium-1`, `date-filter-medium-1`,
+`no-results-hard-1`). Until web-search is a default Actor tool (#1653), these items, the other
+web-selection items, `pr/apify--rag-web-browser/*` and `pr/web-fetch/example-com` set
+`metadata.tools` to `["actors", "docs", "apify/rag-web-browser", "apify/web-fetch", "apify/web-search"]`;
+an omitted `tools` loads the defaults only. The judge never sees the run date, so the date-filter
+reference accepts a `dateFrom` of the form `YYYY-MM-01` no earlier than 2026-10-01. Platform
+behavior the cases are built on (probed 2026-10-20): a call is one run storing one dataset item
+(`query`, `search`, `results`); `search.totalResults` reads 0 while `results` holds entries; 7 of
+30 runs during the first ladder failed with `SEARCH_TIMEOUT` after about 57 s and 10 ran past the
+30 s default wait, so a web-search case can fail on Actor latency — check the run log before
+blaming the case or the description.
 
 ### Tool-call mode
 
