@@ -219,7 +219,7 @@ export const actorsCases: Case[] = [
         run: withClient(undefined, async (client) => {
             const result = await client.callTool({
                 name: 'search-actors',
-                arguments: { keywords: 'normal-mode-test-actor', limit: 5 },
+                arguments: { keywords: ACTOR_NORMAL_MODE, limit: 5 },
             });
             const content = result.content as { text: string }[];
             expect(content.some((item) => item.text.includes(ACTOR_NORMAL_MODE))).toBe(true);
@@ -228,6 +228,8 @@ export const actorsCases: Case[] = [
     {
         name: 'should not return rental Actors from store search',
         isDeploymentTest: false,
+        // TODO: Re-enable once the new Store backend returns `pricingPerEvent`; without it no pricing text renders.
+        skipIf: () => true,
         run: withClient(undefined, async (client) => {
             const result = await client.callTool({
                 name: 'search-actors',
