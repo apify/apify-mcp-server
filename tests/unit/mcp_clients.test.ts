@@ -100,9 +100,9 @@ describe('resolveStoreSearchTracking()', () => {
     });
 
     it('redacts Apify API tokens from the use case before cutting it', () => {
-        const useCase = `${'a'.repeat(1013)} apify_api_${'x'.repeat(36)}`;
+        const useCase = `${'a'.repeat(1011)} apify_api_${'x'.repeat(36)}`;
         expect(resolveStoreSearchTracking('APIFY_AI', { 'com.apify/useCase': useCase }, undefined).useCase).toBe(
-            `${'a'.repeat(1013)} [REDACTED]`,
+            `${'a'.repeat(1011)} apify_api_**`,
         );
     });
 });

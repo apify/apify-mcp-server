@@ -44,7 +44,7 @@ export function getApifyAPIPublicBaseUrl(): string {
 }
 
 export class ApifyClient extends _ApifyClient {
-    /** `_traceId` and `_useCase` for Store searches. */
+    /** Per-call tracking: Store searches send it as `_traceId` and `_useCase`, telemetry takes the trace id. */
     storeSearchTracking?: { traceId?: string; useCase?: string };
 
     constructor(options: ExtendedApifyClientOptions) {
