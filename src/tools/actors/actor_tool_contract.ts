@@ -19,9 +19,9 @@ const RAG_WEB_BROWSER_WEB_SEARCH_HINT = `When the user wants a list of search re
  * no references to any specific client or its built-in tools, so the same text works
  * for every MCP client.
  */
-const buildWebFetchDescription = (
-    findPagesHint: string,
-) => `Use this tool to fetch a specific http(s) URL and return its complete content (one URL per call; http and https only).
+const buildWebFetchDescription = ({
+    hasTool,
+}: ToolDescriptionContext) => `Use this tool to fetch a specific http(s) URL and return its complete content (one URL per call; http and https only).
 It renders JavaScript and bypasses anti-bot protection, so it also retrieves pages where a plain HTTP fetch gets blocked, fails with an error such as 403 or 429, or returns incomplete content.
 The page comes back verbatim - full content, no summarization - as Markdown, plain text, HTML, the raw response body, or the list of links on the page.
 
@@ -30,7 +30,11 @@ Examples of when to use:
 - A previous attempt to fetch a page was blocked, returned an error or CAPTCHA, or came back incomplete because the page needs JavaScript rendering
 - Verbatim page content is needed, e.g. for quoting, extraction, or archiving
 
-This tool does not search the web - it needs a URL. ${findPagesHint}
+This tool does not search the web - it needs a URL. ${
+    hasTool(actorNameToToolName(WEB_SEARCH))
+        ? `To find pages by query, the dedicated ${WEB_SEARCH} tool returns links and snippets.`
+        : 'To find pages by query, use a web search tool instead.'
+}
 If the exact URL cannot be fetched (e.g. a non-http(s) scheme), say so rather than silently substituting a different URL.`;
 
 /**
@@ -95,12 +99,7 @@ const ACTOR_TOOL_POLICIES: Readonly<Record<string, ActorToolPolicyConfig>> = {
     },
     [WEB_FETCH]: {
         inputDescriptionSuffixes: { url: WEB_FETCH_URL_SCHEME_NOTE },
-        buildDescription: ({ hasTool }) =>
-            buildWebFetchDescription(
-                hasTool(actorNameToToolName(WEB_SEARCH))
-                    ? `To find pages by query, the dedicated ${WEB_SEARCH} tool returns links and snippets.`
-                    : 'To find pages by query, use a web search tool instead.',
-            ),
+        buildDescription: buildWebFetchDescription,
     },
     [WEB_SEARCH]: {
         buildDescription: ({ hasTool }) => {

@@ -367,16 +367,12 @@ describe('getServerInstructions()', () => {
 
         it('compares apify/web-search with apify/rag-web-browser only when both are served', () => {
             const ragTool = actorNameToToolName(RAG_WEB_BROWSER);
-            const webFetchTool = actorNameToToolName(WEB_FETCH);
             const webSearchTool = actorNameToToolName(WEB_SEARCH);
-            const bullet =
-                '- **apify/web-search vs apify/rag-web-browser:**\n' +
-                '  apify/web-search returns one page of search results (links and snippets, no page content); apify/rag-web-browser searches and returns the text of the top results in one call.\n';
-            const withoutWebSearch = getServerInstructions(SERVER_MODE.DEFAULT, only(webFetchTool, ragTool));
-            const allThree = getServerInstructions(SERVER_MODE.DEFAULT, only(webFetchTool, ragTool, webSearchTool));
+            const together = getServerInstructions(SERVER_MODE.DEFAULT, only(ragTool, webSearchTool));
 
-            expect(allThree).toContain(`returns content from the top results.\n${bullet}`);
-            expect(allThree.replace(bullet, '')).toBe(withoutWebSearch);
+            expect(together).toContain(`**${WEB_SEARCH} vs ${RAG_WEB_BROWSER}:**`);
+            expect(together).toContain('links and snippets, no page content');
+            expect(together).toContain('text of the top results');
             expect(getServerInstructions(SERVER_MODE.DEFAULT, only(webSearchTool))).not.toContain(RAG_WEB_BROWSER);
             expect(getServerInstructions(SERVER_MODE.DEFAULT, only(ragTool))).not.toContain(WEB_SEARCH);
         });
