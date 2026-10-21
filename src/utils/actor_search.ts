@@ -35,6 +35,7 @@ export type SearchAgentSafeActorsOptions = {
 export async function searchActorsByKeywords(options: SearchActorsByKeywordsOptions): Promise<ActorStoreList[]> {
     const { search, apifyClient, limit, offset, allowsAgenticUsers, includeInputSchema, tracking } = options;
     const storeClient = apifyClient.store();
+    storeClient.params = { ...storeClient.params, _useNewStoreBackend: true };
     if (allowsAgenticUsers !== undefined) storeClient.params = { ...storeClient.params, allowsAgenticUsers };
     if (includeInputSchema !== undefined) storeClient.params = { ...storeClient.params, includeInputSchema };
     const { traceId, useCase } = tracking ?? {};

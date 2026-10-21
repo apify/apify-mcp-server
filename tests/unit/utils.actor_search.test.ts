@@ -74,6 +74,12 @@ describe('searchActorsByKeywords', () => {
         expect(paramsHolder.params).toMatchObject({ _traceId: 'thread-1', _useCase: 'find a scraper' });
     });
 
+    it('always sets `_useNewStoreBackend`', async () => {
+        listMock.mockResolvedValueOnce({ items: [] });
+        await searchActorsByKeywords({ search: 'foo', apifyClient: stubApifyClient, limit: 5 });
+        expect(paramsHolder.params).toMatchObject({ _useNewStoreBackend: true });
+    });
+
     it('omits both flags when not provided', async () => {
         listMock.mockResolvedValueOnce({ items: [] });
         await searchActorsByKeywords({ search: 'foo', apifyClient: stubApifyClient, limit: 5 });

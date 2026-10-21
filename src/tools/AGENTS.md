@@ -53,9 +53,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     create-actor-version from files and delete-actor-version work whatever the Actor's versions are
     stored as, but delete-actor-version takes expectedRevision only for a version stored as files.
   - `api/` — the generic Apify API tools: search the operations of the published OpenAPI spec, get the
-    operations on a path, and send a GET, or a POST, PUT, PATCH, or DELETE, to a path. The write tool is in
-    no category (`UNCATEGORIZED_TOOLS`): `tools=api` serves the other three, and a session gets the write
-    tool only by naming it. The call tools are proxies to the API, like `apify api` in the Apify CLI.
+    operations on a path, and send a GET, or a POST, PUT, PATCH, or DELETE, to a path. All four are in the
+    `api` category, which is not served by default, so a session gets the write tool only with `tools=api`
+    or by naming it. The call tools are proxies to the API, like `apify api` in the Apify CLI.
     They refuse what `API_BLOCK_RULES` in `apify_api_blocklist.ts` lists: the `method` query parameter,
     which the API takes as the HTTP method, and a GET to the synchronous run endpoints of Actors and tasks,
     which starts a paid run (the write tool still sends the POST). So the read tool is annotated read-only.
