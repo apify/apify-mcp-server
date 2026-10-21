@@ -23,10 +23,8 @@ export function getRequestOriginForClient(context: McpClientContext | undefined)
 }
 
 /**
- * Trace id and use case of the call. Only the Apify AI client may set them, in `_meta`; other clients
- * get the session id as the trace id and never a use case. Both are trimmed and omitted when empty.
- * The trace id falls back to the session id and is omitted above 256 UTF-16 units. In the use case,
- * Apify API tokens become `apify_api_***`, then it is cut to 1024 UTF-16 units without a trailing half surrogate.
+ * Trace id and use case of a call: from `_meta` for Apify AI, the session id (no use case) for other clients.
+ * A trace id over the API limit is omitted; the use case has API tokens redacted and is cut to the limit.
  */
 export function resolveStoreSearchTracking(
     requestOrigin: REQUEST_ORIGIN,
