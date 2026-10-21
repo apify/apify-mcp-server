@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
+import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
 import { parseInputParamsFromUrl } from '../../src/mcp/utils.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../src/types.js';
@@ -36,11 +36,12 @@ describe('getServerInstructions()', () => {
         expect(instructions).not.toContain('returns its final status and storage IDs');
     });
 
-    it('mentions call-actor, apify/rag-web-browser and apify/web-fetch when all are loaded', () => {
+    it('prefers dedicated Actor tools without naming a web tool', () => {
         const instructions = getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT);
         expect(instructions).toContain(HELPER_TOOLS.ACTOR_CALL);
-        expect(instructions).toContain(RAG_WEB_BROWSER);
-        expect(instructions).toContain(WEB_FETCH);
+        expect(instructions).toContain('Prefer dedicated tools when available');
+        expect(instructions).not.toContain(RAG_WEB_BROWSER);
+        expect(instructions).not.toContain(WEB_FETCH);
     });
 
     it('omits every call-actor mention when call-actor is absent from the session', () => {
@@ -65,16 +66,6 @@ describe('getServerInstructions()', () => {
         expect(instructions).not.toContain(RAG_WEB_BROWSER);
         expect(instructions).not.toContain(WEB_FETCH);
         expect(instructions).toContain('Prefer dedicated tools when available'); // no dead end
-    });
-
-    // Regression: hasTool must match the registered tool name, not the Actor full name used for display text.
-    it('keeps the rag-web-browser/web-fetch comparisons when their real tool names are present', () => {
-        const instructions = getServerInstructions(
-            SERVER_MODE.DEFAULT,
-            only(HELPER_TOOLS.ACTOR_CALL, actorNameToToolName(RAG_WEB_BROWSER), actorNameToToolName(WEB_FETCH)),
-        );
-        expect(instructions).toContain(RAG_WEB_BROWSER);
-        expect(instructions).toContain(WEB_FETCH);
     });
 
     it('omits the search-vs-details disambiguation when only one side is loaded, but still names it', () => {
@@ -357,24 +348,8 @@ describe('getServerInstructions()', () => {
         });
 
         it('keeps a blank line after the heading when only bullets render', () => {
-            // Only subsection with no `###` heading and no search/details/call dependency, so it renders alone.
-            const instructions = getServerInstructions(
-                SERVER_MODE.DEFAULT,
-                only(actorNameToToolName(WEB_FETCH), actorNameToToolName(RAG_WEB_BROWSER)),
-            );
-            expect(instructions).toContain(`${HEADING}\n\n- **${WEB_FETCH} vs ${RAG_WEB_BROWSER}:**`);
-        });
-
-        it('compares apify/web-search with apify/rag-web-browser only when both are served', () => {
-            const ragTool = actorNameToToolName(RAG_WEB_BROWSER);
-            const webSearchTool = actorNameToToolName(WEB_SEARCH);
-            const together = getServerInstructions(SERVER_MODE.DEFAULT, only(ragTool, webSearchTool));
-
-            expect(together).toContain(`**${WEB_SEARCH} vs ${RAG_WEB_BROWSER}:**`);
-            expect(together).toContain('links and snippets, no page content');
-            expect(together).toContain('text of the top results');
-            expect(getServerInstructions(SERVER_MODE.DEFAULT, only(webSearchTool))).not.toContain(RAG_WEB_BROWSER);
-            expect(getServerInstructions(SERVER_MODE.DEFAULT, only(ragTool))).not.toContain(WEB_SEARCH);
+            const instructions = getServerInstructions(SERVER_MODE.APPS, only(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET));
+            expect(instructions).toContain(`${HEADING}\n\n- **Data vs widget Actor tools`);
         });
     });
 

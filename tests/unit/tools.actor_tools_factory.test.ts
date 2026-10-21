@@ -274,12 +274,14 @@ describe('getNormalActorsAsTools()', () => {
             expect(actorInfo).toEqual(original);
         });
 
-        it('describes Web Search results as links and snippets without page content', async () => {
+        it('describes Web Search results without page content or sibling referrals', async () => {
             const [tool] = await getNormalActorsAsTools([createMockActorInfo(WEB_SEARCH)]);
 
             expect(tool.description).toContain('one page of organic results');
             expect(tool.description).toContain('title, URL, snippet and position');
             expect(tool.description).toContain('no page content');
+            expect(tool.description).not.toContain(WEB_FETCH);
+            expect(tool.description).not.toContain(RAG_WEB_BROWSER);
         });
 
         it.each([true, false])('preserves Web Fetch descriptions with isDirectTool %s', async (isDirectTool) => {
@@ -296,30 +298,15 @@ describe('getNormalActorsAsTools()', () => {
         });
     });
 
-    // Regression: #1532 — the RAG description named apify/web-fetch when the session did not serve it.
-    it.each([
-        [RAG_WEB_BROWSER, WEB_FETCH, 'full or verbatim content'],
-        [RAG_WEB_BROWSER, WEB_SEARCH, 'links, titles, snippets'],
-        [WEB_FETCH, WEB_SEARCH, 'returns links and snippets'],
-        [WEB_SEARCH, WEB_FETCH, "one URL's full content"],
-        [WEB_SEARCH, RAG_WEB_BROWSER, 'text of the top results'],
-    ])('names %s sibling %s only when served', async (actorFullName, sibling, guidance) => {
-        const [tool] = await getNormalActorsAsTools([createMockActorInfo(actorFullName)]);
+    it('describes RAG page content without referring to Web Fetch', async () => {
+        const [tool] = await getNormalActorsAsTools([createMockActorInfo(RAG_WEB_BROWSER)]);
         const alone = getToolPublicFieldOnly(tool, { presentTools: new Set([tool.name]) }).description;
         const together = getToolPublicFieldOnly(tool, {
-            presentTools: new Set([tool.name, actorNameToToolName(sibling)]),
+            presentTools: new Set([tool.name, actorNameToToolName(WEB_FETCH)]),
         }).description;
 
-        expect(alone).not.toContain(sibling);
-        expect(together).toContain(`dedicated ${sibling} tool`);
-        expect(together).toContain(guidance);
-    });
-
-    it('keeps generic search guidance when Web Fetch is served alone', async () => {
-        const [tool] = await getNormalActorsAsTools([createMockActorInfo(WEB_FETCH)]);
-        const { description } = getToolPublicFieldOnly(tool, { presentTools: new Set([tool.name]) });
-
-        expect(description).toContain('needs a URL');
-        expect(description).toContain('use a web search tool instead');
+        expect(together).toBe(alone);
+        expect(together).toContain('text of the top results');
+        expect(together).not.toContain(WEB_FETCH);
     });
 });
