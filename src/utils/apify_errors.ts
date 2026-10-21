@@ -6,6 +6,7 @@ import {
     APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED,
     APIFY_ERROR_TYPE_INVALID_INPUT,
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
+    APIFY_ERROR_TYPE_UNKNOWN_BUILD_TAG,
 } from '../const.js';
 
 // Helpers that read or classify an error received from the Apify API by its `type`. Kept in one leaf
@@ -25,6 +26,11 @@ export function isPermissionApprovalError(error: unknown): error is ApifyApiErro
 /** True when an Actor run is rejected because the account memory quota is exceeded. */
 export function isMemoryQuotaError(error: unknown): error is ApifyApiError {
     return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED;
+}
+
+/** True when the Actor has no build with the requested tag (e.g. never built, or not tagged `latest`). */
+export function isUnknownBuildTagError(error: unknown): error is ApifyApiError {
+    return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_UNKNOWN_BUILD_TAG;
 }
 
 /** True when the API rejects a supplied `publicConfig` field or a request to publish the task. */

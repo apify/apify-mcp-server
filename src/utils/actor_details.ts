@@ -18,6 +18,7 @@ import { ACTOR_TOOL_MODE } from '../types.js';
 import { getActorToolResolutionCached } from './actor.js';
 import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from './actor_card.js';
 import { searchActorsByKeywords } from './actor_search.js';
+import { isUnknownBuildTagError } from './apify_errors.js';
 import { getHttpStatusCode, logHttpError } from './logging.js';
 import type { PricingTier } from './pricing_info.js';
 
@@ -76,7 +77,8 @@ export function resolveReadmeContent(details: {
 // Keep the type here since it is a self-contained module
 export type ActorDetailsResult = {
     actorInfo: Actor;
-    buildInfo: Build;
+    /** Undefined when the Actor has no build tagged `latest`. */
+    buildInfo?: Build;
     actorCard: string;
     actorCardStructured: StructuredActorCard;
     inputSchema: ActorInputSchema;
@@ -102,7 +104,13 @@ export async function fetchActorDetails(
         const [actorInfo, buildInfo, storeActors]: [Actor | undefined, Build | undefined, ActorStoreList[]] =
             await Promise.all([
                 actor.get(),
-                actor.defaultBuild().then(async (build) => build.get()),
+                actor
+                    .defaultBuild()
+                    .then(async (build) => build.get())
+                    .catch((error) => {
+                        if (isUnknownBuildTagError(error)) return undefined;
+                        throw error;
+                    }),
                 // Only needed when the host cannot proxy picture URLs.
                 actorStore?.getProxiedPictureUrl
                     ? []
@@ -112,7 +120,7 @@ export async function fetchActorDetails(
                           limit: ACTOR_DETAILS_PICTURE_SEARCH_LIMIT,
                       }).catch(() => []),
             ]);
-        if (!actorInfo || !buildInfo || !buildInfo.actorDefinition) return null;
+        if (!actorInfo || (buildInfo && !buildInfo.actorDefinition)) return null;
 
         const storeActor = storeActors?.find((item) => item.id === actorInfo.id);
         const pictureUrl =
@@ -123,7 +131,7 @@ export async function fetchActorDetails(
             pictureUrl?: string;
         };
 
-        const inputSchema = (buildInfo.actorDefinition.input || {
+        const inputSchema = (buildInfo?.actorDefinition?.input || {
             type: 'object',
             properties: {},
         }) as ActorInputSchema;
@@ -137,7 +145,7 @@ export async function fetchActorDetails(
             actorCard,
             actorCardStructured,
             inputSchema,
-            readme: buildInfo.actorDefinition.readme || 'No README provided.',
+            readme: buildInfo?.actorDefinition?.readme || 'No README provided.',
             readmeSummary: actorInfo.readmeSummary,
         };
     } catch (error) {

@@ -294,6 +294,7 @@ export const APIFY_ERROR_TYPE_TOO_FEW_VERSIONS = 'too-few-versions';
 export const APIFY_ERROR_TYPE_TOO_MANY_VERSIONS = 'too-many-versions';
 export const APIFY_ERROR_TYPE_VERSIONS_SIZE_EXCEEDED = 'versions-size-exceeded';
 export const APIFY_ERROR_TYPE_PAGE_NOT_FOUND = 'page-not-found';
+export const APIFY_ERROR_TYPE_UNKNOWN_BUILD_TAG = 'unknown-build-tag';
 
 // HTTP status codes
 export const HTTP_UNAUTHORIZED = 401;

@@ -185,6 +185,7 @@ export function buildActorDetailsTextResponse(options: {
         `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
 
     const texts: string[] = [];
+    const hasBuild = details.buildInfo !== undefined;
 
     const needsCard = output.description || output.stats || output.pricing || output.rating || output.metadata;
 
@@ -192,12 +193,20 @@ export function buildActorDetailsTextResponse(options: {
         texts.push(`# Actor information\n${details.actorCard}`);
     }
 
-    const resolvedReadme = output.readme ? resolveReadmeContent(details) : undefined;
+    if (!hasBuild && (output.inputSchema || output.readme || output.mcpTools)) {
+        texts.push(
+            'This Actor has no build tagged "latest", so its input schema, README and MCP tools are not available. ' +
+                'Build the Actor or tag an existing build "latest".',
+        );
+    }
+
+    const resolvedReadme =
+        output.readme && (hasBuild || details.readmeSummary?.trim()) ? resolveReadmeContent(details) : undefined;
     if (resolvedReadme) {
         texts.push(`${resolvedReadme.heading}\n${resolvedReadme.content}`);
     }
 
-    if (output.inputSchema) {
+    if (output.inputSchema && hasBuild) {
         // Console has no /input sub-page — link to the Actor detail page instead.
         const inputSchemaUrl = linkContext ? actorUrl : `${actorUrl}/input`;
         texts.push(`# [Input schema](${inputSchemaUrl})\n${wrapJsonText(details.inputSchema)}`);
@@ -232,7 +241,7 @@ export function buildActorDetailsTextResponse(options: {
     const structuredContent: Record<string, unknown> = {
         actorInfo: needsCard ? details.actorCardStructured : undefined,
         readme: resolvedReadme?.content,
-        inputSchema: output.inputSchema ? details.inputSchema : undefined,
+        inputSchema: output.inputSchema && hasBuild ? details.inputSchema : undefined,
         outputSchema: output.outputSchema ? (actorOutputSchema ?? {}) : undefined,
         mcpTools: output.mcpTools && mcpToolsMessage ? mcpToolsMessage : undefined,
     };
@@ -280,9 +289,11 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
             ? await actorStore.getActorOutputSchemaAsTypeObject(actorName).catch(() => null)
             : null;
     }
-    const mcpToolsMessage = resolvedOutput.mcpTools
-        ? await getMcpToolsMessage(actorName, apifyClient, apifyToken, paymentProvider, mcpSessionId)
-        : undefined;
+    // The MCP tools lookup reads the Actor definition from the `latest` build.
+    const mcpToolsMessage =
+        resolvedOutput.mcpTools && details.buildInfo
+            ? await getMcpToolsMessage(actorName, apifyClient, apifyToken, paymentProvider, mcpSessionId)
+            : undefined;
 
     // NOTE: Data duplication between texts and structuredContent is intentional and required.
     // Some MCP clients only read text content, while others only read structured content.

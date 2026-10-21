@@ -35,6 +35,7 @@ const MOCK_DETAILS = {
         description: 'An example MCP server actor.',
         categories: ['MCP Servers'],
     },
+    buildInfo: {},
     actorCard: '# Actor card',
     actorCardStructured: {
         id: 'actor-id-1',
@@ -109,6 +110,41 @@ describe('buildActorDetailsTextResponse()', () => {
 
         expect(texts).toEqual([]);
         expect(structuredContent.mcpTools).toBeUndefined();
+    });
+
+    describe('for an Actor without a build tagged latest', () => {
+        const { buildInfo: _, ...detailsWithoutBuild } = MOCK_DETAILS;
+        const noOutput = {
+            ...actorDetailsOutputDefaults,
+            description: false,
+            stats: false,
+            pricing: false,
+            rating: false,
+            metadata: false,
+            inputSchema: false,
+            readme: false,
+        };
+
+        it('explains the missing build instead of rendering an input schema', () => {
+            const { texts, structuredContent } = buildActorDetailsTextResponse({
+                details: detailsWithoutBuild,
+                output: { ...noOutput, inputSchema: true },
+            });
+
+            expect(texts).toHaveLength(1);
+            expect(texts[0]).toContain('no build tagged "latest"');
+            expect(structuredContent.inputSchema).toBeUndefined();
+        });
+
+        it('omits the README section when there is no summary either', () => {
+            const { texts } = buildActorDetailsTextResponse({
+                details: { ...detailsWithoutBuild, readmeSummary: undefined },
+                output: { ...noOutput, readme: true },
+            });
+
+            expect(texts).toHaveLength(1);
+            expect(texts[0]).toContain('no build tagged "latest"');
+        });
     });
 
     describe('with a Console link context', () => {
@@ -242,6 +278,20 @@ describe('buildFetchActorDetailsResult()', () => {
         );
 
         await expect(callWithToken('apify_api_test')).rejects.toMatchObject({ statusCode: 401 });
+    });
+
+    // The MCP tools lookup reads the Actor definition from the `latest` build, which does not exist.
+    it('does not look up MCP tools for an Actor without a build tagged latest', async () => {
+        const { buildInfo: _, ...detailsWithoutBuild } = MOCK_DETAILS;
+        vi.mocked(fetchActorDetails).mockResolvedValue(detailsWithoutBuild);
+
+        const result = await buildFetchActorDetailsResult(
+            stubToolCallContext({ actor: 'jane.doe/my-actor', output: { mcpTools: true } }, mockApifyClient(), {
+                loadedToolNames: [HELPER_TOOLS.ACTOR_CALL],
+            }),
+        );
+
+        expect((result.content ?? []).map(textOf).join('\n')).toContain('no build tagged "latest"');
     });
 
     it('appends not-runnable guidance when neither call-actor nor a dedicated tool is loaded', async () => {

@@ -3,7 +3,7 @@ import type { AxiosResponse } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ApifyClient } from '../../src/apify_client.js';
-import { CODE_RUNTIME_ACTOR_NAME } from '../../src/const.js';
+import { APIFY_ERROR_TYPE_UNKNOWN_BUILD_TAG, CODE_RUNTIME_ACTOR_NAME } from '../../src/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
 import type { ActorDefinitionWithInfo, ActorStore } from '../../src/types.js';
 import {
@@ -212,6 +212,31 @@ describe('fetchActorDetails()', () => {
         const client = stubApifyClient(() => Promise.reject(apifyApiError(401, 'Authentication token is not valid')));
 
         await expect(fetchActorDetails(client, 'apify/instagram-scraper')).rejects.toMatchObject({ statusCode: 401 });
+    });
+
+    // The real client's defaultBuild() fetches the `latest` build itself, so it is what rejects.
+    const stubActorWithFailingBuild = (buildError: ApifyApiError) =>
+        mockApifyClient({
+            token: 'test-token',
+            actor: () => ({
+                get: async () => ({ id: 'actor-id', username: 'jane.doe', name: 'my-actor' }),
+                defaultBuild: async () => Promise.reject(buildError),
+            }),
+        });
+
+    it('returns the Actor without build info when it has no build tagged latest', async () => {
+        const client = stubActorWithFailingBuild(apifyApiError(403, APIFY_ERROR_TYPE_UNKNOWN_BUILD_TAG));
+
+        const result = await fetchActorDetails(client, 'jane.doe/my-actor');
+
+        expect(result?.actorInfo.id).toBe('actor-id');
+        expect(result?.buildInfo).toBeUndefined();
+    });
+
+    it('propagates a 403 of another type from the build lookup', async () => {
+        const client = stubActorWithFailingBuild(apifyApiError(403, 'insufficient-permissions'));
+
+        await expect(fetchActorDetails(client, 'jane.doe/my-actor')).rejects.toMatchObject({ statusCode: 403 });
     });
 });
 
