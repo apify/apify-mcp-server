@@ -145,6 +145,16 @@ describe('buildActorDetailsTextResponse()', () => {
             expect(texts).toHaveLength(1);
             expect(texts[0]).toContain('no build tagged "latest"');
         });
+
+        it('renders the README summary when the Actor has one', () => {
+            const { texts, structuredContent } = buildActorDetailsTextResponse({
+                details: detailsWithoutBuild,
+                output: { ...noOutput, readme: true },
+            });
+
+            expect(texts[1]).toContain('# README summary');
+            expect(structuredContent.readme).toBe(detailsWithoutBuild.readmeSummary);
+        });
     });
 
     describe('with a Console link context', () => {
@@ -280,7 +290,6 @@ describe('buildFetchActorDetailsResult()', () => {
         await expect(callWithToken('apify_api_test')).rejects.toMatchObject({ statusCode: 401 });
     });
 
-    // The MCP tools lookup reads the Actor definition from the `latest` build, which does not exist.
     it('does not look up MCP tools for an Actor without a build tagged latest', async () => {
         const { buildInfo: _, ...detailsWithoutBuild } = MOCK_DETAILS;
         vi.mocked(fetchActorDetails).mockResolvedValue(detailsWithoutBuild);

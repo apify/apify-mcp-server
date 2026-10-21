@@ -195,7 +195,7 @@ export function buildActorDetailsTextResponse(options: {
 
     if (!hasBuild && (output.inputSchema || output.readme || output.mcpTools)) {
         texts.push(
-            'This Actor has no build tagged "latest", so its input schema, README and MCP tools are not available. ' +
+            'This Actor has no build tagged "latest", so its input schema, full README and MCP tools are not available. ' +
                 'Build the Actor or tag an existing build "latest".',
         );
     }
