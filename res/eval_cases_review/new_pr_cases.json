@@ -1,0 +1,1666 @@
+[
+  {
+    "id": "pr/search-actors/lazy-tiktok-comments-need",
+    "category": "search-actors",
+    "kind": "tool-call",
+    "query": "need tiktok comments for a project, no clue where to start",
+    "expectedTools": [
+      "search-actors"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/search-actors/lazy-linkedin-jobs-typo",
+    "category": "search-actors",
+    "kind": "tool-call",
+    "query": "smth that can scrape linkedn job postings?",
+    "expectedTools": [
+      "search-actors"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/search-actors/limit-three-amazon-reviews",
+    "category": "search-actors",
+    "kind": "tool-call",
+    "query": "give me just 3 options for scraping amazon reviews",
+    "expectedTools": [
+      "search-actors"
+    ],
+    "expectedArgs": {
+      "limit": 3
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/search-actors/tool-not-data-maps-reviews",
+    "category": "search-actors",
+    "kind": "tool-call",
+    "query": "i need something i can run every week to pull google maps reviews",
+    "expectedTools": [
+      "search-actors"
+    ],
+    "mcpToolsOnly": true,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ]
+  },
+  {
+    "id": "pr/fetch-actor-details/lazy-whats-it-about",
+    "category": "fetch-actor-details",
+    "kind": "tool-call",
+    "query": "whats apify/instagram-scraper about",
+    "expectedTools": [
+      "fetch-actor-details"
+    ],
+    "expectedArgs": {
+      "actor": "apify/instagram-scraper"
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/fetch-actor-details/lazy-cost-tweet-scraper",
+    "category": "fetch-actor-details",
+    "kind": "tool-call",
+    "query": "how much do i pay for apidojo/tweet-scraper",
+    "expectedTools": [
+      "fetch-actor-details"
+    ],
+    "expectedArgs": {
+      "actor": "apidojo/tweet-scraper"
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/fetch-actor-details/lazy-what-input-needed",
+    "category": "fetch-actor-details",
+    "kind": "tool-call",
+    "query": "what do i have to fill in to run apify/google-search-scraper",
+    "expectedTools": [
+      "fetch-actor-details"
+    ],
+    "expectedArgs": {
+      "actor": "apify/google-search-scraper"
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/call-actor/lazy-just-run-hello",
+    "category": "call-actor",
+    "kind": "tool-call",
+    "query": "just run apify/hello-world",
+    "expectedTools": [
+      "call-actor",
+      "fetch-actor-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/call-actor/memory-cap-512",
+    "category": "call-actor",
+    "kind": "tool-call",
+    "query": "run apify/hello-world, cap the memory at 512 MB",
+    "expectedTools": [
+      "call-actor",
+      "fetch-actor-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/call-actor/wait-two-minutes",
+    "category": "call-actor",
+    "kind": "tool-call",
+    "query": "run apify/hello-world and wait up to 2 minutes for it to finish",
+    "expectedTools": [
+      "call-actor",
+      "fetch-actor-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/call-actor/budget-cap-one-dollar",
+    "category": "call-actor",
+    "kind": "tool-call",
+    "query": "run apify/google-search-scraper for 'prague coffee' but dont let it cost more than $1",
+    "expectedTools": [
+      "call-actor",
+      "fetch-actor-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/rag-web-browser/lazy-latest-ai-chip-rules",
+    "category": "apify--rag-web-browser",
+    "kind": "tool-call",
+    "query": "whats the latest on ai chip export rules",
+    "expectedTools": [
+      "apify--rag-web-browser"
+    ],
+    "mcpToolsOnly": true,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ]
+  },
+  {
+    "id": "pr/rag-web-browser/few-articles-by-topic",
+    "category": "apify--rag-web-browser",
+    "kind": "tool-call",
+    "query": "find me a few articles about prague public transport strikes",
+    "expectedTools": [
+      "apify--rag-web-browser"
+    ],
+    "mcpToolsOnly": true,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ]
+  },
+  {
+    "id": "pr/rag-web-browser/search-not-discovery-not-fetch",
+    "category": "apify--rag-web-browser",
+    "kind": "tool-call",
+    "query": "whats being said online about apify pricing lately",
+    "expectedTools": [
+      "apify--rag-web-browser"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/web-fetch/lazy-single-url-content",
+    "category": "apify--web-fetch",
+    "kind": "tool-call",
+    "query": "whats on https://www.rfc-editor.org/rfc/rfc9110.html",
+    "expectedTools": [
+      "apify--web-fetch"
+    ],
+    "mcpToolsOnly": true,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ]
+  },
+  {
+    "id": "pr/web-fetch/blocked-page-retry",
+    "category": "apify--web-fetch",
+    "kind": "tool-call",
+    "query": "i keep getting 403 trying to read https://www.reddit.com/r/webscraping/ - can you get it for me",
+    "expectedTools": [
+      "apify--web-fetch"
+    ],
+    "mcpToolsOnly": true,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ]
+  },
+  {
+    "id": "pr/web-fetch/links-on-page",
+    "category": "apify--web-fetch",
+    "kind": "tool-call",
+    "query": "list the links on https://docs.apify.com/platform",
+    "expectedTools": [
+      "apify--web-fetch"
+    ],
+    "mcpToolsOnly": true,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ]
+  },
+  {
+    "id": "pr/search-apify-docs/lazy-how-proxy-works",
+    "category": "search-apify-docs",
+    "kind": "tool-call",
+    "query": "how does apify proxy work",
+    "expectedTools": [
+      "search-apify-docs"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/search-apify-docs/lazy-webhooks-setup",
+    "category": "search-apify-docs",
+    "kind": "tool-call",
+    "query": "how do i set up webhooks on apify",
+    "expectedTools": [
+      "search-apify-docs"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/search-apify-docs/vs-web-search-standby",
+    "category": "search-apify-docs",
+    "kind": "tool-call",
+    "query": "docs on actor standby mode",
+    "expectedTools": [
+      "search-apify-docs"
+    ],
+    "mcpToolsOnly": true,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ]
+  },
+  {
+    "id": "pr/fetch-apify-docs/explicit-url-page",
+    "category": "fetch-apify-docs",
+    "kind": "tool-call",
+    "query": "read https://docs.apify.com/platform/actors/running/input-and-output and summarise it for me",
+    "expectedTools": [
+      "fetch-apify-docs"
+    ],
+    "expectedArgs": {
+      "url": "https://docs.apify.com/platform/actors/running/input-and-output"
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/fetch-apify-docs/missing-page",
+    "category": "fetch-apify-docs",
+    "kind": "tool-call",
+    "query": "open https://docs.apify.com/platform/this-page-does-not-exist for me",
+    "expectedTools": [
+      "fetch-apify-docs",
+      "apify--web-fetch"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-actor-run/lazy-is-it-done",
+    "category": "get-actor-run",
+    "kind": "tool-call",
+    "query": "is run oQNzVLE4B1CcjtzhS done yet",
+    "expectedTools": [
+      "get-actor-run"
+    ],
+    "expectedArgs": {
+      "runId": "oQNzVLE4B1CcjtzhS"
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-actor-run/wait-until-finished",
+    "category": "get-actor-run",
+    "kind": "tool-call",
+    "query": "wait up to 60 seconds for run oQNzVLE4B1CcjtzhS to finish and tell me how it went",
+    "expectedTools": [
+      "get-actor-run"
+    ],
+    "expectedArgs": {
+      "runId": "oQNzVLE4B1CcjtzhS",
+      "waitSecs": 60
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-actor-run-list/lazy-what-ran-lately",
+    "category": "get-actor-run-list",
+    "kind": "tool-call",
+    "query": "what have i run lately",
+    "expectedTools": [
+      "get-actor-run-list"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-actor-run-list/only-failed-ones",
+    "category": "get-actor-run-list",
+    "kind": "tool-call",
+    "query": "show me my failed runs",
+    "expectedTools": [
+      "get-actor-run-list"
+    ],
+    "expectedArgs": {
+      "status": "FAILED"
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-actor-run-log/lazy-why-did-it-break",
+    "category": "get-actor-run-log",
+    "kind": "tool-call",
+    "query": "run oQNzVLE4B1CcjtzhS blew up, why",
+    "expectedTools": [
+      "get-actor-run-log",
+      "get-actor-run"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-actor-run-log/last-50-lines",
+    "category": "get-actor-run-log",
+    "kind": "tool-call",
+    "query": "show me the last 50 log lines of run oQNzVLE4B1CcjtzhS",
+    "expectedTools": [
+      "get-actor-run-log"
+    ],
+    "expectedArgs": {
+      "runId": "oQNzVLE4B1CcjtzhS",
+      "lines": 50
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-actor-run-log/error-message-not-status",
+    "category": "get-actor-run-log",
+    "kind": "tool-call",
+    "query": "whats the actual error message in run oQNzVLE4B1CcjtzhS",
+    "expectedTools": [
+      "get-actor-run-log",
+      "get-actor-run"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/abort-actor-run/lazy-kill-it",
+    "category": "abort-actor-run",
+    "kind": "tool-call",
+    "query": "kill run oQNzVLE4B1CcjtzhS, its burning credits",
+    "expectedTools": [
+      "abort-actor-run",
+      "get-actor-run"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/abort-actor-run/graceful-stop",
+    "category": "abort-actor-run",
+    "kind": "tool-call",
+    "query": "stop run oQNzVLE4B1CcjtzhS but let it save what it already has",
+    "expectedTools": [
+      "abort-actor-run",
+      "get-actor-run"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-dataset/lazy-how-many-rows",
+    "category": "get-dataset",
+    "kind": "tool-call",
+    "query": "how many rows are in dataset iSpp2Q3G60uWDLOi0",
+    "expectedTools": [
+      "get-dataset"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true,
+    "expectedArgs": {
+      "datasetId": "iSpp2Q3G60uWDLOi0"
+    }
+  },
+  {
+    "id": "pr/get-dataset/when-created",
+    "category": "get-dataset",
+    "kind": "tool-call",
+    "query": "when was dataset iSpp2Q3G60uWDLOi0 created",
+    "expectedTools": [
+      "get-dataset"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-dataset-items/lazy-show-data",
+    "category": "get-dataset-items",
+    "kind": "tool-call",
+    "query": "show me whats in dataset iSpp2Q3G60uWDLOi0",
+    "expectedTools": [
+      "get-dataset-items",
+      "get-dataset"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-dataset-items/only-two-fields",
+    "category": "get-dataset-items",
+    "kind": "tool-call",
+    "query": "from dataset iSpp2Q3G60uWDLOi0 i only need title and url",
+    "expectedTools": [
+      "get-dataset-items"
+    ],
+    "expectedArgs": {
+      "datasetId": "iSpp2Q3G60uWDLOi0",
+      "fields": "title,url"
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-dataset-items/page-two",
+    "category": "get-dataset-items",
+    "kind": "tool-call",
+    "query": "give me rows 100 to 199 of dataset iSpp2Q3G60uWDLOi0",
+    "expectedTools": [
+      "get-dataset-items"
+    ],
+    "expectedArgs": {
+      "datasetId": "iSpp2Q3G60uWDLOi0",
+      "offset": 100,
+      "limit": 100
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-dataset-items/newest-first",
+    "category": "get-dataset-items",
+    "kind": "tool-call",
+    "query": "last 10 entries of dataset iSpp2Q3G60uWDLOi0, newest first",
+    "expectedTools": [
+      "get-dataset-items"
+    ],
+    "expectedArgs": {
+      "datasetId": "iSpp2Q3G60uWDLOi0",
+      "limit": 10,
+      "desc": true
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-dataset-schema/lazy-what-shape",
+    "category": "get-dataset-schema",
+    "kind": "tool-call",
+    "query": "what do the records in dataset iSpp2Q3G60uWDLOi0 look like, field wise",
+    "expectedTools": [
+      "get-dataset-schema",
+      "get-dataset"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-dataset-schema/json-schema-for-dataset",
+    "category": "get-dataset-schema",
+    "kind": "tool-call",
+    "query": "i need the json schema for dataset iSpp2Q3G60uWDLOi0",
+    "expectedTools": [
+      "get-dataset-schema"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true,
+    "expectedArgs": {
+      "datasetId": "iSpp2Q3G60uWDLOi0"
+    }
+  },
+  {
+    "id": "pr/get-dataset-list/lazy-what-data-i-have",
+    "category": "get-dataset-list",
+    "kind": "tool-call",
+    "query": "what datasets do i have lying around",
+    "expectedTools": [
+      "get-dataset-list"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-dataset-list/include-unnamed",
+    "category": "get-dataset-list",
+    "kind": "tool-call",
+    "query": "list all my datasets, including the temporary unnamed ones",
+    "expectedTools": [
+      "get-dataset-list"
+    ],
+    "expectedArgs": {
+      "unnamed": true
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-key-value-store/lazy-store-info",
+    "category": "get-key-value-store",
+    "kind": "tool-call",
+    "query": "tell me about store rMrkxdMEem3a3BGt4",
+    "expectedTools": [
+      "get-key-value-store"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true,
+    "expectedArgs": {
+      "keyValueStoreId": "rMrkxdMEem3a3BGt4"
+    }
+  },
+  {
+    "id": "pr/get-key-value-store/size-check",
+    "category": "get-key-value-store",
+    "kind": "tool-call",
+    "query": "how big is key value store rMrkxdMEem3a3BGt4",
+    "expectedTools": [
+      "get-key-value-store"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-key-value-store-keys/lazy-whats-in-there",
+    "category": "get-key-value-store-keys",
+    "kind": "tool-call",
+    "query": "whats saved in store rMrkxdMEem3a3BGt4",
+    "expectedTools": [
+      "get-key-value-store-keys",
+      "get-key-value-store"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-key-value-store-keys/first-five",
+    "category": "get-key-value-store-keys",
+    "kind": "tool-call",
+    "query": "just the first 5 keys in store rMrkxdMEem3a3BGt4 please",
+    "expectedTools": [
+      "get-key-value-store-keys"
+    ],
+    "expectedArgs": {
+      "keyValueStoreId": "rMrkxdMEem3a3BGt4",
+      "limit": 5
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-key-value-store-record/lazy-output",
+    "category": "get-key-value-store-record",
+    "kind": "tool-call",
+    "query": "get me OUTPUT from store rMrkxdMEem3a3BGt4",
+    "expectedTools": [
+      "get-key-value-store-record"
+    ],
+    "expectedArgs": {
+      "keyValueStoreId": "rMrkxdMEem3a3BGt4",
+      "recordKey": "OUTPUT"
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-key-value-store-record/input-of-run",
+    "category": "get-key-value-store-record",
+    "kind": "tool-call",
+    "query": "what input was used? its in store rMrkxdMEem3a3BGt4 under INPUT",
+    "expectedTools": [
+      "get-key-value-store-record"
+    ],
+    "expectedArgs": {
+      "keyValueStoreId": "rMrkxdMEem3a3BGt4",
+      "recordKey": "INPUT"
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-key-value-store-list/lazy-my-stores",
+    "category": "get-key-value-store-list",
+    "kind": "tool-call",
+    "query": "list my key value stores",
+    "expectedTools": [
+      "get-key-value-store-list"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-key-value-store-list/include-unnamed",
+    "category": "get-key-value-store-list",
+    "kind": "tool-call",
+    "query": "show me every key value store i have, temporary ones included",
+    "expectedTools": [
+      "get-key-value-store-list"
+    ],
+    "expectedArgs": {
+      "unnamed": true
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/create-actor-task/lazy-save-config",
+    "category": "create-actor-task",
+    "kind": "tool-call",
+    "query": "save apify/hello-world as something i can rerun, call it eval-hello-rerun",
+    "expectedTools": [
+      "create-actor-task",
+      "fetch-actor-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/create-actor-task/with-stored-input",
+    "category": "create-actor-task",
+    "kind": "tool-call",
+    "query": "make a reusable config for apify/normal-mode-test-actor that adds 5 and 7, name it eval-sum-five-seven",
+    "expectedTools": [
+      "create-actor-task",
+      "fetch-actor-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/create-actor-task/not-a-schedule-trap",
+    "category": "create-actor-task",
+    "kind": "tool-call",
+    "query": "i want to keep this apify/hello-world setup so i dont have to retype it every time, name it eval-hello-keep",
+    "expectedTools": [
+      "create-actor-task"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-actor-task/lazy-what-does-it-run",
+    "category": "get-actor-task",
+    "kind": "tool-call",
+    "query": "what does my task eval-sum-nightly actually run",
+    "expectedTools": [
+      "get-actor-task"
+    ],
+    "expectedArgs": {
+      "taskId": "eval-sum-nightly"
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-actor-task/is-it-public",
+    "category": "get-actor-task",
+    "kind": "tool-call",
+    "query": "is eval-sum-nightly public",
+    "expectedTools": [
+      "get-actor-task"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/update-actor-task/lazy-change-numbers",
+    "category": "update-actor-task",
+    "kind": "tool-call",
+    "query": "change my task eval-sum-nightly to add 10 and 20 instead",
+    "expectedTools": [
+      "update-actor-task",
+      "get-actor-task"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/update-actor-task/switch-build",
+    "category": "update-actor-task",
+    "kind": "tool-call",
+    "query": "point task eval-sum-nightly at the test build",
+    "expectedTools": [
+      "update-actor-task",
+      "get-actor-task"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/update-actor-task/landing-page-title",
+    "category": "update-actor-task",
+    "kind": "tool-call",
+    "query": "the public page title for eval-sum-nightly should say Nightly sum",
+    "expectedTools": [
+      "update-actor-task",
+      "get-actor-task"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/publish-actor-task/lazy-make-public",
+    "category": "publish-actor-task",
+    "kind": "tool-call",
+    "query": "put eval-sum-nightly up on the actors public page",
+    "expectedTools": [
+      "publish-actor-task",
+      "get-actor-task"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/publish-actor-task/let-people-find-it",
+    "category": "publish-actor-task",
+    "kind": "tool-call",
+    "query": "i want other people to be able to find eval-sum-nightly",
+    "expectedTools": [
+      "publish-actor-task",
+      "get-actor-task"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/unpublish-actor-task/lazy-take-down",
+    "category": "unpublish-actor-task",
+    "kind": "tool-call",
+    "query": "take eval-sum-nightly off the public page",
+    "expectedTools": [
+      "unpublish-actor-task",
+      "get-actor-task"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/unpublish-actor-task/hide-not-delete",
+    "category": "unpublish-actor-task",
+    "kind": "tool-call",
+    "query": "hide eval-sum-nightly from the public but dont delete it",
+    "expectedTools": [
+      "unpublish-actor-task",
+      "get-actor-task"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/create-schedule/lazy-every-morning",
+    "category": "create-schedule",
+    "kind": "tool-call",
+    "query": "run my task eval-sum-nightly every morning at 7",
+    "expectedTools": [
+      "create-schedule",
+      "get-actor-task"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/create-schedule/timezone-prague",
+    "category": "create-schedule",
+    "kind": "tool-call",
+    "query": "kick off eval-sum-nightly at 6am prague time every day",
+    "expectedTools": [
+      "create-schedule",
+      "get-actor-task"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/create-schedule/created-paused",
+    "category": "create-schedule",
+    "kind": "tool-call",
+    "query": "set up apify/hello-world to run mondays at 8 but leave it switched off for now, name it eval-sched-mon",
+    "expectedTools": [
+      "create-schedule",
+      "fetch-actor-details"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-schedule/lazy-when-next",
+    "category": "get-schedule",
+    "kind": "tool-call",
+    "query": "when does eval-nightly-sum fire next",
+    "expectedTools": [
+      "get-schedule"
+    ],
+    "expectedArgs": {
+      "scheduleId": "eval-nightly-sum"
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-schedule/read-before-replacing-actions",
+    "category": "get-schedule",
+    "kind": "tool-call",
+    "query": "add my task eval-sum-nightly to the eval-nightly-sum schedule as well",
+    "expectedTools": [
+      "get-schedule"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/update-schedule/lazy-pause",
+    "category": "update-schedule",
+    "kind": "tool-call",
+    "query": "pause eval-nightly-sum for now",
+    "expectedTools": [
+      "update-schedule",
+      "get-schedule"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/update-schedule/turn-back-on",
+    "category": "update-schedule",
+    "kind": "tool-call",
+    "query": "turn eval-nightly-sum back on",
+    "expectedTools": [
+      "update-schedule",
+      "get-schedule"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/update-schedule/change-frequency",
+    "category": "update-schedule",
+    "kind": "tool-call",
+    "query": "make eval-nightly-sum run every 6 hours instead",
+    "expectedTools": [
+      "update-schedule",
+      "get-schedule"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/delete-schedule/lazy-get-rid-of-it",
+    "category": "delete-schedule",
+    "kind": "tool-call",
+    "query": "get rid of the eval-nightly-sum schedule",
+    "expectedTools": [
+      "delete-schedule",
+      "get-schedule"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/delete-schedule/remove-completely-not-pause",
+    "category": "delete-schedule",
+    "kind": "tool-call",
+    "query": "i dont need eval-nightly-sum anymore, remove it completely",
+    "expectedTools": [
+      "delete-schedule",
+      "get-schedule"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/report-problem/broken-tool-complaint",
+    "category": "report-problem",
+    "kind": "tool-call",
+    "query": "your call-actor tool keeps erroring out, tell someone about it",
+    "expectedTools": [
+      "report-problem"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/get-dataset-schema/from-ten-items",
+    "category": "get-dataset-schema",
+    "kind": "tool-call",
+    "query": "work out the schema of dataset iSpp2Q3G60uWDLOi0 off the first 10 rows",
+    "expectedTools": [
+      "get-dataset-schema"
+    ],
+    "expectedArgs": {
+      "datasetId": "iSpp2Q3G60uWDLOi0",
+      "limit": 10
+    },
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "pr/create-schedule/explicit-cron",
+    "category": "create-schedule",
+    "kind": "tool-call",
+    "query": "schedule my task eval-sum-nightly on the cron 0 3 * * * , name it eval-sched-cron",
+    "expectedTools": [
+      "create-schedule",
+      "get-actor-task"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  }
+]
