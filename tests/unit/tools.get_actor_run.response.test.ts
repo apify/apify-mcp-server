@@ -6,6 +6,7 @@ import { ACTOR_TIP_CAVEAT } from '../../src/tools/actor_tool_naming.js';
 import {
     buildStartRunResponse,
     buildStartRunWidgetResponse,
+    buildDatasetShape,
     buildStatusSummaryNextStep,
     collapseArrayIndices,
     type RunDataset,
@@ -121,6 +122,9 @@ describe('get-actor-run default response', () => {
         expect(content).toHaveLength(2);
         expect(JSON.parse(content[0].text)).toEqual(structuredContent);
         expect(content[1].text).toContain('dataset-xyz');
+        expect(content[1].text).toContain(
+            'Item shape ([] marks an array): { crawl: { httpStatusCode }, metadata: { url }, markdown }',
+        );
         expect(content[1].text).not.toContain('```json');
 
         // Usage attribution `_meta` flows through end-to-end.
@@ -1115,6 +1119,7 @@ function makeRun(status: string, statusMessage?: string, runTimeSecs = 10) {
 }
 
 const datasetWithItems: RunDataset = { id: 'ds-1', itemCount: 47, fields: ['metadata.url', 'markdown'] };
+const DATASET_SHAPE = '{ metadata: { url }, markdown }';
 const datasetEmpty: RunDataset = { id: 'ds-1', itemCount: 0, fields: [] };
 const kvWithRecords: RunKeyValueStore = { id: 'kv-1', keys: ['result-a', 'result-b'], keyCount: 2 };
 
@@ -1131,11 +1136,12 @@ describe('buildStatusTemplate', () => {
         const t = buildStatusSummaryNextStep({
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
+            datasetShape: DATASET_SHAPE,
         });
         expect(t.summary).toContain('47 items; 2 fields available');
         expect(t.nextStep).toContain('get-dataset-items');
         expect(t.nextStep).toContain('datasetId=ds-1');
-        expect(t.nextStep).toContain('metadata.url, markdown');
+        expect(t.nextStep).toContain(DATASET_SHAPE);
     });
 
     it('SUCCEEDED dataset nextStep uses DEFAULT_DATASET_ITEMS_LIMIT as example limit', () => {
@@ -1172,7 +1178,7 @@ describe('buildStatusTemplate', () => {
         const dataset: RunDataset = { id: 'ds-1', itemCount: 5, fields: [] };
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
         expect(t.nextStep).toContain('get-dataset-items');
-        expect(t.nextStep).not.toContain('Available fields');
+        expect(t.nextStep).not.toContain('Item shape');
         expect(t.nextStep).not.toContain('—');
     });
 
@@ -1296,6 +1302,15 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).toContain('partial output (47 items written)');
     });
 
+    it('TIMED-OUT with a dataset shape names the item shape for projection', () => {
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('TIMED-OUT'),
+            dataset: datasetWithItems,
+            datasetShape: DATASET_SHAPE,
+        });
+        expect(t.nextStep).toContain(DATASET_SHAPE);
+    });
+
     it('TIMED-OUT with both dataset and KV records picks dataset for nextStep', () => {
         const t = buildStatusSummaryNextStep({
             run: makeRun('TIMED-OUT'),
@@ -1391,9 +1406,31 @@ describe('buildStatusTemplate', () => {
         const t = buildStatusSummaryNextStep({
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
+            datasetShape: DATASET_SHAPE,
         });
         expect(t.nextStep).toMatch(/to project\.$/);
         expect(t.nextStep).not.toMatch(/\.\.$/);
+    });
+});
+
+describe('buildDatasetShape marks arrays with []', () => {
+    it('nests objects and marks arrays of objects and of strings', () => {
+        expect(
+            buildDatasetShape([
+                'query',
+                'search/provider',
+                'results/0/url',
+                'results/0/emphasizedKeywords/0',
+                'results/1/title',
+                'results/1/siteLinks/0/url',
+            ]),
+        ).toBe(
+            '{ query, search: { provider }, results: { url, emphasizedKeywords[], title, siteLinks: { url }[] }[] }',
+        );
+    });
+
+    it('marks an array of arrays with one [] per level', () => {
+        expect(buildDatasetShape(['table/rows/0/0', 'table/rows/1/2'])).toBe('{ table: { rows[][] } }');
     });
 });
 
