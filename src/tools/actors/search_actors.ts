@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS, MAX_LIMIT_WITH_INPUT_SCHEMA, RAG_WEB_BROWSER } from '../../const.js';
+import { HELPER_TOOLS, MAX_LIMIT_WITH_INPUT_SCHEMA } from '../../const.js';
 import type {
     ActorStoreList,
     ConsoleLinkContext,
@@ -20,11 +20,8 @@ import { getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console
 import { respondOk } from '../../utils/mcp.js';
 import type { PricingTier } from '../../utils/pricing_info.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import { actorNameToToolName, canRunActor, canRunAnyActor, getActorCallabilityCaveat } from '../actor_tool_naming.js';
+import { canRunActor, canRunAnyActor, getActorCallabilityCaveat } from '../actor_tool_naming.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
-
-// hasTool checks registered tool names, not Actor full names — see call_actor.ts's RAG_WEB_BROWSER_TOOL.
-const RAG_WEB_BROWSER_TOOL = actorNameToToolName(RAG_WEB_BROWSER);
 
 /**
  * Shared schema for search-actors arguments. Used by both the default and
@@ -82,7 +79,7 @@ Use this tool when user wants to:
 - Browse existing solutions (e.g., "Show me scrapers for news sites")
 - Learn about MCP servers or AI agents available in the Store
 
-${hasTool(RAG_WEB_BROWSER_TOOL) ? `Do NOT use this tool for generic web content (news, articles, general questions) — use ${RAG_WEB_BROWSER} instead.` : 'This tool discovers Actors; it does not retrieve their output.'}
+This tool discovers Actors; it does not retrieve their output.
 IMPORTANT: When the user wants detailed data from a specific platform or is looking for scraping tools, prefer searching the Store first — a relevant Actor often already exists. When the user names a specific Actor, look up that Actor directly instead of searching.
 ${hasTool(HELPER_TOOLS.ACTOR_LIST_GET) ? `Do NOT use this tool to find the user's own Actors (e.g., "find my weather scraper", "run my Actor"): the Store never returns private Actors. Use ${HELPER_TOOLS.ACTOR_LIST_GET} for those.\n` : ''}
 Usage:

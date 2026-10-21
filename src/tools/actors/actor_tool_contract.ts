@@ -1,6 +1,5 @@
 import { RAG_WEB_BROWSER, WEB_FETCH } from '../../const.js';
 import type { ActorInputSchema, ToolDescriptionContext } from '../../types.js';
-import { actorNameToToolName } from '../actor_tool_naming.js';
 
 const RAG_WEB_BROWSER_ADDITIONAL_DESC = `Use this tool for generic web content: it searches the web by query and returns the text of the top results.
 This tool scrapes the data itself - it does NOT just find tools.
@@ -10,8 +9,6 @@ Examples of when to use:
 
 For detailed data from a specific platform (e.g. Amazon products with prices, Instagram posts, Google Maps places with ratings), a specialized Actor from the Apify Store returns complete, structured results; this tool returns page text only.`;
 
-/** Follows RAG_WEB_BROWSER_ADDITIONAL_DESC on its own line when the session serves the apify/web-fetch tool. */
-const RAG_WEB_BROWSER_WEB_FETCH_HINT = `When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated ${WEB_FETCH} tool - this tool is for searching and scraping by query.`;
 /**
  * Appended to the `apify/web-fetch` Actor tool description. Client-agnostic on purpose:
  * no references to any specific client or its built-in tools, so the same text works
@@ -68,11 +65,7 @@ const ACTOR_TOOL_POLICIES: Readonly<Record<string, ActorToolPolicyConfig>> = {
     },
     [RAG_WEB_BROWSER]: {
         exposedInputs: ['query', 'maxResults', 'outputFormats'],
-        buildDescription: ({ hasTool }) => {
-            let description = RAG_WEB_BROWSER_ADDITIONAL_DESC;
-            if (hasTool(actorNameToToolName(WEB_FETCH))) description += `\n${RAG_WEB_BROWSER_WEB_FETCH_HINT}`;
-            return description;
-        },
+        buildDescription: () => RAG_WEB_BROWSER_ADDITIONAL_DESC,
     },
     [WEB_FETCH]: {
         inputDescriptionSuffixes: { url: WEB_FETCH_URL_SCHEME_NOTE },

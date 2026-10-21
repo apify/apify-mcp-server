@@ -15,37 +15,25 @@ function makeServer(serverMode: SERVER_MODE = SERVER_MODE.DEFAULT): ActorsMcpSer
 }
 
 describe('ActorsMcpServer.getStatelessServerInstructions()', () => {
-    it('without a requestUrl, mentions everything but report-problem — matches the pre-gating default', () => {
+    it('describes available tools without report-problem when no request URL is supplied', () => {
         const instructions = makeServer().getStatelessServerInstructions();
         expect(instructions).toContain(HELPER_TOOLS.ACTOR_CALL);
-        expect(instructions).toContain(RAG_WEB_BROWSER);
-        expect(instructions).toContain(WEB_FETCH);
         expect(instructions).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
     });
 
-    it('with a bare URL (no ?tools=/?actors=), resolves the same as no requestUrl — defaults apply', () => {
+    it('uses the default tools for a bare URL', () => {
         const instructions = makeServer().getStatelessServerInstructions('http://localhost/');
         expect(instructions).toContain(HELPER_TOOLS.ACTOR_CALL);
-        expect(instructions).toContain(RAG_WEB_BROWSER);
-        expect(instructions).toContain(WEB_FETCH);
         expect(instructions).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
     });
 
-    // Regression: resolving only call-actor left rag-web-browser/web-fetch absent even when selected;
-    // resolveActorsToLoad (zero-fetch) fixes it. Selects both since their comparison needs both sides.
-    it('resolves explicitly selected Actor tools from the URL, with no fetch', () => {
+    it('describes a dedicated-Actor session without naming individual web tools', () => {
         const instructions = makeServer().getStatelessServerInstructions(
             'http://localhost/?tools=search-actors,apify/rag-web-browser,apify/web-fetch',
         );
         expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_CALL);
-        expect(instructions).toContain(WEB_FETCH);
-        expect(instructions).toContain(RAG_WEB_BROWSER);
-    });
-
-    it('omits an Actor tool the URL did not select', () => {
-        const instructions = makeServer().getStatelessServerInstructions(
-            'http://localhost/?tools=search-actors,apify/web-fetch',
-        );
+        expect(instructions).toContain('This session can run only Actors exposed as dedicated tools');
+        expect(instructions).not.toContain(WEB_FETCH);
         expect(instructions).not.toContain(RAG_WEB_BROWSER);
     });
 

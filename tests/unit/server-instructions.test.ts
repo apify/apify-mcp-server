@@ -36,11 +36,12 @@ describe('getServerInstructions()', () => {
         expect(instructions).not.toContain('returns its final status and storage IDs');
     });
 
-    it('mentions call-actor, apify/rag-web-browser and apify/web-fetch when all are loaded', () => {
+    it('prefers dedicated Actor tools without naming a web tool', () => {
         const instructions = getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT);
         expect(instructions).toContain(HELPER_TOOLS.ACTOR_CALL);
-        expect(instructions).toContain(RAG_WEB_BROWSER);
-        expect(instructions).toContain(WEB_FETCH);
+        expect(instructions).toContain('Prefer dedicated tools when available');
+        expect(instructions).not.toContain(RAG_WEB_BROWSER);
+        expect(instructions).not.toContain(WEB_FETCH);
     });
 
     it('omits every call-actor mention when call-actor is absent from the session', () => {
@@ -65,16 +66,6 @@ describe('getServerInstructions()', () => {
         expect(instructions).not.toContain(RAG_WEB_BROWSER);
         expect(instructions).not.toContain(WEB_FETCH);
         expect(instructions).toContain('Prefer dedicated tools when available'); // no dead end
-    });
-
-    // Regression: hasTool must match the registered tool name, not the Actor full name used for display text.
-    it('keeps the rag-web-browser/web-fetch comparisons when their real tool names are present', () => {
-        const instructions = getServerInstructions(
-            SERVER_MODE.DEFAULT,
-            only(HELPER_TOOLS.ACTOR_CALL, actorNameToToolName(RAG_WEB_BROWSER), actorNameToToolName(WEB_FETCH)),
-        );
-        expect(instructions).toContain(RAG_WEB_BROWSER);
-        expect(instructions).toContain(WEB_FETCH);
     });
 
     it('omits the search-vs-details disambiguation when only one side is loaded, but still names it', () => {
@@ -357,12 +348,8 @@ describe('getServerInstructions()', () => {
         });
 
         it('keeps a blank line after the heading when only bullets render', () => {
-            // Only subsection with no `###` heading and no search/details/call dependency, so it renders alone.
-            const instructions = getServerInstructions(
-                SERVER_MODE.DEFAULT,
-                only(actorNameToToolName(WEB_FETCH), actorNameToToolName(RAG_WEB_BROWSER)),
-            );
-            expect(instructions).toContain(`${HEADING}\n\n- **${WEB_FETCH} vs ${RAG_WEB_BROWSER}:**`);
+            const instructions = getServerInstructions(SERVER_MODE.APPS, only(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET));
+            expect(instructions).toContain(`${HEADING}\n\n- **Data vs widget Actor tools`);
         });
     });
 
