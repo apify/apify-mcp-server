@@ -1,12 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
-import * as mcpClient from '../../src/mcp/client.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
-import { getActorsAsTools, getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
+import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import type { ActorInfo, SchemaProperties } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
-import { mockApifyClient, only } from './helpers/tool_context.js';
 
 type MockActorOptions = {
     actorPermissionLevel?: string;
@@ -276,16 +274,14 @@ describe('getNormalActorsAsTools()', () => {
             expect(actorInfo).toEqual(original);
         });
 
-        it.each([true, false])('preserves Web Search descriptions with isDirectTool %s', async (isDirectTool) => {
-            const actorInfo = createMockActorInfo(WEB_SEARCH, { ...LIMITED });
-            const original = structuredClone(actorInfo);
-            const [tool] = await getNormalActorsAsTools([actorInfo], { isDirectTool });
-            expect(tool.description).toContain(
-                'Use this tool to search the web by query and get one page of organic results',
-            );
-            expect(tool.description).toContain('This tool does not fetch page content.');
-            expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
-            expect(actorInfo).toEqual(original);
+        it('describes Web Search results without page content or sibling referrals', async () => {
+            const [tool] = await getNormalActorsAsTools([createMockActorInfo(WEB_SEARCH)]);
+
+            expect(tool.description).toContain('one page of organic results');
+            expect(tool.description).toContain('title, URL, snippet and position');
+            expect(tool.description).toContain('no page content');
+            expect(tool.description).not.toContain(WEB_FETCH);
+            expect(tool.description).not.toContain(RAG_WEB_BROWSER);
         });
 
         it.each([true, false])('preserves Web Fetch descriptions with isDirectTool %s', async (isDirectTool) => {
@@ -302,130 +298,15 @@ describe('getNormalActorsAsTools()', () => {
         });
     });
 
-    // Regression: #1532 — the RAG description named apify/web-fetch when the session did not serve it.
-    it('names apify/web-fetch in the RAG description only when its tool is served', async () => {
+    it('describes RAG page content without referring to Web Fetch', async () => {
         const [tool] = await getNormalActorsAsTools([createMockActorInfo(RAG_WEB_BROWSER)]);
-        const ragTool = actorNameToToolName(RAG_WEB_BROWSER);
-        expect(tool.buildDescription!(only(ragTool, actorNameToToolName(WEB_FETCH)))).toContain(
-            'prefer the dedicated apify/web-fetch tool',
-        );
-        expect(tool.buildDescription!(only(ragTool))).not.toContain('web-fetch');
-    });
+        const alone = getToolPublicFieldOnly(tool, { presentTools: new Set([tool.name]) }).description;
+        const together = getToolPublicFieldOnly(tool, {
+            presentTools: new Set([tool.name, actorNameToToolName(WEB_FETCH)]),
+        }).description;
 
-    describe('web tool cross-references name only the web tools the session serves', () => {
-        const ragTool = actorNameToToolName(RAG_WEB_BROWSER);
-        const webFetchTool = actorNameToToolName(WEB_FETCH);
-        const webSearchTool = actorNameToToolName(WEB_SEARCH);
-        const render = async (actorFullName: string, ...present: string[]) => {
-            const [tool] = await getNormalActorsAsTools([createMockActorInfo(actorFullName)]);
-            return tool.buildDescription!(only(...present));
-        };
-
-        it('names apify/web-fetch and apify/rag-web-browser in the Web Search description only when served', async () => {
-            const webFetchHint =
-                "\nWhen the user needs the content of a page found here, the dedicated apify/web-fetch tool returns one URL's full content.";
-            const ragHint =
-                '\nWhen the user wants the text of the top results in one step rather than a list of links, prefer the dedicated apify/rag-web-browser tool.';
-            const alone = await render(WEB_SEARCH, webSearchTool);
-            expect(alone).not.toContain('web-fetch');
-            expect(alone).not.toContain('rag-web-browser');
-            expect(await render(WEB_SEARCH, webSearchTool, webFetchTool)).toBe(`${alone}${webFetchHint}`);
-            expect(await render(WEB_SEARCH, webSearchTool, ragTool)).toBe(`${alone}${ragHint}`);
-            expect(await render(WEB_SEARCH, webSearchTool, webFetchTool, ragTool)).toBe(
-                `${alone}${webFetchHint}${ragHint}`,
-            );
-        });
-
-        it('names apify/web-search in the RAG description, after the Web Fetch hint, only when served', async () => {
-            const webSearchHint =
-                '\nWhen the user wants a list of search results (links, titles, snippets) rather than page text, prefer the dedicated apify/web-search tool.';
-            const withoutWebSearch = await render(RAG_WEB_BROWSER, ragTool, webFetchTool);
-            expect(withoutWebSearch).not.toContain(WEB_SEARCH);
-            expect(await render(RAG_WEB_BROWSER, ragTool, webFetchTool, webSearchTool)).toBe(
-                `${withoutWebSearch}${webSearchHint}`,
-            );
-        });
-
-        it('names apify/web-search in the Web Fetch description only when served', async () => {
-            const fallback = 'To find pages by query, use a web search tool instead.';
-            const withWebSearch =
-                'To find pages by query, the dedicated apify/web-search tool returns links and snippets.';
-            const withoutWebSearch = await render(WEB_FETCH, webFetchTool);
-            expect(withoutWebSearch).toContain(`This tool does not search the web - it needs a URL. ${fallback}`);
-            expect(withoutWebSearch).not.toContain(WEB_SEARCH);
-            expect(await render(WEB_FETCH, webFetchTool, webSearchTool)).toBe(
-                withoutWebSearch.replace(fallback, withWebSearch),
-            );
-        });
-    });
-});
-
-/** `apify/web-search` (build 0.0.20): standby on, `webServerMcpPath: /mcp`, ten inputs, none secret or code. */
-function mockWebSearchClient() {
-    const info = {
-        id: 'web-search-id',
-        name: 'web-search',
-        username: 'apify',
-        isPublic: true,
-        actorPermissionLevel: 'LIMITED_PERMISSIONS',
-        actorStandby: { isEnabled: true },
-        description: 'Search the web.',
-        defaultRunOptions: { memoryMbytes: 1024, timeoutSecs: 300, build: 'latest' },
-    };
-    const actorDefinition = {
-        webServerMcpPath: '/mcp',
-        readme: '',
-        input: {
-            type: 'object',
-            properties: buildInputProperties({
-                query: { type: 'string', editor: 'textfield' },
-                provider: { type: 'string', editor: 'select', enum: ['google'], default: 'google' },
-                maxResults: { type: 'integer', editor: 'number' },
-                languageCode: { type: 'string', editor: 'textfield', default: 'en' },
-                countryCode: { type: 'string', editor: 'textfield', default: 'US' },
-                location: { type: 'string', editor: 'textfield' },
-                dateFrom: { type: 'string', editor: 'datepicker' },
-                dateTo: { type: 'string', editor: 'datepicker' },
-                allowedDomains: { type: 'array', editor: 'stringList' },
-                blockedDomains: { type: 'array', editor: 'stringList' },
-            }),
-            required: ['query'],
-        },
-    };
-    return mockApifyClient({
-        token: 'test-token',
-        actor: () => ({
-            get: async () => info,
-            defaultBuild: async () => ({ get: async () => ({ actorDefinition }) }),
-        }),
-    });
-}
-
-describe('getActorsAsTools()', () => {
-    afterEach(() => vi.restoreAllMocks());
-
-    it('serves the input-interface Actor apify/web-search as a run tool despite its MCP path', async () => {
-        const connectSpy = vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(null);
-        const { tools, errors } = await getActorsAsTools([WEB_SEARCH], mockWebSearchClient());
-
-        expect(errors).toEqual([]);
-        expect(tools.map((tool) => tool.name)).toEqual([actorNameToToolName(WEB_SEARCH)]);
-        expect(Object.keys(tools[0].inputSchema.properties ?? {}).sort()).toEqual(
-            [
-                'query',
-                'provider',
-                'maxResults',
-                'languageCode',
-                'countryCode',
-                'location',
-                'dateFrom',
-                'dateTo',
-                'allowedDomains',
-                'blockedDomains',
-                'waitSecs',
-            ].sort(),
-        );
-        expect(tools[0].annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
-        expect(connectSpy).not.toHaveBeenCalled();
+        expect(together).toBe(alone);
+        expect(together).toContain('text of the top results');
+        expect(together).not.toContain(WEB_FETCH);
     });
 });

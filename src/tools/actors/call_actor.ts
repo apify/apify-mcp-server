@@ -43,7 +43,7 @@ import {
 import { buildPermissionApprovalTexts } from '../../utils/payment_errors.js';
 import { classifyFailureCategory, extractAjvErrorDetails } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
-import { actorNameToToolName, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
+import { isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
 import { actorRunOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
 import {
@@ -58,8 +58,6 @@ import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory
 // Shared call-actor description building blocks
 // ---------------------------------------------------------------------------
 
-const RAG_WEB_BROWSER_TOOL = actorNameToToolName('apify/rag-web-browser');
-
 export const CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG = `When calling an MCP server Actor, you must specify the tool name in the actor parameter as "{actorName}:{toolName}" in the "actor" input property.`;
 
 /** Shared MCP server instructions — identical in both modes. */
@@ -69,14 +67,13 @@ ${hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? `- Use ${HELPER_TOOLS.ACTOR_GET_DETA
 }
 
 /** Shared "two ways to run" + USAGE section — identical in both modes. */
-function buildCallActorUsageSection({ hasTool }: ToolDescriptionContext): string {
-    const actorToolExample = hasTool(RAG_WEB_BROWSER_TOOL) ? ` (e.g., ${RAG_WEB_BROWSER_TOOL})` : '';
+function buildCallActorUsageSection(): string {
     return `There are two ways to run Actors:
-1. Dedicated Actor tools${actorToolExample}: These are pre-configured tools, offering a simpler and more direct experience.
+1. Dedicated Actor tools: These are pre-configured tools, offering a simpler and more direct experience.
 2. Generic call-actor tool (${HELPER_TOOLS.ACTOR_CALL}): Use this when a dedicated tool is not available or when you want to run any Actor dynamically. This tool is especially useful if you do not want to add specific tools or your client does not support dynamic tool registration.
 
 USAGE:
-- Always use dedicated tools when available${actorToolExample}
+- Always use dedicated tools when available
 - Use the generic call-actor tool only if a dedicated tool does not exist for your Actor.`;
 }
 
@@ -151,7 +148,7 @@ export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOL
             - Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with the datasetId to fetch results; non-terminal runs include a nextStep with polling instructions
             - Use dedicated Actor tools when available for better experience
         `,
-        buildCallActorUsageSection(ctx),
+        buildCallActorUsageSection(),
         dedent`
             - Use \`waitSecs\` (0–45) to control how long to wait. Default 30s returns results for fast actors. Use \`waitSecs: 0\` to start and return immediately for long-running actors.
         `,

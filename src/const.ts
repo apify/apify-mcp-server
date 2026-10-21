@@ -135,7 +135,7 @@ export const WEB_FETCH = 'apify/web-fetch';
 export const WEB_SEARCH = 'apify/web-search';
 /**
  * Actors served through the input interface (a run per call) although they declare `webServerMcpPath`.
- * Hand-wired for Apify's own default Actors so the served tool does not change when the Actor's MCP path does.
+ * Hand-wired for selected Apify Actors so the served tool does not change when the Actor's MCP path does.
  */
 export const INPUT_INTERFACE_ACTORS: ReadonlySet<string> = new Set([WEB_SEARCH]);
 export const defaults = {

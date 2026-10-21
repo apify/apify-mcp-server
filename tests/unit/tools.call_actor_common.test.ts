@@ -7,6 +7,7 @@ import {
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
     FAILURE_CATEGORY,
     HELPER_TOOLS,
+    RAG_WEB_BROWSER,
     TOOL_STATUS,
 } from '../../src/const.js';
 import { ActorLoadError } from '../../src/errors.js';
@@ -41,6 +42,14 @@ describe('call_actor_common', () => {
             expect(description).toContain('waitSecs');
             expect(description).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
             expect(description).not.toContain('always runs asynchronously');
+        });
+
+        it('prefers dedicated tools without promoting a web tool example', () => {
+            const description = buildCallActorDescription();
+
+            expect(description).toContain('Always use dedicated tools when available');
+            expect(description).not.toContain('apify--rag-web-browser');
+            expect(description).not.toContain(RAG_WEB_BROWSER);
         });
 
         // The waitSecs: 0 path (buildStartRunSharedContent) returns id-only storages and never
