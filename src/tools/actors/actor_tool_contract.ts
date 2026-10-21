@@ -1,4 +1,4 @@
-import { RAG_WEB_BROWSER, WEB_FETCH } from '../../const.js';
+import { RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../const.js';
 import type { ActorInputSchema, ToolDescriptionContext } from '../../types.js';
 
 const RAG_WEB_BROWSER_ADDITIONAL_DESC = `Use this tool for generic web content: it searches the web by query and returns the text of the top results.
@@ -35,6 +35,16 @@ If the exact URL cannot be fetched (e.g. a non-http(s) scheme), say so rather th
 const WEB_FETCH_URL_SCHEME_NOTE =
     'http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.';
 
+/** Appended to the `apify/web-search` Actor tool description. */
+const WEB_SEARCH_ADDITIONAL_DESC = `Use this tool to search the web by query and get one page of organic results: title, URL, snippet and position (up to about 10 results; links and snippets only, no page content).
+countryCode and languageCode set the locale, dateFrom and dateTo bound the publication date, allowedDomains and blockedDomains restrict or exclude sites.
+
+Examples of when to use:
+- The user wants links to choose from or to know which pages exist for a topic (e.g., "find the official docs for X", "recent articles about Y, with links")
+- A question that a result title or snippet answers
+
+This tool does not fetch page content.`;
+
 type DirectActorPolicyConfig = {
     /** Sent with the run input when the caller omits the field; the served schema shows it as the default. */
     defaults?: Readonly<Record<string, unknown>>;
@@ -70,6 +80,9 @@ const ACTOR_TOOL_POLICIES: Readonly<Record<string, ActorToolPolicyConfig>> = {
     [WEB_FETCH]: {
         inputDescriptionSuffixes: { url: WEB_FETCH_URL_SCHEME_NOTE },
         buildDescription: () => WEB_FETCH_ADDITIONAL_DESC,
+    },
+    [WEB_SEARCH]: {
+        buildDescription: () => WEB_SEARCH_ADDITIONAL_DESC,
     },
 };
 

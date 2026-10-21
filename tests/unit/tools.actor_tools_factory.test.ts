@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
+import { RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import type { ActorInfo, SchemaProperties } from '../../src/types.js';
@@ -272,6 +272,16 @@ describe('getNormalActorsAsTools()', () => {
             expect(input).toEqual({ query: 'apify', hiddenSecret: 'original-input' });
             expect(tool.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true });
             expect(actorInfo).toEqual(original);
+        });
+
+        it('describes Web Search results without page content or sibling referrals', async () => {
+            const [tool] = await getNormalActorsAsTools([createMockActorInfo(WEB_SEARCH)]);
+
+            expect(tool.description).toContain('one page of organic results');
+            expect(tool.description).toContain('title, URL, snippet and position');
+            expect(tool.description).toContain('no page content');
+            expect(tool.description).not.toContain(WEB_FETCH);
+            expect(tool.description).not.toContain(RAG_WEB_BROWSER);
         });
 
         it.each([true, false])('preserves Web Fetch descriptions with isDirectTool %s', async (isDirectTool) => {
