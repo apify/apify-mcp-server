@@ -2,15 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.19.2 - **not yet released**
+## [0.19.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.2) (2026-10-21)
 
 ### 🚀 Features
 
 - Search the Store with the new backend ([#1662](https://github.com/apify/apify-mcp-server/pull/1662)) ([b326ace](https://github.com/apify/apify-mcp-server/commit/b326acecb714ee94eb96e311c5a4d61194e99e9d)) by [@jmikitova](https://github.com/jmikitova)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.19.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.1) (2026-10-20)
 
 ### 🚀 Features
