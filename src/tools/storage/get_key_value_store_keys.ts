@@ -9,10 +9,17 @@ import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { respondUserError } from '../../utils/mcp.js';
 import { keyValueStoreKeysOutputSchema } from '../structured_output_schemas.js';
-import { buildKvsKeysSummaryNextStep, buildStorageResponse, catchNotFound } from './storage_helpers.js';
+import {
+    buildKvsKeysSummaryNextStep,
+    buildStorageResponse,
+    fetchStorageByIdOrName,
+    resolveStorageId,
+    storageIdArgDescription,
+    storageNotFoundText,
+} from './storage_helpers.js';
 
 const getKeyValueStoreKeysArgs = z.object({
-    keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name.'),
+    keyValueStoreId: z.string().min(1).describe(storageIdArgDescription('keyValueStore')),
     exclusiveStartKey: z
         .string()
         .optional()
@@ -57,14 +64,13 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
         const { args, apifyClient: client, apifyToken, loadedToolNames } = toolArgs;
         const parsed = getKeyValueStoreKeysArgs.parse(args);
         const keyValueStoreId = stripQuoteWrappers(parsed.keyValueStoreId);
-        const keys = await catchNotFound(
-            client
-                .keyValueStore(keyValueStoreId)
-                .listKeys({ exclusiveStartKey: parsed.exclusiveStartKey, limit: parsed.limit }),
+        const found = await fetchStorageByIdOrName(keyValueStoreId, async (safeId) =>
+            client.keyValueStore(safeId).listKeys({ exclusiveStartKey: parsed.exclusiveStartKey, limit: parsed.limit }),
         );
-        if (!keys) {
-            return respondUserError(`Key-value store '${keyValueStoreId}' not found.`);
+        if (!found) {
+            return respondUserError(storageNotFoundText('keyValueStore', keyValueStoreId));
         }
+        const { result: keys, safeId } = found;
         const linkContext = await getConsoleLinkContext(apifyToken, client);
         const { summary, nextStep } = buildKvsKeysSummaryNextStep({
             keyValueStoreId,
@@ -78,7 +84,12 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
             structuredContent: { keyValueStoreId, ...keys },
             summary,
             nextStep,
-            apifyConsoleUrl: buildConsoleKeyValueStoreUrl(linkContext, keyValueStoreId),
+            apifyConsoleUrl: linkContext
+                ? buildConsoleKeyValueStoreUrl(
+                      linkContext,
+                      await resolveStorageId(safeId, async (id) => client.keyValueStore(id).get()),
+                  )
+                : undefined,
         });
     },
 } as const);

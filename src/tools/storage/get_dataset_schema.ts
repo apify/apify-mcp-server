@@ -9,10 +9,16 @@ import { stripQuoteWrappers } from '../../utils/generic.js';
 import { respondServerError, respondUserError } from '../../utils/mcp.js';
 import { generateSchemaFromItems } from '../../utils/schema_generation.js';
 import { datasetSchemaOutputSchema } from '../structured_output_schemas.js';
-import { buildStorageResponse, catchNotFound, resolveSiblingNextStep } from './storage_helpers.js';
+import {
+    buildStorageResponse,
+    fetchStorageByIdOrName,
+    resolveSiblingNextStep,
+    storageIdArgDescription,
+    storageNotFoundText,
+} from './storage_helpers.js';
 
 const getDatasetSchemaArgs = z.object({
-    datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
+    datasetId: z.string().min(1).describe(storageIdArgDescription('dataset')),
     limit: z.number().describe('Maximum number of items to use for schema generation. Default is 5.').default(5),
     clean: z
         .boolean()
@@ -67,12 +73,14 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
         const parsed = getDatasetSchemaArgs.parse(args);
         const datasetId = stripQuoteWrappers(parsed.datasetId);
 
-        const datasetResponse = await catchNotFound(
-            client.dataset(datasetId).listItems({ clean: parsed.clean, limit: parsed.limit }),
-        );
+        const datasetResponse = (
+            await fetchStorageByIdOrName(datasetId, async (safeId) =>
+                client.dataset(safeId).listItems({ clean: parsed.clean, limit: parsed.limit }),
+            )
+        )?.result;
 
         if (!datasetResponse) {
-            return respondUserError(`Dataset '${datasetId}' not found.`);
+            return respondUserError(storageNotFoundText('dataset', datasetId));
         }
 
         const datasetItems = datasetResponse.items;

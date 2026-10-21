@@ -52,17 +52,17 @@ describe('get-key-value-store-keys', () => {
         const listKeysSpy = vi.fn().mockResolvedValue(MOCK_KEYS);
 
         const result = await (getKeyValueStoreKeys as HelperTool).call(
-            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
+            stubToolCallContext({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y' }, stubApifyClient(listKeysSpy)),
         );
         const { content, structuredContent } = result as TextToolResult & {
             structuredContent: Record<string, unknown>;
         };
 
-        expect(structuredContent).toMatchObject({ keyValueStoreId: 'kv-1', ...MOCK_KEYS });
+        expect(structuredContent).toMatchObject({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', ...MOCK_KEYS });
         expect(structuredContent.summary).toBe('Listed 2 keys.');
         // nextStep points at reading the first listed key.
         expect(structuredContent.nextStep).toBe(
-            `Use ${HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=kv-1 and recordKey=INPUT to read a value.`,
+            `Use ${HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=KvsWkzbQMuFYuam3Y and recordKey=INPUT to read a value.`,
         );
         // content[0] ships the JSON data; content[1] carries the prose summary + nextStep.
         const { summary, nextStep, ...data } = structuredContent;
@@ -78,7 +78,7 @@ describe('get-key-value-store-keys', () => {
         const listKeysSpy = vi.fn().mockResolvedValue({ ...MOCK_KEYS, nextExclusiveStartKey: null });
 
         const result = await (getKeyValueStoreKeys as HelperTool).call(
-            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
+            stubToolCallContext({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y' }, stubApifyClient(listKeysSpy)),
         );
         expectSchemaConformingStructuredContent(result, keyValueStoreKeysOutputSchema);
     });
@@ -91,7 +91,7 @@ describe('get-key-value-store-keys', () => {
         });
 
         const result = await (getKeyValueStoreKeys as HelperTool).call(
-            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
+            stubToolCallContext({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y' }, stubApifyClient(listKeysSpy)),
         );
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
@@ -105,7 +105,7 @@ describe('get-key-value-store-keys', () => {
         const listKeysSpy = vi.fn().mockResolvedValue({ ...MOCK_KEYS, items: [], count: 0 });
 
         const result = await (getKeyValueStoreKeys as HelperTool).call(
-            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
+            stubToolCallContext({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y' }, stubApifyClient(listKeysSpy)),
         );
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
@@ -118,7 +118,7 @@ describe('get-key-value-store-keys', () => {
 
         await (getKeyValueStoreKeys as HelperTool).call(
             stubToolCallContext(
-                { keyValueStoreId: 'kv-1', exclusiveStartKey: 'data.json', limit: 5 },
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', exclusiveStartKey: 'data.json', limit: 5 },
                 stubApifyClient(listKeysSpy),
             ),
         );
@@ -130,7 +130,7 @@ describe('get-key-value-store-keys', () => {
         const listKeysSpy = vi.fn().mockResolvedValue(MOCK_KEYS);
 
         await (getKeyValueStoreKeys as HelperTool).call(
-            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
+            stubToolCallContext({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y' }, stubApifyClient(listKeysSpy)),
         );
 
         expect(listKeysSpy).toHaveBeenCalledWith({ exclusiveStartKey: undefined, limit: undefined });
@@ -138,8 +138,8 @@ describe('get-key-value-store-keys', () => {
 
     it('rejects limit above 10 via ajv validation', () => {
         const tool = getKeyValueStoreKeys as HelperTool;
-        expect(tool.ajvValidate({ keyValueStoreId: 'kv-1', limit: 11 })).toBe(false);
-        expect(tool.ajvValidate({ keyValueStoreId: 'kv-1', limit: 10 })).toBe(true);
+        expect(tool.ajvValidate({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', limit: 11 })).toBe(false);
+        expect(tool.ajvValidate({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', limit: 10 })).toBe(true);
     });
 
     it('returns isError with a not-found message when listKeys throws 404', async () => {
@@ -157,7 +157,7 @@ describe('get-key-value-store-keys', () => {
         const serverError = Object.assign(new Error('Internal server error'), { statusCode: 500 });
         await expect(
             (getKeyValueStoreKeys as HelperTool).call(
-                stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClientThrowing(serverError)),
+                stubToolCallContext({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y' }, stubApifyClientThrowing(serverError)),
             ),
         ).rejects.toBe(serverError);
     });
@@ -177,7 +177,10 @@ describe('get-key-value-store-keys', () => {
         vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
 
         const result = await (getKeyValueStoreKeys as HelperTool).call({
-            ...stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(vi.fn().mockResolvedValue(MOCK_KEYS))),
+            ...stubToolCallContext(
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y' },
+                stubApifyClient(vi.fn().mockResolvedValue(MOCK_KEYS)),
+            ),
             apifyToken: 'apify_ui_test',
         });
         const { content } = result as TextToolResult;
@@ -185,16 +188,20 @@ describe('get-key-value-store-keys', () => {
         // content: [0] plain JSON, [1] summary/nextStep, [2] Apify Console link.
         expect(content).toHaveLength(3);
         expect(content[2].text).toBe(
-            `Apify Console: https://console.apify.com/storage/key-value-stores/kv-1\n${VERBATIM_LINKS_NUDGE}`,
+            `Apify Console: https://console.apify.com/storage/key-value-stores/KvsWkzbQMuFYuam3Y\n${VERBATIM_LINKS_NUDGE}`,
         );
     });
 
     // Regression: #1296 — nextStep named a sibling tool the session was not served.
     describe('in a session served only get-key-value-store-keys', () => {
         const narrowContext = (response: unknown) =>
-            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(vi.fn().mockResolvedValue(response)), {
-                loadedToolNames: [HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET],
-            });
+            stubToolCallContext(
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y' },
+                stubApifyClient(vi.fn().mockResolvedValue(response)),
+                {
+                    loadedToolNames: [HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET],
+                },
+            );
 
         it.each([
             { name: 'a nonempty listing', response: MOCK_KEYS, sibling: HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET },
@@ -224,5 +231,35 @@ describe('get-key-value-store-keys', () => {
                 `Call ${HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET} again with exclusiveStartKey=OUTPUT to fetch the next page.`,
             );
         });
+    });
+});
+
+describe('get-key-value-store-keys with a bare store name', () => {
+    it("reads the name as one of the caller's own stores", async () => {
+        const kvStoreSpy = vi.fn().mockReturnValue({ listKeys: async () => MOCK_KEYS });
+
+        await (getKeyValueStoreKeys as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: 'eval-ai-store' }, mockApifyClient({ keyValueStore: kvStoreSpy })),
+        );
+
+        expect(kvStoreSpy).toHaveBeenCalledWith('~eval-ai-store');
+    });
+
+    it('links Console to the store ID, which the list response does not carry', async () => {
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
+        const client = mockApifyClient({
+            keyValueStore: (_id: string) => ({
+                listKeys: async () => MOCK_KEYS,
+                get: async () => ({ id: 'WkzbQMuFYuamGv3YF', name: 'eval-ai-store' }),
+            }),
+        });
+
+        const result = await (getKeyValueStoreKeys as HelperTool).call({
+            ...stubToolCallContext({ keyValueStoreId: 'eval-ai-store' }, client),
+            apifyToken: 'apify_ui_test',
+        });
+        const { content } = result as TextToolResult;
+
+        expect(content[2].text).toContain('https://console.apify.com/storage/key-value-stores/WkzbQMuFYuamGv3YF');
     });
 });
