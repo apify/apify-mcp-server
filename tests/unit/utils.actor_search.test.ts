@@ -66,6 +66,12 @@ describe('searchActorsByKeywords', () => {
         expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: 5, offset: 0 });
     });
 
+    it('always sets `_useNewStoreBackend`', async () => {
+        listMock.mockResolvedValueOnce({ items: [] });
+        await searchActorsByKeywords({ search: 'foo', apifyClient: stubApifyClient, limit: 5 });
+        expect(paramsHolder.params).toMatchObject({ _useNewStoreBackend: true });
+    });
+
     it('omits both flags when not provided', async () => {
         listMock.mockResolvedValueOnce({ items: [] });
         await searchActorsByKeywords({ search: 'foo', apifyClient: stubApifyClient, limit: 5 });
