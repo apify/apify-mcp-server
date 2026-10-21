@@ -397,22 +397,63 @@ export const storageCases: Case[] = [
         }),
     },
     {
-        // #880 canary: flatten=math must still surface nested math.factorial.first.
-        name: 'flattens 3-level nested fields via get-dataset-items',
+        // #1656: dotted paths keep the item's nesting; `math.fibonacci` is the array path the run hint lists.
+        name: 'projects 3-level nested fields via get-dataset-items',
         isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
             const result = await client.callTool({
                 name: 'get-dataset-items',
-                arguments: { datasetId, fields: 'math.factorial.first' },
+                arguments: { datasetId, fields: 'math.factorial.first,math.fibonacci' },
             });
             expect(result.isError).not.toBe(true);
             const items = (result as { structuredContent?: { items?: Record<string, unknown>[] } }).structuredContent
                 ?.items;
             expect(Array.isArray(items)).toBe(true);
-            // >=1 (not ==1): the signal is whether the nested field surfaces, not the count.
+            // >=1 (not ==1): the signal is whether the nested fields surface, not the count.
             expect(items!.length).toBeGreaterThanOrEqual(1);
-            // factorial.first = 1! = 1; if flatten recurses, the value appears under the dot-notated key.
-            expect(items![0]['math.factorial.first']).toBe(1);
+            const math = items![0].math as { factorial?: unknown; fibonacci?: unknown };
+            // factorial.first = 1! = 1.
+            expect(math.factorial).toEqual({ first: 1 });
+            expect(Array.isArray(math.fibonacci)).toBe(true);
+            expect(Object.keys(items![0])).toEqual(['math']);
+        }),
+    },
+    {
+        // #1656: arrays of objects map element-wise; a literal dotted key returns as that key.
+        name: 'projects array and literal dotted fields via get-dataset-items',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['storage'] }, async (client, ctx) => {
+            const api = ctx.createApifyClient();
+            const dataset = await api.datasets().getOrCreate();
+            try {
+                await api.dataset(dataset.id).pushItems([
+                    {
+                        query: 'apify mcp',
+                        results: [
+                            { url: 'https://mcp.apify.com/', title: 'Apify MCP', snippet: 'a' },
+                            { url: 'https://docs.apify.com/', title: 'Docs', snippet: 'b' },
+                        ],
+                    },
+                    { 'metadata.url': 'https://apify.com/' },
+                ]);
+                const result = await client.callTool({
+                    name: 'get-dataset-items',
+                    arguments: { datasetId: dataset.id, fields: 'results.url,results.title,metadata.url' },
+                });
+                expect(result.isError).not.toBe(true);
+                const items = (result as { structuredContent?: { items?: unknown[] } }).structuredContent?.items;
+                expect(items).toEqual([
+                    {
+                        results: [
+                            { url: 'https://mcp.apify.com/', title: 'Apify MCP' },
+                            { url: 'https://docs.apify.com/', title: 'Docs' },
+                        ],
+                    },
+                    { 'metadata.url': 'https://apify.com/' },
+                ]);
+            } finally {
+                await api.dataset(dataset.id).delete();
+            }
         }),
     },
     {

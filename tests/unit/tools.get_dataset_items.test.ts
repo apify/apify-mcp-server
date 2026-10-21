@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
-import { extractDotPrefixes, getDatasetItems } from '../../src/tools/storage/get_dataset_items.js';
+import { getApiFields, getDatasetItems, projectFields } from '../../src/tools/storage/get_dataset_items.js';
 import { datasetItemsOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
@@ -20,33 +20,115 @@ vi.mock('../../src/utils/userid_cache.js', () => ({
     getUserInfoCached: vi.fn(),
 }));
 
-describe('extractDotPrefixes', () => {
-    it('returns empty list when no fields contain a dot', () => {
-        expect(extractDotPrefixes(['title', 'url'])).toEqual([]);
+// One apify/web-search item: a nested object and an array of objects.
+const WEB_SEARCH_ITEM = {
+    query: 'apify mcp',
+    search: { provider: 'google', page: 1 },
+    results: [
+        { position: 1, url: 'https://mcp.apify.com/', title: 'Apify MCP', snippet: 'Connect agents' },
+        { position: 2, url: 'https://docs.apify.com/', title: 'Docs' },
+    ],
+};
+
+describe('projectFields keeps the item nesting', () => {
+    it('keeps a top-level field whole', () => {
+        expect(projectFields(WEB_SEARCH_ITEM, ['search'])).toEqual({ search: WEB_SEARCH_ITEM.search });
     });
 
-    it('extracts unique top-level prefixes from dot-notation fields', () => {
-        expect(extractDotPrefixes(['metadata.url', 'crawl.statusCode', 'title'])).toEqual(['metadata', 'crawl']);
+    it('projects a nested object path', () => {
+        expect(projectFields(WEB_SEARCH_ITEM, ['search.provider'])).toEqual({ search: { provider: 'google' } });
     });
 
-    it('deduplicates repeated prefixes', () => {
-        expect(extractDotPrefixes(['metadata.url', 'metadata.title'])).toEqual(['metadata']);
+    it('maps an array of objects element-wise, keeping positions', () => {
+        const item = {
+            results: [{ url: 'https://mcp.apify.com/' }, { title: 'No URL' }, { url: 'https://apify.com/' }],
+        };
+        expect(projectFields(item, ['results.url'])).toEqual({
+            results: [{ url: 'https://mcp.apify.com/' }, {}, { url: 'https://apify.com/' }],
+        });
     });
 
-    it('handles mixed deep and shallow paths', () => {
-        expect(extractDotPrefixes(['a.b.c', 'a.x', 'd'])).toEqual(['a']);
+    it('merges two paths under one array', () => {
+        expect(projectFields(WEB_SEARCH_ITEM, ['results.url', 'results.title'])).toEqual({
+            results: [
+                { url: 'https://mcp.apify.com/', title: 'Apify MCP' },
+                { url: 'https://docs.apify.com/', title: 'Docs' },
+            ],
+        });
     });
 
-    it('returns empty list for empty input', () => {
-        expect(extractDotPrefixes([])).toEqual([]);
+    it('maps an array nested inside an array of objects', () => {
+        const item = {
+            results: [{ title: 'Docs', siteLinks: [{ url: 'https://docs.apify.com/a', text: 'A' }, { text: 'B' }] }],
+        };
+        expect(projectFields(item, ['results.siteLinks.url'])).toEqual({
+            results: [{ siteLinks: [{ url: 'https://docs.apify.com/a' }, {}] }],
+        });
     });
 
-    it('skips fields with leading dot (no top-level prefix)', () => {
-        expect(extractDotPrefixes(['.a', '.b.c'])).toEqual([]);
+    it('keeps the whole value when a path and its parent are both requested, in either order', () => {
+        expect(projectFields(WEB_SEARCH_ITEM, ['search.provider', 'search'])).toEqual({
+            search: WEB_SEARCH_ITEM.search,
+        });
+        expect(projectFields(WEB_SEARCH_ITEM, ['search', 'search.provider'])).toEqual({
+            search: WEB_SEARCH_ITEM.search,
+        });
     });
 
-    it('extracts the prefix from fields with a trailing dot', () => {
-        expect(extractDotPrefixes(['a.', 'b.c'])).toEqual(['a', 'b']);
+    it('adds an index path to that element next to an every-element path on the same array', () => {
+        expect(projectFields(WEB_SEARCH_ITEM, ['results.url', 'results.0.title'])).toEqual({
+            results: [{ url: 'https://mcp.apify.com/', title: 'Apify MCP' }, { url: 'https://docs.apify.com/' }],
+        });
+    });
+
+    it('picks one array element by a numeric segment, keeping its position', () => {
+        expect(projectFields(WEB_SEARCH_ITEM, ['results.1.url'])).toEqual({
+            results: [{}, { url: 'https://docs.apify.com/' }],
+        });
+    });
+
+    it('returns a whole element picked by a numeric segment, with {} before it', () => {
+        expect(projectFields(WEB_SEARCH_ITEM, ['results.1'])).toEqual({
+            results: [{}, WEB_SEARCH_ITEM.results[1]],
+        });
+    });
+
+    it('keeps the place of an element that is not an object as null', () => {
+        const item = { latestComments: [{ text: 'Great post' }, null, 'deleted'] };
+        expect(projectFields(item, ['latestComments.text'])).toEqual({
+            latestComments: [{ text: 'Great post' }, null, null],
+        });
+    });
+
+    it('omits an absent path and returns {} when nothing matches', () => {
+        expect(projectFields(WEB_SEARCH_ITEM, ['query', 'search.missing', 'results.missing'])).toEqual({
+            query: 'apify mcp',
+        });
+        expect(projectFields(WEB_SEARCH_ITEM, ['query.length', 'missing'])).toEqual({});
+    });
+
+    it('orders keys by fields', () => {
+        expect(Object.keys(projectFields(WEB_SEARCH_ITEM, ['results.url', 'query', 'search.provider']))).toEqual([
+            'results',
+            'query',
+            'search',
+        ]);
+    });
+
+    it('returns a literal dotted key the item holds instead of the nested path', () => {
+        const item = { 'metadata.url': 'https://apify.com/', metadata: { url: 'https://docs.apify.com/' } };
+        expect(projectFields(item, ['metadata.url'])).toEqual({ 'metadata.url': 'https://apify.com/' });
+    });
+});
+
+describe('getApiFields requests what the projection needs', () => {
+    it('requests the top-level key of each path and each path as written', () => {
+        expect(getApiFields(['results.url', 'query', 'results.title'])).toEqual([
+            'results',
+            'query',
+            'results.url',
+            'results.title',
+        ]);
     });
 });
 
@@ -141,20 +223,76 @@ describe('get-dataset-items', () => {
         ).rejects.toBe(serverError);
     });
 
-    it('auto-derives flatten from dot-notation in fields', async () => {
-        const listItemsSpy = vi.fn().mockResolvedValue({ items: [], total: 0 });
+    it('sends the API top-level fields without flatten and projects dotted paths on the items', async () => {
+        const listItemsSpy = vi.fn().mockResolvedValue({ items: [WEB_SEARCH_ITEM], total: 1 });
 
-        await (getDatasetItems as HelperTool).call(
+        const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext(
-                {
-                    datasetId: 'ds-1',
-                    fields: 'metadata.url,crawl.statusCode',
-                },
+                { datasetId: 'ds-1', fields: 'results.url,query', flatten: 'results' },
                 stubApifyClient(listItemsSpy),
             ),
         );
 
-        expect(listItemsSpy).toHaveBeenCalledWith(expect.objectContaining({ flatten: ['metadata', 'crawl'] }));
+        const options = listItemsSpy.mock.calls[0][0] as Record<string, unknown>;
+        expect(options.fields).toEqual(getApiFields(['results.url', 'query']));
+        expect(options).not.toHaveProperty('flatten');
+        const { structuredContent } = result as { structuredContent: { items: unknown[] } };
+        expect(structuredContent.items).toEqual([
+            {
+                results: [{ url: 'https://mcp.apify.com/' }, { url: 'https://docs.apify.com/' }],
+                query: 'apify mcp',
+            },
+        ]);
+    });
+
+    it('names in the summary, once, only the fields that matched no item on the page', async () => {
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'ds-1', fields: 'results.url,results.link,results.link' },
+                stubApifyClient(async () => ({ items: [WEB_SEARCH_ITEM], total: 1 })),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: { summary: string } };
+
+        expect(structuredContent.summary).toContain('No item on this page has results.link.');
+        expect(structuredContent.summary).not.toContain('results.url');
+    });
+
+    it('names no unmatched field that the caller also omits', async () => {
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'ds-1', fields: 'results.url,query', omit: 'results' },
+                stubApifyClient(async () => ({ items: [{ query: 'apify mcp' }], total: 1 })),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: { summary: string } };
+
+        expect(structuredContent.summary).not.toContain('No item on this page has');
+    });
+
+    it('ignores a field made of dots only', async () => {
+        const listItemsSpy = vi.fn().mockResolvedValue({ items: [WEB_SEARCH_ITEM], total: 1 });
+
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1', fields: '.,query' }, stubApifyClient(listItemsSpy)),
+        );
+
+        expect(listItemsSpy.mock.calls[0][0]).toEqual(expect.objectContaining({ fields: ['query'] }));
+        const { structuredContent } = result as { structuredContent: { items: unknown[]; summary: string } };
+        expect(structuredContent.items).toEqual([{ query: 'apify mcp' }]);
+        expect(structuredContent.summary).not.toContain('No item on this page has');
+    });
+
+    it('names no unmatched fields when the page is empty', async () => {
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'ds-1', fields: 'results.url' },
+                stubApifyClient(async () => ({ items: [], total: 0 })),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: { summary: string } };
+
+        expect(structuredContent.summary).not.toContain('No item on this page has');
     });
 
     it('rejects empty datasetId via ajv validation', () => {

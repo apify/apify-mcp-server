@@ -8,21 +8,112 @@ import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { parseCommaSeparatedList, stripQuoteWrappers } from '../../utils/generic.js';
 import { respondUserError } from '../../utils/mcp.js';
+import { isRecord } from '../api/apify_api_spec.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
 import { buildDatasetItemsSummaryNextStep, buildStorageResponse, catchNotFound } from './storage_helpers.js';
 
 export const DEFAULT_DATASET_ITEMS_LIMIT = 20;
 
-/** Top-level dot prefixes of `fields`. Apify's `flatten` recurses, so the first segment suffices. */
-export function extractDotPrefixes(fields: string[]): string[] {
-    const prefixes = new Set<string>();
+/** `true` keeps the whole value; a map selects its children. */
+type FieldTree = Map<string, FieldTree | true>;
+
+const ARRAY_INDEX_SEGMENT = /^(0|[1-9]\d*)$/;
+
+function buildFieldTree(fields: string[], isLiteralKey: (field: string) => boolean = () => false): FieldTree {
+    const root: FieldTree = new Map();
     for (const field of fields) {
-        const dotIndex = field.indexOf('.');
-        if (dotIndex > 0) {
-            prefixes.add(field.slice(0, dotIndex));
+        if (isLiteralKey(field)) {
+            root.set(field, true);
+            continue;
+        }
+        const segments = field.split('.').filter((segment) => segment.length > 0);
+        let node = root;
+        for (const [i, segment] of segments.entries()) {
+            const child = node.get(segment);
+            if (child === true) break;
+            if (i === segments.length - 1) {
+                node.set(segment, true);
+                break;
+            }
+            const next: FieldTree = child ?? new Map();
+            node.set(segment, next);
+            node = next;
         }
     }
-    return [...prefixes];
+    return root;
+}
+
+function mergeFieldTrees(a: FieldTree | true, b: FieldTree | true): FieldTree | true {
+    if (a === true || b === true) return true;
+    const merged: FieldTree = new Map(a);
+    for (const [key, subtree] of b) {
+        const existing = merged.get(key);
+        merged.set(key, existing === undefined ? subtree : mergeFieldTrees(existing, subtree));
+    }
+    return merged;
+}
+
+function splitArrayTree(tree: FieldTree): { everyElement: FieldTree; byIndex: Map<number, FieldTree | true> } {
+    const everyElement: FieldTree = new Map();
+    const byIndex = new Map<number, FieldTree | true>();
+    for (const [key, subtree] of tree) {
+        if (ARRAY_INDEX_SEGMENT.test(key)) byIndex.set(Number(key), subtree);
+        else everyElement.set(key, subtree);
+    }
+    return { everyElement, byIndex };
+}
+
+function getElementTree(everyElement: FieldTree, byIndex: Map<number, FieldTree | true>, index: number) {
+    const own = byIndex.get(index);
+    return own === undefined ? everyElement : mergeFieldTrees(everyElement, own);
+}
+
+/** Returns undefined when nothing in `value` matches `tree`. */
+function applyFieldTree(value: unknown, tree: FieldTree): unknown {
+    if (Array.isArray(value)) {
+        const { everyElement, byIndex } = splitArrayTree(tree);
+        // Index paths alone cover the array up to the highest index they pick.
+        const length =
+            everyElement.size > 0 ? value.length : Math.min(value.length, Math.max(-1, ...byIndex.keys()) + 1);
+        const projected = value.slice(0, length).map((element, i) => {
+            const elementTree = getElementTree(everyElement, byIndex, i);
+            if (elementTree === true) return element;
+            return elementTree.size > 0 ? applyFieldTree(element, elementTree) : undefined;
+        });
+        return projected.some((element) => element !== undefined)
+            ? projected.map((element, i) => element ?? (isRecord(value[i]) ? {} : null))
+            : undefined;
+    }
+    if (!isRecord(value)) return undefined;
+    const result: Record<string, unknown> = {};
+    for (const [key, subtree] of tree) {
+        if (!Object.hasOwn(value, key)) continue;
+        const projected = subtree === true ? value[key] : applyFieldTree(value[key], subtree);
+        if (projected !== undefined) result[key] = projected;
+    }
+    return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/** Projects dot paths without flattening objects or arrays; literal dotted keys take precedence. */
+export function projectFields(item: Record<string, unknown>, fields: string[]): Record<string, unknown> {
+    const tree = buildFieldTree(fields, (field) => field.includes('.') && Object.hasOwn(item, field));
+    const projected = applyFieldTree(item, tree);
+    return isRecord(projected) ? projected : {};
+}
+
+/** The API picks top-level keys; full paths also preserve literal dotted keys. */
+export function getApiFields(fields: string[]): string[] {
+    const topLevelKeys = fields.map((field) => field.split('.').find((segment) => segment.length > 0) ?? field);
+    return [...new Set([...topLevelKeys, ...fields])];
+}
+
+function getUnmatchedFields(items: Record<string, unknown>[], fields: string[], omit: string[]): string[] {
+    if (items.length === 0) return [];
+    return fields.filter(
+        (field) =>
+            !omit.some((omitted) => field === omitted || field.startsWith(`${omitted}.`)) &&
+            items.every((item) => Object.keys(projectFields(item, [field])).length === 0),
+    );
 }
 
 const getDatasetItemsArgs = z.object({
@@ -46,17 +137,12 @@ const getDatasetItemsArgs = z.object({
         .describe(
             'Comma-separated list of fields to include in results. ' +
                 'Fields in output are sorted as specified. ' +
-                'Use dot notation for nested objects (e.g. "metadata.url"); the server auto-flattens parent prefixes.',
+                'Use dot notation to reach nested objects and arrays of objects (e.g. "metadata.url", "results.title"); ' +
+                'a number picks one array element (e.g. "results.0.url"). ' +
+                "The output keeps the item's nesting, and arrays keep their positions: an element without the field is {} or null.",
         ),
     omit: z.string().optional().describe('Comma-separated list of fields to exclude from results.'),
     desc: z.boolean().optional().describe('If true, results are returned in reverse order (newest to oldest).'),
-    flatten: z
-        .string()
-        .optional()
-        .describe(
-            'Comma-separated list of fields to flatten (e.g. flatten="metadata" turns {"metadata":{"url":"x"}} into {"metadata.url":"x"}). ' +
-                'Normally derived automatically from dot-notation in `fields`; specify only as a diagnostic override.',
-        ),
 });
 
 /**
@@ -93,10 +179,8 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         const { args, apifyClient: client, apifyToken, loadedToolNames } = toolArgs;
         const parsed = getDatasetItemsArgs.parse(args);
 
-        const fields = parseCommaSeparatedList(parsed.fields);
+        const fields = [...new Set(parseCommaSeparatedList(parsed.fields).filter((field) => /[^.]/.test(field)))];
         const omit = parseCommaSeparatedList(parsed.omit);
-        const flatten =
-            parsed.flatten !== undefined ? parseCommaSeparatedList(parsed.flatten) : extractDotPrefixes(fields);
 
         const effectiveLimit = parsed.limit ?? DEFAULT_DATASET_ITEMS_LIMIT;
         const datasetId = stripQuoteWrappers(parsed.datasetId);
@@ -105,22 +189,23 @@ export const getDatasetItems: ToolEntry = Object.freeze({
                 clean: parsed.clean,
                 offset: parsed.offset,
                 limit: effectiveLimit,
-                fields,
+                fields: getApiFields(fields),
                 omit,
                 desc: parsed.desc,
-                flatten,
             }),
         );
         if (!v) {
             return respondUserError(`Dataset '${datasetId}' not found.`);
         }
 
+        const items = fields.length > 0 ? v.items.map((item) => projectFields(item, fields)) : v.items;
+        const unmatchedFields = getUnmatchedFields(v.items, fields, omit);
         const offset = parsed.offset ?? 0;
         const apifyConsoleUrl = buildConsoleDatasetUrl(await getConsoleLinkContext(apifyToken, client), datasetId);
         const structuredContent = {
             datasetId,
             apifyConsoleUrl,
-            items: v.items,
+            items,
             itemCount: v.items.length,
             totalItemCount: v.total,
             offset,
@@ -133,6 +218,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             totalItemCount: v.total,
             offset,
             loadedToolNames,
+            unmatchedFields,
         });
         return buildStorageResponse({ structuredContent, summary, nextStep, apifyConsoleUrl });
     },
