@@ -23,9 +23,9 @@ const OPENAPI_OPERATION_METHODS = ['get', 'put', 'post', 'delete', 'options', 'h
 type BuildListItem = { id: string; buildNumber?: string };
 
 /**
- * Get Actor input schema by Actor name.
- * First, fetch the Actor details to get the default build tag and buildId.
- * Then, fetch the build details and return actorName, description, and input schema.
+ * Get an Actor's pruned definition by Actor ID or name.
+ * Fetches the Actor and its default build (input schema, README, description), then resolves the build the
+ * server interface runs (`resolveServerInterfaceDefinition`) for `webServerMcpPath` and `hasWebServerSchema`.
  * @param {string} actorIdOrName - Actor ID or Actor full name.
  * @param {ApifyClient} apifyClient - The Apify client instance.
  * @param {number} limit - Truncate the README to this limit.
