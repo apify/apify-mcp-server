@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { HELPER_TOOLS } from '../../src/const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { buildFetchActorDetailsResult } from '../../src/tools/actors/fetch_actor_details.js';
 import { buildServerInterfaceSection, resolveLocalRefs } from '../../src/tools/actors/server_interface_schema.js';
 import type { Actor } from '../../src/types.js';
@@ -117,6 +117,22 @@ describe('buildServerInterfaceSection()', () => {
             expect(text).toContain('- GET /empty: Return no content\n');
         });
 
+        it('names a required path-level parameter among the required inputs of an operation under the path', () => {
+            const schema = {
+                paths: {
+                    '/items/{id}': {
+                        parameters: [{ $ref: '#/components/parameters/ItemId' }],
+                        get: { summary: 'Get an item' },
+                    },
+                },
+                components: { parameters: { ItemId: { name: 'id', in: 'path', required: true } } },
+            };
+
+            expect(textOfSection({ schema, selection: true })).toContain(
+                '- GET /items/{id}: Get an item. Required: id.',
+            );
+        });
+
         it('names the send tool only when the session has it', () => {
             const text = textOfSection({ selection: true, loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS] });
 
@@ -214,6 +230,22 @@ describe('resolveLocalRefs()', () => {
         ]);
     });
 
+    it('stops expanding references once the expanded detail passes the inline cap', () => {
+        // Each schema references the next one twice, so a full expansion doubles in size per level.
+        const schemas: Record<string, unknown> = { S16: { type: 'string' } };
+        for (let level = 0; level < 16; level++) {
+            const next = { $ref: `#/components/schemas/S${level + 1}` };
+            schemas[`S${level}`] = { type: 'object', properties: { left: next, right: next } };
+        }
+
+        const resolved = JSON.stringify(
+            resolveLocalRefs({ $ref: '#/components/schemas/S0' }, { components: { schemas } }),
+        );
+
+        expect(resolved).toContain('"unavailableDetail"');
+        expect(resolved.length).toBeLessThan(2 * MAX_INLINE_BYTES);
+    });
+
     it('resolves a pointer with escaped segments', () => {
         const root = { components: { schemas: { 'a/b': { type: 'string' } } } };
 
@@ -250,7 +282,6 @@ describe('buildFetchActorDetailsResult() with a Server Actor', () => {
         );
 
     it('carries the summary line in the text and structuredContent of the default output', async () => {
-        // pricing is on by default, so the users/me lookup runs; the test token is an API token and skips it.
         const result = await call();
 
         const texts = (result.content ?? []).map(textOf);

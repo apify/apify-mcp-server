@@ -1,33 +1,37 @@
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
 import type { Actor } from '../../types.js';
 import { ACTOR_TENANCY } from '../../types.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { resolveActorTenancy } from '../actor_tool_naming.js';
+import { isRecord } from '../api/apify_api_spec.js';
 
 /** The HTTP methods an OpenAPI path item may hold an operation under. */
 export const OPENAPI_OPERATION_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'] as const;
 
 type Operation = { method: string; path: string; operation: Record<string, unknown> };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** The operations an OpenAPI document declares, in document order, with the method upper-cased as the agent writes it. */
-export function listServerOperations(schema: Record<string, unknown>): Operation[] {
+/**
+ * The operations an OpenAPI document declares, in document order, with the method upper-cased as the agent writes it.
+ * The path item's parameters, which apply to every operation under the path, come before the operation's own.
+ */
+function listServerOperations(schema: Record<string, unknown>): Operation[] {
     if (!isRecord(schema.paths)) return [];
     return Object.entries(schema.paths).flatMap(([path, pathItem]) =>
         isRecord(pathItem)
-            ? OPENAPI_OPERATION_METHODS.filter((method) => isRecord(pathItem[method])).map((method) => ({
-                  method: method.toUpperCase(),
-                  path,
-                  operation: pathItem[method] as Record<string, unknown>,
-              }))
+            ? OPENAPI_OPERATION_METHODS.filter((method) => isRecord(pathItem[method])).map((method) => {
+                  const operation = pathItem[method] as Record<string, unknown>;
+                  const parameters = [pathItem.parameters, operation.parameters].filter(Array.isArray).flat();
+                  return {
+                      method: method.toUpperCase(),
+                      path,
+                      operation: parameters.length > 0 ? { ...operation, parameters } : operation,
+                  };
+              })
             : [],
     );
 }
 
-function lookupJsonPointer(root: Record<string, unknown>, pointer: string): unknown {
+function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unknown {
     let node: unknown = root;
     for (const segment of pointer.split('/')) {
         const key = segment.replaceAll('~1', '/').replaceAll('~0', '~');
@@ -39,37 +43,45 @@ function lookupJsonPointer(root: Record<string, unknown>, pointer: string): unkn
 
 /**
  * A copy of `node` with every local `$ref` (`#/components/...`) replaced by what it points to in `root`.
- * A reference that is circular, not found, or external stays as it is, with an `unavailableDetail` note;
- * nothing is fetched.
+ * A reference that is circular, not found, or external stays as it is, with an `unavailableDetail` note, and so
+ * does every reference past `MAX_INLINE_BYTES` of expanded detail: shared references can otherwise grow the copy
+ * exponentially. Nothing is fetched.
  */
-export function resolveLocalRefs(node: unknown, root: Record<string, unknown>, seen: readonly string[] = []): unknown {
-    if (Array.isArray(node)) return node.map((item) => resolveLocalRefs(item, root, seen));
-    if (!isRecord(node)) return node;
-    const { $ref } = node;
-    if (typeof $ref !== 'string') {
-        return Object.fromEntries(
-            Object.entries(node).map(([key, value]) => [key, resolveLocalRefs(value, root, seen)]),
-        );
-    }
-    if (seen.includes($ref)) return { $ref, unavailableDetail: 'circular reference' };
-    if (!$ref.startsWith('#/')) return { $ref, unavailableDetail: 'external reference, not fetched' };
-    const target = lookupJsonPointer(root, $ref.slice(2));
-    if (target === undefined) return { $ref, unavailableDetail: 'reference not found' };
-    return resolveLocalRefs(target, root, [...seen, $ref]);
+export function resolveLocalRefs(node: unknown, root: Record<string, unknown>): unknown {
+    let expandedSize = 0;
+    const resolve = (value: unknown, seen: readonly string[]): unknown => {
+        if (Array.isArray(value)) return value.map((item) => resolve(item, seen));
+        if (!isRecord(value)) return value;
+        const { $ref } = value;
+        if (typeof $ref !== 'string') {
+            return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, resolve(child, seen)]));
+        }
+        if (seen.includes($ref)) return { $ref, unavailableDetail: 'circular reference' };
+        if (!$ref.startsWith('#/')) return { $ref, unavailableDetail: 'external reference, not fetched' };
+        const target = resolveJsonPointer(root, $ref.slice(2));
+        if (target === undefined) return { $ref, unavailableDetail: 'reference not found' };
+        expandedSize += JSON.stringify(target).length;
+        if (expandedSize > MAX_INLINE_BYTES) return { $ref, unavailableDetail: 'not expanded, size cap reached' };
+        return resolve(target, [...seen, $ref]);
+    };
+    return resolve(node, []);
 }
 
-/** The names of the required parameters, and `request body` when it is required, with local references resolved. */
+/** What a local `$ref` on `node` points to, one level deep; `node` itself when it has none. */
+function resolveRef(node: unknown, root: Record<string, unknown>): unknown {
+    if (!isRecord(node) || typeof node.$ref !== 'string' || !node.$ref.startsWith('#/')) return node;
+    return resolveJsonPointer(root, node.$ref.slice(2));
+}
+
+/** The names of the required parameters, and `request body` when it is required. */
 function listRequiredInputs(operation: Record<string, unknown>, schema: Record<string, unknown>): string[] {
-    const parameters = resolveLocalRefs(operation.parameters, schema);
-    const names = Array.isArray(parameters)
-        ? parameters
-              .filter(
-                  (parameter) =>
-                      isRecord(parameter) && parameter.required === true && typeof parameter.name === 'string',
-              )
-              .map((parameter) => (parameter as { name: string }).name)
+    const parameters = Array.isArray(operation.parameters)
+        ? operation.parameters.map((parameter) => resolveRef(parameter, schema))
         : [];
-    const requestBody = resolveLocalRefs(operation.requestBody, schema);
+    const names = parameters
+        .filter((parameter) => isRecord(parameter) && parameter.required === true && typeof parameter.name === 'string')
+        .map((parameter) => (parameter as { name: string }).name);
+    const requestBody = resolveRef(operation.requestBody, schema);
     return isRecord(requestBody) && requestBody.required === true ? [...names, 'request body'] : names;
 }
 
@@ -91,7 +103,7 @@ function formatTenancy(actor: Pick<Actor, 'actorStandby'>): string {
 
 const EXPAND_HINT = 'output.serverInterface: true lists them, "METHOD /path" details one.';
 
-export type ServerInterfaceSectionParams = {
+type ServerInterfaceSectionParams = {
     actor: Pick<Actor, 'actorStandby' | 'standbyUrl'>;
     actorFullName: string;
     /** The server-interface build's API schema; absent when the Actor has none. */
@@ -110,13 +122,13 @@ export type ServerInterfaceSectionParams = {
 export function buildServerInterfaceSection(
     params: ServerInterfaceSectionParams,
 ): { text: string } | { error: string } | undefined {
-    const { actor, actorFullName, schema, selection, loadedToolNames } = params;
+    const { actor, actorFullName, schema = {}, selection, loadedToolNames } = params;
     const isEnabled = actor.actorStandby?.isEnabled === true;
-    const operations = schema ? listServerOperations(schema) : [];
     if (!isEnabled) {
         return selection === false ? undefined : { text: `Actor '${actorFullName}' has no server interface.` };
     }
     const tenancy = resolveActorTenancy(actor);
+    const operations = listServerOperations(schema);
     if (operations.length === 0) {
         return { text: `Server interface: enabled, ${tenancy}, undocumented: no API schema. See the README.` };
     }
@@ -129,7 +141,7 @@ export function buildServerInterfaceSection(
         : '';
     const header = `${formatTenancy(actor)}.\nBase URL: ${actor.standbyUrl ?? 'not configured'}\n${sendTool}`;
     if (selection === true) {
-        const lines = operations.map((operation) => formatOperationLine(operation, schema!)).join('\n');
+        const lines = operations.map((operation) => formatOperationLine(operation, schema)).join('\n');
         return {
             text: `# Server interface\n${header}Operations (${operations.length}):\n${lines}\noutput.serverInterface: "METHOD /path" details one operation.`,
         };
@@ -143,7 +155,7 @@ export function buildServerInterfaceSection(
         };
     }
     const { summary, description, parameters, requestBody, responses } = operation.operation;
-    const detail = resolveLocalRefs({ description, parameters, requestBody, responses }, schema!);
+    const detail = resolveLocalRefs({ description, parameters, requestBody, responses }, schema);
     const title = typeof summary === 'string' ? `\n${summary}` : '';
     return {
         text: `# Server interface: ${operation.method} ${operation.path}${title}\n${header}${wrapJsonText(detail)}`,

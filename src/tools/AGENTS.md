@@ -31,8 +31,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     schema and README stay on the default build),
     `server_interface_schema.ts` (the server-interface section of `fetch-actor-details`: the one-line default
     summary, the operation list with the Actor's `standbyUrl` and tenancy for `output.serverInterface: true`, or
-    one operation for `"METHOD /path"`, with local `$ref`s resolved and circular, missing or external ones kept
-    with a note; nothing is fetched),
+    one operation for `"METHOD /path"`, with local `$ref`s resolved and circular, missing or external ones, and
+    those past `MAX_INLINE_BYTES` of expanded detail, kept with a note; nothing is fetched),
     `send_server_actor_request.ts` (`send-server-actor-request`: one HTTP request to a Server Actor's API, gated on
     the `server` interface and sent by `fetchServerActorResponse` through `sendApifyApiRequest` with raw response
     bytes, no redirects, the `MAX_INLINE_BYTES` cap after decompression and the `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`
