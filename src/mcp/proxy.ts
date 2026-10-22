@@ -61,17 +61,24 @@ export async function getMCPServerTools(
         escapedUsername !== null &&
         tools.some(({ name }) => `${escapedUsername}--${actorName}--${name}`.length > MAX_TOOL_NAME_LENGTH);
 
-    return tools.map(
-        (tool): ActorMcpTool => ({
+    return tools.map((tool): ActorMcpTool => {
+        // The shared AJV instance is draft-07 only. A declared `$schema` makes compile throw
+        // and drops every tool from this Actor. Copy first so the client object stays intact.
+        const inputSchema = { ...tool.inputSchema };
+        if ('$schema' in inputSchema) {
+            delete (inputSchema as { $schema?: string }).$schema;
+        }
+
+        return {
             type: TOOL_TYPE.ACTOR_MCP,
             actorId: actorID,
             serverUrl,
             originToolName: tool.name,
             name: getProxyMCPServerToolName(actorFullName, tool.name, shouldCapUsername),
             description: tool.description || '',
-            inputSchema: tool.inputSchema,
-            ajvValidate: fixedAjvCompile(ajv, tool.inputSchema),
+            inputSchema,
+            ajvValidate: fixedAjvCompile(ajv, inputSchema),
             annotations: tool.annotations,
-        }),
-    );
+        };
+    });
 }
