@@ -202,7 +202,7 @@ describe('what counts as an empty input schema', () => {
             ACTOR_TOOL_MODE.RUN,
         ],
     ] as const)('resolves %s to %s', (_label, opts, expected) => {
-        expect(resolveActorToolMode(makeActorInfo({ input: NON_EMPTY_INPUT, ...opts }))).toBe(expected);
+        expect(resolveActorToolMode(makeActorInfo(opts))).toBe(expected);
     });
 });
 
