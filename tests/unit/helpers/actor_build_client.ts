@@ -63,12 +63,15 @@ export function mockActorBuildClient({
     builds = {},
     buildList = [],
     buildListFailure,
+    hasToken = true,
 }: {
     actor: Actor;
     defaultBuild: Build;
     builds?: Record<string, Build | undefined>;
     buildList?: BuildListItem[];
     buildListFailure?: unknown;
+    /** `false` is a token-less (payment provider) session. */
+    hasToken?: boolean;
 }) {
     const pulledBuildIds: string[] = [];
     const buildGet = vi.fn(async (buildId: string) => builds[buildId]);
@@ -82,7 +85,7 @@ export function mockActorBuildClient({
         },
     }));
     const apifyClient: ApifyClient = mockApifyClient({
-        token: 'test-token',
+        token: hasToken ? 'test-token' : undefined,
         actor: () => ({
             get: async () => actor,
             defaultBuild: async () => ({ get: async () => defaultBuild }),

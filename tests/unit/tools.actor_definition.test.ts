@@ -155,6 +155,35 @@ describe('getActorDefinition() reads the server interface from the standby build
         expect(pulledBuildIds).not.toContain('build-older');
     });
 
+    it('resolves a build number through the tagged builds without listing them', async () => {
+        const { apifyClient, list } = mockActorBuildClient({
+            actor: mockStandbyActor('1.2.3', {
+                taggedBuilds: { beta: { buildId: STANDBY_BUILD_ID, buildNumber: '1.2.3' } },
+            }),
+            defaultBuild: mockDefaultBuild(),
+            builds: { [STANDBY_BUILD_ID]: mockBuild(STANDBY_BUILD_ID, STANDBY_DEFINITION) },
+        });
+
+        const result = await getActorDefinition('acme/mcp-server', apifyClient);
+
+        expect(result?.definition.webServerMcpPath).toBe('/mcp');
+        expect(list).not.toHaveBeenCalled();
+    });
+
+    it('leaves an untagged build number unresolved without a token instead of listing the builds', async () => {
+        const { apifyClient, list } = mockActorBuildClient({
+            actor: mockStandbyActor('1.2.3'),
+            defaultBuild: mockDefaultBuild(),
+            buildList: [{ id: STANDBY_BUILD_ID, buildNumber: '1.2.3' }],
+            hasToken: false,
+        });
+
+        const result = await getActorDefinition('acme/mcp-server', apifyClient);
+
+        expect(result?.definition).toMatchObject({ webServerMcpPath: undefined, input: DEFAULT_INPUT });
+        expect(list).not.toHaveBeenCalled();
+    });
+
     it('does not scan the build list for a reference that is not a build number', async () => {
         const { apifyClient, list } = mockActorBuildClient({
             actor: mockStandbyActor('beta'),

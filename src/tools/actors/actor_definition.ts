@@ -85,7 +85,8 @@ export async function getActorDefinition(
  * The definition the server-interface fields (`webServerMcpPath`, `webServerSchema`) are read from. In standby
  * mode the Actor serves the build `actorStandby.build` names, which can differ from the default build the input
  * schema and README come from. The reference is a build tag (looked up in `taggedBuilds`) or a `MAJOR.MINOR.BUILD`
- * number (found by scanning the build list newest first, since the API has no lookup by build number).
+ * number (matched against the tagged builds' numbers, else found by scanning the build list newest first, since
+ * the API has no lookup by build number).
  *
  * Returns `undefined` when standby is on but the build cannot be resolved — an unknown reference, a deleted
  * build, or a build without a definition — so the readers report no server interface rather than the default
@@ -111,7 +112,7 @@ export async function resolveServerInterfaceDefinition(
 
     log.softFail('Standby build of the Actor could not be resolved, serving no server interface for it', {
         actorFullName: `${actor.username}/${actor.name}`,
-        standbyBuild: actor.actorStandby.build,
+        standbyBuild: reference,
         failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
     });
     return undefined;
@@ -122,10 +123,16 @@ async function resolveStandbyBuildId(
     reference: string,
     apifyClient: ApifyClient,
 ): Promise<string | undefined> {
-    const taggedBuildId = actor.taggedBuilds?.[reference]?.buildId;
+    const taggedBuilds = actor.taggedBuilds ?? {};
+    const taggedBuildId =
+        taggedBuilds[reference]?.buildId ??
+        Object.values(taggedBuilds).find((build) => build.buildNumber === reference)?.buildId;
     if (taggedBuildId) return taggedBuildId;
 
     if (!BUILD_NUMBER_PATTERN.test(reference)) return undefined;
+    // Listing builds needs a token, unlike the Actor and build reads, so a token-less session (payment
+    // provider) leaves an untagged build number unresolved instead of failing the whole read with a 401.
+    if (!apifyClient.token) return undefined;
     for await (const build of apifyClient.actor(actor.id).builds().list({ desc: true })) {
         if ((build as BuildListItem).buildNumber === reference) return build.id;
     }
