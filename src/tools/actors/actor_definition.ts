@@ -87,9 +87,9 @@ export async function getActorDefinition(
  * schema and README come from. The reference is a build tag (looked up in `taggedBuilds`) or a `MAJOR.MINOR.BUILD`
  * number (found by scanning the build list newest first, since the API has no lookup by build number).
  *
- * Returns `undefined` when standby is on but the build cannot be resolved — an unset or unknown reference, a
- * deleted build, or a build without a definition — so the readers report no server interface rather than the
- * default build's. Authentication, permission and service failures propagate.
+ * Returns `undefined` when standby is on but the build cannot be resolved — an unknown reference, a deleted
+ * build, or a build without a definition — so the readers report no server interface rather than the default
+ * build's. Authentication, permission and service failures propagate.
  */
 export async function resolveServerInterfaceDefinition(
     actor: Pick<Actor, 'id' | 'username' | 'name' | 'actorStandby' | 'taggedBuilds'>,
@@ -98,7 +98,12 @@ export async function resolveServerInterfaceDefinition(
 ): Promise<ActorDefinitionWithServerInterface | undefined> {
     if (actor.actorStandby?.isEnabled !== true) return defaultBuild.actorDefinition;
 
-    const buildId = await resolveStandbyBuildId(actor, apifyClient);
+    // Standby with no build named starts the run without a build option, which the platform resolves to the
+    // Actor's default build.
+    const reference = actor.actorStandby.build;
+    if (!reference) return defaultBuild.actorDefinition;
+
+    const buildId = await resolveStandbyBuildId(actor, reference, apifyClient);
     if (buildId === defaultBuild.id) return defaultBuild.actorDefinition;
 
     const build = buildId === undefined ? undefined : await apifyClient.build(buildId).get();
@@ -113,12 +118,10 @@ export async function resolveServerInterfaceDefinition(
 }
 
 async function resolveStandbyBuildId(
-    actor: Pick<Actor, 'id' | 'actorStandby' | 'taggedBuilds'>,
+    actor: Pick<Actor, 'id' | 'taggedBuilds'>,
+    reference: string,
     apifyClient: ApifyClient,
 ): Promise<string | undefined> {
-    const reference = actor.actorStandby?.build;
-    if (!reference) return undefined;
-
     const taggedBuildId = actor.taggedBuilds?.[reference]?.buildId;
     if (taggedBuildId) return taggedBuildId;
 
