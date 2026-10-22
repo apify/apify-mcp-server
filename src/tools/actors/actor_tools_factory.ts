@@ -247,10 +247,7 @@ export async function getMCPServersAsTools(
         try {
             // getActorMCPServerURL rejects a webServerMcpPath that escapes the Actor's standby origin.
             // Resolve it inside the try so one Actor's bad path skips only that Actor, not the whole batch.
-            const mcpServerUrl = await getActorMCPServerURL(
-                actorInfo.definition.id, // Real ID of the Actor
-                actorInfo.webServerMcpPath,
-            );
+            const mcpServerUrl = await getActorMCPServerURL(actorInfo.actor, actorInfo.webServerMcpPath);
             log.debug('Retrieved MCP server URL for Actor', {
                 actorFullName: actorInfo.definition.actorFullName,
                 actorId,

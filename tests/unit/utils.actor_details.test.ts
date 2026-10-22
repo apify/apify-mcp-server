@@ -13,6 +13,17 @@ import {
     typeObjectToString,
 } from '../../src/utils/actor_details.js';
 import { searchActorsByKeywords } from '../../src/utils/actor_search.js';
+import {
+    DEFAULT_BUILD_ID,
+    DEFAULT_INPUT,
+    mockActor,
+    mockActorBuildClient,
+    mockBuild,
+    mockDefaultBuild,
+    mockStandbyActor,
+    SEARCH_SCHEMA,
+    STANDBY_BUILD_ID,
+} from './helpers/actor_build_client.js';
 import { mockApifyClient } from './helpers/tool_context.js';
 
 vi.mock('../../src/utils/actor_search.js', () => ({
@@ -212,6 +223,127 @@ describe('fetchActorDetails()', () => {
         const client = stubApifyClient(() => Promise.reject(apifyApiError(401, 'Authentication token is not valid')));
 
         await expect(fetchActorDetails(client, 'apify/instagram-scraper')).rejects.toMatchObject({ statusCode: 401 });
+    });
+});
+
+describe('fetchActorDetails() reads the server interface from the standby build', () => {
+    const STANDBY_DEFINITION = {
+        actorSpecification: 1,
+        name: 'mcp-server',
+        version: '2.0',
+        readme: '# Standby build README',
+        input: { type: 'object', properties: { url: { type: 'string' } } },
+        webServerMcpPath: '/mcp',
+        webServerSchema: SEARCH_SCHEMA,
+    };
+
+    it("keeps the default build's server fields when standby is off", async () => {
+        const { apifyClient, buildGet, list } = mockActorBuildClient({
+            actor: mockActor(),
+            defaultBuild: mockDefaultBuild({ webServerMcpPath: '/mcp', webServerSchema: SEARCH_SCHEMA }),
+        });
+
+        const result = await fetchActorDetails(apifyClient, 'acme/mcp-server');
+
+        expect(result).toMatchObject({ webServerMcpPath: '/mcp', webServerSchema: SEARCH_SCHEMA });
+        expect(buildGet).not.toHaveBeenCalled();
+        expect(list).not.toHaveBeenCalled();
+    });
+
+    it('takes the server fields from the tagged standby build and the input schema and README from the default build', async () => {
+        const { apifyClient } = mockActorBuildClient({
+            actor: mockStandbyActor('beta', { taggedBuilds: { beta: { buildId: STANDBY_BUILD_ID } } }),
+            defaultBuild: mockDefaultBuild(),
+            builds: { [STANDBY_BUILD_ID]: mockBuild(STANDBY_BUILD_ID, STANDBY_DEFINITION) },
+        });
+
+        const result = await fetchActorDetails(apifyClient, 'acme/mcp-server');
+
+        expect(result).toMatchObject({
+            webServerMcpPath: '/mcp',
+            webServerSchema: SEARCH_SCHEMA,
+            inputSchema: DEFAULT_INPUT,
+            readme: '# Default build README',
+        });
+    });
+
+    it('reuses the default build without a second fetch when the tag names it', async () => {
+        const { apifyClient, buildGet } = mockActorBuildClient({
+            actor: mockStandbyActor('latest', { taggedBuilds: { latest: { buildId: DEFAULT_BUILD_ID } } }),
+            defaultBuild: mockDefaultBuild({ webServerMcpPath: '/mcp' }),
+        });
+
+        const result = await fetchActorDetails(apifyClient, 'acme/mcp-server');
+
+        expect(result?.webServerMcpPath).toBe('/mcp');
+        expect(buildGet).not.toHaveBeenCalled();
+    });
+
+    it('finds a build-number reference by scanning the build list newest first', async () => {
+        const { apifyClient, buildGet, list } = mockActorBuildClient({
+            actor: mockStandbyActor('1.2.3'),
+            defaultBuild: mockDefaultBuild(),
+            builds: { [STANDBY_BUILD_ID]: mockBuild(STANDBY_BUILD_ID, STANDBY_DEFINITION) },
+            buildList: [
+                { id: 'build-newer', buildNumber: '1.2.4' },
+                { id: STANDBY_BUILD_ID, buildNumber: '1.2.3' },
+            ],
+        });
+
+        const result = await fetchActorDetails(apifyClient, 'acme/mcp-server');
+
+        expect(result?.webServerMcpPath).toBe('/mcp');
+        expect(list).toHaveBeenCalledWith({ desc: true });
+        expect(buildGet).toHaveBeenCalledWith(STANDBY_BUILD_ID);
+    });
+
+    it.each([
+        ['an unset build reference', mockStandbyActor(undefined), {}],
+        ['a tag with no tagged build', mockStandbyActor('beta', { taggedBuilds: {} }), {}],
+        ['a build number no listed build has', mockStandbyActor('9.9.9'), {}],
+        [
+            'a deleted build',
+            mockStandbyActor('beta', { taggedBuilds: { beta: { buildId: STANDBY_BUILD_ID } } }),
+            { [STANDBY_BUILD_ID]: undefined },
+        ],
+        [
+            'a build without a definition',
+            mockStandbyActor('beta', { taggedBuilds: { beta: { buildId: STANDBY_BUILD_ID } } }),
+            { [STANDBY_BUILD_ID]: mockBuild(STANDBY_BUILD_ID) },
+        ],
+    ])("serves no server fields, not the default build's, for %s", async (_label, actor, builds) => {
+        const { apifyClient } = mockActorBuildClient({
+            actor,
+            defaultBuild: mockDefaultBuild(),
+            builds,
+            buildList: [{ id: 'build-newer', buildNumber: '1.2.4' }],
+        });
+
+        const result = await fetchActorDetails(apifyClient, 'acme/mcp-server');
+
+        expect(result).toMatchObject({ inputSchema: DEFAULT_INPUT, readme: '# Default build README' });
+        expect(result?.webServerMcpPath).toBeUndefined();
+        expect(result?.webServerSchema).toBeUndefined();
+    });
+
+    it('propagates a 403 from the standby build read instead of reporting not-found', async () => {
+        const { apifyClient, buildGet } = mockActorBuildClient({
+            actor: mockStandbyActor('beta', { taggedBuilds: { beta: { buildId: STANDBY_BUILD_ID } } }),
+            defaultBuild: mockDefaultBuild(),
+        });
+        buildGet.mockRejectedValue(apifyApiError(403, 'Insufficient permissions'));
+
+        await expect(fetchActorDetails(apifyClient, 'acme/mcp-server')).rejects.toMatchObject({ statusCode: 403 });
+    });
+
+    it('propagates a 500 from the build list', async () => {
+        const { apifyClient } = mockActorBuildClient({
+            actor: mockStandbyActor('1.2.3'),
+            defaultBuild: mockDefaultBuild(),
+            buildListFailure: apifyApiError(500, 'Internal server error'),
+        });
+
+        await expect(fetchActorDetails(apifyClient, 'acme/mcp-server')).rejects.toMatchObject({ statusCode: 500 });
     });
 });
 

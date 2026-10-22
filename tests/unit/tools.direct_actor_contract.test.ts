@@ -32,6 +32,7 @@ const actorInfo: ActorInfo = {
         readme: '',
         description: 'Crawler',
         defaultRunOptions: { memoryMbytes: 1024, timeoutSecs: 300, build: 'latest' },
+        hasWebServerSchema: false,
         input: {
             type: 'object',
             required: ['url'],

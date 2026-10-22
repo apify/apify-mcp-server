@@ -29,6 +29,7 @@ function createMockActorInfo(actorFullName: string, options: MockActorOptions = 
             readme: '',
             description: `Test Actor ${actorFullName}`,
             defaultRunOptions: { memoryMbytes: 1024, timeoutSecs: 300, build: 'latest' },
+            hasWebServerSchema: false,
             input: {
                 type: 'object',
                 properties: {
