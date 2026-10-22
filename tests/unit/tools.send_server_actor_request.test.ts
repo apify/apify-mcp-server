@@ -1,0 +1,470 @@
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { gzipSync } from 'node:zlib';
+
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { ApifyClient } from '../../src/apify_client.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, MAX_INLINE_BYTES, TOOL_STATUS } from '../../src/const.js';
+import { TimeoutError } from '../../src/errors.js';
+import { actorDefinitionCache } from '../../src/state.js';
+import {
+    executeSendServerActorRequest,
+    fetchServerActorResponse,
+    sendServerActorRequest,
+} from '../../src/tools/actors/send_server_actor_request.js';
+import { serverActorRequestOutputSchema } from '../../src/tools/structured_output_schemas.js';
+import type { Actor, ActorDefinitionPruned, HelperTool, ToolTelemetryContext } from '../../src/types.js';
+import { ACTOR_TENANCY, ALL_TOOLS_PRESENT } from '../../src/types.js';
+import { mockActor } from './helpers/actor_build_client.js';
+import { getRequestHandler, makePaymentProvider, withServer } from './helpers/mcp_server.js';
+import {
+    expectSchemaConformingStructuredContent,
+    expectSoftFailInvalidInput,
+    mockApifyClient,
+    only,
+    stubToolCallContext,
+    type TextToolResult,
+} from './helpers/tool_context.js';
+
+const TOKEN = 'test-token';
+const SERVER_ACTOR = 'apify/server-actor-test';
+
+type ReceivedRequest = { method: string; url: string; headers: IncomingMessage['headers']; body: string };
+type ToolResult = TextToolResult & { toolTelemetry?: ToolTelemetryContext };
+
+/** The requests the local Actor server got since the test started. */
+let received: ReceivedRequest[] = [];
+let server: Server;
+let standbyUrl: string;
+
+/**
+ * The fixture endpoints the tool is specified against (DEVELOPMENT.md), served locally. `/status/{code}` echoes
+ * the Authorization header, which the real router strips, so the error-body masking can be checked here.
+ */
+async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) chunks.push(chunk as Buffer);
+    const body = Buffer.concat(chunks).toString('utf8');
+    received.push({ method: req.method!, url: req.url!, headers: req.headers, body });
+    const url = new URL(req.url!, standbyUrl);
+    const n = Number(url.searchParams.get('n'));
+    switch (url.pathname) {
+        case '/echo':
+            res.writeHead(200, { 'content-type': 'application/json' });
+            res.end(
+                JSON.stringify({ query: Object.fromEntries(url.searchParams), body: body ? JSON.parse(body) : null }),
+            );
+            return;
+        case '/bytes':
+            res.writeHead(200, { 'content-type': 'text/plain' });
+            res.end(Buffer.alloc(n, 'a'));
+            return;
+        case '/gzip':
+            res.writeHead(200, { 'content-type': 'text/plain', 'content-encoding': 'gzip' });
+            res.end(gzipSync(Buffer.alloc(n, 'a')));
+            return;
+        case '/empty':
+            res.writeHead(204);
+            res.end();
+            return;
+        case '/binary':
+            res.writeHead(200, { 'content-type': 'application/octet-stream' });
+            res.end(Buffer.from([0, 1, 2]));
+            return;
+        case '/redirect':
+            res.writeHead(302, { location: '/echo' });
+            res.end();
+            return;
+        case '/drip':
+            res.writeHead(200, { 'content-type': 'text/plain' });
+            res.write('a');
+            await sleep(Number(url.searchParams.get('ms')));
+            res.end('b');
+            return;
+        default: {
+            const status = Number(url.pathname.slice('/status/'.length));
+            res.writeHead(status, { 'content-type': 'application/json' });
+            res.end(JSON.stringify({ code: status, authorization: req.headers.authorization }));
+        }
+    }
+}
+
+/** Puts a public Actor with Actor Standby on and an API schema into the definition cache, so no API read is needed. */
+function seedActor(
+    name: string,
+    overrides: { actor?: Partial<Actor>; definition?: Partial<ActorDefinitionPruned> } = {},
+): Actor {
+    const [username, actorName] = name.split('/');
+    const info = mockActor({
+        id: `${actorName}-id`,
+        username,
+        name: actorName,
+        isPublic: true,
+        standbyUrl,
+        actorStandby: { isEnabled: true, tenancy: 'SINGLE_TENANT' },
+        ...overrides.actor,
+    });
+    const definition: ActorDefinitionPruned = {
+        id: info.id,
+        actorFullName: name,
+        buildTag: 'latest',
+        readme: '',
+        description: '',
+        defaultRunOptions: { build: 'latest', memoryMbytes: 256, timeoutSecs: 300 },
+        input: {
+            type: 'object',
+            properties: { firstNumber: { type: 'integer', title: 'First number', description: '' } },
+        },
+        hasWebServerSchema: true,
+        ...overrides.definition,
+    };
+    actorDefinitionCache.set(name, { definition, info });
+    return info;
+}
+
+// The real client: the request goes through apify-client's axios instance, as in production.
+const client = new ApifyClient({ token: TOKEN });
+
+async function callTool(
+    args: Record<string, unknown>,
+    options: {
+        loadedToolNames?: string[];
+        timeoutMillis?: number;
+        signal?: AbortSignal;
+        token?: string;
+        apifyClient?: ApifyClient;
+    } = {},
+): Promise<ToolResult> {
+    const context = stubToolCallContext(
+        { actor: SERVER_ACTOR, method: 'GET', ...args },
+        options.apifyClient ?? client,
+        {
+            loadedToolNames: options.loadedToolNames,
+        },
+    );
+    if (options.signal) context.signal = options.signal;
+    if (options.token !== undefined) context.apifyToken = options.token;
+    return (await executeSendServerActorRequest(context, { timeoutMillis: options.timeoutMillis })) as ToolResult;
+}
+
+beforeAll(async () => {
+    server = createServer((req, res) => void serve(req, res));
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    standbyUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    seedActor(SERVER_ACTOR);
+});
+
+afterAll(async () => {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+});
+
+beforeEach(() => {
+    received = [];
+});
+
+describe('fetchServerActorResponse()', () => {
+    const send = async (path: string, params: Partial<Parameters<typeof fetchServerActorResponse>[0]> = {}) =>
+        fetchServerActorResponse({
+            client,
+            url: new URL(path, standbyUrl),
+            method: 'GET',
+            signal: new AbortController().signal,
+            ...params,
+        });
+
+    it('sends the token, the request origin and the JSON body as is, once, and keeps the raw response', async () => {
+        // Over 1 KiB: apify-client compresses a string body this large, which the Actor server would then get.
+        const body = { pad: 'x'.repeat(2000) };
+
+        const response = await send('/echo?from=path', { method: 'POST', body });
+
+        expect(received).toHaveLength(1);
+        expect(received[0]).toMatchObject({ method: 'POST', url: '/echo?from=path', body: JSON.stringify(body) });
+        expect(received[0].headers).toMatchObject({
+            authorization: `Bearer ${TOKEN}`,
+            'x-apify-request-origin': 'MCP',
+            'content-type': 'application/json',
+        });
+        expect(received[0].headers['content-encoding']).toBeUndefined();
+        expect(response.status).toBe(200);
+        expect(JSON.parse(response.body!.toString())).toEqual({ query: { from: 'path' }, body });
+    });
+
+    it.each([
+        ['/bytes', MAX_INLINE_BYTES, MAX_INLINE_BYTES],
+        ['/bytes', MAX_INLINE_BYTES + 1, undefined],
+        ['/gzip', MAX_INLINE_BYTES, MAX_INLINE_BYTES],
+        ['/gzip', MAX_INLINE_BYTES + 1, undefined],
+    ])('reads a %s body of %i bytes, after decompression, only up to the inline limit', async (path, size, length) => {
+        const response = await send(`${path}?n=${size}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body?.length).toBe(length);
+    });
+
+    it('throws a TimeoutError when the deadline passes while the body is still arriving', async () => {
+        await expect(send('/drip?ms=2000', { timeoutMillis: 100 })).rejects.toBeInstanceOf(TimeoutError);
+    });
+});
+
+describe('send-server-actor-request', () => {
+    it('returns the body as text with the status, size and tenancy, and reports them in telemetry', async () => {
+        const result = await callTool({ method: 'POST', path: '/echo', body: { firstNumber: 2 } });
+
+        expectSchemaConformingStructuredContent(result, serverActorRequestOutputSchema);
+        const body = JSON.stringify({ query: {}, body: { firstNumber: 2 } });
+        expect(result.structuredContent).toEqual({
+            actorId: 'server-actor-test-id',
+            actorName: SERVER_ACTOR,
+            interface: 'server',
+            tenancy: ACTOR_TENANCY.SINGLE_TENANT,
+            method: 'POST',
+            path: '/echo',
+            status: 200,
+            contentType: 'application/json',
+            body,
+            bytes: Buffer.byteLength(body),
+        });
+        expect(result.content[0].text).toBe(JSON.stringify(result.structuredContent));
+        expect(result.toolTelemetry).toEqual({
+            actorId: 'server-actor-test-id',
+            actorTenancy: ACTOR_TENANCY.SINGLE_TENANT,
+            httpStatus: 200,
+        });
+    });
+
+    it('encodes a boolean query value as true or false, after a query written into the path', async () => {
+        await callTool({ path: '/echo?from=path', query: { asText: true, n: 1, flag: false } });
+
+        expect(received[0].url).toBe('/echo?from=path&asText=true&n=1&flag=false');
+    });
+
+    it('rejects a query value that is an array or an object', () => {
+        const base = { actor: SERVER_ACTOR, method: 'GET', path: '/echo' };
+
+        expect(sendServerActorRequest.ajvValidate({ ...base, query: { ok: 'yes', n: 1, flag: true } })).toBe(true);
+        expect(sendServerActorRequest.ajvValidate({ ...base, query: { list: [1, 2] } })).toBe(false);
+        expect(sendServerActorRequest.ajvValidate({ ...base, query: { nested: { a: 1 } } })).toBe(false);
+    });
+
+    it('succeeds with an empty body for a 204 without a Content-Type', async () => {
+        const result = await callTool({ path: '/empty' });
+
+        expect(result.isError).toBe(false);
+        expect(result.structuredContent).toMatchObject({ status: 204, body: '', bytes: 0 });
+        expect((result.structuredContent as { contentType?: string }).contentType).toBeUndefined();
+    });
+
+    it('returns a redirect with its status and location without following it', async () => {
+        const result = await callTool({ path: '/redirect' });
+
+        expect(result.isError).toBe(false);
+        expect(result.structuredContent).toMatchObject({ status: 302, location: '/echo', body: '', bytes: 0 });
+        expect(received.map((request) => request.url)).toEqual(['/redirect']);
+    });
+
+    it('rejects a binary body by its content type and keeps the status', async () => {
+        const result = await callTool({ path: '/binary' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toContain('application/octet-stream');
+        expect(result.toolTelemetry).toMatchObject({ httpStatus: 200, failureHttpStatus: 200 });
+    });
+
+    it('does not return a body over the inline limit, keeps the status, and says the request was sent', async () => {
+        const result = await callTool({ path: `/bytes?n=${MAX_INLINE_BYTES + 1}` });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toContain(`larger than ${MAX_INLINE_BYTES} bytes`);
+        expect(result.content[0].text).toContain('The request itself was sent.');
+        expect(result.content[0].text).not.toContain('aaa');
+        expect(result.toolTelemetry).toMatchObject({ httpStatus: 200, actorTenancy: ACTOR_TENANCY.SINGLE_TENANT });
+    });
+
+    it('passes an Actor error body through as an error, with the session token masked', async () => {
+        const result = await callTool({ path: '/status/404' });
+
+        expect(result.isError).toBe(true);
+        expect(result.structuredContent).toMatchObject({
+            status: 404,
+            body: '{"code":404,"authorization":"Bearer [REDACTED]"}',
+        });
+        expect(JSON.stringify(result)).not.toContain(TOKEN);
+        expect(result.toolTelemetry).toMatchObject({
+            toolStatus: TOOL_STATUS.SOFT_FAIL,
+            failureHttpStatus: 404,
+            httpStatus: 404,
+        });
+    });
+
+    it('marks a 401 from the Actor server as an authentication failure', async () => {
+        const result = await callTool({ path: '/status/401' });
+
+        expect(result.toolTelemetry).toMatchObject({ failureCategory: FAILURE_CATEGORY.AUTH, httpStatus: 401 });
+    });
+
+    it.each([429, 503])('sends one request on a %i and says to wait, not to retry', async (status) => {
+        const result = await callTool({ path: `/status/${status}` });
+
+        expect(received).toHaveLength(1);
+        expect(result.isError).toBe(true);
+        expect(result.content.at(-1)?.text).toContain('wait');
+    });
+
+    it.each(['//other.example/echo', '//user:pw@{host}/echo'])(
+        'does not send to %s, which leaves the standby origin or carries credentials',
+        async (template) => {
+            const result = await callTool({ path: template.replace('{host}', new URL(standbyUrl).host) });
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toContain("leaves the Actor's server");
+            expect(received).toHaveLength(0);
+        },
+    );
+
+    it('rejects a path without a leading slash, and a body on GET, without sending', async () => {
+        const noSlash = await callTool({ path: 'echo' });
+        const getWithBody = await callTool({ path: '/echo', body: { a: 1 } });
+
+        expectSoftFailInvalidInput(noSlash);
+        expectSoftFailInvalidInput(getWithBody);
+        expect(received).toHaveLength(0);
+    });
+
+    it('rejects an Actor with Actor Standby off, naming call-actor only when the session has it', async () => {
+        seedActor('apify/server-off', { actor: { actorStandby: { isEnabled: false } } });
+
+        const withCallActor = await callTool({ actor: 'apify/server-off', path: '/echo' });
+        const withoutCallActor = await callTool(
+            { actor: 'apify/server-off', path: '/echo' },
+            { loadedToolNames: [HELPER_TOOLS.ACTOR_SERVER_REQUEST] },
+        );
+
+        expectSoftFailInvalidInput(withCallActor);
+        expect(withCallActor.content[0].text).toContain(`It runs from an input with ${HELPER_TOOLS.ACTOR_CALL}.`);
+        expect(withoutCallActor.content[0].text).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+        expect(received).toHaveLength(0);
+    });
+
+    it('rejects an MCP-server Actor without an API schema, pointing at its MCP tools', async () => {
+        seedActor('apify/mcp-only', { definition: { webServerMcpPath: '/mcp', hasWebServerSchema: false } });
+
+        const result = await callTool({ actor: 'apify/mcp-only', path: '/echo' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toContain(`${HELPER_TOOLS.ACTOR_CALL} as "apify/mcp-only:toolName"`);
+        expect(received).toHaveLength(0);
+    });
+
+    it('sends to an Actor with both an API schema and an MCP path, even one that would not resolve', async () => {
+        // `getActorToolResolutionCached` throws on this path; the HTTP interface does not depend on it.
+        seedActor('apify/server-and-mcp', { definition: { webServerMcpPath: 'https://other.example/mcp' } });
+
+        const result = await callTool({ actor: 'apify/server-and-mcp', path: '/echo' });
+
+        expect(result.isError).toBe(false);
+        expect(received).toHaveLength(1);
+    });
+
+    it('reports a missing standby URL as a configuration failure without sending', async () => {
+        seedActor('apify/no-standby-url', { actor: { standbyUrl: null } });
+
+        const result = await callTool({ actor: 'apify/no-standby-url', path: '/echo' });
+
+        expect(result.isError).toBe(true);
+        expect(result.toolTelemetry).toMatchObject({ toolStatus: TOOL_STATUS.FAILED });
+        expect(received).toHaveLength(0);
+    });
+
+    it('returns the empty aborted response when the client cancels mid-request', async () => {
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 50);
+
+        await expect(callTool({ path: '/drip?ms=2000' }, { signal: controller.signal })).resolves.toEqual({});
+    });
+
+    it('reports a timeout as a failure that does not claim the request was undone', async () => {
+        const result = await callTool({ path: '/drip?ms=2000' }, { timeoutMillis: 100 });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain('within 0.1 seconds');
+        expect(result.content[0].text).toContain('may still have processed the request');
+        expect(result.toolTelemetry).toMatchObject({
+            toolStatus: TOOL_STATUS.FAILED,
+            actorTenancy: ACTOR_TENANCY.SINGLE_TENANT,
+        });
+    });
+
+    it('requires a token without sending', async () => {
+        const result = await callTool({ path: '/echo' }, { token: '' });
+
+        expect(result.toolTelemetry).toMatchObject({ failureCategory: FAILURE_CATEGORY.AUTH });
+        expect(received).toHaveLength(0);
+    });
+
+    it('returns the not-found response for an Actor the API does not know', async () => {
+        const unknownActorClient = Object.assign(
+            new ApifyClient({ token: TOKEN }),
+            mockApifyClient({ actor: () => ({ get: async () => undefined }) }),
+        );
+
+        const result = await callTool({ actor: 'apify/missing', path: '/echo' }, { apifyClient: unknownActorClient });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toContain("Actor information for 'apify/missing' was not found.");
+    });
+
+    it('logs the body and a token query value only as redacted, and keeps the Actor name', () => {
+        const { redactArgs } = sendServerActorRequest as HelperTool;
+        const args = {
+            actor: SERVER_ACTOR,
+            method: 'POST',
+            path: '/echo',
+            query: { token: 'secret' },
+            body: { value: 'secret' },
+        };
+
+        expect(JSON.stringify(redactArgs?.(args))).not.toContain('secret');
+        expect(redactArgs?.(args)).toMatchObject({ actor: SERVER_ACTOR, method: 'POST', path: '/echo' });
+    });
+
+    it('names call-actor in the description only when the session has it', () => {
+        const withCallActor = sendServerActorRequest.buildDescription!(ALL_TOOLS_PRESENT);
+        const withoutCallActor = sendServerActorRequest.buildDescription!(only(HELPER_TOOLS.ACTOR_SERVER_REQUEST));
+
+        expect(sendServerActorRequest.description).toBe(withCallActor);
+        expect(withCallActor).toContain(HELPER_TOOLS.ACTOR_CALL);
+        expect(withoutCallActor).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+    });
+
+    it('is rejected before any request reaches the Actor server in a payment-provider session', async () => {
+        await withServer(
+            async (server) => {
+                server.upsertTools([sendServerActorRequest]);
+                const handler = getRequestHandler(server, 'tools/call');
+
+                const result = await handler(
+                    {
+                        method: 'tools/call',
+                        params: {
+                            name: HELPER_TOOLS.ACTOR_SERVER_REQUEST,
+                            arguments: { actor: SERVER_ACTOR, method: 'GET', path: '/echo' },
+                            _meta: { mcpSessionId: 's1' },
+                        },
+                    },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                );
+
+                expect(result.isError).toBe(true);
+                expect((result.content as { text: string }[])[0].text).toContain(
+                    'is not supported in agentic payment mode',
+                );
+                expect(received).toHaveLength(0);
+            },
+            { paymentProvider: makePaymentProvider() },
+        );
+    });
+});

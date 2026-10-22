@@ -4,8 +4,8 @@ import log from '@apify/log';
 
 import { APIFY_MCP_URL, HELPER_TOOLS, INPUT_INTERFACE_ACTORS } from '../const.js';
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../mcp/const.js';
-import type { ActorInfo, ActorInterfaces, ToolDescriptionContext } from '../types.js';
-import { ACTOR_TOOL_MODE } from '../types.js';
+import type { Actor, ActorInfo, ActorInterfaces, ActorTenancy, ToolDescriptionContext } from '../types.js';
+import { ACTOR_TENANCY, ACTOR_TOOL_MODE } from '../types.js';
 
 /**
  * The single rule for which interfaces an Actor has. Tool loading and `call-actor` routing both read the
@@ -53,6 +53,11 @@ export function getActorToolModeFromInterfaces({ input, mcp }: ActorInterfaces):
     if (mcp) return ACTOR_TOOL_MODE.MCP;
     if (input) return ACTOR_TOOL_MODE.RUN;
     return ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP;
+}
+
+/** Multi-tenant when the Actor's standby configuration says so; single-tenant otherwise, the platform default. */
+export function resolveActorTenancy(actor: Pick<Actor, 'actorStandby'>): ActorTenancy {
+    return actor.actorStandby?.tenancy === 'MULTI_TENANT' ? ACTOR_TENANCY.MULTI_TENANT : ACTOR_TENANCY.SINGLE_TENANT;
 }
 
 /**

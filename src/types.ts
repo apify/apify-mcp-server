@@ -6,6 +6,7 @@ import type {
     ActorDefaultRunOptions,
     ActorDefinition,
     ActorRunPricingInfo,
+    ActorStandby,
     ActorStats,
     ActorStoreList as ActorStoreListOutdated,
 } from 'apify-client';
@@ -117,6 +118,11 @@ export type ToolBase = z.infer<typeof ToolSchema> & {
     /** Whether this tool requires payment validation before execution */
     paymentRequired?: boolean;
     /**
+     * Whether a third-party payment-provider session is rejected before the call when the Actor named in
+     * `args.actor` has Actor Standby enabled; see `checkPaymentProviderStandbyConflict`.
+     */
+    hasPaymentProviderStandbyCheck?: boolean;
+    /**
      * Session-exact description builder for descriptions that reference sibling tools.
      * `description` must hold the {@link ALL_TOOLS_PRESENT} render for consumers without a
      * session tool set. Resolved at the tools/list boundary in `getToolPublicFieldOnly`.
@@ -154,6 +160,16 @@ export const ACTOR_TOOL_MODE = {
     SERVER_ACTOR_WITHOUT_MCP: 'SERVER_ACTOR_WITHOUT_MCP',
 } as const;
 export type ACTOR_TOOL_MODE = (typeof ACTOR_TOOL_MODE)[keyof typeof ACTOR_TOOL_MODE];
+
+/** `actorStandby.tenancy` as the API returns it. */
+export type ActorStandbyTenancy = 'SINGLE_TENANT' | 'MULTI_TENANT';
+
+/** Whose run serves an Actor's server interface; `resolveActorTenancy` reads it off the Actor record. */
+export const ACTOR_TENANCY = {
+    SINGLE_TENANT: 'single-tenant',
+    MULTI_TENANT: 'multi-tenant',
+} as const;
+export type ActorTenancy = (typeof ACTOR_TENANCY)[keyof typeof ACTOR_TENANCY];
 
 /** Which interfaces an Actor has; `resolveActorInterfaces` holds the rule. */
 export type ActorInterfaces = {
@@ -339,6 +355,7 @@ export type ActorStoreList = ActorStoreListOutdated & {
 
 export type Actor = ActorOutdated & {
     actorPermissionLevel?: string;
+    actorStandby?: ActorStandby & { tenancy?: ActorStandbyTenancy };
     hasNoDataset?: boolean;
     isCritical?: boolean;
     isGeneric?: boolean;
@@ -417,6 +434,10 @@ export type ToolCallTelemetryProperties = {
     failure_category?: FailureCategory;
     failure_http_status?: number;
     failure_detail?: string;
+    /** The status an Actor's server returned to `send-server-actor-request`, whatever the tool status. */
+    http_status?: number;
+    /** Whose standby run `send-server-actor-request` reached. */
+    actor_tenancy?: ActorTenancy;
     actor_name?: string;
     actor_id?: string;
     /** Run the call touched. `run_status` is the run's own outcome, distinct from `tool_status`. */
@@ -472,6 +493,8 @@ export type ToolTelemetryContext = {
     failureCategory?: FailureCategory;
     failureHttpStatus?: number;
     failureDetail?: string;
+    httpStatus?: number;
+    actorTenancy?: ActorTenancy;
     actorId?: string;
     ajvErrorDetails?: AjvErrorDetails;
 };
@@ -481,6 +504,8 @@ export type CallDiagnostics = Pick<
     | 'failure_category'
     | 'failure_http_status'
     | 'failure_detail'
+    | 'http_status'
+    | 'actor_tenancy'
     | 'actor_name'
     | 'actor_id'
     | 'run_id'

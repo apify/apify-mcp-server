@@ -1103,7 +1103,10 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                     .spyOn(callActor, 'checkPaymentProviderStandbyConflict')
                     .mockResolvedValue(standbyResult);
                 const notifySpy = vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
+                const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
+                    hasPaymentProviderStandbyCheck: true,
+                    taskSupport: 'optional',
+                });
                 const res = await callTask(server, tool, { actor: 'apify/some-actor' });
 
                 expect(res.task.status).toBe('completed');
@@ -1129,6 +1132,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 // paymentRequired + missing skyfire-pay-id would also yield paymentRequiredResult.
                 const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
                     paymentRequired: true,
+                    hasPaymentProviderStandbyCheck: true,
                     taskSupport: 'optional',
                 });
                 const res = await callTask(server, tool, { actor: 'apify/some-actor' });
@@ -1172,7 +1176,10 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
                 vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockResolvedValue(standbyResult);
                 vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
+                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
+                    hasPaymentProviderStandbyCheck: true,
+                    taskSupport: 'optional',
+                });
                 await callTask(server, tool, { actor: 'apify/some-actor' });
             },
             {
@@ -1198,7 +1205,10 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
                 vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockResolvedValue(standbyResult);
                 vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
+                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
+                    hasPaymentProviderStandbyCheck: true,
+                    taskSupport: 'optional',
+                });
                 server.upsertTools([tool]);
                 const handler = getRequestHandler(server, 'tools/call');
 
@@ -1310,7 +1320,9 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockRejectedValue(
                     Object.assign(new Error('server error'), { statusCode: 500 }),
                 );
-                const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL);
+                const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
+                    hasPaymentProviderStandbyCheck: true,
+                });
                 server.upsertTools([tool]);
                 const handler = getRequestHandler(server, 'tools/call');
                 const result = await handler(
@@ -1389,7 +1401,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockRejectedValue(
                     Object.assign(new Error('server error'), { statusCode: 500 }),
                 );
-                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL);
+                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { hasPaymentProviderStandbyCheck: true });
                 server.upsertTools([tool]);
                 const handler = getRequestHandler(server, 'tools/call');
                 await handler(

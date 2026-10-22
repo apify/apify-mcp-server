@@ -78,15 +78,20 @@ export class ApifyClient extends _ApifyClient {
 
 /**
  * Sends one request, with no retries, through apify-client's axios instance, which adds the token and the
- * request-origin and payment headers. Check the URL with `isApifyApiUri` (`resources/api_resources.ts`)
- * first and the status after: a non-2xx response resolves. It skips `httpClient.call()`, which retries (a
- * write could apply twice, and a body over the size cap is downloaded again) and turns a streamed error
- * body into a junk message; that also skips its `HTTPS_PROXY` support and User-Agent. axios aborts a body
- * over `MAX_INLINE_BYTES` mid-stream (checked in axios 1.16.1), so it is never buffered whole.
+ * request-origin and payment headers. Check the URL first, with `isApifyApiUri` (`resources/api_resources.ts`)
+ * for the API or against the Actor's standby origin (`tools/actors/send_server_actor_request.ts`), and the
+ * status after: a non-2xx response resolves, and so does a 3xx with `maxRedirects: 0`. It skips
+ * `httpClient.call()`, which retries (a write could apply twice, and a body over the size cap is downloaded
+ * again) and turns a streamed error body into a junk message; that also skips its `HTTPS_PROXY` support and
+ * User-Agent. axios aborts a body over `MAX_INLINE_BYTES` mid-stream (checked in axios 1.16.1), so it is
+ * never buffered whole.
  */
 export async function sendApifyApiRequest(
     apifyClient: ApifyClient,
-    config: Pick<AxiosRequestConfig, 'url' | 'method' | 'params' | 'data' | 'headers' | 'responseType' | 'signal'>,
+    config: Pick<
+        AxiosRequestConfig,
+        'url' | 'method' | 'params' | 'data' | 'headers' | 'responseType' | 'signal' | 'maxRedirects'
+    >,
 ): Promise<AxiosResponse<unknown>> {
     return apifyClient.httpClient.axios.request<unknown>({ ...config, maxContentLength: MAX_INLINE_BYTES });
 }

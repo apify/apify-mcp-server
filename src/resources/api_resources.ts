@@ -20,7 +20,7 @@ const TEXT_MIME_TYPE = 'text/plain';
 export const REDACTED = '[REDACTED]';
 
 /** Textual base MIME types (returned as `text`); everything else becomes a base64 `blob`. */
-function isTextualMimeType(baseMimeType: string | undefined): boolean {
+export function isTextualMimeType(baseMimeType: string | undefined): boolean {
     if (!baseMimeType) return false;
     return (
         baseMimeType.startsWith('text/') ||
@@ -159,7 +159,7 @@ function parseCharset(contentType: string | undefined): string | undefined {
 }
 
 /** Drain a response stream into one Buffer. Chunks are Buffers (`objectMode: false`). */
-async function collectStream(data: unknown): Promise<Buffer> {
+export async function collectStream(data: unknown): Promise<Buffer> {
     const chunks: Buffer[] = [];
     for await (const chunk of data as AsyncIterable<Buffer | string>) {
         chunks.push(Buffer.from(chunk));

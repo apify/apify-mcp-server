@@ -728,6 +728,7 @@ export const callActor: ToolEntry = Object.freeze({
     outputSchema: actorRunOutputSchema,
     ajvValidate: callActorAjvValidate,
     paymentRequired: true,
+    hasPaymentProviderStandbyCheck: true,
     annotations: {
         title: 'Call Actor',
         readOnlyHint: false,

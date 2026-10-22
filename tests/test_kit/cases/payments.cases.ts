@@ -4,7 +4,7 @@ import { expect } from 'vitest';
 
 import { SKYFIRE_ENABLED_TOOLS } from '@apify/actors-mcp-server/internals/test-kit.js';
 
-import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE, skipOnStdio } from '../helpers.js';
+import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE, ACTOR_SERVER_ACTOR_TEST, skipOnStdio } from '../helpers.js';
 import type { Case } from '../types.js';
 
 /** Skyfire and x402 payment modes. */
@@ -161,6 +161,25 @@ export const paymentsCases: Case[] = [
                 expect(result.isError).toBe(true);
                 const content = result.content as { text: string }[];
                 expect(content.length).toBeGreaterThan(0);
+                expect(content[0].text).toContain('is not supported in agentic payment mode');
+            } finally {
+                await client.close();
+            }
+        },
+    },
+    {
+        name: 'returns the standby rejection for send-server-actor-request in x402 payment mode',
+        isDeploymentTest: false,
+        skipIf: skipOnStdio,
+        run: async (ctx) => {
+            const client = await ctx.createClientFn({ payment: 'x402' });
+            try {
+                const result = await client.callTool({
+                    name: 'send-server-actor-request',
+                    arguments: { actor: ACTOR_SERVER_ACTOR_TEST, method: 'GET', path: '/empty' },
+                });
+                expect(result.isError).toBe(true);
+                const content = result.content as { text: string }[];
                 expect(content[0].text).toContain('is not supported in agentic payment mode');
             } finally {
                 await client.close();
