@@ -190,12 +190,20 @@ describe('paging /unstable/store by cursor', () => {
     it('throws the API message with the HTTP status on an error response', async () => {
         const { apifyClient } = mockUnstableStoreClient({
             status: 400,
-            data: { error: { type: 'invalid-parameter', message: "Parameter 'recommId' is invalid." } },
+            data: {
+                error: {
+                    type: 'schema-validation-failed',
+                    message: "Schema validation failed: Parameter 'recommId' is invalid.",
+                },
+            },
         });
 
         await expect(
             searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient, limit: 5 }),
-        ).rejects.toMatchObject({ statusCode: 400, message: "Store search failed: Parameter 'recommId' is invalid." });
+        ).rejects.toMatchObject({
+            statusCode: 400,
+            message: "Store search failed: Schema validation failed: Parameter 'recommId' is invalid.",
+        });
     });
 
     it('throws a server-side error when the response does not match the contract', async () => {
