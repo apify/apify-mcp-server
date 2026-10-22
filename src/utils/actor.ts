@@ -1,7 +1,7 @@
 import type { ApifyClient } from '../apify_client.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
 import { actorDefinitionCache } from '../state.js';
-import { resolveActorInterfaces, resolveActorToolMode } from '../tools/actor_tool_naming.js';
+import { getActorToolModeFromInterfaces, resolveActorInterfaces } from '../tools/actor_tool_naming.js';
 import { getActorDefinition } from '../tools/actors/actor_definition.js';
 import type { ActorDefinitionWithInfo, ActorInfo, ActorToolResolutionResult } from '../types.js';
 import { ACTOR_TOOL_MODE } from '../types.js';
@@ -68,9 +68,9 @@ export async function getActorToolResolutionCached(
         webServerMcpPath: getActorMCPServerPath(cached.definition),
     };
     const interfaces = resolveActorInterfaces(actorInfo);
-    const toolMode = resolveActorToolMode(actorInfo);
+    const toolMode = getActorToolModeFromInterfaces(interfaces);
     const { actorFullName } = cached.definition;
-    // `resolveActorToolMode` returns MCP only when `webServerMcpPath` is set.
+    // `getActorToolModeFromInterfaces` returns MCP only when `webServerMcpPath` is set.
     if (toolMode === ACTOR_TOOL_MODE.MCP) {
         return {
             toolMode,

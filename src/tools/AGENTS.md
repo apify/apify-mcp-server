@@ -20,7 +20,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   `hasWebServerSchema`). `resolveActorToolMode` derives the tool slot from the set — MCP tools if `mcp`, else a
   run tool if `input`, else none (`SERVER_ACTOR_WITHOUT_MCP`) — and tool loading and `call-actor` routing both
   read it. Actors in `INPUT_INTERFACE_ACTORS` (`../const.ts`) read as having no MCP interface, so they are
-  served as run tools although they declare `webServerMcpPath`.
+  served as run tools although they declare `webServerMcpPath`, unless their input schema is empty, in which
+  case they get no tool.
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
   - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), delete
     (`delete_actor.ts`), the actor-tools factory, the direct actor-tool executor (`actor_executor.ts`),

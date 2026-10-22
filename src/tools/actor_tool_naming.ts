@@ -20,7 +20,9 @@ import { ACTOR_TOOL_MODE } from '../types.js';
  *
  * "server" is the Actor's `actorStandby.isEnabled` (the API field is named standby). "MCP path" is
  * `webServerMcpPath`, read as absent for Actors in `INPUT_INTERFACE_ACTORS` (`../const.ts`), which are served
- * through the input interface although they declare it. "HTTP schema" is `definition.hasWebServerSchema`.
+ * through the input interface although they declare it, unless their input schema is empty (including a
+ * malformed one `pruneActorDefinition` drops); then they get no tool, like any other server Actor.
+ * "HTTP schema" is `definition.hasWebServerSchema`.
  * An MCP-server Actor does not get `input` even with a non-empty input schema: Store data shows that
  * interface is unused on such Actors (decided 2026-10-19).
  * The input schema counts as empty when the definition has no `input`, `input.properties` is missing,
@@ -43,7 +45,11 @@ export function resolveActorInterfaces(actorInfo: ActorInfo): ActorInterfaces {
 
 /** The tool slot column of the table on {@link resolveActorInterfaces}: MCP tools, else a run tool, else none. */
 export function resolveActorToolMode(actorInfo: ActorInfo): ACTOR_TOOL_MODE {
-    const { input, mcp } = resolveActorInterfaces(actorInfo);
+    return getActorToolModeFromInterfaces(resolveActorInterfaces(actorInfo));
+}
+
+/** {@link resolveActorToolMode} for an interface set the caller already resolved. */
+export function getActorToolModeFromInterfaces({ input, mcp }: ActorInterfaces): ACTOR_TOOL_MODE {
     if (mcp) return ACTOR_TOOL_MODE.MCP;
     if (input) return ACTOR_TOOL_MODE.RUN;
     return ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP;
