@@ -27,6 +27,7 @@ import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunActor, getOwnServerRemedy } from '../actor_tool_naming.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
+import { buildServerInterfaceSection } from './server_interface_schema.js';
 
 /**
  * Shared schema for actor details output options.
@@ -54,6 +55,13 @@ export const actorDetailsOutputOptionsSchema = z.object({
         .optional()
         .describe('Include inferred output schema from recent successful runs (TypeScript type).'),
     mcpTools: z.boolean().optional().describe('List available tools (only for MCP server Actors).'),
+    serverInterface: z
+        .union([z.boolean(), z.string()])
+        .optional()
+        .describe(
+            "true lists a Server Actor's documented HTTP operations with its base URL and tenancy; " +
+                '"METHOD /path" details one operation\'s parameters, request body and responses.',
+        ),
 });
 
 export const actorDetailsOutputDefaults = {
@@ -66,6 +74,10 @@ export const actorDetailsOutputDefaults = {
     readme: true,
     outputSchema: false,
     mcpTools: false,
+    /** `true` lists a Server Actor's operations, a `METHOD /path` string details one. */
+    serverInterface: false as boolean | string,
+    /** The one-line server-interface summary the default output carries for every Server Actor. */
+    serverInterfaceSummary: true,
 };
 
 export type ResolvedOutputOptions = typeof actorDetailsOutputDefaults;
@@ -91,6 +103,8 @@ export function resolveOutputOptions(output?: z.infer<typeof actorDetailsOutputO
         readme: output?.readme === true,
         outputSchema: output?.outputSchema === true,
         mcpTools: output?.mcpTools === true,
+        serverInterface: output?.serverInterface ?? false,
+        serverInterfaceSummary: false,
     };
 }
 
@@ -120,9 +134,10 @@ find it with ${HELPER_TOOLS.STORE_SEARCH} first.`
     }
 
 Use 'output' parameter with boolean flags to control returned information:
-- Default: All fields true except mcpTools
+- Default: All fields true except mcpTools and serverInterface; a Server Actor gets a one-line server interface summary
 - Selective: Set desired fields to true (e.g., output: { inputSchema: true })
-- Common patterns: inputSchema only, description + readme, mcpTools for MCP Actors
+- Common patterns: inputSchema only, description + readme, mcpTools for MCP Actors, serverInterface for Server Actors
+- serverInterface: true lists a Server Actor's HTTP operations, "METHOD /path" details one
 
 The 'readme' field returns the summary when available, full README otherwise.
 Use when querying Actor details, documentation, input requirements, or MCP tools.
@@ -173,12 +188,13 @@ export function buildActorDetailsTextResponse(options: {
     output: ResolvedOutputOptions;
     actorOutputSchema?: Record<string, unknown> | null;
     mcpToolsMessage?: string;
+    serverInterfaceMessage?: string;
     linkContext?: ConsoleLinkContext;
 }): {
     texts: string[];
     structuredContent: Record<string, unknown>;
 } {
-    const { details, output, actorOutputSchema, mcpToolsMessage, linkContext } = options;
+    const { details, output, actorOutputSchema, mcpToolsMessage, serverInterfaceMessage, linkContext } = options;
 
     const actorUrl =
         buildConsoleActorUrl(linkContext, details.actorInfo.id) ??
@@ -225,6 +241,10 @@ export function buildActorDetailsTextResponse(options: {
         texts.push(mcpToolsMessage);
     }
 
+    if (serverInterfaceMessage) {
+        texts.push(serverInterfaceMessage);
+    }
+
     if (linkContext) {
         texts.push(VERBATIM_LINKS_NUDGE);
     }
@@ -235,6 +255,7 @@ export function buildActorDetailsTextResponse(options: {
         inputSchema: output.inputSchema ? details.inputSchema : undefined,
         outputSchema: output.outputSchema ? (actorOutputSchema ?? {}) : undefined,
         mcpTools: output.mcpTools && mcpToolsMessage ? mcpToolsMessage : undefined,
+        serverInterface: serverInterfaceMessage,
     };
 
     return { texts, structuredContent };
@@ -283,6 +304,17 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     const mcpToolsMessage = resolvedOutput.mcpTools
         ? await getMcpToolsMessage(actorName, apifyClient, apifyToken, paymentProvider, mcpSessionId)
         : undefined;
+    const serverInterface =
+        resolvedOutput.serverInterfaceSummary || resolvedOutput.serverInterface !== false
+            ? buildServerInterfaceSection({
+                  actor: details.actorInfo,
+                  actorFullName: `${details.actorInfo.username}/${details.actorInfo.name}`,
+                  schema: details.webServerSchema,
+                  selection: resolvedOutput.serverInterface,
+                  loadedToolNames,
+              })
+            : undefined;
+    if (serverInterface && 'error' in serverInterface) return respondUserError(serverInterface.error);
 
     // NOTE: Data duplication between texts and structuredContent is intentional and required.
     // Some MCP clients only read text content, while others only read structured content.
@@ -291,6 +323,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         output: resolvedOutput,
         actorOutputSchema,
         mcpToolsMessage,
+        serverInterfaceMessage: serverInterface?.text,
         linkContext,
     });
 

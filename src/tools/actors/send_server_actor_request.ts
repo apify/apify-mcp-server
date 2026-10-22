@@ -64,8 +64,11 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
     const callActor = hasTool(HELPER_TOOLS.ACTOR_CALL)
         ? ` Unlike ${HELPER_TOOLS.ACTOR_CALL}, it starts no run from an input; an Actor can have both interfaces.`
         : '';
+    const details = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
+        ? ` ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface lists the documented operations.`
+        : '';
     return dedent`
-        Send one HTTP request to a Server Actor's API: the server interface its API schema (OpenAPI) and README document.${callActor}
+        Send one HTTP request to a Server Actor's API: the server interface its API schema (OpenAPI) and README document.${callActor}${details}
         The server adds the host and the Apify API token; give the method, the path, and optionally query parameters and a JSON body.
         Only an Actor with Actor Standby enabled and an API schema takes requests here, and the Actor itself accepts or rejects the method and path.
         A request can start a standby run of the Actor in your account, kept for its idle timeout, or is charged per event when the Actor is multi-tenant.

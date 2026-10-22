@@ -13,11 +13,9 @@ import type {
     SchemaProperties,
 } from '../../types.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
+import { OPENAPI_OPERATION_METHODS } from './server_interface_schema.js';
 
 const BUILD_NUMBER_PATTERN = /^\d+\.\d+\.\d+$/;
-
-/** The HTTP methods an OpenAPI path item may hold an operation under. */
-const OPENAPI_OPERATION_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'] as const;
 
 /** `GET /v2/acts/{id}/builds` items carry `buildNumber`; apify-client's `BuildCollectionClientListItem` omits it. */
 type BuildListItem = { id: string; buildNumber?: string };

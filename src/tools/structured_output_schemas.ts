@@ -244,6 +244,12 @@ export const actorDetailsOutputSchema = {
             description:
                 'Markdown listing of MCP tools exposed by the Actor (only present when `output.mcpTools` is requested).',
         },
+        serverInterface: {
+            type: 'string',
+            description:
+                "The Actor's server interface: a one-line summary by default, the documented HTTP operations with " +
+                '`output.serverInterface: true`, or one operation with `output.serverInterface: "METHOD /path"`.',
+        },
     },
 };
 
