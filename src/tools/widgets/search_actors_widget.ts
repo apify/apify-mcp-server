@@ -9,6 +9,7 @@ import { formatActorForWidget } from '../../utils/actor_card.js';
 import { searchAgentSafeActors } from '../../utils/actor_search.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk } from '../../utils/mcp.js';
+import { IS_UNSTABLE_STORE_SEARCH_ENABLED } from '../../utils/store_unstable.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunAnyActor, getActorCallabilityCaveat } from '../actor_tool_naming.js';
 import {
@@ -41,7 +42,7 @@ function buildDescription({ hasTool, clientParam }: ToolDescriptionContext): str
         (e.g., "find me scrapers for Instagram", "show me Amazon Actors", "what tools exist for Twitter").
         The response renders as an interactive widget the user can view directly.
         ${hasTool(HELPER_TOOLS.STORE_SEARCH) ? `\n${silentSearchHint}\n` : ''}
-        Input: keywords (plus optional limit/offset). Output fields are fixed by the widget contract.
+        Input: keywords (plus optional limit/${IS_UNSTABLE_STORE_SEARCH_ENABLED ? 'cursor' : 'offset'}). Output fields are fixed by the widget contract.
     ` + runLimitation
     );
 }
@@ -53,7 +54,15 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
     description: buildDescription(ALL_TOOLS_PRESENT),
     buildDescription,
     inputSchema: z.toJSONSchema(searchActorsWidgetArgsSchema) as ToolInputSchema,
-    outputSchema: actorSearchWidgetOutputSchema,
+    outputSchema: IS_UNSTABLE_STORE_SEARCH_ENABLED
+        ? {
+              ...actorSearchWidgetOutputSchema,
+              properties: {
+                  ...actorSearchWidgetOutputSchema.properties,
+                  nextCursor: { type: 'string', description: 'Pass as `cursor` to get the next page of this search.' },
+              },
+          }
+        : actorSearchWidgetOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(searchActorsWidgetArgsSchema)),
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS)?.meta,
@@ -68,14 +77,17 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyClient, paymentProvider, loadedToolNames, loadedActorIds } = toolArgs;
         const parsed = searchActorsWidgetArgsSchema.parse(args);
+        // Only in the schema when the store search runs on `/unstable/store`.
+        const cursor = typeof parsed.cursor === 'string' ? parsed.cursor : undefined;
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
-        const [actors, { userPlanTier }] = await Promise.all([
+        const [{ actors, nextCursor }, { userPlanTier }] = await Promise.all([
             searchAgentSafeActors({
                 keywords: parsed.keywords,
                 apifyClient,
                 limit: parsed.limit,
                 offset: parsed.offset,
+                cursor,
                 paymentProvider,
             }),
             getUserInfoCached(apifyToken, apifyClient),
@@ -84,7 +96,9 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
         if (actors.length === 0) {
             // Honor the widget tool's declared outputSchema: widgetActors is required, so
             // emit an empty array rather than dropping the field.
-            const instructions = buildNoActorsFoundInstructions(parsed.keywords, parsed.offset);
+            // `/unstable/store` ignores the offset, so it must not show up in the result text either.
+            const offset = IS_UNSTABLE_STORE_SEARCH_ENABLED ? 0 : parsed.offset;
+            const instructions = buildNoActorsFoundInstructions(parsed.keywords, offset, cursor);
             return respondOk(instructions, {
                 structuredContent: {
                     actors: [],
@@ -102,6 +116,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
             count: actors.length,
             userTier: userPlanTier,
             widgetActors: actors.map((actor) => formatActorForWidget(actor, userPlanTier)),
+            ...(nextCursor && { nextCursor }),
         };
 
         const texts = [
@@ -120,6 +135,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
             loadedToolNames,
             loadedActorIds,
         );
+        if (nextCursor) texts.push(`- **Next page cursor:** \`${nextCursor}\``);
         if (callabilityCaveat) texts.push(callabilityCaveat);
 
         const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
