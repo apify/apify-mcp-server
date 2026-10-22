@@ -137,7 +137,7 @@ function extractActorData(actor: Actor | ActorStoreList, options: ActorCardOptio
     if (options.includeStats && 'stats' in actor) {
         const { stats } = actor;
 
-        if ('totalUsers' in stats && 'totalUsers30Days' in stats) {
+        if (stats.totalUsers !== undefined && stats.totalUsers30Days !== undefined) {
             data.stats = {
                 totalUsers: stats.totalUsers,
                 monthlyUsers: stats.totalUsers30Days,

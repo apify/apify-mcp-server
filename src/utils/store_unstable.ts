@@ -1,9 +1,5 @@
-/**
- * Store search through apify-core's `GET /unstable/store`, behind the `APIFY_STORE_UNSTABLE_ENDPOINT`
- * environment variable. The endpoint ranks with Recombee, pages by cursor (`recommId`) and loads the
- * Actor card fields server-side; this module asks for those fields and maps each item to the
- * `GET /v2/store` item shape the Actor card renders.
- */
+/** Store search through apify-core's `GET /unstable/store`, mapped to the `/v2/store` item the Actor card renders. */
+import type { ActorRunPricingInfo } from 'apify-client';
 import { z } from 'zod';
 
 import log from '@apify/log';
@@ -12,13 +8,9 @@ import type { ApifyClient } from '../apify_client.js';
 import { getApifyAPIBaseUrl } from '../apify_client.js';
 import type { ActorStoreList } from '../types.js';
 
-/**
- * `APIFY_STORE_UNSTABLE_ENDPOINT=true` (or `1`) routes `search-actors` through `GET /unstable/store`.
- * Read once at import, so the tool schema and the routing always agree.
- */
+// Read once at import, so the tool schema and the routing always agree.
 export const IS_UNSTABLE_STORE_SEARCH_ENABLED = ['true', '1'].includes(process.env.APIFY_STORE_UNSTABLE_ENDPOINT ?? '');
 
-/** The item fields the Actor card renders. `id` comes with every item. */
 export const UNSTABLE_STORE_CARD_FIELDS = [
     'name',
     'username',
@@ -41,10 +33,12 @@ const unstableStoreItemSchema = z.object({
     title: z.string().optional(),
     description: z.string().optional(),
     pictureUrl: z.string().optional(),
-    url: z.string().optional(),
+    url: z.string(),
     modifiedAt: z.iso.datetime().optional(),
-    // Pricing is rendered by `pricing_info.ts`, which reads the fields it knows and tolerates the rest.
-    currentPricingInfo: z.looseObject({ pricingModel: z.string() }).optional(),
+    // `pricing_info.ts` reads the fields it knows and tolerates the rest.
+    currentPricingInfo: z.custom<ActorRunPricingInfo>(
+        (value) => typeof (value as { pricingModel?: unknown } | null)?.pricingModel === 'string',
+    ),
     stats: z
         .object({
             totalUsers: z.number().optional(),
@@ -78,14 +72,13 @@ export type UnstableStoreSearchOptions = {
     search: string;
     apifyClient: ApifyClient;
     limit: number;
-    /** The `nextCursor` of the previous page. */
     cursor?: string;
     allowsAgenticUsers?: boolean;
 };
 
 export type UnstableStoreSearchPage = {
     actors: ActorStoreList[];
-    /** Continues the same search; absent when the store failed to rank the page. */
+    /** Absent when the store failed to rank the page. */
     nextCursor?: string;
 };
 
@@ -101,17 +94,14 @@ export function buildUnstableStoreSearchUrl(options: Omit<UnstableStoreSearchOpt
     return url;
 }
 
-/**
- * Maps an `/unstable/store` item to the `/v2/store` item shape, field by field, so the Actor card
- * renders both the same. A field the endpoint omits stays absent, as it would be on `/v2/store`.
- */
+/** A field the endpoint omits stays absent, as on `/v2/store`, so the card renders both the same. */
 export function mapUnstableStoreItem(item: UnstableStoreItem): ActorStoreList {
-    const stats = {
+    const stats: ActorStoreList['stats'] = {
         ...(item.stats?.totalUsers !== undefined && { totalUsers: item.stats.totalUsers }),
         ...(item.stats?.totalUsers30Days !== undefined && { totalUsers30Days: item.stats.totalUsers30Days }),
         ...(item.stats?.bookmarkCount !== undefined && { bookmarkCount: item.stats.bookmarkCount }),
     };
-    const mapped = {
+    const mapped: ActorStoreList & { modifiedAt?: Date } = {
         id: item.id,
         name: item.name,
         username: item.username,
@@ -129,16 +119,14 @@ export function mapUnstableStoreItem(item: UnstableStoreItem): ActorStoreList {
         categories: item.categories,
         inputSchema: item.inputSchema,
     };
-    // `ActorStoreList` types the full `/v2/store` item; the card reads only the fields mapped above.
-    return mapped as unknown as ActorStoreList;
+    return mapped;
 }
 
 export async function searchActorsViaUnstableEndpoint(
     options: UnstableStoreSearchOptions,
 ): Promise<UnstableStoreSearchPage> {
     const { apifyClient, ...query } = options;
-    // The client's axios instance carries the token, the request origin header and any payment headers.
-    // It resolves non-2xx responses instead of throwing.
+    // Carries the token, origin and payment headers, and resolves non-2xx responses instead of throwing.
     const response = await apifyClient.httpClient.axios.request({
         url: buildUnstableStoreSearchUrl(query).toString(),
         method: 'GET',
@@ -151,14 +139,14 @@ export async function searchActorsViaUnstableEndpoint(
 
     const parsed = unstableStorePageSchema.safeParse(response.data);
     if (!parsed.success) {
-        // A contract break on the server side, not bad tool input, so it must not read as a client error.
+        // A server-side contract break, so it must not read as a client error.
         log.error('Store search: GET /unstable/store returned an unexpected response', { issues: parsed.error.issues });
         throw new Error('Store search failed: the store returned an unexpected response.');
     }
     const page = parsed.data.data;
     return {
         actors: page.items.map(mapUnstableStoreItem),
-        // An empty page does not end the results: the store drops Actors that are no longer public after ranking.
+        // An empty page does not end the results: the store drops Actors after ranking.
         ...(page.recommId ? { nextCursor: page.recommId } : {}),
     };
 }

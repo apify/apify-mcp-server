@@ -85,7 +85,7 @@ const UNSTABLE_STORE_ITEM: UnstableStoreItem = {
         pricingModel: 'PAY_PER_EVENT',
         pricingPerEvent: PRICING_PER_EVENT,
         minimalMaxTotalChargeUsd: 0.5,
-    },
+    } as unknown as UnstableStoreItem['currentPricingInfo'],
     stats: { totalUsers: 145_000, totalUsers30Days: 12_400, bookmarkCount: 812 },
     rating: { average: 4.37, reviewCount: 213 },
     categories: ['SOCIAL_MEDIA'],

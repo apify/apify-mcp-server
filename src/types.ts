@@ -293,7 +293,8 @@ export type ActorToolResolutionResult = { actorFullName: string } & (
     | { toolMode: typeof ACTOR_TOOL_MODE.RUN | typeof ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP }
 );
 
-export type ActorStoreList = ActorStoreListOutdated & {
+// `stats` is partial: the Recombee-backed store searches omit the counts they do not have.
+export type ActorStoreList = Omit<ActorStoreListOutdated, 'stats'> & {
     actorReviewCount?: number;
     actorReviewRating?: number;
     badge?: string | null;
@@ -305,7 +306,7 @@ export type ActorStoreList = ActorStoreListOutdated & {
     userFullName?: string;
     /** Populated when the search call is made with `includeInputSchema=true`. */
     inputSchema?: ActorStoreInputSchema;
-    stats: ActorStats & {
+    stats: Partial<ActorStats> & {
         actorReviewCount?: number;
         actorReviewRating?: number;
         bookmarkCount?: number;
