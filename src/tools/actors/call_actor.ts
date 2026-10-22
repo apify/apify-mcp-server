@@ -169,7 +169,7 @@ function respondStandbyRejection(
     error: ActorLoadError,
     opts: { mcpSessionId?: string; actorId?: string; paymentProviderId?: string },
 ): ToolResponse {
-    log.softFail('Rejecting call-actor for unsupported standby Actor', {
+    log.softFail('Rejecting a tool call for an unsupported standby Actor', {
         // The error's canonical Actor name, so both call shapes log the same value even when the
         // caller addressed the Actor by ID. `actorLoadErrorKind` distinguishes which cell rejected it.
         actorName: error.actorName,

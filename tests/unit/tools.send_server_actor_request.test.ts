@@ -77,6 +77,10 @@ async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
             res.writeHead(302, { location: '/echo' });
             res.end();
             return;
+        case '/redirect-token':
+            res.writeHead(302, { location: `/login?token=${req.headers.authorization!.slice('Bearer '.length)}` });
+            res.end();
+            return;
         case '/drip':
             res.writeHead(200, { 'content-type': 'text/plain' });
             res.write('a');
@@ -95,7 +99,7 @@ async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
 function seedActor(
     name: string,
     overrides: { actor?: Partial<Actor>; definition?: Partial<ActorDefinitionPruned> } = {},
-): Actor {
+): void {
     const [username, actorName] = name.split('/');
     const info = mockActor({
         id: `${actorName}-id`,
@@ -121,7 +125,6 @@ function seedActor(
         ...overrides.definition,
     };
     actorDefinitionCache.set(name, { definition, info });
-    return info;
 }
 
 // The real client: the request goes through apify-client's axios instance, as in production.
@@ -236,10 +239,10 @@ describe('send-server-actor-request', () => {
         });
     });
 
-    it('encodes a boolean query value as true or false, after a query written into the path', async () => {
-        await callTool({ path: '/echo?from=path', query: { asText: true, n: 1, flag: false } });
+    it('encodes a boolean query value as true or false, after the query written into the path, kept as is', async () => {
+        await callTool({ path: '/echo?from=a%20path', query: { asText: true, n: 1, flag: false } });
 
-        expect(received[0].url).toBe('/echo?from=path&asText=true&n=1&flag=false');
+        expect(received[0].url).toBe('/echo?from=a%20path&asText=true&n=1&flag=false');
     });
 
     it('rejects a query value that is an array or an object', () => {
@@ -264,6 +267,13 @@ describe('send-server-actor-request', () => {
         expect(result.isError).toBe(false);
         expect(result.structuredContent).toMatchObject({ status: 302, location: '/echo', body: '', bytes: 0 });
         expect(received.map((request) => request.url)).toEqual(['/redirect']);
+    });
+
+    it('masks the session token in a redirect location', async () => {
+        const result = await callTool({ path: '/redirect-token' });
+
+        expect(result.structuredContent).toMatchObject({ location: '/login?token=[REDACTED]' });
+        expect(JSON.stringify(result)).not.toContain(TOKEN);
     });
 
     it('rejects a binary body by its content type and keeps the status', async () => {
@@ -325,12 +335,17 @@ describe('send-server-actor-request', () => {
         },
     );
 
-    it('rejects a path without a leading slash, and a body on GET, without sending', async () => {
-        const noSlash = await callTool({ path: 'echo' });
-        const getWithBody = await callTool({ path: '/echo', body: { a: 1 } });
+    it('rejects a path without a leading slash without sending', async () => {
+        const result = await callTool({ path: 'echo' });
 
-        expectSoftFailInvalidInput(noSlash);
-        expectSoftFailInvalidInput(getWithBody);
+        expectSoftFailInvalidInput(result);
+        expect(received).toHaveLength(0);
+    });
+
+    it('rejects a body on GET without sending', async () => {
+        const result = await callTool({ path: '/echo', body: { a: 1 } });
+
+        expectSoftFailInvalidInput(result);
         expect(received).toHaveLength(0);
     });
 
@@ -392,9 +407,11 @@ describe('send-server-actor-request', () => {
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toContain('within 0.1 seconds');
         expect(result.content[0].text).toContain('may still have processed the request');
+        // /drip sends its 200 before the body stalls, so the status that arrived is kept.
         expect(result.toolTelemetry).toMatchObject({
             toolStatus: TOOL_STATUS.FAILED,
             actorTenancy: ACTOR_TENANCY.SINGLE_TENANT,
+            httpStatus: 200,
         });
     });
 

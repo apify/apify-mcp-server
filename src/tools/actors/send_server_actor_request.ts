@@ -12,6 +12,7 @@ import {
     isMaxContentLengthAbort,
     isTextualMimeType,
     maskSessionToken,
+    REDACTED,
 } from '../../resources/api_resources.js';
 import type {
     ActorInterfaces,
@@ -94,7 +95,7 @@ export type ServerActorResponse = {
  * `sendApifyApiRequest`: the session token and the request-origin header go along, there are no retries,
  * redirects are not followed, and the body is read as raw bytes, capped at `MAX_INLINE_BYTES` after
  * decompression. The deadline covers reading the body; when it passes before the client cancels, a
- * `TimeoutError` is thrown.
+ * `TimeoutError` is thrown, with the `status` when one arrived.
  */
 export async function fetchServerActorResponse(params: {
     client: ApifyClient;
@@ -106,6 +107,7 @@ export async function fetchServerActorResponse(params: {
 }): Promise<ServerActorResponse> {
     const { client, url, method, body, signal, timeoutMillis = EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } = params;
     const deadline = AbortSignal.timeout(timeoutMillis);
+    let status: number | undefined;
     try {
         const response = await sendApifyApiRequest(client, {
             url: url.href,
@@ -120,11 +122,12 @@ export async function fetchServerActorResponse(params: {
             maxRedirects: 0,
             signal: AbortSignal.any([signal, deadline]),
         });
+        status = response.status;
         const header = (name: string): string | undefined => {
             const value: unknown = response.headers[name];
             return typeof value === 'string' ? value : undefined;
         };
-        const result = { status: response.status, contentType: header('content-type'), location: header('location') };
+        const result = { status, contentType: header('content-type'), location: header('location') };
         try {
             return { ...result, body: await collectStream(response.data) };
         } catch (error) {
@@ -133,7 +136,10 @@ export async function fetchServerActorResponse(params: {
         }
     } catch (error) {
         if (deadline.aborted && !signal.aborted) {
-            throw new TimeoutError(`The Actor server did not finish responding within ${timeoutMillis} ms`);
+            throw Object.assign(
+                new TimeoutError(`The Actor server did not finish responding within ${timeoutMillis} ms`),
+                { status },
+            );
         }
         throw error;
     }
@@ -167,17 +173,18 @@ function buildResponse(params: {
     actorId: string;
     actorName: string;
     tenancy: ActorTenancy;
-    /** The session's token, masked in the body. */
+    /** The session's token, masked in the body and the location. */
     token: string;
 }): ToolResponse {
     const { response, method, path, actorId, actorName, tenancy, token } = params;
-    const { status, contentType, location } = response;
+    const { status, contentType } = response;
+    const location = response.location?.replaceAll(token, REDACTED);
     const outcome = `${method} ${path} on ${actorName} returned HTTP ${status}`;
     if (response.body === undefined) {
         return respondUserError(
             `${outcome} with a body larger than ${MAX_INLINE_BYTES} bytes, so the body is not returned. ` +
                 'The request itself was sent.',
-            { httpStatus: status, actorId },
+            { httpStatus: status },
         );
     }
     const bytes = response.body.length;
@@ -186,7 +193,7 @@ function buildResponse(params: {
         return respondUserError(
             `${outcome} with ${bytes} bytes of ${baseMimeType ?? 'an unknown type'}, which this tool does not ` +
                 'return; it returns JSON, text, and XML bodies. The request itself was sent.',
-            { httpStatus: status, actorId },
+            { httpStatus: status },
         );
     }
     const structuredContent = {
@@ -212,7 +219,6 @@ function buildResponse(params: {
     return respondUserError(texts, {
         ...((status === HTTP_UNAUTHORIZED || status === HTTP_FORBIDDEN) && { category: FAILURE_CATEGORY.AUTH }),
         httpStatus: status,
-        actorId,
         structuredContent,
     });
 }
@@ -276,8 +282,12 @@ export async function executeSendServerActorRequest(
             telemetry,
         );
     }
-    // Not axios `params`: apify-client's serializer sends a boolean as 1 or 0.
-    for (const [name, value] of Object.entries(parsed.query ?? {})) url.searchParams.append(name, String(value));
+    // Not axios `params`: apify-client's serializer sends a boolean as 1 or 0. Not `url.searchParams`: it would
+    // encode the query written into the path again.
+    const query = new URLSearchParams(
+        Object.entries(parsed.query ?? {}).map(([name, value]) => [name, String(value)]),
+    ).toString();
+    if (query) url.search = url.search ? `${url.search}&${query}` : query;
     const path = `${url.pathname}${url.search}`;
 
     let response: ServerActorResponse;
@@ -293,14 +303,16 @@ export async function executeSendServerActorRequest(
     } catch (error) {
         if (signal.aborted) return respondAborted();
         if (error instanceof TimeoutError) {
+            const { status } = error as TimeoutError & { status?: number };
+            const outcome =
+                status === undefined ? 'got no complete response' : `got HTTP ${status} but not the whole body`;
             return withServerActorTelemetry(
                 respondServerError(
-                    `${parsed.method} ${path} on ${actorFullName} got no complete response within ` +
-                        `${timeoutMillis / 1000} seconds, so nothing is returned. The Actor may still have ` +
-                        'processed the request.',
+                    `${parsed.method} ${path} on ${actorFullName} ${outcome} within ${timeoutMillis / 1000} ` +
+                        'seconds, so nothing is returned. The Actor may still have processed the request.',
                     { detail: 'timeout' },
                 ),
-                telemetry,
+                { ...telemetry, ...(status !== undefined && { httpStatus: status }) },
             );
         }
         throw toPlainError(error);
