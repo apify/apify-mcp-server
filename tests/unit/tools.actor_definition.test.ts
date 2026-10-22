@@ -122,6 +122,19 @@ describe('getActorDefinition() reads the server interface from the standby build
         expect(buildGet).not.toHaveBeenCalled();
     });
 
+    it('reuses the default build without a second fetch when the standby configuration names no build', async () => {
+        const { apifyClient, buildGet, list } = mockActorBuildClient({
+            actor: mockStandbyActor(undefined),
+            defaultBuild: mockDefaultBuild({ webServerMcpPath: '/mcp' }),
+        });
+
+        const result = await getActorDefinition('acme/mcp-server', apifyClient);
+
+        expect(result?.definition.webServerMcpPath).toBe('/mcp');
+        expect(buildGet).not.toHaveBeenCalled();
+        expect(list).not.toHaveBeenCalled();
+    });
+
     it('finds a build-number reference by scanning the build list newest first and stops at the match', async () => {
         const { apifyClient, buildGet, list, pulledBuildIds } = mockActorBuildClient({
             actor: mockStandbyActor('1.2.3'),
@@ -154,7 +167,6 @@ describe('getActorDefinition() reads the server interface from the standby build
     });
 
     it.each([
-        ['an unset build reference', mockStandbyActor(undefined), {}],
         ['a tag with no tagged build', mockStandbyActor('beta', { taggedBuilds: {} }), {}],
         ['a build number no listed build has', mockStandbyActor('9.9.9'), {}],
         [
