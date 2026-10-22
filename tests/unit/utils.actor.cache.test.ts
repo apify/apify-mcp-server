@@ -157,7 +157,7 @@ describe('getActorToolResolutionCached()', () => {
         });
     });
 
-    it('reports the canonical Actor full name when the Actor is addressed by its ID', async () => {
+    it('reports the server-only interface set and the canonical Actor full name when addressed by ID', async () => {
         const entry = seedCache('acme/standby-empty-by-id', true, 'owner-15', {
             isStandbyEnabled: true,
             hasWebServerSchema: true,
