@@ -352,12 +352,8 @@ Use comments to guide reviewers:
 - ✅ ALWAYS use `theme.*` tokens (colors, spacing)
 - ❌ NEVER hardcode: `#hex`, `rgb()`, `Npx` values, font sizes
 - ✅ Import from `@apify/ui-library` only
-- ✅ Check `mcp__storybook__*` and `mcp__figma__*` availability before UI work
-- ✅ Call `mcp__storybook__get-ui-building-instructions` first
 - ✅ Read 1-3 similar components for patterns (max 3 files)
 - ✅ Verify zero hardcoded values before submitting
-
-**Figma Integration**: Call `mcp__figma__get_design_context` when working from designs.
 
 ---
 

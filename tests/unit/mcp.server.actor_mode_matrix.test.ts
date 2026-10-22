@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
-import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
 import { callActorPreExecute, executeCallActor } from '../../src/tools/actors/call_actor.js';
 import type { ActorDefinitionWithInfo } from '../../src/types.js';
@@ -97,6 +97,8 @@ beforeEach(() => {
     seedActor(RUN_ONLY, { input: NON_EMPTY_INPUT });
     seedActor(RUN_ONLY_STALE_PATH, { webServerMcpPath: '/mcp', input: NON_EMPTY_INPUT });
     seedActor(STANDBY_MCP, { webServerMcpPath: '/mcp', isStandbyEnabled: true, input: NON_EMPTY_INPUT });
+    seedActor(WEB_SEARCH, { webServerMcpPath: '/mcp', isStandbyEnabled: true, input: NON_EMPTY_INPUT });
+    seedActor(WEB_FETCH, { webServerMcpPath: '/mcp', isStandbyEnabled: true, input: NON_EMPTY_INPUT });
     seedActor(STANDBY_INPUT, { isStandbyEnabled: true, input: NON_EMPTY_INPUT });
     seedActor(STANDBY_EMPTY, { isStandbyEnabled: true });
     seedActor(STANDBY_EMPTY, { isStandbyEnabled: true, cacheKey: STANDBY_EMPTY_ID });
@@ -109,6 +111,8 @@ describe('Actor run/standby mode decision table', () => {
         ['a run-only Actor', RUN_ONLY, ['acme--run-only']],
         ['a run-only Actor carrying a leftover webServerMcpPath', RUN_ONLY_STALE_PATH, ['acme--run-only-stale-path']],
         ['a standby Actor exposing an MCP server (proxied tools only)', STANDBY_MCP, ['acme--standby-mcp--add']],
+        ['an input-interface Actor carrying an MCP path', WEB_SEARCH, ['apify--web-search']],
+        ['Web Fetch with its MCP endpoint enabled', WEB_FETCH, ['apify--web-fetch']],
         ['a standby Actor with no MCP server but a non-empty input schema', STANDBY_INPUT, ['acme--standby-input']],
         ['a standby Actor with no MCP server and an empty input schema', STANDBY_EMPTY, []],
     ])('tools/list surface for %s', async (_label, actor, expected) => {
@@ -116,11 +120,14 @@ describe('Actor run/standby mode decision table', () => {
     });
 
     describe('call-actor routing', () => {
-        it('runs a run-only Actor with a leftover webServerMcpPath instead of demanding a tool name', async () => {
-            const result = await preExecute(RUN_ONLY_STALE_PATH);
+        it.each([RUN_ONLY_STALE_PATH, WEB_FETCH])(
+            'runs %s through its input schema despite its MCP path',
+            async (actor) => {
+                const result = await preExecute(actor);
 
-            expect('earlyResponse' in result).toBe(false);
-        });
+                expect('earlyResponse' in result).toBe(false);
+            },
+        );
 
         it('answers "is not an MCP server" for the actor:tool shape on a run-only Actor with a leftover path', async () => {
             const result = await preExecute(`${RUN_ONLY_STALE_PATH}:add`);

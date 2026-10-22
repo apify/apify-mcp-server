@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.19.4 - **not yet released**
+
+### 🚀 Features
+
+- Serve apify&#x2F;web-search as a run-based Actor tool ([#1654](https://github.com/apify/apify-mcp-server/pull/1654)) ([09fab11](https://github.com/apify/apify-mcp-server/commit/09fab118b124e6ca5ec21b5cd14cce5e685051be)) by [@jirispilka](https://github.com/jirispilka), closes [#1619](https://github.com/apify/apify-mcp-server/issues/1619), [#1651](https://github.com/apify/apify-mcp-server/issues/1651)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.19.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.3) (2026-10-21)
+
+
+## [0.19.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.2) (2026-10-21)
+
+
+## [0.19.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.2) (2026-10-21)
+
+### 🚀 Features
+
+- Search the Store with the new backend ([#1662](https://github.com/apify/apify-mcp-server/pull/1662)) ([b326ace](https://github.com/apify/apify-mcp-server/commit/b326acecb714ee94eb96e311c5a4d61194e99e9d)) by [@jmikitova](https://github.com/jmikitova)
+
+
 ## [0.19.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.1) (2026-10-20)
 
 ### 🚀 Features
