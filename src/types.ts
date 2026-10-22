@@ -147,13 +147,23 @@ export const TOOL_TYPE = {
  */
 export type TOOL_TYPE = (typeof TOOL_TYPE)[keyof typeof TOOL_TYPE];
 
-/** How an Actor definition maps to the tool surface. */
+/** How an Actor definition maps to the tool surface; `resolveActorToolMode` derives it from {@link ActorInterfaces}. */
 export const ACTOR_TOOL_MODE = {
     RUN: 'RUN',
     MCP: 'MCP',
-    STANDBY_WITHOUT_MCP: 'STANDBY_WITHOUT_MCP',
+    SERVER_ACTOR_WITHOUT_MCP: 'SERVER_ACTOR_WITHOUT_MCP',
 } as const;
 export type ACTOR_TOOL_MODE = (typeof ACTOR_TOOL_MODE)[keyof typeof ACTOR_TOOL_MODE];
+
+/** Which interfaces an Actor has; `resolveActorInterfaces` holds the rule. */
+export type ActorInterfaces = {
+    /** The input schema: a run per call. */
+    input: boolean;
+    /** The MCP server at `webServerMcpPath`. */
+    mcp: boolean;
+    /** The HTTP API described by `webServerSchema`. */
+    server: boolean;
+};
 
 /**
  * Type for Actor-based tools - tools that wrap Apify Actors.
@@ -285,21 +295,23 @@ export type TelemetryEnv = (typeof TELEMETRY_ENV)[keyof typeof TELEMETRY_ENV];
  * Type representing the Actor information needed in order to turn it into an MCP server tool.
  */
 export type ActorInfo = {
-    webServerMcpPath: string | null; // Declared MCP endpoint; only means MCP when standby is on — see `resolveActorToolMode`
+    /** Declared MCP endpoint; only means MCP when standby is on — see `resolveActorInterfaces`. */
+    webServerMcpPath: string | null;
     definition: ActorDefinitionPruned;
     actor: Actor;
 };
 
 /**
- * How an Actor is exposed as a tool, resolved once from its definition by `resolveActorToolMode`.
+ * How an Actor is exposed as a tool, resolved once from its definition: the interface set
+ * (`resolveActorInterfaces`) and the tool slot derived from it (`resolveActorToolMode`).
  * `mcpServerUrl` is present exactly when `toolMode` is {@link ACTOR_TOOL_MODE.MCP}, so callers
  * connect without a cast and an un-narrowed read is a compile error.
  * `actorFullName` is the platform-canonical `username/name`, not whatever identifier the caller used —
  * messages built from it read the same whether the Actor was addressed by ID or by name.
  */
-export type ActorToolResolutionResult = { actorFullName: string } & (
+export type ActorToolResolutionResult = { actorFullName: string; interfaces: ActorInterfaces } & (
     | { toolMode: typeof ACTOR_TOOL_MODE.MCP; mcpServerUrl: string }
-    | { toolMode: typeof ACTOR_TOOL_MODE.RUN | typeof ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP }
+    | { toolMode: typeof ACTOR_TOOL_MODE.RUN | typeof ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP }
 );
 
 export type ActorStoreList = ActorStoreListOutdated & {

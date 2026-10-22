@@ -20,7 +20,13 @@ function seedCache(
     name: string,
     isPublic: boolean,
     ownerUserId: string,
-    opts: { id?: string; webServerMcpPath?: string; isStandbyEnabled?: boolean; input?: unknown } = {},
+    opts: {
+        id?: string;
+        webServerMcpPath?: string;
+        isStandbyEnabled?: boolean;
+        input?: unknown;
+        hasWebServerSchema?: boolean;
+    } = {},
 ): ActorDefinitionWithInfo {
     const id = opts.id ?? name;
     const entry = {
@@ -29,6 +35,7 @@ function seedCache(
             actorFullName: name,
             ...(opts.webServerMcpPath && { webServerMcpPath: opts.webServerMcpPath }),
             ...(opts.input !== undefined && { input: opts.input }),
+            hasWebServerSchema: opts.hasWebServerSchema ?? false,
         },
         info: {
             id,
@@ -114,6 +121,7 @@ describe('getActorToolResolutionCached()', () => {
             toolMode: ACTOR_TOOL_MODE.MCP,
             mcpServerUrl: 'https://acme-mcp-public.apify.actor/mcp',
             actorFullName: 'acme/mcp-public',
+            interfaces: { input: false, mcp: true, server: false },
         });
         expect(getActorDefinitionMock).not.toHaveBeenCalled();
     });
@@ -145,16 +153,21 @@ describe('getActorToolResolutionCached()', () => {
         await expect(getActorToolResolutionCached('acme/stale-path', client)).resolves.toEqual({
             toolMode: ACTOR_TOOL_MODE.RUN,
             actorFullName: 'acme/stale-path',
+            interfaces: { input: true, mcp: false, server: false },
         });
     });
 
     it('reports the canonical Actor full name when the Actor is addressed by its ID', async () => {
-        const entry = seedCache('acme/standby-empty-by-id', true, 'owner-15', { isStandbyEnabled: true });
+        const entry = seedCache('acme/standby-empty-by-id', true, 'owner-15', {
+            isStandbyEnabled: true,
+            hasWebServerSchema: true,
+        });
         actorDefinitionCache.set('aBcD1234', entry);
 
         await expect(getActorToolResolutionCached('aBcD1234', client)).resolves.toEqual({
-            toolMode: ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP,
+            toolMode: ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,
             actorFullName: 'acme/standby-empty-by-id',
+            interfaces: { input: false, mcp: false, server: true },
         });
     });
 });

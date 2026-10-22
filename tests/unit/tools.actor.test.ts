@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
-import { HELPER_TOOLS, WEB_SEARCH } from '../../src/const.js';
+import { HELPER_TOOLS, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../../src/mcp/const.js';
 import {
     actorNameToToolName,
@@ -10,6 +10,7 @@ import {
     canRunAnyActor,
     getOwnServerRemedy,
     legacyToolNameToNew,
+    resolveActorInterfaces,
     resolveActorToolMode,
 } from '../../src/tools/actor_tool_naming.js';
 import type { ActorInfo, ActorInputSchema } from '../../src/types.js';
@@ -86,6 +87,7 @@ function makeActorInfo(opts: {
     isStandbyEnabled?: boolean;
     webServerMcpPath?: string | null;
     input?: unknown;
+    hasWebServerSchema?: boolean;
     actorFullName?: string;
 }): ActorInfo {
     return {
@@ -94,6 +96,7 @@ function makeActorInfo(opts: {
             id: 'actor-id',
             actorFullName: opts.actorFullName ?? 'acme/actor',
             input: opts.input as ActorInputSchema | undefined,
+            hasWebServerSchema: opts.hasWebServerSchema ?? false,
         },
         actor: opts.isStandbyEnabled ? { actorStandby: { isEnabled: true } } : {},
     } as unknown as ActorInfo;
@@ -101,8 +104,68 @@ function makeActorInfo(opts: {
 
 const NON_EMPTY_INPUT = { type: 'object', properties: { url: { type: 'string' } } };
 
+describe('resolveActorInterfaces()', () => {
+    // One row per cell of the decision table in `resolveActorInterfaces`'s docstring, each asserting the
+    // flags and the tool slot `resolveActorToolMode` derives from them on the same record.
+    it.each([
+        [
+            'server interface off ignores a leftover MCP path and HTTP schema',
+            { webServerMcpPath: '/mcp', hasWebServerSchema: true },
+            { input: true, mcp: false, server: false },
+            ACTOR_TOOL_MODE.RUN,
+        ],
+        [
+            'server interface on, MCP path, no HTTP schema',
+            { isStandbyEnabled: true, webServerMcpPath: '/mcp' },
+            { input: false, mcp: true, server: false },
+            ACTOR_TOOL_MODE.MCP,
+        ],
+        [
+            'server interface on, MCP path, HTTP schema',
+            { isStandbyEnabled: true, webServerMcpPath: '/mcp', hasWebServerSchema: true },
+            { input: false, mcp: true, server: true },
+            ACTOR_TOOL_MODE.MCP,
+        ],
+        [
+            'server interface on, no MCP path, input schema, no HTTP schema',
+            { isStandbyEnabled: true },
+            { input: true, mcp: false, server: false },
+            ACTOR_TOOL_MODE.RUN,
+        ],
+        [
+            'server interface on, no MCP path, input schema, HTTP schema',
+            { isStandbyEnabled: true, hasWebServerSchema: true },
+            { input: true, mcp: false, server: true },
+            ACTOR_TOOL_MODE.RUN,
+        ],
+        [
+            'server interface on, no MCP path, no input schema, no HTTP schema',
+            { isStandbyEnabled: true, input: undefined },
+            { input: false, mcp: false, server: false },
+            ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,
+        ],
+        [
+            'server interface on, no MCP path, no input schema, HTTP schema',
+            { isStandbyEnabled: true, input: undefined, hasWebServerSchema: true },
+            { input: false, mcp: false, server: true },
+            ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,
+        ],
+        [
+            'input-interface Actor declaring an MCP path',
+            { isStandbyEnabled: true, webServerMcpPath: '/mcp', actorFullName: WEB_FETCH },
+            { input: true, mcp: false, server: false },
+            ACTOR_TOOL_MODE.RUN,
+        ],
+    ] as const)('resolves %s', (_label, opts, interfaces, toolMode) => {
+        const actorInfo = makeActorInfo({ input: NON_EMPTY_INPUT, ...opts });
+
+        expect(resolveActorInterfaces(actorInfo)).toEqual(interfaces);
+        expect(resolveActorToolMode(actorInfo)).toBe(toolMode);
+    });
+});
+
 describe('resolveActorToolMode()', () => {
-    // One row per cell of the decision table in `resolveActorToolMode`'s docstring, plus the
+    // One row per cell of the decision table in `resolveActorInterfaces`'s docstring, plus the
     // edge cases that define what counts as an empty input schema.
     it.each([
         ['standby disabled, no MCP path', {}, ACTOR_TOOL_MODE.RUN],
@@ -118,22 +181,22 @@ describe('resolveActorToolMode()', () => {
         [
             'missing input counts as empty',
             { isStandbyEnabled: true, input: undefined },
-            ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP,
+            ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,
         ],
         [
             'input without properties counts as empty',
             { isStandbyEnabled: true, input: { type: 'object' } },
-            ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP,
+            ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,
         ],
         [
             'zero properties counts as empty',
             { isStandbyEnabled: true, input: { type: 'object', properties: {} } },
-            ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP,
+            ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,
         ],
         [
             'required without properties still counts as empty',
             { isStandbyEnabled: true, input: { type: 'object', properties: {}, required: ['url'] } },
-            ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP,
+            ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,
         ],
         [
             'non-object input carrying properties counts as non-empty',
