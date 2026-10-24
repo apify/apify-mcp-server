@@ -206,6 +206,25 @@ export const paymentsCases: Case[] = [
         },
     },
     {
+        name: 'returns the standby rejection for fetch-actor-mcp-tool-list in x402 payment mode',
+        isDeploymentTest: false,
+        skipIf: skipOnStdio,
+        run: async (ctx) => {
+            const client = await ctx.createClientFn({ payment: 'x402' });
+            try {
+                const result = await client.callTool({
+                    name: 'fetch-actor-mcp-tool-list',
+                    arguments: { actor: ACTOR_EXAMPLE_MCP_SERVER },
+                });
+                expect(result.isError).toBe(true);
+                const content = result.content as { text: string }[];
+                expect(content[0].text).toContain('is not supported in agentic payment mode');
+            } finally {
+                await client.close();
+            }
+        },
+    },
+    {
         // The removed form is refused before the payment-related Actor lookup, so neither the standby rejection nor a 402.
         name: 'rejects the actor:tool form of call-actor in x402 payment mode',
         isDeploymentTest: false,
