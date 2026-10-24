@@ -380,12 +380,18 @@ describe('createStatelessServer() tools/call', () => {
             }, options);
             const statelessProperties = trackSpy.mock.calls[0][2];
 
-            expect(Object.keys(statelessProperties).sort()).toEqual(Object.keys(legacyProperties).sort());
-            // Only the two values that describe the request itself may differ; both are deliberate.
+            // No session id, so no trace id.
+            expect(Object.keys(statelessProperties).sort()).toEqual(
+                Object.keys(legacyProperties)
+                    .filter((key) => key !== 'trace_id')
+                    .sort(),
+            );
+            // Only the values that describe the request itself may differ; all are deliberate.
             expect({ ...statelessProperties, tool_exec_time_ms: 0 }).toEqual({
                 ...legacyProperties,
                 tool_exec_time_ms: 0,
                 mcp_session_id: '',
+                trace_id: undefined,
                 mcp_protocol_version: STATELESS_PROTOCOL_VERSION,
             });
         });

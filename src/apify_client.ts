@@ -44,6 +44,9 @@ export function getApifyAPIPublicBaseUrl(): string {
 }
 
 export class ApifyClient extends _ApifyClient {
+    /** Trace id and use case: sent with Store searches; the trace id also goes into telemetry. */
+    storeSearchTracking?: { traceId?: string; useCase?: string };
+
     constructor(options: ExtendedApifyClientOptions) {
         /**
          * To publish to DockerHub, we need to run their build task to validate our MCP server.
