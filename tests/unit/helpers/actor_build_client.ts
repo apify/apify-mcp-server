@@ -2,7 +2,7 @@ import type { Build } from 'apify-client';
 import { vi } from 'vitest';
 
 import type { ApifyClient } from '../../../src/apify_client.js';
-import type { Actor } from '../../../src/types.js';
+import type { Actor, ActorDefinitionWithServerInterface } from '../../../src/types.js';
 import { mockApifyClient } from './tool_context.js';
 
 export const DEFAULT_BUILD_ID = 'build-default';
@@ -18,7 +18,30 @@ export const DEFAULT_INPUT = {
 export const SEARCH_SCHEMA = { paths: { '/search': { post: { summary: 'Search' } } } };
 
 export function mockActor(overrides: Partial<Actor> = {}): Actor {
-    return { id: 'actor-id', username: 'acme', name: 'mcp-server', ...overrides } as Actor;
+    return {
+        id: 'actor-id',
+        userId: 'user-id',
+        username: 'acme',
+        name: 'mcp-server',
+        isPublic: false,
+        createdAt: new Date(0),
+        modifiedAt: new Date(0),
+        stats: {
+            totalBuilds: 1,
+            totalRuns: 0,
+            totalUsers: 0,
+            totalUsers7Days: 0,
+            totalUsers30Days: 0,
+            totalUsers90Days: 0,
+            totalMetamorphs: 0,
+            lastRunStartedAt: new Date(0),
+        },
+        versions: [],
+        defaultRunOptions: { build: 'latest', memoryMbytes: 256, timeoutSecs: 300 },
+        deploymentKey: 'test-deployment-key',
+        actorPermissionLevel: 'LIMITED_PERMISSIONS',
+        ...overrides,
+    };
 }
 
 /** Standby enabled and bound to the build `reference` names (a tag or a build number). */
@@ -26,19 +49,30 @@ export function mockStandbyActor(reference: string | undefined, overrides: Parti
     return mockActor({ actorStandby: { isEnabled: true, build: reference }, ...overrides });
 }
 
-export function mockBuild(id: string, actorDefinition?: Record<string, unknown>): Build {
-    return { id, actorDefinition } as unknown as Build;
+export function mockBuild(id: string, actorDefinition?: Partial<ActorDefinitionWithServerInterface>): Build {
+    return {
+        id,
+        actId: 'actor-id',
+        userId: 'user-id',
+        startedAt: new Date(0),
+        status: 'SUCCEEDED',
+        meta: { origin: 'WEB', clientIp: '127.0.0.1', userAgent: 'test' },
+        buildNumber: '1.0.0',
+        actorDefinition: actorDefinition && {
+            actorSpecification: 1,
+            name: 'mcp-server',
+            version: '1.0',
+            ...actorDefinition,
+        },
+    };
 }
 
 /**
  * The default build, seeded with server fields that conflict with every standby build in these tests:
  * a reader that leaks them serves a stale MCP path and HTTP schema.
  */
-export function mockDefaultBuild(definitionOverrides: Record<string, unknown> = {}): Build {
+export function mockDefaultBuild(definitionOverrides: Partial<ActorDefinitionWithServerInterface> = {}): Build {
     return mockBuild(DEFAULT_BUILD_ID, {
-        actorSpecification: 1,
-        name: 'mcp-server',
-        version: '1.0',
         readme: '# Default build README',
         // `fetchActorDetails` rewrites the input's properties in place, so each build gets its own copy.
         input: structuredClone(DEFAULT_INPUT),
