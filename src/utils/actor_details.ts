@@ -89,12 +89,14 @@ export type ActorDetailsResult = {
 type FetchActorDetailsOptions = {
     cardOptions?: ActorCardOptions;
     actorStore?: ActorStore;
+    /** Resolve the standby build for `webServerSchema`; off for callers that do not render the server interface. */
+    includeServerInterface?: boolean;
 };
 
 export async function fetchActorDetails(
     apifyClient: ApifyClient,
     actorName: string,
-    { cardOptions, actorStore }: FetchActorDetailsOptions = {},
+    { cardOptions, actorStore, includeServerInterface = false }: FetchActorDetailsOptions = {},
 ): Promise<ActorDetailsResult | null> {
     try {
         // Use only the actor name part (after '/') for better keyword search relevance —
@@ -115,7 +117,9 @@ export async function fetchActorDetails(
                       }).catch(() => []),
             ]);
         if (!actorInfo || !buildInfo || !buildInfo.actorDefinition) return null;
-        const serverDefinition = await resolveServerInterfaceDefinition(actorInfo, buildInfo, apifyClient);
+        const serverDefinition = includeServerInterface
+            ? await resolveServerInterfaceDefinition(actorInfo, buildInfo, apifyClient)
+            : undefined;
 
         const storeActor = storeActors?.find((item) => item.id === actorInfo.id);
         const pictureUrl =
