@@ -13,6 +13,7 @@ import { callActorWidget } from '../../src/tools/widgets/call_actor_widget.js';
 import type { ActorDefinitionWithInfo, ToolEntry } from '../../src/types.js';
 import * as actorUtils from '../../src/utils/actor.js';
 import type { ToolResponse } from '../../src/utils/mcp.js';
+import { cloneToolEntry } from '../../src/utils/tools.js';
 import { getRequestHandler, makePaymentProvider, withServer } from './helpers/mcp_server.js';
 import { textOf, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
@@ -165,6 +166,9 @@ describe('Actor run/standby mode decision table', () => {
         });
 
         describe('the removed actor:tool form', () => {
+            // Like the real x402 and Skyfire providers, which store a decorated copy of each paid tool.
+            const cloningPaymentProvider = { ...makePaymentProvider(), decorateToolSchema: cloneToolEntry };
+
             async function dispatch(
                 tools: ToolEntry[],
                 name: string,
@@ -191,9 +195,9 @@ describe('Actor run/standby mode decision table', () => {
 
             it.each([
                 [HELPER_TOOLS.ACTOR_CALL, 'without', undefined],
-                [HELPER_TOOLS.ACTOR_CALL, 'with', makePaymentProvider()],
+                [HELPER_TOOLS.ACTOR_CALL, 'with', cloningPaymentProvider],
                 [HELPER_TOOLS.ACTOR_CALL_WIDGET, 'without', undefined],
-                [HELPER_TOOLS.ACTOR_CALL_WIDGET, 'with', makePaymentProvider()],
+                [HELPER_TOOLS.ACTOR_CALL_WIDGET, 'with', cloningPaymentProvider],
             ])(
                 'is rejected by %s before any Actor lookup, %s a payment provider',
                 async (name, _label, paymentProvider) => {
