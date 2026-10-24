@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import log from '@apify/log';
 
-import { APIFY_MCP_URL, HELPER_TOOLS } from '../const.js';
+import { APIFY_MCP_URL, HELPER_TOOLS, INPUT_INTERFACE_ACTORS } from '../const.js';
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../mcp/const.js';
 import type { ActorInfo, ToolDescriptionContext } from '../types.js';
 import { ACTOR_TOOL_MODE } from '../types.js';
@@ -11,19 +11,22 @@ import { ACTOR_TOOL_MODE } from '../types.js';
  * The single rule for how an Actor is exposed as a tool. Tool loading and `call-actor` routing both
  * read it, so the two can never disagree.
  *
- * | standby  | `webServerMcpPath` | input schema | result                |
- * |----------|--------------------|--------------|-----------------------|
- * | disabled | any (path ignored) | any          | `RUN`                 |
- * | enabled  | present            | any          | `MCP`                 |
- * | enabled  | absent             | non-empty    | `RUN`                 |
- * | enabled  | absent             | empty        | `STANDBY_WITHOUT_MCP` |
+ * | standby  | `webServerMcpPath`                    | input schema | result                |
+ * |----------|---------------------------------------|--------------|-----------------------|
+ * | disabled | any (path ignored)                    | any          | `RUN`                 |
+ * | enabled  | any (Actor in INPUT_INTERFACE_ACTORS) | any          | `RUN`                 |
+ * | enabled  | present                               | any          | `MCP`                 |
+ * | enabled  | absent                                | non-empty    | `RUN`                 |
+ * | enabled  | absent                                | empty        | `STANDBY_WITHOUT_MCP` |
  *
+ * Rows are checked top to bottom.
  * The input schema counts as empty when the definition has no `input`, `input.properties` is missing,
  * or `input.properties` has zero keys. Nothing else counts — a non-empty `required` with no properties
  * still reads as empty.
  */
 export function resolveActorToolMode(actorInfo: ActorInfo): ACTOR_TOOL_MODE {
     if (actorInfo.actor.actorStandby?.isEnabled !== true) return ACTOR_TOOL_MODE.RUN;
+    if (INPUT_INTERFACE_ACTORS.has(actorInfo.definition.actorFullName)) return ACTOR_TOOL_MODE.RUN;
     if (actorInfo.webServerMcpPath) return ACTOR_TOOL_MODE.MCP;
     if (Object.keys(actorInfo.definition.input?.properties ?? {}).length === 0) {
         return ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP;
