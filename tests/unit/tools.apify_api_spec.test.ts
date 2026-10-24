@@ -143,6 +143,13 @@ describe('resolveLocalRefs()', () => {
 
         expect(resolveLocalRefs({ $ref: '#/components/schemas/a~1b' }, root)).toEqual({ type: 'string' });
     });
+
+    it('reports a reference to a name an object only inherits, such as toString, as not found', () => {
+        expect(resolveLocalRefs({ $ref: '#/components/schemas/toString' }, { components: { schemas: {} } })).toEqual({
+            $ref: '#/components/schemas/toString',
+            unavailableDetail: 'reference not found',
+        });
+    });
 });
 
 describe('searchApiOperations()', () => {

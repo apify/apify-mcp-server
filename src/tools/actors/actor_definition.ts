@@ -13,7 +13,7 @@ import type {
     SchemaProperties,
 } from '../../types.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
-import { isRecord } from '../api/apify_api_spec.js';
+import { isRecord, resolveRef } from '../api/apify_api_spec.js';
 import type { BuildListItem } from '../builds/get_actor_build_list.js';
 
 const BUILD_NUMBER_PATTERN = /^\d+\.\d+\.\d+$/;
@@ -143,15 +143,30 @@ export type ServerOperation = { method: string; path: string; operation: Record<
 /**
  * The operations an OpenAPI document declares, in document order, with the method upper-cased as the agent writes
  * it; none for an absent or empty schema, which `hasWebServerSchema` reads as no HTTP interface. The path item's
- * parameters, which apply to every operation under the path, come before the operation's own.
+ * parameters, which apply to every operation under the path, come before the operation's own, and an operation's
+ * parameter replaces the path item's with the same name and location.
  */
 export function listServerOperations(schema: unknown): ServerOperation[] {
     if (!isRecord(schema) || !isRecord(schema.paths)) return [];
+    // A parameter's location and name, through a local `$ref`; a parameter without a name stands for itself.
+    const keyOf = (parameter: unknown): unknown => {
+        const resolved = resolveRef(parameter, schema);
+        return isRecord(resolved) && typeof resolved.name === 'string'
+            ? JSON.stringify([resolved.in, resolved.name])
+            : parameter;
+    };
     return Object.entries(schema.paths).flatMap(([path, pathItem]) =>
         isRecord(pathItem)
             ? OPENAPI_OPERATION_METHODS.filter((method) => isRecord(pathItem[method])).map((method) => {
                   const operation = pathItem[method] as Record<string, unknown>;
-                  const parameters = [pathItem.parameters, operation.parameters].filter(Array.isArray).flat();
+                  const parameters = [
+                      ...new Map(
+                          [pathItem.parameters, operation.parameters]
+                              .filter(Array.isArray)
+                              .flat()
+                              .map((parameter): [unknown, unknown] => [keyOf(parameter), parameter]),
+                      ).values(),
+                  ];
                   return {
                       method: method.toUpperCase(),
                       path,

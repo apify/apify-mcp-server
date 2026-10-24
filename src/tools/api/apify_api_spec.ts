@@ -78,10 +78,16 @@ export function resolveLocalRef(spec: unknown, ref: string): unknown {
     let node: unknown = spec;
     for (const segment of ref.slice(2).split('/')) {
         const key = segment.replaceAll('~1', '/').replaceAll('~0', '~');
-        if (typeof node !== 'object' || node === null || !(key in node)) return undefined;
+        if (typeof node !== 'object' || node === null || !Object.hasOwn(node, key)) return undefined;
         node = (node as Record<string, unknown>)[key];
     }
     return node;
+}
+
+/** `node` itself, or what its local `$ref` points to in `spec`: `undefined` for one not found. */
+export function resolveRef(node: unknown, spec: unknown): unknown {
+    if (!isRecord(node) || typeof node.$ref !== 'string' || !node.$ref.startsWith('#/')) return node;
+    return resolveLocalRef(spec, node.$ref);
 }
 
 /**

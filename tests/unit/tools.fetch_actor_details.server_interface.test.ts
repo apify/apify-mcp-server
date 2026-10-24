@@ -133,6 +133,19 @@ describe('buildServerInterfaceSection()', () => {
             );
         });
 
+        it("replaces a path-level parameter with the operation's parameter of the same name and location", () => {
+            const schema = {
+                paths: {
+                    '/items': {
+                        parameters: [{ name: 'verbose', in: 'query', required: true }],
+                        get: { summary: 'List items', parameters: [{ name: 'verbose', in: 'query' }] },
+                    },
+                },
+            };
+
+            expect(textOfSection({ schema, selection: true })).toContain('- GET /items: List items\n');
+        });
+
         it('names the send tool only when the session has it', () => {
             const text = textOfSection({ selection: true, loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS] });
 

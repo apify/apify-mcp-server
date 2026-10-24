@@ -3,14 +3,8 @@ import type { Actor } from '../../types.js';
 import { ACTOR_TENANCY } from '../../types.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { resolveActorTenancy } from '../actor_tool_naming.js';
-import { isRecord, resolveLocalRef, resolveLocalRefs } from '../api/apify_api_spec.js';
+import { isRecord, resolveLocalRefs, resolveRef } from '../api/apify_api_spec.js';
 import { listServerOperations, type ServerOperation } from './actor_definition.js';
-
-/** What a local `$ref` on `node` points to, one level deep; `node` itself when it has none. */
-function resolveRef(node: unknown, root: Record<string, unknown>): unknown {
-    if (!isRecord(node) || typeof node.$ref !== 'string' || !node.$ref.startsWith('#/')) return node;
-    return resolveLocalRef(root, node.$ref);
-}
 
 /** The names of the required parameters, and `request body` when it is required. */
 function listRequiredInputs(operation: Record<string, unknown>, schema: Record<string, unknown>): string[] {
