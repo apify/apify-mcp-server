@@ -2,10 +2,8 @@ import Ajv from 'ajv';
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import type { ApifyClient } from '../../apify_client.js';
 import { readBodyUnderCap, sendApifyApiRequest } from '../../apify_client.js';
 import { FAILURE_CATEGORY, HELPER_TOOLS, HTTP_FORBIDDEN, HTTP_UNAUTHORIZED, MAX_INLINE_BYTES } from '../../const.js';
-import { TimeoutError } from '../../errors.js';
 import { getActorMCPServerPath, resolveOnStandbyOrigin } from '../../mcp/actors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import { isTextualMimeType, maskSessionToken, parseCharset, REDACTED } from '../../resources/api_resources.js';
@@ -32,7 +30,7 @@ import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 
 const SERVER_ACTOR_REQUEST_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
-export type ServerActorRequestMethod = (typeof SERVER_ACTOR_REQUEST_METHODS)[number];
+type ServerActorRequestMethod = (typeof SERVER_ACTOR_REQUEST_METHODS)[number];
 
 const sendServerActorRequestArgs = z.object({
     actor: z
@@ -78,64 +76,12 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 }
 
 /** What one request got back; `body` is absent when it exceeded `MAX_INLINE_BYTES`, where reading stopped. */
-export type ServerActorResponse = {
+type ServerActorResponse = {
     status: number;
     contentType?: string;
     location?: string;
     body?: Buffer;
 };
-
-/**
- * Sends one request to a URL on an Actor's standby origin, which the caller has checked, through
- * `sendApifyApiRequest`: the session token and the request-origin header go along, there are no retries,
- * redirects are not followed, and the body is read as raw bytes, capped at `MAX_INLINE_BYTES` after
- * decompression. The deadline covers reading the body; when it passes before the client cancels, a
- * `TimeoutError` is thrown. A failure after the status arrived, a timeout included, carries it as `status`.
- */
-export async function fetchServerActorResponse(params: {
-    client: ApifyClient;
-    url: URL;
-    method: ServerActorRequestMethod;
-    body?: unknown;
-    signal: AbortSignal;
-    timeoutMillis: number;
-}): Promise<ServerActorResponse> {
-    const { client, url, method, body, signal, timeoutMillis } = params;
-    const deadline = AbortSignal.timeout(timeoutMillis);
-    let status: number | undefined;
-    try {
-        const response = await sendApifyApiRequest(client, {
-            url: url.href,
-            method,
-            // Bytes, not a string: apify-client compresses a string body of 1 KiB or more with brotli, which
-            // an Actor's server need not decode.
-            ...(body !== undefined && {
-                data: new TextEncoder().encode(JSON.stringify(body)),
-                headers: { 'Content-Type': 'application/json' },
-            }),
-            responseType: 'stream',
-            maxRedirects: 0,
-            signal: AbortSignal.any([signal, deadline]),
-        });
-        status = response.status;
-        const header = (name: string): string | undefined => {
-            const value: unknown = response.headers[name];
-            return typeof value === 'string' ? value : undefined;
-        };
-        return {
-            status,
-            contentType: header('content-type'),
-            location: header('location'),
-            body: await readBodyUnderCap(response),
-        };
-    } catch (error) {
-        const failure =
-            deadline.aborted && !signal.aborted
-                ? new TimeoutError(`The Actor server did not finish responding within ${timeoutMillis} ms`)
-                : toPlainError(error);
-        throw status === undefined ? failure : Object.assign(failure, { status });
-    }
-}
 
 /** The response with the Actor fields, and the status once one arrived, for the response telemetry. */
 function withServerActorTelemetry(response: ToolResponse, telemetry: ToolTelemetryContext): ToolResponse {
@@ -173,20 +119,17 @@ function buildResponse(params: {
     const contentType = response.contentType?.replaceAll(token, REDACTED);
     const location = response.location?.replaceAll(token, REDACTED);
     const outcome = `${method} ${path} on ${actorName} returned HTTP ${status}`;
+    const rejectBody = (reason: string) =>
+        respondUserError(`${outcome} ${reason} The request itself was sent.`, { httpStatus: status });
     if (response.body === undefined) {
-        return respondUserError(
-            `${outcome} with a body larger than ${MAX_INLINE_BYTES} bytes, so the body is not returned. ` +
-                'The request itself was sent.',
-            { httpStatus: status },
-        );
+        return rejectBody(`with a body larger than ${MAX_INLINE_BYTES} bytes, so the body is not returned.`);
     }
     const bytes = response.body.length;
     const baseMimeType = parseBaseMimeType(contentType);
     if (bytes > 0 && !isTextualMimeType(baseMimeType)) {
-        return respondUserError(
-            `${outcome} with ${bytes} bytes of ${baseMimeType ?? 'an unknown type'}, which this tool does not ` +
-                'return; it returns JSON, text, and XML bodies. The request itself was sent.',
-            { httpStatus: status },
+        return rejectBody(
+            `with ${bytes} bytes of ${baseMimeType ?? 'an unknown type'}, which this tool does not return; it ` +
+                'returns JSON, text, and XML bodies.',
         );
     }
     const charset = parseCharset(contentType) ?? 'utf-8';
@@ -195,11 +138,7 @@ function buildResponse(params: {
         try {
             body = new TextDecoder(charset).decode(maskSessionToken(response.body, token)).replaceAll(token, REDACTED);
         } catch {
-            return respondUserError(
-                `${outcome} with unsupported charset "${charset}", so the body is not returned. ` +
-                    'The request itself was sent.',
-                { httpStatus: status },
-            );
+            return rejectBody(`with unsupported charset "${charset}", so the body is not returned.`);
         }
     }
     const structuredContent = {
@@ -295,25 +234,42 @@ export async function executeSendServerActorRequest(
     // The path as sent, for the response text: the agent can write the token into a query value.
     const path = `${url.pathname}${url.search}`.replaceAll(apifyToken, REDACTED);
 
+    // The deadline covers reading the body too.
+    const deadline = AbortSignal.timeout(timeoutMillis);
+    let status: number | undefined;
     let response: ServerActorResponse;
     try {
-        response = await fetchServerActorResponse({
-            client: apifyClient,
-            url,
+        const sent = await sendApifyApiRequest(apifyClient, {
+            url: url.href,
             method: parsed.method,
-            body: parsed.body,
-            signal,
-            timeoutMillis,
+            // Bytes, not a string: apify-client compresses a string body of 1 KiB or more with brotli, which
+            // an Actor's server need not decode.
+            ...(parsed.body !== undefined && {
+                data: new TextEncoder().encode(JSON.stringify(parsed.body)),
+                headers: { 'Content-Type': 'application/json' },
+            }),
+            responseType: 'stream',
+            maxRedirects: 0,
+            signal: AbortSignal.any([signal, deadline]),
         });
+        status = sent.status;
+        const header = (name: string): string | undefined => {
+            const value: unknown = sent.headers[name];
+            return typeof value === 'string' ? value : undefined;
+        };
+        response = {
+            status,
+            contentType: header('content-type'),
+            location: header('location'),
+            body: await readBodyUnderCap(sent),
+        };
     } catch (error) {
         if (signal.aborted) return respondAborted();
-        const failure = error as Error & { status?: number };
-        const isTimeout = error instanceof TimeoutError;
+        const isTimeout = deadline.aborted;
         // A failure before any status, other than the deadline, is reported by the engine.
-        if (!isTimeout && failure.status === undefined) throw error;
-        const { status } = failure;
+        if (!isTimeout && status === undefined) throw toPlainError(error);
         const got = status === undefined ? 'got no complete response' : `got HTTP ${status} but not the whole body`;
-        const why = isTimeout ? `within ${timeoutMillis / 1000} seconds` : `(${failure.message})`;
+        const why = isTimeout ? `within ${timeoutMillis / 1000} seconds` : `(${toPlainError(error).message})`;
         return withServerActorTelemetry(
             respondServerError(
                 `${parsed.method} ${path} on ${actorFullName} ${got} ${why}, so nothing is returned. ` +
