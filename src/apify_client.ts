@@ -10,7 +10,7 @@ import type { PaymentHeaders } from './payments/types.js';
 const USER_AGENT_ORIGIN = 'Origin/mcp-server';
 
 // Request origin headers
-const REQUEST_ORIGIN_HEADER = 'X-Apify-Request-Origin';
+export const REQUEST_ORIGIN_HEADER = 'X-Apify-Request-Origin';
 
 /** Values sent in the X-Apify-Request-Origin header; expected to correspond to `META_ORIGINS` in `@apify/consts` on the backend. */
 export const REQUEST_ORIGIN = {

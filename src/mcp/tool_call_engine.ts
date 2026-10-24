@@ -63,7 +63,7 @@ export type PreparedCall = {
     apifyClient: ApifyClient;
     actorName: string | undefined;
     actorId: string | undefined;
-    standbyRejection: Record<string, unknown> | null;
+    preflightRejection: Record<string, unknown> | null;
     paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined;
     // The shell uses this decoded copy for telemetry.
     decodedArgs: Record<string, unknown>;
@@ -82,9 +82,9 @@ export type PreparedCallError = ToolCallOutcome & {
     decodedArgs: Record<string, unknown>;
 };
 
-/** Builds the pre-flight result; standby rejection takes precedence over 402. */
+/** Builds the pre-flight result; a preflight rejection takes precedence over 402. */
 export function buildPreflightFailureOutcome(
-    standbyRejection: Record<string, unknown> | null,
+    preflightRejection: Record<string, unknown> | null,
     paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined,
     actorName: string | undefined,
     actorId: string | undefined,
@@ -97,10 +97,10 @@ export function buildPreflightFailureOutcome(
         toolStatus: TOOL_STATUS.SOFT_FAIL,
         callDiagnostics: {
             failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-            ...(standbyRejection ? {} : { failure_http_status: 402 }),
+            ...(preflightRejection ? {} : { failure_http_status: 402 }),
             ...buildActorFields(actorName, actorId),
         },
-        result: (standbyRejection ?? paymentRequiredResult)!,
+        result: (preflightRejection ?? paymentRequiredResult)!,
     };
 }
 
@@ -289,11 +289,14 @@ export async function prepareToolCall(params: {
             };
         }
 
-        // Standby Actors need a specific rejection instead of a generic 402 in both modes; the tool declares the check.
+        // A tool's own argument rejection and, for standby Actors, a specific rejection come before a generic 402 in
+        // both modes; the tool declares both checks.
+        const argsRejection = tool.type === TOOL_TYPE.INTERNAL ? tool.rejectArgs?.(toolArgs, [...tools.keys()]) : null;
         const actorArg = (toolArgs as { actor?: unknown } | undefined)?.actor;
 
-        const standbyRejection =
-            paymentProvider &&
+        const preflightRejection =
+            argsRejection ??
+            (paymentProvider &&
             tool.hasPaymentProviderStandbyCheck &&
             typeof actorArg === 'string' &&
             actorArg.length > 0
@@ -303,7 +306,7 @@ export async function prepareToolCall(params: {
                       apifyToken,
                       mcpSessionId: params.mcpSessionId,
                   })
-                : null;
+                : null);
 
         return {
             tool,
@@ -312,7 +315,7 @@ export async function prepareToolCall(params: {
             apifyClient,
             actorName,
             actorId,
-            standbyRejection,
+            preflightRejection,
             paymentRequiredResult,
             decodedArgs,
         };
@@ -360,7 +363,7 @@ export async function executeSyncToolCall(
         sendNotification,
         emitLog,
     } = params;
-    const { tool, toolArgs, logSafeArgs, apifyClient, actorName, actorId, standbyRejection, paymentRequiredResult } =
+    const { tool, toolArgs, logSafeArgs, apifyClient, actorName, actorId, preflightRejection, paymentRequiredResult } =
         prepared;
     const resolvedToolName = getToolFullName(tool);
 
@@ -373,8 +376,8 @@ export async function executeSyncToolCall(
             failureHttpStatus: callDiagnostics.failure_http_status,
         }) as Record<string, unknown>;
 
-    if (standbyRejection || paymentRequiredResult) {
-        const outcome = buildPreflightFailureOutcome(standbyRejection, paymentRequiredResult, actorName, actorId);
+    if (preflightRejection || paymentRequiredResult) {
+        const outcome = buildPreflightFailureOutcome(preflightRejection, paymentRequiredResult, actorName, actorId);
         return {
             result: nudge(outcome.result, outcome.callDiagnostics),
             toolStatus: outcome.toolStatus,

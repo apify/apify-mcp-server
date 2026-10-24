@@ -32,10 +32,12 @@ Two MCP protocol revisions are served, each by its own adapter:
 - `client_context.ts` — protocol-neutral client identity and capabilities.
 - `errors.ts` — protocol-neutral domain errors mapped by each protocol adapter.
 - `tool_call_engine.ts` — shared `tools/call` orchestration. `prepareToolCall()` handles
-  preparation; `executeSyncToolCall()` runs synchronous calls.
-- `client.ts` — `connectMCPClient(url, token)`: transport negotiation.
+  preparation, including the tool's declared `rejectArgs` and standby checks, which come before a 402;
+  `executeSyncToolCall()` runs synchronous calls.
+- `client.ts` — `connectMCPClient(url, token)`: transport negotiation; both transports send the token and the
+  `MCP` request-origin header on every request.
 - `remote_tool_call.ts` — `withRemoteMcpClient()`: connect-call-close round trip for
-  `tool_dispatch.ts` and `call_actor.ts`'s remote tool calls.
+  `tool_dispatch.ts` and `call_actor_mcp_tool.ts`'s remote tool calls.
 - `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`, `getProxyMCPServerToolName(actorFullName, toolName)`.
 - `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`; `resolveOnStandbyOrigin()`:
   resolves a path against the Actor's `standbyUrl` (no `standbyUrl`, no URL) and flags a path that leaves that

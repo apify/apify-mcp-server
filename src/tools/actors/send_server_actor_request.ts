@@ -153,11 +153,12 @@ function buildNoServerInterfaceText(
     const text =
         `Actor '${actorName}' has no HTTP API documented by an API schema, so this tool cannot send it a ` +
         'request. See its README for how to use it.';
-    if (!loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL)) return text;
-    if (interfaces.mcp) {
-        return `${text} Its MCP tools are called with ${HELPER_TOOLS.ACTOR_CALL} as "${actorName}:toolName".`;
+    if (interfaces.mcp && loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL)) {
+        return `${text} Its MCP tools are called with ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL}.`;
     }
-    if (interfaces.input) return `${text} It runs from an input with ${HELPER_TOOLS.ACTOR_CALL}.`;
+    if (interfaces.input && loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL)) {
+        return `${text} It runs from an input with ${HELPER_TOOLS.ACTOR_CALL}.`;
+    }
     return text;
 }
 
@@ -259,7 +260,6 @@ export async function executeSendServerActorRequest(
     const tenancy = resolveActorTenancy(info);
     const telemetry: ToolTelemetryContext = { actorId: info.id, actorTenancy: tenancy };
 
-    // Not `getActorToolResolutionCached`: it resolves the MCP URL too, and a bad MCP path must not stop an HTTP request.
     const interfaces = resolveActorInterfaces({
         definition,
         actor: info,

@@ -3,10 +3,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApifyClient } from '../../src/apify_client.js';
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
-import { callActorPreExecute, executeCallActor } from '../../src/tools/actors/call_actor.js';
-import type { ActorDefinitionWithInfo } from '../../src/types.js';
+import {
+    callActor as callActorTool,
+    callActorPreExecute,
+    executeCallActor,
+} from '../../src/tools/actors/call_actor.js';
+import { callActorMcpTool } from '../../src/tools/actors/call_actor_mcp_tool.js';
+import { callActorWidget } from '../../src/tools/widgets/call_actor_widget.js';
+import type { ActorDefinitionWithInfo, ToolEntry } from '../../src/types.js';
+import * as actorUtils from '../../src/utils/actor.js';
 import type { ToolResponse } from '../../src/utils/mcp.js';
-import { withServer } from './helpers/mcp_server.js';
+import { getRequestHandler, makePaymentProvider, withServer } from './helpers/mcp_server.js';
 import { textOf, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 // Any Actor not seeded into the definition cache is unknown; the fetch fallback must not hit the network.
@@ -20,7 +27,6 @@ vi.mock('../../src/mcp/client.js', () => ({
         listTools: async () => ({
             tools: [{ name: 'add', description: 'adds', inputSchema: { type: 'object', properties: {} } }],
         }),
-        callTool: async () => ({ content: [{ type: 'text', text: 'MCP result' }] }),
         close: async () => {},
     })),
 }));
@@ -35,8 +41,6 @@ const STANDBY_INPUT = 'acme/standby-input';
 const STANDBY_EMPTY = 'acme/standby-empty';
 /** The unsupported cell addressed by its Actor ID — an identifier that is not the canonical `username/name`. */
 const STANDBY_EMPTY_ID = 'aBcD1234';
-/** A run-only Actor addressed by its Actor ID. */
-const RUN_ONLY_ID = 'zXyW9876';
 
 function seedActor(
     name: string,
@@ -76,10 +80,11 @@ function callActor(actor: string): Promise<ToolResponse> {
     return executeCallActor(stubToolCallContext({ actor, input: {} }, new ApifyClient({ token: 'test-token' })));
 }
 
-function preExecute(actor: string) {
-    return callActorPreExecute(stubToolCallContext({ actor, input: {} }, new ApifyClient({ token: 'test-token' })), {
-        route: HELPER_TOOLS.ACTOR_CALL,
-    });
+function preExecute(actor: string, loadedToolNames?: string[]) {
+    return callActorPreExecute(
+        stubToolCallContext({ actor, input: {} }, new ApifyClient({ token: 'test-token' }), { loadedToolNames }),
+        { route: HELPER_TOOLS.ACTOR_CALL },
+    );
 }
 
 function firstText(response: ToolResponse): string {
@@ -105,7 +110,6 @@ beforeEach(() => {
     seedActor(STANDBY_INPUT, { isStandbyEnabled: true, input: NON_EMPTY_INPUT });
     seedActor(STANDBY_EMPTY, { isStandbyEnabled: true });
     seedActor(STANDBY_EMPTY, { isStandbyEnabled: true, cacheKey: STANDBY_EMPTY_ID });
-    seedActor(RUN_ONLY, { input: NON_EMPTY_INPUT, cacheKey: RUN_ONLY_ID });
 });
 
 describe('Actor run/standby mode decision table', () => {
@@ -132,46 +136,26 @@ describe('Actor run/standby mode decision table', () => {
             },
         );
 
-        it('answers "is not an MCP server" for the actor:tool shape on a run-only Actor with a leftover path', async () => {
-            const result = await preExecute(`${RUN_ONLY_STALE_PATH}:add`);
-
-            expect(earlyText(result)).toContain('is not an MCP server');
-        });
-
-        it('records the "is not an MCP server" rejection as a caller mistake, not a server fault', async () => {
-            const result = await preExecute(`${RUN_ONLY_STALE_PATH}:add`);
-
-            expect(earlyResponseOf(result).toolTelemetry).toEqual(
-                expect.objectContaining({
-                    toolStatus: TOOL_STATUS.SOFT_FAIL,
-                    failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
-                }),
-            );
-        });
-
         it('runs a standby Actor with no MCP server but a non-empty input schema', async () => {
             const result = await preExecute(STANDBY_INPUT);
 
             expect('earlyResponse' in result).toBe(false);
         });
 
-        it('rejects the actor:tool shape for a standby Actor with no MCP server but a non-empty input schema', async () => {
-            const result = await preExecute(`${STANDBY_INPUT}:add`);
+        it('rejects a standby Actor exposing an MCP server, naming call-actor-mcp-tool only when the session has it', async () => {
+            const withMcpTool = earlyResponseOf(await preExecute(STANDBY_MCP));
+            const withoutMcpTool = earlyText(await preExecute(STANDBY_MCP, [HELPER_TOOLS.ACTOR_CALL]));
 
-            expect(earlyText(result)).toContain('is not an MCP server');
-        });
-
-        it('demands a tool name for a bare call on a standby Actor exposing an MCP server', async () => {
-            const result = await preExecute(STANDBY_MCP);
-
-            expect(earlyText(result)).toContain('tool name');
-        });
-
-        it('proxies an MCP tool call on a standby Actor exposing an MCP server', async () => {
-            const result = await callActor(`${STANDBY_MCP}:add`);
-
-            expect(firstText(result)).toBe('MCP result');
-            expect(result.isError).toBe(false);
+            expect(firstText(withMcpTool)).toContain(
+                `Its MCP tools are called with ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL}.`,
+            );
+            expect(withMcpTool.toolTelemetry).toEqual(
+                expect.objectContaining({
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                }),
+            );
+            expect(withoutMcpTool).not.toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
         });
 
         it('rejects a bare unsupported standby Actor during pre-execution', async () => {
@@ -180,55 +164,73 @@ describe('Actor run/standby mode decision table', () => {
             expect('earlyResponse' in result).toBe(true);
         });
 
-        it('answers the canonical standby-without-MCP message for both call shapes on the unsupported cell', async () => {
-            const bare = await callActor(STANDBY_EMPTY);
-            const withToolName = await preExecute(`${STANDBY_EMPTY}:add`);
+        describe('the removed actor:tool form', () => {
+            async function dispatch(
+                tools: ToolEntry[],
+                name: string,
+                paymentProvider?: ReturnType<typeof makePaymentProvider>,
+            ) {
+                return withServer(
+                    async (server) => {
+                        server.upsertTools(tools);
+                        return getRequestHandler(server, 'tools/call')(
+                            {
+                                method: 'tools/call',
+                                params: {
+                                    name,
+                                    arguments: { actor: `${STANDBY_MCP}:add`, input: {} },
+                                    _meta: { mcpSessionId: 's1' },
+                                },
+                            },
+                            { signal: new AbortController().signal, sendNotification: vi.fn() },
+                        );
+                    },
+                    { paymentProvider },
+                );
+            }
 
-            const withToolNameText = earlyText(withToolName);
+            it.each([
+                [HELPER_TOOLS.ACTOR_CALL, 'without', undefined],
+                [HELPER_TOOLS.ACTOR_CALL, 'with', makePaymentProvider()],
+                [HELPER_TOOLS.ACTOR_CALL_WIDGET, 'without', undefined],
+                [HELPER_TOOLS.ACTOR_CALL_WIDGET, 'with', makePaymentProvider()],
+            ])(
+                'is rejected by %s before any Actor lookup, %s a payment provider',
+                async (name, _label, paymentProvider) => {
+                    const definitionSpy = vi.spyOn(actorUtils, 'getActorDefinitionCached');
+                    const resolutionSpy = vi.spyOn(actorUtils, 'getActorToolResolutionCached');
 
-            expect(firstText(bare)).toBe(withToolNameText);
-            expect(withToolNameText).toContain('standby mode without an MCP server');
-            expect(bare.isError).toBe(true);
-            expect(earlyResponseOf(withToolName).isError).toBe(true);
+                    const result = await dispatch(
+                        [callActorTool, callActorWidget, callActorMcpTool],
+                        name,
+                        paymentProvider,
+                    );
+
+                    expect(result.isError).toBe(true);
+                    expect(JSON.stringify(result.content)).toContain(
+                        '"actorName:toolName\\" form is no longer supported',
+                    );
+                    expect(JSON.stringify(result.content)).toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
+                    expect(definitionSpy).not.toHaveBeenCalled();
+                    expect(resolutionSpy).not.toHaveBeenCalled();
+                },
+            );
+
+            it('names call-actor-mcp-tool only when the session has it', async () => {
+                const result = await dispatch([callActorTool], HELPER_TOOLS.ACTOR_CALL);
+
+                expect(result.isError).toBe(true);
+                expect(JSON.stringify(result.content)).not.toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
+            });
         });
 
-        it('answers with the canonical Actor name for both call shapes when addressed by Actor ID', async () => {
-            const bare = await callActor(STANDBY_EMPTY_ID);
-            const withToolName = await preExecute(`${STANDBY_EMPTY_ID}:add`);
+        it('answers the standby-without-MCP message with the canonical Actor name when addressed by Actor ID', async () => {
+            const result = await callActor(STANDBY_EMPTY_ID);
 
-            const withToolNameText = earlyText(withToolName);
-
-            expect(firstText(bare)).toBe(withToolNameText);
-            expect(withToolNameText).toContain(STANDBY_EMPTY);
-            expect(withToolNameText).not.toContain(STANDBY_EMPTY_ID);
-        });
-
-        it('answers "is not an MCP server" with the canonical Actor name when addressed by Actor ID', async () => {
-            const result = await preExecute(`${RUN_ONLY_ID}:add`);
-
-            expect('earlyResponse' in result).toBe(true);
-            const text = earlyText(result);
-            expect(text).toContain(RUN_ONLY);
-            expect(text).not.toContain(RUN_ONLY_ID);
-        });
-
-        it('answers not-found instead of "is not an MCP server" for the actor:tool shape on an unknown Actor', async () => {
-            const result = await preExecute('acme/ghost:add');
-
-            const text = earlyText(result);
-            expect(text).toContain("Actor 'acme/ghost' was not found");
-            expect(text).not.toContain('is not an MCP server');
-        });
-
-        it('keeps the unsupported-cell message distinct from the "is not an MCP server" wording', async () => {
-            const unsupported = await preExecute(`${STANDBY_EMPTY}:add`);
-            const runOnly = await preExecute(`${RUN_ONLY_STALE_PATH}:add`);
-
-            const unsupportedText = earlyText(unsupported);
-            const runOnlyText = earlyText(runOnly);
-
-            expect(unsupportedText).not.toBe(runOnlyText);
-            expect(unsupportedText).not.toContain('is not an MCP server');
+            const text = firstText(result);
+            expect(text).toContain('standby mode without an MCP server');
+            expect(text).toContain(STANDBY_EMPTY);
+            expect(text).not.toContain(STANDBY_EMPTY_ID);
         });
     });
 });

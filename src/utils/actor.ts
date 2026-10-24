@@ -1,10 +1,9 @@
 import type { ApifyClient } from '../apify_client.js';
-import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
+import { getActorMCPServerPath } from '../mcp/actors.js';
 import { actorDefinitionCache } from '../state.js';
 import { getActorToolModeFromInterfaces, resolveActorInterfaces } from '../tools/actor_tool_naming.js';
 import { getActorDefinition } from '../tools/actors/actor_definition.js';
 import type { ActorDefinitionWithInfo, ActorInfo, ActorToolResolutionResult } from '../types.js';
-import { ACTOR_TOOL_MODE } from '../types.js';
 import { getUserInfoCached } from './userid_cache.js';
 
 /**
@@ -56,10 +55,8 @@ export async function getActorDefinitionCached(
  * from it. The only place `resolveActorToolMode` is consulted outside the tool-loading factory, so `call-actor`
  * routing and tool loading share one rule.
  *
- * Returns `null` when there is no definition to classify (unknown Actor). The URL is a pure function of
- * the Actor record's `standbyUrl` and the definition's path (`getActorMCPServerURL` does no I/O), so this rides
- * the authorization-gated `getActorDefinitionCached` instead of a separate cache that would leak a private
- * Actor's URL across tenants.
+ * Returns `null` when there is no definition to classify (unknown Actor). It does not resolve the MCP server URL,
+ * so a bad `webServerMcpPath` fails only the MCP call that needs it (`runOnActorMcpServer`).
  */
 export async function getActorToolResolutionCached(
     actorIdOrName: string,
@@ -74,16 +71,9 @@ export async function getActorToolResolutionCached(
         webServerMcpPath: getActorMCPServerPath(cached.definition),
     };
     const interfaces = resolveActorInterfaces(actorInfo);
-    const toolMode = getActorToolModeFromInterfaces(interfaces);
-    const { actorFullName } = cached.definition;
-    // `getActorToolModeFromInterfaces` returns MCP only when `webServerMcpPath` is set.
-    if (toolMode === ACTOR_TOOL_MODE.MCP) {
-        return {
-            toolMode,
-            mcpServerUrl: await getActorMCPServerURL(cached.info, actorInfo.webServerMcpPath!),
-            actorFullName,
-            interfaces,
-        };
-    }
-    return { toolMode, actorFullName, interfaces };
+    return {
+        toolMode: getActorToolModeFromInterfaces(interfaces),
+        actorFullName: cached.definition.actorFullName,
+        interfaces,
+    };
 }

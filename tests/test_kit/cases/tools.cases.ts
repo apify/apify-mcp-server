@@ -4,10 +4,7 @@ import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/cl
 import { ErrorCode, LoggingMessageNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import { expect, vi } from 'vitest';
 
-import {
-    APIFY_ACTOR_RUN_META_KEY,
-    CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
-} from '@apify/actors-mcp-server/internals/test-kit.js';
+import { APIFY_ACTOR_RUN_META_KEY } from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
     ACTOR_EXAMPLE_MCP_SERVER,
@@ -57,34 +54,39 @@ export const toolsCases: Case[] = [
         }),
     },
     {
-        // Regression #415: after listTools caches validators, MCP passthrough must return structuredContent.
-        name: 'MCP server actor:tool pass-through returns structuredContent satisfying outputSchema',
+        name: 'calls an MCP server Actor tool with call-actor-mcp-tool and returns the remote result',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
-            // Populates the SDK's `_cachedToolOutputValidators` map so callTool runs schema validation.
+            // Populates the SDK's `_cachedToolOutputValidators` map, so callTool validates against any outputSchema.
             await client.listTools();
 
             const callResult = await client.callTool({
+                name: 'call-actor-mcp-tool',
+                arguments: {
+                    actor: ACTOR_EXAMPLE_MCP_SERVER,
+                    tool: 'add',
+                    arguments: { firstNumber: 2, secondNumber: 3 },
+                },
+            });
+
+            expect(callResult.content).toEqual(buildExampleMcpServerAddToolContent(2, 3));
+            expect(callResult.isError ?? false).toBe(false);
+            expect(callResult).not.toHaveProperty('structuredContent.runId');
+        }),
+    },
+    {
+        name: 'rejects the actor:tool form of call-actor and names call-actor-mcp-tool',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
+            const response = await client.callTool({
                 name: 'call-actor',
                 arguments: { actor: `${ACTOR_EXAMPLE_MCP_SERVER}:add`, input: { firstNumber: 2, secondNumber: 3 } },
             });
 
-            // Passthrough has no Apify run — expect sentinel structuredContent fields.
-            const sc = (callResult as { structuredContent?: Record<string, unknown> }).structuredContent;
-            expect(sc).toBeDefined();
-            expect(sc).toHaveProperty('runId');
-            expect(sc).toHaveProperty('actorId');
-            expect(sc).toHaveProperty('status');
-            expect(sc).toHaveProperty('storages');
-            expect(sc).toHaveProperty('summary');
-            expect(sc).toHaveProperty('nextStep');
-
-            // Remote payload must still flow through content.
-            const content = callResult.content as { text: string }[];
-            expect(content).toEqual(buildExampleMcpServerAddToolContent(2, 3));
-
-            // isError must be forwarded from the remote tool.
-            expect(callResult.isError ?? false).toBe(false);
+            const content = response.content as { text: string }[];
+            expect(response.isError).toBe(true);
+            expect(content[0].text).toContain('"actorName:toolName" form is no longer supported');
+            expect(content[0].text).toContain('call-actor-mcp-tool');
         }),
     },
     {
@@ -230,7 +232,7 @@ export const toolsCases: Case[] = [
         }),
     },
     {
-        name: 'should return error message when trying to call MCP server Actor without tool name in actor parameter',
+        name: 'rejects call-actor on an MCP server Actor and names call-actor-mcp-tool',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const response = await client.callTool({
@@ -239,9 +241,9 @@ export const toolsCases: Case[] = [
             });
 
             const content = response.content as { text: string }[];
-            expect(content.length).toBeGreaterThan(0);
-            expect(content[0].text).toContain(CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG);
             expect(response.isError).toBe(true);
+            expect(content[0].text).toContain(`Actor '${ACTOR_EXAMPLE_MCP_SERVER}' is an MCP server`);
+            expect(content[0].text).toContain('call-actor-mcp-tool');
         }),
     },
     {

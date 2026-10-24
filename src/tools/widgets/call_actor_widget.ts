@@ -8,13 +8,13 @@ import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { respondServerError } from '../../utils/mcp.js';
 import { extractActorId } from '../../utils/tools.js';
 import { buildStartRunWidgetResponse } from '../actors/actor_run_response.js';
 import {
     buildCallActorErrorResponse,
     callActorPreExecute,
     callOptionsSchema,
+    rejectMcpToolSyntax,
     resolveAndValidateActor,
 } from '../actors/call_actor.js';
 import { actorRunOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
@@ -26,8 +26,6 @@ import { actorRunOutputSchema, anyJsonObjectSchema } from '../structured_output_
  * AJV may also remove unknown properties at the server boundary, but any non-AJV execution
  * path must explicitly parse with this schema in the handler to enforce the same runtime
  * contract. The widget is always async.
- *
- * The widget variant does not support MCP `actor:toolName` syntax — use `call-actor` for that.
  */
 const callActorWidgetArgsSchema = z
     .object({
@@ -85,6 +83,7 @@ export const callActorWidget: ToolEntry = Object.freeze({
     ajvValidate: compileSchema(z.toJSONSchema(callActorWidgetArgsSchema)),
     paymentRequired: true,
     hasPaymentProviderStandbyCheck: true,
+    rejectArgs: rejectMcpToolSyntax,
     _meta: getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
     annotations: {
         title: 'Call Actor (widget)',
@@ -94,27 +93,18 @@ export const callActorWidget: ToolEntry = Object.freeze({
         openWorldHint: true,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const rawActor = toolArgs.args?.actor;
-        if (typeof rawActor === 'string' && rawActor.includes(':')) {
-            return respondServerError([
-                `${HELPER_TOOLS.ACTOR_CALL_WIDGET} does not render widgets for MCP tool calls.`,
-                `Use ${HELPER_TOOLS.ACTOR_CALL} for the "actorName:toolName" syntax.`,
-            ]);
-        }
-
         const preResult = await callActorPreExecute(toolArgs, { route: HELPER_TOOLS.ACTOR_CALL_WIDGET });
         if ('earlyResponse' in preResult) {
             return preResult.earlyResponse;
         }
 
-        const { parsed, baseActorName } = preResult;
-        const { input, callOptions } = parsed;
+        const { actor: actorName, input, callOptions } = preResult.parsed;
 
         let resolvedActorId: string | undefined;
         let resolvedInputSchema: ToolInputSchema | undefined;
         try {
             const resolution = await resolveAndValidateActor({
-                actorName: baseActorName,
+                actorName,
                 input: input as Record<string, unknown>,
                 toolArgs,
             });
@@ -126,21 +116,21 @@ export const callActorWidget: ToolEntry = Object.freeze({
             resolvedInputSchema = resolution.actor.inputSchema;
             const { apifyClient } = toolArgs;
 
-            const actorClient = apifyClient.actor(baseActorName);
+            const actorClient = apifyClient.actor(actorName);
             const actorRun = await actorClient.start(input, callOptions);
             log.debug('Started Actor run (widget)', {
-                actorName: baseActorName,
+                actorName,
                 runId: actorRun.id,
                 mcpSessionId: toolArgs.mcpSessionId,
             });
-            const response = buildStartRunWidgetResponse({ actorName: baseActorName, actorRun });
+            const response = buildStartRunWidgetResponse({ actorName, actorRun });
             return {
                 ...response,
                 toolTelemetry: { actorId: resolvedActorId },
             };
         } catch (error) {
             return buildCallActorErrorResponse({
-                actorName: baseActorName,
+                actorName,
                 error,
                 actorId: resolvedActorId,
                 mcpSessionId: toolArgs.mcpSessionId,

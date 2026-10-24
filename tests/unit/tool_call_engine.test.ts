@@ -130,7 +130,7 @@ describe('prepareToolCall()', () => {
             expect('message' in result).toBe(false);
             const prepared = result as PreparedCall;
             expect(prepared.tool.name).toBe('recorder-tool');
-            expect(prepared.standbyRejection).toBeNull();
+            expect(prepared.preflightRejection).toBeNull();
             expect(prepared.paymentRequiredResult).toBeUndefined();
             expect(telemetryData.tool_name).toBe('recorder-tool');
         });
