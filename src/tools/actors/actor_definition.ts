@@ -13,6 +13,7 @@ import type {
     SchemaProperties,
 } from '../../types.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
+import { isRecord } from '../api/apify_api_spec.js';
 import type { BuildListItem } from '../builds/get_actor_build_list.js';
 
 const BUILD_NUMBER_PATTERN = /^\d+\.\d+\.\d+$/;
@@ -134,16 +135,14 @@ async function resolveStandbyBuildId(
     return undefined;
 }
 
-/** An absent schema, or one with paths but no operations, means the Actor exposes no HTTP interface. */
+/**
+ * True when the schema declares at least one operation, an object under a method key of a path item.
+ * The schema is publisher-written and unvalidated, so any level that is not an object counts as absent.
+ */
 function hasWebServerSchemaOperations(schema: unknown): boolean {
-    if (typeof schema !== 'object' || schema === null) return false;
-    const { paths } = schema as { paths?: unknown };
-    if (typeof paths !== 'object' || paths === null) return false;
-    return Object.values(paths).some(
-        (pathItem) =>
-            typeof pathItem === 'object' &&
-            pathItem !== null &&
-            OPENAPI_OPERATION_METHODS.some((method) => method in pathItem),
+    if (!isRecord(schema) || !isRecord(schema.paths)) return false;
+    return Object.values(schema.paths).some(
+        (pathItem) => isRecord(pathItem) && OPENAPI_OPERATION_METHODS.some((method) => isRecord(pathItem[method])),
     );
 }
 
