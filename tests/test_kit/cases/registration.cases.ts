@@ -111,7 +111,7 @@ export const registrationCases: Case[] = [
         isDeploymentTest: true,
         run: withClient({ telemetry: { enabled: true } }, async (client) => {
             const names = getToolNames(await client.listTools());
-            expect(names).toHaveLength(9 + AUTO_INJECTED_TOOL_NAMES.length);
+            expect(names).toHaveLength(10 + AUTO_INJECTED_TOOL_NAMES.length);
             expect(names).toContain('report-problem');
         }),
     },
