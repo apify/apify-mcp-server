@@ -84,10 +84,17 @@ export function resolveLocalRef(spec: unknown, ref: string): unknown {
     return node;
 }
 
-/** `node` itself, or what its local `$ref` points to in `spec`: `undefined` for one not found. */
+/** Follows top-level local reference chains only; `undefined` for a missing or circular reference. */
 export function resolveRef(node: unknown, spec: unknown): unknown {
-    if (!isRecord(node) || typeof node.$ref !== 'string' || !node.$ref.startsWith('#/')) return node;
-    return resolveLocalRef(spec, node.$ref);
+    const seen = new Set<string>();
+    let resolved = node;
+    // Parameter aliases must reach their name and location before overrides are matched; see #1645.
+    while (isRecord(resolved) && typeof resolved.$ref === 'string' && resolved.$ref.startsWith('#/')) {
+        if (seen.has(resolved.$ref)) return undefined;
+        seen.add(resolved.$ref);
+        resolved = resolveLocalRef(spec, resolved.$ref);
+    }
+    return resolved;
 }
 
 /**
@@ -97,21 +104,48 @@ export function resolveRef(node: unknown, spec: unknown): unknown {
  * Nothing is fetched.
  */
 export function resolveLocalRefs(node: unknown, spec: unknown): unknown {
+    const hasRefSiblings = isRecord(spec) && typeof spec.openapi === 'string' && /^3\.[1-9]\d*\./.test(spec.openapi);
     let expandedSize = 0;
-    const resolve = (value: unknown, seen: readonly string[]): unknown => {
-        if (Array.isArray(value)) return value.map((item) => resolve(item, seen));
+    const resolve = (value: unknown, seen: readonly string[], isSchema = false): unknown => {
+        if (Array.isArray(value)) return value.map((item) => resolve(item, seen, isSchema));
         if (!isRecord(value)) return value;
-        const { $ref } = value;
+        const { $ref, ...rest } = value;
         if (typeof $ref !== 'string') {
-            return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, resolve(child, seen)]));
+            return Object.fromEntries(
+                Object.entries(value).map(([key, child]) => [key, resolve(child, seen, isSchema || key === 'schema')]),
+            );
         }
-        if (seen.includes($ref)) return { $ref, unavailableDetail: 'circular reference' };
-        if (!$ref.startsWith('#/')) return { $ref, unavailableDetail: 'external reference, not fetched' };
+        const hasSchemaContext = isSchema || $ref.startsWith('#/components/schemas/');
+        // 3.1 Schema Objects keep all siblings; Reference Objects override only these annotations.
+        // https://spec.openapis.org/oas/v3.1.0.html#reference-object (see #1645).
+        const siblings = hasRefSiblings
+            ? Object.fromEntries(
+                  Object.entries(rest).filter(
+                      ([key]) => hasSchemaContext || key === 'summary' || key === 'description',
+                  ),
+              )
+            : {};
+        const unavailable = (unavailableDetail: string) => ({
+            ...(resolve(siblings, seen, hasSchemaContext) as Record<string, unknown>),
+            $ref,
+            unavailableDetail,
+        });
+        if (seen.includes($ref)) return unavailable('circular reference');
+        if (!$ref.startsWith('#/')) return unavailable('external reference, not fetched');
         const target = resolveLocalRef(spec, $ref);
-        if (target === undefined) return { $ref, unavailableDetail: 'reference not found' };
+        if (target === undefined) return unavailable('reference not found');
         expandedSize += JSON.stringify(target).length;
-        if (expandedSize > MAX_INLINE_BYTES) return { $ref, unavailableDetail: 'not expanded, size cap reached' };
-        return resolve(target, [...seen, $ref]);
+        if (expandedSize > MAX_INLINE_BYTES) return unavailable('not expanded, size cap reached');
+        const resolved = resolve(target, [...seen, $ref], hasSchemaContext);
+        if (Object.keys(siblings).length === 0) return resolved;
+        const resolvedSiblings = resolve(siblings, seen, hasSchemaContext) as Record<string, unknown>;
+        if (!hasSchemaContext) return { ...(isRecord(resolved) && resolved), ...resolvedSiblings };
+        // Keep constraints conjunctive, including overlapping keywords; a spread can weaken the target.
+        // Siblings stay outside allOf so unevaluatedProperties can see the target's evaluated properties.
+        return {
+            ...resolvedSiblings,
+            allOf: [resolved, ...(Array.isArray(resolvedSiblings.allOf) ? resolvedSiblings.allOf : [])],
+        };
     };
     return resolve(node, []);
 }

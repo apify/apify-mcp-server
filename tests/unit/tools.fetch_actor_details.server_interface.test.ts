@@ -146,6 +146,47 @@ describe('buildServerInterfaceSection()', () => {
             expect(textOfSection({ schema, selection: true })).toContain('- GET /items: List items\n');
         });
 
+        it('lists required inputs through a parameter alias chain', () => {
+            const schema = {
+                openapi: '3.0.3',
+                paths: { '/search': { get: { parameters: [{ $ref: '#/components/parameters/Alias' }] } } },
+                components: {
+                    parameters: {
+                        Alias: { $ref: '#/components/parameters/Search' },
+                        Search: { name: 'q', in: 'query', required: true, schema: { type: 'string' } },
+                    },
+                },
+            };
+
+            expect(textOfSection({ schema, selection: true })).toContain('- GET /search Required: q.');
+        });
+
+        it('replaces an aliased path-level parameter by its operation-level override', () => {
+            const schema = {
+                openapi: '3.0.3',
+                paths: {
+                    '/search': {
+                        parameters: [{ $ref: '#/components/parameters/Alias' }],
+                        get: {
+                            summary: 'Search',
+                            parameters: [{ name: 'q', in: 'query', schema: { type: 'integer' } }],
+                        },
+                    },
+                },
+                components: {
+                    parameters: {
+                        Alias: { $ref: '#/components/parameters/Search' },
+                        Search: { name: 'q', in: 'query', required: true, schema: { type: 'string' } },
+                    },
+                },
+            };
+
+            expect(textOfSection({ schema, selection: true })).toContain('- GET /search: Search\n');
+            const text = textOfSection({ schema, selection: 'GET /search' });
+            const detail = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+            expect(detail.parameters).toEqual([{ name: 'q', in: 'query', schema: { type: 'integer' } }]);
+        });
+
         it('names the send tool only when the session has it', () => {
             const text = textOfSection({ selection: true, loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS] });
 
@@ -197,6 +238,34 @@ describe('buildServerInterfaceSection()', () => {
             expect(text).toContain('# Server interface: POST /add');
             expect(text).toContain('"required":["firstNumber"]');
             expect(text).not.toContain('/empty');
+        });
+
+        it('renders OpenAPI 3.1 schema constraints next to a resolved request-body reference', () => {
+            const schema = {
+                openapi: '3.1.0',
+                paths: {
+                    '/search': {
+                        post: {
+                            requestBody: {
+                                content: {
+                                    'application/json': {
+                                        schema: { $ref: '#/components/schemas/Text', maxLength: 10 },
+                                    },
+                                },
+                            },
+                            responses: { '200': { description: 'OK' } },
+                        },
+                    },
+                },
+                components: { schemas: { Text: { type: 'string' } } },
+            };
+
+            const text = textOfSection({ schema, selection: 'POST /search' });
+            const detail = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+            expect(detail.requestBody.content['application/json'].schema).toEqual({
+                maxLength: 10,
+                allOf: [{ type: 'string' }],
+            });
         });
 
         it.each(['GET /nope', 'add', 'DELETE /add'])(

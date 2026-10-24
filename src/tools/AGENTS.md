@@ -84,7 +84,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     choice never offer it.
     `apify_api_spec.ts` builds the operation index from the spec (cached for a day) and owns `resolveLocalRefs`,
     the one `$ref` resolver (circular, missing or external references, and those past `MAX_INLINE_BYTES` of
-    expanded detail, are kept with a note; nothing is fetched), with `resolveRef` as its one-level form, also used
+    expanded detail, are kept with a note; nothing is fetched), preserving OpenAPI 3.1 schema siblings as
+    conjunctive constraints and Reference Object summary/description overrides, with `resolveRef` following only
+    top-level local reference chains, also used
     for Actors' API schemas; search and
     details use it, the write tool uses it to choose a method that was not given, and a call uses it
     otherwise only for hints, waiting at most a few seconds, so a failed download does not stop a

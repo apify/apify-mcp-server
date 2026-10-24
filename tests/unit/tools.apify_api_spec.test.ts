@@ -6,6 +6,7 @@ import {
     APIFY_API_OPENAPI_URL,
     buildApiOperationIndex,
     resolveLocalRefs,
+    resolveRef,
     searchApiOperations,
 } from '../../src/tools/api/apify_api_spec.js';
 import { API_SPEC_FIXTURE } from './helpers/apify_api_spec_fixture.js';
@@ -91,7 +92,170 @@ describe('buildApiOperationIndex()', () => {
     });
 });
 
+describe('local reference chains', () => {
+    it('resolves aliases without expanding the final object’s nested schema', () => {
+        const parameter = { name: 'q', in: 'query', required: true, schema: { $ref: '#/components/schemas/Text' } };
+        const spec = {
+            components: { parameters: { Alias: { $ref: '#/components/parameters/Search' }, Search: parameter } },
+        };
+
+        expect(resolveRef({ $ref: '#/components/parameters/Alias' }, spec)).toBe(parameter);
+    });
+
+    it('stops a circular alias chain and leaves an external reference unresolved', () => {
+        const spec = { components: { parameters: { Alias: { $ref: '#/components/parameters/Alias' } } } };
+
+        expect(resolveRef({ $ref: '#/components/parameters/Alias' }, spec)).toBeUndefined();
+        expect(resolveRef({ $ref: '#/components/parameters/Missing' }, spec)).toBeUndefined();
+        expect(resolveRef({ $ref: 'https://example.com/parameter.json' }, spec)).toEqual({
+            $ref: 'https://example.com/parameter.json',
+        });
+    });
+});
+
 describe('resolveLocalRefs()', () => {
+    it('preserves OpenAPI 3.1 schema siblings as constraints alongside the referenced schema', () => {
+        const spec = {
+            openapi: '3.1.0',
+            components: { schemas: { Text: { type: 'string', maxLength: 5 }, Minimum: { minLength: 2 } } },
+        };
+
+        expect(
+            resolveLocalRefs(
+                {
+                    schema: {
+                        $ref: '#/components/schemas/Text',
+                        maxLength: 10,
+                        allOf: [{ $ref: '#/components/schemas/Minimum' }],
+                    },
+                },
+                spec,
+            ),
+        ).toEqual({
+            schema: {
+                maxLength: 10,
+                allOf: [{ type: 'string', maxLength: 5 }, { minLength: 2 }],
+            },
+        });
+    });
+
+    it('uses schema context for a reference outside components.schemas', () => {
+        const spec = { openapi: '3.1.0', definitions: { Text: { type: 'string' } } };
+
+        expect(
+            resolveLocalRefs(
+                {
+                    schema: {
+                        type: 'object',
+                        properties: { text: { $ref: '#/definitions/Text', maxLength: 10 } },
+                    },
+                },
+                spec,
+            ),
+        ).toEqual({
+            schema: {
+                type: 'object',
+                properties: { text: { maxLength: 10, allOf: [{ type: 'string' }] } },
+            },
+        });
+    });
+
+    it('overrides only summary and description siblings on OpenAPI 3.1 Reference Objects', () => {
+        const spec = {
+            openapi: '3.1.0',
+            components: { responses: { Result: { description: 'Default response', content: {} } } },
+        };
+
+        expect(
+            resolveLocalRefs(
+                {
+                    responses: {
+                        '200': {
+                            $ref: '#/components/responses/Result',
+                            summary: 'Search response',
+                            description: '',
+                            content: { ignored: true },
+                        },
+                    },
+                },
+                spec,
+            ),
+        ).toEqual({
+            responses: {
+                '200': {
+                    summary: 'Search response',
+                    description: '',
+                    content: {},
+                },
+            },
+        });
+    });
+
+    it('ignores reference siblings in OpenAPI 3.0', () => {
+        const spec = {
+            openapi: '3.0.3',
+            components: { schemas: { Text: { type: 'string', description: 'Default' } } },
+        };
+
+        expect(
+            resolveLocalRefs(
+                {
+                    schema: {
+                        $ref: '#/components/schemas/Text',
+                        maxLength: 10,
+                        description: 'Ignored',
+                    },
+                },
+                spec,
+            ),
+        ).toEqual({ schema: { type: 'string', description: 'Default' } });
+    });
+
+    it('retains OpenAPI 3.1 schema siblings when a reference cannot be expanded', () => {
+        const spec = {
+            openapi: '3.1.0',
+            components: { schemas: { Loop: { $ref: '#/components/schemas/Loop', maxLength: 5 } } },
+        };
+
+        expect(resolveLocalRefs({ schema: { $ref: '#/components/schemas/Loop', minLength: 2 } }, spec)).toEqual({
+            schema: {
+                minLength: 2,
+                allOf: [{ $ref: '#/components/schemas/Loop', maxLength: 5, unavailableDetail: 'circular reference' }],
+            },
+        });
+        expect(resolveLocalRefs({ schema: { $ref: '#/components/schemas/Missing', maxLength: 10 } }, spec)).toEqual({
+            schema: { $ref: '#/components/schemas/Missing', maxLength: 10, unavailableDetail: 'reference not found' },
+        });
+        expect(resolveLocalRefs({ schema: { $ref: 'https://example.com/schema.json', maxLength: 10 } }, spec)).toEqual({
+            schema: {
+                $ref: 'https://example.com/schema.json',
+                maxLength: 10,
+                unavailableDetail: 'external reference, not fetched',
+            },
+        });
+    });
+
+    it('applies the expansion budget to references in OpenAPI 3.1 schema siblings', () => {
+        const schemas: Record<string, unknown> = { S16: { type: 'string' } };
+        for (let level = 0; level < 16; level++) {
+            const next = { $ref: `#/components/schemas/S${level + 1}` };
+            schemas[`S${level}`] = { $ref: `#/components/schemas/S${level + 1}`, allOf: [next] };
+        }
+
+        const resolved = JSON.stringify(
+            resolveLocalRefs(
+                { schema: { $ref: '#/components/schemas/S0' } },
+                {
+                    openapi: '3.1.0',
+                    components: { schemas },
+                },
+            ),
+        );
+
+        expect(resolved).toContain('"unavailableDetail":"not expanded, size cap reached"');
+        expect(resolved.length).toBeLessThan(3 * MAX_INLINE_BYTES);
+    });
+
     it('keeps a circular, a missing and an external reference, each with a note', () => {
         const root = {
             components: {
