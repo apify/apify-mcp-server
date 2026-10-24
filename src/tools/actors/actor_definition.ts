@@ -13,12 +13,10 @@ import type {
     SchemaProperties,
 } from '../../types.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
+import type { BuildListItem } from '../builds/get_actor_build_list.js';
 import { OPENAPI_OPERATION_METHODS } from './server_interface_schema.js';
 
 const BUILD_NUMBER_PATTERN = /^\d+\.\d+\.\d+$/;
-
-/** `GET /v2/acts/{id}/builds` items carry `buildNumber`; apify-client's `BuildCollectionClientListItem` omits it. */
-type BuildListItem = { id: string; buildNumber?: string };
 
 /**
  * Get an Actor's pruned definition by Actor ID or name.

@@ -5,7 +5,7 @@ import type { ApifyClient } from '../../apify_client.js';
 import { sendApifyApiRequest } from '../../apify_client.js';
 import { FAILURE_CATEGORY, HELPER_TOOLS, HTTP_FORBIDDEN, HTTP_UNAUTHORIZED, MAX_INLINE_BYTES } from '../../const.js';
 import { TimeoutError } from '../../errors.js';
-import { getActorMCPServerPath } from '../../mcp/actors.js';
+import { getActorMCPServerPath, resolveOnStandbyOrigin } from '../../mcp/actors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import {
     collectStream,
@@ -106,9 +106,9 @@ export async function fetchServerActorResponse(params: {
     method: ServerActorRequestMethod;
     body?: unknown;
     signal: AbortSignal;
-    timeoutMillis?: number;
+    timeoutMillis: number;
 }): Promise<ServerActorResponse> {
-    const { client, url, method, body, signal, timeoutMillis = EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } = params;
+    const { client, url, method, body, signal, timeoutMillis } = params;
     const deadline = AbortSignal.timeout(timeoutMillis);
     let status: number | undefined;
     try {
@@ -265,7 +265,8 @@ export async function executeSendServerActorRequest(
             telemetry,
         );
     }
-    if (!info.standbyUrl || !URL.canParse(info.standbyUrl)) {
+    const resolved = resolveOnStandbyOrigin(info, parsed.path);
+    if (!resolved) {
         return withServerActorTelemetry(
             respondServerError(
                 `Actor '${actorFullName}' has no valid standby URL in its Actor Standby configuration, so its ` +
@@ -274,13 +275,12 @@ export async function executeSendServerActorRequest(
             telemetry,
         );
     }
-    // The token goes to whatever host the URL names, so the path may not change the origin or add credentials.
-    const standby = new URL(info.standbyUrl);
-    const url = new URL(parsed.path, standby);
-    if (url.origin !== standby.origin || url.username || url.password) {
+    // Unlike the MCP URL, a path with credentials is refused rather than stripped: the agent wrote them.
+    const { url, standbyOrigin } = resolved;
+    if (!url || url.username || url.password) {
         return withServerActorTelemetry(
             respondUserError(
-                `The path "${parsed.path}" leaves the Actor's server at ${standby.origin}, so it is not sent.`,
+                `The path "${parsed.path}" leaves the Actor's server at ${standbyOrigin}, so it is not sent.`,
             ),
             telemetry,
         );
