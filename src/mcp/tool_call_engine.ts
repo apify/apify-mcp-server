@@ -297,12 +297,14 @@ export async function prepareToolCall(params: {
             };
         }
 
-        // Standby Actors need a specific rejection instead of a generic 402 in both modes.
-        const isCallActorTool = tool.name === HELPER_TOOLS.ACTOR_CALL || tool.name === HELPER_TOOLS.ACTOR_CALL_WIDGET;
+        // Standby Actors need a specific rejection instead of a generic 402 in both modes; the tool declares the check.
         const actorArg = (toolArgs as { actor?: unknown } | undefined)?.actor;
 
         const standbyRejection =
-            paymentProvider && isCallActorTool && typeof actorArg === 'string' && actorArg.length > 0
+            paymentProvider &&
+            tool.hasPaymentProviderStandbyCheck &&
+            typeof actorArg === 'string' &&
+            actorArg.length > 0
                 ? await checkPaymentProviderStandbyConflict({
                       actorName: actorArg,
                       paymentProvider,

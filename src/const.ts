@@ -56,6 +56,7 @@ export const HELPER_TOOLS = {
     ACTOR_CALL: 'call-actor',
     ACTOR_CREATE: 'create-actor',
     ACTOR_CALL_WIDGET: 'call-actor-widget',
+    ACTOR_SERVER_REQUEST: 'send-server-actor-request',
     ACTOR_DELETE: 'delete-actor',
     ACTOR_GET_DETAILS: 'fetch-actor-details',
     ACTOR_GET_DETAILS_WIDGET: 'fetch-actor-details-widget',

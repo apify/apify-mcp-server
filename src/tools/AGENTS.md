@@ -29,6 +29,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     the server-interface fields — `webServerMcpPath`, `webServerSchema` — are read from when standby is on,
     `resolveServerInterfaceDefinition`, shared with `fetchActorDetails` in `../utils/actor_details.ts`; the input
     schema and README stay on the default build),
+    `send_server_actor_request.ts` (`send-server-actor-request`: one HTTP request to a Server Actor's API, gated on
+    the `server` interface and sent by `fetchServerActorResponse` through `sendApifyApiRequest` with raw response
+    bytes, no redirects, the `MAX_INLINE_BYTES` cap after decompression and the `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`
+    deadline; the path is resolved against the Actor's `standbyUrl` and must keep its origin),
     `actor_tool_contract.ts` (Actor-specific presentation policies plus direct-tool input restrictions
     and defaults, shared by schema generation, the call engine's denied-input check and execution;
     generic calls skip direct-only restrictions and defaults), and
@@ -83,8 +87,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     response, redacts the `urlSigningSecretKey` and `password` values in a JSON body, keeps a query in
     the path out of the error it throws, and adds the closest spec paths to a `page-not-found` 404 (a
     wrong path), not to a missing record.
-    The one capped request (`sendApifyApiRequest`) is in `../apify_client.ts`. The origin check
-    (`isApifyApiUri`), the detection of a body over `MAX_INLINE_BYTES` (`isMaxContentLengthAbort`),
+    The one capped request (`sendApifyApiRequest`) and the detection of a body over `MAX_INLINE_BYTES`
+    (`isMaxContentLengthAbort`) are in `../apify_client.ts`. The origin check (`isApifyApiUri`),
     the binary token mask (`maskSessionToken`), the secret redaction (`redactJsonSecrets`) and
     `REDACTED` are the API resource's own, imported from `../resources/api_resources.ts`
     ([`../resources/AGENTS.md`](../resources/AGENTS.md#api-resources-api_resourcests)).

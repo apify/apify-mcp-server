@@ -22,6 +22,7 @@ import { deleteActor } from './actors/delete_actor.js';
 import { fetchActorDetails } from './actors/fetch_actor_details.js';
 import { getActorList } from './actors/get_actor_list.js';
 import { searchActors } from './actors/search_actors.js';
+import { sendServerActorRequest } from './actors/send_server_actor_request.js';
 import { apifyApiDetails } from './api/apify_api_details.js';
 import { apifyApiRead } from './api/apify_api_read.js';
 import { apifyApiSearch } from './api/apify_api_search.js';
@@ -66,7 +67,7 @@ import { searchActorsWidget } from './widgets/search_actors_widget.js';
 
 /** Unified tool category definitions — single source of truth. */
 export const toolCategories = {
-    actors: [searchActors, fetchActorDetails, callActor],
+    actors: [searchActors, fetchActorDetails, callActor, sendServerActorRequest],
     docs: [searchApifyDocs, fetchApifyDocs],
     runs: [getActorRun, getActorRunList, getActorRunLog, abortActorRun],
     storage: [

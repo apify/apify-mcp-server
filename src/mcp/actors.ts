@@ -33,36 +33,42 @@ export function getActorMCPServerPath(actorDefinition: ActorDefinition | ActorDe
 }
 
 /**
- * Returns the MCP server URL of an Actor: `mcpServerPath` resolved against the Actor's `standbyUrl`,
- * the platform-assigned standby origin (absent or null when Actor Standby is off).
- *
- * `mcpServerPath` comes from an Actor's `webServerMcpPath` field, i.e. it is
- * controlled by whoever published the Actor. Resolve it against the standby
- * origin and reject anything that escapes that origin so a crafted path
- * (`@host/...`, `.host/...`, `//host/...`, `https://host/...`) cannot redirect
- * the MCP client — and the caller's Apify token — to a third-party host.
+ * Resolves `path` against the Actor's `standbyUrl`, the platform-assigned standby origin (absent or null when
+ * Actor Standby is off). The caller's Apify token goes to whatever host the URL names, so `url` is null when
+ * the path leaves that origin (`@host/...`, `.host/...`, `//host/...`, `https://host/...`). Returns null when
+ * the Actor has no valid standby URL: a constructed hostname would send the token to a host the platform did
+ * not assign to this Actor.
+ */
+export function resolveOnStandbyOrigin(
+    actor: Pick<Actor, 'standbyUrl'>,
+    path: string,
+): { standbyOrigin: string; url: URL | null } | null {
+    if (!actor.standbyUrl || !URL.canParse(actor.standbyUrl)) return null;
+    // Parse the standby URL first so the origin comparison is between two values normalised by the same parser.
+    const standby = new URL(actor.standbyUrl);
+    const url = new URL(path, standby);
+    return { standbyOrigin: standby.origin, url: url.origin === standby.origin ? url : null };
+}
+
+/**
+ * Returns the MCP server URL of an Actor: `mcpServerPath` resolved by `resolveOnStandbyOrigin`.
+ * `mcpServerPath` comes from an Actor's `webServerMcpPath` field, i.e. it is controlled by whoever
+ * published the Actor.
  */
 export async function getActorMCPServerURL(
     actor: Pick<Actor, 'id' | 'standbyUrl'>,
     mcpServerPath: string,
 ): Promise<string> {
-    // Never substitute a constructed hostname: a guessed origin would send the caller's token to a host
-    // the platform did not assign to this Actor.
-    if (!actor.standbyUrl || !URL.canParse(actor.standbyUrl)) {
+    const resolved = resolveOnStandbyOrigin(actor, mcpServerPath);
+    if (!resolved) {
         throw new Error(
             `Actor ${actor.id} has no valid standby URL in its Actor Standby configuration, so its MCP server cannot be reached`,
         );
     }
-    // Parse the standby URL up front so the origin comparison below is between two
-    // values normalised by the same parser.
-    const standby = new URL(actor.standbyUrl);
-
-    const resolved = new URL(mcpServerPath, standby);
-    if (resolved.origin !== standby.origin) {
-        throw new Error(`Actor ${actor.id} declares a webServerMcpPath that resolves outside its standby origin`);
-    }
+    const { url } = resolved;
+    if (!url) throw new Error(`Actor ${actor.id} declares a webServerMcpPath that resolves outside its standby origin`);
     // Strip any userinfo that survived parsing; we never want credentials in the URL we hand to the MCP client.
-    resolved.username = '';
-    resolved.password = '';
-    return resolved.toString();
+    url.username = '';
+    url.password = '';
+    return url.toString();
 }
