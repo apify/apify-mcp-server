@@ -4,32 +4,7 @@ import { ACTOR_TENANCY } from '../../types.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { resolveActorTenancy } from '../actor_tool_naming.js';
 import { isRecord } from '../api/apify_api_spec.js';
-
-/** The HTTP methods an OpenAPI path item may hold an operation under. */
-export const OPENAPI_OPERATION_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'] as const;
-
-type Operation = { method: string; path: string; operation: Record<string, unknown> };
-
-/**
- * The operations an OpenAPI document declares, in document order, with the method upper-cased as the agent writes it.
- * The path item's parameters, which apply to every operation under the path, come before the operation's own.
- */
-function listServerOperations(schema: Record<string, unknown>): Operation[] {
-    if (!isRecord(schema.paths)) return [];
-    return Object.entries(schema.paths).flatMap(([path, pathItem]) =>
-        isRecord(pathItem)
-            ? OPENAPI_OPERATION_METHODS.filter((method) => isRecord(pathItem[method])).map((method) => {
-                  const operation = pathItem[method] as Record<string, unknown>;
-                  const parameters = [pathItem.parameters, operation.parameters].filter(Array.isArray).flat();
-                  return {
-                      method: method.toUpperCase(),
-                      path,
-                      operation: parameters.length > 0 ? { ...operation, parameters } : operation,
-                  };
-              })
-            : [],
-    );
-}
+import { listServerOperations, type ServerOperation } from './actor_definition.js';
 
 function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unknown {
     let node: unknown = root;
@@ -85,7 +60,7 @@ function listRequiredInputs(operation: Record<string, unknown>, schema: Record<s
     return isRecord(requestBody) && requestBody.required === true ? [...names, 'request body'] : names;
 }
 
-function formatOperationLine({ method, path, operation }: Operation, schema: Record<string, unknown>): string {
+function formatOperationLine({ method, path, operation }: ServerOperation, schema: Record<string, unknown>): string {
     const required = listRequiredInputs(operation, schema);
     const summary = typeof operation.summary === 'string' ? `: ${operation.summary}${required.length ? '.' : ''}` : '';
     return `- ${method} ${path}${summary}${required.length ? ` Required: ${required.join(', ')}.` : ''}`;

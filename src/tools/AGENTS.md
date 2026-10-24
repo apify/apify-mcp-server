@@ -28,7 +28,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`, and resolves the build
     the server-interface fields — `webServerMcpPath`, `webServerSchema` — are read from when standby is on,
     `resolveServerInterfaceDefinition`, shared with `fetchActorDetails` in `../utils/actor_details.ts`; the input
-    schema and README stay on the default build),
+    schema and README stay on the default build; `listServerOperations` is the one rule for an API schema's
+    operations, read by `hasWebServerSchema` and the server-interface section),
     `server_interface_schema.ts` (the server-interface section of `fetch-actor-details`: the one-line default
     summary, the operation list with the Actor's `standbyUrl` and tenancy for `output.serverInterface: true`, or
     one operation for `"METHOD /path"`, with local `$ref`s resolved and circular, missing or external ones, and

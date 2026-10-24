@@ -13,8 +13,8 @@ import type {
     SchemaProperties,
 } from '../../types.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
+import { isRecord } from '../api/apify_api_spec.js';
 import type { BuildListItem } from '../builds/get_actor_build_list.js';
-import { OPENAPI_OPERATION_METHODS } from './server_interface_schema.js';
 
 const BUILD_NUMBER_PATTERN = /^\d+\.\d+\.\d+$/;
 
@@ -135,16 +135,30 @@ async function resolveStandbyBuildId(
     return undefined;
 }
 
-/** True only when the OpenAPI document declares at least one operation; an empty or absent schema is no HTTP interface. */
-function hasWebServerSchemaOperations(schema: unknown): boolean {
-    if (typeof schema !== 'object' || schema === null) return false;
-    const { paths } = schema as { paths?: unknown };
-    if (typeof paths !== 'object' || paths === null) return false;
-    return Object.values(paths).some(
-        (pathItem) =>
-            typeof pathItem === 'object' &&
-            pathItem !== null &&
-            OPENAPI_OPERATION_METHODS.some((method) => method in pathItem),
+/** The HTTP methods an OpenAPI path item may hold an operation under. */
+const OPENAPI_OPERATION_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'] as const;
+
+export type ServerOperation = { method: string; path: string; operation: Record<string, unknown> };
+
+/**
+ * The operations an OpenAPI document declares, in document order, with the method upper-cased as the agent writes
+ * it; none for an absent or empty schema, which `hasWebServerSchema` reads as no HTTP interface. The path item's
+ * parameters, which apply to every operation under the path, come before the operation's own.
+ */
+export function listServerOperations(schema: unknown): ServerOperation[] {
+    if (!isRecord(schema) || !isRecord(schema.paths)) return [];
+    return Object.entries(schema.paths).flatMap(([path, pathItem]) =>
+        isRecord(pathItem)
+            ? OPENAPI_OPERATION_METHODS.filter((method) => isRecord(pathItem[method])).map((method) => {
+                  const operation = pathItem[method] as Record<string, unknown>;
+                  const parameters = [pathItem.parameters, operation.parameters].filter(Array.isArray).flat();
+                  return {
+                      method: method.toUpperCase(),
+                      path,
+                      operation: parameters.length > 0 ? { ...operation, parameters } : operation,
+                  };
+              })
+            : [],
     );
 }
 
@@ -169,7 +183,7 @@ function pruneActorDefinition(
         description: response.description,
         defaultRunOptions: response.defaultRunOptions,
         webServerMcpPath: serverDefinition?.webServerMcpPath,
-        hasWebServerSchema: hasWebServerSchemaOperations(serverDefinition?.webServerSchema),
+        hasWebServerSchema: listServerOperations(serverDefinition?.webServerSchema).length > 0,
         pictureUrl: 'pictureUrl' in response ? (response.pictureUrl as string | undefined) : undefined,
     };
 }
