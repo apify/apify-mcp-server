@@ -30,8 +30,8 @@ const callActorMcpToolArgs = z.object({
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    const details = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
-        ? `\n${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.mcpTools lists the Actor's MCP tools and their input schemas.`
+    const details = hasTool(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST)
+        ? `\n${HELPER_TOOLS.ACTOR_MCP_TOOL_LIST} lists the Actor's MCP tools and their input schemas.`
         : '';
     return dedent`
         Call one tool on the MCP server of an Actor that is an MCP server, and return the tool's result unchanged.${details}

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
+import * as mcpClient from '../../src/mcp/client.js';
 import {
     actorDetailsOutputDefaults,
     buildActorDetailsTextResponse,
@@ -52,65 +53,6 @@ const MOCK_DETAILS = {
 } as unknown as ActorDetailsResult;
 
 describe('buildActorDetailsTextResponse()', () => {
-    it('mirrors mcpToolsMessage into structuredContent.mcpTools when output.mcpTools is requested', () => {
-        const mcpToolsMessage = '# Available MCP Tools\nThis Actor is an MCP server with 1 tool.';
-
-        const { texts, structuredContent } = buildActorDetailsTextResponse({
-            details: MOCK_DETAILS,
-            output: {
-                ...actorDetailsOutputDefaults,
-                description: false,
-                stats: false,
-                pricing: false,
-                rating: false,
-                metadata: false,
-                inputSchema: false,
-                readme: false,
-                outputSchema: false,
-                mcpTools: true,
-            },
-            mcpToolsMessage,
-        });
-
-        // Text channel: MCP tools message is the only text emitted.
-        expect(texts).toEqual([mcpToolsMessage]);
-
-        // Structured channel: the same information must be present so that
-        // schema-aware MCP clients (which prefer structuredContent over texts)
-        // do not see an empty `{}` response.
-        expect(structuredContent.mcpTools).toBe(mcpToolsMessage);
-    });
-
-    it('omits structuredContent.mcpTools when output.mcpTools is not requested', () => {
-        const { structuredContent } = buildActorDetailsTextResponse({
-            details: MOCK_DETAILS,
-            output: { ...actorDetailsOutputDefaults, mcpTools: false },
-        });
-
-        expect(structuredContent.mcpTools).toBeUndefined();
-    });
-
-    it('omits structuredContent.mcpTools when output.mcpTools is requested but no message is available', () => {
-        const { texts, structuredContent } = buildActorDetailsTextResponse({
-            details: MOCK_DETAILS,
-            output: {
-                ...actorDetailsOutputDefaults,
-                description: false,
-                stats: false,
-                pricing: false,
-                rating: false,
-                metadata: false,
-                inputSchema: false,
-                readme: false,
-                outputSchema: false,
-                mcpTools: true,
-            },
-        });
-
-        expect(texts).toEqual([]);
-        expect(structuredContent.mcpTools).toBeUndefined();
-    });
-
     describe('with a Console link context', () => {
         const linkContext = {};
         const inputSchemaOnlyOutput = {
@@ -190,6 +132,18 @@ describe('buildFetchActorDetailsResult()', () => {
         });
         return result as { content: { type: string; text: string }[] };
     };
+
+    it('makes no MCP connection for an MCP server Actor, even when a client still sends output.mcpTools', async () => {
+        const connectSpy = vi.spyOn(mcpClient, 'connectMCPClient');
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
+
+        await buildFetchActorDetailsResult(
+            stubToolCallContext({ actor: 'apify/example-mcp-server', output: { mcpTools: true } }, mockApifyClient()),
+        );
+
+        expect(connectSpy).not.toHaveBeenCalled();
+        connectSpy.mockRestore();
+    });
 
     it('skips the users/me lookup for API tokens when pricing is not rendered', async () => {
         const { content } = await callWithToken('apify_api_test');

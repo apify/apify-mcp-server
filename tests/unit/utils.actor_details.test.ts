@@ -4,14 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { ApifyClient } from '../../src/apify_client.js';
 import { CODE_RUNTIME_ACTOR_NAME } from '../../src/const.js';
-import { actorDefinitionCache } from '../../src/state.js';
-import type { ActorDefinitionWithInfo, ActorStore } from '../../src/types.js';
-import {
-    fetchActorDetails,
-    getMcpToolsMessage,
-    resolveReadmeContent,
-    typeObjectToString,
-} from '../../src/utils/actor_details.js';
+import type { ActorStore } from '../../src/types.js';
+import { fetchActorDetails, resolveReadmeContent, typeObjectToString } from '../../src/utils/actor_details.js';
 import { searchActorsByKeywords } from '../../src/utils/actor_search.js';
 import {
     DEFAULT_INPUT,
@@ -272,42 +266,5 @@ describe('fetchActorDetails() reads the server interface from the standby build'
         buildGet.mockRejectedValue(apifyApiError(403, 'Insufficient permissions'));
 
         await expect(fetchActorDetails(apifyClient, 'acme/mcp-server')).rejects.toMatchObject({ statusCode: 403 });
-    });
-});
-
-describe('getMcpToolsMessage()', () => {
-    it('reports a run-only Actor with a leftover webServerMcpPath as not an MCP server', async () => {
-        const actorName = 'acme/stale-mcp-path';
-        actorDefinitionCache.set(actorName, {
-            definition: { id: 'staleactor', actorFullName: actorName, webServerMcpPath: '/mcp' },
-            info: { id: 'staleactor', isPublic: true, userId: 'owner' },
-        } as unknown as ActorDefinitionWithInfo);
-
-        const message = await getMcpToolsMessage(
-            actorName,
-            stubApifyClient(async () => ({})),
-            'token',
-        );
-
-        expect(message).toBe('Note: This Actor is not an MCP server and does not expose MCP tools.');
-    });
-
-    it("reports the canonical standby-without-MCP message, matching call-actor's rejection", async () => {
-        const actorName = 'acme/standby-empty';
-        actorDefinitionCache.set(actorName, {
-            definition: { id: 'standbyempty', actorFullName: actorName },
-            info: { id: 'standbyempty', isPublic: true, userId: 'owner', actorStandby: { isEnabled: true } },
-        } as unknown as ActorDefinitionWithInfo);
-
-        const message = await getMcpToolsMessage(
-            actorName,
-            stubApifyClient(async () => ({})),
-            'token',
-        );
-
-        expect(message).toBe(
-            'Actor "acme/standby-empty" runs in standby mode without an MCP server and has an empty input schema,' +
-                ' which is not supported yet.',
-        );
     });
 });

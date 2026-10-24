@@ -34,6 +34,7 @@ const EXPECTED_TOOL_NAMES = [
     'get-key-value-store-record',
     'abort-actor-run',
     'send-server-actor-request',
+    'fetch-actor-mcp-tool-list',
     'call-actor-mcp-tool',
     'search-apify-docs',
     'fetch-apify-docs',

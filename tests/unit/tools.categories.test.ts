@@ -85,12 +85,13 @@ describe('getCategoryTools', () => {
         const result = getCategoryTools('default');
         const actorNames = result.actors.map((t: ToolEntry) => t.name);
 
-        // Verify workflow order: search → details → call → server request → MCP tool call
+        // Verify workflow order: search → details → call → server request → MCP tool list → MCP tool call
         expect(actorNames).toEqual([
             HELPER_TOOLS.STORE_SEARCH,
             HELPER_TOOLS.ACTOR_GET_DETAILS,
             HELPER_TOOLS.ACTOR_CALL,
             HELPER_TOOLS.ACTOR_SERVER_REQUEST,
+            HELPER_TOOLS.ACTOR_MCP_TOOL_LIST,
             HELPER_TOOLS.ACTOR_MCP_TOOL_CALL,
         ]);
     });

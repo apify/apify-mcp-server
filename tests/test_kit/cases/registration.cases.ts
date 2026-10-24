@@ -89,6 +89,7 @@ export const registrationCases: Case[] = [
                 'search-actors',
                 'call-actor',
                 'send-server-actor-request',
+                'fetch-actor-mcp-tool-list',
                 'call-actor-mcp-tool',
             ];
             const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];

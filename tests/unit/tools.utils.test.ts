@@ -1057,11 +1057,6 @@ describe('extractActorName', () => {
         expect(extractActorName(tool, { actor: 'apify/web-scraper' })).toBe('apify/web-scraper');
     });
 
-    it('strips :toolName suffix from call-actor args', () => {
-        const tool = { type: TOOL_TYPE.INTERNAL, name: 'call-actor' } as unknown as ToolEntry;
-        expect(extractActorName(tool, { actor: 'apify/example-mcp-server:add' })).toBe('apify/example-mcp-server');
-    });
-
     it('returns undefined for internal tools without actor arg', () => {
         const tool = { type: TOOL_TYPE.INTERNAL, name: 'store-search' } as unknown as ToolEntry;
         expect(extractActorName(tool)).toBeUndefined();
