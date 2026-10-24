@@ -8,6 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { ApifyClient } from '../../src/apify_client.js';
 import { FAILURE_CATEGORY, HELPER_TOOLS, MAX_INLINE_BYTES, TOOL_STATUS } from '../../src/const.js';
 import { TimeoutError } from '../../src/errors.js';
+import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../src/mcp/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
 import {
     executeSendServerActorRequest,
@@ -175,6 +176,7 @@ describe('fetchServerActorResponse()', () => {
             url: new URL(path, standbyUrl),
             method: 'GET',
             signal: new AbortController().signal,
+            timeoutMillis: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
             ...params,
         });
 

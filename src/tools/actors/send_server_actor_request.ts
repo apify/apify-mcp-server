@@ -103,9 +103,9 @@ export async function fetchServerActorResponse(params: {
     method: ServerActorRequestMethod;
     body?: unknown;
     signal: AbortSignal;
-    timeoutMillis?: number;
+    timeoutMillis: number;
 }): Promise<ServerActorResponse> {
-    const { client, url, method, body, signal, timeoutMillis = EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } = params;
+    const { client, url, method, body, signal, timeoutMillis } = params;
     const deadline = AbortSignal.timeout(timeoutMillis);
     let status: number | undefined;
     try {
