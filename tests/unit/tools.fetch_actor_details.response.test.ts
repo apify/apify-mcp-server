@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import * as mcpClient from '../../src/mcp/client.js';
+import { actorDefinitionCache } from '../../src/state.js';
 import {
     actorDetailsOutputDefaults,
     buildActorDetailsTextResponse,
@@ -9,6 +10,7 @@ import {
     buildActorNotRunnableGuidance,
     buildFetchActorDetailsResult,
 } from '../../src/tools/actors/fetch_actor_details.js';
+import type { ActorDefinitionWithInfo } from '../../src/types.js';
 import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
 import { fetchActorDetails } from '../../src/utils/actor_details.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
@@ -134,7 +136,17 @@ describe('buildFetchActorDetailsResult()', () => {
     };
 
     it('makes no MCP connection for an MCP server Actor, even when a client still sends output.mcpTools', async () => {
-        const connectSpy = vi.spyOn(mcpClient, 'connectMCPClient');
+        // An MCP server Actor whose URL resolves, so a connection attempt would reach the spy.
+        actorDefinitionCache.set('apify/example-mcp-server', {
+            definition: { id: 'actor-id-1', actorFullName: 'apify/example-mcp-server', webServerMcpPath: '/mcp' },
+            info: {
+                id: 'actor-id-1',
+                isPublic: true,
+                actorStandby: { isEnabled: true },
+                standbyUrl: 'https://example-mcp-server.apify.actor',
+            },
+        } as unknown as ActorDefinitionWithInfo);
+        const connectSpy = vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(null);
         vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
 
         await buildFetchActorDetailsResult(

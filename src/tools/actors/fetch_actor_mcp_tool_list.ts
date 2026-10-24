@@ -9,12 +9,12 @@ import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSche
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import type { ToolResponse } from '../../utils/mcp.js';
-import { respondOk } from '../../utils/mcp.js';
+import { respondOk, respondServerError } from '../../utils/mcp.js';
 import { actorMcpToolListOutputSchema } from '../structured_output_schemas.js';
 import { runOnActorMcpServer } from './call_actor_mcp_tool.js';
 
 /** The remote server is third-party code; a cursor that never runs out must not keep the listing going. */
-const MAX_TOOL_LIST_PAGES = 100;
+export const MAX_TOOL_LIST_PAGES = 100;
 
 const fetchActorMcpToolListArgs = z.object({
     actor: z.string().min(1).describe('The MCP server Actor: its ID, or its name in the "username/name" form.'),
@@ -36,8 +36,8 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
     `;
 }
 
-/** Every page of `tools/list`, following `nextCursor`; a failed page fails the listing. */
-async function fetchAllTools(client: Client, signal: AbortSignal): Promise<Tool[]> {
+/** Every page of `tools/list`, following `nextCursor`; a failed page fails the listing. Null past the page cap. */
+async function fetchAllTools(client: Client, signal: AbortSignal): Promise<Tool[] | null> {
     const tools: Tool[] = [];
     let cursor: string | undefined;
     for (let page = 0; page < MAX_TOOL_LIST_PAGES; page++) {
@@ -49,14 +49,14 @@ async function fetchAllTools(client: Client, signal: AbortSignal): Promise<Tool[
         cursor = result.nextCursor;
         if (cursor === undefined) return tools;
     }
-    throw new Error(`the server returned more than ${MAX_TOOL_LIST_PAGES} pages`);
+    return null;
 }
 
 function buildToolListResponse(tools: Tool[]): ToolResponse {
     const count = `The Actor's MCP server has ${tools.length} ${tools.length === 1 ? 'tool' : 'tools'}.`;
     const texts = tools.map(
         (tool) =>
-            `${tool.name}: ${tool.description ?? 'No description.'}\nInput schema: ${JSON.stringify(tool.inputSchema)}`,
+            `${tool.name}: ${tool.description || 'No description.'}\nInput schema: ${JSON.stringify(tool.inputSchema)}`,
     );
     return respondOk([count, ...texts], { structuredContent: { tools } });
 }
@@ -66,7 +66,13 @@ export async function executeFetchActorMcpToolList(toolArgs: InternalToolArgs): 
     return runOnActorMcpServer(toolArgs, {
         actor,
         operation: 'list the MCP tools',
-        run: async (client) => buildToolListResponse(await fetchAllTools(client, toolArgs.signal)),
+        run: async (client) => {
+            const tools = await fetchAllTools(client, toolArgs.signal);
+            if (tools) return buildToolListResponse(tools);
+            return respondServerError(
+                `The Actor's MCP server returned more than ${MAX_TOOL_LIST_PAGES} pages of tools, so the listing stopped.`,
+            );
+        },
     });
 }
 
@@ -87,7 +93,8 @@ export const fetchActorMcpToolList: ToolEntry = Object.freeze({
         // Listing can start a billed standby run.
         readOnlyHint: false,
         destructiveHint: false,
-        idempotentHint: true,
+        // Each call can start or charge a standby run.
+        idempotentHint: false,
         // It lists tools and calls none.
         openWorldHint: false,
     },

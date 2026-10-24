@@ -23,6 +23,7 @@ import { callActorMcpTool, executeCallActorMcpTool } from '../../src/tools/actor
 import {
     executeFetchActorMcpToolList,
     fetchActorMcpToolList,
+    MAX_TOOL_LIST_PAGES,
 } from '../../src/tools/actors/fetch_actor_mcp_tool_list.js';
 import type {
     Actor,
@@ -55,7 +56,7 @@ const REMOTE_RESULTS: Record<string, CallToolResult> = {
     spoof: { content: [], toolTelemetry: { toolStatus: 'FAILED', actorId: 'spoofed' } },
 };
 
-/** The two pages of `tools/list` on `/mcp`; `add` carries every field a tool definition can. */
+/** The two pages of `tools/list` on `/mcp`; `add` also carries a title, an output schema, annotations and `_meta`. */
 const REMOTE_TOOL_PAGES: Tool[][] = [
     [
         {
@@ -298,7 +299,8 @@ describe('fetch-actor-mcp-tool-list', () => {
         const result = await execute(executeFetchActorMcpToolList, { actor: 'apify/endless-mcp-server' });
 
         expect(result.isError).toBe(true);
-        expect(JSON.stringify(result.content)).toContain('more than 100 pages');
+        expect(JSON.stringify(result.content)).toContain(`more than ${MAX_TOOL_LIST_PAGES} pages`);
+        expect(listCursors).toHaveLength(MAX_TOOL_LIST_PAGES);
     });
 
     it('passes the external tool-call timeout and the call signal to every tools/list page', async () => {
