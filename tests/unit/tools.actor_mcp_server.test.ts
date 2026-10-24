@@ -12,7 +12,7 @@ import {
     McpError,
     type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { FAILURE_CATEGORY, HELPER_TOOLS } from '../../src/const.js';
@@ -51,6 +51,8 @@ const REMOTE_RESULTS: Record<string, CallToolResult> = {
         _meta: { 'example/trace': 'abc' },
     },
     fail: { content: [{ type: 'text', text: 'firstNumber is required' }], isError: true },
+    // A key the server reads as its own internal telemetry.
+    spoof: { content: [], toolTelemetry: { toolStatus: 'FAILED', actorId: 'spoofed' } },
 };
 
 /** The two pages of `tools/list` on `/mcp`; `add` carries every field a tool definition can. */
@@ -186,6 +188,10 @@ afterAll(async () => {
     await new Promise<void>((resolve) => httpServer.close(() => resolve()));
 });
 
+afterEach(() => {
+    vi.restoreAllMocks();
+});
+
 beforeEach(() => {
     requests = [];
     remoteCalls = [];
@@ -208,6 +214,12 @@ describe('call-actor-mcp-tool', () => {
         const result = await execute(executeCallActorMcpTool, { tool: 'fail' });
 
         expect(result).toMatchObject(REMOTE_RESULTS.fail);
+        expect(result.toolTelemetry).toEqual({ actorId: 'example-mcp-server-id' });
+    });
+
+    it("ignores a toolTelemetry key in the remote result, so the remote cannot write the server's telemetry", async () => {
+        const result = await execute(executeCallActorMcpTool, { tool: 'spoof' });
+
         expect(result.toolTelemetry).toEqual({ actorId: 'example-mcp-server-id' });
     });
 
@@ -236,7 +248,6 @@ describe('call-actor-mcp-tool', () => {
             timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
             signal: controller.signal,
         });
-        callToolSpy.mockRestore();
     });
 
     it('reports a JSON-RPC error from the remote server as a failed call of that tool', async () => {
@@ -300,7 +311,6 @@ describe('fetch-actor-mcp-tool-list', () => {
         for (const [, options] of listToolsSpy.mock.calls) {
             expect(options).toMatchObject({ timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, signal: controller.signal });
         }
-        listToolsSpy.mockRestore();
     });
 
     it("discovers again on every call, under each caller's token", async () => {
@@ -320,7 +330,6 @@ describe('fetch-actor-mcp-tool-list', () => {
         await execute(executeFetchActorMcpToolList, { actor: 'apify/broken-pages-mcp-server' });
 
         expect(closeSpy).toHaveBeenCalledTimes(2);
-        closeSpy.mockRestore();
     });
 
     it('names call-actor-mcp-tool in the description only when the session has it, and states the billing caveat', () => {
@@ -357,6 +366,17 @@ describe.each([
         const result = await execute(run, { ...args, actor: 'apify/missing' }, { apifyClient: unknownActorClient });
 
         expectSoftFailInvalidInput(result);
+        expect(requests).toHaveLength(0);
+    });
+
+    it('rejects an MCP path that leaves the standby origin without connecting, and reports the Actor ID', async () => {
+        seedActor('apify/off-origin-mcp-server', { definition: { webServerMcpPath: 'https://elsewhere.example/mcp' } });
+
+        const result = await execute(run, { ...args, actor: 'apify/off-origin-mcp-server' });
+
+        expect(result.isError).toBe(true);
+        expect(JSON.stringify(result.content)).toContain('resolves outside its standby origin');
+        expect(result.toolTelemetry).toMatchObject({ actorId: 'off-origin-mcp-server-id' });
         expect(requests).toHaveLength(0);
     });
 
