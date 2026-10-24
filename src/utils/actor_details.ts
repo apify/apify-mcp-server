@@ -82,8 +82,7 @@ export type ActorDetailsResult = {
     inputSchema: ActorInputSchema;
     readme: string;
     readmeSummary?: string;
-    /** Server-interface fields of the build standby serves (`resolveServerInterfaceDefinition`); absent when unresolved. */
-    webServerMcpPath?: string;
+    /** API schema of the build standby serves (`resolveServerInterfaceDefinition`); absent when unresolved. */
     webServerSchema?: Record<string, unknown>;
 };
 
@@ -142,7 +141,6 @@ export async function fetchActorDetails(
             inputSchema,
             readme: buildInfo.actorDefinition.readme || 'No README provided.',
             readmeSummary: actorInfo.readmeSummary,
-            webServerMcpPath: serverDefinition?.webServerMcpPath,
             webServerSchema: serverDefinition?.webServerSchema,
         };
     } catch (error) {
