@@ -15,10 +15,13 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 - `structured_output_schemas.ts` — shared JSON-schema definitions for structured
   output across tools.
 - `utils.ts` — shared tool helpers (schema property shaping, AJV compile).
-- `actor_tool_naming.ts` — Actor tool names and `resolveActorToolMode`, the one rule (read by tool loading
-  and `call-actor` routing) for serving an Actor as a run tool through its input schema or through its MCP
-  server. Actors in `INPUT_INTERFACE_ACTORS` (`../const.ts`) are served as run tools although they declare
-  `webServerMcpPath`.
+- `actor_tool_naming.ts` — Actor tool names and `resolveActorInterfaces`, the one rule for which interfaces an
+  Actor has: `input` (a run tool through its input schema), `mcp` (its MCP server) and `server` (its HTTP API,
+  `hasWebServerSchema`). `resolveActorToolMode` derives the tool slot from the set — MCP tools if `mcp`, else a
+  run tool if `input`, else none (`SERVER_ACTOR_WITHOUT_MCP`) — and tool loading and `call-actor` routing both
+  read it. Actors in `INPUT_INTERFACE_ACTORS` (`../const.ts`) read as having no MCP interface, so they are
+  served as run tools although they declare `webServerMcpPath`, unless their input schema is empty, in which
+  case they get no tool.
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
   - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), delete
     (`delete_actor.ts`), the actor-tools factory, the direct actor-tool executor (`actor_executor.ts`),

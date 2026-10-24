@@ -189,8 +189,8 @@ export async function getMcpToolsMessage(
 
     // Same canonical wording call-actor rejects with, so an agent gets one consistent reason
     // for this Actor regardless of which tool it asked.
-    if (resolution?.toolMode === ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP) {
-        return ActorLoadError.standbyWithoutMcpNotSupported(resolution.actorFullName).message;
+    if (resolution?.toolMode === ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP) {
+        return ActorLoadError.serverActorWithoutMcpNotSupported(resolution.actorFullName).message;
     }
 
     // Early return: not an MCP server
