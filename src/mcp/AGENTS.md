@@ -34,8 +34,8 @@ Two MCP protocol revisions are served, each by its own adapter:
 - `tool_call_engine.ts` — shared `tools/call` orchestration. `prepareToolCall()` handles
   preparation, including the tool's declared `rejectArgs` and standby checks, which come before a 402;
   `executeSyncToolCall()` runs synchronous calls.
-- `client.ts` — `connectMCPClient(url, token)`: transport negotiation; both transports send the token and the
-  `MCP` request-origin header on every request.
+- `client.ts` — `connectMCPClient(url, credentials)`: transport negotiation; both transports send the token and the
+  session's request origin (`ApifyClient.requestOrigin`, `APIFY_AI` for the Apify AI client) on every request.
 - `remote_tool_call.ts` — `withRemoteMcpClient()`: connect-call-close round trip for
   `tool_dispatch.ts` and the MCP server Actor tools (`runOnActorMcpServer` in `call_actor_mcp_tool.ts`).
 - `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`, `getProxyMCPServerToolName(actorFullName, toolName)`.

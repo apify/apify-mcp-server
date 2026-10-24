@@ -21,7 +21,14 @@ import {
 } from '../tools/actors/actor_tool_contract.js';
 import { checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
 import { withReportProblemNudge } from '../tools/dev/report_problem.js';
-import type { ActorStore, CallDiagnostics, ToolCallTelemetryProperties, ToolEntry, ToolStatus } from '../types.js';
+import type {
+    ActorStore,
+    CallDiagnostics,
+    ToolCallTelemetryProperties,
+    ToolEntry,
+    ToolStatus,
+    ToolTelemetryContext,
+} from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 import { logHttpError } from '../utils/logging.js';
 import { respondOk } from '../utils/mcp.js';
@@ -82,7 +89,10 @@ export type PreparedCallError = ToolCallOutcome & {
     decodedArgs: Record<string, unknown>;
 };
 
-/** Builds the pre-flight result; a preflight rejection takes precedence over 402. */
+/**
+ * Builds the pre-flight result; a preflight rejection takes precedence over 402. The rejection skipped dispatch, which
+ * strips `toolTelemetry` from a tool response, so it is stripped here and its failure detail recorded.
+ */
 export function buildPreflightFailureOutcome(
     preflightRejection: Record<string, unknown> | null,
     paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined,
@@ -93,14 +103,16 @@ export function buildPreflightFailureOutcome(
     callDiagnostics: CallDiagnostics;
     result: Record<string, unknown> | ReturnType<typeof buildPaymentRequiredResponse>;
 } {
+    const { toolTelemetry, ...rejection } = (preflightRejection ?? {}) as { toolTelemetry?: ToolTelemetryContext };
     return {
         toolStatus: TOOL_STATUS.SOFT_FAIL,
         callDiagnostics: {
             failure_category: FAILURE_CATEGORY.INVALID_INPUT,
             ...(preflightRejection ? {} : { failure_http_status: 402 }),
+            ...(toolTelemetry?.failureDetail && { failure_detail: toolTelemetry.failureDetail }),
             ...buildActorFields(actorName, actorId),
         },
-        result: (preflightRejection ?? paymentRequiredResult)!,
+        result: preflightRejection ? rejection : paymentRequiredResult!,
     };
 }
 

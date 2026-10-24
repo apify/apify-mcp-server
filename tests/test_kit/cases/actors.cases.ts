@@ -352,7 +352,7 @@ export const actorsCases: Case[] = [
     },
     {
         name: 'lists the MCP tools of an MCP server Actor with fetch-actor-mcp-tool-list',
-        isDeploymentTest: false,
+        isDeploymentTest: true,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
                 name: 'fetch-actor-mcp-tool-list',

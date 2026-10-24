@@ -8,14 +8,15 @@ import {
     CallToolRequestSchema,
     type CallToolResult,
     ErrorCode,
+    type InitializeRequest,
     ListToolsRequestSchema,
     McpError,
     type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ApifyClient } from '../../src/apify_client.js';
-import { FAILURE_CATEGORY, HELPER_TOOLS } from '../../src/const.js';
+import { ApifyClient, REQUEST_ORIGIN } from '../../src/apify_client.js';
+import { APIFY_AI_CLIENT_NAME, FAILURE_CATEGORY, HELPER_TOOLS } from '../../src/const.js';
 import { connectMCPClient } from '../../src/mcp/client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../src/mcp/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
@@ -239,6 +240,27 @@ describe('call-actor-mcp-tool', () => {
         }
     });
 
+    it('sends APIFY_AI as the request origin of the MCP connection for an Apify AI client session', async () => {
+        await dispatch(
+            callActorMcpTool as HelperTool,
+            { actor: MCP_ACTOR, tool: 'add' },
+            {
+                token: TOKEN,
+                initializeRequestData: {
+                    method: 'initialize',
+                    params: {
+                        protocolVersion: '2025-06-18',
+                        clientInfo: { name: APIFY_AI_CLIENT_NAME, version: '1.0.0' },
+                        capabilities: {},
+                    },
+                } as InitializeRequest,
+            },
+        );
+
+        expect(requests.length).toBeGreaterThan(0);
+        for (const { headers } of requests) expect(headers['x-apify-request-origin']).toBe('APIFY_AI');
+    });
+
     it('passes the external tool-call timeout and the call signal to tools/call', async () => {
         const callToolSpy = vi.spyOn(Client.prototype, 'callTool');
         const controller = new AbortController();
@@ -433,12 +455,14 @@ describe.each([
 
         expect(result.isError).toBe(true);
         expect(JSON.stringify(result.content)).toContain('is not supported in agentic payment mode');
+        // The engine returns a preflight rejection as is, so it must not carry the internal telemetry.
+        expect(result).not.toHaveProperty('toolTelemetry');
         expect(requests).toHaveLength(0);
     });
 });
 
 describe('MCP connection headers', () => {
-    it('sends the token and the MCP request origin on the SSE fallback too', async () => {
+    it("sends the token and the session's request origin on the SSE fallback too", async () => {
         const seen: { method?: string; headers: IncomingMessage['headers'] }[] = [];
         const notFound = createServer((req, res) => {
             seen.push({ method: req.method, headers: req.headers });
@@ -446,16 +470,16 @@ describe('MCP connection headers', () => {
         });
         await new Promise<void>((resolve) => notFound.listen(0, '127.0.0.1', resolve));
 
-        const client = await connectMCPClient(
-            `http://127.0.0.1:${(notFound.address() as AddressInfo).port}/mcp`,
-            TOKEN,
-        );
+        const client = await connectMCPClient(`http://127.0.0.1:${(notFound.address() as AddressInfo).port}/mcp`, {
+            token: TOKEN,
+            requestOrigin: REQUEST_ORIGIN.APIFY_AI,
+        });
         await new Promise<void>((resolve) => notFound.close(() => resolve()));
 
         expect(client).toBeNull();
         expect(seen.map(({ method }) => method)).toEqual(['POST', 'GET']);
         for (const { headers } of seen) {
-            expect(headers).toMatchObject({ authorization: `Bearer ${TOKEN}`, 'x-apify-request-origin': 'MCP' });
+            expect(headers).toMatchObject({ authorization: `Bearer ${TOKEN}`, 'x-apify-request-origin': 'APIFY_AI' });
         }
     });
 });

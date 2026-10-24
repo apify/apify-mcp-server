@@ -253,8 +253,7 @@ export type HelperTool = ToolBase & {
     redactArgs?: (args: Record<string, unknown>) => Record<string, unknown>;
     /**
      * Returns a rejection for arguments the tool refuses before the payment checks and any Actor lookup, or
-     * null. It runs in `prepareToolCall` after AJV validation, which records its telemetry, so build it with
-     * `respondErrorNoTelemetry`; `loadedToolNames` gates the tools it may name.
+     * null. It runs in `prepareToolCall` after AJV validation; `loadedToolNames` gates the tools it may name.
      */
     rejectArgs?: (args: Record<string, unknown>, loadedToolNames: readonly string[]) => ToolResponse | null;
 };
