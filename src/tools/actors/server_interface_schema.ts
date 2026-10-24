@@ -1,51 +1,15 @@
-import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type { Actor } from '../../types.js';
 import { ACTOR_TENANCY } from '../../types.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { resolveActorTenancy } from '../actor_tool_naming.js';
-import { isRecord } from '../api/apify_api_spec.js';
+import { isRecord, resolveLocalRef, resolveLocalRefs } from '../api/apify_api_spec.js';
 import { listServerOperations, type ServerOperation } from './actor_definition.js';
-
-function resolveJsonPointer(root: Record<string, unknown>, pointer: string): unknown {
-    let node: unknown = root;
-    for (const segment of pointer.split('/')) {
-        const key = segment.replaceAll('~1', '/').replaceAll('~0', '~');
-        if (!isRecord(node) || !(key in node)) return undefined;
-        node = node[key];
-    }
-    return node;
-}
-
-/**
- * A copy of `node` with every local `$ref` (`#/components/...`) replaced by what it points to in `root`.
- * A reference that is circular, not found, or external stays as it is, with an `unavailableDetail` note, and so
- * does every reference past `MAX_INLINE_BYTES` of expanded detail: shared references can otherwise grow the copy
- * exponentially. Nothing is fetched.
- */
-export function resolveLocalRefs(node: unknown, root: Record<string, unknown>): unknown {
-    let expandedSize = 0;
-    const resolve = (value: unknown, seen: readonly string[]): unknown => {
-        if (Array.isArray(value)) return value.map((item) => resolve(item, seen));
-        if (!isRecord(value)) return value;
-        const { $ref } = value;
-        if (typeof $ref !== 'string') {
-            return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, resolve(child, seen)]));
-        }
-        if (seen.includes($ref)) return { $ref, unavailableDetail: 'circular reference' };
-        if (!$ref.startsWith('#/')) return { $ref, unavailableDetail: 'external reference, not fetched' };
-        const target = resolveJsonPointer(root, $ref.slice(2));
-        if (target === undefined) return { $ref, unavailableDetail: 'reference not found' };
-        expandedSize += JSON.stringify(target).length;
-        if (expandedSize > MAX_INLINE_BYTES) return { $ref, unavailableDetail: 'not expanded, size cap reached' };
-        return resolve(target, [...seen, $ref]);
-    };
-    return resolve(node, []);
-}
 
 /** What a local `$ref` on `node` points to, one level deep; `node` itself when it has none. */
 function resolveRef(node: unknown, root: Record<string, unknown>): unknown {
     if (!isRecord(node) || typeof node.$ref !== 'string' || !node.$ref.startsWith('#/')) return node;
-    return resolveJsonPointer(root, node.$ref.slice(2));
+    return resolveLocalRef(root, node.$ref);
 }
 
 /** The names of the required parameters, and `request body` when it is required. */

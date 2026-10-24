@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { MAX_INLINE_BYTES } from '../../const.js';
 import { apifyApiOperationsCache } from '../../state.js';
 import type { ApiBlockRule } from './apify_api_blocklist.js';
 import { isEndpointBlocked } from './apify_api_blocklist.js';
@@ -68,38 +69,65 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** Walks a local `#/...` reference; `undefined` when it does not resolve. */
-function resolveLocalRef(spec: unknown, ref: string): unknown {
+/**
+ * Walks a local `#/...` reference as a JSON Pointer (RFC 6901: `~1` stands for `/`, `~0` for `~`, a number
+ * indexes an array); `undefined` when it does not resolve.
+ */
+export function resolveLocalRef(spec: unknown, ref: string): unknown {
     if (!ref.startsWith('#/')) return undefined;
     let node: unknown = spec;
     for (const segment of ref.slice(2).split('/')) {
-        if (!isRecord(node)) return undefined;
-        node = node[segment];
+        const key = segment.replaceAll('~1', '/').replaceAll('~0', '~');
+        if (typeof node !== 'object' || node === null || !(key in node)) return undefined;
+        node = (node as Record<string, unknown>)[key];
     }
     return node;
+}
+
+/**
+ * A copy of `node` with every local `$ref` replaced by what it points to in `spec`. A reference that is
+ * circular, not found, or external stays as it is, with an `unavailableDetail` note, and so does every reference
+ * past `MAX_INLINE_BYTES` of expanded detail: shared references can otherwise grow the copy exponentially.
+ * Nothing is fetched.
+ */
+export function resolveLocalRefs(node: unknown, spec: unknown): unknown {
+    let expandedSize = 0;
+    const resolve = (value: unknown, seen: readonly string[]): unknown => {
+        if (Array.isArray(value)) return value.map((item) => resolve(item, seen));
+        if (!isRecord(value)) return value;
+        const { $ref } = value;
+        if (typeof $ref !== 'string') {
+            return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, resolve(child, seen)]));
+        }
+        if (seen.includes($ref)) return { $ref, unavailableDetail: 'circular reference' };
+        if (!$ref.startsWith('#/')) return { $ref, unavailableDetail: 'external reference, not fetched' };
+        const target = resolveLocalRef(spec, $ref);
+        if (target === undefined) return { $ref, unavailableDetail: 'reference not found' };
+        expandedSize += JSON.stringify(target).length;
+        if (expandedSize > MAX_INLINE_BYTES) return { $ref, unavailableDetail: 'not expanded, size cap reached' };
+        return resolve(target, [...seen, $ref]);
+    };
+    return resolve(node, []);
 }
 
 /**
  * Resolves local `$ref`s and drops examples and vendor extensions. Property names under `properties`
  * are kept as they are, since a property can be named `example`.
  */
-function dereference(node: unknown, spec: unknown, seenRefs: ReadonlySet<string> = new Set()): unknown {
-    if (Array.isArray(node)) return node.map((item) => dereference(item, spec, seenRefs));
+function dereference(node: unknown, spec: unknown): unknown {
+    return dropSchemaExtras(resolveLocalRefs(node, spec));
+}
+
+function dropSchemaExtras(node: unknown): unknown {
+    if (Array.isArray(node)) return node.map(dropSchemaExtras);
     if (!isRecord(node)) return node;
-    if (typeof node.$ref === 'string') {
-        // A reference cycle would recurse forever; the published spec has none.
-        if (seenRefs.has(node.$ref)) return {};
-        return dereference(resolveLocalRef(spec, node.$ref), spec, new Set([...seenRefs, node.$ref]));
-    }
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(node)) {
         if (DROPPED_SCHEMA_KEYS.has(key) || key.startsWith('x-')) continue;
         result[key] =
             key === 'properties' && isRecord(value)
-                ? Object.fromEntries(
-                      Object.entries(value).map(([name, schema]) => [name, dereference(schema, spec, seenRefs)]),
-                  )
-                : dereference(value, spec, seenRefs);
+                ? Object.fromEntries(Object.entries(value).map(([name, schema]) => [name, dropSchemaExtras(schema)]))
+                : dropSchemaExtras(value);
     }
     return result;
 }

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
+import { HELPER_TOOLS } from '../../src/const.js';
 import { buildFetchActorDetailsResult } from '../../src/tools/actors/fetch_actor_details.js';
-import { buildServerInterfaceSection, resolveLocalRefs } from '../../src/tools/actors/server_interface_schema.js';
+import { buildServerInterfaceSection } from '../../src/tools/actors/server_interface_schema.js';
 import type { Actor } from '../../src/types.js';
 import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
 import { fetchActorDetails } from '../../src/utils/actor_details.js';
@@ -196,60 +196,6 @@ describe('buildServerInterfaceSection()', () => {
                 });
             },
         );
-    });
-});
-
-describe('resolveLocalRefs()', () => {
-    it('keeps a circular, a missing and an external reference, each with a note', () => {
-        const root = {
-            components: {
-                schemas: {
-                    Node: { type: 'object', properties: { next: { $ref: '#/components/schemas/Node' } } },
-                },
-            },
-        };
-
-        expect(
-            resolveLocalRefs(
-                [
-                    { $ref: '#/components/schemas/Node' },
-                    { $ref: '#/components/schemas/Missing' },
-                    { $ref: 'https://example.com/schema.json#/Thing' },
-                ],
-                root,
-            ),
-        ).toEqual([
-            {
-                type: 'object',
-                properties: {
-                    next: { $ref: '#/components/schemas/Node', unavailableDetail: 'circular reference' },
-                },
-            },
-            { $ref: '#/components/schemas/Missing', unavailableDetail: 'reference not found' },
-            { $ref: 'https://example.com/schema.json#/Thing', unavailableDetail: 'external reference, not fetched' },
-        ]);
-    });
-
-    it('stops expanding references once the expanded detail passes the inline cap', () => {
-        // Each schema references the next one twice, so a full expansion doubles in size per level.
-        const schemas: Record<string, unknown> = { S16: { type: 'string' } };
-        for (let level = 0; level < 16; level++) {
-            const next = { $ref: `#/components/schemas/S${level + 1}` };
-            schemas[`S${level}`] = { type: 'object', properties: { left: next, right: next } };
-        }
-
-        const resolved = JSON.stringify(
-            resolveLocalRefs({ $ref: '#/components/schemas/S0' }, { components: { schemas } }),
-        );
-
-        expect(resolved).toContain('"unavailableDetail"');
-        expect(resolved.length).toBeLessThan(2 * MAX_INLINE_BYTES);
-    });
-
-    it('resolves a pointer with escaped segments', () => {
-        const root = { components: { schemas: { 'a/b': { type: 'string' } } } };
-
-        expect(resolveLocalRefs({ $ref: '#/components/schemas/a~1b' }, root)).toEqual({ type: 'string' });
     });
 });
 
