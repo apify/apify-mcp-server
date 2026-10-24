@@ -25,11 +25,11 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         ? ` ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} calls one of them by name.`
         : '';
     return dedent`
-        List the tools on the MCP server of an Actor that is an MCP server: each tool's name, description, input schema, annotations and metadata, as the server reports them.${callTool}
+        List an Actor's MCP tools with each tool's name, description, input schema, annotations, and metadata, as the server reports them.${callTool}
         Each call asks the server again; nothing is cached. The server connects with the Apify API token. Connecting can start a standby run of the Actor in your account, kept for its idle timeout, or is charged per event when the Actor is multi-tenant.
 
         USAGE:
-        - Use when the user asks which tools an Actor that is an MCP server provides, or before calling one of them.
+        - Use when the user asks which MCP tools an Actor provides, or before calling one of them.
 
         USAGE EXAMPLES:
         - user_input: What tools does username/name provide?
