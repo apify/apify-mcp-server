@@ -92,7 +92,7 @@ export type ServerActorResponse = {
  * `sendApifyApiRequest`: the session token and the request-origin header go along, there are no retries,
  * redirects are not followed, and the body is read as raw bytes, capped at `MAX_INLINE_BYTES` after
  * decompression. The deadline covers reading the body; when it passes before the client cancels, a
- * `TimeoutError` is thrown, with the `status` when one arrived.
+ * `TimeoutError` is thrown. A failure after the status arrived, a timeout included, carries it as `status`.
  */
 export async function fetchServerActorResponse(params: {
     client: ApifyClient;
@@ -131,13 +131,11 @@ export async function fetchServerActorResponse(params: {
             body: await readBodyUnderCap(response),
         };
     } catch (error) {
-        if (deadline.aborted && !signal.aborted) {
-            throw Object.assign(
-                new TimeoutError(`The Actor server did not finish responding within ${timeoutMillis} ms`),
-                { status },
-            );
-        }
-        throw error;
+        const failure =
+            deadline.aborted && !signal.aborted
+                ? new TimeoutError(`The Actor server did not finish responding within ${timeoutMillis} ms`)
+                : toPlainError(error);
+        throw status === undefined ? failure : Object.assign(failure, { status });
     }
 }
 
@@ -169,11 +167,12 @@ function buildResponse(params: {
     actorId: string;
     actorName: string;
     tenancy: ActorTenancy;
-    /** The session's token, masked in the body and the location. */
+    /** The session's token, masked in the body, the content type and the location; the path comes masked. */
     token: string;
 }): ToolResponse {
     const { response, method, path, actorId, actorName, tenancy, token } = params;
-    const { status, contentType } = response;
+    const { status } = response;
+    const contentType = response.contentType?.replaceAll(token, REDACTED);
     const location = response.location?.replaceAll(token, REDACTED);
     const outcome = `${method} ${path} on ${actorName} returned HTTP ${status}`;
     if (response.body === undefined) {
@@ -284,7 +283,8 @@ export async function executeSendServerActorRequest(
         Object.entries(parsed.query ?? {}).map(([name, value]): [string, string] => [name, String(value)]),
     ).toString();
     if (query) url.search = url.search ? `${url.search}&${query}` : query;
-    const path = `${url.pathname}${url.search}`;
+    // The path as sent, for the response text: the agent can write the token into a query value.
+    const path = `${url.pathname}${url.search}`.replaceAll(apifyToken, REDACTED);
 
     let response: ServerActorResponse;
     try {
@@ -298,20 +298,21 @@ export async function executeSendServerActorRequest(
         });
     } catch (error) {
         if (signal.aborted) return respondAborted();
-        if (error instanceof TimeoutError) {
-            const { status } = error as TimeoutError & { status?: number };
-            const outcome =
-                status === undefined ? 'got no complete response' : `got HTTP ${status} but not the whole body`;
-            return withServerActorTelemetry(
-                respondServerError(
-                    `${parsed.method} ${path} on ${actorFullName} ${outcome} within ${timeoutMillis / 1000} ` +
-                        'seconds, so nothing is returned. The Actor may still have processed the request.',
-                    { detail: 'timeout' },
-                ),
-                { ...telemetry, ...(status !== undefined && { httpStatus: status }) },
-            );
-        }
-        throw toPlainError(error);
+        const failure = error as Error & { status?: number };
+        const isTimeout = error instanceof TimeoutError;
+        // A failure before any status, other than the deadline, is reported by the engine.
+        if (!isTimeout && failure.status === undefined) throw error;
+        const { status } = failure;
+        const got = status === undefined ? 'got no complete response' : `got HTTP ${status} but not the whole body`;
+        const why = isTimeout ? `within ${timeoutMillis / 1000} seconds` : `(${failure.message})`;
+        return withServerActorTelemetry(
+            respondServerError(
+                `${parsed.method} ${path} on ${actorFullName} ${got} ${why}, so nothing is returned. ` +
+                    'The Actor may still have processed the request.',
+                { detail: isTimeout ? 'timeout' : 'incomplete body' },
+            ),
+            { ...telemetry, ...(status !== undefined && { httpStatus: status }) },
+        );
     }
     return withServerActorTelemetry(
         buildResponse({

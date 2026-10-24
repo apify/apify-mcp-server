@@ -78,9 +78,16 @@ async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
             res.writeHead(302, { location: '/echo' });
             res.end();
             return;
-        case '/redirect-token':
-            res.writeHead(302, { location: `/login?token=${req.headers.authorization!.slice('Bearer '.length)}` });
+        case '/reflect-token': {
+            const token = req.headers.authorization!.slice('Bearer '.length);
+            res.writeHead(302, { location: `/login?token=${token}`, 'content-type': `text/plain; note=${token}` });
             res.end();
+            return;
+        }
+        case '/truncate':
+            res.writeHead(200, { 'content-type': 'text/plain', 'content-length': '10' });
+            // Closed once the start of the body is on the wire, so the client has the status.
+            res.write('abc', () => res.destroy());
             return;
         case '/drip':
             res.writeHead(200, { 'content-type': 'text/plain' });
@@ -271,10 +278,15 @@ describe('send-server-actor-request', () => {
         expect(received.map((request) => request.url)).toEqual(['/redirect']);
     });
 
-    it('masks the session token in a redirect location', async () => {
-        const result = await callTool({ path: '/redirect-token' });
+    it('masks the session token in the path, the content type and the location, but sends it as is', async () => {
+        const result = await callTool({ path: '/reflect-token', query: { token: TOKEN } });
 
-        expect(result.structuredContent).toMatchObject({ location: '/login?token=[REDACTED]' });
+        expect(received[0].url).toBe(`/reflect-token?token=${TOKEN}`);
+        expect(result.structuredContent).toMatchObject({
+            path: '/reflect-token?token=[REDACTED]',
+            contentType: 'text/plain; note=[REDACTED]',
+            location: '/login?token=[REDACTED]',
+        });
         expect(JSON.stringify(result)).not.toContain(TOKEN);
     });
 
@@ -415,6 +427,15 @@ describe('send-server-actor-request', () => {
             actorTenancy: ACTOR_TENANCY.SINGLE_TENANT,
             httpStatus: 200,
         });
+    });
+
+    it('reports a body cut off after the status as a failure that keeps the status', async () => {
+        const result = await callTool({ path: '/truncate' });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain('got HTTP 200 but not the whole body');
+        expect(result.content[0].text).not.toContain('abc');
+        expect(result.toolTelemetry).toMatchObject({ toolStatus: TOOL_STATUS.FAILED, httpStatus: 200 });
     });
 
     it('requires a token without sending', async () => {
