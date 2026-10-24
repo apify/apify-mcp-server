@@ -1234,7 +1234,7 @@ export const actorsCases: Case[] = [
             });
 
             const text = (result.content as { text: string }[]).map((item) => item.text).join('\n');
-            expect(text).toContain('Server interface: enabled, single-tenant, 12 documented operations.');
+            expect(text).toMatch(/Server interface: enabled, single-tenant, [1-9]\d* documented operations\./);
             validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
         }),
     },

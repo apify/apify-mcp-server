@@ -280,6 +280,64 @@ describe('call-actor-mcp-tool', () => {
         expect(JSON.stringify(result.content)).toContain(`Failed to call MCP tool 'subtract' on Actor '${MCP_ACTOR}'`);
     });
 
+    it('returns the not-found response for an Actor the API does not know, without connecting', async () => {
+        const unknownActorClient = Object.assign(
+            new ApifyClient({ token: TOKEN }),
+            mockApifyClient({ actor: () => ({ get: async () => undefined }) }),
+        );
+
+        const result = await execute(
+            executeCallActorMcpTool,
+            { tool: 'add', actor: 'apify/missing' },
+            { apifyClient: unknownActorClient },
+        );
+
+        expectSoftFailInvalidInput(result);
+        expect(requests).toHaveLength(0);
+    });
+
+    it('rejects an MCP path that leaves the standby origin without connecting, and reports the Actor ID', async () => {
+        seedActor('apify/off-origin-mcp-server', { definition: { webServerMcpPath: 'https://elsewhere.example/mcp' } });
+
+        const result = await execute(executeCallActorMcpTool, { tool: 'add', actor: 'apify/off-origin-mcp-server' });
+
+        expect(result.isError).toBe(true);
+        expect(JSON.stringify(result.content)).toContain('resolves outside its standby origin');
+        expect(result.toolTelemetry).toMatchObject({ actorId: 'off-origin-mcp-server-id' });
+        expect(requests).toHaveLength(0);
+    });
+
+    it('requires a token without connecting', async () => {
+        const result = await execute(executeCallActorMcpTool, { tool: 'add' }, { token: '' });
+
+        expect(result.toolTelemetry).toMatchObject({ failureCategory: FAILURE_CATEGORY.AUTH });
+        expect(requests).toHaveLength(0);
+    });
+
+    it('reports a server that cannot be reached as a connection failure', async () => {
+        const closed = createServer();
+        await new Promise<void>((resolve) => closed.listen(0, '127.0.0.1', resolve));
+        const { port } = closed.address() as AddressInfo;
+        await new Promise<void>((resolve) => closed.close(() => resolve()));
+        seedActor('apify/unreachable-mcp-server', { actor: { standbyUrl: `http://127.0.0.1:${port}` } });
+
+        const result = await execute(executeCallActorMcpTool, {
+            tool: 'add',
+            actor: 'apify/unreachable-mcp-server',
+        });
+
+        expect(result.isError).toBe(true);
+        expect(JSON.stringify(result.content)).toContain('Failed to connect to MCP server');
+    });
+
+    it('does not connect when the call is already cancelled', async () => {
+        const controller = new AbortController();
+        controller.abort();
+
+        expect(await execute(executeCallActorMcpTool, { tool: 'add' }, { signal: controller.signal })).toEqual({});
+        expect(requests).toHaveLength(0);
+    });
+
     it('names fetch-actor-mcp-tool-list in the description only when the session has it, and states the billing caveat', () => {
         const withList = callActorMcpTool.buildDescription!(ALL_TOOLS_PRESENT);
         const withoutList = callActorMcpTool.buildDescription!(only(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL));
@@ -381,49 +439,6 @@ describe.each([
         expect(requests).toHaveLength(0);
     });
 
-    it('returns the not-found response for an Actor the API does not know, without connecting', async () => {
-        const unknownActorClient = Object.assign(
-            new ApifyClient({ token: TOKEN }),
-            mockApifyClient({ actor: () => ({ get: async () => undefined }) }),
-        );
-
-        const result = await execute(run, { ...args, actor: 'apify/missing' }, { apifyClient: unknownActorClient });
-
-        expectSoftFailInvalidInput(result);
-        expect(requests).toHaveLength(0);
-    });
-
-    it('rejects an MCP path that leaves the standby origin without connecting, and reports the Actor ID', async () => {
-        seedActor('apify/off-origin-mcp-server', { definition: { webServerMcpPath: 'https://elsewhere.example/mcp' } });
-
-        const result = await execute(run, { ...args, actor: 'apify/off-origin-mcp-server' });
-
-        expect(result.isError).toBe(true);
-        expect(JSON.stringify(result.content)).toContain('resolves outside its standby origin');
-        expect(result.toolTelemetry).toMatchObject({ actorId: 'off-origin-mcp-server-id' });
-        expect(requests).toHaveLength(0);
-    });
-
-    it('requires a token without connecting', async () => {
-        const result = await execute(run, args, { token: '' });
-
-        expect(result.toolTelemetry).toMatchObject({ failureCategory: FAILURE_CATEGORY.AUTH });
-        expect(requests).toHaveLength(0);
-    });
-
-    it('reports a server that cannot be reached as a connection failure', async () => {
-        const closed = createServer();
-        await new Promise<void>((resolve) => closed.listen(0, '127.0.0.1', resolve));
-        const { port } = closed.address() as AddressInfo;
-        await new Promise<void>((resolve) => closed.close(() => resolve()));
-        seedActor('apify/unreachable-mcp-server', { actor: { standbyUrl: `http://127.0.0.1:${port}` } });
-
-        const result = await execute(run, { ...args, actor: 'apify/unreachable-mcp-server' });
-
-        expect(result.isError).toBe(true);
-        expect(JSON.stringify(result.content)).toContain('Failed to connect to MCP server');
-    });
-
     it('returns the empty aborted response when the client cancels mid-request', async () => {
         seedActor('apify/slow-mcp-server', { definition: { webServerMcpPath: '/mcp-slow' } });
         const controller = new AbortController();
@@ -433,14 +448,6 @@ describe.each([
         controller.abort();
 
         expect(await pending).toEqual({});
-    });
-
-    it('does not connect when the call is already cancelled', async () => {
-        const controller = new AbortController();
-        controller.abort();
-
-        expect(await execute(run, args, { signal: controller.signal })).toEqual({});
-        expect(requests).toHaveLength(0);
     });
 
     it.each([

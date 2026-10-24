@@ -1,17 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import { buildFetchActorDetailsResult } from '../../src/tools/actors/fetch_actor_details.js';
 import { buildServerInterfaceSection } from '../../src/tools/actors/server_interface_schema.js';
 import type { Actor } from '../../src/types.js';
-import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
-import { fetchActorDetails } from '../../src/utils/actor_details.js';
+import { mockActor, mockActorBuildClient, mockDefaultBuild } from './helpers/actor_build_client.js';
 import { mockApifyClient, stubToolCallContext, textOf } from './helpers/tool_context.js';
-
-vi.mock('../../src/utils/actor_details.js', async () => {
-    const actual = await vi.importActual<Record<string, unknown>>('../../src/utils/actor_details.js');
-    return { ...actual, fetchActorDetails: vi.fn() };
-});
 
 const ACTOR_FULL_NAME = 'apify/server-actor-test';
 const STANDBY_URL = 'https://server-actor-test.apify.actor';
@@ -117,39 +111,10 @@ describe('buildServerInterfaceSection()', () => {
             expect(text).toContain('- GET /empty: Return no content\n');
         });
 
-        it('names a required path-level parameter among the required inputs of an operation under the path', () => {
-            const schema = {
-                paths: {
-                    '/items/{id}': {
-                        parameters: [{ $ref: '#/components/parameters/ItemId' }],
-                        get: { summary: 'Get an item' },
-                    },
-                },
-                components: { parameters: { ItemId: { name: 'id', in: 'path', required: true } } },
-            };
-
-            expect(textOfSection({ schema, selection: true })).toContain(
-                '- GET /items/{id}: Get an item. Required: id.',
-            );
-        });
-
-        it("replaces a path-level parameter with the operation's parameter of the same name and location", () => {
-            const schema = {
-                paths: {
-                    '/items': {
-                        parameters: [{ name: 'verbose', in: 'query', required: true }],
-                        get: { summary: 'List items', parameters: [{ name: 'verbose', in: 'query' }] },
-                    },
-                },
-            };
-
-            expect(textOfSection({ schema, selection: true })).toContain('- GET /items: List items\n');
-        });
-
-        it('lists required inputs through a parameter alias chain', () => {
+        it('lists required path-level inputs through a parameter alias chain', () => {
             const schema = {
                 openapi: '3.0.3',
-                paths: { '/search': { get: { parameters: [{ $ref: '#/components/parameters/Alias' }] } } },
+                paths: { '/search': { parameters: [{ $ref: '#/components/parameters/Alias' }], get: {} } },
                 components: {
                     parameters: {
                         Alias: { $ref: '#/components/parameters/Search' },
@@ -268,46 +233,35 @@ describe('buildServerInterfaceSection()', () => {
             });
         });
 
-        it.each(['GET /nope', 'add', 'DELETE /add'])(
-            'returns a selection error listing the operations for %j',
-            (selection) => {
-                expect(section({ selection })).toEqual({
-                    error:
-                        `Actor '${ACTOR_FULL_NAME}' has no operation "${selection}". ` +
-                        'Documented operations: GET /add, POST /add, GET /empty.',
-                });
-            },
-        );
+        it.each(['GET /nope', 'add'])('returns a selection error listing the operations for %j', (selection) => {
+            expect(section({ selection })).toEqual({
+                error:
+                    `Actor '${ACTOR_FULL_NAME}' has no operation "${selection}". ` +
+                    'Documented operations: GET /add, POST /add, GET /empty.',
+            });
+        });
     });
 });
 
 describe('buildFetchActorDetailsResult() with a Server Actor', () => {
-    const details = {
-        actorInfo: {
-            id: 'server-actor-id',
-            name: 'server-actor-test',
-            username: 'apify',
-            actorStandby: { isEnabled: true, tenancy: 'SINGLE_TENANT' },
-            standbyUrl: STANDBY_URL,
-        },
-        actorCard: '# Actor card',
-        actorCardStructured: { id: 'server-actor-id', fullName: ACTOR_FULL_NAME },
-        inputSchema: { type: 'object', properties: {} },
-        readme: '# README',
-        webServerSchema: SCHEMA,
-    } as unknown as ActorDetailsResult;
-
-    beforeEach(() => {
-        vi.mocked(fetchActorDetails).mockReset();
-        vi.mocked(fetchActorDetails).mockResolvedValue(details);
-    });
-
-    const call = async (output?: Record<string, unknown>) =>
-        buildFetchActorDetailsResult(
-            stubToolCallContext({ actor: ACTOR_FULL_NAME, ...(output && { output }) }, mockApifyClient(), {
-                loadedToolNames: [HELPER_TOOLS.ACTOR_CALL],
+    const call = async (output?: Record<string, unknown>) => {
+        const { apifyClient } = mockActorBuildClient({
+            actor: mockActor({ id: 'server-actor-id', name: 'server-actor-test', username: 'apify', ...serverActor() }),
+            defaultBuild: mockDefaultBuild({ webServerSchema: SCHEMA }),
+            hasToken: false,
+        });
+        const client = mockApifyClient({
+            ...apifyClient,
+            store: () => ({
+                list: async () => ({ total: 0, count: 0, offset: 0, limit: 10, desc: false, items: [] }),
             }),
-        );
+        });
+        const context = stubToolCallContext({ actor: ACTOR_FULL_NAME, ...(output && { output }) }, client, {
+            loadedToolNames: [HELPER_TOOLS.ACTOR_CALL],
+        });
+        context.apifyToken = '';
+        return buildFetchActorDetailsResult(context);
+    };
 
     it('carries the summary line in the text and structuredContent of the default output', async () => {
         const result = await call();

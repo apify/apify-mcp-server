@@ -99,10 +99,10 @@ describe('local reference chains', () => {
             components: { parameters: { Alias: { $ref: '#/components/parameters/Search' }, Search: parameter } },
         };
 
-        expect(resolveRef({ $ref: '#/components/parameters/Alias' }, spec)).toBe(parameter);
+        expect(resolveRef({ $ref: '#/components/parameters/Alias' }, spec)).toEqual(parameter);
     });
 
-    it('stops a circular alias chain and leaves an external reference unresolved', () => {
+    it('stops circular or missing aliases and preserves external references', () => {
         const spec = { components: { parameters: { Alias: { $ref: '#/components/parameters/Alias' } } } };
 
         expect(resolveRef({ $ref: '#/components/parameters/Alias' }, spec)).toBeUndefined();

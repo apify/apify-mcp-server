@@ -89,6 +89,7 @@ describe('getActorDefinition() reads the server interface from the standby build
         const result = await getActorDefinition('acme/mcp-server', apifyClient);
 
         expect(result?.definition).toMatchObject({ webServerMcpPath: '/mcp', hasWebServerSchema: true });
+        expect(result?.definition).not.toHaveProperty('webServerSchema');
         expect(buildGet).not.toHaveBeenCalled();
         expect(list).not.toHaveBeenCalled();
     });
@@ -184,33 +185,24 @@ describe('getActorDefinition() reads the server interface from the standby build
         expect(list).not.toHaveBeenCalled();
     });
 
-    it('does not scan the build list for a reference that is not a build number', async () => {
-        const { apifyClient, list } = mockActorBuildClient({
-            actor: mockStandbyActor('beta'),
-            defaultBuild: mockDefaultBuild(),
-        });
-
-        await getActorDefinition('acme/mcp-server', apifyClient);
-
-        expect(list).not.toHaveBeenCalled();
-    });
-
     it.each([
-        ['a tag with no tagged build', mockStandbyActor('beta', { taggedBuilds: {} }), {}],
-        ['a build number no listed build has', mockStandbyActor('9.9.9'), {}],
+        ['a tag with no tagged build', mockStandbyActor('beta', { taggedBuilds: {} }), {}, false],
+        ['a build number no listed build has', mockStandbyActor('9.9.9'), {}, true],
         [
             'a deleted build',
             mockStandbyActor('beta', { taggedBuilds: { beta: { buildId: STANDBY_BUILD_ID } } }),
             { [STANDBY_BUILD_ID]: undefined },
+            false,
         ],
         [
             'a build without a definition',
             mockStandbyActor('beta', { taggedBuilds: { beta: { buildId: STANDBY_BUILD_ID } } }),
             { [STANDBY_BUILD_ID]: mockBuild(STANDBY_BUILD_ID) },
+            false,
         ],
-    ])("serves no server fields, not the default build's, for %s", async (_label, actor, builds) => {
+    ])("serves no server fields, not the default build's, for %s", async (_label, actor, builds, shouldListBuilds) => {
         const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
-        const { apifyClient } = mockActorBuildClient({
+        const { apifyClient, list } = mockActorBuildClient({
             actor,
             defaultBuild: mockDefaultBuild(),
             builds,
@@ -226,6 +218,7 @@ describe('getActorDefinition() reads the server interface from the standby build
         });
         expect(result?.definition).not.toHaveProperty('webServerSchema');
         expect(softFail).toHaveBeenCalledTimes(1);
+        expect(list).toHaveBeenCalledTimes(shouldListBuilds ? 1 : 0);
     });
 
     it('rethrows a 403 from the standby build read instead of reporting not-found', async () => {
@@ -263,27 +256,5 @@ describe('hasWebServerSchema on the pruned definition', () => {
         const result = await getActorDefinition('acme/mcp-server', apifyClient);
 
         expect(result?.definition.hasWebServerSchema).toBe(false);
-    });
-
-    it('is true for a schema with one operation', async () => {
-        const { apifyClient } = mockActorBuildClient({
-            actor: mockActor(),
-            defaultBuild: mockDefaultBuild({ webServerSchema: SEARCH_SCHEMA }),
-        });
-
-        const result = await getActorDefinition('acme/mcp-server', apifyClient);
-
-        expect(result?.definition.hasWebServerSchema).toBe(true);
-    });
-
-    it('keeps the schema itself off the pruned definition', async () => {
-        const { apifyClient } = mockActorBuildClient({
-            actor: mockActor(),
-            defaultBuild: mockDefaultBuild({ webServerSchema: SEARCH_SCHEMA }),
-        });
-
-        const result = await getActorDefinition('acme/mcp-server', apifyClient);
-
-        expect(result?.definition).not.toHaveProperty('webServerSchema');
     });
 });
