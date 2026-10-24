@@ -290,12 +290,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     // Console UI tokens hit the same cached users/me lookup; non-UI tokens short-circuit.
     const linkContext = await getConsoleLinkContext(apifyToken, apifyClient);
     const cardOptions = { ...buildCardOptions(resolvedOutput), userTier: userPlanTier, linkContext };
-    const includeServerInterface = resolvedOutput.serverInterfaceSummary || resolvedOutput.serverInterface !== false;
-    const details = await fetchActorDetailsFromApi(apifyClient, actorName, {
-        cardOptions,
-        actorStore,
-        includeServerInterface,
-    });
+    const details = await fetchActorDetailsFromApi(apifyClient, actorName, { cardOptions, actorStore });
     if (!details) {
         return buildActorNotFoundResponse(actorName, loadedToolNames);
     }
@@ -309,15 +304,16 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     const mcpToolsMessage = resolvedOutput.mcpTools
         ? await getMcpToolsMessage(actorName, apifyClient, apifyToken, paymentProvider, mcpSessionId)
         : undefined;
-    const serverInterface = includeServerInterface
-        ? buildServerInterfaceSection({
-              actor: details.actorInfo,
-              actorFullName: `${details.actorInfo.username}/${details.actorInfo.name}`,
-              schema: details.webServerSchema,
-              selection: resolvedOutput.serverInterface,
-              loadedToolNames,
-          })
-        : undefined;
+    const serverInterface =
+        resolvedOutput.serverInterfaceSummary || resolvedOutput.serverInterface !== false
+            ? buildServerInterfaceSection({
+                  actor: details.actorInfo,
+                  actorFullName: `${details.actorInfo.username}/${details.actorInfo.name}`,
+                  schema: details.webServerSchema,
+                  selection: resolvedOutput.serverInterface,
+                  loadedToolNames,
+              })
+            : undefined;
     if (serverInterface && 'error' in serverInterface) return respondUserError(serverInterface.error);
 
     // NOTE: Data duplication between texts and structuredContent is intentional and required.

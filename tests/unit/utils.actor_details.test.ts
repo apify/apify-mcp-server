@@ -243,7 +243,7 @@ describe('fetchActorDetails() reads the server interface from the standby build'
             builds: { [STANDBY_BUILD_ID]: mockBuild(STANDBY_BUILD_ID, STANDBY_DEFINITION) },
         });
 
-        const result = await fetchActorDetails(apifyClient, 'acme/mcp-server', { includeServerInterface: true });
+        const result = await fetchActorDetails(apifyClient, 'acme/mcp-server');
 
         expect(result).toMatchObject({
             webServerSchema: SEARCH_SCHEMA,
@@ -259,23 +259,10 @@ describe('fetchActorDetails() reads the server interface from the standby build'
             builds: { [STANDBY_BUILD_ID]: undefined },
         });
 
-        const result = await fetchActorDetails(apifyClient, 'acme/mcp-server', { includeServerInterface: true });
+        const result = await fetchActorDetails(apifyClient, 'acme/mcp-server');
 
         expect(result).toMatchObject({ inputSchema: DEFAULT_INPUT, readme: '# Default build README' });
         expect(result?.webServerSchema).toBeUndefined();
-    });
-
-    it('reads no standby build for a caller that does not render the server interface', async () => {
-        const { apifyClient, buildGet } = mockActorBuildClient({
-            actor: mockStandbyActor('beta', { taggedBuilds: { beta: { buildId: STANDBY_BUILD_ID } } }),
-            defaultBuild: mockDefaultBuild(),
-            builds: { [STANDBY_BUILD_ID]: mockBuild(STANDBY_BUILD_ID, STANDBY_DEFINITION) },
-        });
-
-        const result = await fetchActorDetails(apifyClient, 'acme/mcp-server');
-
-        expect(result?.webServerSchema).toBeUndefined();
-        expect(buildGet).not.toHaveBeenCalled();
     });
 
     it('propagates a 403 from the standby build read instead of reporting not-found', async () => {
@@ -285,9 +272,7 @@ describe('fetchActorDetails() reads the server interface from the standby build'
         });
         buildGet.mockRejectedValue(apifyApiError(403, 'Insufficient permissions'));
 
-        await expect(
-            fetchActorDetails(apifyClient, 'acme/mcp-server', { includeServerInterface: true }),
-        ).rejects.toMatchObject({ statusCode: 403 });
+        await expect(fetchActorDetails(apifyClient, 'acme/mcp-server')).rejects.toMatchObject({ statusCode: 403 });
     });
 });
 
