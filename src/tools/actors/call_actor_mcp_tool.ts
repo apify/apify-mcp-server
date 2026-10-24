@@ -90,7 +90,13 @@ export async function runOnActorMcpServer(
     }
     if (signal.aborted) return respondAborted();
 
-    const outcome = await withRemoteMcpClient(serverUrl, apifyToken, mcpSessionId, signal, params.run);
+    const outcome = await withRemoteMcpClient(
+        serverUrl,
+        { token: apifyToken, requestOrigin: apifyClient.requestOrigin },
+        mcpSessionId,
+        signal,
+        params.run,
+    );
     switch (outcome.outcome) {
         case 'connect-failed':
             return withActorId(respondServerError(`Failed to connect to MCP server ${serverUrl}`));

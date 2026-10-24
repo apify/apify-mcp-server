@@ -30,7 +30,6 @@ import { logHttpError } from '../../utils/logging.js';
 import {
     buildInvalidInputTexts,
     respondAborted,
-    respondErrorNoTelemetry,
     respondServerError,
     respondUserError,
     type ToolResponse,
@@ -368,8 +367,9 @@ export function rejectMcpToolSyntax(
     const replacement = loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL)
         ? ` ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} calls an Actor's MCP tool, with the tool name as its own argument.`
         : '';
-    return respondErrorNoTelemetry(
+    return respondUserError(
         `The "actor" argument takes an Actor ID or name; the "actorName:toolName" form is no longer supported.${replacement}`,
+        { detail: 'actor:tool syntax' },
     );
 }
 

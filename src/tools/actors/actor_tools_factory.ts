@@ -20,7 +20,6 @@ import {
     type ActorInfo,
     type ActorStore,
     type ActorTool,
-    type ApifyToken,
     type ToolDescriptionContext,
     type ToolEntry,
     type ToolInputSchema,
@@ -222,12 +221,13 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
 
 export async function getMCPServersAsTools(
     actorsInfo: ActorInfo[],
-    apifyToken: ApifyToken,
+    apifyClient: Pick<ApifyClient, 'token' | 'requestOrigin'>,
     mcpSessionId?: string,
 ): Promise<ToolEntry[]> {
+    const { token, requestOrigin } = apifyClient;
     // Payment-provider request with no Apify token: standby Actors aren't supported here, so
     // MCP servers — which are always standby Actors — are skipped since they'd fail anyway.
-    if (apifyToken === null || apifyToken === undefined) {
+    if (token === null || token === undefined) {
         return [];
     }
 
@@ -255,7 +255,7 @@ export async function getMCPServersAsTools(
                 mcpSessionId,
             });
 
-            client = await connectMCPClient(mcpServerUrl, apifyToken, mcpSessionId);
+            client = await connectMCPClient(mcpServerUrl, { token, requestOrigin }, mcpSessionId);
             if (!client) {
                 // Skip this Actor, connectMCPClient will log the error
                 return [];
@@ -423,7 +423,7 @@ export async function getActorsAsTools(
 
     const [normalTools, mcpServerTools] = await Promise.all([
         getNormalActorsAsTools(normalActorsInfo, { mcpSessionId, actorStore, isDirectTool }),
-        getMCPServersAsTools(actorMCPServersInfo, apifyClient.token, mcpSessionId),
+        getMCPServersAsTools(actorMCPServersInfo, apifyClient, mcpSessionId),
     ]);
 
     return { tools: [...normalTools, ...mcpServerTools], errors };

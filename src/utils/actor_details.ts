@@ -210,7 +210,11 @@ export async function getMcpToolsMessage(
 
     // Connect and list tools
     const mcpServerUrl = await getActorMCPServerURL(cached.info, webServerMcpPath);
-    const client = await connectMCPClient(mcpServerUrl, apifyToken, mcpSessionId);
+    const client = await connectMCPClient(
+        mcpServerUrl,
+        { token: apifyToken, requestOrigin: apifyClient.requestOrigin },
+        mcpSessionId,
+    );
     if (!client) {
         return `Failed to connect to MCP server for Actor '${actorName}'.`;
     }

@@ -45,6 +45,12 @@ export function getApifyAPIPublicBaseUrl(): string {
 }
 
 export class ApifyClient extends _ApifyClient {
+    /**
+     * Sent in the X-Apify-Request-Origin header; connections to an Actor's MCP server send it too. Always set; optional
+     * so a plain apify-client `ApifyClient`, which public methods such as `loadToolsFromInput` accept, stays assignable.
+     */
+    readonly requestOrigin?: REQUEST_ORIGIN;
+
     constructor(options: ExtendedApifyClientOptions) {
         /**
          * To publish to DockerHub, we need to run their build task to validate our MCP server.
@@ -74,6 +80,7 @@ export class ApifyClient extends _ApifyClient {
             userAgentSuffix: USER_AGENT_ORIGIN,
             requestInterceptors: [(config) => ({ ...config, headers: { ...config.headers, ...staticHeaders } })],
         });
+        this.requestOrigin = staticHeaders[REQUEST_ORIGIN_HEADER];
     }
 }
 

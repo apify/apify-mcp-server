@@ -55,7 +55,7 @@ export const toolsCases: Case[] = [
     },
     {
         name: 'calls an MCP server Actor tool with call-actor-mcp-tool and returns the remote result',
-        isDeploymentTest: false,
+        isDeploymentTest: true,
         run: withClient({ tools: ['actors'] }, async (client) => {
             // Populates the SDK's `_cachedToolOutputValidators` map, so callTool validates against any outputSchema.
             await client.listTools();
