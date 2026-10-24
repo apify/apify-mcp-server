@@ -225,8 +225,7 @@ describe('fetchActorDetails()', () => {
 });
 
 describe('fetchActorDetails() reads the server interface from the standby build', () => {
-    // How the standby build is resolved is covered once in `tools.actor_definition.test.ts`; these cases prove
-    // this reader uses that resolution, clears the default build's server fields, and propagates its errors.
+    // Build resolution is covered in `tools.actor_definition.test.ts`; these cases cover only this reader's wiring.
     const STANDBY_DEFINITION = {
         actorSpecification: 1,
         name: 'mcp-server',

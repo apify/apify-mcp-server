@@ -70,6 +70,18 @@ async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
             res.writeHead(204);
             res.end();
             return;
+        case '/latin1':
+            res.writeHead(200, { 'content-type': 'text/plain; note=example; CHARSET="ISO-8859-1"' });
+            res.end(Buffer.from('café', 'latin1'));
+            return;
+        case '/utf16-token':
+            res.writeHead(200, { 'content-type': 'text/plain; charset=utf-16le' });
+            res.end(Buffer.from(TOKEN, 'utf16le'));
+            return;
+        case '/unsupported-charset':
+            res.writeHead(200, { 'content-type': 'text/plain; charset=unsupported-encoding' });
+            res.end('café');
+            return;
         case '/binary':
             res.writeHead(200, { 'content-type': 'application/octet-stream' });
             res.end(Buffer.from([0, 1, 2]));
@@ -158,6 +170,26 @@ async function callTool(
     if (options.signal) context.signal = options.signal;
     if (options.token !== undefined) context.apifyToken = options.token;
     return (await executeSendServerActorRequest(context, { timeoutMillis: options.timeoutMillis })) as ToolResult;
+}
+
+async function dispatchTool(args: Record<string, unknown>): Promise<Record<string, unknown>> {
+    return withServer(
+        async (mcpServer) => {
+            mcpServer.upsertTools([sendServerActorRequest]);
+            return getRequestHandler(mcpServer, 'tools/call')(
+                {
+                    method: 'tools/call',
+                    params: {
+                        name: HELPER_TOOLS.ACTOR_SERVER_REQUEST,
+                        arguments: { actor: SERVER_ACTOR, method: 'POST', path: '/echo', ...args },
+                        _meta: { mcpSessionId: 's1' },
+                    },
+                },
+                { signal: new AbortController().signal, sendNotification: vi.fn() },
+            );
+        },
+        { token: TOKEN },
+    );
 }
 
 beforeAll(async () => {
@@ -254,12 +286,35 @@ describe('send-server-actor-request', () => {
         expect(received[0].url).toBe('/echo?from=a%20path&asText=true&n=1&flag=false');
     });
 
-    it('rejects a query value that is an array or an object', () => {
-        const base = { actor: SERVER_ACTOR, method: 'GET', path: '/echo' };
+    it.each([
+        ['null', null],
+        ['a singleton array', [1]],
+        ['a multi-item array', [1, 2]],
+        ['an object', { a: 1 }],
+    ])('rejects %s as a query value through dispatch before sending a POST', async (_label, value) => {
+        const result = await dispatchTool({ query: { deleteAll: value } });
 
-        expect(sendServerActorRequest.ajvValidate({ ...base, query: { ok: 'yes', n: 1, flag: true } })).toBe(true);
-        expect(sendServerActorRequest.ajvValidate({ ...base, query: { list: [1, 2] } })).toBe(false);
-        expect(sendServerActorRequest.ajvValidate({ ...base, query: { nested: { a: 1 } } })).toBe(false);
+        expect(received).toHaveLength(0);
+        expect(result.isError).toBe(true);
+    });
+
+    it('preserves scalar queries and JSON bodies through dispatch while stripping unknown keys', async () => {
+        const args = {
+            path: '/echo?from=a%20path',
+            query: { n: 1, asText: true, flag: false, label: 'apify' },
+            body: { values: [null, 2, true, 'apify'] },
+            extra: 'client metadata',
+        };
+
+        const result = await dispatchTool(args);
+
+        expect(result.isError).toBe(false);
+        expect(received).toHaveLength(1);
+        expect(received[0]).toMatchObject({
+            method: 'POST',
+            url: '/echo?from=a%20path&n=1&asText=true&flag=false&label=apify',
+            body: JSON.stringify(args.body),
+        });
     });
 
     it('succeeds with an empty body for a 204 without a Content-Type', async () => {
@@ -288,6 +343,36 @@ describe('send-server-actor-request', () => {
             location: '/login?token=[REDACTED]',
         });
         expect(JSON.stringify(result)).not.toContain(TOKEN);
+    });
+
+    it('decodes the declared charset and counts bytes before text conversion', async () => {
+        const result = await callTool({ path: '/latin1' });
+
+        expect(result.isError).toBe(false);
+        expect(result.structuredContent).toMatchObject({ status: 200, body: 'café', bytes: 4 });
+    });
+
+    it('masks the session token after decoding a non-UTF-8 body', async () => {
+        const result = await callTool({ path: '/utf16-token' });
+
+        expect(result.isError).toBe(false);
+        expect(result.structuredContent).toMatchObject({ body: '[REDACTED]', bytes: 20 });
+        expect(JSON.stringify(result)).not.toContain(TOKEN);
+    });
+
+    it('rejects an unsupported charset with the status and Actor telemetry after sending', async () => {
+        const result = await callTool({ path: '/unsupported-charset' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toContain('unsupported-encoding');
+        expect(result.content[0].text).toContain('The request itself was sent.');
+        expect(result.toolTelemetry).toMatchObject({
+            httpStatus: 200,
+            failureHttpStatus: 200,
+            actorId: 'server-actor-test-id',
+            actorTenancy: ACTOR_TENANCY.SINGLE_TENANT,
+        });
+        expect(received).toHaveLength(1);
     });
 
     it('rejects a binary body by its content type and keeps the status', async () => {
@@ -355,6 +440,17 @@ describe('send-server-actor-request', () => {
         expectSoftFailInvalidInput(result);
         expect(received).toHaveLength(0);
     });
+
+    it.each([`echo?token=${TOKEN}`, `//${TOKEN}@other.example/echo`])(
+        'masks the session token when rejecting path %s without sending',
+        async (path) => {
+            const result = await callTool({ path });
+
+            expectSoftFailInvalidInput(result);
+            expect(JSON.stringify(result)).not.toContain(TOKEN);
+            expect(received).toHaveLength(0);
+        },
+    );
 
     it('rejects a body on GET without sending', async () => {
         const result = await callTool({ path: '/echo', body: { a: 1 } });

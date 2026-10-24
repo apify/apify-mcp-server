@@ -37,7 +37,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `send_server_actor_request.ts` (`send-server-actor-request`: one HTTP request to a Server Actor's API, gated on
     the `server` interface and sent by `fetchServerActorResponse` through `sendApifyApiRequest` with raw response
     bytes, no redirects, the `MAX_INLINE_BYTES` cap after decompression and the `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`
-    deadline; the path is resolved against the Actor's `standbyUrl` and must keep its origin),
+    deadline; the path is resolved against the Actor's `standbyUrl` and must keep its origin; query values are
+    validated without coercion; text uses the declared charset, UTF-8 by default, and rejects unsupported
+    charsets while keeping the HTTP status; session tokens are masked after decoding too),
     `actor_tool_contract.ts` (Actor-specific presentation policies plus direct-tool input restrictions
     and defaults, shared by schema generation, the call engine's denied-input check and execution;
     generic calls skip direct-only restrictions and defaults), and

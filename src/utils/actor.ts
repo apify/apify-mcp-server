@@ -41,7 +41,13 @@ export async function getActorDefinitionCached(
     const cached = actorDefinitionCache.get(actorIdOrName);
     if (cached && (await callerMaySeeCachedActor(cached, apifyClient))) return cached;
     const fetched = await getActorDefinition(actorIdOrName, apifyClient);
-    if (fetched) actorDefinitionCache.set(actorIdOrName, fetched);
+    // Anonymous reads can skip standby build resolution; don't cache missing interfaces for other callers (#1642).
+    const isUnresolvedAnonymousServer =
+        !apifyClient.token &&
+        fetched?.info.actorStandby?.isEnabled === true &&
+        !fetched.definition.webServerMcpPath &&
+        !fetched.definition.hasWebServerSchema;
+    if (fetched && !isUnresolvedAnonymousServer) actorDefinitionCache.set(actorIdOrName, fetched);
     return fetched;
 }
 
