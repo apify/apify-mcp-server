@@ -46,7 +46,7 @@ const sendServerActorRequestArgs = z.object({
         .string()
         .min(1)
         .describe(
-            "The path on the Actor's server, starting with /, such as /search. A query string written into the " +
+            'The path on the Actor Server, starting with /, such as /search. A query string written into the ' +
                 'path is sent too.',
         ),
     query: apiCallArgsShape.query.describe(
@@ -62,16 +62,16 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         ? ` Unlike ${HELPER_TOOLS.ACTOR_CALL}, it starts no run from an input; an Actor can have both interfaces.`
         : '';
     return dedent`
-        Send one HTTP request to a Server Actor's API: the server interface its API schema (OpenAPI) and README document.${callActor}
-        The server adds the host and the Apify API token; give the method, the path, and optionally query parameters and a JSON body.
-        Only an Actor with Actor Standby enabled and an API schema takes requests here, and the Actor itself accepts or rejects the method and path.
-        A request can start a standby run of the Actor in your account, kept for its idle timeout, or is charged per event when the Actor is multi-tenant.
-        The request is sent once, with no retries and without following redirects. The response body comes back as text (JSON, text, or XML); a body over ${MAX_INLINE_BYTES} bytes is not returned.
+        Send one HTTP request to an Actor Server: the HTTP API of a Server Actor, documented in its API schema (OpenAPI) and README.${callActor}
+        Give the method, the path, and optionally query parameters and a JSON body; the Actor Server's host and your Apify API token are added for you.
+        Only an Actor with an Actor Server and an API schema takes requests here; the Actor accepts or rejects the method and path.
+        A request to a single-tenant Actor Server can start a run of the Actor in your account, kept until its idle timeout; a multi-tenant Actor Server charges per event.
+        The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text; other content types, and bodies over ${MAX_INLINE_BYTES} bytes, are not returned.
 
         Example call: {"actor": "username/name", "method": "POST", "path": "/search", "body": {"query": "apify"}}
 
         USAGE:
-        - Use when the user asks for an Actor's HTTP endpoint, or the Actor's documentation names one.
+        - Use when the user asks for an Actor Server HTTP endpoint, or the Actor's documentation names one.
 
         USAGE EXAMPLES:
         - user_input: Send GET /status to username/name
@@ -89,7 +89,7 @@ type ServerActorRequest = {
     path: string;
 };
 
-/** What the Actor server sent back; `body` is absent when it exceeded `MAX_INLINE_BYTES`, where reading stopped. */
+/** What the Actor Server sent back; `body` is absent when it exceeded `MAX_INLINE_BYTES`, where reading stopped. */
 type ServerActorResponse = {
     status: number;
     contentType?: string;
@@ -139,8 +139,7 @@ function buildRequestUrl(
     if (!resolved) {
         return {
             error: respondServerError(
-                `Actor '${actorName}' has no valid standby URL in its Actor Standby configuration, so its server ` +
-                    'cannot be reached.',
+                `Actor '${actorName}' has no valid Actor Server URL, so its Actor Server cannot be reached.`,
             ),
         };
     }
@@ -148,7 +147,7 @@ function buildRequestUrl(
     const { url, standbyOrigin } = resolved;
     if (!url || url.username || url.password) {
         return {
-            error: respondUserError(`The path leaves the Actor's server at ${standbyOrigin}, so it is not sent.`),
+            error: respondUserError(`The path leaves the Actor Server at ${standbyOrigin}, so it is not sent.`),
         };
     }
     // Not axios `params`: apify-client's serializer sends a boolean as 1 or 0. Not `url.searchParams`: it would
@@ -227,7 +226,7 @@ function decodeBody(body: Buffer, charset: string, token: string): string | unde
     }
 }
 
-/** The tool response for what the Actor server sent back, with the session token masked. */
+/** The tool response for what the Actor Server sent back, with the session token masked. */
 function buildResponse(request: ServerActorRequest, response: ServerActorResponse, token: string): ToolResponse {
     const { status } = response;
     const contentType = response.contentType?.replaceAll(token, REDACTED);
@@ -264,7 +263,7 @@ function buildResponse(request: ServerActorRequest, response: ServerActorRespons
     const texts = [JSON.stringify(structuredContent), `${outcome} with ${bodyNote}${redirectNote}.`];
     if (status < 400) return respondOk(texts, { structuredContent });
     if (status === 429 || status === 503) {
-        texts.push('The Actor server is busy; wait, then send requests one at a time.');
+        texts.push('The Actor Server is busy; wait, then send requests one at a time.');
     }
     return respondUserError(texts, {
         ...((status === HTTP_UNAUTHORIZED || status === HTTP_FORBIDDEN) && { category: FAILURE_CATEGORY.AUTH }),
@@ -297,7 +296,7 @@ export async function executeSendServerActorRequest(
     const { apifyToken, apifyClient, mcpSessionId, loadedToolNames, signal } = toolArgs;
     const args = sendServerActorRequestArgs.parse(toolArgs.args);
     if (!apifyToken) {
-        return respondUserError('An Apify API token is required: the request to the Actor server carries it.', {
+        return respondUserError('An Apify API token is required: the request to the Actor Server carries it.', {
             category: FAILURE_CATEGORY.AUTH,
         });
     }
@@ -378,7 +377,7 @@ export const sendServerActorRequest: ToolEntry = Object.freeze({
     ajvValidate: new Ajv({ coerceTypes: false, strict: false, removeAdditional: true }).compile(
         fixZodSchemaRequired(z.toJSONSchema(sendServerActorRequestArgs)),
     ),
-    // A third-party payment provider cannot pay for a standby run, so such a session is rejected before the call.
+    // A third-party payment provider cannot pay for an Actor Server run, so such a session is rejected before the call.
     hasPaymentProviderStandbyCheck: true,
     annotations: {
         title: 'Send Server Actor request',

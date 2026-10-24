@@ -406,7 +406,7 @@ describe('send-server-actor-request', () => {
             const result = await callTool({ path: template.replace('{host}', new URL(standbyUrl).host) });
 
             expectSoftFailInvalidInput(result);
-            expect(result.content[0].text).toContain("leaves the Actor's server");
+            expect(result.content[0].text).toContain('leaves the Actor Server');
             expect(received).toHaveLength(0);
         },
     );

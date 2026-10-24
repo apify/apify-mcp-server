@@ -1248,12 +1248,12 @@ export const serverActorRequestOutputSchema = {
     properties: {
         actorId: { type: 'string', description: 'Actor ID' },
         actorName: { type: 'string', description: 'Actor full name (username/name)' },
-        interface: { type: 'string', enum: ['server'], description: 'The Actor interface used: its HTTP server' },
+        interface: { type: 'string', enum: ['server'], description: 'The Actor interface used: its Actor Server' },
         tenancy: {
             type: 'string',
             enum: Object.values(ACTOR_TENANCY),
             description:
-                'single-tenant: a standby run in your account served the request; multi-tenant: a run of the ' +
+                'single-tenant: a run of the Actor in your account served the request; multi-tenant: a run of the ' +
                 "Actor's owner did, charged per event",
         },
         method: { type: 'string', description: 'HTTP method sent' },
