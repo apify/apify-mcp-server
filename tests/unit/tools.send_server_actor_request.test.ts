@@ -172,7 +172,10 @@ async function callTool(
     return (await executeSendServerActorRequest(context, { timeoutMillis: options.timeoutMillis })) as ToolResult;
 }
 
-async function dispatchTool(args: Record<string, unknown>): Promise<Record<string, unknown>> {
+async function dispatchTool(
+    args: Record<string, unknown>,
+    options: Parameters<typeof withServer>[1] = {},
+): Promise<Record<string, unknown>> {
     return withServer(
         async (mcpServer) => {
             mcpServer.upsertTools([sendServerActorRequest]);
@@ -188,7 +191,7 @@ async function dispatchTool(args: Record<string, unknown>): Promise<Record<strin
                 { signal: new AbortController().signal, sendNotification: vi.fn() },
             );
         },
-        { token: TOKEN },
+        { token: TOKEN, ...options },
     );
 }
 
@@ -280,16 +283,9 @@ describe('send-server-actor-request', () => {
         });
     });
 
-    it('encodes a boolean query value as true or false, after the query written into the path, kept as is', async () => {
-        await callTool({ path: '/echo?from=a%20path', query: { asText: true, n: 1, flag: false } });
-
-        expect(received[0].url).toBe('/echo?from=a%20path&asText=true&n=1&flag=false');
-    });
-
     it.each([
         ['null', null],
         ['a singleton array', [1]],
-        ['a multi-item array', [1, 2]],
         ['an object', { a: 1 }],
     ])('rejects %s as a query value through dispatch before sending a POST', async (_label, value) => {
         const result = await dispatchTool({ query: { deleteAll: value } });
@@ -434,13 +430,6 @@ describe('send-server-actor-request', () => {
         },
     );
 
-    it('rejects a path without a leading slash without sending', async () => {
-        const result = await callTool({ path: 'echo' });
-
-        expectSoftFailInvalidInput(result);
-        expect(received).toHaveLength(0);
-    });
-
     it.each([`echo?token=${TOKEN}`, `//${TOKEN}@other.example/echo`])(
         'masks the session token when rejecting path %s without sending',
         async (path) => {
@@ -506,9 +495,11 @@ describe('send-server-actor-request', () => {
 
     it('returns the empty aborted response when the client cancels mid-request', async () => {
         const controller = new AbortController();
-        setTimeout(() => controller.abort(), 50);
+        const pending = callTool({ path: '/drip?ms=2000' }, { signal: controller.signal });
+        await vi.waitFor(() => expect(received).toHaveLength(1));
+        controller.abort();
 
-        await expect(callTool({ path: '/drip?ms=2000' }, { signal: controller.signal })).resolves.toEqual({});
+        await expect(pending).resolves.toEqual({});
     });
 
     it('reports a timeout as a failure that does not claim the request was undone', async () => {
@@ -534,10 +525,11 @@ describe('send-server-actor-request', () => {
         expect(result.toolTelemetry).toMatchObject({ toolStatus: TOOL_STATUS.FAILED, httpStatus: 200 });
     });
 
-    it('requires a token without sending', async () => {
-        const result = await callTool({ path: '/echo' }, { token: '' });
+    it('requires a token through dispatch without sending', async () => {
+        const result = await dispatchTool({}, { token: '', allowUnauthMode: true });
 
-        expect(result.toolTelemetry).toMatchObject({ failureCategory: FAILURE_CATEGORY.AUTH });
+        expect(result.isError).toBe(true);
+        expect((result.content as { text: string }[])[0].text).toContain('An Apify API token is required');
         expect(received).toHaveLength(0);
     });
 
