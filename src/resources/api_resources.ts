@@ -152,7 +152,7 @@ async function buildLinkOutResult(uri: string, apifyClient: ApifyClient): Promis
 }
 
 /** `charset` parameter of a Content-Type header, lowercased; `undefined` when absent. */
-function parseCharset(contentType: string | undefined): string | undefined {
+export function parseCharset(contentType: string | undefined): string | undefined {
     const match = /;\s*charset\s*=\s*"?([^";]+)"?/i.exec(contentType ?? '');
     return match?.[1].trim().toLowerCase();
 }

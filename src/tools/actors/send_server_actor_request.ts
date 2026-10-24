@@ -1,3 +1,4 @@
+import Ajv from 'ajv';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -7,7 +8,7 @@ import { FAILURE_CATEGORY, HELPER_TOOLS, HTTP_FORBIDDEN, HTTP_UNAUTHORIZED, MAX_
 import { TimeoutError } from '../../errors.js';
 import { getActorMCPServerPath, resolveOnStandbyOrigin } from '../../mcp/actors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
-import { isTextualMimeType, maskSessionToken, REDACTED } from '../../resources/api_resources.js';
+import { isTextualMimeType, maskSessionToken, parseCharset, REDACTED } from '../../resources/api_resources.js';
 import type {
     ActorInterfaces,
     ActorTenancy,
@@ -19,7 +20,7 @@ import type {
 } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
-import { compileSchema } from '../../utils/ajv.js';
+import { fixZodSchemaRequired } from '../../utils/ajv.js';
 import { toPlainError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondServerError, respondUserError } from '../../utils/mcp.js';
@@ -188,6 +189,19 @@ function buildResponse(params: {
             { httpStatus: status },
         );
     }
+    const charset = parseCharset(contentType) ?? 'utf-8';
+    let body = '';
+    if (bytes > 0) {
+        try {
+            body = new TextDecoder(charset).decode(maskSessionToken(response.body, token)).replaceAll(token, REDACTED);
+        } catch {
+            return respondUserError(
+                `${outcome} with unsupported charset "${charset}", so the body is not returned. ` +
+                    'The request itself was sent.',
+                { httpStatus: status },
+            );
+        }
+    }
     const structuredContent = {
         actorId,
         actorName,
@@ -197,7 +211,7 @@ function buildResponse(params: {
         path,
         status,
         ...(contentType && { contentType }),
-        body: maskSessionToken(response.body, token).toString('utf8'),
+        body,
         bytes,
         ...(location && { location }),
     };
@@ -228,7 +242,7 @@ export async function executeSendServerActorRequest(
         });
     }
     if (!parsed.path.startsWith('/')) {
-        return respondUserError(`The path must start with /, as in /search; "${parsed.path}" does not.`);
+        return respondUserError('The path must start with /, as in /search.');
     }
     if (parsed.method === 'GET' && parsed.body !== undefined) {
         return respondUserError('A GET request carries no body; leave body out, or send the data as query parameters.');
@@ -268,9 +282,7 @@ export async function executeSendServerActorRequest(
     const { url, standbyOrigin } = resolved;
     if (!url || url.username || url.password) {
         return withServerActorTelemetry(
-            respondUserError(
-                `The path "${parsed.path}" leaves the Actor's server at ${standbyOrigin}, so it is not sent.`,
-            ),
+            respondUserError(`The path leaves the Actor's server at ${standbyOrigin}, so it is not sent.`),
             telemetry,
         );
     }
@@ -337,7 +349,10 @@ export const sendServerActorRequest: ToolEntry = Object.freeze({
         sendServerActorRequestArgs.extend({ body: sendServerActorRequestArgs.shape.body.meta(anyJsonValueSchema) }),
     ) as ToolInputSchema,
     outputSchema: serverActorRequestOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(sendServerActorRequestArgs)),
+    // The shared validator coerces null and singleton arrays into scalar query values.
+    ajvValidate: new Ajv({ coerceTypes: false, strict: false, removeAdditional: true }).compile(
+        fixZodSchemaRequired(z.toJSONSchema(sendServerActorRequestArgs)),
+    ),
     // A third-party payment provider cannot pay for a standby run, so such a session is rejected before the call.
     hasPaymentProviderStandbyCheck: true,
     annotations: {
