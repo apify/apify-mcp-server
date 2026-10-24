@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
@@ -102,6 +102,10 @@ function earlyText(result: Awaited<ReturnType<typeof preExecute>>): string {
     return firstText(earlyResponseOf(result));
 }
 
+afterEach(() => {
+    vi.restoreAllMocks();
+});
+
 beforeEach(() => {
     seedActor(RUN_ONLY, { input: NON_EMPTY_INPUT });
     seedActor(RUN_ONLY_STALE_PATH, { webServerMcpPath: '/mcp', input: NON_EMPTY_INPUT });
@@ -157,6 +161,8 @@ describe('Actor run/standby mode decision table', () => {
                 }),
             );
             expect(withoutMcpTool).not.toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
+            // No dead end: without the tool, the remedy is the session's own configuration.
+            expect(withoutMcpTool).toContain('cannot be called in this configuration');
         });
 
         it('rejects a bare unsupported standby Actor during pre-execution', async () => {

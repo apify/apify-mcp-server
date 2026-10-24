@@ -38,7 +38,7 @@ import {
 import { buildPermissionApprovalTexts } from '../../utils/payment_errors.js';
 import { classifyFailureCategory, extractAjvErrorDetails } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
-import { isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
+import { getOwnServerRemedy, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
 import { actorRunOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
 import {
@@ -128,9 +128,7 @@ export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOL
     const sections: string[] = [
         'Call any Actor from the Apify Store.',
         workflowSection,
-        ...(hasTool(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL)
-            ? [`MCP server Actors are not run here; ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} calls their MCP tools.`]
-            : []),
+        `MCP server Actors are not run here${hasTool(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL) ? `; ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} calls their MCP tools` : ''}.`,
         dedent`
             IMPORTANT:
             - Waits up to waitSecs (default 30s) for completion; returns run status and storage IDs, and with waitSecs > 0 also reports dataset field metadata
@@ -379,7 +377,7 @@ export function rejectMcpToolSyntax(
 function respondMcpServerActor(actorFullName: string, route: string, loadedToolNames: readonly string[]): ToolResponse {
     const replacement = loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL)
         ? ` Its MCP tools are called with ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL}.`
-        : '';
+        : ` Its MCP tools cannot be called in this configuration. To use them, ${getOwnServerRemedy()}`;
     return respondUserError(`Actor '${actorFullName}' is an MCP server, which ${route} does not run.${replacement}`, {
         detail: 'MCP server Actor',
     });

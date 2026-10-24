@@ -82,7 +82,12 @@ export async function runOnActorMcpServer(
             respondUserError(`Actor '${actorFullName}' is not an MCP server.`, { detail: 'not an MCP server' }),
         );
     }
-    const serverUrl = await getActorMCPServerURL(info, webServerMcpPath);
+    let serverUrl: string;
+    try {
+        serverUrl = await getActorMCPServerURL(info, webServerMcpPath);
+    } catch (error) {
+        return withActorId(respondServerError((error as Error).message));
+    }
     if (signal.aborted) return respondAborted();
 
     const outcome = await withRemoteMcpClient(serverUrl, apifyToken, mcpSessionId, signal, params.run);
@@ -110,13 +115,15 @@ export async function executeCallActorMcpTool(toolArgs: InternalToolArgs): Promi
     return runOnActorMcpServer(toolArgs, {
         actor: parsed.actor,
         operation: `call MCP tool '${parsed.tool}'`,
-        run: async (client) =>
-            respondRaw(
-                (await client.callTool({ name: parsed.tool, arguments: parsed.arguments ?? {} }, CallToolResultSchema, {
-                    timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
-                    signal: toolArgs.signal,
-                })) as CallToolResult,
-            ),
+        run: async (client) => {
+            // `toolTelemetry` is this server's internal channel, so a remote result must not set it.
+            const { toolTelemetry: _remoteTelemetry, ...result } = await client.callTool(
+                { name: parsed.tool, arguments: parsed.arguments ?? {} },
+                CallToolResultSchema,
+                { timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, signal: toolArgs.signal },
+            );
+            return respondRaw(result as CallToolResult);
+        },
     });
 }
 
