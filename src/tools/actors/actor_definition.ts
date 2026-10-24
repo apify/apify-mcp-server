@@ -13,21 +13,23 @@ import type {
     SchemaProperties,
 } from '../../types.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
+import { isRecord } from '../api/apify_api_spec.js';
 import type { BuildListItem } from '../builds/get_actor_build_list.js';
 
 const BUILD_NUMBER_PATTERN = /^\d+\.\d+\.\d+$/;
 
-/** The HTTP methods an OpenAPI path item may hold an operation under. */
+/** OpenAPI path-item keys that hold an operation; the other keys (`parameters`, `servers`, `summary`, `$ref`) don't. */
 const OPENAPI_OPERATION_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'] as const;
 
 /**
  * Get an Actor's pruned definition by Actor ID or name.
- * Fetches the Actor and its default build (input schema, README, description), then resolves the build the
- * server interface runs (`resolveServerInterfaceDefinition`) for `webServerMcpPath` and `hasWebServerSchema`.
+ * Input schema and README come from the default build; `webServerMcpPath` and `hasWebServerSchema` come from
+ * the build Actor Standby runs, which can be a different one (see `resolveServerInterfaceDefinition`).
  * @param {string} actorIdOrName - Actor ID or Actor full name.
  * @param {ApifyClient} apifyClient - The Apify client instance.
  * @param {number} limit - Truncate the README to this limit.
- * @returns {Promise<ActorDefinitionWithInfo | null>} - The Actor definition with info or null if not found.
+ * @returns {Promise<ActorDefinitionWithInfo | null>} - null when the Actor is not found (API 404 or 400) or its
+ * default build has no definition. Other API failures, including 401 and 403, are thrown; the caller logs them.
  */
 export async function getActorDefinition(
     actorIdOrName: string,
@@ -36,7 +38,6 @@ export async function getActorDefinition(
 ): Promise<ActorDefinitionWithInfo | null> {
     const actorClient = apifyClient.actor(actorIdOrName);
     try {
-        // Fetch Actor details
         const actor = await actorClient.get();
         if (!actor) {
             return null;
@@ -48,14 +49,13 @@ export async function getActorDefinition(
         if (buildDetails?.actorDefinition) {
             const serverDefinition = await resolveServerInterfaceDefinition(actor, buildDetails, apifyClient);
             const actorDefinitions = buildDetails?.actorDefinition as ActorDefinitionWithDesc;
-            // We set actorDefinition ID to Actor ID
             actorDefinitions.id = actor.id;
             actorDefinitions.readme = truncateActorReadme(actorDefinitions.readme || '', limit);
             actorDefinitions.readmeSummary = actor.readmeSummary;
             actorDefinitions.description = actor.description || '';
             actorDefinitions.actorFullName = `${actor.username}/${actor.name}`;
             actorDefinitions.defaultRunOptions = actor.defaultRunOptions;
-            // Pass pictureUrl from actor object (untyped property but present in API response)
+            // The API returns `pictureUrl`, but apify-client's `Actor` type lacks it.
             (actorDefinitions as Record<string, unknown>).pictureUrl = (
                 actor as unknown as Record<string, unknown>
             ).pictureUrl;
@@ -66,29 +66,21 @@ export async function getActorDefinition(
         }
         return null;
     } catch (error) {
-        // Check if it's a "not found" error (404 or 400 status codes)
         const statusCode = getHttpStatusCode(error);
         if (statusCode === 404 || statusCode === 400) {
-            // Return null for not found - caller will log appropriately
             return null;
         }
-
-        // For server errors, throw the original error (preserve error type)
-        // Caller should catch and log
         throw error;
     }
 }
 
 /**
- * The definition the server-interface fields (`webServerMcpPath`, `webServerSchema`) are read from. In standby
- * mode the Actor serves the build `actorStandby.build` names, which can differ from the default build the input
- * schema and README come from. The reference is a build tag (looked up in `taggedBuilds`) or a `MAJOR.MINOR.BUILD`
- * number (matched against the tagged builds' numbers, else found by scanning the build list newest first, since
- * the API has no lookup by build number).
+ * Returns the definition to read `webServerMcpPath` and `webServerSchema` from: the build named by
+ * `actorStandby.build` when Actor Standby is on, otherwise the default build.
  *
- * Returns `undefined` when standby is on but the build cannot be resolved — an unknown reference, a deleted
- * build, or a build without a definition — so the readers report no server interface rather than the default
- * build's. Authentication, permission and service failures propagate.
+ * Returns `undefined` when the Standby build cannot be resolved (unknown reference, deleted build, build without
+ * a definition). Falling back to the default build would advertise an interface the running server may not have.
+ * Authentication, permission and service failures propagate.
  */
 export async function resolveServerInterfaceDefinition(
     actor: Pick<Actor, 'id' | 'username' | 'name' | 'actorStandby' | 'taggedBuilds'>,
@@ -97,8 +89,7 @@ export async function resolveServerInterfaceDefinition(
 ): Promise<ActorDefinitionWithServerInterface | undefined> {
     if (actor.actorStandby?.isEnabled !== true) return defaultBuild.actorDefinition;
 
-    // Standby with no build named starts the run without a build option, which the platform resolves to the
-    // Actor's default build.
+    // With no build named, the platform starts Standby runs on the default build.
     const reference = actor.actorStandby.build;
     if (!reference) return defaultBuild.actorDefinition;
 
@@ -116,6 +107,13 @@ export async function resolveServerInterfaceDefinition(
     return undefined;
 }
 
+/**
+ * Turns `actorStandby.build` into a build ID, the only key the API reads a build (and its definition) by.
+ * The API resolves the default build's tag or number itself (`builds/default`) but has no equivalent for the
+ * Standby build, so this repeats the platform's lookup. `reference` is a build tag or a `MAJOR.MINOR.BUILD`
+ * number; Console accepts both. A number is first matched against the tagged builds, then searched for in the
+ * build list newest first, because the API has no lookup by build number.
+ */
 async function resolveStandbyBuildId(
     actor: Pick<Actor, 'id' | 'taggedBuilds'>,
     reference: string,
@@ -128,8 +126,8 @@ async function resolveStandbyBuildId(
     if (taggedBuildId) return taggedBuildId;
 
     if (!BUILD_NUMBER_PATTERN.test(reference)) return undefined;
-    // Listing builds needs a token, unlike the Actor and build reads, so a token-less session (payment
-    // provider) leaves an untagged build number unresolved instead of failing the whole read with a 401.
+    // Unlike the Actor and build reads, listing builds needs a token. Without one (payment-provider sessions),
+    // leave an untagged build number unresolved rather than fail the whole read with a 401.
     if (!apifyClient.token) return undefined;
     for await (const build of apifyClient.actor(actor.id).builds().list({ desc: true })) {
         if ((build as BuildListItem).buildNumber === reference) return build.id;
@@ -137,16 +135,14 @@ async function resolveStandbyBuildId(
     return undefined;
 }
 
-/** True only when the OpenAPI document declares at least one operation; an empty or absent schema is no HTTP interface. */
+/**
+ * True when the schema declares at least one operation, an object under a method key of a path item.
+ * The schema is publisher-written and unvalidated, so any level that is not an object counts as absent.
+ */
 function hasWebServerSchemaOperations(schema: unknown): boolean {
-    if (typeof schema !== 'object' || schema === null) return false;
-    const { paths } = schema as { paths?: unknown };
-    if (typeof paths !== 'object' || paths === null) return false;
-    return Object.values(paths).some(
-        (pathItem) =>
-            typeof pathItem === 'object' &&
-            pathItem !== null &&
-            OPENAPI_OPERATION_METHODS.some((method) => method in pathItem),
+    if (!isRecord(schema) || !isRecord(schema.paths)) return false;
+    return Object.values(schema.paths).some(
+        (pathItem) => isRecord(pathItem) && OPENAPI_OPERATION_METHODS.some((method) => isRecord(pathItem[method])),
     );
 }
 
