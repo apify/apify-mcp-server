@@ -166,6 +166,7 @@ describe('prepareToolCall()', () => {
             const tracked = await call(telemetryData);
             expect(tracked.apifyClient.storeSearchTracking).toEqual({ traceId: 'thread-1', useCase: 'find a scraper' });
             expect(telemetryData.trace_id).toBe('thread-1');
+            expect(JSON.stringify(telemetryData)).not.toContain('find a scraper');
 
             const untracked = await call(null);
             expect(untracked.apifyClient.storeSearchTracking).toBeUndefined();
