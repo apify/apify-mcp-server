@@ -14,6 +14,15 @@ import {
 } from '../../src/utils/actor_details.js';
 import type * as ActorSearchModule from '../../src/utils/actor_search.js';
 import { searchActorsByKeywords } from '../../src/utils/actor_search.js';
+import {
+    DEFAULT_INPUT,
+    mockActorBuildClient,
+    mockBuild,
+    mockDefaultBuild,
+    mockStandbyActor,
+    SEARCH_SCHEMA,
+    STANDBY_BUILD_ID,
+} from './helpers/actor_build_client.js';
 import { mockApifyClient } from './helpers/tool_context.js';
 
 vi.mock('../../src/utils/actor_search.js', () => ({
@@ -227,6 +236,57 @@ describe('fetchActorDetails()', () => {
         const client = stubApifyClient(() => Promise.reject(apifyApiError(401, 'Authentication token is not valid')));
 
         await expect(fetchActorDetails(client, 'apify/instagram-scraper')).rejects.toMatchObject({ statusCode: 401 });
+    });
+});
+
+describe('fetchActorDetails() reads the server interface from the standby build', () => {
+    // Build resolution is covered in `tools.actor_definition.test.ts`; these cases cover only this reader's wiring.
+    const STANDBY_DEFINITION = {
+        actorSpecification: 1,
+        name: 'mcp-server',
+        version: '2.0',
+        readme: '# Standby build README',
+        input: { type: 'object', properties: { url: { type: 'string' } } },
+        webServerSchema: SEARCH_SCHEMA,
+    };
+
+    it('takes the API schema from the tagged standby build and the input schema and README from the default build', async () => {
+        const { apifyClient } = mockActorBuildClient({
+            actor: mockStandbyActor('beta', { taggedBuilds: { beta: { buildId: STANDBY_BUILD_ID } } }),
+            defaultBuild: mockDefaultBuild(),
+            builds: { [STANDBY_BUILD_ID]: mockBuild(STANDBY_BUILD_ID, STANDBY_DEFINITION) },
+        });
+
+        const result = await fetchActorDetails(apifyClient, 'acme/mcp-server');
+
+        expect(result).toMatchObject({
+            webServerSchema: SEARCH_SCHEMA,
+            inputSchema: DEFAULT_INPUT,
+            readme: '# Default build README',
+        });
+    });
+
+    it("serves no API schema, not the default build's, when the standby build is deleted", async () => {
+        const { apifyClient } = mockActorBuildClient({
+            actor: mockStandbyActor('beta', { taggedBuilds: { beta: { buildId: STANDBY_BUILD_ID } } }),
+            defaultBuild: mockDefaultBuild(),
+            builds: { [STANDBY_BUILD_ID]: undefined },
+        });
+
+        const result = await fetchActorDetails(apifyClient, 'acme/mcp-server');
+
+        expect(result).toMatchObject({ inputSchema: DEFAULT_INPUT, readme: '# Default build README' });
+        expect(result?.webServerSchema).toBeUndefined();
+    });
+
+    it('propagates a 403 from the standby build read instead of reporting not-found', async () => {
+        const { apifyClient, buildGet } = mockActorBuildClient({
+            actor: mockStandbyActor('beta', { taggedBuilds: { beta: { buildId: STANDBY_BUILD_ID } } }),
+            defaultBuild: mockDefaultBuild(),
+        });
+        buildGet.mockRejectedValue(apifyApiError(403, 'Insufficient permissions'));
+
+        await expect(fetchActorDetails(apifyClient, 'acme/mcp-server')).rejects.toMatchObject({ statusCode: 403 });
     });
 });
 

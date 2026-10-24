@@ -59,24 +59,27 @@ describe('getActorMCPServerPath', () => {
 });
 
 describe('getActorMCPServerURL', () => {
-    const ACTOR_ID = 'abc123';
-    const STANDBY = `https://${ACTOR_ID}.apify.actor`;
+    const STANDBY = 'https://acme-mcp-server.apify.actor';
+    const ACTOR = { id: 'abc123', standbyUrl: STANDBY };
 
     it('returns URL on the standby origin for a normal path', async () => {
-        const url = await getActorMCPServerURL(ACTOR_ID, '/mcp');
+        const url = await getActorMCPServerURL(ACTOR, '/mcp');
         expect(url).toBe(`${STANDBY}/mcp`);
     });
 
     it('returns URL on the standby origin for a path with query and fragment', async () => {
-        const url = await getActorMCPServerURL(ACTOR_ID, '/mcp?x=1#frag');
+        const url = await getActorMCPServerURL(ACTOR, '/mcp?x=1#frag');
         expect(url).toBe(`${STANDBY}/mcp?x=1#frag`);
     });
 
-    // Apify Actor IDs are mixed-case; WHATWG URL parsing lowercases hostnames.
-    // The origin check must compare two parser-normalised values, not raw strings.
-    it('accepts a normal path for a mixed-case Actor ID', async () => {
-        const url = await getActorMCPServerURL('Iei3c51WbI7eKwgSg', '/mcp');
-        expect(url).toBe('https://iei3c51wbi7ekwgsg.apify.actor/mcp');
+    // WHATWG URL parsing lowercases hostnames. The origin check must compare two
+    // parser-normalised values, not raw strings.
+    it('accepts a normal path for a mixed-case standby host', async () => {
+        const url = await getActorMCPServerURL(
+            { id: 'abc123', standbyUrl: 'https://Acme-MCP-Server.apify.actor' },
+            '/mcp',
+        );
+        expect(url).toBe(`${STANDBY}/mcp`);
     });
 
     // Inputs that, under the buggy `${standby}${path}` concat, would produce a URL
@@ -98,7 +101,7 @@ describe('getActorMCPServerURL', () => {
     ])('never resolves outside the standby origin for malicious input: %s', async (path) => {
         let url: string | undefined;
         try {
-            url = await getActorMCPServerURL(ACTOR_ID, path);
+            url = await getActorMCPServerURL(ACTOR, path);
         } catch (err) {
             expect((err as Error).message).toMatch(/resolves outside its standby origin/);
             return;
@@ -107,5 +110,16 @@ describe('getActorMCPServerURL', () => {
         expect(parsed.origin).toBe(STANDBY);
         expect(parsed.username).toBe('');
         expect(parsed.password).toBe('');
+    });
+
+    // The API omits `standbyUrl` when Actor Standby is off; a guessed host would carry the caller's token elsewhere.
+    it('throws a configuration error instead of inventing a host when the Actor has no standby URL', async () => {
+        await expect(getActorMCPServerURL({ id: 'abc123' }, '/mcp')).rejects.toThrow(/standby URL/);
+    });
+
+    it('throws a configuration error for an unparsable standby URL', async () => {
+        await expect(getActorMCPServerURL({ id: 'abc123', standbyUrl: 'not a url' }, '/mcp')).rejects.toThrow(
+            /standby URL/,
+        );
     });
 });

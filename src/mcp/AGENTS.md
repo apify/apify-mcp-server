@@ -37,7 +37,8 @@ Two MCP protocol revisions are served, each by its own adapter:
 - `remote_tool_call.ts` — `withRemoteMcpClient()`: connect-call-close round trip for
   `tool_dispatch.ts` and `call_actor.ts`'s remote tool calls.
 - `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`, `getProxyMCPServerToolName(actorFullName, toolName)`.
-- `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`.
+- `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`; `getActorMCPServerURL()`:
+  resolves it against the Actor's `standbyUrl` (no `standbyUrl`, no URL) and rejects a path that leaves that origin.
 - `utils.ts` — `processParamsGetTools()`: turns `?actors=` URL params into tools.
 - `tool_call_error_mapper.ts` — shared tool-call error classification.
 - `tool_dispatch.ts` — neutral dispatch for internal, Actor MCP, and Actor tools.

@@ -63,6 +63,13 @@ export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
     input?: ActorInputSchema;
 };
 
+/** A build's `actorDefinition` with the server-interface fields apify-client's type omits. */
+export type ActorDefinitionWithServerInterface = ActorDefinition & {
+    webServerMcpPath?: string;
+    /** An OpenAPI document; the Actor's HTTP interface in standby mode. */
+    webServerSchema?: Record<string, unknown>;
+};
+
 /**
  * Pruned Actor definition type.
  * The `id` property is set to Actor ID.
@@ -72,6 +79,8 @@ export type ActorDefinitionPruned = Pick<
     'id' | 'actorFullName' | 'buildTag' | 'readme' | 'readmeSummary' | 'input' | 'description' | 'defaultRunOptions'
 > & {
     webServerMcpPath?: string; // Optional, used for Actorized MCP server tools
+    /** Whether the server-interface build's `webServerSchema` declares at least one operation; the schema itself is not cached. */
+    hasWebServerSchema: boolean;
     pictureUrl?: string; // Optional, URL to the Actor's icon/picture
 };
 
@@ -81,7 +90,7 @@ export type ActorDefinitionPruned = Pick<
  */
 export type ActorDefinitionWithInfo = {
     definition: ActorDefinitionPruned;
-    info: ActorOutdated;
+    info: Actor;
 };
 
 /**
@@ -278,7 +287,7 @@ export type TelemetryEnv = (typeof TELEMETRY_ENV)[keyof typeof TELEMETRY_ENV];
 export type ActorInfo = {
     webServerMcpPath: string | null; // Declared MCP endpoint; only means MCP when standby is on — see `resolveActorToolMode`
     definition: ActorDefinitionPruned;
-    actor: ActorOutdated;
+    actor: Actor;
 };
 
 /**

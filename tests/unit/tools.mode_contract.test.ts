@@ -38,6 +38,7 @@ function buildFixtureActorInfo(actorFullName: string): ActorInfo {
             readme: '',
             description: 'Test actor for description-gating coverage.',
             defaultRunOptions: { memoryMbytes: 1024, timeoutSecs: 300, build: 'latest' },
+            hasWebServerSchema: false,
             input: {
                 type: 'object',
                 title: 'Test Input',

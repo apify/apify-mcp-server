@@ -6,6 +6,7 @@ import { ActorLoadError } from '../errors.js';
 import { connectMCPClient } from '../mcp/client.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/actor_input_schema.js';
+import { resolveServerInterfaceDefinition } from '../tools/actors/actor_definition.js';
 import type {
     Actor,
     ActorCardOptions,
@@ -76,12 +77,13 @@ export function resolveReadmeContent(details: {
 // Keep the type here since it is a self-contained module
 export type ActorDetailsResult = {
     actorInfo: Actor;
-    buildInfo: Build;
     actorCard: string;
     actorCardStructured: StructuredActorCard;
     inputSchema: ActorInputSchema;
     readme: string;
     readmeSummary?: string;
+    /** API schema of the build standby serves (`resolveServerInterfaceDefinition`); absent when unresolved. */
+    webServerSchema?: Record<string, unknown>;
 };
 
 type FetchActorDetailsOptions = {
@@ -113,6 +115,7 @@ export async function fetchActorDetails(
                       }).catch(() => []),
             ]);
         if (!actorInfo || !buildInfo || !buildInfo.actorDefinition) return null;
+        const serverDefinition = await resolveServerInterfaceDefinition(actorInfo, buildInfo, apifyClient);
 
         const storeActor = storeActors?.find((item) => item.id === actorInfo.id);
         const pictureUrl =
@@ -133,12 +136,12 @@ export async function fetchActorDetails(
         const actorCardStructured = formatActorToStructuredCard(actorInfoWithPicture, cardOptions);
         return {
             actorInfo: actorInfoWithPicture,
-            buildInfo,
             actorCard,
             actorCardStructured,
             inputSchema,
             readme: buildInfo.actorDefinition.readme || 'No README provided.',
             readmeSummary: actorInfo.readmeSummary,
+            webServerSchema: serverDefinition?.webServerSchema,
         };
     } catch (error) {
         // 404/400 is a genuine "Actor doesn't exist" — same treatment as the not-found check

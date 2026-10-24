@@ -1,17 +1,29 @@
+import type { Build } from 'apify-client';
+
+import log from '@apify/log';
+
 import type { ApifyClient } from '../../apify_client.js';
-import { ACTOR_README_MAX_LENGTH } from '../../const.js';
+import { ACTOR_README_MAX_LENGTH, FAILURE_CATEGORY } from '../../const.js';
 import type {
+    Actor,
     ActorDefinitionPruned,
     ActorDefinitionWithDesc,
     ActorDefinitionWithInfo,
+    ActorDefinitionWithServerInterface,
     SchemaProperties,
 } from '../../types.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
+import type { BuildListItem } from '../builds/get_actor_build_list.js';
+
+const BUILD_NUMBER_PATTERN = /^\d+\.\d+\.\d+$/;
+
+/** The HTTP methods an OpenAPI path item may hold an operation under. */
+const OPENAPI_OPERATION_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'] as const;
 
 /**
- * Get Actor input schema by Actor name.
- * First, fetch the Actor details to get the default build tag and buildId.
- * Then, fetch the build details and return actorName, description, and input schema.
+ * Get an Actor's pruned definition by Actor ID or name.
+ * Fetches the Actor and its default build (input schema, README, description), then resolves the build the
+ * server interface runs (`resolveServerInterfaceDefinition`) for `webServerMcpPath` and `hasWebServerSchema`.
  * @param {string} actorIdOrName - Actor ID or Actor full name.
  * @param {ApifyClient} apifyClient - The Apify client instance.
  * @param {number} limit - Truncate the README to this limit.
@@ -34,6 +46,7 @@ export async function getActorDefinition(
         const buildDetails = await defaultBuildClient.get();
 
         if (buildDetails?.actorDefinition) {
+            const serverDefinition = await resolveServerInterfaceDefinition(actor, buildDetails, apifyClient);
             const actorDefinitions = buildDetails?.actorDefinition as ActorDefinitionWithDesc;
             // We set actorDefinition ID to Actor ID
             actorDefinitions.id = actor.id;
@@ -47,7 +60,7 @@ export async function getActorDefinition(
                 actor as unknown as Record<string, unknown>
             ).pictureUrl;
             return {
-                definition: pruneActorDefinition(actorDefinitions),
+                definition: pruneActorDefinition(actorDefinitions, serverDefinition),
                 info: actor,
             };
         }
@@ -65,7 +78,82 @@ export async function getActorDefinition(
         throw error;
     }
 }
-function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitionPruned {
+
+/**
+ * The definition the server-interface fields (`webServerMcpPath`, `webServerSchema`) are read from. In standby
+ * mode the Actor serves the build `actorStandby.build` names, which can differ from the default build the input
+ * schema and README come from. The reference is a build tag (looked up in `taggedBuilds`) or a `MAJOR.MINOR.BUILD`
+ * number (matched against the tagged builds' numbers, else found by scanning the build list newest first, since
+ * the API has no lookup by build number).
+ *
+ * Returns `undefined` when standby is on but the build cannot be resolved — an unknown reference, a deleted
+ * build, or a build without a definition — so the readers report no server interface rather than the default
+ * build's. Authentication, permission and service failures propagate.
+ */
+export async function resolveServerInterfaceDefinition(
+    actor: Pick<Actor, 'id' | 'username' | 'name' | 'actorStandby' | 'taggedBuilds'>,
+    defaultBuild: Build,
+    apifyClient: ApifyClient,
+): Promise<ActorDefinitionWithServerInterface | undefined> {
+    if (actor.actorStandby?.isEnabled !== true) return defaultBuild.actorDefinition;
+
+    // Standby with no build named starts the run without a build option, which the platform resolves to the
+    // Actor's default build.
+    const reference = actor.actorStandby.build;
+    if (!reference) return defaultBuild.actorDefinition;
+
+    const buildId = await resolveStandbyBuildId(actor, reference, apifyClient);
+    if (buildId === defaultBuild.id) return defaultBuild.actorDefinition;
+
+    const build = buildId === undefined ? undefined : await apifyClient.build(buildId).get();
+    if (build?.actorDefinition) return build.actorDefinition;
+
+    log.softFail('Standby build of the Actor could not be resolved, serving no server interface for it', {
+        actorFullName: `${actor.username}/${actor.name}`,
+        standbyBuild: reference,
+        failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+    });
+    return undefined;
+}
+
+async function resolveStandbyBuildId(
+    actor: Pick<Actor, 'id' | 'taggedBuilds'>,
+    reference: string,
+    apifyClient: ApifyClient,
+): Promise<string | undefined> {
+    const taggedBuilds = actor.taggedBuilds ?? {};
+    const taggedBuildId =
+        taggedBuilds[reference]?.buildId ??
+        Object.values(taggedBuilds).find((build) => build.buildNumber === reference)?.buildId;
+    if (taggedBuildId) return taggedBuildId;
+
+    if (!BUILD_NUMBER_PATTERN.test(reference)) return undefined;
+    // Listing builds needs a token, unlike the Actor and build reads, so a token-less session (payment
+    // provider) leaves an untagged build number unresolved instead of failing the whole read with a 401.
+    if (!apifyClient.token) return undefined;
+    for await (const build of apifyClient.actor(actor.id).builds().list({ desc: true })) {
+        if ((build as BuildListItem).buildNumber === reference) return build.id;
+    }
+    return undefined;
+}
+
+/** True only when the OpenAPI document declares at least one operation; an empty or absent schema is no HTTP interface. */
+function hasWebServerSchemaOperations(schema: unknown): boolean {
+    if (typeof schema !== 'object' || schema === null) return false;
+    const { paths } = schema as { paths?: unknown };
+    if (typeof paths !== 'object' || paths === null) return false;
+    return Object.values(paths).some(
+        (pathItem) =>
+            typeof pathItem === 'object' &&
+            pathItem !== null &&
+            OPENAPI_OPERATION_METHODS.some((method) => method in pathItem),
+    );
+}
+
+function pruneActorDefinition(
+    response: ActorDefinitionWithDesc,
+    serverDefinition: ActorDefinitionWithServerInterface | undefined,
+): ActorDefinitionPruned {
     return {
         id: response.id,
         actorFullName: response.actorFullName || '',
@@ -82,7 +170,8 @@ function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitio
                 : undefined,
         description: response.description,
         defaultRunOptions: response.defaultRunOptions,
-        webServerMcpPath: 'webServerMcpPath' in response ? (response.webServerMcpPath as string) : undefined,
+        webServerMcpPath: serverDefinition?.webServerMcpPath,
+        hasWebServerSchema: hasWebServerSchemaOperations(serverDefinition?.webServerSchema),
         pictureUrl: 'pictureUrl' in response ? (response.pictureUrl as string | undefined) : undefined,
     };
 }

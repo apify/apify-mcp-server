@@ -50,8 +50,9 @@ export async function getActorDefinitionCached(
  * is consulted outside the tool-loading factory, so `call-actor` routing and tool loading share one rule.
  *
  * Returns `null` when there is no definition to classify (unknown Actor). The URL is a pure function of
- * the definition (`getActorMCPServerURL` does no I/O), so this rides the authorization-gated
- * `getActorDefinitionCached` instead of a separate cache that would leak a private Actor's URL across tenants.
+ * the Actor record's `standbyUrl` and the definition's path (`getActorMCPServerURL` does no I/O), so this rides
+ * the authorization-gated `getActorDefinitionCached` instead of a separate cache that would leak a private
+ * Actor's URL across tenants.
  */
 export async function getActorToolResolutionCached(
     actorIdOrName: string,
@@ -71,7 +72,7 @@ export async function getActorToolResolutionCached(
     if (toolMode === ACTOR_TOOL_MODE.MCP) {
         return {
             toolMode,
-            mcpServerUrl: await getActorMCPServerURL(cached.definition.id, webServerMcpPath!),
+            mcpServerUrl: await getActorMCPServerURL(cached.info, webServerMcpPath!),
             actorFullName,
         };
     }

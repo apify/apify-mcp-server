@@ -34,7 +34,10 @@ function seedCache(
             id,
             isPublic,
             userId: ownerUserId,
-            ...(opts.isStandbyEnabled && { actorStandby: { isEnabled: true } }),
+            ...(opts.isStandbyEnabled && {
+                actorStandby: { isEnabled: true },
+                standbyUrl: `https://${name.replace('/', '-')}.apify.actor`,
+            }),
         },
     } as unknown as ActorDefinitionWithInfo;
     actorDefinitionCache.set(name, entry);
@@ -109,7 +112,7 @@ describe('getActorToolResolutionCached()', () => {
 
         expect(result).toEqual({
             toolMode: ACTOR_TOOL_MODE.MCP,
-            mcpServerUrl: 'https://actorpub.apify.actor/mcp',
+            mcpServerUrl: 'https://acme-mcp-public.apify.actor/mcp',
             actorFullName: 'acme/mcp-public',
         });
         expect(getActorDefinitionMock).not.toHaveBeenCalled();

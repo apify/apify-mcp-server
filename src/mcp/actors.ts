@@ -1,6 +1,6 @@
 import type { ActorDefinition } from 'apify-client';
 
-import type { ActorDefinitionPruned } from '../types.js';
+import type { Actor, ActorDefinitionPruned } from '../types.js';
 import { parseCommaSeparatedList } from '../utils/generic.js';
 import { MCP_STREAMABLE_ENDPOINT } from './const.js';
 
@@ -33,7 +33,8 @@ export function getActorMCPServerPath(actorDefinition: ActorDefinition | ActorDe
 }
 
 /**
- * Returns the MCP server URL for the given Actor ID.
+ * Returns the MCP server URL of an Actor: `mcpServerPath` resolved against the Actor's `standbyUrl`,
+ * the platform-assigned standby origin (absent or null when Actor Standby is off).
  *
  * `mcpServerPath` comes from an Actor's `webServerMcpPath` field, i.e. it is
  * controlled by whoever published the Actor. Resolve it against the standby
@@ -41,20 +42,24 @@ export function getActorMCPServerPath(actorDefinition: ActorDefinition | ActorDe
  * (`@host/...`, `.host/...`, `//host/...`, `https://host/...`) cannot redirect
  * the MCP client — and the caller's Apify token — to a third-party host.
  */
-export async function getActorMCPServerURL(realActorId: string, mcpServerPath: string): Promise<string> {
-    // TODO: get from API instead
-    const standbyBaseUrl =
-        process.env.HOSTNAME === 'mcp-securitybyobscurity.apify.com'
-            ? 'securitybyobscurity.apify.actor'
-            : 'apify.actor';
+export async function getActorMCPServerURL(
+    actor: Pick<Actor, 'id' | 'standbyUrl'>,
+    mcpServerPath: string,
+): Promise<string> {
+    // Never substitute a constructed hostname: a guessed origin would send the caller's token to a host
+    // the platform did not assign to this Actor.
+    if (!actor.standbyUrl || !URL.canParse(actor.standbyUrl)) {
+        throw new Error(
+            `Actor ${actor.id} has no valid standby URL in its Actor Standby configuration, so its MCP server cannot be reached`,
+        );
+    }
     // Parse the standby URL up front so the origin comparison below is between two
-    // values normalised by the same parser — WHATWG lowercases hostnames, and Apify
-    // Actor IDs are mixed-case, so a raw-string comparison would reject legitimate URLs.
-    const standby = new URL(`https://${realActorId}.${standbyBaseUrl}/`);
+    // values normalised by the same parser.
+    const standby = new URL(actor.standbyUrl);
 
     const resolved = new URL(mcpServerPath, standby);
     if (resolved.origin !== standby.origin) {
-        throw new Error(`Actor ${realActorId} declares a webServerMcpPath that resolves outside its standby origin`);
+        throw new Error(`Actor ${actor.id} declares a webServerMcpPath that resolves outside its standby origin`);
     }
     // Strip any userinfo that survived parsing; we never want credentials in the URL we hand to the MCP client.
     resolved.username = '';
