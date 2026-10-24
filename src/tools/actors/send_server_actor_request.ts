@@ -2,18 +2,12 @@ import dedent from 'dedent';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { sendApifyApiRequest } from '../../apify_client.js';
+import { readBodyUnderCap, sendApifyApiRequest } from '../../apify_client.js';
 import { FAILURE_CATEGORY, HELPER_TOOLS, HTTP_FORBIDDEN, HTTP_UNAUTHORIZED, MAX_INLINE_BYTES } from '../../const.js';
 import { TimeoutError } from '../../errors.js';
 import { getActorMCPServerPath, resolveOnStandbyOrigin } from '../../mcp/actors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
-import {
-    collectStream,
-    isMaxContentLengthAbort,
-    isTextualMimeType,
-    maskSessionToken,
-    REDACTED,
-} from '../../resources/api_resources.js';
+import { isTextualMimeType, maskSessionToken, REDACTED } from '../../resources/api_resources.js';
 import type {
     ActorInterfaces,
     ActorTenancy,
@@ -127,13 +121,12 @@ export async function fetchServerActorResponse(params: {
             const value: unknown = response.headers[name];
             return typeof value === 'string' ? value : undefined;
         };
-        const result = { status, contentType: header('content-type'), location: header('location') };
-        try {
-            return { ...result, body: await collectStream(response.data) };
-        } catch (error) {
-            if (isMaxContentLengthAbort(error)) return result;
-            throw error;
-        }
+        return {
+            status,
+            contentType: header('content-type'),
+            location: header('location'),
+            body: await readBodyUnderCap(response),
+        };
     } catch (error) {
         if (deadline.aborted && !signal.aborted) {
             throw Object.assign(

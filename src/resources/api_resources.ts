@@ -3,10 +3,14 @@ import type {
     ReadResourceResult,
     TextResourceContents,
 } from '@modelcontextprotocol/sdk/types.js';
-import { isAxiosError } from 'axios';
 
 import type { ApifyClient } from '../apify_client.js';
-import { getApifyAPIBaseUrl, getApifyAPIPublicBaseUrl, sendApifyApiRequest } from '../apify_client.js';
+import {
+    getApifyAPIBaseUrl,
+    getApifyAPIPublicBaseUrl,
+    readBodyUnderCap,
+    sendApifyApiRequest,
+} from '../apify_client.js';
 import { MAX_INLINE_BYTES } from '../const.js';
 import { InternalError, InvalidParamsError } from '../mcp/errors.js';
 import { validateApiBlocklist } from '../tools/api/apify_api_blocklist.js';
@@ -147,24 +151,10 @@ async function buildLinkOutResult(uri: string, apifyClient: ApifyClient): Promis
     );
 }
 
-/** The mid-consumption abort axios raises when a body crosses `maxContentLength`. */
-export function isMaxContentLengthAbort(err: unknown): boolean {
-    return isAxiosError(err) && err.code === 'ERR_BAD_RESPONSE' && err.message.includes('maxContentLength');
-}
-
 /** `charset` parameter of a Content-Type header, lowercased; `undefined` when absent. */
 function parseCharset(contentType: string | undefined): string | undefined {
     const match = /;\s*charset\s*=\s*"?([^";]+)"?/i.exec(contentType ?? '');
     return match?.[1].trim().toLowerCase();
-}
-
-/** Drain a response stream into one Buffer. Chunks are Buffers (`objectMode: false`). */
-export async function collectStream(data: unknown): Promise<Buffer> {
-    const chunks: Buffer[] = [];
-    for await (const chunk of data as AsyncIterable<Buffer | string>) {
-        chunks.push(Buffer.from(chunk));
-    }
-    return Buffer.concat(chunks);
 }
 
 /** `error.message` from an Apify API error body, or `undefined` when the body isn't that shape. */
@@ -254,22 +244,19 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
         throwReadFailure(uri, getHttpStatusCode(err), err instanceof Error ? err.message : String(err));
     }
 
+    // `undefined` when the body passed `MAX_INLINE_BYTES`.
     let body: Buffer | undefined;
-    let overLimit = false;
     try {
-        body = maskSessionToken(await collectStream(response.data), apifyClient.token);
+        body = await readBodyUnderCap(response);
     } catch (err) {
-        if (isMaxContentLengthAbort(err)) {
-            overLimit = true;
-        } else {
-            // A drop mid-body (reset, truncation, bad gzip). Never return partial content.
-            logHttpError(err, `resources/read response interrupted`, { uri });
-            const message = err instanceof Error ? err.message : String(err);
-            throw new InternalError(`Failed to read ${uri}: response interrupted: ${message}`, {
-                uri,
-            });
-        }
+        // A drop mid-body (reset, truncation, bad gzip). Never return partial content.
+        logHttpError(err, `resources/read response interrupted`, { uri });
+        const message = err instanceof Error ? err.message : String(err);
+        throw new InternalError(`Failed to read ${uri}: response interrupted: ${message}`, {
+            uri,
+        });
     }
+    if (body) body = maskSessionToken(body, apifyClient.token);
 
     // `validateStatus: null` on this axios instance resolves non-2xx responses instead of throwing,
     // so a failed request is checked here. The error body was just collected above (Apify API error
@@ -282,8 +269,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
         throwReadFailure(uri, response.status, message);
     }
 
-    // Second clause is runtime-redundant (undefined ⟺ overLimit) but narrows `body` to Buffer below.
-    if (overLimit || body === undefined) {
+    if (body === undefined) {
         return buildLinkOutResult(uri, apifyClient);
     }
 

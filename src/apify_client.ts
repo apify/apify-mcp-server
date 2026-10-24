@@ -1,6 +1,7 @@
 import type { ApifyClientOptions } from 'apify-client';
 import { ApifyClient as _ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig, AxiosResponse } from 'axios';
+import { isAxiosError } from 'axios';
 
 import { API_PUBLIC_BASE_URL, API_PUBLIC_BASE_URL_STAGING, MAX_INLINE_BYTES, STAGING_MCP_HOSTNAME } from './const.js';
 import type { PaymentHeaders } from './payments/types.js';
@@ -94,4 +95,28 @@ export async function sendApifyApiRequest(
     >,
 ): Promise<AxiosResponse<unknown>> {
     return apifyClient.httpClient.axios.request<unknown>({ ...config, maxContentLength: MAX_INLINE_BYTES });
+}
+
+/** The mid-consumption abort axios raises when a body crosses `maxContentLength`. */
+export function isMaxContentLengthAbort(err: unknown): boolean {
+    return isAxiosError(err) && err.code === 'ERR_BAD_RESPONSE' && err.message.includes('maxContentLength');
+}
+
+/**
+ * Reads the body of a `responseType: 'stream'` response from `sendApifyApiRequest`; `undefined` when it passed
+ * `MAX_INLINE_BYTES`, where axios stopped reading. Any other failure mid-body propagates, so a partial body is
+ * never returned.
+ */
+export async function readBodyUnderCap(response: Pick<AxiosResponse<unknown>, 'data'>): Promise<Buffer | undefined> {
+    const chunks: Buffer[] = [];
+    try {
+        // Chunks are Buffers (`objectMode: false`).
+        for await (const chunk of response.data as AsyncIterable<Buffer | string>) {
+            chunks.push(Buffer.from(chunk));
+        }
+    } catch (err) {
+        if (isMaxContentLengthAbort(err)) return undefined;
+        throw err;
+    }
+    return Buffer.concat(chunks);
 }
