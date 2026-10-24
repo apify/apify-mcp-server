@@ -288,7 +288,7 @@ export async function executeSendServerActorRequest(
     // Not axios `params`: apify-client's serializer sends a boolean as 1 or 0. Not `url.searchParams`: it would
     // encode the query written into the path again.
     const query = new URLSearchParams(
-        Object.entries(parsed.query ?? {}).map(([name, value]) => [name, String(value)]),
+        Object.entries(parsed.query ?? {}).map(([name, value]): [string, string] => [name, String(value)]),
     ).toString();
     if (query) url.search = url.search ? `${url.search}&${query}` : query;
     const path = `${url.pathname}${url.search}`;
