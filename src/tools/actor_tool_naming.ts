@@ -29,18 +29,12 @@ import { ACTOR_TOOL_MODE } from '../types.js';
  * or `input.properties` has zero keys. Nothing else counts — a non-empty `required` with no properties
  * still reads as empty.
  */
-export function resolveActorInterfaces(actorInfo: ActorInfo): ActorInterfaces {
-    const isServerInterfaceEnabled = actorInfo.actor.actorStandby?.isEnabled === true;
-    const mcp =
-        isServerInterfaceEnabled &&
-        Boolean(actorInfo.webServerMcpPath) &&
-        !INPUT_INTERFACE_ACTORS.has(actorInfo.definition.actorFullName);
-    const hasInputProperties = Object.keys(actorInfo.definition.input?.properties ?? {}).length > 0;
-    return {
-        input: !isServerInterfaceEnabled || (hasInputProperties && !mcp),
-        mcp,
-        server: isServerInterfaceEnabled && actorInfo.definition.hasWebServerSchema,
-    };
+export function resolveActorInterfaces({ actor, definition, webServerMcpPath }: ActorInfo): ActorInterfaces {
+    if (actor.actorStandby?.isEnabled !== true) return { input: true, mcp: false, server: false };
+
+    const mcp = Boolean(webServerMcpPath) && !INPUT_INTERFACE_ACTORS.has(definition.actorFullName);
+    const hasInputProperties = Object.keys(definition.input?.properties ?? {}).length > 0;
+    return { input: hasInputProperties && !mcp, mcp, server: definition.hasWebServerSchema };
 }
 
 /** The tool slot column of the table on {@link resolveActorInterfaces}: MCP tools, else a run tool, else none. */
