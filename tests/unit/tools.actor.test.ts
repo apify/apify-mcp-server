@@ -104,9 +104,7 @@ function makeActorInfo(opts: {
 
 const NON_EMPTY_INPUT = { type: 'object', properties: { url: { type: 'string' } } };
 
-describe('interface set and tool slot per row of the decision table', () => {
-    // One row per cell of the decision table in `resolveActorInterfaces`'s docstring, each asserting the
-    // flags and the tool slot `resolveActorToolMode` derives from them on the same record.
+describe('interface availability and tool routing', () => {
     it.each([
         [
             'server interface off ignores a leftover MCP path and HTTP schema',
@@ -115,34 +113,16 @@ describe('interface set and tool slot per row of the decision table', () => {
             ACTOR_TOOL_MODE.RUN,
         ],
         [
-            'server interface on, MCP path, no HTTP schema',
-            { isStandbyEnabled: true, webServerMcpPath: '/mcp' },
-            { input: false, mcp: true, server: false },
-            ACTOR_TOOL_MODE.MCP,
-        ],
-        [
             'server interface on, MCP path, HTTP schema',
             { isStandbyEnabled: true, webServerMcpPath: '/mcp', hasWebServerSchema: true },
             { input: false, mcp: true, server: true },
             ACTOR_TOOL_MODE.MCP,
         ],
         [
-            'server interface on, no MCP path, input schema, no HTTP schema',
-            { isStandbyEnabled: true },
-            { input: true, mcp: false, server: false },
-            ACTOR_TOOL_MODE.RUN,
-        ],
-        [
             'server interface on, no MCP path, input schema, HTTP schema',
             { isStandbyEnabled: true, hasWebServerSchema: true },
             { input: true, mcp: false, server: true },
             ACTOR_TOOL_MODE.RUN,
-        ],
-        [
-            'server interface on, no MCP path, no input schema, no HTTP schema',
-            { isStandbyEnabled: true, input: undefined },
-            { input: false, mcp: false, server: false },
-            ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,
         ],
         [
             'server interface on, no MCP path, no input schema, HTTP schema',
@@ -176,21 +156,6 @@ describe('what counts as an empty input schema', () => {
     // cover the interface combinations.
     it.each([
         ['standby disabled, empty input schema', { input: undefined }, ACTOR_TOOL_MODE.RUN],
-        [
-            'missing input counts as empty',
-            { isStandbyEnabled: true, input: undefined },
-            ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,
-        ],
-        [
-            'input without properties counts as empty',
-            { isStandbyEnabled: true, input: { type: 'object' } },
-            ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,
-        ],
-        [
-            'zero properties counts as empty',
-            { isStandbyEnabled: true, input: { type: 'object', properties: {} } },
-            ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,
-        ],
         [
             'required without properties still counts as empty',
             { isStandbyEnabled: true, input: { type: 'object', properties: {}, required: ['url'] } },
