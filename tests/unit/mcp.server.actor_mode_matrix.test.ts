@@ -211,6 +211,7 @@ describe('Actor run/standby mode decision table', () => {
                         '"actorName:toolName\\" form is no longer supported',
                     );
                     expect(JSON.stringify(result.content)).toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
+                    expect(result).not.toHaveProperty('toolTelemetry');
                     expect(definitionSpy).not.toHaveBeenCalled();
                     expect(resolutionSpy).not.toHaveBeenCalled();
                 },
