@@ -28,7 +28,12 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`, and resolves the build
     the server-interface fields — `webServerMcpPath`, `webServerSchema` — are read from when standby is on,
     `resolveServerInterfaceDefinition`, shared with `fetchActorDetails` in `../utils/actor_details.ts`; the input
-    schema and README stay on the default build),
+    schema and README stay on the default build; `listServerOperations` is the one rule for an API schema's
+    operations, read by `hasWebServerSchema` and the server-interface section: an operation's parameter replaces
+    the path item's with the same name and location),
+    `server_interface_schema.ts` (the server-interface section of `fetch-actor-details`: the one-line default
+    summary, the operation list with the Actor's `standbyUrl` and tenancy for `output.serverInterface: true`, or
+    one operation for `"METHOD /path"`, with local `$ref`s resolved by `resolveLocalRefs` in `api/apify_api_spec.ts`),
     `send_server_actor_request.ts` (`send-server-actor-request`: one HTTP request to a Server Actor's API, gated on
     the `server` interface and sent by `fetchServerActorResponse` through `sendApifyApiRequest` with raw response
     bytes, no redirects, the `MAX_INLINE_BYTES` cap after decompression and the `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`
@@ -77,7 +82,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     refuses a path whose dot segments climb out of `/v2/`; the index leaves out each operation a rule matches
     (`isEndpointBlocked`), so search, details, the closest-path hints, and the write tool's method
     choice never offer it.
-    `apify_api_spec.ts` builds the operation index from the spec (cached for a day); search and
+    `apify_api_spec.ts` builds the operation index from the spec (cached for a day) and owns `resolveLocalRefs`,
+    the one `$ref` resolver (circular, missing or external references, and those past `MAX_INLINE_BYTES` of
+    expanded detail, are kept with a note; nothing is fetched), with `resolveRef` as its one-level form, also used
+    for Actors' API schemas; search and
     details use it, the write tool uses it to choose a method that was not given, and a call uses it
     otherwise only for hints, waiting at most a few seconds, so a failed download does not stop a
     call. `apify_api_request.ts` normalizes the path as the CLI does (`actors`, `v2/actors`, and

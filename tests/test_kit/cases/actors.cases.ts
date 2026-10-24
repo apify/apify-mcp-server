@@ -1261,4 +1261,60 @@ export const actorsCases: Case[] = [
             expect((result.content as { text: string }[])[0].text).toContain('within 120 seconds');
         }),
     },
+    {
+        name: 'summarizes a Server Actor interface in the default fetch-actor-details output',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
+            const result = await client.callTool({
+                name: 'fetch-actor-details',
+                arguments: { actor: ACTOR_SERVER_ACTOR_TEST },
+            });
+
+            const text = (result.content as { text: string }[]).map((item) => item.text).join('\n');
+            expect(text).toContain('Server interface: enabled, single-tenant, 12 documented operations.');
+            validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
+        }),
+    },
+    {
+        name: 'lists a Server Actor operations and details one with its references resolved',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
+            const list = await client.callTool({
+                name: 'fetch-actor-details',
+                arguments: { actor: ACTOR_SERVER_ACTOR_TEST, output: { serverInterface: true } },
+            });
+            const operation = await client.callTool({
+                name: 'fetch-actor-details',
+                arguments: { actor: ACTOR_SERVER_ACTOR_TEST, output: { serverInterface: 'GET /add' } },
+            });
+            const unknown = await client.callTool({
+                name: 'fetch-actor-details',
+                arguments: { actor: ACTOR_SERVER_ACTOR_TEST, output: { serverInterface: 'GET /nope' } },
+            });
+
+            const listText = (list.content as { text: string }[]).map((item) => item.text).join('\n');
+            expect(listText).toContain('Base URL: https://server-actor-test.apify.actor');
+            expect(listText).toContain('- POST /add: Add two numbers (JSON body). Required: request body.');
+            // `asText` comes from `#/components/parameters/AsText`, the sum schema from `#/components/responses/Add`.
+            const operationText = (operation.content as { text: string }[]).map((item) => item.text).join('\n');
+            expect(operationText).toContain('"name":"asText"');
+            expect(operationText).toContain('"sum"');
+            expect(operationText).not.toContain('$ref');
+            expect(unknown.isError).toBe(true);
+            expect((unknown.content as { text: string }[])[0].text).toContain('GET /add');
+        }),
+    },
+    {
+        name: 'says an Actor without a server interface has none when fetch-actor-details is asked for it',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['actors'] }, async (client) => {
+            const result = await client.callTool({
+                name: 'fetch-actor-details',
+                arguments: { actor: ACTOR_NORMAL_MODE, output: { serverInterface: true } },
+            });
+
+            const text = (result.content as { text: string }[]).map((item) => item.text).join('\n');
+            expect(text).toContain(`Actor '${ACTOR_NORMAL_MODE}' has no server interface.`);
+        }),
+    },
 ];

@@ -264,7 +264,7 @@ Legend for the **Enabled by default** column:
 | Tool name | Category | Description | Enabled by default |
 | :--- | :--- | :--- | :---: |
 | `search-actors` | actors | Search for Actors in Apify Store. | ✅ |
-| `fetch-actor-details` | actors | Retrieve detailed information about a specific Actor, including its input schema, README (summary when available, full otherwise), pricing, and Actor output schema. | ✅ |
+| `fetch-actor-details` | actors | Retrieve detailed information about a specific Actor, including its input schema, README (summary when available, full otherwise), pricing, Actor output schema, and a Server Actor's HTTP operations. | ✅ |
 | `call-actor` | actors | Call an Actor and get its run results. Use fetch-actor-details first to get the Actor's input schema. | ✅ |
 | `send-server-actor-request` | actors | Send one HTTP request to a Server Actor's API, the server interface its API schema documents, and return the response. | ✅ |
 | `get-actor-run` | runs | Get detailed information about a specific Actor run. | ⚡ |
