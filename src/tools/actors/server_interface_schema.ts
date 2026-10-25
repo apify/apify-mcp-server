@@ -1,11 +1,10 @@
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, SERVER_ACTOR_REQUEST_METHODS } from '../../const.js';
 import type { Actor } from '../../types.js';
 import { ACTOR_TENANCY } from '../../types.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { resolveActorTenancy } from '../actor_tool_naming.js';
 import { isRecord, resolveLocalRefs, resolveRef } from '../api/apify_api_spec.js';
 
-const OPENAPI_OPERATION_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'] as const;
 const EXPAND_HINT = 'output.serverInterface: true lists them, "METHOD /path" details one.';
 
 type ServerOperation = { method: string; path: string; operation: Record<string, unknown> };
@@ -18,6 +17,8 @@ type ServerInterfaceSectionParams = {
     /** `true` lists operations, a `METHOD /path` string details one, `false` gives the one-line summary. */
     selection: boolean | string;
     loadedToolNames: readonly string[];
+    /** An agentic payment provider (x402, Skyfire) cannot pay for an Actor Server request. */
+    hasPaymentProvider: boolean;
 };
 
 /** Operation parameters override path-level parameters by their resolved name and location. */
@@ -43,12 +44,12 @@ function listServerOperations(schema: unknown): ServerOperation[] {
     const operations: ServerOperation[] = [];
     for (const [path, pathItem] of Object.entries(schema.paths)) {
         if (!isRecord(pathItem)) continue;
-        for (const method of OPENAPI_OPERATION_METHODS) {
-            const operation = pathItem[method];
+        for (const method of SERVER_ACTOR_REQUEST_METHODS) {
+            const operation = pathItem[method.toLowerCase()];
             if (!isRecord(operation)) continue;
             const parameters = mergeOperationParameters(pathItem.parameters, operation.parameters, schema);
             operations.push({
-                method: method.toUpperCase(),
+                method,
                 path,
                 operation: parameters.length > 0 ? { ...operation, parameters } : operation,
             });
@@ -117,6 +118,7 @@ export function buildServerInterfaceSection({
     schema = {},
     selection,
     loadedToolNames,
+    hasPaymentProvider,
 }: ServerInterfaceSectionParams): { text: string } | { error: string } | undefined {
     if (actor.actorStandby?.isEnabled !== true) {
         return selection === false ? undefined : { text: `Actor '${actorFullName}' has no server interface.` };
@@ -130,10 +132,13 @@ export function buildServerInterfaceSection({
         const count = `${operations.length} documented operation${operations.length === 1 ? '' : 's'}`;
         return { text: `Server interface: enabled, ${tenancy}, ${count}. ${EXPAND_HINT}` };
     }
+    const baseUrl = `Base URL: ${actor.standbyUrl ?? 'not configured'}\n`;
     const sendTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)
         ? `Requests go through ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}.\n`
         : '';
-    const header = `${formatTenancy(actor)}.\nBase URL: ${actor.standbyUrl ?? 'not configured'}\n${sendTool}`;
+    const header = hasPaymentProvider
+        ? `Requests to an Actor Server are not supported in agentic payment mode.\n${baseUrl}`
+        : `${formatTenancy(actor)}.\n${baseUrl}${sendTool}`;
     if (selection === true) return { text: buildOperationList(operations, schema, header) };
 
     const match = /^\s*([A-Za-z]+)\s+(\S+)\s*$/.exec(selection);

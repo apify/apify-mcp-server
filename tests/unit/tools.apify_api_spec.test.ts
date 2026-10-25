@@ -256,6 +256,22 @@ describe('resolveLocalRefs()', () => {
         expect(resolved.length).toBeLessThan(3 * MAX_INLINE_BYTES);
     });
 
+    it('expands a small reference after refusing one over the expansion budget', () => {
+        const resolved = resolveLocalRefs(
+            { big: { $ref: '#/components/schemas/Big' }, small: { $ref: '#/components/schemas/Small' } },
+            {
+                components: {
+                    schemas: { Big: { description: 'a'.repeat(MAX_INLINE_BYTES) }, Small: { type: 'string' } },
+                },
+            },
+        );
+
+        expect(resolved).toMatchObject({
+            big: { unavailableDetail: 'not expanded, size cap reached' },
+            small: { type: 'string' },
+        });
+    });
+
     it('keeps a circular, a missing and an external reference, each with a note', () => {
         const root = {
             components: {

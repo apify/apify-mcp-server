@@ -66,6 +66,7 @@ function section(params: Partial<Parameters<typeof buildServerInterfaceSection>[
         schema: SCHEMA,
         selection: false,
         loadedToolNames: Object.values(HELPER_TOOLS),
+        hasPaymentProvider: false,
         ...params,
     });
 }
@@ -125,6 +126,23 @@ describe('buildServerInterfaceSection()', () => {
             };
 
             expect(textOfSection({ schema, selection: true })).toContain('- GET /: Fetch a URL. Required: url.');
+        });
+
+        it('lists only the methods the send tool accepts', () => {
+            const schema = { openapi: '3.0.3', paths: { '/': { get: { summary: 'Fetch' }, head: {}, options: {} } } };
+
+            const text = textOfSection({ schema, selection: true });
+
+            expect(text).toContain('Operations (1):');
+            expect(text).not.toMatch(/- (HEAD|OPTIONS) \//);
+        });
+
+        it('says requests are not supported, without the send tool or run cost, in a payment-provider session', () => {
+            const text = textOfSection({ selection: true, hasPaymentProvider: true });
+
+            expect(text).toContain('not supported in agentic payment mode');
+            expect(text).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
+            expect(text).not.toContain('starts a run');
         });
 
         it('lists required path-level inputs through a parameter alias chain', () => {

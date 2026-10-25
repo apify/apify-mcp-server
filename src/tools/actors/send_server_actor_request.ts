@@ -5,7 +5,14 @@ import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { readBodyUnderCap, sendApifyApiRequest } from '../../apify_client.js';
-import { FAILURE_CATEGORY, HELPER_TOOLS, HTTP_FORBIDDEN, HTTP_UNAUTHORIZED, MAX_INLINE_BYTES } from '../../const.js';
+import {
+    FAILURE_CATEGORY,
+    HELPER_TOOLS,
+    HTTP_FORBIDDEN,
+    HTTP_UNAUTHORIZED,
+    MAX_INLINE_BYTES,
+    SERVER_ACTOR_REQUEST_METHODS,
+} from '../../const.js';
 import { getActorMCPServerPath, resolveOnStandbyOrigin } from '../../mcp/actors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import { isTextualMimeType, maskSessionToken, parseCharset, REDACTED } from '../../resources/api_resources.js';
@@ -31,7 +38,6 @@ import { anyJsonValueSchema, serverActorRequestOutputSchema } from '../structure
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 
-const SERVER_ACTOR_REQUEST_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
 type ServerActorRequestMethod = (typeof SERVER_ACTOR_REQUEST_METHODS)[number];
 
 const sendServerActorRequestArgs = z.object({

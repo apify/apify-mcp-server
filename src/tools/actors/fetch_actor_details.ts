@@ -312,6 +312,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
                   schema: details.webServerSchema,
                   selection: resolvedOutput.serverInterface,
                   loadedToolNames,
+                  hasPaymentProvider: paymentProvider !== undefined,
               })
             : undefined;
     if (serverInterface && 'error' in serverInterface) return respondUserError(serverInterface.error);

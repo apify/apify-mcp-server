@@ -142,8 +142,10 @@ export function resolveLocalRefs(node: unknown, spec: unknown): unknown {
         if (!$ref.startsWith('#/')) return unavailable('external reference, not fetched');
         const target = resolveLocalRef(spec, $ref);
         if (target === undefined) return unavailable('reference not found');
-        expandedSize += JSON.stringify(target).length;
-        if (expandedSize > MAX_INLINE_BYTES) return unavailable('not expanded, size cap reached');
+        // A refused reference leaves the budget for smaller ones.
+        const targetSize = JSON.stringify(target).length;
+        if (expandedSize + targetSize > MAX_INLINE_BYTES) return unavailable('not expanded, size cap reached');
+        expandedSize += targetSize;
         const resolved = resolve(target, [...seen, $ref], hasSchemaContext);
         if (Object.keys(siblings).length === 0) return resolved;
         const resolvedSiblings = resolveProperties(siblings, seen, hasSchemaContext);
