@@ -110,6 +110,9 @@ async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
             res.end();
             return;
         }
+        case '/drop-before-status':
+            req.socket.destroy();
+            return;
         case '/truncate':
             res.writeHead(200, { 'content-type': 'text/plain', 'content-length': '10' });
             // Closed once the start of the body is on the wire, so the client has the status.
@@ -498,16 +501,37 @@ describe('send-server-actor-request', () => {
         expect(result.content.at(-1)?.text).toBe(hint);
     });
 
-    it.each(['//other.example/echo', '//user:pw@{host}/echo'])(
-        'does not send to %s, which leaves the standby origin or carries credentials',
+    it.each(['//other.example/echo', '//user:pw@{host}/echo', '//[bad/echo'])(
+        'does not send to %s, which leaves the standby origin, carries credentials, or does not parse',
         async (template) => {
             const result = await callTool({ path: template.replace('{host}', new URL(standbyUrl).host) });
 
             expectSoftFailInvalidInput(result);
-            expect(result.content[0].text).toContain('must stay on the Actor Server');
+            expect(result.content[0].text).toContain('must be a valid path on the Actor Server');
             expect(received).toHaveLength(0);
         },
     );
+
+    it('reports a connection dropped before any status as possibly processed', async () => {
+        const result = await callTool({ method: 'POST', path: '/drop-before-status', body: { a: 1 } });
+
+        expect(received).toHaveLength(1);
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain('got no complete response');
+        expect(result.content[0].text).toContain('may still have processed the request');
+        expect(result.toolTelemetry).toMatchObject({ actorTenancy: ACTOR_TENANCY.SINGLE_TENANT });
+    });
+
+    it('reports a multi-tenant Actor Server in the response and telemetry', async () => {
+        seedActor('apify/multi-tenant-server', {
+            actor: { actorStandby: { isEnabled: true, tenancy: 'MULTI_TENANT' } },
+        });
+
+        const result = await callTool({ actor: 'apify/multi-tenant-server', path: '/echo' });
+
+        expect(result.structuredContent).toMatchObject({ tenancy: ACTOR_TENANCY.MULTI_TENANT });
+        expect(result.toolTelemetry).toMatchObject({ actorTenancy: ACTOR_TENANCY.MULTI_TENANT });
+    });
 
     it.each([`echo?token=${TOKEN}`, `//${TOKEN}@other.example/echo`])(
         'masks the session token when rejecting path %s without sending',
