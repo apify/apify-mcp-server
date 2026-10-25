@@ -454,22 +454,23 @@ describe('send-server-actor-request', () => {
     });
 
     it.each([true, false])(
-        'points a 404 at the Actor README, through fetch-actor-details when served: %s',
+        'points a 404 at the operation list, or at the README without fetch-actor-details: %s',
         async (hasDetails) => {
             const result = await callTool(
                 { path: '/status/404' },
                 { loadedToolNames: hasDetails ? [HELPER_TOOLS.ACTOR_GET_DETAILS] : [] },
             );
-            const text = result.content.map((block) => block.text).join('\n');
+            const { nextStep } = result.structuredContent as { nextStep: string };
 
             expect(received).toHaveLength(1);
             expect(result.isError).toBe(true);
-            expect(result.structuredContent).toMatchObject({ nextStep: expect.stringContaining('README') });
-            expect(result.content.at(-1)?.text).toBe((result.structuredContent as { nextStep: string }).nextStep);
+            expect(result.content.at(-1)?.text).toBe(nextStep);
             if (hasDetails) {
-                expect(text).toContain(JSON.stringify({ actor: SERVER_ACTOR, output: { readme: true } }));
+                // The whole list, not the failed operation: on a 404 the path itself may be wrong.
+                expect(nextStep).toContain(JSON.stringify({ actor: SERVER_ACTOR, output: { serverInterface: true } }));
             } else {
-                expect(text).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+                expect(nextStep).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+                expect(nextStep).toContain('README');
             }
         },
     );

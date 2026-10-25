@@ -255,7 +255,7 @@ function buildRequestRecoveryText(
     if (status === 503) return 'The Actor Server is temporarily unavailable.';
     if (![400, 404, 405, 422].includes(status)) return undefined;
     const documentation = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)
-        ? `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorName, output: { readme: true } })} returns the Actor README or its summary, which may omit HTTP endpoint details.`
+        ? `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorName, output: { serverInterface: true } })} lists the documented HTTP operations.`
         : 'The Actor README may describe its HTTP endpoints.';
     return hasErrorMessage
         ? `The Actor Server error may name the expected HTTP method, path, or parameters. ${documentation}`
