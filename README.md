@@ -606,3 +606,4 @@ Full rules, including [AI-assisted contributions](./CONTRIBUTING.md#ai-assisted-
 - [How to build and monetize an AI agent on Apify](https://blog.apify.com/how-to-build-an-ai-agent/)
 - [Connect Apify MCP with Claude Desktop](https://docs.apify.com/platform/integrations/claude-desktop)
 - [Connect Apify MCP with ChatGPT](https://docs.apify.com/platform/integrations/chatgpt)
+- [Mode VC Radar MCP](https://modevc.com/api/mcp) - Read-only venture capital & AI market research MCP server (39 empirical AI charts, 3,650 VC firms, SEC Form D filings, and 18 founder financial calculators; free Streamable HTTP at https://modevc.com/api/mcp).
