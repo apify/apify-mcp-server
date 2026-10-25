@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Serve apify&#x2F;web-search as a run-based Actor tool ([#1654](https://github.com/apify/apify-mcp-server/pull/1654)) ([09fab11](https://github.com/apify/apify-mcp-server/commit/09fab118b124e6ca5ec21b5cd14cce5e685051be)) by [@jirispilka](https://github.com/jirispilka), closes [#1619](https://github.com/apify/apify-mcp-server/issues/1619), [#1651](https://github.com/apify/apify-mcp-server/issues/1651)
+- Send trace id and use case with Apify Store searches ([#1650](https://github.com/apify/apify-mcp-server/pull/1650)) ([826e128](https://github.com/apify/apify-mcp-server/commit/826e128e5506760cb9d22f254dec7cddfceb1486)) by [@MQ37](https://github.com/MQ37), closes [#1362](https://github.com/apify/apify-mcp-server/issues/1362), [#272](https://github.com/apify/apify-mcp-server/issues/272), [#1553](https://github.com/apify/apify-mcp-server/issues/1553)
 
 
 <!-- git-cliff-unreleased-end -->
