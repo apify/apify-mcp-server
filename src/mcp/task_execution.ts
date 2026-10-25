@@ -12,15 +12,21 @@ import type { ApifyClient } from '../apify_client.js';
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { withReportProblemNudge } from '../tools/dev/report_problem.js';
-import type { ActorStore, CallDiagnostics, TelemetryEnv, ToolEntry, ToolStatus, TransportType } from '../types.js';
+import type {
+    ActorStore,
+    CallDiagnostics,
+    TelemetryEnv,
+    ToolCallTelemetryProperties,
+    ToolEntry,
+    ToolStatus,
+} from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 import { logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
 import { createProgressTracker } from '../utils/progress.js';
-import { buildActorFields, getToolFullName } from '../utils/tools.js';
-import type { McpClientContext } from './client_context.js';
+import { buildActorFields } from '../utils/tools.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
 import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
-import { logToolCallAndTelemetry, prepareTelemetryData } from './tool_call_telemetry.js';
+import { logToolCallAndTelemetry } from './tool_call_telemetry.js';
 import { dispatchToolCall } from './tool_dispatch.js';
 import {
     createTaskCancellationWatcher,
@@ -81,7 +87,8 @@ export async function emitTaskStatusNotification(
  * @param params.mcpSessionId - MCP session ID for telemetry
  * @param params.actorName - Actor name, used for telemetry and error diagnostics
  * @param params.actorId - Actor ID, used for telemetry and error diagnostics
- * @param params.clientParam - Raw `?client=` URL query-param value, for Segment attribution
+ * @param params.telemetryData - Telemetry prepared by the tool-call handler, or null when disabled
+ * @param params.userId - User identity resolved by the tool-call handler
  * @param params.taskStore - Task store (legacy) for status/result persistence
  * @param params.server - v1 SDK server (legacy) for task-status notifications and logging
  * @param params.sendNotification - Progress-notification sink for the running tool
@@ -100,17 +107,14 @@ export async function executeToolAndUpdateTask(params: {
     mcpSessionId: string | undefined;
     actorName?: string;
     actorId?: string;
-    clientContext: McpClientContext | undefined;
-    /** Raw `?client=` URL query-param value for this connection, if any. */
-    clientParam?: string;
     taskStore: TaskStore;
     server: Server;
     tools: Map<string, ToolEntry>;
     actorStore?: ActorStore;
     paymentProvider?: PaymentProvider;
-    telemetryEnabled: boolean;
+    telemetryData: ToolCallTelemetryProperties | null;
+    userId: string | null;
     telemetryEnv: TelemetryEnv;
-    transportType?: TransportType;
     sendNotification: (notification: ServerNotification) => Promise<void>;
 }): Promise<void> {
     const {
@@ -124,16 +128,14 @@ export async function executeToolAndUpdateTask(params: {
         mcpSessionId,
         actorName,
         actorId,
-        clientContext,
-        clientParam,
         taskStore,
         server,
         tools,
         actorStore,
         paymentProvider,
-        telemetryEnabled,
+        telemetryData,
+        userId,
         telemetryEnv,
-        transportType,
         sendNotification,
     } = params;
     const emitLog = async (msg: { level: string; data?: unknown }) =>
@@ -147,19 +149,6 @@ export async function executeToolAndUpdateTask(params: {
         taskId,
         toolName: tool.name,
         mcpSessionId,
-    });
-
-    // Prepare telemetry before try-catch so it's accessible to both paths.
-    // This avoids re-fetching user data in the error handler.
-    const { telemetryData, userId } = await prepareTelemetryData({
-        toolName: getToolFullName(tool),
-        mcpSessionId,
-        apifyToken,
-        telemetryEnabled,
-        transportType,
-        clientContext,
-        clientParam,
-        paymentProvider,
     });
 
     const finishTaskTracking = (status: ToolStatus, diagnostics?: CallDiagnostics, result?: unknown) => {
