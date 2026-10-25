@@ -77,12 +77,21 @@ function buildAjvFailureText(errors: ErrorObject[], args: unknown, inputSchema: 
             error.keyword === 'type'
                 ? `, got ${getJsonTypeName(resolveJsonPointer(args, error.instancePath, false))}`
                 : '';
-        return `${error.instancePath || 'root'}: ${error.message || 'validation error'}${received}`;
+        const allowedValues = error.keyword === 'enum' ? `: ${JSON.stringify(error.params.allowedValues)}` : '';
+        return `${error.instancePath || 'root'}: ${error.message || 'validation error'}${received}${allowedValues}`;
     });
-    const descriptions = [...parameterPaths].flatMap((path) => {
-        const { description } = (resolveJsonPointer(inputSchema, path, true) ?? {}) as { description?: unknown };
-        return path && typeof description === 'string' ? [`Parameter ${path}: ${description}`] : [];
-    });
+    const descriptions = new Set<string>();
+    for (let path of parameterPaths) {
+        // Dictionary values may have no description; their parent explains the accepted shape.
+        while (path) {
+            const { description } = (resolveJsonPointer(inputSchema, path, true) ?? {}) as { description?: unknown };
+            if (typeof description === 'string') {
+                descriptions.add(`Parameter ${path}: ${description}`);
+                break;
+            }
+            path = path.slice(0, path.lastIndexOf('/'));
+        }
+    }
     return [`Validation errors: ${failures.join('; ')}.`, ...descriptions].join('\n');
 }
 

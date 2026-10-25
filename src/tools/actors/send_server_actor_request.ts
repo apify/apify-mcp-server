@@ -240,8 +240,16 @@ function buildResponse(request: ServerActorRequest, response: ServerActorRespons
     const redirectNote = location ? ` The redirect to ${location} was not followed.` : '';
     const texts = [JSON.stringify(structuredContent), `${outcome} with ${bodyNote}.${redirectNote}`];
     if (status < 400) return respondOk(texts, { structuredContent });
-    if (status === 429) texts.push('The Actor Server rate limit was reached.');
-    if (status === 503) texts.push('The Actor Server is temporarily unavailable.');
+    if (status === 429) {
+        texts.push(
+            'The Actor Server rate limit was reached. Wait before further requests, and send them one at a time.',
+        );
+    }
+    if (status === 503) {
+        texts.push(
+            'The Actor Server is temporarily unavailable. Wait before further requests, and send them one at a time.',
+        );
+    }
     return respondUserError(texts, {
         ...((status === HTTP_UNAUTHORIZED || status === HTTP_FORBIDDEN) && { category: FAILURE_CATEGORY.AUTH }),
         httpStatus: status,
@@ -355,7 +363,7 @@ export const sendServerActorRequest: ToolEntry = Object.freeze({
 
         USAGE:
         - Use when the Actor that fits the user's request has an Actor Server, and its API schema or README names the endpoint for the task.
-        - Fits requests for one or a few results: the Actor Server answers in the HTTP response, typically within seconds. Batch jobs over many inputs do not fit.
+        - Fits requests for one or a few results returned in the HTTP response. Larger batches depend on the endpoint and the response size and time limits.
 
         USAGE EXAMPLES:
         - user_input: Search the web for the latest AI news with apify/web-search

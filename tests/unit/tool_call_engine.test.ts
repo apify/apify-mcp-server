@@ -7,11 +7,13 @@ import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { InvalidToolCall, PreparedCall } from '../../src/mcp/tool_call_engine.js';
 import { classifyToolCallError, executeSyncToolCall, prepareToolCall } from '../../src/mcp/tool_call_engine.js';
 import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
+import { sendServerActorRequest } from '../../src/tools/actors/send_server_actor_request.js';
 import {
     REPORT_PROBLEM_INVALID_INPUT_NUDGE,
     REPORT_PROBLEM_NUDGE,
     reportProblem,
 } from '../../src/tools/dev/report_problem.js';
+import { getActorRunList } from '../../src/tools/runs/get_actor_run_list.js';
 import type { ToolCallTelemetryProperties, ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
@@ -231,11 +233,11 @@ describe('prepareToolCall()', () => {
             call: async () => respondRaw({ content: [] }),
         };
 
-        async function failureMessage(args: Record<string, unknown>): Promise<string> {
+        async function failureMessage(args: Record<string, unknown>, selectedTool: ToolEntry = tool): Promise<string> {
             const result = await prepareToolCall({
-                tools: new Map([[tool.name, tool]]),
+                tools: new Map([[selectedTool.name, selectedTool]]),
                 apifyToken: 'fake-token',
-                name: tool.name,
+                name: selectedTool.name,
                 args,
                 meta: undefined,
                 requestHeaders: undefined,
@@ -246,6 +248,24 @@ describe('prepareToolCall()', () => {
             });
             return (result as InvalidToolCall).message;
         }
+
+        it('lists the allowed values for an invalid enum', async () => {
+            const message = await failureMessage({ status: 'SUCCESS' }, getActorRunList);
+
+            expect(message).toContain('/status: must be equal to one of the allowed values');
+            expect(message).toContain('"SUCCEEDED"');
+            expect(message).toContain('"FAILED"');
+        });
+
+        it('uses the parent description for an invalid query value', async () => {
+            const message = await failureMessage(
+                { actor: 'apify/web-search', method: 'GET', path: '/', query: { limit: {} } },
+                sendServerActorRequest,
+            );
+
+            expect(message).toContain('/query/limit: must be string, got object');
+            expect(message).toContain('Parameter /query: Query parameters, by name');
+        });
 
         it('reports the received type and the description for a wrong type', async () => {
             const message = await failureMessage({ path: '/', query: '{"ai"}' });

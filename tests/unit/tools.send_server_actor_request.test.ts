@@ -394,12 +394,14 @@ describe('send-server-actor-request', () => {
     it.each([
         [429, 'The Actor Server rate limit was reached.'],
         [503, 'The Actor Server is temporarily unavailable.'],
-    ])('sends one request on a %i and names the cause', async (status, hint) => {
+    ])('sends one request on a %i and explains how to pace further requests', async (status, hint) => {
         const result = await callTool({ path: `/status/${status}` });
 
         expect(received).toHaveLength(1);
         expect(result.isError).toBe(true);
-        expect(result.content.at(-1)?.text).toBe(hint);
+        expect(result.content.at(-1)?.text).toContain(hint);
+        expect(result.content.at(-1)?.text).toContain('Wait');
+        expect(result.content.at(-1)?.text).toContain('one at a time');
     });
 
     it.each(['//other.example/echo', '//user:pw@{host}/echo'])(
