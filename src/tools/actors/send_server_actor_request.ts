@@ -75,7 +75,7 @@ type ServerActorResponse = {
     body?: Buffer;
 };
 
-/** The request went out, but its response did not fully arrive; `status` is set when the headers did. */
+/** The request may have gone out, but its response did not fully arrive; `status` is set when the headers did. */
 class IncompleteResponseError extends Error {
     override readonly name = 'IncompleteResponseError';
 
@@ -124,7 +124,7 @@ function buildRequestUrl(
     if (!url || url.username || url.password) {
         return {
             error: respondUserError(
-                `The path must stay on the Actor Server at ${standbyOrigin} and contain no credentials. ` +
+                `The path must be a valid path on the Actor Server at ${standbyOrigin}, with no credentials. ` +
                     'The request was not sent.',
             ),
         };
@@ -146,8 +146,8 @@ function readHeader(headers: AxiosResponse['headers'], name: string): string | u
 
 /**
  * Sends the request once, without following redirects, and reads the body up to `MAX_INLINE_BYTES`. The deadline
- * covers reading the body too. A failure once the status arrived, or the deadline passing, is thrown as an
- * `IncompleteResponseError`; any other failure is thrown as is.
+ * covers reading the body too. Any failure is thrown as an `IncompleteResponseError`: even a connection that drops
+ * before the status may have delivered the request.
  */
 async function sendRequest({
     client,
@@ -188,7 +188,6 @@ async function sendRequest({
             body: await readBodyUnderCap(response),
         };
     } catch (error) {
-        if (!deadline.aborted && status === undefined) throw toPlainError(error);
         throw new IncompleteResponseError(toPlainError(error).message, status, deadline.aborted);
     }
 }
@@ -212,7 +211,7 @@ function decodeBody(body: Buffer, charset: string, token: string): string | unde
 function getReadableErrorMessage(body: string, token: string): string | undefined {
     try {
         const parsed = z.object({ error: z.string() }).safeParse(JSON.parse(body));
-        // JSON escapes can hide the token until parsing; see apify/apify-mcp-server#1623.
+        // JSON escapes can hide the token until parsing.
         if (parsed.success) return parsed.data.error.replaceAll(token, REDACTED);
     } catch {
         // An Actor can return plain text or malformed JSON.
@@ -303,7 +302,7 @@ function buildIncompleteResponse(
     return respondServerError(
         `${request.method} ${request.path} on ${request.actorName} ${got} ${why}. Nothing is returned, and the ` +
             'Actor may still have processed the request.',
-        { detail: error.isTimeout ? 'timeout' : 'incomplete body' },
+        { detail: error.isTimeout ? 'timeout' : error.status === undefined ? 'no response' : 'incomplete body' },
     );
 }
 

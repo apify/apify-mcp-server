@@ -34,8 +34,8 @@ export function getActorMCPServerPath(actorDefinition: ActorDefinition | ActorDe
  *
  * `path` is publisher-controlled, and the caller's Apify token goes to whatever host the result names. A crafted
  * path (`@host/...`, `.host/...`, `//host/...`, `https://host/...`) could point the token at a third-party host,
- * so `url` is null when the path leaves the standby origin. Returns null when the Actor has no valid standby URL;
- * don't build a fallback hostname from the Actor ID: the platform never assigned it.
+ * so `url` is null when the path leaves the standby origin or does not parse. Returns null when the Actor has no
+ * valid standby URL; don't build a fallback hostname from the Actor ID: the platform never assigned it.
  */
 export function resolveOnStandbyOrigin(
     actor: Pick<Actor, 'standbyUrl'>,
@@ -45,8 +45,8 @@ export function resolveOnStandbyOrigin(
     // Compare origins produced by the same parser; a raw-string comparison would miss case and default-port
     // differences.
     const standby = new URL(actor.standbyUrl);
-    const url = new URL(path, standby);
-    return { standbyOrigin: standby.origin, url: url.origin === standby.origin ? url : null };
+    const url = URL.canParse(path, standby.href) ? new URL(path, standby) : null;
+    return { standbyOrigin: standby.origin, url: url?.origin === standby.origin ? url : null };
 }
 
 /** Returns the Actor's MCP server URL: `mcpServerPath` (its `webServerMcpPath`) resolved by `resolveOnStandbyOrigin`. */
