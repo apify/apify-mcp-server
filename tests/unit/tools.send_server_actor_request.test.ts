@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { gzipSync } from 'node:zlib';
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { FAILURE_CATEGORY, HELPER_TOOLS, MAX_INLINE_BYTES, TOOL_STATUS } from '../../src/const.js';
@@ -32,8 +32,8 @@ const SERVER_ACTOR = 'apify/server-actor-test';
 type ReceivedRequest = { method: string; url: string; headers: IncomingMessage['headers']; body: string };
 type ToolResult = TextToolResult & { toolTelemetry?: ToolTelemetryContext };
 
-/** The requests the local Actor server got since the test started. */
-let received: ReceivedRequest[] = [];
+/** Where the local Actor server records requests; `recordRequests` gives each test its own list. */
+let recording: ReceivedRequest[] = [];
 let server: Server;
 let standbyUrl: string;
 
@@ -45,7 +45,7 @@ async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const chunks: Buffer[] = [];
     for await (const chunk of req) chunks.push(chunk as Buffer);
     const body = Buffer.concat(chunks).toString('utf8');
-    received.push({ method: req.method!, url: req.url!, headers: req.headers, body });
+    recording.push({ method: req.method!, url: req.url!, headers: req.headers, body });
     const url = new URL(req.url!, standbyUrl);
     const n = Number(url.searchParams.get('n'));
     switch (url.pathname) {
@@ -164,6 +164,12 @@ function seedActor(
     actorDefinitionCache.set(name, { definition, info });
 }
 
+/** Starts a fresh list of the requests the local Actor server gets, for the calling test. */
+function recordRequests(): ReceivedRequest[] {
+    recording = [];
+    return recording;
+}
+
 // The real client: the request goes through apify-client's axios instance, as in production.
 const client = new ApifyClient({ token: TOKEN });
 
@@ -222,12 +228,9 @@ afterAll(async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
-beforeEach(() => {
-    received = [];
-});
-
-describe('send-server-actor-request', () => {
+describe('sending the request', () => {
     it('sends the token, the request origin and the JSON body as is, once', async () => {
+        const received = recordRequests();
         // Over 1 KiB: apify-client compresses a string body this large, which the Actor server would then get.
         const body = { pad: 'x'.repeat(2000) };
 
@@ -243,6 +246,51 @@ describe('send-server-actor-request', () => {
         expect(received[0].headers['content-encoding']).toBeUndefined();
     });
 
+    it('preserves scalar queries and JSON bodies through dispatch while stripping unknown keys', async () => {
+        const received = recordRequests();
+        const args = {
+            path: '/echo?from=a%20path',
+            query: { n: 1, asText: true, flag: false, label: 'apify' },
+            body: { values: [null, 2, true, 'apify'] },
+            extra: 'client metadata',
+        };
+
+        const result = await dispatchTool(args);
+
+        expect(result.isError).toBe(false);
+        expect(received).toHaveLength(1);
+        expect(received[0]).toMatchObject({
+            method: 'POST',
+            url: '/echo?from=a%20path&n=1&asText=true&flag=false&label=apify',
+            body: JSON.stringify(args.body),
+        });
+    });
+
+    it.each([
+        ['null', null],
+        ['a singleton array', [1]],
+        ['an object', { a: 1 }],
+    ])('rejects %s as a query value through dispatch before sending a POST', async (_label, value) => {
+        const received = recordRequests();
+        const result = await dispatchTool({ query: { deleteAll: value } });
+
+        expect(received).toHaveLength(0);
+        expect(result.isError).toBe(true);
+    });
+
+    it('sends to an Actor with both an API schema and an MCP path, even one that would not resolve', async () => {
+        const received = recordRequests();
+        // `getActorToolResolutionCached` throws on this path; the HTTP interface does not depend on it.
+        seedActor('apify/server-and-mcp', { definition: { webServerMcpPath: 'https://other.example/mcp' } });
+
+        const result = await callTool({ actor: 'apify/server-and-mcp', path: '/echo' });
+
+        expect(result.isError).toBe(false);
+        expect(received).toHaveLength(1);
+    });
+});
+
+describe('returning the response', () => {
     it('returns the body as text with the status, size and tenancy, and reports them in telemetry', async () => {
         const result = await callTool({ method: 'POST', path: '/echo', body: { firstNumber: 2 } });
 
@@ -270,34 +318,15 @@ describe('send-server-actor-request', () => {
         });
     });
 
-    it.each([
-        ['null', null],
-        ['a singleton array', [1]],
-        ['an object', { a: 1 }],
-    ])('rejects %s as a query value through dispatch before sending a POST', async (_label, value) => {
-        const result = await dispatchTool({ query: { deleteAll: value } });
-
-        expect(received).toHaveLength(0);
-        expect(result.isError).toBe(true);
-    });
-
-    it('preserves scalar queries and JSON bodies through dispatch while stripping unknown keys', async () => {
-        const args = {
-            path: '/echo?from=a%20path',
-            query: { n: 1, asText: true, flag: false, label: 'apify' },
-            body: { values: [null, 2, true, 'apify'] },
-            extra: 'client metadata',
-        };
-
-        const result = await dispatchTool(args);
-
-        expect(result.isError).toBe(false);
-        expect(received).toHaveLength(1);
-        expect(received[0]).toMatchObject({
-            method: 'POST',
-            url: '/echo?from=a%20path&n=1&asText=true&flag=false&label=apify',
-            body: JSON.stringify(args.body),
+    it('reports a multi-tenant Actor Server in the response and telemetry', async () => {
+        seedActor('apify/multi-tenant-server', {
+            actor: { actorStandby: { isEnabled: true, tenancy: 'MULTI_TENANT' } },
         });
+
+        const result = await callTool({ actor: 'apify/multi-tenant-server', path: '/echo' });
+
+        expect(result.structuredContent).toMatchObject({ tenancy: ACTOR_TENANCY.MULTI_TENANT });
+        expect(result.toolTelemetry).toMatchObject({ actorTenancy: ACTOR_TENANCY.MULTI_TENANT });
     });
 
     it('succeeds with an empty body for a 204 without a Content-Type', async () => {
@@ -309,6 +338,7 @@ describe('send-server-actor-request', () => {
     });
 
     it('returns a redirect with its status and location without following it', async () => {
+        const received = recordRequests();
         const result = await callTool({ path: '/redirect' });
 
         expect(result.isError).toBe(false);
@@ -317,6 +347,7 @@ describe('send-server-actor-request', () => {
     });
 
     it('masks the session token in the path, the content type and the location, but sends it as is', async () => {
+        const received = recordRequests();
         const result = await callTool({ path: '/reflect-token', query: { token: TOKEN } });
 
         expect(received[0].url).toBe(`/reflect-token?token=${TOKEN}`);
@@ -344,6 +375,7 @@ describe('send-server-actor-request', () => {
     });
 
     it('rejects an unsupported charset with the status and Actor telemetry after sending', async () => {
+        const received = recordRequests();
         const result = await callTool({ path: '/unsupported-charset' });
 
         expectSoftFailInvalidInput(result);
@@ -391,7 +423,9 @@ describe('send-server-actor-request', () => {
             });
         },
     );
+});
 
+describe('returning an Actor Server error', () => {
     it('passes an Actor error body through as an error, with the session token masked', async () => {
         const result = await callTool({ path: '/status/404' });
 
@@ -409,6 +443,7 @@ describe('send-server-actor-request', () => {
     });
 
     it('mirrors structured output first and exposes a readable Actor error in both response surfaces', async () => {
+        const received = recordRequests();
         const result = await callTool({ path: '/fetch' });
         const message = 'There is nothing at route GET /fetch. A "url" query parameter is required.';
 
@@ -459,6 +494,7 @@ describe('send-server-actor-request', () => {
     it.each([true, false])(
         'points a 404 at the operation list, or at the README without fetch-actor-details: %s',
         async (hasDetails) => {
+            const received = recordRequests();
             const result = await callTool(
                 { path: '/status/404' },
                 { loadedToolNames: hasDetails ? [HELPER_TOOLS.ACTOR_GET_DETAILS] : [] },
@@ -494,16 +530,29 @@ describe('send-server-actor-request', () => {
         [429, 'The Actor Server rate limit was reached.'],
         [503, 'The Actor Server is temporarily unavailable.'],
     ])('sends one request on a %i and names the cause', async (status, hint) => {
+        const received = recordRequests();
         const result = await callTool({ path: `/status/${status}` });
 
         expect(received).toHaveLength(1);
         expect(result.isError).toBe(true);
         expect(result.content.at(-1)?.text).toBe(hint);
     });
+});
+
+describe('rejecting a call before sending', () => {
+    it('requires a token through dispatch without sending', async () => {
+        const received = recordRequests();
+        const result = await dispatchTool({}, { token: '', allowUnauthMode: true });
+
+        expect(result.isError).toBe(true);
+        expect((result.content as { text: string }[])[0].text).toContain('An Apify API token is required');
+        expect(received).toHaveLength(0);
+    });
 
     it.each(['//other.example/echo', '//user:pw@{host}/echo', '//[bad/echo'])(
         'does not send to %s, which leaves the standby origin, carries credentials, or does not parse',
         async (template) => {
+            const received = recordRequests();
             const result = await callTool({ path: template.replace('{host}', new URL(standbyUrl).host) });
 
             expectSoftFailInvalidInput(result);
@@ -512,30 +561,10 @@ describe('send-server-actor-request', () => {
         },
     );
 
-    it('reports a connection dropped before any status as possibly processed', async () => {
-        const result = await callTool({ method: 'POST', path: '/drop-before-status', body: { a: 1 } });
-
-        expect(received).toHaveLength(1);
-        expect(result.isError).toBe(true);
-        expect(result.content[0].text).toContain('got no complete response');
-        expect(result.content[0].text).toContain('may still have processed the request');
-        expect(result.toolTelemetry).toMatchObject({ actorTenancy: ACTOR_TENANCY.SINGLE_TENANT });
-    });
-
-    it('reports a multi-tenant Actor Server in the response and telemetry', async () => {
-        seedActor('apify/multi-tenant-server', {
-            actor: { actorStandby: { isEnabled: true, tenancy: 'MULTI_TENANT' } },
-        });
-
-        const result = await callTool({ actor: 'apify/multi-tenant-server', path: '/echo' });
-
-        expect(result.structuredContent).toMatchObject({ tenancy: ACTOR_TENANCY.MULTI_TENANT });
-        expect(result.toolTelemetry).toMatchObject({ actorTenancy: ACTOR_TENANCY.MULTI_TENANT });
-    });
-
     it.each([`echo?token=${TOKEN}`, `//${TOKEN}@other.example/echo`])(
         'masks the session token when rejecting path %s without sending',
         async (path) => {
+            const received = recordRequests();
             const result = await callTool({ path });
 
             expectSoftFailInvalidInput(result);
@@ -545,13 +574,27 @@ describe('send-server-actor-request', () => {
     );
 
     it('rejects a body on GET without sending', async () => {
+        const received = recordRequests();
         const result = await callTool({ path: '/echo', body: { a: 1 } });
 
         expectSoftFailInvalidInput(result);
         expect(received).toHaveLength(0);
     });
 
+    it('returns the not-found response for an Actor the API does not know', async () => {
+        const unknownActorClient = Object.assign(
+            new ApifyClient({ token: TOKEN }),
+            mockApifyClient({ actor: () => ({ get: async () => undefined }) }),
+        );
+
+        const result = await callTool({ actor: 'apify/missing', path: '/echo' }, { apifyClient: unknownActorClient });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toContain("Actor information for 'apify/missing' was not found.");
+    });
+
     it('rejects an Actor with Actor Standby off, naming call-actor only when the session has it', async () => {
+        const received = recordRequests();
         seedActor('apify/server-off', { actor: { actorStandby: { isEnabled: false } } });
 
         const withCallActor = await callTool({ actor: 'apify/server-off', path: '/echo' });
@@ -567,6 +610,7 @@ describe('send-server-actor-request', () => {
     });
 
     it('rejects an MCP-server Actor without an API schema, pointing at its MCP tools', async () => {
+        const received = recordRequests();
         seedActor('apify/mcp-only', { definition: { webServerMcpPath: '/mcp', hasWebServerSchema: false } });
 
         const result = await callTool({ actor: 'apify/mcp-only', path: '/echo' });
@@ -576,17 +620,8 @@ describe('send-server-actor-request', () => {
         expect(received).toHaveLength(0);
     });
 
-    it('sends to an Actor with both an API schema and an MCP path, even one that would not resolve', async () => {
-        // `getActorToolResolutionCached` throws on this path; the HTTP interface does not depend on it.
-        seedActor('apify/server-and-mcp', { definition: { webServerMcpPath: 'https://other.example/mcp' } });
-
-        const result = await callTool({ actor: 'apify/server-and-mcp', path: '/echo' });
-
-        expect(result.isError).toBe(false);
-        expect(received).toHaveLength(1);
-    });
-
     it('reports a missing standby URL as a configuration failure without sending', async () => {
+        const received = recordRequests();
         seedActor('apify/no-standby-url', { actor: { standbyUrl: null } });
 
         const result = await callTool({ actor: 'apify/no-standby-url', path: '/echo' });
@@ -596,13 +631,26 @@ describe('send-server-actor-request', () => {
         expect(received).toHaveLength(0);
     });
 
-    it('returns the empty aborted response when the client cancels mid-request', async () => {
-        const controller = new AbortController();
-        const pending = callTool({ path: '/drip?ms=2000' }, { signal: controller.signal });
-        await vi.waitFor(() => expect(received).toHaveLength(1));
-        controller.abort();
+    it('rejects a payment-provider session before any request reaches the Actor server', async () => {
+        const received = recordRequests();
+        const result = await dispatchTool({ method: 'GET' }, { paymentProvider: makePaymentProvider() });
 
-        await expect(pending).resolves.toEqual({});
+        expect(result.isError).toBe(true);
+        expect((result.content as { text: string }[])[0].text).toContain('is not supported in agentic payment mode');
+        expect(received).toHaveLength(0);
+    });
+});
+
+describe('reporting an incomplete response', () => {
+    it('reports a connection dropped before any status as possibly processed', async () => {
+        const received = recordRequests();
+        const result = await callTool({ method: 'POST', path: '/drop-before-status', body: { a: 1 } });
+
+        expect(received).toHaveLength(1);
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain('got no complete response');
+        expect(result.content[0].text).toContain('may still have processed the request');
+        expect(result.toolTelemetry).toMatchObject({ actorTenancy: ACTOR_TENANCY.SINGLE_TENANT });
     });
 
     it('reports a timeout as a failure that does not claim the request was undone', async () => {
@@ -628,26 +676,29 @@ describe('send-server-actor-request', () => {
         expect(result.toolTelemetry).toMatchObject({ toolStatus: TOOL_STATUS.FAILED, httpStatus: 200 });
     });
 
-    it('requires a token through dispatch without sending', async () => {
-        const result = await dispatchTool({}, { token: '', allowUnauthMode: true });
+    it('returns the empty aborted response when the client cancels mid-request', async () => {
+        const received = recordRequests();
+        const controller = new AbortController();
+        const pending = callTool({ path: '/drip?ms=2000' }, { signal: controller.signal });
+        await vi.waitFor(() => expect(received).toHaveLength(1));
+        controller.abort();
 
-        expect(result.isError).toBe(true);
-        expect((result.content as { text: string }[])[0].text).toContain('An Apify API token is required');
-        expect(received).toHaveLength(0);
+        await expect(pending).resolves.toEqual({});
     });
+});
 
-    it('returns the not-found response for an Actor the API does not know', async () => {
-        const unknownActorClient = Object.assign(
-            new ApifyClient({ token: TOKEN }),
-            mockApifyClient({ actor: () => ({ get: async () => undefined }) }),
-        );
+describe('describing the tool', () => {
+    it('names fetch-actor-details in the description only when the session has it', () => {
+        const withDetails = sendServerActorRequest.buildDescription!(ALL_TOOLS_PRESENT);
+        const withoutDetails = sendServerActorRequest.buildDescription!(only(HELPER_TOOLS.ACTOR_SERVER_REQUEST));
 
-        const result = await callTool({ actor: 'apify/missing', path: '/echo' }, { apifyClient: unknownActorClient });
-
-        expectSoftFailInvalidInput(result);
-        expect(result.content[0].text).toContain("Actor information for 'apify/missing' was not found.");
+        expect(sendServerActorRequest.description).toBe(withDetails);
+        expect(withDetails).toContain(`${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface`);
+        expect(withoutDetails).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
     });
+});
 
+describe('logging the call', () => {
     it('logs the body and a token query value only as redacted, and keeps the Actor name', () => {
         const { redactArgs } = sendServerActorRequest as HelperTool;
         const args = {
@@ -660,22 +711,5 @@ describe('send-server-actor-request', () => {
 
         expect(JSON.stringify(redactArgs?.(args))).not.toContain('secret');
         expect(redactArgs?.(args)).toMatchObject({ actor: SERVER_ACTOR, method: 'POST', path: '/echo' });
-    });
-
-    it('names fetch-actor-details in the description only when the session has it', () => {
-        const withDetails = sendServerActorRequest.buildDescription!(ALL_TOOLS_PRESENT);
-        const withoutDetails = sendServerActorRequest.buildDescription!(only(HELPER_TOOLS.ACTOR_SERVER_REQUEST));
-
-        expect(sendServerActorRequest.description).toBe(withDetails);
-        expect(withDetails).toContain(`${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface`);
-        expect(withoutDetails).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
-    });
-
-    it('is rejected before any request reaches the Actor server in a payment-provider session', async () => {
-        const result = await dispatchTool({ method: 'GET' }, { paymentProvider: makePaymentProvider() });
-
-        expect(result.isError).toBe(true);
-        expect((result.content as { text: string }[])[0].text).toContain('is not supported in agentic payment mode');
-        expect(received).toHaveLength(0);
     });
 });
