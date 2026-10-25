@@ -106,15 +106,23 @@ export function resolveRef(node: unknown, spec: unknown): unknown {
 export function resolveLocalRefs(node: unknown, spec: unknown): unknown {
     const hasRefSiblings = isRecord(spec) && typeof spec.openapi === 'string' && /^3\.[1-9]\d*\./.test(spec.openapi);
     let expandedSize = 0;
-    const resolve = (value: unknown, seen: readonly string[], isSchema = false): unknown => {
+    function resolveProperties(
+        value: Record<string, unknown>,
+        seen: readonly string[],
+        isSchema: boolean,
+    ): Record<string, unknown> {
+        const properties: [string, unknown][] = [];
+        for (const [key, child] of Object.entries(value)) {
+            properties.push([key, resolve(child, seen, isSchema || key === 'schema')]);
+        }
+        return Object.fromEntries(properties);
+    }
+
+    function resolve(value: unknown, seen: readonly string[], isSchema = false): unknown {
         if (Array.isArray(value)) return value.map((item) => resolve(item, seen, isSchema));
         if (!isRecord(value)) return value;
         const { $ref, ...rest } = value;
-        if (typeof $ref !== 'string') {
-            return Object.fromEntries(
-                Object.entries(value).map(([key, child]) => [key, resolve(child, seen, isSchema || key === 'schema')]),
-            );
-        }
+        if (typeof $ref !== 'string') return resolveProperties(value, seen, isSchema);
         const hasSchemaContext = isSchema || $ref.startsWith('#/components/schemas/');
         // 3.1 Schema Objects keep all siblings; Reference Objects override only these annotations.
         // https://spec.openapis.org/oas/v3.1.0.html#reference-object (see #1645).
@@ -126,7 +134,7 @@ export function resolveLocalRefs(node: unknown, spec: unknown): unknown {
               )
             : {};
         const unavailable = (unavailableDetail: string) => ({
-            ...(resolve(siblings, seen, hasSchemaContext) as Record<string, unknown>),
+            ...resolveProperties(siblings, seen, hasSchemaContext),
             $ref,
             unavailableDetail,
         });
@@ -138,7 +146,7 @@ export function resolveLocalRefs(node: unknown, spec: unknown): unknown {
         if (expandedSize > MAX_INLINE_BYTES) return unavailable('not expanded, size cap reached');
         const resolved = resolve(target, [...seen, $ref], hasSchemaContext);
         if (Object.keys(siblings).length === 0) return resolved;
-        const resolvedSiblings = resolve(siblings, seen, hasSchemaContext) as Record<string, unknown>;
+        const resolvedSiblings = resolveProperties(siblings, seen, hasSchemaContext);
         if (!hasSchemaContext) return { ...(isRecord(resolved) && resolved), ...resolvedSiblings };
         // Keep constraints conjunctive, including overlapping keywords; a spread can weaken the target.
         // Siblings stay outside allOf so unevaluatedProperties can see the target's evaluated properties.
@@ -146,7 +154,7 @@ export function resolveLocalRefs(node: unknown, spec: unknown): unknown {
             ...resolvedSiblings,
             allOf: [resolved, ...(Array.isArray(resolvedSiblings.allOf) ? resolvedSiblings.allOf : [])],
         };
-    };
+    }
     return resolve(node, []);
 }
 

@@ -4,24 +4,81 @@ import { ACTOR_TENANCY } from '../../types.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { resolveActorTenancy } from '../actor_tool_naming.js';
 import { isRecord, resolveLocalRefs, resolveRef } from '../api/apify_api_spec.js';
-import { listServerOperations, type ServerOperation } from './actor_definition.js';
 
-/** The names of the required parameters, and `request body` when it is required. */
+const OPENAPI_OPERATION_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'] as const;
+const EXPAND_HINT = 'output.serverInterface: true lists them, "METHOD /path" details one.';
+
+type ServerOperation = { method: string; path: string; operation: Record<string, unknown> };
+
+type ServerInterfaceSectionParams = {
+    actor: Pick<Actor, 'actorStandby' | 'standbyUrl'>;
+    actorFullName: string;
+    /** The server-interface build's API schema; absent when the Actor has none. */
+    schema: Record<string, unknown> | undefined;
+    /** `true` lists operations, a `METHOD /path` string details one, `false` gives the one-line summary. */
+    selection: boolean | string;
+    loadedToolNames: readonly string[];
+};
+
+/** Operation parameters override path-level parameters by their resolved name and location. */
+function mergeOperationParameters(pathParameters: unknown, operationParameters: unknown, schema: unknown): unknown[] {
+    const merged = new Map<unknown, unknown>();
+    const parameters = [
+        ...(Array.isArray(pathParameters) ? pathParameters : []),
+        ...(Array.isArray(operationParameters) ? operationParameters : []),
+    ];
+    for (const parameter of parameters) {
+        const resolved = resolveRef(parameter, schema);
+        const key =
+            isRecord(resolved) && typeof resolved.name === 'string'
+                ? JSON.stringify([resolved.in, resolved.name])
+                : parameter;
+        merged.set(key, parameter);
+    }
+    return [...merged.values()];
+}
+
+function listServerOperations(schema: unknown): ServerOperation[] {
+    if (!isRecord(schema) || !isRecord(schema.paths)) return [];
+    const operations: ServerOperation[] = [];
+    for (const [path, pathItem] of Object.entries(schema.paths)) {
+        if (!isRecord(pathItem)) continue;
+        for (const method of OPENAPI_OPERATION_METHODS) {
+            const operation = pathItem[method];
+            if (!isRecord(operation)) continue;
+            const parameters = mergeOperationParameters(pathItem.parameters, operation.parameters, schema);
+            operations.push({
+                method: method.toUpperCase(),
+                path,
+                operation: parameters.length > 0 ? { ...operation, parameters } : operation,
+            });
+        }
+    }
+    return operations;
+}
+
 function listRequiredInputs(operation: Record<string, unknown>, schema: Record<string, unknown>): string[] {
-    const parameters = Array.isArray(operation.parameters)
-        ? operation.parameters.map((parameter) => resolveRef(parameter, schema))
-        : [];
-    const names = parameters
-        .filter((parameter) => isRecord(parameter) && parameter.required === true && typeof parameter.name === 'string')
-        .map((parameter) => (parameter as { name: string }).name);
+    const names: string[] = [];
+    for (const parameter of Array.isArray(operation.parameters) ? operation.parameters : []) {
+        const resolved = resolveRef(parameter, schema);
+        if (isRecord(resolved) && resolved.required === true && typeof resolved.name === 'string') {
+            names.push(resolved.name);
+        }
+    }
     const requestBody = resolveRef(operation.requestBody, schema);
-    return isRecord(requestBody) && requestBody.required === true ? [...names, 'request body'] : names;
+    if (isRecord(requestBody) && requestBody.required === true) names.push('request body');
+    return names;
 }
 
 function formatOperationLine({ method, path, operation }: ServerOperation, schema: Record<string, unknown>): string {
     const required = listRequiredInputs(operation, schema);
-    const summary = typeof operation.summary === 'string' ? `: ${operation.summary}${required.length ? '.' : ''}` : '';
-    return `- ${method} ${path}${summary}${required.length ? ` Required: ${required.join(', ')}.` : ''}`;
+    let text = `- ${method} ${path}`;
+    if (typeof operation.summary === 'string') {
+        text += `: ${operation.summary}`;
+        if (required.length > 0) text += '.';
+    }
+    if (required.length > 0) text += ` Required: ${required.join(', ')}.`;
+    return text;
 }
 
 /** What a request costs, by tenancy. */
@@ -34,30 +91,34 @@ function formatTenancy(actor: Pick<Actor, 'actorStandby'>): string {
     return `${ACTOR_TENANCY.SINGLE_TENANT}: the first request starts a run in your account, kept for ${idleTimeout}`;
 }
 
-const EXPAND_HINT = 'output.serverInterface: true lists them, "METHOD /path" details one.';
+function buildOperationList(operations: ServerOperation[], schema: Record<string, unknown>, header: string): string {
+    const lines = operations.map((operation) => formatOperationLine(operation, schema)).join('\n');
+    return `# Server interface\n${header}Operations (${operations.length}):\n${lines}\noutput.serverInterface: "METHOD /path" details one operation.`;
+}
 
-type ServerInterfaceSectionParams = {
-    actor: Pick<Actor, 'actorStandby' | 'standbyUrl'>;
-    actorFullName: string;
-    /** The server-interface build's API schema; absent when the Actor has none. */
-    schema: Record<string, unknown> | undefined;
-    /** `true` lists the operations, a `METHOD /path` string details one, `false` gives the one-line summary. */
-    selection: boolean | string;
-    loadedToolNames: readonly string[];
-};
+function buildOperationDetail(
+    { method, path, operation }: ServerOperation,
+    schema: Record<string, unknown>,
+    header: string,
+): string {
+    const { summary, description, parameters, requestBody, responses } = operation;
+    const detail = resolveLocalRefs({ description, parameters, requestBody, responses }, schema);
+    const title = typeof summary === 'string' ? `\n${summary}` : '';
+    return `# Server interface: ${method} ${path}${title}\n${header}${wrapJsonText(detail)}`;
+}
 
 /**
- * The server-interface section of `fetch-actor-details`: the one-line summary for the default output, the
- * operation list with the base URL (the Actor's `standbyUrl`, never the document's `servers`) and tenancy, or
- * one operation with its local references resolved. `undefined` when there is nothing to say (the default
- * output for an Actor without a server interface); `error` for a selection that names no operation.
+ * The default summary, an operation list, or one operation with its local references resolved. The base URL
+ * is the Actor's assigned `standbyUrl`, never the document's `servers` value.
  */
-export function buildServerInterfaceSection(
-    params: ServerInterfaceSectionParams,
-): { text: string } | { error: string } | undefined {
-    const { actor, actorFullName, schema = {}, selection, loadedToolNames } = params;
-    const isEnabled = actor.actorStandby?.isEnabled === true;
-    if (!isEnabled) {
+export function buildServerInterfaceSection({
+    actor,
+    actorFullName,
+    schema = {},
+    selection,
+    loadedToolNames,
+}: ServerInterfaceSectionParams): { text: string } | { error: string } | undefined {
+    if (actor.actorStandby?.isEnabled !== true) {
         return selection === false ? undefined : { text: `Actor '${actorFullName}' has no server interface.` };
     }
     const tenancy = resolveActorTenancy(actor);
@@ -73,12 +134,8 @@ export function buildServerInterfaceSection(
         ? `Requests go through ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}.\n`
         : '';
     const header = `${formatTenancy(actor)}.\nBase URL: ${actor.standbyUrl ?? 'not configured'}\n${sendTool}`;
-    if (selection === true) {
-        const lines = operations.map((operation) => formatOperationLine(operation, schema)).join('\n');
-        return {
-            text: `# Server interface\n${header}Operations (${operations.length}):\n${lines}\noutput.serverInterface: "METHOD /path" details one operation.`,
-        };
-    }
+    if (selection === true) return { text: buildOperationList(operations, schema, header) };
+
     const match = /^\s*([A-Za-z]+)\s+(\S+)\s*$/.exec(selection);
     const operation = operations.find(({ method, path }) => method === match?.[1].toUpperCase() && path === match[2]);
     if (!operation) {
@@ -87,10 +144,5 @@ export function buildServerInterfaceSection(
             error: `Actor '${actorFullName}' has no operation "${selection}". Documented operations: ${documented}.`,
         };
     }
-    const { summary, description, parameters, requestBody, responses } = operation.operation;
-    const detail = resolveLocalRefs({ description, parameters, requestBody, responses }, schema);
-    const title = typeof summary === 'string' ? `\n${summary}` : '';
-    return {
-        text: `# Server interface: ${operation.method} ${operation.path}${title}\n${header}${wrapJsonText(detail)}`,
-    };
+    return { text: buildOperationDetail(operation, schema, header) };
 }

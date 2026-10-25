@@ -133,8 +133,8 @@ find it with ${HELPER_TOOLS.STORE_SEARCH} first.`
             : ''
     }
 
-Use 'output' parameter with boolean flags to control returned information:
-- Default: All fields true except mcpTools and serverInterface; a Server Actor gets a one-line server interface summary
+Use 'output' to control returned information:
+- Default: All fields true except outputSchema, mcpTools, and serverInterface; a Server Actor gets a one-line server interface summary
 - Selective: Set desired fields to true (e.g., output: { inputSchema: true })
 - Common patterns: inputSchema only, description + readme, mcpTools for MCP Actors, serverInterface for Server Actors
 - serverInterface: true lists a Server Actor's HTTP operations, "METHOD /path" details one

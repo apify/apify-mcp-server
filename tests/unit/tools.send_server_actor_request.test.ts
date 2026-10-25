@@ -7,12 +7,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { FAILURE_CATEGORY, HELPER_TOOLS, MAX_INLINE_BYTES, TOOL_STATUS } from '../../src/const.js';
-import { TimeoutError } from '../../src/errors.js';
-import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../src/mcp/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
 import {
     executeSendServerActorRequest,
-    fetchServerActorResponse,
     sendServerActorRequest,
 } from '../../src/tools/actors/send_server_actor_request.js';
 import { serverActorRequestOutputSchema } from '../../src/tools/structured_output_schemas.js';
@@ -156,7 +153,6 @@ async function callTool(
         loadedToolNames?: string[];
         timeoutMillis?: number;
         signal?: AbortSignal;
-        token?: string;
         apifyClient?: ApifyClient;
     } = {},
 ): Promise<ToolResult> {
@@ -168,7 +164,6 @@ async function callTool(
         },
     );
     if (options.signal) context.signal = options.signal;
-    if (options.token !== undefined) context.apifyToken = options.token;
     return (await executeSendServerActorRequest(context, { timeoutMillis: options.timeoutMillis })) as ToolResult;
 }
 
@@ -211,53 +206,23 @@ beforeEach(() => {
     received = [];
 });
 
-describe('fetchServerActorResponse()', () => {
-    const send = async (path: string, params: Partial<Parameters<typeof fetchServerActorResponse>[0]> = {}) =>
-        fetchServerActorResponse({
-            client,
-            url: new URL(path, standbyUrl),
-            method: 'GET',
-            signal: new AbortController().signal,
-            timeoutMillis: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
-            ...params,
-        });
-
-    it('sends the token, the request origin and the JSON body as is, once, and keeps the raw response', async () => {
+describe('send-server-actor-request', () => {
+    it('sends the token, the request origin and the JSON body as is, once', async () => {
         // Over 1 KiB: apify-client compresses a string body this large, which the Actor server would then get.
         const body = { pad: 'x'.repeat(2000) };
 
-        const response = await send('/echo?from=path', { method: 'POST', body });
+        await callTool({ method: 'POST', path: '/echo', body });
 
         expect(received).toHaveLength(1);
-        expect(received[0]).toMatchObject({ method: 'POST', url: '/echo?from=path', body: JSON.stringify(body) });
+        expect(received[0]).toMatchObject({ method: 'POST', url: '/echo', body: JSON.stringify(body) });
         expect(received[0].headers).toMatchObject({
             authorization: `Bearer ${TOKEN}`,
             'x-apify-request-origin': 'MCP',
             'content-type': 'application/json',
         });
         expect(received[0].headers['content-encoding']).toBeUndefined();
-        expect(response.status).toBe(200);
-        expect(JSON.parse(response.body!.toString())).toEqual({ query: { from: 'path' }, body });
     });
 
-    it.each([
-        ['/bytes', MAX_INLINE_BYTES, MAX_INLINE_BYTES],
-        ['/bytes', MAX_INLINE_BYTES + 1, undefined],
-        ['/gzip', MAX_INLINE_BYTES, MAX_INLINE_BYTES],
-        ['/gzip', MAX_INLINE_BYTES + 1, undefined],
-    ])('reads a %s body of %i bytes, after decompression, only up to the inline limit', async (path, size, length) => {
-        const response = await send(`${path}?n=${size}`);
-
-        expect(response.status).toBe(200);
-        expect(response.body?.length).toBe(length);
-    });
-
-    it('throws a TimeoutError when the deadline passes while the body is still arriving', async () => {
-        await expect(send('/drip?ms=2000', { timeoutMillis: 100 })).rejects.toBeInstanceOf(TimeoutError);
-    });
-});
-
-describe('send-server-actor-request', () => {
     it('returns the body as text with the status, size and tenancy, and reports them in telemetry', async () => {
         const result = await callTool({ method: 'POST', path: '/echo', body: { firstNumber: 2 } });
 
@@ -379,15 +344,31 @@ describe('send-server-actor-request', () => {
         expect(result.toolTelemetry).toMatchObject({ httpStatus: 200, failureHttpStatus: 200 });
     });
 
-    it('does not return a body over the inline limit, keeps the status, and says the request was sent', async () => {
-        const result = await callTool({ path: `/bytes?n=${MAX_INLINE_BYTES + 1}` });
+    it.each(['/bytes', '/gzip'])(
+        'returns a %s body of exactly the inline limit, counted after decompression',
+        async (path) => {
+            const result = await callTool({ path: `${path}?n=${MAX_INLINE_BYTES}` });
 
-        expectSoftFailInvalidInput(result);
-        expect(result.content[0].text).toContain(`larger than ${MAX_INLINE_BYTES} bytes`);
-        expect(result.content[0].text).toContain('The request itself was sent.');
-        expect(result.content[0].text).not.toContain('aaa');
-        expect(result.toolTelemetry).toMatchObject({ httpStatus: 200, actorTenancy: ACTOR_TENANCY.SINGLE_TENANT });
-    });
+            expect(result.isError).toBe(false);
+            expect(result.structuredContent).toMatchObject({ bytes: MAX_INLINE_BYTES });
+        },
+    );
+
+    it.each(['/bytes', '/gzip'])(
+        'does not return a %s body over the inline limit, keeps the status, and says the request was sent',
+        async (path) => {
+            const result = await callTool({ path: `${path}?n=${MAX_INLINE_BYTES + 1}` });
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toContain(`larger than ${MAX_INLINE_BYTES} bytes`);
+            expect(result.content[0].text).toContain('The request itself was sent.');
+            expect(result.content[0].text).not.toContain('aaa');
+            expect(result.toolTelemetry).toMatchObject({
+                httpStatus: 200,
+                actorTenancy: ACTOR_TENANCY.SINGLE_TENANT,
+            });
+        },
+    );
 
     it('passes an Actor error body through as an error, with the session token masked', async () => {
         const result = await callTool({ path: '/status/404' });
@@ -425,7 +406,7 @@ describe('send-server-actor-request', () => {
             const result = await callTool({ path: template.replace('{host}', new URL(standbyUrl).host) });
 
             expectSoftFailInvalidInput(result);
-            expect(result.content[0].text).toContain("leaves the Actor's server");
+            expect(result.content[0].text).toContain('leaves the Actor Server');
             expect(received).toHaveLength(0);
         },
     );
@@ -569,30 +550,10 @@ describe('send-server-actor-request', () => {
     });
 
     it('is rejected before any request reaches the Actor server in a payment-provider session', async () => {
-        await withServer(
-            async (server) => {
-                server.upsertTools([sendServerActorRequest]);
-                const handler = getRequestHandler(server, 'tools/call');
+        const result = await dispatchTool({ method: 'GET' }, { paymentProvider: makePaymentProvider() });
 
-                const result = await handler(
-                    {
-                        method: 'tools/call',
-                        params: {
-                            name: HELPER_TOOLS.ACTOR_SERVER_REQUEST,
-                            arguments: { actor: SERVER_ACTOR, method: 'GET', path: '/echo' },
-                            _meta: { mcpSessionId: 's1' },
-                        },
-                    },
-                    { signal: { aborted: false }, sendNotification: vi.fn() },
-                );
-
-                expect(result.isError).toBe(true);
-                expect((result.content as { text: string }[])[0].text).toContain(
-                    'is not supported in agentic payment mode',
-                );
-                expect(received).toHaveLength(0);
-            },
-            { paymentProvider: makePaymentProvider() },
-        );
+        expect(result.isError).toBe(true);
+        expect((result.content as { text: string }[])[0].text).toContain('is not supported in agentic payment mode');
+        expect(received).toHaveLength(0);
     });
 });

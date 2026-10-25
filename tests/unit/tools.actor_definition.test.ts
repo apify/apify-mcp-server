@@ -247,6 +247,8 @@ describe('hasWebServerSchema on the pruned definition', () => {
         ['an absent schema', undefined],
         ['an empty schema', {}],
         ['a path item with no operation', { paths: { '/search': {} } }],
+        ['a path item that is not an object', { paths: { '/search': 'get' } }],
+        ['an operation that is not an object', { paths: { '/search': { get: null } } }],
     ])('is false for %s', async (_label, webServerSchema) => {
         const { apifyClient } = mockActorBuildClient({
             actor: mockActor(),
