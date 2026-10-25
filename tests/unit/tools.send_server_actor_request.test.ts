@@ -453,7 +453,7 @@ describe('send-server-actor-request', () => {
     });
 
     it.each([true, false])(
-        'provides endpoint documentation for a 404 with details tool served: %s',
+        'prioritizes the server error before README fallback with details tool served: %s',
         async (hasDetails) => {
             const result = await callTool(
                 { path: '/status/404' },
@@ -465,8 +465,10 @@ describe('send-server-actor-request', () => {
             expect(result.isError).toBe(true);
             expect(text).toContain('HTTP method, path, and required parameters');
             expect(result.structuredContent).toMatchObject({
-                nextStep: expect.stringContaining('HTTP method, path, and required parameters'),
+                nextStep: expect.stringContaining('Read errorMessage first'),
             });
+            expect(text).toContain('If errorMessage is missing or insufficient');
+            expect(text).toContain('may omit HTTP endpoint details');
             expect(
                 result.content
                     .slice(1)

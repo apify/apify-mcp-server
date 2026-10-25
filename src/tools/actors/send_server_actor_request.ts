@@ -230,9 +230,12 @@ function buildRequestRecoveryText(
     }
     if (![400, 404, 405, 422].includes(status)) return undefined;
     const documentation = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)
-        ? `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorName, output: { readme: true } })} returns the Actor README or its summary.`
-        : 'See the Actor README for its HTTP endpoints.';
-    return `Check the documented HTTP method, path, and required parameters. ${documentation}`;
+        ? `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorName, output: { readme: true } })} returns the Actor README or its summary, which may omit HTTP endpoint details.`
+        : 'consult the Actor README, which may omit HTTP endpoint details.';
+    return dedent`
+        Read errorMessage first for the expected HTTP method, path, and required parameters.
+        If errorMessage is missing or insufficient, ${documentation}
+    `;
 }
 
 /** The tool response for what the Actor Server sent back, with the session token masked. */
