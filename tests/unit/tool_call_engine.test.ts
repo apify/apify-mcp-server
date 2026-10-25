@@ -49,6 +49,7 @@ describe('prepareToolCall()', () => {
 
     it('returns InvalidToolCall with AUTH category when no token is provided', async () => {
         await withServer(async (server) => {
+            const telemetryData = {} as ToolCallTelemetryProperties;
             const result = await prepareToolCall({
                 ...prepareFields(server),
                 apifyToken: '',
@@ -58,7 +59,7 @@ describe('prepareToolCall()', () => {
                 requestHeaders: undefined,
                 isTaskRequest: false,
                 mcpSessionId: 's1',
-                telemetryData: null,
+                telemetryData,
                 clientContext: undefined,
             });
             expect('message' in result).toBe(true);
@@ -66,11 +67,13 @@ describe('prepareToolCall()', () => {
             expect(invalid.toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
             expect(invalid.callDiagnostics.failure_category).toBe(FAILURE_CATEGORY.AUTH);
             expect(invalid.message).toContain('Apify API token is required');
+            expect(telemetryData.trace_id).toBe('s1');
         });
     });
 
     it('returns InvalidToolCall for an unknown tool name', async () => {
         await withServer(async (server) => {
+            const telemetryData = {} as ToolCallTelemetryProperties;
             const result = await prepareToolCall({
                 ...prepareFields(server),
                 apifyToken: 'fake-token',
@@ -80,13 +83,14 @@ describe('prepareToolCall()', () => {
                 requestHeaders: undefined,
                 isTaskRequest: false,
                 mcpSessionId: 's1',
-                telemetryData: null,
+                telemetryData,
                 clientContext: undefined,
             });
             expect('message' in result).toBe(true);
             const invalid = result as InvalidToolCall;
             expect(invalid.callDiagnostics.failure_category).toBe(FAILURE_CATEGORY.INVALID_INPUT);
             expect(invalid.message).toContain('was not found');
+            expect(telemetryData.trace_id).toBe('s1');
         });
     });
 
@@ -135,6 +139,39 @@ describe('prepareToolCall()', () => {
             expect(prepared.standbyRejection).toBeNull();
             expect(prepared.paymentRequiredResult).toBeUndefined();
             expect(telemetryData.tool_name).toBe('recorder-tool');
+        });
+    });
+
+    it('carries the call tracking on the client and in telemetry only when telemetry is on', async () => {
+        await withServer(async (server) => {
+            const { tool } = makeRecorderTool('recorder-tool');
+            server.upsertTools([tool]);
+            const call = (telemetryData: ToolCallTelemetryProperties | null) =>
+                prepareToolCall({
+                    ...prepareFields(server),
+                    apifyToken: 'fake-token',
+                    name: 'recorder-tool',
+                    args: {},
+                    meta: { 'com.apify/traceId': 'thread-1', 'com.apify/useCase': 'find a scraper' },
+                    requestHeaders: undefined,
+                    isTaskRequest: false,
+                    mcpSessionId: 's1',
+                    telemetryData,
+                    clientContext: {
+                        protocolVersion: '2025-06-18',
+                        clientInfo: { name: 'apify-ai', version: '1' },
+                        capabilities: {},
+                    },
+                }) as Promise<PreparedCall>;
+
+            const telemetryData = { tool_name: 'recorder-tool' } as unknown as ToolCallTelemetryProperties;
+            const tracked = await call(telemetryData);
+            expect(tracked.apifyClient.storeSearchTracking).toEqual({ traceId: 'thread-1', useCase: 'find a scraper' });
+            expect(telemetryData.trace_id).toBe('thread-1');
+            expect(JSON.stringify(telemetryData)).not.toContain('find a scraper');
+
+            const untracked = await call(null);
+            expect(untracked.apifyClient.storeSearchTracking).toBeUndefined();
         });
     });
 
