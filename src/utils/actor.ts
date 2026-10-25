@@ -56,8 +56,8 @@ export async function getActorDefinitionCached(
 
 /**
  * Resolve how an Actor is exposed as a tool at call time, by name: its interface set and the tool slot derived
- * from it. The only place `resolveActorToolMode` is consulted outside the tool-loading factory, so `call-actor`
- * routing and tool loading share one rule.
+ * from it. The only place outside the tool-loading factory that resolves them (`resolveActorInterfaces`), so
+ * `call-actor` routing and tool loading share one rule.
  *
  * Returns `null` when there is no definition to classify (unknown Actor). The URL is a pure function of
  * the Actor record's `standbyUrl` and the definition's path (`getActorMCPServerURL` does no I/O), so this rides
