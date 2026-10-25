@@ -205,8 +205,42 @@ function decodeBody(body: Buffer, charset: string, token: string): string | unde
     }
 }
 
+/** Display a JSON error message without its envelope; keep other response bodies as text. */
+function getReadableErrorMessage(body: string, token: string): string {
+    try {
+        const parsed = z.object({ error: z.string() }).safeParse(JSON.parse(body));
+        // JSON escapes can hide the token until parsing; see apify/apify-mcp-server#1623.
+        if (parsed.success) return parsed.data.error.replaceAll(token, REDACTED);
+    } catch {
+        // An Actor can return plain text or malformed JSON.
+    }
+    return body;
+}
+
+function buildRequestRecoveryText(
+    status: number,
+    actorName: string,
+    loadedToolNames: readonly string[],
+): string | undefined {
+    if (status === 429) {
+        return 'The Actor Server rate limit was reached. Wait before further requests, and send them one at a time.';
+    }
+    if (status === 503) {
+        return 'The Actor Server is temporarily unavailable. Wait before further requests, and send them one at a time.';
+    }
+    if (![400, 404, 405, 422].includes(status)) return undefined;
+    const documentation = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)
+        ? `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorName, output: { readme: true } })} returns the Actor README or its summary.`
+        : 'See the Actor README for its HTTP endpoints.';
+    return `Check the documented HTTP method, path, and required parameters. ${documentation}`;
+}
+
 /** The tool response for what the Actor Server sent back, with the session token masked. */
-function buildResponse(request: ServerActorRequest, response: ServerActorResponse, token: string): ToolResponse {
+function buildResponse(
+    request: ServerActorRequest,
+    response: ServerActorResponse,
+    { apifyToken: token, loadedToolNames }: Pick<InternalToolArgs, 'apifyToken' | 'loadedToolNames'>,
+): ToolResponse {
     const { status } = response;
     const contentType = response.contentType?.replaceAll(token, REDACTED);
     const location = response.location?.replaceAll(token, REDACTED);
@@ -228,6 +262,11 @@ function buildResponse(request: ServerActorRequest, response: ServerActorRespons
     const body = bytes === 0 ? '' : decodeBody(response.body, charset, token);
     if (body === undefined) return rejectBody(`its charset "${charset}" is not supported`);
 
+    const bodyNote = bytes === 0 ? 'an empty body' : `${bytes} bytes of ${mimeType}`;
+    const redirectNote = location ? ` The redirect to ${location} was not followed.` : '';
+    const summary = `${outcome} with ${bodyNote}.${redirectNote}`;
+    const errorMessage = status >= 400 && body ? getReadableErrorMessage(body, token) : undefined;
+    const nextStep = buildRequestRecoveryText(status, request.actorName, loadedToolNames);
     const structuredContent = {
         ...request,
         status,
@@ -235,21 +274,14 @@ function buildResponse(request: ServerActorRequest, response: ServerActorRespons
         body,
         bytes,
         ...(location && { location }),
+        summary,
+        ...(errorMessage && { errorMessage }),
+        ...(nextStep && { nextStep }),
     };
-    const bodyNote = bytes === 0 ? 'an empty body' : `${bytes} bytes of ${mimeType}`;
-    const redirectNote = location ? ` The redirect to ${location} was not followed.` : '';
-    const texts = [JSON.stringify(structuredContent), `${outcome} with ${bodyNote}.${redirectNote}`];
+    const texts = [JSON.stringify(structuredContent), summary];
+    if (errorMessage) texts.push(`Actor Server error: ${errorMessage}`);
+    if (nextStep) texts.push(nextStep);
     if (status < 400) return respondOk(texts, { structuredContent });
-    if (status === 429) {
-        texts.push(
-            'The Actor Server rate limit was reached. Wait before further requests, and send them one at a time.',
-        );
-    }
-    if (status === 503) {
-        texts.push(
-            'The Actor Server is temporarily unavailable. Wait before further requests, and send them one at a time.',
-        );
-    }
     return respondUserError(texts, {
         ...((status === HTTP_UNAUTHORIZED || status === HTTP_FORBIDDEN) && { category: FAILURE_CATEGORY.AUTH }),
         httpStatus: status,
@@ -339,7 +371,7 @@ export async function executeSendServerActorRequest(
             signal,
             timeoutMillis,
         });
-        return withActorTelemetry(buildResponse(request, response, apifyToken), response.status);
+        return withActorTelemetry(buildResponse(request, response, { apifyToken, loadedToolNames }), response.status);
     } catch (error) {
         if (signal.aborted) return respondAborted();
         if (!(error instanceof IncompleteResponseError)) throw error;
