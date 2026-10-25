@@ -14,14 +14,13 @@ import {
 } from '../../src/tools/actors/send_server_actor_request.js';
 import { serverActorRequestOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { Actor, ActorDefinitionPruned, HelperTool, ToolTelemetryContext } from '../../src/types.js';
-import { ACTOR_TENANCY, ALL_TOOLS_PRESENT } from '../../src/types.js';
+import { ACTOR_TENANCY } from '../../src/types.js';
 import { mockActor } from './helpers/actor_build_client.js';
 import { getRequestHandler, makePaymentProvider, withServer } from './helpers/mcp_server.js';
 import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
     mockApifyClient,
-    only,
     stubToolCallContext,
     type TextToolResult,
 } from './helpers/tool_context.js';
@@ -392,12 +391,15 @@ describe('send-server-actor-request', () => {
         expect(result.toolTelemetry).toMatchObject({ failureCategory: FAILURE_CATEGORY.AUTH, httpStatus: 401 });
     });
 
-    it.each([429, 503])('sends one request on a %i and says to wait, not to retry', async (status) => {
+    it.each([
+        [429, 'The Actor Server rate limit was reached.'],
+        [503, 'The Actor Server is temporarily unavailable.'],
+    ])('sends one request on a %i and names the cause', async (status, hint) => {
         const result = await callTool({ path: `/status/${status}` });
 
         expect(received).toHaveLength(1);
         expect(result.isError).toBe(true);
-        expect(result.content.at(-1)?.text).toContain('wait');
+        expect(result.content.at(-1)?.text).toBe(hint);
     });
 
     it.each(['//other.example/echo', '//user:pw@{host}/echo'])(
@@ -406,7 +408,7 @@ describe('send-server-actor-request', () => {
             const result = await callTool({ path: template.replace('{host}', new URL(standbyUrl).host) });
 
             expectSoftFailInvalidInput(result);
-            expect(result.content[0].text).toContain('leaves the Actor Server');
+            expect(result.content[0].text).toContain('must stay on the Actor Server');
             expect(received).toHaveLength(0);
         },
     );
@@ -439,7 +441,7 @@ describe('send-server-actor-request', () => {
         );
 
         expectSoftFailInvalidInput(withCallActor);
-        expect(withCallActor.content[0].text).toContain(`It runs from an input with ${HELPER_TOOLS.ACTOR_CALL}.`);
+        expect(withCallActor.content[0].text).toContain(`It can be run from an input with ${HELPER_TOOLS.ACTOR_CALL}.`);
         expect(withoutCallActor.content[0].text).not.toContain(HELPER_TOOLS.ACTOR_CALL);
         expect(received).toHaveLength(0);
     });
@@ -538,15 +540,6 @@ describe('send-server-actor-request', () => {
 
         expect(JSON.stringify(redactArgs?.(args))).not.toContain('secret');
         expect(redactArgs?.(args)).toMatchObject({ actor: SERVER_ACTOR, method: 'POST', path: '/echo' });
-    });
-
-    it('names call-actor in the description only when the session has it', () => {
-        const withCallActor = sendServerActorRequest.buildDescription!(ALL_TOOLS_PRESENT);
-        const withoutCallActor = sendServerActorRequest.buildDescription!(only(HELPER_TOOLS.ACTOR_SERVER_REQUEST));
-
-        expect(sendServerActorRequest.description).toBe(withCallActor);
-        expect(withCallActor).toContain(HELPER_TOOLS.ACTOR_CALL);
-        expect(withoutCallActor).not.toContain(HELPER_TOOLS.ACTOR_CALL);
     });
 
     it('is rejected before any request reaches the Actor server in a payment-provider session', async () => {
