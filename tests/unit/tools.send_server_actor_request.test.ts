@@ -55,6 +55,23 @@ async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
                 JSON.stringify({ query: Object.fromEntries(url.searchParams), body: body ? JSON.parse(body) : null }),
             );
             return;
+        case '/fetch':
+            res.writeHead(404, { 'content-type': 'application/json' });
+            res.end(
+                JSON.stringify({
+                    code: 'NOT_FOUND',
+                    error: 'There is nothing at route GET /fetch. A "url" query parameter is required.',
+                }),
+            );
+            return;
+        case '/escaped-error-token':
+            res.writeHead(400, { 'content-type': 'application/json' });
+            res.end(JSON.stringify({ error: TOKEN }).replace('test-token', '\\u0074est-token'));
+            return;
+        case '/text-error':
+            res.writeHead(400, { 'content-type': 'text/plain' });
+            res.end('The "url" query parameter is required.');
+            return;
         case '/bytes':
             res.writeHead(200, { 'content-type': 'text/plain' });
             res.end(Buffer.alloc(n, 'a'));
@@ -239,8 +256,10 @@ describe('send-server-actor-request', () => {
             contentType: 'application/json',
             body,
             bytes: Buffer.byteLength(body),
+            summary: expect.stringContaining('returned HTTP 200'),
         });
         expect(result.content[0].text).toBe(JSON.stringify(result.structuredContent));
+        expect(result.content[1].text).toBe((result.structuredContent as { summary: string }).summary);
         expect(result.toolTelemetry).toEqual({
             actorId: 'server-actor-test-id',
             actorTenancy: ACTOR_TENANCY.SINGLE_TENANT,
@@ -386,18 +405,96 @@ describe('send-server-actor-request', () => {
         });
     });
 
+    it('mirrors structured output first and exposes a readable Actor error in both response surfaces', async () => {
+        const result = await callTool({ path: '/fetch' });
+        const message = 'There is nothing at route GET /fetch. A "url" query parameter is required.';
+
+        expect(result.structuredContent).toMatchObject({
+            status: 404,
+            body: JSON.stringify({ code: 'NOT_FOUND', error: message }),
+            errorMessage: message,
+            summary: expect.stringContaining('returned HTTP 404'),
+        });
+        expect(result.content[0].text).toBe(JSON.stringify(result.structuredContent));
+        expect(
+            result.content
+                .slice(1)
+                .map(({ text }) => text)
+                .join('\n'),
+        ).toContain(message);
+        expect(received).toHaveLength(1);
+    });
+
+    it('masks tokens revealed by decoding a JSON error message', async () => {
+        const result = await callTool({ path: '/escaped-error-token' });
+
+        expect(result.structuredContent).toMatchObject({ errorMessage: '[REDACTED]' });
+        expect(JSON.stringify(result)).not.toContain(TOKEN);
+    });
+
+    it('returns a non-JSON error body only once, as the body', async () => {
+        const result = await callTool({ path: '/text-error' });
+        const message = 'The "url" query parameter is required.';
+
+        expect(result.structuredContent).toMatchObject({ body: message });
+        expect(result.structuredContent).not.toHaveProperty('errorMessage');
+        expect(
+            result.content
+                .slice(1)
+                .map(({ text }) => text)
+                .join('\n'),
+        ).not.toContain(message);
+    });
+
     it('marks a 401 from the Actor server as an authentication failure', async () => {
         const result = await callTool({ path: '/status/401' });
 
         expect(result.toolTelemetry).toMatchObject({ failureCategory: FAILURE_CATEGORY.AUTH, httpStatus: 401 });
+        expect(result.content.map(({ text }) => text).join('\n')).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
     });
 
-    it.each([429, 503])('sends one request on a %i and says to wait, not to retry', async (status) => {
+    it.each([true, false])(
+        'points a 404 at the Actor README, through fetch-actor-details when served: %s',
+        async (hasDetails) => {
+            const result = await callTool(
+                { path: '/status/404' },
+                { loadedToolNames: hasDetails ? [HELPER_TOOLS.ACTOR_GET_DETAILS] : [] },
+            );
+            const text = result.content.map((block) => block.text).join('\n');
+
+            expect(received).toHaveLength(1);
+            expect(result.isError).toBe(true);
+            expect(result.structuredContent).toMatchObject({ nextStep: expect.stringContaining('README') });
+            expect(result.content.at(-1)?.text).toBe((result.structuredContent as { nextStep: string }).nextStep);
+            if (hasDetails) {
+                expect(text).toContain(JSON.stringify({ actor: SERVER_ACTOR, output: { readme: true } }));
+            } else {
+                expect(text).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+            }
+        },
+    );
+
+    it('names the Actor Server error before the README only when the body carries one', async () => {
+        const withError = await callTool({ path: '/fetch' });
+        const withoutError = await callTool({ path: '/status/404' });
+
+        expect(withError.structuredContent).toMatchObject({
+            nextStep: expect.stringMatching(/^The Actor Server error may name/),
+        });
+        expect(withoutError.structuredContent).toMatchObject({
+            nextStep: expect.not.stringContaining('Actor Server error'),
+        });
+    });
+
+    it.each([
+        [429, 'The Actor Server rate limit was reached.'],
+        [503, 'The Actor Server is temporarily unavailable.'],
+    ])('sends one request on a %i and names the cause', async (status, hint) => {
         const result = await callTool({ path: `/status/${status}` });
 
         expect(received).toHaveLength(1);
         expect(result.isError).toBe(true);
-        expect(result.content.at(-1)?.text).toContain('wait');
+        expect(result.content.at(-1)?.text).toBe(hint);
     });
 
     it.each(['//other.example/echo', '//user:pw@{host}/echo'])(
@@ -406,7 +503,7 @@ describe('send-server-actor-request', () => {
             const result = await callTool({ path: template.replace('{host}', new URL(standbyUrl).host) });
 
             expectSoftFailInvalidInput(result);
-            expect(result.content[0].text).toContain('leaves the Actor Server');
+            expect(result.content[0].text).toContain('must stay on the Actor Server');
             expect(received).toHaveLength(0);
         },
     );
@@ -439,7 +536,7 @@ describe('send-server-actor-request', () => {
         );
 
         expectSoftFailInvalidInput(withCallActor);
-        expect(withCallActor.content[0].text).toContain(`It runs from an input with ${HELPER_TOOLS.ACTOR_CALL}.`);
+        expect(withCallActor.content[0].text).toContain(`It can be run from an input with ${HELPER_TOOLS.ACTOR_CALL}.`);
         expect(withoutCallActor.content[0].text).not.toContain(HELPER_TOOLS.ACTOR_CALL);
         expect(received).toHaveLength(0);
     });
@@ -540,13 +637,13 @@ describe('send-server-actor-request', () => {
         expect(redactArgs?.(args)).toMatchObject({ actor: SERVER_ACTOR, method: 'POST', path: '/echo' });
     });
 
-    it('names call-actor in the description only when the session has it', () => {
-        const withCallActor = sendServerActorRequest.buildDescription!(ALL_TOOLS_PRESENT);
-        const withoutCallActor = sendServerActorRequest.buildDescription!(only(HELPER_TOOLS.ACTOR_SERVER_REQUEST));
+    it('names fetch-actor-details in the description only when the session has it', () => {
+        const withDetails = sendServerActorRequest.buildDescription!(ALL_TOOLS_PRESENT);
+        const withoutDetails = sendServerActorRequest.buildDescription!(only(HELPER_TOOLS.ACTOR_SERVER_REQUEST));
 
-        expect(sendServerActorRequest.description).toBe(withCallActor);
-        expect(withCallActor).toContain(HELPER_TOOLS.ACTOR_CALL);
-        expect(withoutCallActor).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+        expect(sendServerActorRequest.description).toBe(withDetails);
+        expect(withDetails).toContain(`${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface`);
+        expect(withoutDetails).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
     });
 
     it('is rejected before any request reaches the Actor server in a payment-provider session', async () => {

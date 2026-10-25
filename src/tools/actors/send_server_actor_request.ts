@@ -58,26 +58,26 @@ const sendServerActorRequestArgs = z.object({
 type SendServerActorRequestArgs = z.infer<typeof sendServerActorRequestArgs>;
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    const callActor = hasTool(HELPER_TOOLS.ACTOR_CALL)
-        ? ` Unlike ${HELPER_TOOLS.ACTOR_CALL}, it starts no run from an input; an Actor can have both interfaces.`
-        : '';
     const details = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
         ? ` ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface lists the documented operations.`
         : '';
     return dedent`
-        Send one HTTP request to an Actor Server: the HTTP API of a Server Actor, documented in its API schema (OpenAPI) and README.${callActor}${details}
+        Send one HTTP request to an Actor Server: the HTTP API of a Server Actor, documented in its API schema (OpenAPI) and README.${details}
         Give the method, the path, and optionally query parameters and a JSON body; the Actor Server's host and your Apify API token are added for you.
         Only an Actor with an Actor Server and an API schema takes requests here; the Actor accepts or rejects the method and path.
         A request to a single-tenant Actor Server can start a run of the Actor in your account, kept until its idle timeout; a multi-tenant Actor Server charges per event.
         The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text; other content types, and bodies over ${MAX_INLINE_BYTES} bytes, are not returned.
 
-        Example call: {"actor": "username/name", "method": "POST", "path": "/search", "body": {"query": "apify"}}
+        Example call: {"actor": "apify/web-search", "method": "GET", "path": "/", "query": {"query": "AI news", "maxResults": 5}}
 
         USAGE:
-        - Use when the user asks for an Actor Server HTTP endpoint, or the Actor's documentation names one.
+        - Use when the Actor that fits the user's request has an Actor Server, and its API schema or README names the endpoint for the task.
+        - Fits requests for one or a few results returned in the HTTP response. Larger batches depend on the endpoint and the response size and time limits.
 
         USAGE EXAMPLES:
-        - user_input: Send GET /status to username/name
+        - user_input: Search the web for the latest AI news with apify/web-search
+        - user_input: Find articles about Apify from the past week with apify/web-search
+        - user_input: Get the content of https://example.com with apify/web-fetch
     `;
 }
 
@@ -119,13 +119,13 @@ function buildNoServerInterfaceText(
     loadedToolNames: readonly string[],
 ): string {
     const text =
-        `Actor '${actorName}' has no HTTP API documented by an API schema, so this tool cannot send it a ` +
-        'request. See its README for how to use it.';
+        `Actor '${actorName}' has no Actor Server with an API schema, and this tool sends requests only to ` +
+        'such Actors. Its README describes how to use it.';
     if (!loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL)) return text;
     if (interfaces.mcp) {
-        return `${text} Its MCP tools are called with ${HELPER_TOOLS.ACTOR_CALL} as "${actorName}:toolName".`;
+        return `${text} Its MCP tools can be called with ${HELPER_TOOLS.ACTOR_CALL} as "${actorName}:toolName".`;
     }
-    if (interfaces.input) return `${text} It runs from an input with ${HELPER_TOOLS.ACTOR_CALL}.`;
+    if (interfaces.input) return `${text} It can be run from an input with ${HELPER_TOOLS.ACTOR_CALL}.`;
     return text;
 }
 
@@ -141,16 +141,17 @@ function buildRequestUrl(
     const resolved = resolveOnStandbyOrigin(actor, path);
     if (!resolved) {
         return {
-            error: respondServerError(
-                `Actor '${actorName}' has no valid Actor Server URL, so its Actor Server cannot be reached.`,
-            ),
+            error: respondServerError(`Actor '${actorName}' has no valid Actor Server URL. The request was not sent.`),
         };
     }
     // Unlike the MCP URL, a path with credentials is refused rather than stripped: the agent wrote them.
     const { url, standbyOrigin } = resolved;
     if (!url || url.username || url.password) {
         return {
-            error: respondUserError(`The path leaves the Actor Server at ${standbyOrigin}, so it is not sent.`),
+            error: respondUserError(
+                `The path must stay on the Actor Server at ${standbyOrigin} and contain no credentials. ` +
+                    'The request was not sent.',
+            ),
         };
     }
     // Not axios `params`: apify-client's serializer sends a boolean as 1 or 0. Not `url.searchParams`: it would
@@ -229,30 +230,70 @@ function decodeBody(body: Buffer, charset: string, token: string): string | unde
     }
 }
 
+/**
+ * The `error` string of a JSON `{"error": ...}` body; `undefined` for any other body, which the response already
+ * carries as `body`.
+ */
+function getReadableErrorMessage(body: string, token: string): string | undefined {
+    try {
+        const parsed = z.object({ error: z.string() }).safeParse(JSON.parse(body));
+        // JSON escapes can hide the token until parsing; see apify/apify-mcp-server#1623.
+        if (parsed.success) return parsed.data.error.replaceAll(token, REDACTED);
+    } catch {
+        // An Actor can return plain text or malformed JSON.
+    }
+    return undefined;
+}
+
+function buildRequestRecoveryText(
+    status: number,
+    actorName: string,
+    loadedToolNames: readonly string[],
+    hasErrorMessage: boolean,
+): string | undefined {
+    if (status === 429) return 'The Actor Server rate limit was reached.';
+    if (status === 503) return 'The Actor Server is temporarily unavailable.';
+    if (![400, 404, 405, 422].includes(status)) return undefined;
+    const documentation = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)
+        ? `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorName, output: { readme: true } })} returns the Actor README or its summary, which may omit HTTP endpoint details.`
+        : 'The Actor README may describe its HTTP endpoints.';
+    return hasErrorMessage
+        ? `The Actor Server error may name the expected HTTP method, path, or parameters. ${documentation}`
+        : documentation;
+}
+
 /** The tool response for what the Actor Server sent back, with the session token masked. */
-function buildResponse(request: ServerActorRequest, response: ServerActorResponse, token: string): ToolResponse {
+function buildResponse(
+    request: ServerActorRequest,
+    response: ServerActorResponse,
+    { apifyToken: token, loadedToolNames }: Pick<InternalToolArgs, 'apifyToken' | 'loadedToolNames'>,
+): ToolResponse {
     const { status } = response;
     const contentType = response.contentType?.replaceAll(token, REDACTED);
     const location = response.location?.replaceAll(token, REDACTED);
     const outcome = `${request.method} ${request.path} on ${request.actorName} returned HTTP ${status}`;
     const rejectBody = (reason: string) =>
-        respondUserError(`${outcome} ${reason} The request itself was sent.`, { httpStatus: status });
+        respondUserError(`${outcome}. The body is not returned: ${reason}. The request itself was sent.`, {
+            httpStatus: status,
+        });
 
-    if (response.body === undefined) {
-        return rejectBody(`with a body larger than ${MAX_INLINE_BYTES} bytes, so the body is not returned.`);
-    }
+    if (response.body === undefined) return rejectBody(`it is larger than ${MAX_INLINE_BYTES} bytes`);
     const bytes = response.body.length;
     const mimeType = parseBaseMimeType(contentType);
     if (bytes > 0 && !isTextualMimeType(mimeType)) {
         return rejectBody(
-            `with ${bytes} bytes of ${mimeType ?? 'an unknown type'}, which this tool does not return; it ` +
-                'returns JSON, text, and XML bodies.',
+            `it is ${bytes} bytes of ${mimeType ?? 'an unknown type'}, and only JSON, text, and XML bodies are returned`,
         );
     }
     const charset = parseCharset(contentType) ?? 'utf-8';
     const body = bytes === 0 ? '' : decodeBody(response.body, charset, token);
-    if (body === undefined) return rejectBody(`with unsupported charset "${charset}", so the body is not returned.`);
+    if (body === undefined) return rejectBody(`its charset "${charset}" is not supported`);
 
+    const bodyNote = bytes === 0 ? 'an empty body' : `${bytes} bytes of ${mimeType}`;
+    const redirectNote = location ? ` The redirect to ${location} was not followed.` : '';
+    const summary = `${outcome} with ${bodyNote}.${redirectNote}`;
+    const errorMessage = status >= 400 && body ? getReadableErrorMessage(body, token) : undefined;
+    const nextStep = buildRequestRecoveryText(status, request.actorName, loadedToolNames, errorMessage !== undefined);
     const structuredContent = {
         ...request,
         status,
@@ -260,14 +301,14 @@ function buildResponse(request: ServerActorRequest, response: ServerActorRespons
         body,
         bytes,
         ...(location && { location }),
+        summary,
+        ...(errorMessage && { errorMessage }),
+        ...(nextStep && { nextStep }),
     };
-    const bodyNote = bytes === 0 ? 'an empty body' : `${bytes} bytes of ${mimeType}`;
-    const redirectNote = location ? `, redirecting to ${location}, which is not followed` : '';
-    const texts = [JSON.stringify(structuredContent), `${outcome} with ${bodyNote}${redirectNote}.`];
+    const texts = [JSON.stringify(structuredContent), summary];
+    if (errorMessage) texts.push(`Actor Server error: ${errorMessage}`);
+    if (nextStep) texts.push(nextStep);
     if (status < 400) return respondOk(texts, { structuredContent });
-    if (status === 429 || status === 503) {
-        texts.push('The Actor Server is busy; wait, then send requests one at a time.');
-    }
     return respondUserError(texts, {
         ...((status === HTTP_UNAUTHORIZED || status === HTTP_FORBIDDEN) && { category: FAILURE_CATEGORY.AUTH }),
         httpStatus: status,
@@ -285,8 +326,8 @@ function buildIncompleteResponse(
         error.status === undefined ? 'got no complete response' : `got HTTP ${error.status} but not the whole body`;
     const why = error.isTimeout ? `within ${timeoutMillis / 1000} seconds` : `(${error.message})`;
     return respondServerError(
-        `${request.method} ${request.path} on ${request.actorName} ${got} ${why}, so nothing is returned. ` +
-            'The Actor may still have processed the request.',
+        `${request.method} ${request.path} on ${request.actorName} ${got} ${why}. Nothing is returned, and the ` +
+            'Actor may still have processed the request.',
         { detail: error.isTimeout ? 'timeout' : 'incomplete body' },
     );
 }
@@ -299,13 +340,14 @@ export async function executeSendServerActorRequest(
     const { apifyToken, apifyClient, mcpSessionId, loadedToolNames, signal } = toolArgs;
     const args = sendServerActorRequestArgs.parse(toolArgs.args);
     if (!apifyToken) {
-        return respondUserError('An Apify API token is required: the request to the Actor Server carries it.', {
+        return respondUserError('An Apify API token is required to send requests to an Actor Server.', {
             category: FAILURE_CATEGORY.AUTH,
         });
     }
-    if (!args.path.startsWith('/')) return respondUserError('The path must start with /, as in /search.');
+    // The path is not echoed: it can carry the session token.
+    if (!args.path.startsWith('/')) return respondUserError('The path must start with "/", for example "/search".');
     if (args.method === 'GET' && args.body !== undefined) {
-        return respondUserError('A GET request carries no body; leave body out, or send the data as query parameters.');
+        return respondUserError('A GET request cannot have a body. Send the data in query instead.');
     }
 
     const actorName = fixActorNameInputAndLog(args.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_SERVER_REQUEST });
@@ -356,7 +398,7 @@ export async function executeSendServerActorRequest(
             signal,
             timeoutMillis,
         });
-        return withActorTelemetry(buildResponse(request, response, apifyToken), response.status);
+        return withActorTelemetry(buildResponse(request, response, { apifyToken, loadedToolNames }), response.status);
     } catch (error) {
         if (signal.aborted) return respondAborted();
         if (!(error instanceof IncompleteResponseError)) throw error;

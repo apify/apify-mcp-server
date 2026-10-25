@@ -1269,6 +1269,15 @@ export const serverActorRequestOutputSchema = {
         body: { type: 'string', description: 'Response body as text; empty when the response had none' },
         bytes: { type: 'integer', description: 'Response body size in bytes, after decompression' },
         location: { type: 'string', description: 'Location header of a redirect, which is not followed' },
+        summary: { type: 'string', description: 'Readable summary of the HTTP response' },
+        errorMessage: {
+            type: 'string',
+            description: 'The error string of a JSON {"error": ...} error body; other error bodies are only in body',
+        },
+        nextStep: {
+            type: 'string',
+            description: 'Where to look to correct the request, or why the Actor Server refused it',
+        },
     },
-    required: ['actorId', 'actorName', 'interface', 'tenancy', 'method', 'path', 'status', 'body', 'bytes'],
+    required: ['actorId', 'actorName', 'interface', 'tenancy', 'method', 'path', 'status', 'body', 'bytes', 'summary'],
 };
