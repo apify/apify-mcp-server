@@ -171,6 +171,23 @@ describe('getActorDefinition() reads the server interface from the standby build
         expect(list).not.toHaveBeenCalled();
     });
 
+    // The platform parses the reference to integers, so a zero-padded number runs the build the API lists unpadded.
+    it.each([
+        ['the tagged builds', { beta: { buildId: STANDBY_BUILD_ID, buildNumber: '1.2.3' } }, []],
+        ['the build list', {}, [{ id: STANDBY_BUILD_ID, buildNumber: '1.2.3' }]],
+    ])('matches a zero-padded build number through %s', async (_label, taggedBuilds, buildList) => {
+        const { apifyClient } = mockActorBuildClient({
+            actor: mockStandbyActor('01.2.03', { taggedBuilds }),
+            defaultBuild: mockDefaultBuild(),
+            builds: { [STANDBY_BUILD_ID]: mockBuild(STANDBY_BUILD_ID, STANDBY_DEFINITION) },
+            buildList,
+        });
+
+        const result = await getActorDefinition('acme/mcp-server', apifyClient);
+
+        expect(result?.definition.webServerMcpPath).toBe('/mcp');
+    });
+
     it('leaves an untagged build number unresolved without a token instead of listing the builds', async () => {
         const { apifyClient, list } = mockActorBuildClient({
             actor: mockStandbyActor('1.2.3'),
