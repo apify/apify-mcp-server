@@ -101,9 +101,9 @@ export function resolveRef(node: unknown, spec: unknown): unknown {
  * A copy of `node` with every local `$ref` replaced by what it points to in `spec`. A reference that is
  * circular, not found, or external stays as it is, with an `unavailableDetail` note, and so does every reference
  * past `MAX_INLINE_BYTES` of expanded detail: shared references can otherwise grow the copy exponentially.
- * Nothing is fetched.
+ * Nothing is fetched. An optional pruner removes unused detail before reference budget accounting.
  */
-export function resolveLocalRefs(node: unknown, spec: unknown): unknown {
+export function resolveLocalRefs(node: unknown, spec: unknown, prune?: (value: unknown) => unknown): unknown {
     const hasRefSiblings = isRecord(spec) && typeof spec.openapi === 'string' && /^3\.[1-9]\d*\./.test(spec.openapi);
     let expandedSize = 0;
     function resolveProperties(
@@ -140,8 +140,9 @@ export function resolveLocalRefs(node: unknown, spec: unknown): unknown {
         });
         if (seen.includes($ref)) return unavailable('circular reference');
         if (!$ref.startsWith('#/')) return unavailable('external reference, not fetched');
-        const target = resolveLocalRef(spec, $ref);
-        if (target === undefined) return unavailable('reference not found');
+        const rawTarget = resolveLocalRef(spec, $ref);
+        if (rawTarget === undefined) return unavailable('reference not found');
+        const target = prune ? prune(rawTarget) : rawTarget;
         // A refused reference leaves the budget for smaller ones.
         const targetSize = JSON.stringify(target).length;
         if (expandedSize + targetSize > MAX_INLINE_BYTES) return unavailable('not expanded, size cap reached');
@@ -157,7 +158,7 @@ export function resolveLocalRefs(node: unknown, spec: unknown): unknown {
             allOf: [resolved, ...(Array.isArray(resolvedSiblings.allOf) ? resolvedSiblings.allOf : [])],
         };
     }
-    return resolve(node, []);
+    return resolve(prune ? prune(node) : node, []);
 }
 
 /**
@@ -165,7 +166,7 @@ export function resolveLocalRefs(node: unknown, spec: unknown): unknown {
  * are kept as they are, since a property can be named `example`.
  */
 function dereference(node: unknown, spec: unknown): unknown {
-    return dropSchemaExtras(resolveLocalRefs(node, spec));
+    return resolveLocalRefs(node, spec, dropSchemaExtras);
 }
 
 function dropSchemaExtras(node: unknown): unknown {

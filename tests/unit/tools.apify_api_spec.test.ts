@@ -79,6 +79,31 @@ describe('buildApiOperationIndex()', () => {
         expect(index.get('actorRun_abort_post')?.requestBody).toBeUndefined();
     });
 
+    it('keeps a referenced request schema when its discarded example exceeds the expansion budget', () => {
+        const spec = {
+            paths: {
+                '/v2/datasets': {
+                    post: { operationId: 'dataset_post', requestBody: { $ref: '#/components/requestBodies/Body' } },
+                },
+            },
+            components: {
+                requestBodies: {
+                    Body: {
+                        required: true,
+                        content: {
+                            'application/json': { schema: { type: 'string' }, example: 'a'.repeat(MAX_INLINE_BYTES) },
+                        },
+                    },
+                },
+            },
+        };
+
+        expect(buildApiOperationIndex(spec).get('dataset_post')?.requestBody).toEqual({
+            isRequired: true,
+            schema: { type: 'string' },
+        });
+    });
+
     it('links each operation to its page in the API reference, at the operation ID in kebab case', () => {
         expect(index.get('actorRun_abort_post')?.docsUrl).toBe('https://docs.apify.com/api/v2/actor-run-abort-post');
         expect(index.get('keyValueStore_record_put')?.docsUrl).toBe(
