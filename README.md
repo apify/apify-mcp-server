@@ -1,608 +1,409 @@
-<h1 align="center">
+<p align="center">
     <a href="https://mcp.apify.com">
         <picture>
             <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/apify_mcp_server_dark_background.png">
-            <img alt="Apify MCP Server" src="https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/apify_mcp_server_white_background.png" width="500">
+            <img alt="Apify MCP server logo" src="https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/apify_mcp_server_white_background.png" width="500">
         </picture>
     </a>
-    <br>
-    <small><a href="https://mcp.apify.com">mcp.apify.com</a></small>
-</h1>
-
-<p align=center>
-    <a href="https://www.npmjs.com/package/@apify/actors-mcp-server" rel="nofollow"><img src="https://img.shields.io/npm/v/@apify/actors-mcp-server.svg" alt="NPM latest version" data-canonical-src="https://img.shields.io/npm/v/@apify/actors-mcp-server.svg" style="max-width: 100%;"></a>
-    <a href="https://www.npmjs.com/package/@apify/actors-mcp-server" rel="nofollow"><img src="https://img.shields.io/npm/dm/@apify/actors-mcp-server.svg" alt="Downloads" data-canonical-src="https://img.shields.io/npm/dm/@apify/actors-mcp-server.svg" style="max-width: 100%;"></a>
-    <a href="https://github.com/apify/actors-mcp-server/actions/workflows/check.yaml"><img src="https://github.com/apify/actors-mcp-server/actions/workflows/check.yaml/badge.svg?branch=master" alt="Build Status" style="max-width: 100%;"></a>
-    <a href="https://smithery.ai/server/@apify/mcp"><img src="https://smithery.ai/badge/@apify/mcp" alt="smithery badge"></a>
 </p>
 
+<p align="center">
+    <a href="https://www.npmjs.com/package/@apify/actors-mcp-server"><img src="https://img.shields.io/npm/v/@apify/actors-mcp-server.svg" alt="npm version"></a>
+    <a href="https://www.npmjs.com/package/@apify/actors-mcp-server"><img src="https://img.shields.io/npm/dm/@apify/actors-mcp-server.svg" alt="npm downloads"></a>
+    <a href="https://github.com/apify/apify-mcp-server/actions/workflows/on_master.yaml"><img src="https://github.com/apify/apify-mcp-server/actions/workflows/on_master.yaml/badge.svg?branch=master" alt="CI status"></a>
+</p>
 
-The Apify Model Context Protocol (MCP) server at [**mcp.apify.com**](https://mcp.apify.com) enables your AI agents to extract data from social media, search engines, maps, e-commerce sites, and any other website using thousands of ready-made scrapers, crawlers, and automation tools from [Apify Store](https://apify.com/store). It supports OAuth, allowing you to connect from clients like Claude.ai or Visual Studio Code using just the URL.
+# Apify MCP server
 
-> **🚀 Use the hosted Apify MCP Server!**
->
-> For the best experience, connect your AI assistant to our hosted server at **[`https://mcp.apify.com`](https://mcp.apify.com)**. The hosted server supports the latest features - including output schema inference for structured Actor results - that are not available when running locally via stdio.
+Connect your AI agent to the largest marketplace of tools for AI.
 
-> ⚠️ **Legacy SSE transport removed.** The `https://mcp.apify.com/sse` endpoint has been removed in favor of Streamable HTTP. Migrate your client to **[`https://mcp.apify.com`](https://mcp.apify.com)** — drop the `/sse` suffix from your configuration.
+**The official Apify Model Context Protocol (MCP) server gives AI agents web scraping, data extraction, and browser automation through thousands of ready-made Actors from [Apify Store](https://apify.com/store), at [`https://mcp.apify.com`](https://mcp.apify.com).**
 
-💰 The server also supports [agentic payments](#-agentic-payments): buy a token from [AGI](#-agi-recommended) to run any Actor, or pay per-request via [direct x402](#-direct-x402) (Pay Per Event Actors only) or [Skyfire](#-skyfire).
+Apify is the marketplace of ready-to-run tools for AI agents. One connection to the Apify MCP server gives your agent thousands of tools to choose from, for jobs like web fetch, SERP monitoring, lead generation and enrichment, and pulling data from e-commerce sites and social media. The server loads only what each task needs.
 
-Apify MCP Server is compatible with `Claude Code, Claude.ai, Cursor, VS Code` and any client that adheres to the Model Context Protocol.
-Check out the [MCP clients section](#-mcp-clients) for more details or visit the [MCP configuration page](https://mcp.apify.com).
+An agent connected to the server can search Apify Store for the right Actor, read its input schema and pricing, run it, and read the structured results. It can also search the Apify documentation. The hosted server uses Streamable HTTP with OAuth, so most clients connect with the URL alone. You can also run it locally over stdio with the [`@apify/actors-mcp-server`](https://www.npmjs.com/package/@apify/actors-mcp-server) npm package.
 
-![Apify-MCP-server](https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/apify-mcp-server.png)
+<img alt="Diagram: AI agents such as Claude, ChatGPT, Cursor, Grok Bot, Hermes Agent, and OpenCode connect to the Apify MCP server, which searches Apify Store, runs Actors like Web Search, Web Fetch, and Google Maps Scraper, and returns structured results" src="docs/apify-mcp-server-diagram.png">
 
-## Table of Contents
-- [🌐 Introducing Apify MCP Server](#-introducing-apify-mcp-server)
-- [🚀 Quickstart](#-quickstart)
-- [🤖 MCP clients](#-mcp-clients)
-- [🪄 Try Apify MCP instantly](#-try-apify-mcp-instantly)
-- [💰 Agentic payments](#-agentic-payments)
-  - [How agentic payments work](#how-agentic-payments-work)
-  - [🪙 AGI (recommended)](#-agi-recommended)
-  - [💸 Direct x402](#-direct-x402)
-  - [🔥 Skyfire](#-skyfire)
-- [🛠️ Tools, resources, and prompts](#%EF%B8%8F-tools-resources-and-prompts)
-- [📊 Telemetry](#-telemetry)
-- [💬 Usage examples](#-usage-examples)
-- [🐛 Troubleshooting](#-troubleshooting)
-- [⚙️ Development](#%EF%B8%8F-development)
-- [🔒 Privacy policy](#-privacy-policy)
-- [🤝 Contributing](#-contributing)
-- [📚 Learn more](#-learn-more)
+<!-- TODO: add the new setup video here once it is published. The old 2025 Claude tutorial (BKu8H91uCTg) was removed as outdated. -->
 
-# 🌐 Introducing Apify MCP Server
+## Contents
 
-The Apify MCP Server allows an AI assistant to use any [Apify Actor](https://apify.com/store) as a tool to perform a specific task.
-For example, it can:
-- Use [Facebook Posts Scraper](https://apify.com/apify/facebook-posts-scraper) to extract data from Facebook posts from multiple pages/profiles.
-- Use [Google Maps Email Extractor](https://apify.com/lukaskrivka/google-maps-with-contact-details) to extract contact details from Google Maps.
-- Use [Google Search Results Scraper](https://apify.com/apify/google-search-scraper) to scrape Google Search Engine Results Pages (SERPs).
-- Use [Instagram Scraper](https://apify.com/apify/instagram-scraper) to scrape Instagram posts, profiles, places, photos, and comments.
-- Use [RAG Web Browser](https://apify.com/apify/rag-web-browser) to search the web, scrape the top N URLs, and return their content.
-- Use [Web Fetch](https://apify.com/apify/web-fetch) to fetch any URL and return its content as Markdown, plain text, HTML, or links — with JavaScript rendering and anti-bot protection.
+- [Quickstart](#-quickstart)
+- [Set up your client](#-set-up-your-client)
+- [Hosted or local server](#hosted-or-local-server)
+- [How an agent uses Apify Actors](#how-an-agent-uses-apify-actors)
+- [Available tools](#-available-tools)
+- [Choose which tools load](#choose-which-tools-load)
+- [Example prompts](#-example-prompts)
+- [Pricing and limits](#-pricing-and-limits)
+- [Agentic payments (experimental)](#agentic-payments-experimental)
+- [Other Apify tools for agents](#other-apify-tools-for-agents)
+- [Telemetry](#telemetry)
+- [Troubleshooting and limitations](#-troubleshooting-and-limitations)
+- [FAQ](#-faq)
+- [Development](#-development)
+- [Contributing](#contributing)
 
-**Video tutorial: Integrate 8,000+ Apify Actors and Agents with Claude**
+## 🚀 Quickstart
 
-[![Apify MCP Server Tutorial: Integrate 5,000+ Apify Actors and Agents with Claude](https://img.youtube.com/vi/BKu8H91uCTg/hqdefault.jpg)](https://www.youtube.com/watch?v=BKu8H91uCTg)
+1. Open the [MCP configurator](https://mcp.apify.com), pick your client, and choose the tools you want.
+2. Copy the generated configuration, deeplink, or command into your client.
+3. Sign in to Apify in the browser window that opens. If you don't have an account, you can create a free one there.
 
-# 🚀 Quickstart
+The hosted endpoint is `https://mcp.apify.com`. If your client can't use OAuth, send your [Apify API token](https://docs.apify.com/integrations/api#api-token) in an `Authorization: Bearer <APIFY_TOKEN>` header instead. Treat the token like a password: keep it out of shared config files and repositories.
 
-You can use the Apify MCP Server in two ways:
+> **Migrating from SSE?** The legacy `https://mcp.apify.com/sse` endpoint has been removed. Drop the `/sse` suffix from your configuration and connect to `https://mcp.apify.com` over Streamable HTTP.
 
-**HTTPS Endpoint (mcp.apify.com)**: Connect from your MCP client via OAuth or by including the `Authorization: Bearer <APIFY_TOKEN>` header in your requests. This is the recommended method for most use cases. Because it supports OAuth, you can connect from clients like [Claude.ai](https://claude.ai) or [Visual Studio Code](https://code.visualstudio.com/) using just the URL: `https://mcp.apify.com`.
-- `https://mcp.apify.com` streamable transport
+Using a coding agent such as Claude Code, Codex, Cursor, or GitHub Copilot? An [official Apify plugin](https://docs.apify.com/agents/plugins) installs this MCP server together with [Agent Skills](https://docs.apify.com/agents/skills) in one step.
 
-**Standard Input/Output (stdio)**: Ideal for local integrations and command-line tools like the Claude for Desktop client.
-- Set the MCP client server command to `npx @apify/actors-mcp-server` and the `APIFY_TOKEN` environment variable to your Apify API token.
-- See `npx @apify/actors-mcp-server --help` for more options.
+## 🤖 Set up your client
 
-You can find detailed instructions for setting up the MCP server in the [Apify documentation](https://docs.apify.com/platform/integrations/mcp).
+The [configurator](https://mcp.apify.com) generates the exact setup for each supported client, including Claude, Claude Code, Claude Desktop, ChatGPT, Codex, Cursor, VS Code, GitHub Copilot CLI, OpenCode, Kiro, and more. Configuration formats differ between clients, so start there when in doubt. The snippets below cover the most common cases.
 
-# 🤖 MCP clients
+![The MCP configurator at mcp.apify.com, listing supported MCP clients](docs/mcp-configurator.png)
 
-Apify MCP Server is compatible with any MCP client that adheres to the [Model Context Protocol](https://modelcontextprotocol.org/), but the level of support for dynamic tool discovery and other features may vary between clients.
-<!--Therefore, the server uses [mcp-client-capabilities](https://github.com/apify/mcp-client-capabilities) to detect client capabilities and adjust its behavior accordingly.-->
-
-To interact with the Apify MCP Server, you can use clients such as [Claude Desktop](https://claude.ai/download), [Visual Studio Code](https://code.visualstudio.com/), or [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client).
-
-Visit [mcp.apify.com](https://mcp.apify.com) to configure the server for your preferred client.
-
-![Apify-MCP-configuration-clients](https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/mcp-clients.png)
-
-### Tested clients
-
-- [Claude Desktop](https://docs.apify.com/platform/integrations/claude-desktop)
-- Claude.ai (web)
-- [ChatGPT](https://docs.apify.com/platform/integrations/chatgpt)
-- VS Code (Genie)
-- Cursor
-- OpenCode
-- [Kiro](https://kiro.dev)
-- [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) — designed for testing Apify MCP servers
-
-
-# 🪄 Try Apify MCP instantly
-
-Want to try Apify MCP without any setup?
-
-Check out [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
-
-This interactive, chat-like interface provides an easy way to explore the capabilities of Apify MCP without any local setup.
-Sign in with your Apify account and start experimenting with web scraping, data extraction, and automation tools!
-
-Or use the MCP bundle file (formerly known as Anthropic Desktop extension file, or DXT) for one-click installation: [Apify MCP Server MCPB file](https://github.com/apify/apify-mcp-server/releases/latest/download/apify-mcp-server.mcpb)
-
-
-# 💰 Agentic payments
-
-You can pay for Actor runs without an Apify API token using **AGI**, **direct x402**, or **Skyfire**.
-
-- **AGI** ([agi.apify.com](https://agi.apify.com)) mints a prepaid Apify API token in exchange for an x402 or MPP payment. Use the token like a normal API token against `mcp.apify.com` and `api.apify.com` — works for any Actor, not just Pay Per Event ones. **Recommended** for new integrations; see [AGI (recommended)](#-agi-recommended) below.
-- **Direct x402** pays with USDC on [Base](https://base.org) per request and does not require a separate platform account. It is fully supported by [`mcpc`](https://github.com/apify/mcpc) (`brew install apify/tap/mcpc` or `npm install -g @apify/mcpc`). We use `mcpc` because it is one of the few MCP clients that supports the latest features and the x402 protocol natively.
-- **Skyfire** pays with PAY tokens and requires a Skyfire account with a funded wallet. It does not require a special MCP client; the entire payment flow is handled directly through the MCP tool call parameters.
-
-> ℹ️ **Scope:** Both direct x402 and Skyfire are limited to Pay Per Event Actors, don't support Standby Actors, and settle per run instead of minting a token.
-
-## How agentic payments work
-
-Actor run costs vary, so both payment methods use a prepaid balance model. The payment flow happens in four steps:
-
-1. **Discovery**: The agent discovers Actors with `search-actors` or `fetch-actor-details`. Those calls are free.
-2. **Prepayment**: Before running a paid Actor tool, the agent funds a prepaid balance.
-   - **Direct x402**: `mcpc` automatically signs a $1.00 USDC transaction.
-   - **Skyfire**: The agent creates a PAY token (minimum $5.00) using Skyfire's `create-pay-token` tool.
-3. **Execution**: The agent calls the Actor tool.
-   - **Direct x402**: Handled automatically by `mcpc` using the prepaid balance.
-   - **Skyfire**: The agent explicitly passes the PAY token in the `skyfire-pay-id` input property.
-4. **Resolution**: The tool returns the Actor results. Unused funds stay available for later runs.
-   - **Direct x402**: After 60 minutes of inactivity, the server refunds any unused balance to the wallet on [Base](https://base.org).
-   - **Skyfire**: Skyfire returns unused funds when the token expires.
-
-## 🪙 AGI (recommended)
-
-[AGI](https://agi.apify.com) (Apify Agent General Interface) is the recommended way for autonomous agents to pay for Apify usage without an account. Pay once via x402 or MPP, receive a prepaid, spend-capped Apify API token, and use it directly against `mcp.apify.com` and `api.apify.com` (`Authorization: Bearer <token>`) — for any Actor.
-
-Full protocol, supported payment methods, and current terms (minimum amount, token lifetime, refund policy) are documented at **[agi.apify.com/AGENTS.md](https://agi.apify.com/AGENTS.md)** — treat it as the single source of truth.
-
-## 💸 Direct x402
-
-The [x402 protocol](https://www.x402.org/) enables direct, machine-to-machine payments. Your MCP client can use it to pay for Actor runs with USDC on the [Base blockchain](https://base.org/), completely bypassing the need for an Apify API token.
-
-### Prerequisites
-
-- A wallet with USDC on [Base](https://base.org) mainnet.
-
-### Setup
-
-Create or import a wallet:
+<details>
+<summary><b>Claude Code</b></summary>
 
 ```bash
-# Create a new wallet
-mcpc x402 init
-
-# Import an existing wallet
-mcpc x402 import <private-key>
-
-# Show the wallet address and a funding QR code, so you can fund it with USDC on Base (https://base.org)
-mcpc x402
+claude mcp add apify "https://mcp.apify.com" -t http
 ```
 
-Connect to the server with x402 enabled:
+Claude Code opens the Apify sign-in page the first time it uses the server. To install the [Apify plugin](https://docs.apify.com/agents/plugins) with Agent Skills instead, run `/plugin marketplace add apify/apify-claude-code-plugin`, then `/plugin install apify@apify` and `/reload-plugins`.
+
+</details>
+
+<details>
+<summary><b>Cursor</b></summary>
+
+Use the one-click install link from the [configurator](https://mcp.apify.com), or let the [Apify CLI](https://docs.apify.com/cli) write the configuration for you:
 
 ```bash
-mcpc connect "mcp.apify.com?payment=x402" @apify --x402
+apify mcp install cursor
 ```
 
-You can now call a paid tool:
+The same command works for `claude-code`, `vscode`, `codex`, `kiro`, and `antigravity`.
 
-```bash
-mcpc @apify tools-call call-actor actor:="apify/rag-web-browser" input:='{"query": "latest AI news"}'
-```
+</details>
 
-## 🔥 Skyfire
+<details>
+<summary><b>VS Code and GitHub Copilot</b></summary>
 
-[Skyfire](https://www.skyfire.xyz/) provides managed payment infrastructure for AI agents. Instead of authenticating with an Apify API token, your agent passes a Skyfire payment token to cover the cost of each tool call using PAY tokens.
-
-### Prerequisites
-
-- A [Skyfire account](https://www.skyfire.xyz/) with a funded wallet.
-- An MCP client that supports multiple servers, such as Claude Desktop, OpenCode, or VS Code.
-
-### Setup
-
-Configure the Skyfire MCP server and the Apify MCP Server in your client. Add `payment=skyfire` to the Apify server URL:
+Use the one-click install link from the [configurator](https://mcp.apify.com), run `apify mcp install vscode`, or add `https://mcp.apify.com` as an HTTP server in your MCP configuration:
 
 ```json
 {
-  "mcpServers": {
-    "skyfire": {
-      "url": "https://api.skyfire.xyz/mcp/sse",
-      "headers": {
-        "skyfire-api-key": "<YOUR_SKYFIRE_API_KEY>"
-      }
-    },
+  "servers": {
     "apify": {
-      "url": "https://mcp.apify.com?payment=skyfire"
+      "type": "http",
+      "url": "https://mcp.apify.com"
     }
   }
 }
 ```
 
-See the [Skyfire integration documentation](https://docs.apify.com/platform/integrations/skyfire) for setup details. The [Agentic Payments with Skyfire](https://blog.apify.com/agentic-payments-skyfire/) post provides additional background.
+</details>
 
-# 🛠️ Tools, resources, and prompts
+<details>
+<summary><b>Claude.ai, Claude Desktop, and ChatGPT</b></summary>
 
-The MCP server provides a set of tools for interacting with Apify Actors.
-Since Apify Store is large and growing rapidly, the MCP server provides a way to dynamically discover and use new Actors.
+**Claude.ai and Claude Desktop:** open **Settings** > **Connectors**, select **Add custom connector**, name it `Apify`, and enter `https://mcp.apify.com` as the remote MCP server URL. The same connector works in both apps. See the [Claude guide](https://docs.apify.com/integrations/claude-desktop).
 
-### Actors
+**ChatGPT:** turn on Developer mode, then go to **Settings** > **Apps & Connectors** > **Create** and enter `https://mcp.apify.com` as the MCP server URL with OAuth authentication. You don't need a client ID or secret. See the [ChatGPT guide](https://docs.apify.com/integrations/chatgpt).
 
-Any [Apify Actor](https://apify.com/store) can be used as a tool.
-By default, the server is pre-configured with two Actors, `apify/rag-web-browser` and `apify/web-fetch`, and several helper tools.
-The MCP server loads an Actor's input schema and creates a corresponding MCP tool.
-This allows the AI agent to know exactly what arguments to pass to the Actor and what to expect in return.
+</details>
 
+<details>
+<summary><b>Any other MCP client (JSON config)</b></summary>
 
-For example, for the `apify/rag-web-browser` Actor, the input parameters are:
+Most clients that support remote servers and OAuth accept a configuration like this:
 
 ```json
 {
-  "query": "restaurants in San Francisco",
-  "maxResults": 3
+  "mcpServers": {
+    "apify": {
+      "url": "https://mcp.apify.com"
+    }
+  }
 }
 ```
-You don't need to manually specify which Actor to call or its input parameters; the LLM handles this automatically.
-When a tool is called, the arguments are automatically passed to the Actor by the LLM.
-You can refer to the specific Actor's documentation for a list of available arguments.
 
-### Helper tools
+</details>
 
-One of the most powerful features of using MCP with Apify is dynamic tool discovery.
-It allows an AI agent to find new tools (Actors) as needed and incorporate them.
-Here are some special MCP operations and how the Apify MCP Server supports them:
+<details>
+<summary><b>Local stdio (npx)</b></summary>
 
-- **Apify Actors**: Search for Actors, list the Actors in your account, view their details, use them as tools for the AI, and delete your own Actors.
-- **Apify documentation**: Search the Apify documentation and fetch specific documents to provide context to the AI.
-- **Actor runs**: Get lists of your Actor runs, inspect their details, and retrieve logs.
-- **Apify storage**: Access data from your datasets and key-value stores.
-- **Actor tasks**: Create, inspect, and update your saved Actor tasks, and publish or unpublish their public landing pages.
-- **Schedules**: Create, inspect, update, and delete schedules that run your Actors and tasks automatically.
-- **Builds**: Build an Actor version, list builds, check the status of a build, and retrieve its build log.
-- **Actor versions**: Read an Actor version's files with a hash for each file and a revision for the whole set, create an Actor from files, change a version's files with checks that catch changes made since your last read, add a version from files or as a copy of another version, and delete a version.
-- **Apify API**: Search the Apify API reference, inspect an operation, and send requests to the API to read or change data.
+Requires Node.js 22 or later.
 
-### Overview of available tools
-
-Here is an overview list of all the tools provided by the Apify MCP Server.
-
-Legend for the **Enabled by default** column:
-- ✅ — in the default tool set.
-- ⚡ — auto-injected when `call-actor`, an Actor tool, or `get-actor-run` is present (which is true in the default configuration).
-- ✅¹ — served by default, but only when telemetry is enabled and the client is not withheld: Anthropic surfaces (Claude.ai / Claude Desktop / Claude Code) or `local-agent-mode-apify`. To disable, pass an explicit `tools=` list that omits it. Explicitly selecting it (`tools=report-problem` or `tools=dev`) serves it regardless of client — telemetry still must be enabled.
-
-| Tool name | Category | Description | Enabled by default |
-| :--- | :--- | :--- | :---: |
-| `search-actors` | actors | Search for Actors in Apify Store. | ✅ |
-| `fetch-actor-details` | actors | Retrieve detailed information about a specific Actor, including its input schema, README (summary when available, full otherwise), pricing, and Actor output schema. | ✅ |
-| `call-actor` | actors | Call an Actor and get its run results. Use fetch-actor-details first to get the Actor's input schema. | ✅ |
-| `get-actor-run` | runs | Get detailed information about a specific Actor run. | ⚡ |
-| `get-dataset-items` | storage | Retrieve items from a dataset with support for filtering and pagination. | ⚡ |
-| `get-key-value-store-record`| storage | Get the value associated with a specific key in a key-value store. | ⚡ |
-| `abort-actor-run` | runs | Abort a running Actor run, optionally gracefully. | ⚡ |
-| `delete-actor` | none (select by name: `tools=delete-actor`) | Delete an Actor from your account permanently. Public Actors must be unpublished first. |  |
-| `search-apify-docs` | docs | Search the Apify documentation for relevant pages. | ✅ |
-| `fetch-apify-docs` | docs | Fetch the full content of an Apify documentation page by its URL. | ✅ |
-| [`apify--rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see [tool configuration](#tools-configuration)) | An Actor tool to browse the web. | ✅ |
-| [`apify--web-fetch`](https://apify.com/apify/web-fetch) | Actor (see [tool configuration](#tools-configuration)) | An Actor tool to fetch a URL and return its content. | ✅ |
-| `report-problem` | dev | Report a problem with an Apify tool or Actor to the Apify team. | ✅¹ |
-| `get-actor-list` | none (select by name: `tools=get-actor-list`) | List the Actors you own and those shared with you, including private ones. |  |
-| `get-actor-run-list` | runs | Get a list of Actor runs, filterable by Actor and status. |  |
-| `get-actor-run-log` | runs | Retrieve the logs for a specific Actor run. |  |
-| `get-dataset` | storage | Get metadata about a specific dataset. |  |
-| `get-dataset-schema` | storage | Generate a JSON schema from dataset items. |  |
-| `get-key-value-store` | storage | Get metadata about a specific key-value store. |  |
-| `get-key-value-store-keys`| storage | List the keys within a specific key-value store. |  |
-| `get-dataset-list` | storage | List all available datasets for the user. |  |
-| `get-key-value-store-list`| storage | List all available key-value stores for the user. |  |
-| `create-actor-task` | tasks | Create a saved Actor task (a named, reusable Actor configuration). |  |
-| `get-actor-task` | tasks | Get a saved Actor task, its publication state and public display configuration. |  |
-| `update-actor-task` | tasks | Update a task's input, run options, or public display configuration. |  |
-| `publish-actor-task` | tasks | Publish a task on its public landing page. |  |
-| `unpublish-actor-task` | tasks | Unpublish a task from its public landing page. |  |
-| `create-schedule` | schedules | Create a schedule that runs Actors or tasks on a cron cadence. |  |
-| `get-schedule` | schedules | Get a schedule, its cron expression, state, and the actions it runs. |  |
-| `update-schedule` | schedules | Update a schedule: cron expression, time zone, enabled state, or actions. |  |
-| `delete-schedule` | schedules | Delete a schedule. |  |
-| `get-actor-build` | builds | Get an Actor build's status. |  |
-| `get-actor-build-log` | builds | Retrieve the logs for a specific Actor build. |  |
-| `get-actor-build-list` | builds | List the account's builds, or one Actor's, in every status, newest first. |  |
-| `build-actor` | builds | Build an Actor version and wait a bounded time for the build to finish. |  |
-| `get-actor-version` | versions | Get an Actor version's file listing with hashes and the content of the files you ask for. |  |
-| `create-actor` | versions | Create a private Actor in your account from files, optionally starting a build. |  |
-| `update-actor-version` | versions | Write, edit, or delete files of an Actor version in one all-or-nothing write. |  |
-| `create-actor-version` | versions | Add a version to an Actor, from files or as a copy of another version, optionally starting a build. |  |
-| `delete-actor-version` | versions | Delete an Actor version; its builds and their tags stay. |  |
-| `apify-api-search` | api | Search the Apify API reference for operations by keywords. Returns each one's method, path, and docs page. |  |
-| `apify-api-details` | api | Get the parameters and request body schema of the Apify API operations on a path. |  |
-| `apify-api-read` | api | Send a GET request to an Apify API path, such as `actor-runs` or `/v2/actor-runs`, like `apify api` in the Apify CLI. Read-only: it refuses the `method` query parameter and a GET to the synchronous run endpoints, which starts a paid run. |  |
-| `apify-api-write` | api | Send a POST, PUT, PATCH, or DELETE request to any Apify API path, with a JSON body, like `apify api` in the Apify CLI. It refuses the `method` query parameter. |  |
-
-> **Note:**
->
-> When `call-actor`, an Actor tool, or `get-actor-run` is present, the server auto-injects `get-actor-run`, `get-dataset-items`, `get-key-value-store-record`, and `abort-actor-run`.
->
-> When you call an Actor — through `call-actor` or directly via an Actor tool (e.g., `apify--rag-web-browser`) — the response contains run metadata, storage IDs, and a `summary` + `nextStep`, but no dataset items. To fetch items, follow `nextStep` and call `get-dataset-items` (auto-injected), passing the `datasetId` returned from the call.
-
-### Tool annotations
-
-All tools include metadata annotations to help MCP clients and LLMs understand tool behavior:
-
-- **`title`**: Short display name for the tool (e.g., "Search Actors", "Call Actor", "apify/rag-web-browser")
-- **`readOnlyHint`**: `true` for tools that only read data without modifying state (e.g., `get-dataset`, `fetch-actor-details`). Actor tools get it only for Apify-maintained Actors with limited permissions and no accepted secret, writable storage, MCP connector, or code input (e.g., `apify--web-fetch`). Direct tools can restrict the original Actor inputs: `apify--website-content-crawler` excludes and rejects `pageFunction` and `initialCookies`, so it is read-only. Other Actor tools are marked destructive.
-- **`openWorldHint`**: `true` for tools that access external resources outside the Apify platform (e.g., `call-actor` executes external Actors). Tools that interact only with the Apify platform (like `search-actors` or `fetch-apify-docs`) do not have this hint.
-
-The direct `apify--website-content-crawler` tool defaults `respectRobotsTxtFile` to `true`; an explicit `false` is preserved. These restrictions and defaults apply only to the direct tool. `call-actor`, `call-actor-widget`, and `fetch-actor-details` retain the original Actor input contract.
-
-### Tools configuration
-
-The `tools` configuration parameter is used to specify loaded tools – either categories or specific tools directly, and Apify Actors. For example, `tools=storage,runs` loads two categories; `tools=call-actor` loads just one tool.
-
-When no query parameters are provided, the MCP server loads the following `tools` by default:
-
-- `actors`
-- `docs`
-- `apify/rag-web-browser`
-- `apify/web-fetch`
-
-If the tools parameter is specified, only the listed tools or categories will be enabled – no default tools will be included.
-
-`report-problem` is served by default (subject to the gating in the footnote above) but lives in the `dev` category, so an explicit `tools=dev` selects it too. To disable it, pass an explicit `tools=` list that omits it (e.g. `tools=actors,docs`).
-
-> **Easy configuration:**
->
-> Use the [UI configurator](https://mcp.apify.com/) to configure your server, then copy the configuration to your client.
-
-**Configuring the hosted server:**
-
-The hosted server can be configured using query parameters in the URL. For example, to load the default tools, use:
-
-```
-https://mcp.apify.com?tools=actors,docs,apify/rag-web-browser,apify/web-fetch
+```json
+{
+  "mcpServers": {
+    "actors-mcp-server": {
+      "command": "npx",
+      "args": ["-y", "@apify/actors-mcp-server"],
+      "env": {
+        "APIFY_TOKEN": "YOUR_APIFY_TOKEN"
+      }
+    }
+  }
+}
 ```
 
+If you've run `apify login`, the server can also read the token saved by the Apify CLI. Run `npx @apify/actors-mcp-server --help` for all options.
 
-For minimal configuration, if you want to use only a single Actor tool - without any discovery or generic calling tools, the server can be configured as follows:
+</details>
 
+The server is also listed in the [Docker MCP catalog](https://hub.docker.com/mcp/server/apify-mcp-server/overview), and each [release](https://github.com/apify/apify-mcp-server/releases/latest) ships an MCP bundle file ([`apify-mcp-server.mcpb`](https://github.com/apify/apify-mcp-server/releases/latest/download/apify-mcp-server.mcpb)) for one-click installation in clients that support it.
+
+## Hosted or local server
+
+The hosted server is the recommended option. Use the local server when your client only supports stdio or you need to run everything on your own machine.
+
+| | Hosted (`https://mcp.apify.com`) | Local (`npx @apify/actors-mcp-server`) |
+| :--- | :--- | :--- |
+| Transport | Streamable HTTP | stdio |
+| Authentication | OAuth or Bearer token | `APIFY_TOKEN` environment variable or Apify CLI login |
+| Output schemas inferred for Actor results | Yes | No |
+| Tool selection | `tools` URL parameter | `--tools` flag or `TOOLS` environment variable |
+| Updates | Always the latest server | The npm version you install |
+
+## How an agent uses Apify Actors
+
+[Actors](https://docs.apify.com/actors) are serverless programs on the Apify platform. Each one does a specific job, like scraping Google Maps, crawling a website for RAG, or collecting social media posts. The MCP server turns Actors into tools an agent can find and call without you configuring each one in advance.
+
+A typical task follows four steps:
+
+1. `search-actors` finds candidate Actors in Apify Store for the task.
+2. `fetch-actor-details` returns the Actor's input schema, README, pricing, and output schema.
+3. `call-actor` starts the run and waits up to 45 seconds for it to finish. It returns the **run status and storage IDs**. The scraped items stay in the run's dataset.
+4. `get-dataset-items` reads the results from the run's dataset, with `limit` and `offset` for pagination.
+
+The server adds `get-dataset-items`, `get-key-value-store-record`, `get-actor-run`, and `abort-actor-run` automatically whenever `call-actor` or an Actor tool is loaded, so the default setup can always read results. Long runs keep going after `call-actor` returns; the agent checks on them with `get-actor-run`.
+
+You can also expose a specific Actor as its own tool, for example `apify/web-search` or `apify/instagram-scraper`. The server builds the tool's parameters from the Actor's input schema, so the agent knows exactly what to pass.
+
+**Actors that run their own MCP server.** Some Actors are MCP servers themselves. `call-actor` reaches their tools with the `actorName:toolName` format. When such an Actor is loaded as a tool source, its tools are exposed under names in the form `username--actor-name--tool-name`.
+
+**Official server and community Actors.** This repository is the official MCP server, maintained by the Apify team. Apify Store also lists MCP-related Actors published by independent creators. Those are separate products with their own READMEs and pricing.
+
+## 🧰 Available tools
+
+By default, the server loads the `actors` and `docs` categories, a small set of web Actor tools including [Web Fetch](https://apify.com/apify/web-fetch), and `report-problem`. Everything else is opt-in by category or by tool name. [Web Search](https://apify.com/apify/web-search) pairs with Web Fetch: with both loaded, the agent searches the web and then fetches the pages it picks. The [tool reference](https://docs.apify.com/mcp#available-tools) lists the current default Actors.
+
+| Category | Tools | Loaded by default |
+| :--- | :--- | :---: |
+| `actors` | `search-actors`, `fetch-actor-details`, `call-actor` | ✅ |
+| `docs` | `search-apify-docs`, `fetch-apify-docs` | ✅ |
+| Actor tools | [Web Search](https://apify.com/apify/web-search), [Web Fetch](https://apify.com/apify/web-fetch), or any other Actor you add | ✅ (default web Actors) |
+| `runs` | `get-actor-run`, `get-actor-run-list`, `get-actor-run-log`, `abort-actor-run` | Partly, auto-added |
+| `storage` | `get-dataset-items`, `get-dataset`, `get-dataset-list`, `get-dataset-schema`, `get-key-value-store`, `get-key-value-store-keys`, `get-key-value-store-list`, `get-key-value-store-record` | Partly, auto-added |
+| `tasks` | Create, read, update, publish, and unpublish saved Actor tasks | |
+| `schedules` | Create, read, update, and delete schedules | |
+| `builds` | `build-actor`, `get-actor-build`, `get-actor-build-list`, `get-actor-build-log` | |
+| `versions` | Read and write Actor source files, and create Actors and versions from files | |
+| `api` | `apify-api-search`, `apify-api-details`, `apify-api-read`, `apify-api-write` | |
+| `dev` | `report-problem` | ✅ (see note) |
+| By name only | `get-actor-list`, `delete-actor` | |
+
+Notes:
+
+- `report-problem` is served by default only when telemetry is on, and it's withheld from Claude clients unless you select it explicitly with `tools=report-problem` or `tools=dev`.
+- The `tasks` category manages saved [Actor tasks](https://docs.apify.com/actors/running/tasks) (reusable Actor configurations). It is unrelated to the MCP Tasks protocol.
+- Every tool carries MCP annotations: a `title`, `readOnlyHint` for tools that only read data, and `openWorldHint` for tools that reach outside the Apify platform. Actor tools are marked read-only only for Apify-maintained Actors with limited permissions and no inputs that can write data or run code.
+- The server advertises the `prompts` capability but registers no prompts. It supports `resources/read` for any Apify API GET URL (`https://api.apify.com/v2/...`), with response bodies inlined up to 256 KB, and lists the common URL shapes in `resources/templates/list`.
+- In clients that support MCP Apps, tools such as `search-actors` can return interactive widgets. The server turns widgets on when the client supports them; set `ui=false` (hosted) or `--ui false` (local) to turn widgets off, or `ui=true` to force them on.
+
+The [tool reference](https://docs.apify.com/mcp#available-tools) has full descriptions of each tool.
+
+## Choose which tools load
+
+The `tools` parameter takes categories, tool names, and Actor names, separated by commas. When you set it, only what you list is loaded and the defaults are dropped. The easiest way to build a selection is the [configurator](https://mcp.apify.com).
+
+Hosted server:
+
+```text
+https://mcp.apify.com?tools=actors,docs,apify/web-search,apify/web-fetch
 ```
-https://mcp.apify.com?tools=apify/my-actor
-```
 
-This setup exposes only the specified Actor (`apify/my-actor`) as a tool. No other tools will be available.
-
-**Configuring the CLI:**
-
-The CLI can be configured using command-line flags. For example, to load the same tools as in the hosted server configuration, use:
+Local server:
 
 ```bash
-npx @apify/actors-mcp-server --tools actors,docs,apify/rag-web-browser,apify/web-fetch
+npx @apify/actors-mcp-server --tools actors,docs,apify/web-search,apify/web-fetch
 ```
 
-The minimal configuration is similar to the hosted server configuration:
+To give an agent exactly one Actor and nothing else, list only that Actor:
 
-```bash
-npx @apify/actors-mcp-server --tools apify/my-actor
+```text
+https://mcp.apify.com?tools=apify/instagram-scraper
 ```
 
-As above, this exposes only the specified Actor (`apify/my-actor`) as a tool. No other tools will be available.
+> **Pin your tools in production.** The default tool set can change between versions. Set `tools` explicitly if you need a stable interface.
 
-> **⚠️ Important recommendation**
->
-> **The default tools configuration may change in future versions.** When no `tools` parameter is specified, the server currently loads default tools, but this behavior is subject to change.
->
-> **For production use and stable interfaces, always explicitly specify the `tools` parameter** to ensure your configuration remains consistent across updates.
+<details>
+<summary><b>Backward compatibility with older configurations</b></summary>
 
-### UI mode configuration
+- The `actors` URL parameter and `--actors` flag still work. They're merged into `tools`, so `?actors=apify/web-fetch` equals `?tools=apify/web-fetch`.
+- `enableAddingActors`, `enable-adding-actors`, and `enableActorAutoLoading` were removed and are ignored. Dynamic Actor calls come from `call-actor`, which the default `actors` category includes.
+- The selectors `add-actor`, `experimental`, and `preview` are retired and load nothing. Use `call-actor` or the `actors` category.
+- `get-actor-log` was renamed to `get-actor-run-log`, and the `source` category to `versions`. The old names load nothing.
 
-The `ui` parameter enables [MCP Apps](https://mcp.apify.com/) widget rendering in tool responses. When enabled, tools like `search-actors` return interactive MCP App responses.
+</details>
 
-**Configuring the hosted server:**
+## 💬 Example prompts
 
-Enable UI mode using the `ui` query parameter:
+**Search the web.**
 
-```
-https://mcp.apify.com?ui=true
-```
-
-You can combine it with other parameters:
-
-```
-https://mcp.apify.com?tools=actors,docs&ui=true
-```
-
-**Configuring the CLI:**
-
-The CLI can be configured using command-line flags. For example, to enable UI mode:
-
-```bash
-npx @apify/actors-mcp-server --ui true
-```
-
-You can also set it via the `UI_MODE` environment variable:
-
-```bash
-export UI_MODE=true
-npx @apify/actors-mcp-server
-```
-
-### Backward compatibility
-
-The v2 configuration preserves backward compatibility with v1 usage. Notes:
-
-- `actors` param (URL) and `--actors` flag (CLI) are still supported.
-  - Internally they are merged into `tools` selectors.
-  - Examples: `?actors=apify/rag-web-browser` ≡ `?tools=apify/rag-web-browser`; `--actors apify/rag-web-browser` ≡ `--tools apify/rag-web-browser`.
-- `enableAddingActors` (URL), `enable-adding-actors` (CLI), and the legacy `enableActorAutoLoading` alias have been removed. To call Actors dynamically, use `tools=call-actor` (included by default via the `actors` category). Any lingering raw value is ignored.
-- Defaults remain compatible: when no `tools` are specified, the server loads `actors`, `docs`, `apify/rag-web-browser`, and `apify/web-fetch`.
-  - If any `tools` are specified, the defaults are not added (same as v1 intent for explicit selection).
-- `call-actor` is now included by default via the `actors` category (additive change). To exclude it, specify an explicit `tools` list without `actors`.
-- `tools=add-actor`, `tools=experimental`, and `tools=preview` are retired: they are ignored and load no tools. Use `tools=call-actor` (or the default `actors` category) instead.
-- `tools=get-actor-log` is retired: the tool was renamed to `get-actor-run-log`. The old selector is ignored and loads no tools. Use `tools=get-actor-run-log` (or the `runs` category) instead.
-- `tools=source` is retired: the category was renamed to `versions`. The old selector is ignored and loads no tools. Use `tools=versions` instead.
-
-Existing URLs and commands using `?actors=...` or `--actors` continue to work unchanged.
-
-### Prompts
-
-The server advertises the `prompts` capability, but no prompts are currently registered — `prompts/list` returns an empty list.
-
-### Resources
-
-Your Apify data is not enumerated in `resources/list` — reads are on demand: pass any Apify API GET URL (`https://api.apify.com/v2/...`) to `resources/read` and the server injects the session's Apify token and returns the response body. `resources/templates/list` enumerates the common shapes — dataset items, key-value store records and keys, run metadata, run log — with their paging parameters. Responses inline up to 256 KB; anything larger returns a short notice with a download URL instead of the body. API reads require an Apify token, so a payment-only session (x402 or Skyfire) gets a JSON-RPC error for them.
-
-## 💬 Usage examples
-
-Below are realistic examples showing how an AI assistant uses the Apify MCP Server tools.
-
-### Example 1: Search the web using RAG Web Browser
-
-**User prompt:**
 > Find the latest news about autonomous AI agents and summarize the key developments.
 
-The AI assistant calls the pre-configured `apify--rag-web-browser` Actor tool to search the web and return content from top results.
-The tool returns markdown content from the top 3 search results, which the AI assistant then summarizes for the user.
+The agent uses Web Search to find recent pages and Web Fetch to read them as Markdown, then summarizes what it found.
 
-### Example 2: Discover and run an Actor from Apify Store
+**Find and run an Actor.**
 
-**User prompt:**
-> Scrape the top 10 restaurants in Prague from Google Maps with their contact details.
+> Find an Actor that scrapes Google Maps. Show me its required input and pricing, then get the top 10 restaurants in Prague with their contact details.
 
-The AI assistant first searches for a suitable Actor, inspects its input schema, and then executes it.
-The tool returns a preview of the scraped data including restaurant names, addresses, ratings, phone numbers, and websites.
+The agent searches Apify Store, reads the Actor's details, confirms the input, runs it with `call-actor`, and reads the results with `get-dataset-items`.
 
-### Example 3: Retrieve and paginate through Actor run results
+**Page through results.**
 
-**User prompt:**
-> Show me the next 10 results from that scraping run.
+> Show me the next 10 results from that run.
 
-The AI assistant uses the dataset ID from the previous Actor run to fetch additional items.
-Expected output: The tool returns the next page of structured data items from the Actor's output dataset.
+The agent calls `get-dataset-items` again with the same dataset ID and a higher `offset`.
 
-## 📡 Telemetry
+## 💰 Pricing and limits
 
-The Apify MCP Server collects telemetry data about tool calls to help Apify understand usage patterns and improve the service.
-By default, telemetry is **enabled** for all tool calls.
-With telemetry enabled, Actor searches in the Apify Store send the MCP session id as `_traceId`, and tool-call events carry it as `trace_id`.
-Opting out of telemetry disables both.
+- Connecting to the MCP server is free. Actor runs bill to your Apify account according to each Actor's pricing, which `fetch-actor-details` shows before a run. The [Apify free plan](https://apify.com/pricing) includes $5 of monthly platform usage.
+- To cap what a single run can cost, the agent can pass limits such as `maxItems`, `timeout`, `memory`, and `maxTotalChargeUsd` in the `callOptions` of `call-actor`.
+- The hosted server accepts up to 30 requests per second per account.
+- For security, the server excludes [full-permission Actors](https://docs.apify.com/actors/running/permissions#full-permission-actors) from search and execution, because running one is a decision you should approve yourself. Rental Actors are also excluded from search.
+- Some tools work without an Apify account: `search-actors`, `fetch-actor-details`, `search-apify-docs`, `fetch-apify-docs`, `apify-api-search`, and `apify-api-details`. Select only those, for example `https://mcp.apify.com?tools=search-actors`, and the hosted server accepts the connection without a token.
 
-The stdio transport also uses [Sentry](https://sentry.io) for error tracking, which helps us identify and fix issues faster.
-Sentry is automatically disabled when telemetry is opted out.
+## Agentic payments (experimental)
 
-### Opting out of telemetry
+Autonomous agents can pay for Actor runs without signing up for an Apify account. This feature is experimental, and its terms can change. The [agentic payments documentation](https://docs.apify.com/agents/payments) is the source of truth for supported methods, minimums, and expiry.
 
-You can opt out of telemetry (including Sentry error tracking) by setting the `--telemetry-enabled` CLI flag to `false` or the `TELEMETRY_ENABLED` environment variable to `false`.
-CLI flags take precedence over environment variables.
+- **AGI (recommended).** [agi.apify.com](https://agi.apify.com) sells a prepaid, spend-capped Apify API token for an x402 or MPP payment. The agent then uses it as a normal Bearer token against `mcp.apify.com` and works with any Actor. Protocol details are in [agi.apify.com/AGENTS.md](https://agi.apify.com/AGENTS.md).
+- **Direct x402.** Add `payment=x402` to the server URL and pay per request with USDC on [Base](https://base.org) from an x402-capable client such as [`mcpc`](https://github.com/apify/mcpc). This works only with Pay Per Event Actors.
+- **Skyfire.** Add `payment=skyfire` to the server URL and pass a [Skyfire](https://www.skyfire.xyz/) PAY token with each call. This works only with Pay Per Event Actors. See the [Skyfire integration guide](https://docs.apify.com/integrations/skyfire).
 
-#### Examples
+Payment-only sessions can't read Apify API resources, because those reads require an Apify token.
 
-**For the remote server (mcp.apify.com)**:
+## Other Apify tools for agents
+
+| Resource | Use it for |
+| :--- | :--- |
+| [MCP configurator](https://mcp.apify.com) | Client setup and tool selection |
+| [MCP documentation](https://docs.apify.com/mcp) | Authentication, tool reference, and advanced configuration |
+| [Apify for AI agents](https://docs.apify.com/agents) | Choosing between MCP, plugins, Agent Skills, the CLI, and machine-readable docs |
+| [Official plugins](https://docs.apify.com/agents/plugins) | One-step install of the MCP server and Agent Skills for your coding agent |
+| [Agent Skills](https://docs.apify.com/agents/skills) | Guided multi-step workflows, installed with `npx skills add apify/agent-skills` |
+| [Apify CLI](https://docs.apify.com/cli) | Running and building Actors from a terminal, and `apify mcp install` |
+| [Agentic payments](https://docs.apify.com/agents/payments) | Paying for runs without an account (experimental) |
+
+## Telemetry
+
+The server collects telemetry about tool calls to help the Apify team understand usage and improve the service. Telemetry is on by default. With telemetry on, Apify Store searches send the MCP session ID as `_traceId`, and tool-call events carry it as `trace_id`. The local stdio server also reports errors to [Sentry](https://sentry.io).
+
+Turning telemetry off disables all of this, including Sentry:
+
 ```text
-# Disable via URL parameter
+# Hosted server
 https://mcp.apify.com?telemetry-enabled=false
 ```
 
-**For the local stdio server**:
 ```bash
-# Disable via CLI flag
+# Local server: CLI flag (takes precedence) or environment variable
 npx @apify/actors-mcp-server --telemetry-enabled=false
-
-# Or set environment variable
-export TELEMETRY_ENABLED=false
-npx @apify/actors-mcp-server
+TELEMETRY_ENABLED=false npx @apify/actors-mcp-server
 ```
 
-# ⚙️ Development
+## 🐛 Troubleshooting and limitations
 
-Please see the [CONTRIBUTING.md](./CONTRIBUTING.md) guide for contribution guidelines and commit message conventions.
+- **The local server won't start.** Check your Node.js version: the package requires Node.js 22 or later.
+- **The client can't connect to `/sse`.** That endpoint was removed. Use `https://mcp.apify.com`.
+- **Authentication fails.** Reconnect so the client repeats the OAuth flow, or switch to a Bearer token. For the local server, check that `APIFY_TOKEN` is set in the client's server configuration, not only in your shell.
+- **Tools are missing.** If you set `tools`, only what you listed is loaded. Remove the parameter to get the defaults back.
+- **Client features vary.** Any MCP client can connect, but support for dynamic tool lists, OAuth, and MCP Apps differs between clients.
+- **Invalid Actor input.** When `call-actor` fails because of invalid input, the error includes the Actor's input schema so the agent can correct the input and retry.
 
-For detailed development setup, project structure, and local testing instructions, see the [DEVELOPMENT.md](./DEVELOPMENT.md) guide.
+The server adapts Actor input schemas so that more clients and models can use them:
 
-## Prerequisites
+- Descriptions longer than 500 characters are cut at the last complete sentence and marked `[Description truncated]`.
+- Enums are kept in full up to 2,000 combined characters. Larger enums are replaced by a short note with example values.
+- Required fields get a `REQUIRED` prefix in their descriptions for frameworks that ignore the JSON Schema `required` list.
+- Nested properties are built for special inputs such as proxy configuration and request lists.
+- Missing array item types are inferred from the item type, the prefill, the default value, or the editor type, in that order.
+- Enum values and examples are copied into descriptions so clients with partial JSON Schema support still see them.
 
-- [Node.js](https://nodejs.org/en) (v22 or higher)
+For more help, see the [MCP documentation](https://docs.apify.com/mcp) or [open an issue](https://github.com/apify/apify-mcp-server/issues).
 
-Create an environment file, `.env`, with the following content:
-```text
-APIFY_TOKEN="your-apify-token"
-```
+## ❓ FAQ
 
-Build the `actors-mcp-server` package:
+**What is the Apify MCP server?**
+It's the official [Model Context Protocol](https://modelcontextprotocol.io) server for Apify. It lets AI agents search Apify Store, run Actors for web scraping, data extraction, and browser automation, and read the structured results.
+
+**When is it a good MCP server for web scraping?**
+When an agent needs data from many different sites. A typical case is Google Maps one day, Instagram or an online store the next. The agent picks a ready-made Actor for each site from Apify Store instead of you writing and maintaining a scraper. Actors run on the Apify platform, which handles scaling, proxies, and storage of the results.
+
+**Can ChatGPT or Claude scrape websites with it?**
+Yes. Connect ChatGPT, Claude.ai, Claude Desktop, or Claude Code to `https://mcp.apify.com`, then ask in plain language. The model searches for a suitable Actor, runs it, and reads the results.
+
+**Is it free?**
+Connecting is free, and some discovery tools work without an account. Actor runs bill to your Apify account at each Actor's price, and the free plan includes $5 of monthly platform usage.
+
+**Which clients does it work with?**
+Any MCP client that supports Streamable HTTP or stdio. The [configurator](https://mcp.apify.com) has tailored setup for Claude, Claude Code, ChatGPT, Codex, Cursor, VS Code, GitHub Copilot, OpenCode, Kiro, and more.
+
+**Do I need an API token?**
+Not with the hosted server, because OAuth signs you in through the browser. The local server needs `APIFY_TOKEN` or an Apify CLI login.
+
+**Does `call-actor` return the scraped data?**
+No. It returns the run status and storage IDs. The agent reads the items with `get-dataset-items`, which the server loads automatically.
+
+**Can I limit what the agent can do or spend?**
+Yes. Select tools with the `tools` parameter, expose a single Actor, and pass `maxTotalChargeUsd` or `maxItems` in `call-actor` options.
+
+## 🔧 Development
+
+This repository contains the open-source server package published to npm as [`@apify/actors-mcp-server`](https://www.npmjs.com/package/@apify/actors-mcp-server). The hosted service at mcp.apify.com runs on this core logic from a separate private repository.
+
+You need Node.js 22 or later and pnpm.
 
 ```bash
+pnpm install
 pnpm run build
+pnpm run dev              # Streamable HTTP server with hot reload on http://localhost:3001
+pnpm run inspector:stdio  # MCP Inspector against the stdio server
 ```
 
-## Start HTTP streamable MCP server
+The development HTTP server doesn't read `APIFY_TOKEN` from the environment. Pass your token in an `Authorization: Bearer` header or a `?token=` query parameter, for example from the [MCP Inspector](https://github.com/modelcontextprotocol/inspector).
 
-Run using Apify CLI:
+To publish a canary build of a pull request to [pkg.pr.new](https://pkg.pr.new/), add the `beta` label to it.
 
-```bash
-export APIFY_TOKEN="your-apify-token"
-export APIFY_META_ORIGIN=STANDBY
-apify run -p
-```
+[DEVELOPMENT.md](./DEVELOPMENT.md) covers the project structure, tool loading phases, the Node.js version policy, and testing.
 
-Once the server is running, you can use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) to debug the server exposed at `http://localhost:3001`.
+## Contributing
 
-## Start standard input/output (stdio) MCP server
+Bug reports, feature requests, and documentation fixes are welcome. A precise issue with a reproduction helps the Apify team more than a pull request.
 
-You can launch the MCP Inspector with this command:
+- **Report a bug:** [open an issue](https://github.com/apify/apify-mcp-server/issues) with steps to reproduce it.
+- **Propose a feature:** [open an issue](https://github.com/apify/apify-mcp-server/issues) describing the problem and who runs into it.
+- **Code:** work only on an issue a maintainer has invited you to pick up. Unsolicited pull requests are closed.
+- **Documentation:** send typos, broken links, and wrong commands straight to a pull request.
 
-```bash
-export APIFY_TOKEN="your-apify-token"
-npx @modelcontextprotocol/inspector node ./dist/stdio.js
-```
+Read [CONTRIBUTING.md](./CONTRIBUTING.md) before you start, including the rules for [AI-assisted contributions](./CONTRIBUTING.md#ai-assisted-contributions).
 
-Upon launching, the Inspector will display a URL that you can open in your browser to begin debugging.
+## Privacy and license
 
-## Unauthenticated access
+Requests and Actor inputs go to the Apify API to run the Actors you call. Apify doesn't share them with third parties beyond what running those Actors requires. See [Apify legal documents](https://docs.apify.com/legal) for details on data collection and retention.
 
-When the `tools` query parameter includes only tools explicitly enabled for unauthenticated use, the hosted server allows access without an API token.
-Currently allowed tools: `search-actors`, `fetch-actor-details`, `search-apify-docs`, `fetch-apify-docs`, `apify-api-search`, `apify-api-details`.
-Example: `https://mcp.apify.com?tools=search-actors`.
+The project is licensed under the [MIT license](./LICENSE.md).
 
-## 🐦 Canary PR releases
+## Learn more
 
-Apify MCP is split across two repositories: this repository for core MCP logic and the private `apify-mcp-server-internal` for the hosted server.
-Changes must be synchronized between both.
-
-To create a canary release, add the `beta` label to your pull request.
-This publishes the package to [pkg.pr.new](https://pkg.pr.new/) for staging and testing before merging.
-See [the workflow file](.github/workflows/on_pull_request_label.yaml) for details.
-
-## 🐋 Docker Hub integration
-The Apify MCP Server is also available on [Docker Hub](https://hub.docker.com/mcp/server/apify-mcp-server/overview), registered via the [mcp-registry](https://github.com/docker/mcp-registry) repository. The entry in `servers/apify-mcp-server/server.yaml` should be deployed automatically by the Docker Hub MCP registry (deployment frequency is unknown). **Before making major changes to the `stdio` server version, test it locally to ensure the Docker build passes.** To test, change the `source.branch` to your PR branch and run `task build -- apify-mcp-server`. For more details, see [CONTRIBUTING.md](https://github.com/docker/mcp-registry/blob/main/CONTRIBUTING.md).
-
-# 🐛 Troubleshooting
-
-For step-by-step troubleshooting, see the [Claude Desktop integration guide](https://docs.apify.com/platform/integrations/claude-desktop) in the Apify documentation.
-
-## 💡 Limitations
-
-The Actor input schema is processed to be compatible with most MCP clients while adhering to [JSON Schema](https://json-schema.org/) standards. The processing includes:
-- **Descriptions** longer than 500 characters (as defined in `ACTOR_MAX_DESCRIPTION_LENGTH`) are cut at the last complete sentence in that window, or the last complete word if there is no sentence break, and marked `[Description truncated]`.
-- **Enum fields** that fit within 2000 combined characters (as defined in `ACTOR_ENUM_MAX_LENGTH`) are kept in full; larger enums are omitted, with a short note and a few example values in the description instead.
-- **Required fields** are explicitly marked with a `REQUIRED` prefix in their descriptions for compatibility with frameworks that may not handle the JSON schema properly.
-- **Nested properties** are built for special cases like proxy configuration and request list sources to ensure the correct input structure.
-- **Array item types** are inferred when not explicitly defined in the schema, using a priority order: explicit type in items > prefill type > default value type > editor type.
-- **Enum values and examples** are added to property descriptions to ensure visibility, even if the client doesn't fully support the JSON schema.
-- **Rental Actors** are only available for use with the hosted MCP server at https://mcp.apify.com. When running the server locally via stdio, you can only access Actors that are already added to your local toolset. To dynamically search for and use any Actor from Apify Store—including rental Actors—connect to the hosted endpoint.
-
-# 🔒 Privacy policy
-
-When you use this server, your requests and Actor inputs are sent to the Apify API for execution.
-Data is not shared with third parties beyond what is necessary to run the requested Actors.
-For full details on data collection, usage, sharing, and retention, see [Apify Legal](https://docs.apify.com/legal).
-
-# 🤝 Contributing
-
-We welcome bug reports, feature requests, and documentation fixes. **Send us the problem, not the patch** — a precise issue with a reproduction is more useful than a pull request.
-
-- **🐛 Report a bug**: [Open an issue](https://github.com/apify/apify-mcp-server/issues) with a reproduction. The most useful thing you can send us.
-- **💡 Propose a feature**: [Open an issue](https://github.com/apify/apify-mcp-server/issues) — the problem and who hits it, not the implementation.
-- **🔧 Code**: Work only on a maintainer-invited issue. An open issue is not an invitation to pick it up; unsolicited pull requests are closed.
-- **📚 Documentation**: Typos, broken links, and wrong commands go straight to a PR.
-
-Full rules, including [AI-assisted contributions](./CONTRIBUTING.md#ai-assisted-contributions): [CONTRIBUTING.md](./CONTRIBUTING.md).
-
-# 📚 Learn more
-
-- [Model Context Protocol](https://modelcontextprotocol.org/)
-- [What are AI Agents?](https://blog.apify.com/what-are-ai-agents/)
-- [What is MCP and why does it matter?](https://blog.apify.com/what-is-model-context-protocol/)
+- [Model Context Protocol](https://modelcontextprotocol.io)
+- [MCP for beginners](https://blog.apify.com/mcp-for-beginners/)
 - [How to use MCP with Apify Actors](https://blog.apify.com/how-to-use-mcp/)
-- [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
-- [Webinar: Building and Monetizing MCP Servers on Apify](https://www.youtube.com/watch?v=w3AH3jIrXXo)
+- [What are AI agents?](https://blog.apify.com/what-are-ai-agents/)
 - [How to build and monetize an AI agent on Apify](https://blog.apify.com/how-to-build-an-ai-agent/)
-- [Connect Apify MCP with Claude Desktop](https://docs.apify.com/platform/integrations/claude-desktop)
-- [Connect Apify MCP with ChatGPT](https://docs.apify.com/platform/integrations/chatgpt)
+- [Webinar: Building and monetizing MCP servers on Apify](https://www.youtube.com/watch?v=w3AH3jIrXXo)
