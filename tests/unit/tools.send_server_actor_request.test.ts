@@ -395,7 +395,6 @@ describe('send-server-actor-request', () => {
         expect(result.structuredContent).toMatchObject({
             status: 404,
             body: '{"code":404,"authorization":"Bearer [REDACTED]"}',
-            errorMessage: '{"code":404,"authorization":"Bearer [REDACTED]"}',
         });
         expect(JSON.stringify(result)).not.toContain(TOKEN);
         expect(result.toolTelemetry).toMatchObject({
@@ -432,17 +431,18 @@ describe('send-server-actor-request', () => {
         expect(JSON.stringify(result)).not.toContain(TOKEN);
     });
 
-    it('keeps a non-JSON error readable without changing its body', async () => {
+    it('returns a non-JSON error body only once, as the body', async () => {
         const result = await callTool({ path: '/text-error' });
         const message = 'The "url" query parameter is required.';
 
-        expect(result.structuredContent).toMatchObject({ body: message, errorMessage: message });
+        expect(result.structuredContent).toMatchObject({ body: message });
+        expect(result.structuredContent).not.toHaveProperty('errorMessage');
         expect(
             result.content
                 .slice(1)
                 .map(({ text }) => text)
                 .join('\n'),
-        ).toContain(message);
+        ).not.toContain(message);
     });
 
     it('marks a 401 from the Actor server as an authentication failure', async () => {
@@ -453,7 +453,7 @@ describe('send-server-actor-request', () => {
     });
 
     it.each([true, false])(
-        'prioritizes the server error before README fallback with details tool served: %s',
+        'points a 404 at the Actor README, through fetch-actor-details when served: %s',
         async (hasDetails) => {
             const result = await callTool(
                 { path: '/status/404' },
@@ -463,39 +463,37 @@ describe('send-server-actor-request', () => {
 
             expect(received).toHaveLength(1);
             expect(result.isError).toBe(true);
-            expect(text).toContain('HTTP method, path, and required parameters');
-            expect(result.structuredContent).toMatchObject({
-                nextStep: expect.stringContaining('Read errorMessage first'),
-            });
-            expect(text).toContain('If errorMessage is missing or insufficient');
-            expect(text).toContain('may omit HTTP endpoint details');
-            expect(
-                result.content
-                    .slice(1)
-                    .map((block) => block.text)
-                    .join('\n'),
-            ).toContain('HTTP method, path, and required parameters');
+            expect(result.structuredContent).toMatchObject({ nextStep: expect.stringContaining('README') });
+            expect(result.content.at(-1)?.text).toBe((result.structuredContent as { nextStep: string }).nextStep);
             if (hasDetails) {
-                expect(text).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
                 expect(text).toContain(JSON.stringify({ actor: SERVER_ACTOR, output: { readme: true } }));
             } else {
                 expect(text).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
-                expect(text).toContain('Actor README');
             }
         },
     );
 
+    it('names the Actor Server error before the README only when the body carries one', async () => {
+        const withError = await callTool({ path: '/fetch' });
+        const withoutError = await callTool({ path: '/status/404' });
+
+        expect(withError.structuredContent).toMatchObject({
+            nextStep: expect.stringMatching(/^The Actor Server error may name/),
+        });
+        expect(withoutError.structuredContent).toMatchObject({
+            nextStep: expect.not.stringContaining('Actor Server error'),
+        });
+    });
+
     it.each([
         [429, 'The Actor Server rate limit was reached.'],
         [503, 'The Actor Server is temporarily unavailable.'],
-    ])('sends one request on a %i and explains how to pace further requests', async (status, hint) => {
+    ])('sends one request on a %i and names the cause', async (status, hint) => {
         const result = await callTool({ path: `/status/${status}` });
 
         expect(received).toHaveLength(1);
         expect(result.isError).toBe(true);
-        expect(result.content.at(-1)?.text).toContain(hint);
-        expect(result.content.at(-1)?.text).toContain('Wait');
-        expect(result.content.at(-1)?.text).toContain('one at a time');
+        expect(result.content.at(-1)?.text).toBe(hint);
     });
 
     it.each(['//other.example/echo', '//user:pw@{host}/echo'])(

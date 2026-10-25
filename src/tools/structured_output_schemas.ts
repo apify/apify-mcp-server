@@ -1266,9 +1266,12 @@ export const serverActorRequestOutputSchema = {
         summary: { type: 'string', description: 'Readable summary of the HTTP response' },
         errorMessage: {
             type: 'string',
-            description: 'Readable Actor Server error, when a non-empty error body was returned',
+            description: 'The error string of a JSON {"error": ...} error body; other error bodies are only in body',
         },
-        nextStep: { type: 'string', description: 'Guidance for correcting the request or pacing further requests' },
+        nextStep: {
+            type: 'string',
+            description: 'Where to look to correct the request, or why the Actor Server refused it',
+        },
     },
     required: ['actorId', 'actorName', 'interface', 'tenancy', 'method', 'path', 'status', 'body', 'bytes', 'summary'],
 };

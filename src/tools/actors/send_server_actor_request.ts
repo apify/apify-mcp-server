@@ -205,8 +205,11 @@ function decodeBody(body: Buffer, charset: string, token: string): string | unde
     }
 }
 
-/** Display a JSON error message without its envelope; keep other response bodies as text. */
-function getReadableErrorMessage(body: string, token: string): string {
+/**
+ * The `error` string of a JSON `{"error": ...}` body; `undefined` for any other body, which the response already
+ * carries as `body`.
+ */
+function getReadableErrorMessage(body: string, token: string): string | undefined {
     try {
         const parsed = z.object({ error: z.string() }).safeParse(JSON.parse(body));
         // JSON escapes can hide the token until parsing; see apify/apify-mcp-server#1623.
@@ -214,28 +217,24 @@ function getReadableErrorMessage(body: string, token: string): string {
     } catch {
         // An Actor can return plain text or malformed JSON.
     }
-    return body;
+    return undefined;
 }
 
 function buildRequestRecoveryText(
     status: number,
     actorName: string,
     loadedToolNames: readonly string[],
+    hasErrorMessage: boolean,
 ): string | undefined {
-    if (status === 429) {
-        return 'The Actor Server rate limit was reached. Wait before further requests, and send them one at a time.';
-    }
-    if (status === 503) {
-        return 'The Actor Server is temporarily unavailable. Wait before further requests, and send them one at a time.';
-    }
+    if (status === 429) return 'The Actor Server rate limit was reached.';
+    if (status === 503) return 'The Actor Server is temporarily unavailable.';
     if (![400, 404, 405, 422].includes(status)) return undefined;
     const documentation = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)
         ? `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorName, output: { readme: true } })} returns the Actor README or its summary, which may omit HTTP endpoint details.`
-        : 'consult the Actor README, which may omit HTTP endpoint details.';
-    return dedent`
-        Read errorMessage first for the expected HTTP method, path, and required parameters.
-        If errorMessage is missing or insufficient, ${documentation}
-    `;
+        : 'The Actor README may describe its HTTP endpoints.';
+    return hasErrorMessage
+        ? `The Actor Server error may name the expected HTTP method, path, or parameters. ${documentation}`
+        : documentation;
 }
 
 /** The tool response for what the Actor Server sent back, with the session token masked. */
@@ -269,7 +268,7 @@ function buildResponse(
     const redirectNote = location ? ` The redirect to ${location} was not followed.` : '';
     const summary = `${outcome} with ${bodyNote}.${redirectNote}`;
     const errorMessage = status >= 400 && body ? getReadableErrorMessage(body, token) : undefined;
-    const nextStep = buildRequestRecoveryText(status, request.actorName, loadedToolNames);
+    const nextStep = buildRequestRecoveryText(status, request.actorName, loadedToolNames, errorMessage !== undefined);
     const structuredContent = {
         ...request,
         status,
