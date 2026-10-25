@@ -75,7 +75,7 @@ function formatOperationLine({ method, path, operation }: ServerOperation, schem
     let text = `- ${method} ${path}`;
     if (typeof operation.summary === 'string') {
         text += `: ${operation.summary}`;
-        if (required.length > 0) text += '.';
+        if (required.length > 0 && !/[.!?]$/.test(operation.summary)) text += '.';
     }
     if (required.length > 0) text += ` Required: ${required.join(', ')}.`;
     return text;

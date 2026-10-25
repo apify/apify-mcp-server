@@ -111,6 +111,22 @@ describe('buildServerInterfaceSection()', () => {
             expect(text).toContain('- GET /empty: Return no content\n');
         });
 
+        it('keeps one period after a summary that already ends with one', () => {
+            const schema = {
+                openapi: '3.0.3',
+                paths: {
+                    '/': {
+                        get: {
+                            summary: 'Fetch a URL.',
+                            parameters: [{ name: 'url', in: 'query', required: true, schema: { type: 'string' } }],
+                        },
+                    },
+                },
+            };
+
+            expect(textOfSection({ schema, selection: true })).toContain('- GET /: Fetch a URL. Required: url.');
+        });
+
         it('lists required path-level inputs through a parameter alias chain', () => {
             const schema = {
                 openapi: '3.0.3',

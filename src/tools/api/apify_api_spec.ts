@@ -88,7 +88,7 @@ export function resolveLocalRef(spec: unknown, ref: string): unknown {
 export function resolveRef(node: unknown, spec: unknown): unknown {
     const seen = new Set<string>();
     let resolved = node;
-    // Parameter aliases must reach their name and location before overrides are matched; see #1645.
+    // Parameter aliases must reach their name and location before overrides are matched.
     while (isRecord(resolved) && typeof resolved.$ref === 'string' && resolved.$ref.startsWith('#/')) {
         if (seen.has(resolved.$ref)) return undefined;
         seen.add(resolved.$ref);
@@ -125,7 +125,7 @@ export function resolveLocalRefs(node: unknown, spec: unknown): unknown {
         if (typeof $ref !== 'string') return resolveProperties(value, seen, isSchema);
         const hasSchemaContext = isSchema || $ref.startsWith('#/components/schemas/');
         // 3.1 Schema Objects keep all siblings; Reference Objects override only these annotations.
-        // https://spec.openapis.org/oas/v3.1.0.html#reference-object (see #1645).
+        // https://spec.openapis.org/oas/v3.1.0.html#reference-object
         const siblings = hasRefSiblings
             ? Object.fromEntries(
                   Object.entries(rest).filter(
