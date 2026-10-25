@@ -119,18 +119,20 @@ async function resolveStandbyBuildId(
     reference: string,
     apifyClient: ApifyClient,
 ): Promise<string | undefined> {
+    // The platform reads a number as integers, so `0.1.05` runs build `0.1.5`, the form the API lists.
+    const buildNumber = BUILD_NUMBER_PATTERN.test(reference) ? reference.split('.').map(Number).join('.') : undefined;
     const taggedBuilds = actor.taggedBuilds ?? {};
     const taggedBuildId =
         taggedBuilds[reference]?.buildId ??
-        Object.values(taggedBuilds).find((build) => build.buildNumber === reference)?.buildId;
+        (buildNumber && Object.values(taggedBuilds).find((build) => build.buildNumber === buildNumber)?.buildId);
     if (taggedBuildId) return taggedBuildId;
 
-    if (!BUILD_NUMBER_PATTERN.test(reference)) return undefined;
+    if (!buildNumber) return undefined;
     // Unlike the Actor and build reads, listing builds needs a token. Without one (payment-provider sessions),
     // leave an untagged build number unresolved rather than fail the whole read with a 401.
     if (!apifyClient.token) return undefined;
     for await (const build of apifyClient.actor(actor.id).builds().list({ desc: true })) {
-        if ((build as BuildListItem).buildNumber === reference) return build.id;
+        if ((build as BuildListItem).buildNumber === buildNumber) return build.id;
     }
     return undefined;
 }
