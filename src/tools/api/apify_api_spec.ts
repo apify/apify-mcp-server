@@ -70,8 +70,8 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Walks a local `#/...` reference as a JSON Pointer (RFC 6901: `~1` stands for `/`, `~0` for `~`, a number
- * indexes an array); `undefined` when it does not resolve.
+ * Returns the node a local `$ref` points to, e.g. `#/components/schemas/Actor` → `spec.components.schemas.Actor`;
+ * `undefined` when it does not resolve. Keys are JSON Pointer escaped (RFC 6901): `#/paths/~1v2~1acts` → `spec.paths['/v2/acts']`.
  */
 export function resolveLocalRef(spec: unknown, ref: string): unknown {
     if (!ref.startsWith('#/')) return undefined;
@@ -84,7 +84,11 @@ export function resolveLocalRef(spec: unknown, ref: string): unknown {
     return node;
 }
 
-/** Follows top-level local reference chains only; `undefined` for a missing or circular reference. */
+/**
+ * Follows top-level local reference chains only; `undefined` for a missing or circular reference.
+ * For example, Alias → Limit → { name: 'limit', in: 'query' } returns the parameter object.
+ * A `$ref` nested inside that object's `schema` is left for `resolveLocalRefs`.
+ */
 export function resolveRef(node: unknown, spec: unknown): unknown {
     const seen = new Set<string>();
     let resolved = node;
@@ -97,68 +101,90 @@ export function resolveRef(node: unknown, spec: unknown): unknown {
     return resolved;
 }
 
+function getRefSiblings(siblings: Record<string, unknown>, isSchema: boolean): Record<string, unknown> {
+    // OpenAPI 3.1 Schema Objects keep all siblings; Reference Objects override only these annotations.
+    // https://spec.openapis.org/oas/v3.1.0.html#reference-object
+    // For example, { description: 'Custom', maxLength: 10 } keeps both in a schema,
+    // but only description beside a response or parameter reference.
+    if (isSchema) return siblings;
+    return Object.fromEntries(Object.entries(siblings).filter(([key]) => key === 'summary' || key === 'description'));
+}
+
+function mergeRefSiblings(resolved: unknown, siblings: Record<string, unknown>, isSchema: boolean): unknown {
+    if (Object.keys(siblings).length === 0) return resolved;
+    if (!isSchema) return { ...(isRecord(resolved) && resolved), ...siblings };
+    // Keep constraints conjunctive; a spread can weaken the target. Siblings stay outside allOf
+    // so unevaluatedProperties can see the target's evaluated properties.
+    // Target { maxLength: 5 } + sibling { maxLength: 10 } → { maxLength: 10, allOf: [{ maxLength: 5 }] }.
+    // Both constraints apply, so the effective maximum stays 5.
+    return { ...siblings, allOf: [resolved, ...(Array.isArray(siblings.allOf) ? siblings.allOf : [])] };
+}
+
 /**
  * A copy of `node` with every local `$ref` replaced by what it points to in `spec`. A reference that is
  * circular, not found, or external stays as it is, with an `unavailableDetail` note, and so does every reference
  * past `MAX_INLINE_BYTES` of expanded detail: shared references can otherwise grow the copy exponentially.
  * Nothing is fetched. An optional pruner removes unused detail before reference budget accounting.
+ *
+ * For example, with components.schemas.Text = { type: 'string' }:
+ * { schema: { $ref: '#/components/schemas/Text' } } → { schema: { type: 'string' } }.
+ * A missing target stays { $ref: '#/components/schemas/Missing', unavailableDetail: 'reference not found' }.
  */
 export function resolveLocalRefs(node: unknown, spec: unknown, prune?: (value: unknown) => unknown): unknown {
     const hasRefSiblings = isRecord(spec) && typeof spec.openapi === 'string' && /^3\.[1-9]\d*\./.test(spec.openapi);
     let expandedSize = 0;
+
     function resolveProperties(
         value: Record<string, unknown>,
         seen: readonly string[],
         isSchema: boolean,
     ): Record<string, unknown> {
-        const properties: [string, unknown][] = [];
-        for (const [key, child] of Object.entries(value)) {
-            properties.push([key, resolve(child, seen, isSchema || key === 'schema')]);
-        }
-        return Object.fromEntries(properties);
+        return Object.fromEntries(
+            Object.entries(value).map(([key, child]) => [key, resolveNode(child, seen, isSchema || key === 'schema')]),
+        );
     }
 
-    function resolve(value: unknown, seen: readonly string[], isSchema = false): unknown {
-        if (Array.isArray(value)) return value.map((item) => resolve(item, seen, isSchema));
+    function resolveNode(value: unknown, seen: readonly string[], isSchema = false): unknown {
+        if (Array.isArray(value)) return value.map((item) => resolveNode(item, seen, isSchema));
         if (!isRecord(value)) return value;
         const { $ref, ...rest } = value;
         if (typeof $ref !== 'string') return resolveProperties(value, seen, isSchema);
+        return resolveReference($ref, rest, seen, isSchema);
+    }
+
+    function resolveReference(
+        $ref: string,
+        rest: Record<string, unknown>,
+        seen: readonly string[],
+        isSchema: boolean,
+    ): unknown {
         const hasSchemaContext = isSchema || $ref.startsWith('#/components/schemas/');
-        // 3.1 Schema Objects keep all siblings; Reference Objects override only these annotations.
-        // https://spec.openapis.org/oas/v3.1.0.html#reference-object
-        const siblings = hasRefSiblings
-            ? Object.fromEntries(
-                  Object.entries(rest).filter(
-                      ([key]) => hasSchemaContext || key === 'summary' || key === 'description',
-                  ),
-              )
-            : {};
-        const unavailable = (unavailableDetail: string) => ({
+        const siblings = hasRefSiblings ? getRefSiblings(rest, hasSchemaContext) : {};
+        const buildUnavailableReference = (unavailableDetail: string) => ({
             ...resolveProperties(siblings, seen, hasSchemaContext),
             $ref,
             unavailableDetail,
         });
-        if (seen.includes($ref)) return unavailable('circular reference');
-        if (!$ref.startsWith('#/')) return unavailable('external reference, not fetched');
+
+        if (seen.includes($ref)) return buildUnavailableReference('circular reference');
+        if (!$ref.startsWith('#/')) return buildUnavailableReference('external reference, not fetched');
         const rawTarget = resolveLocalRef(spec, $ref);
-        if (rawTarget === undefined) return unavailable('reference not found');
+        if (rawTarget === undefined) return buildUnavailableReference('reference not found');
         const target = prune ? prune(rawTarget) : rawTarget;
+
         // A refused reference leaves the budget for smaller ones.
         const targetSize = JSON.stringify(target).length;
-        if (expandedSize + targetSize > MAX_INLINE_BYTES) return unavailable('not expanded, size cap reached');
+        if (expandedSize + targetSize > MAX_INLINE_BYTES)
+            return buildUnavailableReference('not expanded, size cap reached');
         expandedSize += targetSize;
-        const resolved = resolve(target, [...seen, $ref], hasSchemaContext);
-        if (Object.keys(siblings).length === 0) return resolved;
+
+        const resolved = resolveNode(target, [...seen, $ref], hasSchemaContext);
+        // Siblings are beside this reference, not inside its target, so they keep the parent's reference path.
         const resolvedSiblings = resolveProperties(siblings, seen, hasSchemaContext);
-        if (!hasSchemaContext) return { ...(isRecord(resolved) && resolved), ...resolvedSiblings };
-        // Keep constraints conjunctive, including overlapping keywords; a spread can weaken the target.
-        // Siblings stay outside allOf so unevaluatedProperties can see the target's evaluated properties.
-        return {
-            ...resolvedSiblings,
-            allOf: [resolved, ...(Array.isArray(resolvedSiblings.allOf) ? resolvedSiblings.allOf : [])],
-        };
+        return mergeRefSiblings(resolved, resolvedSiblings, hasSchemaContext);
     }
-    return resolve(prune ? prune(node) : node, []);
+
+    return resolveNode(prune ? prune(node) : node, []);
 }
 
 /**

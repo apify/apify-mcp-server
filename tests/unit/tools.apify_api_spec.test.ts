@@ -357,6 +357,44 @@ describe('resolveLocalRefs()', () => {
     });
 });
 
+describe('local reference edge cases', () => {
+    it('decodes escaped tildes without decoding the resulting escape sequence again', () => {
+        const spec = { components: { schemas: { 'text~1value': { type: 'string' } } } };
+
+        expect(resolveLocalRefs({ $ref: '#/components/schemas/text~01value' }, spec)).toEqual({ type: 'string' });
+    });
+
+    it('expands a shared target in separate branches without treating it as a cycle', () => {
+        const spec = { components: { schemas: { Text: { type: 'string' } } } };
+        const schema = {
+            type: 'object',
+            properties: {
+                name: { $ref: '#/components/schemas/Text' },
+                description: { $ref: '#/components/schemas/Text' },
+            },
+        };
+
+        expect(resolveLocalRefs(schema, spec)).toEqual({
+            type: 'object',
+            properties: { name: { type: 'string' }, description: { type: 'string' } },
+        });
+    });
+
+    it('preserves a false schema as a resolved target', () => {
+        const spec = { openapi: '3.1.0', components: { schemas: { Forbidden: false } } };
+
+        expect(resolveLocalRefs({ $ref: '#/components/schemas/Forbidden' }, spec)).toBe(false);
+    });
+
+    it('keeps a false target as a constraint when a reference has schema siblings', () => {
+        const spec = { openapi: '3.1.0', components: { schemas: { Forbidden: false } } };
+
+        expect(
+            resolveLocalRefs({ $ref: '#/components/schemas/Forbidden', description: 'No values allowed' }, spec),
+        ).toEqual({ description: 'No values allowed', allOf: [false] });
+    });
+});
+
 describe('searchApiOperations()', () => {
     const index = buildApiOperationIndex(API_SPEC_FIXTURE);
 
