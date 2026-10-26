@@ -152,7 +152,7 @@ describe('Actor run/standby mode decision table', () => {
             const withoutMcpTool = earlyText(await preExecute(STANDBY_MCP, [HELPER_TOOLS.ACTOR_CALL]));
 
             expect(firstText(withMcpTool)).toContain(
-                `Its MCP tools are called with ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL}.`,
+                `Its MCP tools can be called with ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL}.`,
             );
             expect(withMcpTool.toolTelemetry).toEqual(
                 expect.objectContaining({
@@ -227,11 +227,12 @@ describe('Actor run/standby mode decision table', () => {
                 },
             );
 
-            it('names call-actor-mcp-tool only when the session has it', async () => {
+            it('names call-actor-mcp-tool only when the session has it, and otherwise the own-server remedy', async () => {
                 const result = await dispatch([callActorTool], HELPER_TOOLS.ACTOR_CALL);
 
                 expect(result.isError).toBe(true);
                 expect(JSON.stringify(result.content)).not.toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
+                expect(JSON.stringify(result.content)).toContain('cannot be called in this configuration');
             });
         });
 

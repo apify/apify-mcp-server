@@ -168,7 +168,7 @@ export const paymentsCases: Case[] = [
         },
     },
     {
-        name: 'does not list send-server-actor-request in x402 or skyfire payment mode',
+        name: 'does not list send-server-actor-request or call-actor-mcp-tool in x402 or skyfire payment mode',
         isDeploymentTest: false,
         skipIf: skipOnStdio,
         run: async (ctx) => {
@@ -176,29 +176,12 @@ export const paymentsCases: Case[] = [
                 const client = await ctx.createClientFn({ payment, tools: ['actors'] });
                 try {
                     const { tools } = await client.listTools();
-                    expect(tools.map((tool) => tool.name)).not.toContain('send-server-actor-request');
+                    const names = tools.map((tool) => tool.name);
+                    expect(names).not.toContain('send-server-actor-request');
+                    expect(names).not.toContain('call-actor-mcp-tool');
                 } finally {
                     await client.close();
                 }
-            }
-        },
-    },
-    {
-        name: 'returns the standby rejection for call-actor-mcp-tool in x402 payment mode',
-        isDeploymentTest: false,
-        skipIf: skipOnStdio,
-        run: async (ctx) => {
-            const client = await ctx.createClientFn({ payment: 'x402' });
-            try {
-                const result = await client.callTool({
-                    name: 'call-actor-mcp-tool',
-                    arguments: { actor: ACTOR_EXAMPLE_MCP_SERVER, tool: 'add', arguments: {} },
-                });
-                expect(result.isError).toBe(true);
-                const content = result.content as { text: string }[];
-                expect(content[0].text).toContain('is not supported in agentic payment mode');
-            } finally {
-                await client.close();
             }
         },
     },

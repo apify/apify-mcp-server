@@ -4,7 +4,7 @@ import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { FAILURE_CATEGORY, HELPER_TOOLS } from '../../const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../const.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import { withRemoteMcpClient } from '../../mcp/remote_tool_call.js';
@@ -35,7 +35,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         : '';
     return dedent`
         Call one tool on an Actor's MCP server and return its result.${details}
-        The server connects with the Apify API token. Connecting can start a standby run of the Actor in your account, kept for its idle timeout, or is charged per event when the Actor is multi-tenant. What the tool itself does depends on the Actor.
+        It connects with your Apify API token. Connecting can start a standby run of the Actor in your account, kept until its idle timeout; a multi-tenant Actor charges per event. What the tool itself does depends on the Actor.
 
         Example call: {"actor": "username/name", "tool": "search", "arguments": {"query": "apify"}}
 
@@ -50,8 +50,8 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
 /**
  * Runs one operation on an MCP server Actor's server under the caller's token: resolves the Actor, rejects one
  * without the `mcp` interface before connecting, and turns a failed connection, an abort or a thrown error into
- * a response. `operation` completes "Failed to … on Actor 'name'". Every response after the lookup carries the
- * Actor ID for telemetry.
+ * a response. `operation` completes "Failed to … on Actor 'name'". Every response after the lookup, except an
+ * abort, carries the Actor ID for telemetry.
  */
 export async function runOnActorMcpServer(
     toolArgs: InternalToolArgs,
@@ -128,7 +128,13 @@ export async function executeCallActorMcpTool(toolArgs: InternalToolArgs): Promi
                 CallToolResultSchema,
                 { timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, signal: toolArgs.signal },
             );
-            return respondRaw(result as CallToolResult);
+            const response = respondRaw(result as CallToolResult);
+            if (!result.isError) return response;
+            // The remote reports no cause, so this is recorded like a proxied Actor MCP tool's error.
+            return {
+                ...response,
+                toolTelemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR },
+            };
         },
     });
 }

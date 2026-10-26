@@ -14,13 +14,13 @@ import {
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient, REQUEST_ORIGIN } from '../../src/apify_client.js';
-import { APIFY_AI_CLIENT_NAME, FAILURE_CATEGORY, HELPER_TOOLS } from '../../src/const.js';
+import { APIFY_AI_CLIENT_NAME, FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import { connectMCPClient } from '../../src/mcp/client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../src/mcp/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
 import { callActorMcpTool, executeCallActorMcpTool } from '../../src/tools/actors/call_actor_mcp_tool.js';
 import type { Actor, ActorDefinitionPruned, ToolTelemetryContext } from '../../src/types.js';
-import { ALL_TOOLS_PRESENT } from '../../src/types.js';
+import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../src/types.js';
 import { mockActor } from './helpers/actor_build_client.js';
 import { getRequestHandler, makePaymentProvider, withServer } from './helpers/mcp_server.js';
 import { expectSoftFailInvalidInput, mockApifyClient, only, stubToolCallContext } from './helpers/tool_context.js';
@@ -28,7 +28,7 @@ import { expectSoftFailInvalidInput, mockApifyClient, only, stubToolCallContext 
 const TOKEN = 'test-token';
 const MCP_ACTOR = 'apify/example-mcp-server';
 
-/** What the remote server returns per tool; `add` carries every field a `CallToolResult` can. */
+/** What the remote server returns per tool; `add` carries text and resource content, structuredContent and _meta. */
 const REMOTE_RESULTS: Record<string, CallToolResult> = {
     add: {
         content: [
@@ -161,11 +161,15 @@ describe('call-actor-mcp-tool', () => {
         expect(remoteCalls).toEqual([{ name: 'add', arguments: { a: 2, b: 3 } }]);
     });
 
-    it("passes the remote tool's error flag through and reports the Actor ID", async () => {
+    it("passes the remote tool's error flag through, recorded as an internal error", async () => {
         const result = await callTool({ tool: 'fail' });
 
         expect(result).toMatchObject(REMOTE_RESULTS.fail);
-        expect(result.toolTelemetry).toEqual({ actorId: 'example-mcp-server-id' });
+        expect(result.toolTelemetry).toEqual({
+            toolStatus: TOOL_STATUS.SOFT_FAIL,
+            failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
+            actorId: 'example-mcp-server-id',
+        });
     });
 
     it("ignores a toolTelemetry key in the remote result, so the remote cannot write the server's telemetry", async () => {
@@ -220,16 +224,12 @@ describe('call-actor-mcp-tool', () => {
         for (const headers of requestHeaders) expect(headers['x-apify-request-origin']).toBe('APIFY_AI');
     });
 
-    it('passes the external tool-call timeout and the call signal to tools/call', async () => {
+    it('passes the external tool-call timeout to tools/call', async () => {
         const callToolSpy = vi.spyOn(Client.prototype, 'callTool');
-        const controller = new AbortController();
 
-        await callTool({}, { signal: controller.signal });
+        await callTool({});
 
-        expect(callToolSpy.mock.calls[0][2]).toMatchObject({
-            timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
-            signal: controller.signal,
-        });
+        expect(callToolSpy.mock.calls[0][2]).toMatchObject({ timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC });
     });
 
     it('rejects an Actor that is not an MCP server without connecting', async () => {
@@ -255,9 +255,10 @@ describe('call-actor-mcp-tool', () => {
     });
 
     it('requires a token without connecting', async () => {
-        const result = await callTool({}, { token: '' });
+        const result = await dispatchTool({ actor: MCP_ACTOR, tool: 'add' }, { token: '', allowUnauthMode: true });
 
-        expect(result.toolTelemetry).toMatchObject({ failureCategory: FAILURE_CATEGORY.AUTH });
+        expect(result.isError).toBe(true);
+        expect(JSON.stringify(result.content)).toContain('An Apify API token is required');
         expect(requestHeaders).toHaveLength(0);
     });
 
@@ -309,9 +310,23 @@ describe('call-actor-mcp-tool', () => {
 
         expect(result.isError).toBe(true);
         expect(JSON.stringify(result.content)).toContain('is not supported in agentic payment mode');
-        // The engine returns a preflight rejection as is, so it must not carry the internal telemetry.
-        expect(result).not.toHaveProperty('toolTelemetry');
         expect(requestHeaders).toHaveLength(0);
+    });
+
+    it('is not listed in a payment-provider session', async () => {
+        const listActorsTools = async (options: Parameters<typeof withServer>[1]) =>
+            withServer(
+                async (server) => {
+                    await server.loadToolsFromInput({ tools: ['actors'] }, mockApifyClient());
+                    return server.listToolNames();
+                },
+                { serverMode: SERVER_MODE.DEFAULT, ...options },
+            );
+
+        expect(await listActorsTools({})).toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
+        expect(await listActorsTools({ paymentProvider: makePaymentProvider() })).not.toContain(
+            HELPER_TOOLS.ACTOR_MCP_TOOL_CALL,
+        );
     });
 
     it('names fetch-actor-details in the description only when the session has it, and states the billing caveat', () => {
