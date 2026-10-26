@@ -294,8 +294,11 @@ function buildRequestRecoveryText(
 function buildResponse(
     request: ServerActorRequest,
     response: ServerActorResponse,
-    { apifyToken: token, loadedToolNames }: Pick<InternalToolArgs, 'apifyToken' | 'loadedToolNames'>,
-    operations: readonly string[] | undefined,
+    {
+        apifyToken: token,
+        loadedToolNames,
+        operations,
+    }: Pick<InternalToolArgs, 'apifyToken' | 'loadedToolNames'> & { operations?: readonly string[] },
 ): ToolResponse {
     const { status } = response;
     const contentType = response.contentType?.replaceAll(token, REDACTED);
@@ -437,7 +440,11 @@ export async function executeSendServerActorRequest(
             timeoutMillis,
         });
         return withActorTelemetry(
-            buildResponse(request, response, { apifyToken, loadedToolNames }, definition.webServerOperations),
+            buildResponse(request, response, {
+                apifyToken,
+                loadedToolNames,
+                operations: definition.webServerOperations,
+            }),
             response.status,
         );
     } catch (error) {
