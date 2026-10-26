@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { gzipSync } from 'node:zlib';
 
+import Ajv from 'ajv';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
@@ -382,6 +383,13 @@ describe('returning the response', () => {
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toContain('unsupported-encoding');
         expect(result.content[0].text).toContain('The request itself was sent.');
+        expect(result.structuredContent).toMatchObject({
+            status: 200,
+            bodyOmitted: true,
+            reason: expect.stringContaining('charset'),
+            bytes: Buffer.byteLength('café'),
+        });
+        expect(result.structuredContent).not.toHaveProperty('body');
         expect(result.toolTelemetry).toMatchObject({
             httpStatus: 200,
             failureHttpStatus: 200,
@@ -392,10 +400,29 @@ describe('returning the response', () => {
     });
 
     it('rejects a binary body by its content type and keeps the status', async () => {
-        const result = await callTool({ path: '/binary' });
+        const result = await callTool({ path: '/binary', query: { token: TOKEN } });
 
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toContain('application/octet-stream');
+        expect(result.structuredContent).toMatchObject({
+            actorId: 'server-actor-test-id',
+            actorName: SERVER_ACTOR,
+            interface: 'server',
+            tenancy: ACTOR_TENANCY.SINGLE_TENANT,
+            method: 'GET',
+            path: '/binary?token=[REDACTED]',
+            status: 200,
+            contentType: 'application/octet-stream',
+            bodyOmitted: true,
+            reason: expect.stringContaining('application/octet-stream'),
+            bytes: 3,
+            summary: expect.stringContaining('The request itself was sent.'),
+        });
+        expect(result.structuredContent).not.toHaveProperty('body');
+        const validate = new Ajv({ strict: false }).compile(serverActorRequestOutputSchema);
+        expect(validate(result.structuredContent), JSON.stringify(validate.errors)).toBe(true);
+        expect(result.content[0].text).toBe(JSON.stringify(result.structuredContent));
+        expect(JSON.stringify(result)).not.toContain(TOKEN);
         expect(result.toolTelemetry).toMatchObject({ httpStatus: 200, failureHttpStatus: 200 });
     });
 
@@ -418,6 +445,15 @@ describe('returning the response', () => {
             expect(result.content[0].text).toContain(`larger than ${MAX_INLINE_BYTES} bytes`);
             expect(result.content[0].text).toContain('The request itself was sent.');
             expect(result.content[0].text).not.toContain('aaa');
+            expect(result.structuredContent).toMatchObject({
+                status: 200,
+                bodyOmitted: true,
+                reason: expect.stringContaining(`larger than ${MAX_INLINE_BYTES} bytes`),
+            });
+            expect(result.structuredContent).not.toHaveProperty('body');
+            expect(result.structuredContent).not.toHaveProperty('bytes');
+            const validate = new Ajv({ strict: false }).compile(serverActorRequestOutputSchema);
+            expect(validate(result.structuredContent), JSON.stringify(validate.errors)).toBe(true);
             expect(result.toolTelemetry).toMatchObject({
                 httpStatus: 200,
                 actorTenancy: ACTOR_TENANCY.SINGLE_TENANT,

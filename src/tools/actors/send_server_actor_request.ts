@@ -304,10 +304,23 @@ function buildResponse(
     const contentType = response.contentType?.replaceAll(token, REDACTED);
     const location = response.location?.replaceAll(token, REDACTED);
     const outcome = `${request.method} ${request.path} on ${request.actorName} returned HTTP ${status}`;
-    const rejectBody = (reason: string) =>
-        respondUserError(`${outcome}. The body is not returned: ${reason}. The request itself was sent.`, {
+    const rejectBody = (reason: string) => {
+        const summary = `${outcome}. The body is not returned: ${reason}. The request itself was sent.`;
+        const structuredContent = {
+            ...request,
+            status,
+            ...(contentType && { contentType }),
+            ...(location && { location }),
+            ...(response.body !== undefined && { bytes: response.body.length }),
+            bodyOmitted: true,
+            reason,
+            summary,
+        };
+        return respondUserError([JSON.stringify(structuredContent), summary], {
             httpStatus: status,
+            structuredContent,
         });
+    };
 
     if (response.body === undefined) return rejectBody(`it is larger than ${MAX_INLINE_BYTES} bytes`);
     const bytes = response.body.length;
