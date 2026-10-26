@@ -168,11 +168,21 @@ describe('secrets in a run log are redacted', () => {
             'Proxy: http://groups-RESIDENTIAL:apify_proxy_Xk29fLq@proxy.apify.com:8000',
             'apify_proxy_Xk29fLq',
         ],
+        ['a proxy password with no user', 'Proxy: http://:Xk29fLqPass@proxy.apify.com:8000', 'Xk29fLqPass'],
+        ['a URL password with no user', 'Connecting to redis://:pw0rdSecret@cache:6379', 'pw0rdSecret'],
+        ['a URL password that holds an @', 'Proxy: http://auto:p@ssw0rd@proxy.apify.com:8000', 'ssw0rd'],
+        ['the proxy password in an env line', 'APIFY_PROXY_PASSWORD=SECRETPW123', 'SECRETPW123'],
+        ['the proxy password in a printed env object', "  APIFY_PROXY_PASSWORD: 'SECRETPW123',", 'SECRETPW123'],
+        ['a password in JSON', 'Config: {"proxy":{"password":"SECRETPW123"}}', 'SECRETPW123'],
     ])('hides %s', (_name, line, secret) => {
         const redacted = redactLogSecrets(line, 's3ss10nT0ken');
 
         expect(redacted).not.toContain(secret);
         expect(redacted).toContain(REDACTED);
+    });
+
+    it('leaves the text unchanged when the session token is empty', () => {
+        expect(redactLogSecrets('Run started', '')).toBe('Run started');
     });
 
     it('keeps the proxy host and user so the line stays useful', () => {
@@ -194,6 +204,12 @@ describe('the log tail keeps the end of the log within its limits', () => {
                 .split('\n')
                 .slice(-RUN_LOG_TAIL_LINES),
         );
+    });
+
+    it('drops the carriage return of Windows line endings', () => {
+        const tail = buildLogTail('line 1\r\nline 2\r\n', undefined);
+
+        expect(tail).toBe('line 1\nline 2');
     });
 
     it('drops whole leading lines while the tail is over the character limit', () => {
