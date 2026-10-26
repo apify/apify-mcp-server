@@ -285,14 +285,20 @@ export async function getMCPServersAsTools(
 export function fixActorNameInputAndLog(actorName: string, extra?: Record<string, unknown>): string {
     const fixed = fixActorNameInput(actorName);
     if (fixed !== actorName) {
-        log.info('Actor name input required normalization before lookup (quotes, spacing, or slash padding)', {
-            actorNameInput: actorName,
-            actorNameFixed: fixed,
-            ...extra,
-        });
+        log.info(
+            'Actor name input required normalization before lookup (quotes, spacing, slash padding, or a tool name)',
+            {
+                actorNameInput: actorName,
+                actorNameFixed: fixed,
+                ...extra,
+            },
+        );
     }
     return fixed;
 }
+
+/** The `:toolName` of the removed `actorName:toolName` form; a URL's `scheme://` is not one. */
+export const MCP_TOOL_NAME_SUFFIX = /:[^/]*$/;
 
 /**
  * Fixes Actor name strings (`username/name`) before cache + Apify API lookup.
@@ -304,7 +310,7 @@ export function fixActorNameInputAndLog(actorName: string, extra?: Record<string
  */
 export function fixActorNameInput(actorName: string): string {
     const s = stripQuoteWrappers(actorName).replace(/\s*\/\s*/g, '/');
-    return s.replace(/\s+/g, ' ').trim().split(':')[0];
+    return s.replace(/\s+/g, ' ').trim().replace(MCP_TOOL_NAME_SUFFIX, '');
 }
 
 /**

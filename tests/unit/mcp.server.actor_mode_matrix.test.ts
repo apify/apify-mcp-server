@@ -1,9 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
-import { callActorPreExecute, executeCallActor } from '../../src/tools/actors/call_actor.js';
+import { callActorPreExecute } from '../../src/tools/actors/call_actor.js';
 import type { ActorDefinitionWithInfo } from '../../src/types.js';
 import type { ToolResponse } from '../../src/utils/mcp.js';
 import { withServer } from './helpers/mcp_server.js';
@@ -69,10 +69,6 @@ async function loadedToolNames(actorFullName: string): Promise<string[]> {
     });
 }
 
-function callActor(actor: string): Promise<ToolResponse> {
-    return executeCallActor(stubToolCallContext({ actor, input: {} }, new ApifyClient({ token: 'test-token' })));
-}
-
 function preExecute(actor: string, loadedToolNames?: string[]) {
     return callActorPreExecute(
         stubToolCallContext({ actor, input: {} }, new ApifyClient({ token: 'test-token' }), { loadedToolNames }),
@@ -93,10 +89,6 @@ function earlyResponseOf(result: Awaited<ReturnType<typeof preExecute>>): ToolRe
 function earlyText(result: Awaited<ReturnType<typeof preExecute>>): string {
     return firstText(earlyResponseOf(result));
 }
-
-afterEach(() => {
-    vi.restoreAllMocks();
-});
 
 beforeEach(() => {
     seedActor(RUN_ONLY, { input: NON_EMPTY_INPUT });
@@ -157,6 +149,13 @@ describe('Actor run/standby mode decision table', () => {
             expect(withoutMcpTool).toContain('cannot be called in this configuration');
         });
 
+        it('refuses to run an Actor that is not an MCP server when addressed in the removed actorName:toolName form', async () => {
+            const text = earlyText(await preExecute(`${RUN_ONLY}:search`));
+
+            expect(text).toContain(`Actor '${RUN_ONLY}' is not an MCP server`);
+            expect(text).toContain(`pass "actor": "${RUN_ONLY}"`);
+        });
+
         it('answers the removed actorName:toolName form with the MCP server rejection', async () => {
             const text = earlyText(await preExecute(`${STANDBY_MCP}:add`));
 
@@ -164,16 +163,9 @@ describe('Actor run/standby mode decision table', () => {
             expect(text).toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
         });
 
-        it('rejects a bare unsupported standby Actor during pre-execution', async () => {
-            const result = await preExecute(STANDBY_EMPTY);
+        it('rejects an unsupported standby Actor during pre-execution, with its canonical name when addressed by Actor ID', async () => {
+            const text = earlyText(await preExecute(STANDBY_EMPTY_ID));
 
-            expect('earlyResponse' in result).toBe(true);
-        });
-
-        it('answers the standby-without-MCP message with the canonical Actor name when addressed by Actor ID', async () => {
-            const result = await callActor(STANDBY_EMPTY_ID);
-
-            const text = firstText(result);
             expect(text).toContain('standby mode without an MCP server');
             expect(text).toContain(STANDBY_EMPTY);
             expect(text).not.toContain(STANDBY_EMPTY_ID);

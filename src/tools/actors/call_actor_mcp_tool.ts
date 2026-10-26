@@ -8,7 +8,13 @@ import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../const.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import { withRemoteMcpClient } from '../../mcp/remote_tool_call.js';
-import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
+import type {
+    ActorInterfaces,
+    InternalToolArgs,
+    ToolDescriptionContext,
+    ToolEntry,
+    ToolInputSchema,
+} from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -47,6 +53,22 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
     `;
 }
 
+/** Rejection for an Actor that is not an MCP server, pointing at the tool that serves its interface when there is one. */
+function buildNotMcpServerText(
+    actorFullName: string,
+    { input, server }: ActorInterfaces,
+    loadedToolNames: readonly string[],
+): string {
+    const text = `Actor '${actorFullName}' is not an MCP server.`;
+    if (server && loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)) {
+        return `${text} Its HTTP API can be called with ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}.`;
+    }
+    if (input && loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL)) {
+        return `${text} It can be run from an input with ${HELPER_TOOLS.ACTOR_CALL}.`;
+    }
+    return text;
+}
+
 /**
  * Runs one operation on an MCP server Actor's server under the caller's token: resolves the Actor, rejects one
  * without the `mcp` interface before connecting, and turns a failed connection, an abort or a thrown error into
@@ -77,9 +99,12 @@ export async function runOnActorMcpServer(
     });
 
     const webServerMcpPath = getActorMCPServerPath(definition);
-    if (!webServerMcpPath || !resolveActorInterfaces({ definition, actor: info, webServerMcpPath }).mcp) {
+    const interfaces = resolveActorInterfaces({ definition, actor: info, webServerMcpPath });
+    if (!webServerMcpPath || !interfaces.mcp) {
         return withActorId(
-            respondUserError(`Actor '${actorFullName}' is not an MCP server.`, { detail: 'not an MCP server' }),
+            respondUserError(buildNotMcpServerText(actorFullName, interfaces, loadedToolNames), {
+                detail: 'not an MCP server',
+            }),
         );
     }
     let serverUrl: string;
@@ -109,6 +134,7 @@ export async function runOnActorMcpServer(
             return withActorId(
                 respondServerError(
                     `Failed to ${params.operation} on Actor '${actorFullName}': ${remoteMcpFailureDetail(outcome.error)}`,
+                    { error: outcome.error },
                 ),
             );
         case 'success':

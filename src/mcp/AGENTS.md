@@ -32,8 +32,7 @@ Two MCP protocol revisions are served, each by its own adapter:
 - `client_context.ts` — protocol-neutral client identity and capabilities.
 - `errors.ts` — protocol-neutral domain errors mapped by each protocol adapter.
 - `tool_call_engine.ts` — shared `tools/call` orchestration. `prepareToolCall()` handles
-  preparation, including the tool's declared standby check, which comes before a 402;
-  `executeSyncToolCall()` runs synchronous calls.
+  preparation; `executeSyncToolCall()` runs synchronous calls.
 - `client.ts` — `connectMCPClient(url, credentials)`: transport negotiation; both transports send the token and the
   session's request origin (`ApifyClient.requestOrigin`, `APIFY_AI` for the Apify AI client) on every request.
 - `remote_tool_call.ts` — `withRemoteMcpClient()`: connect-call-close round trip for

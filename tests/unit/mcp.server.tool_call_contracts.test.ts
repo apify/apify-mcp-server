@@ -1232,7 +1232,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 server.upsertTools([tool]);
                 const handler = getRequestHandler(server, 'tools/call');
 
-                // Non-task sync path returns the preflight rejection directly.
+                // Non-task sync path returns the standbyRejection directly.
                 const syncResult = await handler(
                     {
                         method: 'tools/call',

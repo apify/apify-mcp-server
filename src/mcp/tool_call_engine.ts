@@ -122,7 +122,7 @@ export type PreparedCall = {
     apifyClient: ApifyClient;
     actorName: string | undefined;
     actorId: string | undefined;
-    preflightRejection: Record<string, unknown> | null;
+    standbyRejection: Record<string, unknown> | null;
     paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined;
     // The shell uses this decoded copy for telemetry.
     decodedArgs: Record<string, unknown>;
@@ -142,11 +142,11 @@ export type PreparedCallError = ToolCallOutcome & {
 };
 
 /**
- * Builds the pre-flight result; a preflight rejection takes precedence over 402. The rejection skipped dispatch, which
+ * Builds the pre-flight result; standby rejection takes precedence over 402. The rejection skipped dispatch, which
  * strips `toolTelemetry` from a tool response, so it is stripped here and its failure detail recorded.
  */
 export function buildPreflightFailureOutcome(
-    preflightRejection: Record<string, unknown> | null,
+    standbyRejection: Record<string, unknown> | null,
     paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined,
     actorName: string | undefined,
     actorId: string | undefined,
@@ -155,16 +155,16 @@ export function buildPreflightFailureOutcome(
     callDiagnostics: CallDiagnostics;
     result: Record<string, unknown> | ReturnType<typeof buildPaymentRequiredResponse>;
 } {
-    const { toolTelemetry, ...rejection } = (preflightRejection ?? {}) as { toolTelemetry?: ToolTelemetryContext };
+    const { toolTelemetry, ...rejection } = (standbyRejection ?? {}) as { toolTelemetry?: ToolTelemetryContext };
     return {
         toolStatus: TOOL_STATUS.SOFT_FAIL,
         callDiagnostics: {
             failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-            ...(preflightRejection ? {} : { failure_http_status: 402 }),
+            ...(standbyRejection ? {} : { failure_http_status: 402 }),
             ...(toolTelemetry?.failureDetail && { failure_detail: toolTelemetry.failureDetail }),
             ...buildActorFields(actorName, actorId),
         },
-        result: preflightRejection ? rejection : paymentRequiredResult!,
+        result: standbyRejection ? rejection : paymentRequiredResult!,
     };
 }
 
@@ -361,7 +361,7 @@ export async function prepareToolCall(params: {
             };
         }
 
-        const preflightRejection = await checkPaymentProviderStandbyConflict({
+        const standbyRejection = await checkPaymentProviderStandbyConflict({
             tool,
             args: toolArgs,
             paymentProvider,
@@ -376,7 +376,7 @@ export async function prepareToolCall(params: {
             apifyClient,
             actorName,
             actorId,
-            preflightRejection,
+            standbyRejection,
             paymentRequiredResult,
             decodedArgs,
         };
@@ -424,7 +424,7 @@ export async function executeSyncToolCall(
         sendNotification,
         emitLog,
     } = params;
-    const { tool, toolArgs, logSafeArgs, apifyClient, actorName, actorId, preflightRejection, paymentRequiredResult } =
+    const { tool, toolArgs, logSafeArgs, apifyClient, actorName, actorId, standbyRejection, paymentRequiredResult } =
         prepared;
     const resolvedToolName = getToolFullName(tool);
 
@@ -437,8 +437,8 @@ export async function executeSyncToolCall(
             failureHttpStatus: callDiagnostics.failure_http_status,
         }) as Record<string, unknown>;
 
-    if (preflightRejection || paymentRequiredResult) {
-        const outcome = buildPreflightFailureOutcome(preflightRejection, paymentRequiredResult, actorName, actorId);
+    if (standbyRejection || paymentRequiredResult) {
+        const outcome = buildPreflightFailureOutcome(standbyRejection, paymentRequiredResult, actorName, actorId);
         return {
             result: nudge(outcome.result, outcome.callDiagnostics),
             toolStatus: outcome.toolStatus,
