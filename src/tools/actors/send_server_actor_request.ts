@@ -25,6 +25,7 @@ import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondServerError, respondUserError } from '../../utils/mcp.js';
 import { resolveActorInterfaces, resolveActorTenancy } from '../actor_tool_naming.js';
 import { apiCallArgsShape, redactApiCallArgs } from '../api/apify_api_request.js';
+import { isRecord } from '../api/apify_api_spec.js';
 import { parseBaseMimeType } from '../storage/storage_helpers.js';
 import { anyJsonValueSchema, serverActorRequestOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
@@ -194,13 +195,21 @@ async function sendRequest({
 
 /**
  * The body decoded with `charset`, the session token masked before and after decoding; `undefined` when
- * `TextDecoder` does not support the charset.
+ * `TextDecoder` does not support the charset. A JSON body whose escapes hide the token comes back
+ * re-serialized with the token masked; any other body keeps its text.
  */
 function decodeBody(body: Buffer, charset: string, token: string): string | undefined {
+    let text: string;
     try {
-        return new TextDecoder(charset).decode(maskSessionToken(body, token)).replaceAll(token, REDACTED);
+        text = new TextDecoder(charset).decode(maskSessionToken(body, token)).replaceAll(token, REDACTED);
     } catch {
         return undefined;
+    }
+    try {
+        const serialized = JSON.stringify(JSON.parse(text));
+        return serialized.includes(token) ? serialized.replaceAll(token, REDACTED) : text;
+    } catch {
+        return text;
     }
 }
 
@@ -208,11 +217,10 @@ function decodeBody(body: Buffer, charset: string, token: string): string | unde
  * The `error` string of a JSON `{"error": ...}` body; `undefined` for any other body, which the response already
  * carries as `body`.
  */
-function getReadableErrorMessage(body: string, token: string): string | undefined {
+function getReadableErrorMessage(body: string): string | undefined {
     try {
         const parsed = z.object({ error: z.string() }).safeParse(JSON.parse(body));
-        // JSON escapes can hide the token until parsing.
-        if (parsed.success) return parsed.data.error.replaceAll(token, REDACTED);
+        if (parsed.success) return parsed.data.error;
     } catch {
         // An Actor can return plain text or malformed JSON.
     }
@@ -266,7 +274,7 @@ function buildResponse(
     const bodyNote = bytes === 0 ? 'an empty body' : `${bytes} bytes of ${mimeType}`;
     const redirectNote = location ? ` The redirect to ${location} was not followed.` : '';
     const summary = `${outcome} with ${bodyNote}.${redirectNote}`;
-    const errorMessage = status >= 400 && body ? getReadableErrorMessage(body, token) : undefined;
+    const errorMessage = status >= 400 && body ? getReadableErrorMessage(body) : undefined;
     const nextStep = buildRequestRecoveryText(status, request.actorName, loadedToolNames, errorMessage !== undefined);
     const structuredContent = {
         ...request,
@@ -283,6 +291,8 @@ function buildResponse(
     if (errorMessage) texts.push(`Actor Server error: ${errorMessage}`);
     if (nextStep) texts.push(nextStep);
     if (status < 400) return respondOk(texts, { structuredContent });
+    // Classified like an Apify API 5xx in the API tools: a failure, with the status kept.
+    if (status >= 500) return respondServerError(texts, { error: { statusCode: status }, structuredContent });
     return respondUserError(texts, {
         ...((status === HTTP_UNAUTHORIZED || status === HTTP_FORBIDDEN) && { category: FAILURE_CATEGORY.AUTH }),
         httpStatus: status,
@@ -422,7 +432,13 @@ export const sendServerActorRequest: ToolEntry = Object.freeze({
         idempotentHint: false,
         openWorldHint: true,
     },
-    // The body can carry secrets, and a query value can be a token.
-    redactArgs: ({ actor, ...rest }: Record<string, unknown>) => ({ actor, ...redactApiCallArgs(rest) }),
+    // The body can carry secrets, and an Actor Server can take a credential under any query name.
+    redactArgs: ({ actor, query, ...rest }: Record<string, unknown>) => ({
+        actor,
+        ...redactApiCallArgs(rest),
+        ...(query !== undefined && {
+            query: isRecord(query) ? Object.fromEntries(Object.keys(query).map((name) => [name, REDACTED])) : REDACTED,
+        }),
+    }),
     call: async (toolArgs: InternalToolArgs) => executeSendServerActorRequest(toolArgs),
 } as const);
