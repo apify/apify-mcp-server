@@ -6,6 +6,7 @@ import type { ApifyClient } from '../../src/apify_client.js';
 import { CODE_RUNTIME_ACTOR_NAME } from '../../src/const.js';
 import type { ActorStore } from '../../src/types.js';
 import { fetchActorDetails, resolveReadmeContent, typeObjectToString } from '../../src/utils/actor_details.js';
+import type * as ActorSearchModule from '../../src/utils/actor_search.js';
 import { searchActorsByKeywords } from '../../src/utils/actor_search.js';
 import {
     DEFAULT_INPUT,
@@ -201,6 +202,20 @@ describe('fetchActorDetails()', () => {
         const result = await fetchActorDetails(stubActorWithPicture(), 'apify/web-scraper');
 
         expect(result?.actorInfo.pictureUrl).toBe('https://images.example.com/store-picture.webp');
+    });
+
+    it('sends no call tracking with the picture Store search', async () => {
+        const actual = await vi.importActual<typeof ActorSearchModule>('../../src/utils/actor_search.js');
+        vi.mocked(searchActorsByKeywords).mockImplementationOnce(actual.searchActorsByKeywords);
+        const store = { params: {}, list: vi.fn().mockResolvedValue({ items: [] }) };
+        const storeSearchTracking = { traceId: 'thread-1', useCase: 'find a scraper' };
+        const client = mockApifyClient({ ...stubActorWithPicture(), store: () => store, storeSearchTracking });
+
+        await fetchActorDetails(client, 'apify/web-scraper');
+
+        expect(store.list).toHaveBeenCalled();
+        expect(store.params).not.toHaveProperty('_traceId');
+        expect(store.params).not.toHaveProperty('_useCase');
     });
 
     it('returns null on a genuine 404 (Actor does not exist)', async () => {

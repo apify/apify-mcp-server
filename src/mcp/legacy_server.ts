@@ -565,16 +565,14 @@ export class LegacyMcpServer {
                             mcpSessionId,
                             actorName,
                             actorId,
-                            clientContext,
-                            clientParam: this.host.options.clientParam,
                             taskStore: this.taskStore,
                             server: this.server,
                             tools: this.host.tools,
                             actorStore,
                             paymentProvider,
-                            telemetryEnabled: this.host.telemetryEnabled,
+                            telemetryData,
+                            userId,
                             telemetryEnv: this.host.telemetryEnv,
-                            transportType: this.host.options.transportType,
                             sendNotification,
                         }).catch((error) =>
                             // Benign task-expiry is handled in-method (see the catch block and

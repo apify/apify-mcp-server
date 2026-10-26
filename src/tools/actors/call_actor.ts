@@ -52,6 +52,17 @@ import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory
 // Shared call-actor description building blocks
 // ---------------------------------------------------------------------------
 
+/** Points at the Actor Server for results that do not need a batch run; empty when the send tool is absent. */
+function buildCallActorServerActorSection({ hasTool }: ToolDescriptionContext): string {
+    if (!hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST)) return '';
+    const operations = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
+        ? `\n- ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output={ serverInterface: true } lists its HTTP operations`
+        : '';
+    return `For Server Actors (Actors with an HTTP API):
+- This tool starts a batch run and stores the results in a dataset; use it when you need batch results
+- For one or a few results, ${HELPER_TOOLS.ACTOR_SERVER_REQUEST} returns them in the HTTP response, without a batch run${operations}`;
+}
+
 /** Shared "two ways to run" + USAGE section — identical in both modes. */
 function buildCallActorUsageSection(): string {
     return `There are two ways to run Actors:
@@ -128,6 +139,7 @@ export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOL
         'Call any Actor from the Apify Store.',
         workflowSection,
         `MCP server Actors are not run here${hasTool(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL) ? `; ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} calls their MCP tools` : ''}.`,
+        buildCallActorServerActorSection(ctx),
         dedent`
             IMPORTANT:
             - Waits up to waitSecs (default 30s) for completion; returns run status and storage IDs, and with waitSecs > 0 also reports dataset field metadata
@@ -143,7 +155,7 @@ export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOL
 
     if (hasTool(HELPER_TOOLS.ACTOR_CALL_WIDGET)) sections.push(buildWidgetAddendum(ctx));
 
-    return sections.join('\n\n');
+    return sections.filter(Boolean).join('\n\n');
 }
 
 /**

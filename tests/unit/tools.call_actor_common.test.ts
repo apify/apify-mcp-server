@@ -63,6 +63,24 @@ describe('call_actor_common', () => {
             expect(withoutMcpTool).not.toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
         });
 
+        it('points Server Actor requests that need no batch run at send-server-actor-request', () => {
+            const description = buildCallActorDescription(
+                only(HELPER_TOOLS.ACTOR_SERVER_REQUEST, HELPER_TOOLS.ACTOR_GET_DETAILS),
+            );
+
+            expect(description).toContain('For Server Actors');
+            expect(description).toContain(`For one or a few results, ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}`);
+            expect(description).toContain(`${HELPER_TOOLS.ACTOR_GET_DETAILS} with output={ serverInterface: true }`);
+        });
+
+        it('omits the Server Actor section when send-server-actor-request is absent from the session', () => {
+            const description = buildCallActorDescription(only(HELPER_TOOLS.ACTOR_GET_DETAILS));
+
+            expect(description).not.toContain('For Server Actors');
+            expect(description).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
+            expect(description).not.toMatch(/\n{3}/);
+        });
+
         // call-actor-widget is not auto-paired — gate strictly on its own presence, not on
         // ALL_TOOLS_PRESENT happening to include everything.
         it('omits the widget addendum when call-actor-widget is absent from the session', () => {
