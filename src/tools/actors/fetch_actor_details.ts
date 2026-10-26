@@ -132,7 +132,7 @@ find it with ${HELPER_TOOLS.STORE_SEARCH} first.`
 Use 'output' to control returned information:
 - Default: all fields except outputSchema, mcpTools and serverInterface. Server Actors always get a one-line server interface summary unless serverInterface is set.
 - Selective: set only the fields you need to true, e.g. output: { inputSchema: true }
-- Common patterns: inputSchema only, description + readme, mcpTools for MCP Actors, serverInterface for Server Actors
+- Common patterns: inputSchema only, description + readme, mcpTools for MCP Actors, serverInterface: true (all operations) or "GET /search" (one operation) for Server Actors
 
 The 'readme' field returns the summary when available, full README otherwise.
 Use when querying Actor details, documentation, input requirements, or MCP tools.
