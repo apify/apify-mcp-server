@@ -17,7 +17,7 @@
 
 # Apify MCP server
 
-Connect your AI agent to the largest marketplace of web automation tools.
+Connect your agent to the largest marketplace of tools for AI.
 
 **The official Apify Model Context Protocol (MCP) server gives AI agents web scraping, data extraction, and browser automation through thousands of ready-made Actors from [Apify Store](https://apify.com/store), at [`https://mcp.apify.com`](https://mcp.apify.com).**
 
