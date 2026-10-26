@@ -24,7 +24,7 @@ import { ACTOR_TENANCY, ACTOR_TOOL_MODE } from '../types.js';
  * malformed one `pruneActorDefinition` drops); then they get no tool, like any other server Actor.
  * "HTTP schema" is `definition.hasWebServerSchema`.
  * An MCP-server Actor does not get `input` even with a non-empty input schema: Store data shows that
- * interface is unused on such Actors (decided 2026-10-19).
+ * interface is unused on such Actors.
  * The input schema counts as empty when the definition has no `input`, `input.properties` is missing,
  * or `input.properties` has zero keys. Nothing else counts — a non-empty `required` with no properties
  * still reads as empty.

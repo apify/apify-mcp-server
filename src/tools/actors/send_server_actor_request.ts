@@ -227,8 +227,8 @@ async function sendRequest({
 
 /**
  * The body decoded with `charset`, the session token masked before and after decoding; `undefined` when
- * `TextDecoder` does not support the charset. A JSON body whose escapes hide the token comes back
- * re-serialized with the token masked; any other body keeps its text.
+ * `TextDecoder` does not support the charset. In a JSON body whose escapes hide the token, only the string
+ * literals holding it are rewritten, so numbers and formatting stay as sent.
  */
 function decodeBody(body: Buffer, charset: string, token: string): string | undefined {
     let text: string;
@@ -238,33 +238,46 @@ function decodeBody(body: Buffer, charset: string, token: string): string | unde
         return undefined;
     }
     try {
-        const serialized = JSON.stringify(JSON.parse(text));
-        return serialized.includes(token) ? serialized.replaceAll(token, REDACTED) : text;
+        if (!JSON.stringify(JSON.parse(text)).includes(token)) return text;
     } catch {
         return text;
     }
+    return text.replace(/"(?:[^"\\]|\\.)*"/g, (literal) => {
+        const value = JSON.parse(literal) as string;
+        return value.includes(token) ? JSON.stringify(value.replaceAll(token, REDACTED)) : literal;
+    });
 }
 
+/** Longest `errorMessage` returned; the full error stays in `body`. */
+const ERROR_MESSAGE_MAX_LENGTH = 1_000;
+
 /**
- * The `error` string of a JSON `{"error": ...}` body; `undefined` for any other body, which the response already
- * carries as `body`.
+ * The `error` string of a JSON `{"error": ...}` body, cut to `ERROR_MESSAGE_MAX_LENGTH`; `undefined` for any other
+ * body, which the response already carries as `body`.
  */
 function getReadableErrorMessage(body: string): string | undefined {
     try {
         const parsed = z.object({ error: z.string() }).safeParse(JSON.parse(body));
-        if (parsed.success) return parsed.data.error;
+        if (!parsed.success) return undefined;
+        const { error } = parsed.data;
+        return error.length > ERROR_MESSAGE_MAX_LENGTH ? `${error.slice(0, ERROR_MESSAGE_MAX_LENGTH)}…` : error;
     } catch {
         // An Actor can return plain text or malformed JSON.
     }
     return undefined;
 }
 
-function buildRequestRecoveryText(
-    status: number,
-    actorName: string,
-    loadedToolNames: readonly string[],
-    hasErrorMessage: boolean,
-): string | undefined {
+function buildRequestRecoveryText({
+    status,
+    actorName,
+    loadedToolNames,
+    hasErrorMessage,
+}: {
+    status: number;
+    actorName: string;
+    loadedToolNames: readonly string[];
+    hasErrorMessage: boolean;
+}): string | undefined {
     if (status === 429) return 'The Actor Server rate limit was reached.';
     if (status === 503) return 'The Actor Server is temporarily unavailable.';
     if (![400, 404, 405, 422].includes(status)) return undefined;
@@ -286,10 +299,19 @@ function buildResponse(
     const contentType = response.contentType?.replaceAll(token, REDACTED);
     const location = response.location?.replaceAll(token, REDACTED);
     const outcome = `${request.method} ${request.path} on ${request.actorName} returned HTTP ${status}`;
+    // A 5xx is a failure, as an Apify API 5xx is in the API tools; any other refusal is the caller's.
+    const respondError = (texts: string[], structuredContent?: Record<string, unknown>) =>
+        status >= 500
+            ? respondServerError(texts, { error: { statusCode: status }, structuredContent })
+            : respondUserError(texts, {
+                  ...((status === HTTP_UNAUTHORIZED || status === HTTP_FORBIDDEN) && {
+                      category: FAILURE_CATEGORY.AUTH,
+                  }),
+                  httpStatus: status,
+                  structuredContent,
+              });
     const rejectBody = (reason: string) =>
-        respondUserError(`${outcome}. The body is not returned: ${reason}. The request itself was sent.`, {
-            httpStatus: status,
-        });
+        respondError([`${outcome}. The body is not returned: ${reason}. The request itself was sent.`]);
 
     if (response.body === undefined) return rejectBody(`it is larger than ${MAX_INLINE_BYTES} bytes`);
     const bytes = response.body.length;
@@ -307,7 +329,12 @@ function buildResponse(
     const redirectNote = location ? ` The redirect to ${location} was not followed.` : '';
     const summary = `${outcome} with ${bodyNote}.${redirectNote}`;
     const errorMessage = status >= 400 && body ? getReadableErrorMessage(body) : undefined;
-    const nextStep = buildRequestRecoveryText(status, request.actorName, loadedToolNames, errorMessage !== undefined);
+    const nextStep = buildRequestRecoveryText({
+        status,
+        actorName: request.actorName,
+        loadedToolNames,
+        hasErrorMessage: errorMessage !== undefined,
+    });
     const structuredContent = {
         ...request,
         status,
@@ -323,13 +350,7 @@ function buildResponse(
     if (errorMessage) texts.push(`Actor Server error: ${errorMessage}`);
     if (nextStep) texts.push(nextStep);
     if (status < 400) return respondOk(texts, { structuredContent });
-    // Classified like an Apify API 5xx in the API tools: a failure, with the status kept.
-    if (status >= 500) return respondServerError(texts, { error: { statusCode: status }, structuredContent });
-    return respondUserError(texts, {
-        ...((status === HTTP_UNAUTHORIZED || status === HTTP_FORBIDDEN) && { category: FAILURE_CATEGORY.AUTH }),
-        httpStatus: status,
-        structuredContent,
-    });
+    return respondError(texts, structuredContent);
 }
 
 /** The tool response when the request went out but its response did not fully arrive. */

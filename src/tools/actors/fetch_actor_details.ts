@@ -24,6 +24,7 @@ import { wrapJsonText } from '../../utils/encode_text.js';
 import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunActor, getOwnServerRemedy } from '../actor_tool_naming.js';
+import { isRecord } from '../api/apify_api_spec.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 import { buildServerInterfaceSection, buildServerInterfaceSummary } from './server_interface_schema.js';
@@ -284,7 +285,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     const serverInterfaceParams = {
         actor: details.actorInfo,
         actorFullName: `${details.actorInfo.username}/${details.actorInfo.name}`,
-        schema: details.webServerSchema,
+        schema: isRecord(details.webServerSchema) ? details.webServerSchema : undefined,
     };
     if (resolvedOutput.serverInterface !== false) {
         const section = buildServerInterfaceSection({
