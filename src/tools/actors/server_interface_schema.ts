@@ -5,8 +5,6 @@ import { wrapJsonText } from '../../utils/encode_text.js';
 import { resolveActorTenancy } from '../actor_tool_naming.js';
 import { isRecord, resolveLocalRefs, resolveRef } from '../api/apify_api_spec.js';
 
-const EXPAND_HINT = 'output.serverInterface: true lists them, "METHOD /path" details one.';
-
 type ServerOperation = { method: string; path: string; operation: Record<string, unknown> };
 
 type ServerInterfaceSectionParams = {
@@ -104,22 +102,44 @@ function formatTenancy(actor: Pick<Actor, 'actorStandby'>): string {
     return `${ACTOR_TENANCY.SINGLE_TENANT}: the first request starts a run in your account, kept for ${idleTimeout}`;
 }
 
+/** What the list and the detail share: the tenancy or payment notice, and the base URL when the send tool is absent. */
+type SectionContext = { actorFullName: string; header: string; canSend: boolean };
+
+/** E.g. `send-server-actor-request sends this request: {"actor":"apify/search","method":"GET","path":"/search"}` */
+function formatSendExample(lead: string, actorFullName: string, { method, path }: ServerOperation): string {
+    return `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends ${lead}: ${JSON.stringify({ actor: actorFullName, method, path })}\n`;
+}
+
+/** E.g. `fetch-actor-details with {"actor":"apify/search","output":{"serverInterface":true}}` */
+function formatDetailsCall(actorFullName: string, serverInterface: true | string): string {
+    return `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorFullName, output: { serverInterface } })}`;
+}
+
 /** The `serverInterface: true` output; see {@link buildServerInterfaceSection}. */
-function buildOperationList(operations: ServerOperation[], schema: Record<string, unknown>, header: string): string {
+function buildOperationList(
+    operations: ServerOperation[],
+    schema: Record<string, unknown>,
+    { actorFullName, header, canSend }: SectionContext,
+): string {
     const lines = operations.map((operation) => formatOperationLine(operation, schema)).join('\n');
-    return `# Server interface\n${header}Operations (${operations.length}):\n${lines}\noutput.serverInterface: "METHOD /path" details one operation.`;
+    const send = canSend ? formatSendExample('a request to one of them', actorFullName, operations[0]) : '';
+    const { method, path } = operations[0];
+    const details = `${formatDetailsCall(actorFullName, `${method} ${path}`)} returns one operation's parameters, request body and responses.`;
+    return `# Server interface of ${actorFullName}\n${header}Operations (${operations.length}):\n${lines}\n${send}${details}`;
 }
 
 /** The `serverInterface: "METHOD /path"` output; see {@link buildServerInterfaceSection}. */
 function buildOperationDetail(
-    { method, path, operation }: ServerOperation,
+    serverOperation: ServerOperation,
     schema: Record<string, unknown>,
-    header: string,
+    { actorFullName, header, canSend }: SectionContext,
 ): string {
+    const { method, path, operation } = serverOperation;
     const { summary, description, parameters, requestBody, responses } = operation;
     const detail = resolveLocalRefs({ description, parameters, requestBody, responses }, schema);
     const title = typeof summary === 'string' ? `\n${summary}` : '';
-    return `# Server interface: ${method} ${path}${title}\n${header}${wrapJsonText(detail)}`;
+    const send = canSend ? formatSendExample('this request', actorFullName, serverOperation) : '';
+    return `# Server interface of ${actorFullName}: ${method} ${path}${title}\n${header}${send}${wrapJsonText(detail)}`;
 }
 
 function formatUndocumented(tenancy: string): string {
@@ -130,20 +150,26 @@ function formatUndocumented(tenancy: string): string {
  * The one line the default output (no `output` given) carries for a Server Actor; `undefined` for any other Actor.
  * For a single-tenant Server Actor documenting `GET /search` and `GET /status`:
  * ```
- * Server interface: enabled, single-tenant, 2 documented operations. output.serverInterface: true lists them, "METHOD /path" details one.
+ * Server interface: enabled, single-tenant, 2 documented operations. fetch-actor-details with {"actor":"apify/search","output":{"serverInterface":true}} lists them.
  * ```
+ * The second sentence is left out when the session lacks `fetch-actor-details` (only its widget sibling).
  * Without an API schema: `Server interface: enabled, single-tenant, undocumented: no API schema. See the README.`
  */
 export function buildServerInterfaceSummary({
     actor,
+    actorFullName,
     schema = {},
-}: Pick<ServerInterfaceSectionParams, 'actor' | 'schema'>): string | undefined {
+    loadedToolNames,
+}: Pick<ServerInterfaceSectionParams, 'actor' | 'actorFullName' | 'schema' | 'loadedToolNames'>): string | undefined {
     if (actor.actorStandby?.isEnabled !== true) return undefined;
     const tenancy = resolveActorTenancy(actor);
     const operations = listServerOperations(schema);
     if (operations.length === 0) return formatUndocumented(tenancy);
     const count = `${operations.length} documented operation${operations.length === 1 ? '' : 's'}`;
-    return `Server interface: enabled, ${tenancy}, ${count}. ${EXPAND_HINT}`;
+    const list = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)
+        ? ` ${formatDetailsCall(actorFullName, true)} lists them.`
+        : '';
+    return `Server interface: enabled, ${tenancy}, ${count}.${list}`;
 }
 
 /**
@@ -154,27 +180,28 @@ export function buildServerInterfaceSummary({
  *
  * `serverInterface: true`:
  * ```
- * # Server interface
+ * # Server interface of apify/search
  * single-tenant: the first request starts a run in your account, kept for its idle timeout of 300 s.
- * Base URL: https://search.apify.actor
- * Requests go through send-server-actor-request.
  * Operations (2):
  * - GET /search: Search the web. Required: q.
  * - GET /status: Return the server status
- * output.serverInterface: "METHOD /path" details one operation.
+ * send-server-actor-request sends a request to one of them: {"actor":"apify/search","method":"GET","path":"/search"}
+ * fetch-actor-details with {"actor":"apify/search","output":{"serverInterface":"GET /search"}} returns one operation's parameters, request body and responses.
  * ```
  *
  * `serverInterface: 'GET /search'`:
  * ````
- * # Server interface: GET /search
+ * # Server interface of apify/search: GET /search
  * Search the web
  * single-tenant: the first request starts a run in your account, kept for its idle timeout of 300 s.
- * Base URL: https://search.apify.actor
- * Requests go through send-server-actor-request.
+ * send-server-actor-request sends this request: {"actor":"apify/search","method":"GET","path":"/search"}
  * ```json
  * {"parameters":[{"name":"q","in":"query","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"Search results."}}}
  * ```
  * ````
+ *
+ * Without the send tool, or with an agentic payment provider (whose notice replaces the tenancy line), the
+ * send line is absent and `Base URL: https://search.apify.actor` follows the notice.
  *
  * Other cases:
  * - no API schema: `Server interface: enabled, single-tenant, undocumented: no API schema. See the README.`
@@ -192,14 +219,14 @@ export function buildServerInterfaceSection({
     if (actor.actorStandby?.isEnabled !== true) return { text: `Actor '${actorFullName}' has no server interface.` };
     const operations = listServerOperations(schema);
     if (operations.length === 0) return { text: formatUndocumented(resolveActorTenancy(actor)) };
-    const baseUrl = `Base URL: ${actor.standbyUrl ?? 'not configured'}\n`;
-    const sendTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)
-        ? `Requests go through ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}.\n`
-        : '';
-    const header = hasPaymentProvider
-        ? `Requests to an Actor Server are not supported in agentic payment mode.\n${baseUrl}`
-        : `${formatTenancy(actor)}.\n${baseUrl}${sendTool}`;
-    if (serverInterface === true) return { text: buildOperationList(operations, schema, header) };
+    const canSend = !hasPaymentProvider && loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
+    const notice = hasPaymentProvider
+        ? 'Requests to a server interface are not supported in agentic payment mode.'
+        : `${formatTenancy(actor)}.`;
+    // The send tool adds the host itself; without it, the base URL is how the user reaches the API.
+    const baseUrl = canSend ? '' : `Base URL: ${actor.standbyUrl ?? 'not configured'}\n`;
+    const context = { actorFullName, header: `${notice}\n${baseUrl}`, canSend };
+    if (serverInterface === true) return { text: buildOperationList(operations, schema, context) };
 
     const match = /^\s*([A-Za-z]+)\s+(\S+)\s*$/.exec(serverInterface);
     const operation = operations.find(({ method, path }) => method === match?.[1].toUpperCase() && path === match[2]);
@@ -209,5 +236,5 @@ export function buildServerInterfaceSection({
             error: `Actor '${actorFullName}' has no operation "${serverInterface}". Documented operations: ${documented}.`,
         };
     }
-    return { text: buildOperationDetail(operation, schema, header) };
+    return { text: buildOperationDetail(operation, schema, context) };
 }

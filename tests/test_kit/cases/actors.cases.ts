@@ -1293,7 +1293,9 @@ export const actorsCases: Case[] = [
             });
 
             const listText = (list.content as { text: string }[]).map((item) => item.text).join('\n');
-            expect(listText).toContain('Base URL: https://server-actor-test.apify.actor');
+            expect(listText).toContain(
+                `send-server-actor-request sends a request to one of them: {"actor":"${ACTOR_SERVER_ACTOR_TEST}"`,
+            );
             expect(listText).toContain('- POST /add: Add two numbers (JSON body). Required: request body.');
             // `asText` comes from `#/components/parameters/AsText`, the sum schema from `#/components/responses/Add`.
             const operationText = (operation.content as { text: string }[]).map((item) => item.text).join('\n');

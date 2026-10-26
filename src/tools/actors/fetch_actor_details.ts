@@ -318,7 +318,9 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     } else if (resolvedOutput.serverInterfaceSummary) {
         serverInterfaceMessage = buildServerInterfaceSummary({
             actor: details.actorInfo,
+            actorFullName: `${details.actorInfo.username}/${details.actorInfo.name}`,
             schema: details.webServerSchema,
+            loadedToolNames,
         });
     }
 

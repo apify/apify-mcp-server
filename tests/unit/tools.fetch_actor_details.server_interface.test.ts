@@ -80,24 +80,38 @@ function textOfSection(params: Partial<Parameters<typeof buildServerInterfaceSec
     return result.text;
 }
 
+function summary(params: Partial<Parameters<typeof buildServerInterfaceSummary>[0]> = {}) {
+    return buildServerInterfaceSummary({
+        actor: serverActor(),
+        actorFullName: ACTOR_FULL_NAME,
+        schema: SCHEMA,
+        loadedToolNames: Object.values(HELPER_TOOLS),
+        ...params,
+    });
+}
+
 describe('buildServerInterfaceSummary()', () => {
-    it('states the tenancy, the operation count and how to expand it for a Server Actor with an API schema', () => {
-        expect(buildServerInterfaceSummary({ actor: serverActor(), schema: SCHEMA })).toBe(
+    it('states the tenancy, the operation count and the fetch-actor-details call that lists them', () => {
+        expect(summary()).toBe(
             'Server interface: enabled, single-tenant, 3 documented operations. ' +
-                'output.serverInterface: true lists them, "METHOD /path" details one.',
+                `${HELPER_TOOLS.ACTOR_GET_DETAILS} with {"actor":"${ACTOR_FULL_NAME}","output":{"serverInterface":true}} lists them.`,
+        );
+    });
+
+    it('leaves out the fetch-actor-details call when the session lacks that tool', () => {
+        expect(summary({ loadedToolNames: [HELPER_TOOLS.ACTOR_CALL] })).toBe(
+            'Server interface: enabled, single-tenant, 3 documented operations.',
         );
     });
 
     it.each([undefined, { paths: {} }])('says the interface is undocumented when the schema is %s', (schema) => {
-        expect(buildServerInterfaceSummary({ actor: serverActor(), schema })).toBe(
+        expect(summary({ schema })).toBe(
             'Server interface: enabled, single-tenant, undocumented: no API schema. See the README.',
         );
     });
 
     it('is absent for an Actor without a server interface', () => {
-        expect(buildServerInterfaceSummary({ actor: { actorStandby: { isEnabled: false } }, schema: SCHEMA })).toBe(
-            undefined,
-        );
+        expect(summary({ actor: { actorStandby: { isEnabled: false } } })).toBe(undefined);
     });
 });
 
@@ -109,12 +123,19 @@ describe('buildServerInterfaceSection()', () => {
             );
         });
 
-        it("lists each operation with its summary and required inputs, the Actor's standby URL as the base URL, and the send tool", () => {
+        it('lists each operation with its summary and required inputs under the Actor name, and a send tool call for the first', () => {
             const text = textOfSection({ serverInterface: true });
 
-            expect(text).toContain(`Base URL: ${STANDBY_URL}`);
-            expect(text).not.toContain('example-server-actor');
-            expect(text).toContain(`Requests go through ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}.`);
+            expect(text).toContain(`# Server interface of ${ACTOR_FULL_NAME}\n`);
+            expect(text).not.toContain('Base URL');
+            expect(text).toContain(
+                `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends a request to one of them: ` +
+                    `{"actor":"${ACTOR_FULL_NAME}","method":"GET","path":"/add"}`,
+            );
+            expect(text).toContain(
+                `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ` +
+                    `{"actor":"${ACTOR_FULL_NAME}","output":{"serverInterface":"GET /add"}} returns one operation's`,
+            );
             expect(text).toContain('Operations (3):');
             expect(text).toContain('- GET /add: Add two numbers (query). Required: firstNumber.');
             expect(text).toContain('- POST /add: Add two numbers (JSON body). Required: request body.');
@@ -195,10 +216,12 @@ describe('buildServerInterfaceSection()', () => {
             expect(detail.parameters).toEqual([{ name: 'q', in: 'query', schema: { type: 'integer' } }]);
         });
 
-        it('names the send tool only when the session has it', () => {
+        it("gives the Actor's standby URL as the base URL instead of the send tool when the session lacks it", () => {
             const text = textOfSection({ serverInterface: true, loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS] });
 
             expect(text).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
+            expect(text).toContain(`Base URL: ${STANDBY_URL}`);
+            expect(text).not.toContain('example-server-actor');
         });
 
         it.each([
@@ -227,7 +250,11 @@ describe('buildServerInterfaceSection()', () => {
         it('renders the parameters with a parameter reference and the responses with a response reference resolved', () => {
             const text = textOfSection({ serverInterface: 'GET /add' });
 
-            expect(text).toContain('# Server interface: GET /add\nAdd two numbers (query)');
+            expect(text).toContain(`# Server interface of ${ACTOR_FULL_NAME}: GET /add\nAdd two numbers (query)`);
+            expect(text).toContain(
+                `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends this request: ` +
+                    `{"actor":"${ACTOR_FULL_NAME}","method":"GET","path":"/add"}`,
+            );
             const detail = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```'))) as {
                 parameters: { name: string }[];
                 responses: Record<string, { content: Record<string, { schema: unknown }> }>;
@@ -243,7 +270,7 @@ describe('buildServerInterfaceSection()', () => {
         it('renders the request body with its schema reference resolved, accepting a lower-case method', () => {
             const text = textOfSection({ serverInterface: 'post /add' });
 
-            expect(text).toContain('# Server interface: POST /add');
+            expect(text).toContain(`# Server interface of ${ACTOR_FULL_NAME}: POST /add`);
             expect(text).toContain('"required":["firstNumber"]');
             expect(text).not.toContain('/empty');
         });
