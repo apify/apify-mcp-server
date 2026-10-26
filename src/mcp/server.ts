@@ -12,6 +12,7 @@ import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
 
 import { ApifyClient } from '../apify_client.js';
+import { isRestrictedSubmission } from '../chatgpt_submission.js';
 import { DEFAULT_TELEMETRY_ENABLED, DEFAULT_TELEMETRY_ENV, HELPER_TOOLS } from '../const.js';
 import { prompts } from '../prompts/index.js';
 import { createPromptService } from '../prompts/prompt_service.js';
@@ -214,6 +215,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
 
         this.promptService = createPromptService(prompts);
         this.resourceService = createResourceService({
+            areResourcesEnabled: () => !isRestrictedSubmission((name) => this.tools.has(name)),
             paymentProvider: this.options.paymentProvider,
             getMode: () => this.serverMode,
             getAvailableWidgets: () => this.availableWidgets,
@@ -339,6 +341,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
             clientContext,
             tools,
             resourceService: createResourceService({
+                areResourcesEnabled: () => !isRestrictedSubmission((name) => tools.has(name)),
                 paymentProvider: this.options.paymentProvider,
                 getMode: () => serverMode,
                 getAvailableWidgets: () => availableWidgets,

@@ -5,6 +5,12 @@
 
 Three files serving the MCP `resources/*` surface:
 
+The ChatGPT submission selection disables resource listings, templates and reads. Its reviewed
+retrieval tools are the only data path; the generic API resource proxy would otherwise expose
+operations outside that selection. The facade supplies a per-view enablement getter, so legacy
+sessions and stateless snapshots enforce the same rule. Custom configurations explicitly adding
+`apify-api-read` retain the generic resources.
+
 - `resource_service.ts` — handles `ListResources` / `ListResourceTemplates` / read-resource
   requests. Takes an optional `apifyClient` on read, built by the server from the per-request
   token (`_meta.apifyToken || options.token`). Token-only by design — no payment headers, so a

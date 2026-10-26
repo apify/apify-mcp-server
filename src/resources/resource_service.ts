@@ -37,6 +37,8 @@ type ResourceService = {
 };
 
 type ResourceServiceOptions = {
+    /** Evaluated per request so restored sessions use their actual tool selection. */
+    areResourcesEnabled?: () => boolean;
     paymentProvider?: PaymentProvider;
     /**
      * Read the current server mode at call time. Callers must pass a getter rather
@@ -50,9 +52,10 @@ type ResourceServiceOptions = {
 };
 
 export function createResourceService(options: ResourceServiceOptions): ResourceService {
-    const { paymentProvider, getMode, getAvailableWidgets } = options;
+    const { paymentProvider, getMode, getAvailableWidgets, areResourcesEnabled = () => true } = options;
 
     const listResources = async (): Promise<ListResourcesResult> => {
+        if (!areResourcesEnabled()) return { resources: [] };
         const resources: Resource[] = [];
 
         if (paymentProvider?.getUsageGuide?.()) {
@@ -85,6 +88,9 @@ export function createResourceService(options: ResourceServiceOptions): Resource
     };
 
     const readResource = async (uri: string, apifyClient?: ApifyClient): Promise<ExtendedReadResourceResult> => {
+        if (!areResourcesEnabled()) {
+            throw new InvalidParamsError('Resources are unavailable in this configuration. Use its retrieval tools.');
+        }
         // Route every http(s) URI to the API proxy — it owns the single origin gate, so a
         // non-Apify URL gets the explanatory origin refusal instead of the generic fallback.
         if (/^https?:\/\//i.test(uri)) {
@@ -172,6 +178,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
     // Advertisement only, NOT a route table: the read path stays a generic proxy, and any other
     // Apify API GET URL is readable the same way.
     const listResourceTemplates = async (): Promise<ListResourceTemplatesResult> => {
+        if (!areResourcesEnabled()) return { resourceTemplates: [] };
         const api = getApifyAPIPublicBaseUrl();
         return {
             resourceTemplates: [

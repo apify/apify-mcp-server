@@ -12,6 +12,20 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 
 - `registry.ts` — tool categories and the tools in each (`index.ts` re-exports them), plus tools in no
   category (`ALL_WIDGET_TOOLS`, `UNCATEGORIZED_TOOLS`).
+  ChatGPT submission tools are explicit-only members of `UNCATEGORIZED_TOOLS`, with the fixed
+  submission selection in `../chatgpt_submission.ts`. They do not change existing defaults or categories.
+- `chatgpt_output_tools.ts` — submission-only wrappers for dataset/log bounds, response size limits,
+  and credential redaction. The loader applies them in both modes and suppresses implicit widgets.
+  Resource reads are disabled for this configuration; adding the generic API read tool explicitly
+  opts a custom configuration back into generic behavior.
+- `actors/curated_actor_catalog.ts` — 13 closed input contracts mapped to immutable Actor IDs.
+  `curated_actor_releases.ts` pins builds and review evidence; `review: null` prevents execution.
+  `curated_actor_tools.ts` validates arguments without stripping unknown fields and checks build identity
+  before running. `tests/fixtures/curated_actor_build_schemas.json` is compatibility evidence only,
+  not source or runtime approval. Release procedure: [ChatGPT submission](../../docs/chatgpt-submission.md).
+- `actors/private_actor_tools.ts` — explicit-only private source/build aliases and a runner. Uses fresh
+  account and Actor ownership/private checks, preserves source conflict checks, and forces limited
+  permissions on exact successful builds. Limited permissions do not prevent nested Actor calls.
 - `structured_output_schemas.ts` — shared JSON-schema definitions for structured
   output across tools.
 - `utils.ts` — shared tool helpers (schema property shaping, AJV compile).

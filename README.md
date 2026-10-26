@@ -328,6 +328,8 @@ The direct `apify--website-content-crawler` tool defaults `respectRobotsTxtFile`
 
 The `tools` configuration parameter is used to specify loaded tools – either categories or specific tools directly, and Apify Actors. For example, `tools=storage,runs` loads two categories; `tools=call-actor` loads just one tool.
 
+The [ChatGPT submission candidate](./docs/chatgpt-submission.md) defines a separate, explicit 29-tool configuration with bounded web-data operations and private Actor development. It includes Web Search and Web Fetch, excludes RAG Web Browser, and leaves the general server defaults unchanged. Curated runs remain disabled until each pinned build has review approval; the candidate is not ready for public submission.
+
 When no query parameters are provided, the MCP server loads the following `tools` by default:
 
 - `actors`

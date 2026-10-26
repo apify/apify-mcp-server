@@ -7,9 +7,11 @@ import type { ApifyClient } from 'apify-client';
 
 import log from '@apify/log';
 
+import { CHATGPT_SUBMISSION_TOOLS, isRestrictedSubmission } from '../chatgpt_submission.js';
 import { defaults, HELPER_TOOLS, type HelperToolName, RETIRED_SELECTOR_NAMES } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { actorNameToToolName } from '../tools/actor_tool_naming.js';
+import { wrapChatGptOutputTool } from '../tools/chatgpt_output_tools.js';
 import { reportProblem } from '../tools/dev/report_problem.js';
 import { getActorsAsTools } from '../tools/index.js';
 import {
@@ -311,7 +313,8 @@ export function getToolsForServerMode(
     // Apps mode: append a widget tool for each base tool already in the result.
     // Runs after the get-actor-run auto-inject, so an auto-injected base still
     // brings its widget sibling.
-    if (mode === SERVER_MODE.APPS) {
+    const restrictedSubmission = isRestrictedSubmission((name) => resultNames.has(name));
+    if (mode === SERVER_MODE.APPS && !restrictedSubmission) {
         for (const entry of [...result]) {
             const widget = WIDGET_BY_BASE_TOOL.get(entry.name as HelperToolName);
             // Push unconditionally; any duplicates are stripped by the de-dup pass below.
@@ -321,7 +324,11 @@ export function getToolsForServerMode(
 
     // De-duplicate by tool name for safety
     const seen = new Set<string>();
-    return result.filter((entry) => !seen.has(entry.name) && seen.add(entry.name));
+    const uniqueTools = result.filter((entry) => !seen.has(entry.name) && seen.add(entry.name));
+    const submissionNames = new Set<string>(CHATGPT_SUBMISSION_TOOLS);
+    return restrictedSubmission
+        ? uniqueTools.map((entry) => (submissionNames.has(entry.name) ? wrapChatGptOutputTool(entry) : entry))
+        : uniqueTools;
 }
 
 /** Resolve the tool names composition will serve without fetching Actor metadata. */

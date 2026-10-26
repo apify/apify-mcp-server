@@ -1,0 +1,908 @@
+{
+  "chatgpt-web-search": {
+    "actorId": "yD95d01y3SlKrPqQ7",
+    "buildId": "IiPL53af0DNBgkFX8",
+    "buildNumber": "0.0.20",
+    "source": "https://api.apify.com/v2/actor-builds/IiPL53af0DNBgkFX8",
+    "inputSchemaSha256": "e8e8a4845413a6b49c050f3bdd18e7d8e7fb1abd671e5164ecdf6e1dee9372d5",
+    "note": "Validation keywords for mapped inputs and required fields; display metadata and unused optional properties omitted.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string",
+          "enum": [
+            "google",
+            "duckduckgo"
+          ],
+          "default": "google"
+        },
+        "maxResults": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "location": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "chatgpt-web-fetch": {
+    "actorId": "a6Sqhlnt4touIHTub",
+    "buildId": "C1Yufsdmf7hffPfl9",
+    "buildNumber": "0.0.30",
+    "source": "https://api.apify.com/v2/actor-builds/C1Yufsdmf7hffPfl9",
+    "inputSchemaSha256": "eef15b82bcc090c8a566ef441da8dd2813ba450eb42fa44e2acb1fae5ee75963",
+    "note": "Validation keywords for mapped inputs and required fields; display metadata and unused optional properties omitted.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "pattern": "^\\s*(?:[Hh][Tt][Tt][Pp][Ss]?:|(?![A-Za-z][A-Za-z0-9+.\\-]*:))\\S[\\s\\S]*$"
+        },
+        "formats": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "html",
+              "text",
+              "links",
+              "raw"
+            ]
+          }
+        },
+        "headers": {
+          "type": "object"
+        },
+        "wait": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60000
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "chatgpt-website-content": {
+    "actorId": "aYG0l9s7dbB7j3gbS",
+    "buildId": "bsZdc9Cal4wAwV0VW",
+    "buildNumber": "0.3.101",
+    "source": "https://api.apify.com/v2/actor-builds/bsZdc9Cal4wAwV0VW",
+    "inputSchemaSha256": "f67a63f12cbc2ed347c7ec4633ebf07add6310add8cd5e60081a2e340fc781f9",
+    "note": "Validation keywords for mapped inputs and required fields; display metadata and unused optional properties omitted.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "startUrls": {
+          "type": "array"
+        },
+        "crawlerType": {
+          "type": "string",
+          "enum": [
+            "playwright:adaptive",
+            "playwright:firefox",
+            "cheerio",
+            "jsdom",
+            "playwright:chrome"
+          ],
+          "default": "playwright:firefox"
+        },
+        "includeUrlGlobs": {
+          "type": "array",
+          "default": []
+        },
+        "maxCrawlDepth": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 20
+        },
+        "maxCrawlPages": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 9999999
+        },
+        "useSitemaps": {
+          "type": "boolean",
+          "default": false
+        },
+        "useLlmsTxt": {
+          "type": "boolean",
+          "default": false
+        },
+        "respectRobotsTxtFile": {
+          "type": "boolean",
+          "default": false
+        },
+        "proxyConfiguration": {
+          "type": "object",
+          "default": {
+            "useApifyProxy": true
+          }
+        },
+        "initialCookies": {
+          "type": "array"
+        },
+        "customHttpHeaders": {
+          "type": "object",
+          "default": {}
+        },
+        "signHttpRequests": {
+          "type": "boolean",
+          "default": false
+        },
+        "maxConcurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999,
+          "default": 200
+        },
+        "requestTimeoutSecs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600,
+          "default": 60
+        },
+        "maxRequestRetries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20,
+          "default": 3
+        },
+        "maxSessionRotations": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20,
+          "default": 10
+        },
+        "ignoreHttpsErrors": {
+          "type": "boolean",
+          "default": false
+        },
+        "removeCookieWarnings": {
+          "type": "boolean",
+          "default": true
+        },
+        "blockMedia": {
+          "type": "boolean",
+          "default": false
+        },
+        "expandIframes": {
+          "type": "boolean",
+          "default": true
+        },
+        "clickElementsCssSelector": {
+          "type": "string",
+          "default": "[aria-expanded=\"false\"]"
+        },
+        "pageFunction": {
+          "type": "string",
+          "default": ""
+        },
+        "debugMode": {
+          "type": "boolean",
+          "default": false
+        },
+        "debugLog": {
+          "type": "boolean",
+          "default": false
+        },
+        "saveHtml": {
+          "type": "boolean",
+          "default": false
+        },
+        "saveHtmlAsFile": {
+          "type": "boolean",
+          "default": false
+        },
+        "saveMarkdown": {
+          "type": "boolean",
+          "default": true
+        },
+        "summarize": {
+          "type": "boolean",
+          "default": false
+        },
+        "saveFiles": {
+          "type": "boolean",
+          "default": false
+        },
+        "saveContentTypes": {
+          "type": "string"
+        },
+        "saveScreenshots": {
+          "type": "boolean",
+          "default": false
+        },
+        "maxResults": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 9999999
+        },
+        "reuseStoredDetectionResults": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [
+        "startUrls",
+        "proxyConfiguration"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "chatgpt-screenshot": {
+    "actorId": "rGCyoaKTKhyMiiTvS",
+    "buildId": "AEgoxMZIJXkz2zxdq",
+    "buildNumber": "0.0.66",
+    "source": "https://api.apify.com/v2/actor-builds/AEgoxMZIJXkz2zxdq",
+    "inputSchemaSha256": "c03371074b3ff1ec8cea28126ce123365743df3f065ed1eac4349a5c328370bd",
+    "note": "Validation keywords for mapped inputs and required fields; display metadata and unused optional properties omitted.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "urls": {
+          "type": "array"
+        },
+        "format": {
+          "type": "string",
+          "default": "png",
+          "enum": [
+            "png",
+            "pdf"
+          ]
+        },
+        "waitUntil": {
+          "type": "string",
+          "enum": [
+            "load",
+            "domcontentloaded",
+            "networkidle2",
+            "networkidle0"
+          ]
+        },
+        "delay": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 3600000
+        },
+        "viewportWidth": {
+          "type": "integer",
+          "default": 1280,
+          "minimum": 100,
+          "maximum": 3840
+        },
+        "scrollToBottom": {
+          "type": "boolean",
+          "default": false
+        },
+        "proxy": {
+          "default": {
+            "useApifyProxy": true
+          },
+          "type": "object"
+        },
+        "selectorsToHide": {
+          "default": "",
+          "type": "string"
+        }
+      },
+      "required": [
+        "waitUntil",
+        "delay",
+        "viewportWidth"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "chatgpt-sitemap": {
+    "actorId": "rGeTNESChDZ65EbYh",
+    "buildId": "e16XISfdhxOWHF3Db",
+    "buildNumber": "0.1.30",
+    "source": "https://api.apify.com/v2/actor-builds/e16XISfdhxOWHF3Db",
+    "inputSchemaSha256": "c1c2bf2e09e48264191b66d18b7d2bdc4870fe8d76c51b9daa133441acaf6e52",
+    "note": "Validation keywords for mapped inputs and required fields; display metadata and unused optional properties omitted.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "startUrls": {
+          "type": "array"
+        },
+        "checkPageStatus": {
+          "type": "boolean",
+          "default": true
+        },
+        "proxyConfiguration": {
+          "type": "object",
+          "default": {
+            "useApifyProxy": true
+          }
+        },
+        "proxyRotation": {
+          "type": "string",
+          "default": "RECOMMENDED",
+          "enum": [
+            "RECOMMENDED",
+            "PER_REQUEST",
+            "UNTIL_FAILURE"
+          ]
+        },
+        "maxCrawlingDepth": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "maxRequestRetries": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 3
+        }
+      },
+      "required": [
+        "startUrls",
+        "proxyConfiguration"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "chatgpt-google-maps": {
+    "actorId": "nwua9Gu5YrADL7ZDj",
+    "buildId": "EH35UvIrsV0hnZG0Y",
+    "buildNumber": "0.14.775",
+    "source": "https://api.apify.com/v2/actor-builds/EH35UvIrsV0hnZG0Y",
+    "inputSchemaSha256": "026dac2f7eaae339693213054ad24efc73417f2cbd92055970ab0c04bd2dc091",
+    "note": "Validation keywords for mapped inputs and required fields; display metadata and unused optional properties omitted.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "searchStringsArray": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "locationQuery": {
+          "type": "string"
+        },
+        "maxCrawledPlacesPerSearch": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "website": {
+          "enum": [
+            "allPlaces",
+            "withWebsite",
+            "withoutWebsite"
+          ],
+          "type": "string",
+          "default": "allPlaces"
+        },
+        "scrapePlaceDetailPage": {
+          "type": "boolean",
+          "default": false
+        },
+        "scrapeTableReservationProvider": {
+          "type": "boolean",
+          "default": false
+        },
+        "scrapeOrderOnline": {
+          "type": "boolean",
+          "default": false
+        },
+        "includeWebResults": {
+          "type": "boolean",
+          "default": false
+        },
+        "scrapeDirectories": {
+          "type": "boolean",
+          "default": false
+        },
+        "maxQuestions": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0
+        },
+        "scrapeContacts": {
+          "type": "boolean",
+          "default": false
+        },
+        "scrapeSocialMediaProfiles": {
+          "type": "object",
+          "default": {
+            "facebooks": false,
+            "instagrams": false,
+            "youtubes": false,
+            "tiktoks": false,
+            "twitters": false
+          },
+          "properties": {
+            "facebooks": {
+              "type": "boolean"
+            },
+            "instagrams": {
+              "type": "boolean"
+            },
+            "youtubes": {
+              "type": "boolean"
+            },
+            "tiktoks": {
+              "type": "boolean"
+            },
+            "twitters": {
+              "type": "boolean"
+            }
+          }
+        },
+        "maximumLeadsEnrichmentRecords": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0
+        },
+        "verifyLeadsEnrichmentEmails": {
+          "type": "boolean",
+          "default": false
+        },
+        "maxReviews": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0
+        },
+        "scrapeReviewsPersonalData": {
+          "type": "boolean",
+          "default": true
+        },
+        "maxImages": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0
+        },
+        "scrapeImageAuthors": {
+          "type": "boolean",
+          "default": false
+        },
+        "enableCompetitorAnalysis": {
+          "type": "boolean",
+          "default": false
+        },
+        "startUrls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "chatgpt-amazon-products": {
+    "actorId": "BG3WDrGdteHgZgbPK",
+    "buildId": "BrNBL93fpaDpXCmhA",
+    "buildNumber": "0.0.441",
+    "source": "https://api.apify.com/v2/actor-builds/BrNBL93fpaDpXCmhA",
+    "inputSchemaSha256": "a5f46f75312678875d7cdd7e2d2e36d443cd0a7f41970e0fd290b630a495aeda",
+    "note": "Validation keywords for mapped inputs and required fields; display metadata and unused optional properties omitted.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "categoryOrProductUrls": {
+          "type": "array",
+          "uniqueItems": true
+        },
+        "maxItemsPerStartUrl": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxSearchPagesPerStartUrl": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxProductVariantsAsSeparateResults": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxOffers": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "scrapeSellers": {
+          "type": "boolean",
+          "default": false
+        },
+        "useCaptchaSolver": {
+          "type": "boolean",
+          "default": false
+        },
+        "scrapeProductVariantPrices": {
+          "type": "boolean",
+          "default": false
+        },
+        "scrapeProductDetails": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "required": [
+        "categoryOrProductUrls"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "chatgpt-youtube": {
+    "actorId": "h7sDV53CddomktSi5",
+    "buildId": "kOLogYtrERZU9YfGW",
+    "buildNumber": "0.0.319",
+    "source": "https://api.apify.com/v2/actor-builds/kOLogYtrERZU9YfGW",
+    "inputSchemaSha256": "314c961cd2c2088b981501710004d149ffc9a0c8900b0139793d69dad318b8d2",
+    "note": "Validation keywords for mapped inputs and required fields; display metadata and unused optional properties omitted.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "searchQueries": {
+          "type": "array"
+        },
+        "maxResults": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "maximum": 999999
+        },
+        "maxResultsShorts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999,
+          "default": 0
+        },
+        "maxResultStreams": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999,
+          "default": 0
+        },
+        "startUrls": {
+          "type": "array",
+          "default": []
+        },
+        "transcriptionAndSubtitle": {
+          "type": "string",
+          "default": "NONE",
+          "enum": [
+            "NONE",
+            "ALWAYS_SUBTITLES",
+            "TRANSCRIPTION_AS_FALLBACK",
+            "ALWAYS_TRANSCRIBE"
+          ]
+        },
+        "aiVideoDescription": {
+          "type": "boolean",
+          "default": false
+        },
+        "aiVideoSummary": {
+          "type": "boolean",
+          "default": false
+        },
+        "saveSubsToKVS": {
+          "type": "boolean"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "chatgpt-tiktok": {
+    "actorId": "GdWCkxBtKWOsKjdch",
+    "buildId": "O7b58rnGZYU3P0DX4",
+    "buildNumber": "0.0.620",
+    "source": "https://api.apify.com/v2/actor-builds/O7b58rnGZYU3P0DX4",
+    "inputSchemaSha256": "150d9d36d0bb70cf3183efcd375b55b6db4c973edc35b0c52173ae5e780588d7",
+    "note": "Validation keywords for mapped inputs and required fields; display metadata and unused optional properties omitted.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "resultsPerPage": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "maximum": 1000000
+        },
+        "profiles": {
+          "type": "array"
+        },
+        "profileScrapeSections": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "default": [
+            "videos"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "videos",
+              "reposts",
+              "stories"
+            ]
+          }
+        },
+        "maxFollowersPerProfile": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxFollowingPerProfile": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "searchQueries": {
+          "type": "array"
+        },
+        "searchSection": {
+          "type": "string",
+          "enum": [
+            "",
+            "/video",
+            "/user"
+          ],
+          "default": ""
+        },
+        "maxProfilesPerQuery": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10
+        },
+        "scrapeRelatedSearchWords": {
+          "type": "boolean",
+          "default": false
+        },
+        "postURLs": {
+          "type": "array"
+        },
+        "scrapeRelatedVideos": {
+          "type": "boolean",
+          "default": false
+        },
+        "scrapeAdditionalAuthorMeta": {
+          "type": "boolean",
+          "default": false
+        },
+        "shouldDownloadVideos": {
+          "type": "boolean",
+          "default": false
+        },
+        "shouldDownloadCovers": {
+          "type": "boolean",
+          "default": false
+        },
+        "shouldDownloadSlideshowImages": {
+          "type": "boolean",
+          "default": false
+        },
+        "shouldDownloadAvatars": {
+          "type": "boolean",
+          "default": false
+        },
+        "shouldDownloadMusicCovers": {
+          "type": "boolean",
+          "default": false
+        },
+        "downloadSubtitlesOptions": {
+          "type": "string",
+          "default": "NEVER_DOWNLOAD_SUBTITLES",
+          "enum": [
+            "NEVER_DOWNLOAD_SUBTITLES",
+            "DOWNLOAD_SUBTITLES",
+            "DOWNLOAD_AND_TRANSCRIBE_VIDEOS_WITHOUT_SUBTITLES",
+            "TRANSCRIBE_ALL_VIDEOS"
+          ]
+        },
+        "aiVideoDescription": {
+          "type": "boolean",
+          "default": false
+        },
+        "aiVideoSummary": {
+          "type": "boolean",
+          "default": false
+        },
+        "commentsPerPost": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "topLevelCommentsPerPost": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxRepliesPerComment": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "chatgpt-instagram": {
+    "actorId": "shu8hvrXbJbY3Eb9W",
+    "buildId": "vEteb4rbcDg3FSQY6",
+    "buildNumber": "0.0.830",
+    "source": "https://api.apify.com/v2/actor-builds/vEteb4rbcDg3FSQY6",
+    "inputSchemaSha256": "8838f0b4175b969ca850f847c323460309615c5d0e7540b2d1d783aeca06264c",
+    "note": "Validation keywords for mapped inputs and required fields; display metadata and unused optional properties omitted.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "resultsType": {
+          "type": "string",
+          "enum": [
+            "posts",
+            "details",
+            "comments",
+            "reels",
+            "mentions",
+            "stories"
+          ],
+          "default": "posts"
+        },
+        "directUrls": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(https:\\/\\/)?(www\\.)?instagram\\.com\\/[A-Za-z0-9._-]+(\\/.*)?$"
+          },
+          "uniqueItems": true
+        },
+        "resultsLimit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "onlyPostsNewerThan": {
+          "type": "string",
+          "pattern": "^(\\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])(T[0-2]\\d:[0-5]\\d(:[0-5]\\d)?(\\.\\d+)?Z?)?$|^(\\d+)\\s*(minute|hour|day|week|month|year)s?$"
+        },
+        "search": {
+          "type": "string"
+        },
+        "addParentData": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "chatgpt-facebook-posts": {
+    "actorId": "KoJrdxJCTtpon81KY",
+    "buildId": "4wMadXpcOrMwWYpSz",
+    "buildNumber": "0.0.404",
+    "source": "https://api.apify.com/v2/actor-builds/4wMadXpcOrMwWYpSz",
+    "inputSchemaSha256": "819f103134e2df6592c982527cb9f4e2b9f8d0e7ebdb6b70db348479e0b36ed1",
+    "note": "Validation keywords for mapped inputs and required fields; display metadata and unused optional properties omitted.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "startUrls": {
+          "type": "array"
+        },
+        "resultsLimit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "captionText": {
+          "default": false,
+          "type": "boolean"
+        },
+        "onlyPostsNewerThan": {
+          "type": "string",
+          "pattern": "^(\\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])(T[0-2]\\d:[0-5]\\d(:[0-5]\\d)?(\\.\\d+)?Z?)?$|^(\\d+)\\s*(minute|hour|day|week|month|year)s?$"
+        },
+        "onlyPostsOlderThan": {
+          "type": "string",
+          "pattern": "^(\\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])(T[0-2]\\d:[0-5]\\d(:[0-5]\\d)?(\\.\\d+)?Z?)?$|^(\\d+)\\s*(minute|hour|day|week|month|year)s?$"
+        }
+      },
+      "required": [
+        "startUrls"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "chatgpt-booking": {
+    "actorId": "oeiQgfg5fsmIJB7Cn",
+    "buildId": "UbddRwuHiMrBtTctB",
+    "buildNumber": "0.0.197",
+    "source": "https://api.apify.com/v2/actor-builds/UbddRwuHiMrBtTctB",
+    "inputSchemaSha256": "2ba3f80a2d6080988729eae7170ef05c4d6ad832446a16ece34156ae3d9e6445",
+    "note": "Validation keywords for mapped inputs and required fields; display metadata and unused optional properties omitted.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "search": {
+          "type": "string"
+        },
+        "startUrls": {
+          "type": "array"
+        },
+        "maxItems": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "extractAdditionalHotelData": {
+          "type": "boolean",
+          "default": false
+        },
+        "checkIn": {
+          "type": "string",
+          "pattern": "^(\\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$|^(\\d+)\\s*(day|week|month|year)s?$"
+        },
+        "checkOut": {
+          "type": "string",
+          "pattern": "^(\\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$|^(\\d+)\\s*(day|week|month|year)s?$"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "chatgpt-tripadvisor": {
+    "actorId": "dbEyMBriog95Fv8CW",
+    "buildId": "UeIiKUOLTjcia9GlG",
+    "buildNumber": "0.0.294",
+    "source": "https://api.apify.com/v2/actor-builds/UeIiKUOLTjcia9GlG",
+    "inputSchemaSha256": "0845b20c1a76941bf14e1903a9987f4d56d20192a745836da3ee81f0454d6579",
+    "note": "Validation keywords for mapped inputs and required fields; display metadata and unused optional properties omitted.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "startUrls": {
+          "type": "array"
+        },
+        "maxItemsPerQuery": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "includeNearbyResults": {
+          "default": false,
+          "type": "boolean"
+        },
+        "includeAiReviewsSummary": {
+          "default": false,
+          "type": "boolean"
+        },
+        "maxPhotosPerPlace": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximumLeadsEnrichmentRecords": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0
+        },
+        "verifyLeadsEnrichmentEmails": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
