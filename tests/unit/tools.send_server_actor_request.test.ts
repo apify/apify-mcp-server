@@ -14,7 +14,7 @@ import {
 } from '../../src/tools/actors/send_server_actor_request.js';
 import { serverActorRequestOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { Actor, ActorDefinitionPruned, HelperTool, ToolTelemetryContext } from '../../src/types.js';
-import { ACTOR_TENANCY, ALL_TOOLS_PRESENT } from '../../src/types.js';
+import { ACTOR_TENANCY, ALL_TOOLS_PRESENT, SERVER_MODE } from '../../src/types.js';
 import { mockActor } from './helpers/actor_build_client.js';
 import { getRequestHandler, makePaymentProvider, withServer } from './helpers/mcp_server.js';
 import {
@@ -463,9 +463,11 @@ describe('returning an Actor Server error', () => {
         expect(received).toHaveLength(1);
     });
 
-    it('masks tokens revealed by decoding a JSON error message', async () => {
+    it('masks a token that JSON escapes hide, in the body and the error message', async () => {
         const result = await callTool({ path: '/escaped-error-token' });
+        const { body } = result.structuredContent as { body: string };
 
+        expect(JSON.parse(body)).toEqual({ error: '[REDACTED]' });
         expect(result.structuredContent).toMatchObject({ errorMessage: '[REDACTED]' });
         expect(JSON.stringify(result)).not.toContain(TOKEN);
     });
@@ -536,6 +538,19 @@ describe('returning an Actor Server error', () => {
         expect(received).toHaveLength(1);
         expect(result.isError).toBe(true);
         expect(result.content.at(-1)?.text).toBe(hint);
+    });
+
+    it('reports a 5xx from the Actor Server as a failure that keeps the status and the body', async () => {
+        const result = await callTool({ path: '/status/500' });
+
+        expect(result.isError).toBe(true);
+        expect(result.structuredContent).toMatchObject({ status: 500 });
+        expect(result.toolTelemetry).toMatchObject({
+            toolStatus: TOOL_STATUS.FAILED,
+            failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
+            failureHttpStatus: 500,
+            httpStatus: 500,
+        });
     });
 });
 
@@ -640,6 +655,22 @@ describe('rejecting a call before sending', () => {
         expect((result.content as { text: string }[])[0].text).toContain('is not supported in agentic payment mode');
         expect(received).toHaveLength(0);
     });
+
+    it('is not listed in a payment-provider session', async () => {
+        const listActorsTools = async (options: Parameters<typeof withServer>[1]) =>
+            withServer(
+                async (server) => {
+                    await server.loadToolsFromInput({ tools: ['actors'] }, mockApifyClient());
+                    return server.listToolNames();
+                },
+                { serverMode: SERVER_MODE.DEFAULT, ...options },
+            );
+
+        expect(await listActorsTools({})).toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
+        expect(await listActorsTools({ paymentProvider: makePaymentProvider() })).not.toContain(
+            HELPER_TOOLS.ACTOR_SERVER_REQUEST,
+        );
+    });
 });
 
 describe('reporting an incomplete response', () => {
@@ -700,17 +731,22 @@ describe('describing the tool', () => {
 });
 
 describe('logging the call', () => {
-    it('logs the body and a token query value only as redacted, and keeps the Actor name', () => {
+    it('logs the body and every query value as redacted, and keeps the Actor name and query names', () => {
         const { redactArgs } = sendServerActorRequest as HelperTool;
         const args = {
             actor: SERVER_ACTOR,
             method: 'POST',
             path: '/echo',
-            query: { token: 'secret' },
+            query: { apiKey: 'secret', limit: 5 },
             body: { value: 'secret' },
         };
 
         expect(JSON.stringify(redactArgs?.(args))).not.toContain('secret');
-        expect(redactArgs?.(args)).toMatchObject({ actor: SERVER_ACTOR, method: 'POST', path: '/echo' });
+        expect(redactArgs?.(args)).toMatchObject({
+            actor: SERVER_ACTOR,
+            method: 'POST',
+            path: '/echo',
+            query: { apiKey: '[REDACTED]', limit: '[REDACTED]' },
+        });
     });
 });
