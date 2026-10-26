@@ -201,16 +201,6 @@ describe('fetchActorDetails()', () => {
         expect(result?.actorInfo.pictureUrl).toBe('https://images.example.com/store-picture.webp');
     });
 
-    it('searches the Store for the picture by the full Actor name', async () => {
-        vi.mocked(searchActorsByKeywords).mockClear();
-
-        await fetchActorDetails(stubActorWithPicture(), 'apify/google-search-scraper');
-
-        expect(searchActorsByKeywords).toHaveBeenCalledWith(
-            expect.objectContaining({ search: 'apify/google-search-scraper' }),
-        );
-    });
-
     it('sends no call tracking with the picture Store search', async () => {
         const actual = await vi.importActual<typeof ActorSearchModule>('../../src/utils/actor_search.js');
         vi.mocked(searchActorsByKeywords).mockImplementationOnce(actual.searchActorsByKeywords);

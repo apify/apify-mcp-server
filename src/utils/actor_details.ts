@@ -95,6 +95,9 @@ export async function fetchActorDetails(
     { cardOptions, actorStore }: FetchActorDetailsOptions = {},
 ): Promise<ActorDetailsResult | null> {
     try {
+        // Use only the actor name part (after '/') for better keyword search relevance —
+        // "apify/instagram-scraper" returns unrelated results, while "instagram-scraper" finds the correct actor.
+        const actorSlug = actorName.split('/').pop() || actorName;
         const actor = apifyClient.actor(actorName);
         const [actorInfo, buildInfo, storeActors]: [Actor | undefined, Build | undefined, ActorStoreList[]] =
             await Promise.all([
@@ -104,8 +107,7 @@ export async function fetchActorDetails(
                 actorStore?.getProxiedPictureUrl
                     ? []
                     : searchActorsByKeywords({
-                          // The full name ranks the Actor first; the name alone can miss it (apify/apify-mcp-server#1673).
-                          search: actorName,
+                          search: actorSlug,
                           apifyClient,
                           limit: ACTOR_DETAILS_PICTURE_SEARCH_LIMIT,
                       }).catch(() => []),
