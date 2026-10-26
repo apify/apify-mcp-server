@@ -66,8 +66,8 @@ export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
 /** A build's `actorDefinition` with the server-interface fields apify-client's type omits. */
 export type ActorDefinitionWithServerInterface = ActorDefinition & {
     webServerMcpPath?: string;
-    /** An OpenAPI document; the Actor's HTTP interface in standby mode. */
-    webServerSchema?: Record<string, unknown>;
+    /** The Actor's HTTP interface in standby mode: an OpenAPI document as the publisher wrote it, unvalidated. */
+    webServerSchema?: unknown;
 };
 
 /**
