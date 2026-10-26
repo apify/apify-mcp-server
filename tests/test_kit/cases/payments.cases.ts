@@ -147,6 +147,7 @@ export const paymentsCases: Case[] = [
         },
     },
     {
+        // The removed actor:tool form resolves the Actor too, so it gets the same rejection before a 402.
         name: 'should return error when calling a standby Actor via call-actor in x402 payment mode',
         isDeploymentTest: false,
         skipIf: skipOnStdio,
@@ -155,7 +156,7 @@ export const paymentsCases: Case[] = [
             try {
                 const result = await client.callTool({
                     name: 'call-actor',
-                    arguments: { actor: ACTOR_EXAMPLE_MCP_SERVER, input: {} },
+                    arguments: { actor: `${ACTOR_EXAMPLE_MCP_SERVER}:add`, input: {} },
                 });
                 expect(result).toBeDefined();
                 expect(result.isError).toBe(true);

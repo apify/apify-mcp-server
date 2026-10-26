@@ -46,7 +46,7 @@ import {
     CALL_ACTOR_WAIT_SECS_DEFAULT,
     fetchActorRunData,
 } from './actor_run_response.js';
-import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory.js';
+import { fixActorNameInputAndLog, getActorsAsTools, MCP_TOOL_NAME_SUFFIX } from './actor_tools_factory.js';
 
 // ---------------------------------------------------------------------------
 // Shared call-actor description building blocks
@@ -168,8 +168,8 @@ function respondStandbyRejection(
     opts: { mcpSessionId?: string; actorId?: string; paymentProviderId?: string },
 ): ToolResponse {
     log.softFail('Rejecting a tool call for an unsupported standby Actor', {
-        // The error's canonical Actor name, so both call shapes log the same value even when the
-        // caller addressed the Actor by ID. `actorLoadErrorKind` distinguishes which cell rejected it.
+        // The error's canonical Actor name, not the caller's identifier, which may be an Actor ID.
+        // `actorLoadErrorKind` distinguishes which cell rejected it.
         actorName: error.actorName,
         mcpSessionId: opts.mcpSessionId,
         paymentProviderId: opts.paymentProviderId,
@@ -499,6 +499,16 @@ export async function callActorPreExecute(
     }
     if (resolution?.toolMode === ACTOR_TOOL_MODE.MCP) {
         return { earlyResponse: respondMcpServerActor(resolution.actorFullName, options.route, loadedToolNames) };
+    }
+    // The removed "actorName:toolName" form names a tool, which only an MCP server Actor has; never run the Actor.
+    if (resolution && MCP_TOOL_NAME_SUFFIX.test(parsedArgs.actor)) {
+        const name = resolution.actorFullName;
+        return {
+            earlyResponse: respondUserError(
+                `Actor '${name}' is not an MCP server, so "${parsedArgs.actor}" names no tool. To run it from an input, pass "actor": "${name}".`,
+                { detail: 'not an MCP server' },
+            ),
+        };
     }
 
     return { parsed: { ...parsedArgs, actor: actorName } };

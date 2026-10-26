@@ -469,8 +469,7 @@ export class LegacyMcpServer {
                     throw new McpError(ErrorCode.InvalidParams, prepared.message);
                 }
 
-                const { tool, toolArgs, logSafeArgs, apifyClient, preflightRejection, paymentRequiredResult } =
-                    prepared;
+                const { tool, toolArgs, logSafeArgs, apifyClient, standbyRejection, paymentRequiredResult } = prepared;
                 actorName = prepared.actorName;
                 actorId = prepared.actorId;
                 resolvedToolName = getToolFullName(tool);
@@ -496,12 +495,12 @@ export class LegacyMcpServer {
 
                     // Pre-flight failure is already known — resolve the task synchronously: store
                     // the failure as the terminal `completed` result and emit exactly one status
-                    // notification. A preflight rejection wins over payment-required, matching the sync
+                    // notification. Standby rejection wins over payment-required, matching the sync
                     // path. Telemetry rides the handler's outer `finally`.
-                    const preflightResult = preflightRejection ?? paymentRequiredResult;
+                    const preflightResult = standbyRejection ?? paymentRequiredResult;
                     if (preflightResult) {
                         const outcome = buildPreflightFailureOutcome(
-                            preflightRejection,
+                            standbyRejection,
                             paymentRequiredResult,
                             actorName,
                             actorId,

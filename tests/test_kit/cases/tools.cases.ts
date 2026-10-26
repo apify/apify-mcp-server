@@ -217,12 +217,13 @@ export const toolsCases: Case[] = [
         }),
     },
     {
+        // In the removed actor:tool form, which old clients still send.
         name: 'rejects call-actor on an MCP server Actor and names call-actor-mcp-tool',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const response = await client.callTool({
                 name: 'call-actor',
-                arguments: { actor: ACTOR_EXAMPLE_MCP_SERVER, input: { firstNumber: 1, secondNumber: 2 } },
+                arguments: { actor: `${ACTOR_EXAMPLE_MCP_SERVER}:add`, input: { firstNumber: 1, secondNumber: 2 } },
             });
 
             const content = response.content as { text: string }[];

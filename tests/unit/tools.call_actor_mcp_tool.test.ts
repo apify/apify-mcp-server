@@ -99,14 +99,13 @@ function seedActor(
 
 async function callTool(
     args: Record<string, unknown>,
-    options: { signal?: AbortSignal; token?: string; apifyClient?: ApifyClient } = {},
+    options: { signal?: AbortSignal; apifyClient?: ApifyClient } = {},
 ): Promise<ToolResult> {
     const context = stubToolCallContext(
         { actor: MCP_ACTOR, tool: 'add', ...args },
         options.apifyClient ?? new ApifyClient({ token: TOKEN }),
     );
     if (options.signal) context.signal = options.signal;
-    if (options.token !== undefined) context.apifyToken = options.token;
     return (await executeCallActorMcpTool(context)) as ToolResult;
 }
 
@@ -232,12 +231,15 @@ describe('call-actor-mcp-tool', () => {
         expect(callToolSpy.mock.calls[0][2]).toMatchObject({ timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC });
     });
 
-    it('rejects an Actor that is not an MCP server without connecting', async () => {
+    it('rejects an Actor that is not an MCP server without connecting, naming the tool that serves it', async () => {
         seedActor('apify/server-actor-test', { definition: { webServerMcpPath: undefined, hasWebServerSchema: true } });
 
         const result = await callTool({ actor: 'apify/server-actor-test' });
 
         expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(
+            `Actor 'apify/server-actor-test' is not an MCP server. Its HTTP API can be called with ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}.`,
+        );
         expect(result.toolTelemetry).toMatchObject({ actorId: 'server-actor-test-id' });
         expect(requestHeaders).toHaveLength(0);
     });
@@ -280,6 +282,10 @@ describe('call-actor-mcp-tool', () => {
 
         expect(result.isError).toBe(true);
         expect(JSON.stringify(result.content)).toContain(`Failed to call MCP tool 'subtract' on Actor '${MCP_ACTOR}'`);
+        expect(result.toolTelemetry).toMatchObject({
+            toolStatus: TOOL_STATUS.SOFT_FAIL,
+            failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+        });
     });
 
     it('returns the empty aborted response when the client cancels mid-call', async () => {

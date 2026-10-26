@@ -141,7 +141,7 @@ describe('prepareToolCall()', () => {
             expect('message' in result).toBe(false);
             const prepared = result as PreparedCall;
             expect(prepared.tool.name).toBe('recorder-tool');
-            expect(prepared.preflightRejection).toBeNull();
+            expect(prepared.standbyRejection).toBeNull();
             expect(prepared.paymentRequiredResult).toBeUndefined();
             expect(telemetryData.tool_name).toBe('recorder-tool');
         });
@@ -431,7 +431,7 @@ describe('classifyToolCallError()', () => {
     });
 });
 
-describe('preflight rejection outcome', () => {
+describe('standby rejection outcome', () => {
     it('keeps the internal telemetry off the wire and records its failure detail', () => {
         const outcome = buildPreflightFailureOutcome(
             respondUserError('Actor apify/example-mcp-server is not supported in agentic payment mode.', {

@@ -48,9 +48,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     validated without coercion; text uses the declared charset, UTF-8 by default, and rejects unsupported
     charsets while keeping the HTTP status; session tokens are masked after decoding too),
     `call_actor_mcp_tool.ts` (`call-actor-mcp-tool`: one `tools/call` on an MCP server Actor's server, gated on the
-    `mcp` interface, with the remote `CallToolResult` passed through unchanged; `runOnActorMcpServer` resolves the
-    Actor and its MCP URL, connects under the caller's token and turns a failed connection, an abort or a remote
-    error into a response),
+    `mcp` interface, with the remote `CallToolResult` passed through except for internal telemetry;
+    `runOnActorMcpServer` resolves the Actor and its MCP URL, connects under the caller's token and turns a failed
+    connection, an abort or a remote error into a response),
     `actor_tool_contract.ts` (Actor-specific presentation policies plus direct-tool input restrictions
     and defaults, shared by schema generation, the call engine's denied-input check and execution;
     generic calls skip direct-only restrictions and defaults), and
