@@ -10,7 +10,6 @@ import { getHttpStatusCode, sanitizeMezmoMessage } from '../utils/logging.js';
 import { ACTORIZED_MCP_CONNECTION_TIMEOUT_MSEC } from './const.js';
 import { getMCPServerID } from './proxy.js';
 
-/** What a connection to an Actor's MCP server carries: the session token and the session's request origin. */
 export type McpServerCredentials = { token: string; requestOrigin?: REQUEST_ORIGIN };
 
 /**
@@ -83,7 +82,6 @@ async function connectWithTransport(
 
 /** Headers on every request to an Actor's MCP server; the request origin is the one the session's API calls carry. */
 function buildMCPRequestHeaders({ token, requestOrigin }: McpServerCredentials): Record<string, string> {
-    // A plain apify-client `ApifyClient` has no origin; MCP is the wrapper's own default.
     return { authorization: `Bearer ${token}`, [REQUEST_ORIGIN_HEADER]: requestOrigin ?? REQUEST_ORIGIN.MCP };
 }
 

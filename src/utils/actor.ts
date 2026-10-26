@@ -3,7 +3,7 @@ import { getActorMCPServerPath } from '../mcp/actors.js';
 import { actorDefinitionCache } from '../state.js';
 import { getActorToolModeFromInterfaces, resolveActorInterfaces } from '../tools/actor_tool_naming.js';
 import { getActorDefinition } from '../tools/actors/actor_definition.js';
-import type { ActorDefinitionWithInfo, ActorInfo, ActorToolResolutionResult } from '../types.js';
+import type { ActorDefinitionWithInfo, ActorToolResolutionResult } from '../types.js';
 import { getUserInfoCached } from './userid_cache.js';
 
 /**
@@ -68,12 +68,11 @@ export async function getActorToolResolutionCached(
     const cached = await getActorDefinitionCached(actorIdOrName, apifyClient);
     if (!cached) return null;
 
-    const actorInfo: ActorInfo = {
+    const interfaces = resolveActorInterfaces({
         definition: cached.definition,
         actor: cached.info,
         webServerMcpPath: getActorMCPServerPath(cached.definition),
-    };
-    const interfaces = resolveActorInterfaces(actorInfo);
+    });
     return {
         toolMode: getActorToolModeFromInterfaces(interfaces),
         actorFullName: cached.definition.actorFullName,
