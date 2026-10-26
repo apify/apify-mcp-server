@@ -180,7 +180,7 @@ describe('Actor run/standby mode decision table', () => {
             expect('earlyResponse' in result).toBe(true);
         });
 
-        it('answers the canonical standby-without-MCP message for both call shapes on the unsupported cell', async () => {
+        it('answers the canonical server-Actor-without-MCP message for both call shapes on the unsupported cell', async () => {
             const bare = await callActor(STANDBY_EMPTY);
             const withToolName = await preExecute(`${STANDBY_EMPTY}:add`);
 
