@@ -43,16 +43,17 @@ export function buildActorFields(
 
 /**
  * Extract actor name for telemetry from the tool entry or call-actor args.
- * For actor tools, read from the tool entry. For call-actor, read the `actor` arg.
+ * For actor tools, read from the tool entry. For call-actor, parse from the `actor` arg.
  * Returns undefined for other internal tools or when the arg is missing/invalid.
  */
 export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>): string | undefined {
     if (tool.type === TOOL_TYPE.ACTOR) return tool.actorFullName;
     if (tool.type === TOOL_TYPE.ACTOR_MCP) return tool.actorId;
 
+    // A legacy "username/name:toolName" value, which call-actor rejects, is logged by its Actor name.
     const actorArg = args?.actor;
     if (typeof actorArg !== 'string') return undefined;
-    return actorArg.trim() || undefined;
+    return actorArg.split(':')[0]?.trim() || undefined;
 }
 
 type ToolPublicFieldOptions = {
