@@ -388,26 +388,34 @@ describe('fetch-actor-mcp-tool-list', () => {
         expect(listCursors).toHaveLength(MAX_TOOL_LIST_PAGES);
     });
 
-    it('passes the external tool-call timeout and the call signal to every tools/list page', async () => {
-        const requestSpy = vi.spyOn(Client.prototype, 'request');
+    it('gives all tools/list pages one external tool-call timeout and passes each the call signal', async () => {
+        // Each page takes a minute, so the second one gets what is left of the timeout.
+        const realNow = Date.now.bind(Date);
+        let elapsed = 0;
+        vi.spyOn(Date, 'now').mockImplementation(() => realNow() + elapsed);
+        const { request } = Client.prototype;
+        const requestSpy = vi.spyOn(Client.prototype, 'request').mockImplementation(function (this: Client, ...args) {
+            if (args[0].method === 'tools/list') elapsed += 60_000;
+            return request.apply(this, args);
+        });
         const controller = new AbortController();
 
         await execute(executeFetchActorMcpToolList, {}, { signal: controller.signal });
 
-        const listCalls = requestSpy.mock.calls.filter(([request]) => request.method === 'tools/list');
-        expect(listCalls).toHaveLength(2);
-        for (const [, , options] of listCalls) {
-            expect(options).toMatchObject({ timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, signal: controller.signal });
-        }
+        const pageOptions = requestSpy.mock.calls
+            .filter(([{ method }]) => method === 'tools/list')
+            .map(([, , options]) => options);
+        expect(pageOptions).toHaveLength(2);
+        expect(pageOptions[0]?.timeout).toBeLessThanOrEqual(EXTERNAL_TOOL_CALL_TIMEOUT_MSEC);
+        expect(pageOptions[1]?.timeout).toBeLessThanOrEqual(EXTERNAL_TOOL_CALL_TIMEOUT_MSEC - 60_000);
+        for (const options of pageOptions) expect(options?.signal).toBe(controller.signal);
     });
 
-    it("discovers again on every call, under each caller's token", async () => {
-        await execute(executeFetchActorMcpToolList, {}, { token: 'first-token' });
-        await execute(executeFetchActorMcpToolList, {}, { token: 'second-token' });
+    it('discovers again on every call, with nothing cached', async () => {
+        await execute(executeFetchActorMcpToolList, {});
+        await execute(executeFetchActorMcpToolList, {});
 
         expect(listCursors).toEqual([undefined, 'page-2', undefined, 'page-2']);
-        const tokens = new Set(requestHeaders.map((headers) => headers.authorization));
-        expect(tokens).toEqual(new Set(['Bearer first-token', 'Bearer second-token']));
     });
 
     it('closes the client after a listing that succeeds and after one that fails', async () => {

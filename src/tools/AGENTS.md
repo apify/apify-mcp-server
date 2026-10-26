@@ -53,7 +53,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     error into a response. `call-actor` and its widget refuse the removed `actorName:toolName` form through
     `rejectArgs` (`rejectMcpToolSyntax` in `call_actor.ts`), before any Actor lookup),
     `fetch_actor_mcp_tool_list.ts` (`fetch-actor-mcp-tool-list`: an uncached `tools/list` through
-    `runOnActorMcpServer` that follows `nextCursor`, fails on a failed page and stops after `MAX_TOOL_LIST_PAGES`;
+    `runOnActorMcpServer` that follows `nextCursor` within one `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC` for all pages,
+    fails on a failed page and stops after `MAX_TOOL_LIST_PAGES`;
     `fetch-actor-details` never connects to an MCP server),
     `actor_tool_contract.ts` (Actor-specific presentation policies plus direct-tool input restrictions
     and defaults, shared by schema generation, the call engine's denied-input check and execution;

@@ -50,16 +50,17 @@ export async function executeFetchActorMcpToolList(toolArgs: InternalToolArgs): 
     return runOnActorMcpServer(toolArgs, {
         actor,
         operation: 'list the MCP tools',
-        // Follows `nextCursor`; a failed page fails the listing. Not `client.listTools`: it compiles every remote
-        // output schema, so one that does not compile would fail the listing.
+        // Follows `nextCursor` within one external tool-call timeout for all pages; a failed page fails the listing.
+        // Not `client.listTools`: it compiles every remote output schema, so one that does not compile would fail it.
         run: async (client) => {
             const tools: Tool[] = [];
             let cursor: string | undefined;
+            const deadline = Date.now() + EXTERNAL_TOOL_CALL_TIMEOUT_MSEC;
             for (let page = 0; page < MAX_TOOL_LIST_PAGES; page++) {
                 const result = await client.request(
                     { method: 'tools/list', params: cursor === undefined ? undefined : { cursor } },
                     ListToolsResultSchema,
-                    { timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, signal: toolArgs.signal },
+                    { timeout: deadline - Date.now(), signal: toolArgs.signal },
                 );
                 tools.push(...result.tools);
                 cursor = result.nextCursor;
