@@ -56,7 +56,9 @@ export async function searchAgentSafeActors(options: SearchAgentSafeActorsOption
     const { keywords, apifyClient, limit, offset, paymentProvider } = options;
 
     return searchActorsByKeywords({
-        search: keywords,
+        // The Store returns no Actors for keywords without letters or digits (" ", "%", "...");
+        // send them as empty keywords. See apify/apify-mcp-server#1673.
+        search: /[\p{L}\p{N}]/u.test(keywords) ? keywords : '',
         apifyClient,
         limit,
         offset,

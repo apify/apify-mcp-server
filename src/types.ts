@@ -297,7 +297,6 @@ export type ActorStoreList = ActorStoreListOutdated & {
     actorReviewCount?: number;
     actorReviewRating?: number;
     badge?: string | null;
-    bookmarkCount?: number;
     categories?: string[];
     currentPricingInfo: ActorRunPricingInfo;
     isWhiteListedForAgenticPayments?: boolean;
@@ -308,7 +307,6 @@ export type ActorStoreList = ActorStoreListOutdated & {
     stats: ActorStats & {
         actorReviewCount?: number;
         actorReviewRating?: number;
-        bookmarkCount?: number;
         publicActorRunStats30Days?: Partial<Record<string, number>> & {
             SUCCEEDED?: number;
             TOTAL?: number;
@@ -331,7 +329,6 @@ export type Actor = ActorOutdated & {
         };
         actorReviewCount?: number;
         actorReviewRating?: number;
-        bookmarkCount?: number;
         lastRunStartedAt?: string | Date | null;
     };
 };
@@ -703,7 +700,6 @@ export type StructuredActorCard = {
     stats?: {
         totalUsers: number;
         monthlyUsers: number;
-        bookmarks?: number;
     };
     rating?: {
         average: number;
@@ -734,7 +730,7 @@ export type ConsoleLinkContext = {
 export type ActorCardOptions = {
     /** Include description text only */
     includeDescription?: boolean;
-    /** Include usage statistics (users, runs, success rate, bookmarks) */
+    /** Include usage statistics (users, runs, success rate) */
     includeStats?: boolean;
     /** Include pricing information */
     includePricing?: boolean;

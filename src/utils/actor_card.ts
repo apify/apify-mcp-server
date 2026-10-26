@@ -97,7 +97,6 @@ type ExtractedActorData = {
     stats?: {
         totalUsers: number;
         monthlyUsers: number;
-        bookmarks?: number;
     };
     rating?: {
         average: number;
@@ -142,13 +141,6 @@ function extractActorData(actor: Actor | ActorStoreList, options: ActorCardOptio
                 totalUsers: stats.totalUsers,
                 monthlyUsers: stats.totalUsers30Days,
             };
-        }
-
-        const bookmarkCount =
-            ('bookmarkCount' in actor && actor.bookmarkCount) || ('bookmarkCount' in stats && stats.bookmarkCount);
-        if (bookmarkCount) {
-            data.stats ??= { totalUsers: 0, monthlyUsers: 0 };
-            data.stats.bookmarks = Number(bookmarkCount);
         }
     }
 
@@ -215,13 +207,9 @@ export function formatActorToActorCard(
     }
 
     if (data.stats) {
-        const statsParts = [
-            `${data.stats.totalUsers.toLocaleString()} total users, ${data.stats.monthlyUsers.toLocaleString()} monthly users`,
-        ];
-        if (data.stats.bookmarks) {
-            statsParts.push(`${data.stats.bookmarks} bookmarks`);
-        }
-        markdownLines.push(`- **Stats:** ${statsParts.join(', ')}`);
+        markdownLines.push(
+            `- **Stats:** ${data.stats.totalUsers.toLocaleString()} total users, ${data.stats.monthlyUsers.toLocaleString()} monthly users`,
+        );
     }
 
     if (data.rating) {
