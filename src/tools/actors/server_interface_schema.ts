@@ -108,8 +108,8 @@ function listRequiredInputs(operation: Record<string, unknown>, schema: Record<s
  * Each operation with its required inputs, e.g.
  * `['GET / (required: query)', 'POST / (required: request body)', 'GET /status']`.
  */
-export function listDocumentedOperations(schema: Record<string, unknown> | undefined): string[] {
-    if (!schema) return [];
+export function listDocumentedOperations(schema: unknown): string[] {
+    if (!isRecord(schema)) return [];
     return listServerOperations(schema).map(({ method, path, operation }) => {
         const required = listRequiredInputs(operation, schema);
         return required.length > 0 ? `${method} ${path} (required: ${required.join(', ')})` : `${method} ${path}`;
