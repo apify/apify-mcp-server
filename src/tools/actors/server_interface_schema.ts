@@ -102,7 +102,7 @@ function listRequiredInputs(operation: Record<string, unknown>, schema: Record<s
 }
 
 /**
- * Each operation with its required inputs, short enough to cache, e.g.
+ * Each operation with its required inputs, e.g.
  * `['GET / (required: query)', 'POST / (required: request body)', 'GET /status']`.
  */
 export function listDocumentedOperations(schema: Record<string, unknown> | undefined): string[] {
