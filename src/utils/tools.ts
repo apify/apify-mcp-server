@@ -43,7 +43,7 @@ export function buildActorFields(
 
 /**
  * Extract actor name for telemetry from the tool entry or call-actor args.
- * For actor tools, read from the tool entry. For call-actor, parse from the `actor` arg.
+ * For actor tools, read from the tool entry. For call-actor, read the `actor` arg.
  * Returns undefined for other internal tools or when the arg is missing/invalid.
  */
 export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>): string | undefined {

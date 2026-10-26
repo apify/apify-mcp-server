@@ -26,7 +26,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         : '';
     return dedent`
         List an Actor's MCP tools with each tool's name, description, input schema, annotations, and metadata, as the server reports them.${callTool}
-        Each call asks the server again; nothing is cached. The server connects with the Apify API token. Connecting can start a standby run of the Actor in your account, kept for its idle timeout, or is charged per event when the Actor is multi-tenant.
+        Each call asks the server again; nothing is cached. It connects with your Apify API token. Connecting can start a standby run of the Actor in your account, kept until its idle timeout; a multi-tenant Actor charges per event.
 
         USAGE:
         - Use when the user asks which MCP tools an Actor provides, or before calling one of them.
@@ -86,10 +86,9 @@ export const fetchActorMcpToolList: ToolEntry = Object.freeze({
     hasPaymentProviderStandbyCheck: true,
     annotations: {
         title: 'Fetch Actor MCP tool list',
-        // Listing can start a billed standby run.
+        // Each call can start or charge a standby run, so it is neither read-only nor idempotent.
         readOnlyHint: false,
         destructiveHint: false,
-        // Each call can start or charge a standby run.
         idempotentHint: false,
         // It lists tools and calls none.
         openWorldHint: false,

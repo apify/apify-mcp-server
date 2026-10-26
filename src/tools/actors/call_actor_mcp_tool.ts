@@ -30,11 +30,11 @@ const callActorMcpToolArgs = z.object({
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    const details = hasTool(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST)
+    const toolList = hasTool(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST)
         ? `\n${HELPER_TOOLS.ACTOR_MCP_TOOL_LIST} lists the Actor's MCP tools and their input schemas.`
         : '';
     return dedent`
-        Call one tool on an Actor's MCP server and return its result.${details}
+        Call one tool on an Actor's MCP server and return its result.${toolList}
         It connects with your Apify API token. Connecting can start a standby run of the Actor in your account, kept until its idle timeout; a multi-tenant Actor charges per event. What the tool itself does depends on the Actor.
 
         Example call: {"actor": "username/name", "tool": "search", "arguments": {"query": "apify"}}

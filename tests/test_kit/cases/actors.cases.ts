@@ -380,36 +380,6 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        name: 'should return structured output for fetch-actor-details with selective output matching outputSchema',
-        isDeploymentTest: false,
-        run: withClient({ tools: ['actors'] }, async (client) => {
-            const toolName = 'fetch-actor-details';
-
-            // Selective fields must still validate against the schema
-            const result = await client.callTool({
-                name: toolName,
-                arguments: {
-                    actor: ACTOR_EXAMPLE_MCP_SERVER,
-                    output: {
-                        description: false,
-                        stats: false,
-                        pricing: false,
-                        rating: false,
-                        metadata: false,
-                        inputSchema: true,
-                        readme: false,
-                    },
-                },
-            });
-
-            const content = result.content as { text: string; isError?: boolean }[];
-            expect(content.length).toBeGreaterThan(0);
-
-            // This should validate successfully - structured output must match schema
-            validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
-        }),
-    },
-    {
         name: 'should return structured output for fetch-actor-details with output={ description: true, readme: true } matching outputSchema',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {

@@ -365,10 +365,12 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         let tools = getToolsForServerMode(source.input, source.actorTools, view.serverMode);
         // A payment provider cannot pay for an Actor Server or MCP server run, so every call would be rejected.
         if (this.options.paymentProvider) {
-            tools = tools.filter(
-                (tool) =>
-                    tool.name !== HELPER_TOOLS.ACTOR_SERVER_REQUEST && tool.name !== HELPER_TOOLS.ACTOR_MCP_TOOL_CALL,
-            );
+            const unservable: string[] = [
+                HELPER_TOOLS.ACTOR_SERVER_REQUEST,
+                HELPER_TOOLS.ACTOR_MCP_TOOL_CALL,
+                HELPER_TOOLS.ACTOR_MCP_TOOL_LIST,
+            ];
+            tools = tools.filter((tool) => !unservable.includes(tool.name));
         }
         if (this.isReportProblemServable(view, source.input)) return tools;
         return tools.filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT);

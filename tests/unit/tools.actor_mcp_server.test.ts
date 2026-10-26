@@ -26,15 +26,8 @@ import {
     fetchActorMcpToolList,
     MAX_TOOL_LIST_PAGES,
 } from '../../src/tools/actors/fetch_actor_mcp_tool_list.js';
-import type {
-    Actor,
-    ActorDefinitionPruned,
-    HelperTool,
-    InternalToolArgs,
-    ToolTelemetryContext,
-} from '../../src/types.js';
+import type { Actor, ActorDefinitionPruned, HelperTool, ToolEntry, ToolTelemetryContext } from '../../src/types.js';
 import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../src/types.js';
-import type { ToolResponse } from '../../src/utils/mcp.js';
 import { mockActor } from './helpers/actor_build_client.js';
 import { getRequestHandler, makePaymentProvider, withServer } from './helpers/mcp_server.js';
 import { expectSoftFailInvalidInput, mockApifyClient, only, stubToolCallContext } from './helpers/tool_context.js';
@@ -84,8 +77,8 @@ const REMOTE_TOOL_PAGES: Tool[][] = [
 
 type ToolResult = Record<string, unknown> & { toolTelemetry?: ToolTelemetryContext };
 
-/** Since the test started: every HTTP request to the remote servers, and each tools/call and tools/list they got. */
-let requests: { path?: string; headers: IncomingMessage['headers'] }[] = [];
+/** Since the test started: the headers of every request to the remote servers, and each tools/call and tools/list. */
+let requestHeaders: IncomingMessage['headers'][] = [];
 let remoteCalls: { name: string; arguments: unknown }[] = [];
 let listCursors: (string | undefined)[] = [];
 let httpServer: HttpServer;
@@ -150,10 +143,8 @@ function seedActor(
     actorDefinitionCache.set(name, { definition, info });
 }
 
-type Execute = (toolArgs: InternalToolArgs) => Promise<ToolResponse>;
-
 async function execute(
-    run: Execute,
+    run: HelperTool['call'],
     args: Record<string, unknown>,
     options: { signal?: AbortSignal; token?: string; apifyClient?: ApifyClient } = {},
 ): Promise<ToolResult> {
@@ -167,7 +158,7 @@ async function execute(
 }
 
 async function dispatch(
-    tool: HelperTool,
+    tool: ToolEntry,
     args: Record<string, unknown>,
     serverOptions: Parameters<typeof withServer>[1] = { token: TOKEN },
 ): Promise<Record<string, unknown>> {
@@ -183,7 +174,7 @@ async function dispatch(
 beforeAll(async () => {
     httpServer = createServer((req, res) => {
         const path = req.url?.split('?')[0];
-        requests.push({ path, headers: req.headers });
+        requestHeaders.push(req.headers);
         const remote = createRemoteServer(path);
         const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
         res.on('close', () => void remote.close());
@@ -204,14 +195,14 @@ afterEach(() => {
 });
 
 beforeEach(() => {
-    requests = [];
+    requestHeaders = [];
     remoteCalls = [];
     listCursors = [];
 });
 
 describe('call-actor-mcp-tool', () => {
     it('returns the remote CallToolResult unchanged, with no run fields', async () => {
-        const result = await dispatch(callActorMcpTool as HelperTool, {
+        const result = await dispatch(callActorMcpTool, {
             actor: MCP_ACTOR,
             tool: 'add',
             arguments: { a: 2, b: 3 },
@@ -247,15 +238,15 @@ describe('call-actor-mcp-tool', () => {
     it('sends the session token and the MCP request origin on every request of the connection', async () => {
         await execute(executeCallActorMcpTool, { tool: 'add' });
 
-        expect(requests.length).toBeGreaterThan(0);
-        for (const { headers } of requests) {
+        expect(requestHeaders.length).toBeGreaterThan(0);
+        for (const headers of requestHeaders) {
             expect(headers).toMatchObject({ authorization: `Bearer ${TOKEN}`, 'x-apify-request-origin': 'MCP' });
         }
     });
 
     it('sends APIFY_AI as the request origin of the MCP connection for an Apify AI client session', async () => {
         await dispatch(
-            callActorMcpTool as HelperTool,
+            callActorMcpTool,
             { actor: MCP_ACTOR, tool: 'add' },
             {
                 token: TOKEN,
@@ -270,8 +261,8 @@ describe('call-actor-mcp-tool', () => {
             },
         );
 
-        expect(requests.length).toBeGreaterThan(0);
-        for (const { headers } of requests) expect(headers['x-apify-request-origin']).toBe('APIFY_AI');
+        expect(requestHeaders.length).toBeGreaterThan(0);
+        for (const headers of requestHeaders) expect(headers['x-apify-request-origin']).toBe('APIFY_AI');
     });
 
     it('passes the external tool-call timeout to tools/call', async () => {
@@ -302,7 +293,7 @@ describe('call-actor-mcp-tool', () => {
         );
 
         expectSoftFailInvalidInput(result);
-        expect(requests).toHaveLength(0);
+        expect(requestHeaders).toHaveLength(0);
     });
 
     it('rejects an MCP path that leaves the standby origin without connecting, and reports the Actor ID', async () => {
@@ -313,19 +304,19 @@ describe('call-actor-mcp-tool', () => {
         expect(result.isError).toBe(true);
         expect(JSON.stringify(result.content)).toContain('resolves outside its standby origin');
         expect(result.toolTelemetry).toMatchObject({ actorId: 'off-origin-mcp-server-id' });
-        expect(requests).toHaveLength(0);
+        expect(requestHeaders).toHaveLength(0);
     });
 
     it('requires a token without connecting', async () => {
         const result = await dispatch(
-            callActorMcpTool as HelperTool,
+            callActorMcpTool,
             { actor: MCP_ACTOR, tool: 'add' },
             { token: '', allowUnauthMode: true },
         );
 
         expect(result.isError).toBe(true);
         expect(JSON.stringify(result.content)).toContain('An Apify API token is required');
-        expect(requests).toHaveLength(0);
+        expect(requestHeaders).toHaveLength(0);
     });
 
     it('reports a server that cannot be reached as a connection failure', async () => {
@@ -349,23 +340,7 @@ describe('call-actor-mcp-tool', () => {
         controller.abort();
 
         expect(await execute(executeCallActorMcpTool, { tool: 'add' }, { signal: controller.signal })).toEqual({});
-        expect(requests).toHaveLength(0);
-    });
-
-    it('is not listed in a payment-provider session', async () => {
-        const listActorsTools = async (options: Parameters<typeof withServer>[1]) =>
-            withServer(
-                async (server) => {
-                    await server.loadToolsFromInput({ tools: ['actors'] }, mockApifyClient());
-                    return server.listToolNames();
-                },
-                { serverMode: SERVER_MODE.DEFAULT, ...options },
-            );
-
-        expect(await listActorsTools({})).toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
-        expect(await listActorsTools({ paymentProvider: makePaymentProvider() })).not.toContain(
-            HELPER_TOOLS.ACTOR_MCP_TOOL_CALL,
-        );
+        expect(requestHeaders).toHaveLength(0);
     });
 
     it('names fetch-actor-mcp-tool-list in the description only when the session has it, and states the billing caveat', () => {
@@ -380,8 +355,8 @@ describe('call-actor-mcp-tool', () => {
 });
 
 describe('fetch-actor-mcp-tool-list', () => {
-    it("returns every page's tool definitions unchanged, with one line of text per tool", async () => {
-        const result = await dispatch(fetchActorMcpToolList as HelperTool, { actor: MCP_ACTOR });
+    it("returns every page's tool definitions unchanged, with one text item per tool", async () => {
+        const result = await dispatch(fetchActorMcpToolList, { actor: MCP_ACTOR });
 
         expect(result.structuredContent).toEqual({ tools: REMOTE_TOOL_PAGES.flat() });
         expect(listCursors).toEqual([undefined, 'page-2']);
@@ -431,7 +406,7 @@ describe('fetch-actor-mcp-tool-list', () => {
         await execute(executeFetchActorMcpToolList, {}, { token: 'second-token' });
 
         expect(listCursors).toEqual([undefined, 'page-2', undefined, 'page-2']);
-        const tokens = new Set(requests.map(({ headers }) => headers.authorization));
+        const tokens = new Set(requestHeaders.map((headers) => headers.authorization));
         expect(tokens).toEqual(new Set(['Bearer first-token', 'Bearer second-token']));
     });
 
@@ -457,8 +432,8 @@ describe('fetch-actor-mcp-tool-list', () => {
 });
 
 describe.each([
-    { tool: callActorMcpTool as HelperTool, run: executeCallActorMcpTool, args: { tool: 'add' } },
-    { tool: fetchActorMcpToolList as HelperTool, run: executeFetchActorMcpToolList, args: {} },
+    { tool: callActorMcpTool, run: executeCallActorMcpTool, args: { tool: 'add' } },
+    { tool: fetchActorMcpToolList, run: executeFetchActorMcpToolList, args: {} },
 ])('$tool.name before and during the connection', ({ tool, run, args }) => {
     it('rejects an Actor that is not an MCP server without connecting', async () => {
         seedActor('apify/server-actor-test', { definition: { webServerMcpPath: undefined, hasWebServerSchema: true } });
@@ -467,7 +442,7 @@ describe.each([
 
         expectSoftFailInvalidInput(result);
         expect(result.toolTelemetry).toMatchObject({ actorId: 'server-actor-test-id' });
-        expect(requests).toHaveLength(0);
+        expect(requestHeaders).toHaveLength(0);
     });
 
     it('returns the empty aborted response when the client cancels mid-request', async () => {
@@ -493,7 +468,21 @@ describe.each([
 
         expect(result.isError).toBe(true);
         expect(JSON.stringify(result.content)).toContain('is not supported in agentic payment mode');
-        expect(requests).toHaveLength(0);
+        expect(requestHeaders).toHaveLength(0);
+    });
+
+    it('is not listed in a payment-provider session', async () => {
+        const listActorsTools = async (options: Parameters<typeof withServer>[1]) =>
+            withServer(
+                async (server) => {
+                    await server.loadToolsFromInput({ tools: ['actors'] }, mockApifyClient());
+                    return server.listToolNames();
+                },
+                { serverMode: SERVER_MODE.DEFAULT, ...options },
+            );
+
+        expect(await listActorsTools({})).toContain(tool.name);
+        expect(await listActorsTools({ paymentProvider: makePaymentProvider() })).not.toContain(tool.name);
     });
 });
 
