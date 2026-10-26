@@ -126,7 +126,7 @@ function formatTenancy(actor: Pick<Actor, 'actorStandby'>): string {
     return `${ACTOR_TENANCY.SINGLE_TENANT}: the first request starts a run in your account, kept for ${idleTimeout}`;
 }
 
-/** What the list and the detail share: the tenancy or payment notice, and the base URL when the send tool is absent. */
+/** What every section shares: the tenancy or payment notice, and the base URL when the send tool is absent. */
 type SectionContext = { actorFullName: string; header: string; canSend: boolean };
 
 /** E.g. `send-server-actor-request sends this request: {"actor":"apify/search","method":"GET","path":"/search"}` */

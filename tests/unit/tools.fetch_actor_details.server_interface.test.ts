@@ -77,8 +77,13 @@ function section(params: Partial<Parameters<typeof buildServerInterfaceSection>[
 
 function textOfSection(params: Partial<Parameters<typeof buildServerInterfaceSection>[0]> = {}): string {
     const result = section(params);
-    if (!result || 'error' in result) throw new Error(`Expected a section, got ${JSON.stringify(result)}`);
+    if ('error' in result) throw new Error(`Expected a section, got ${JSON.stringify(result)}`);
     return result.text;
+}
+
+/** Parses the fenced JSON block a section ends with. */
+function parseJsonBlock(text: string) {
+    return JSON.parse(text.slice(text.indexOf('```json\n') + '```json\n'.length, text.lastIndexOf('\n```')));
 }
 
 function summary(params: Partial<Parameters<typeof buildServerInterfaceSummary>[0]> = {}) {
@@ -90,7 +95,7 @@ function summary(params: Partial<Parameters<typeof buildServerInterfaceSummary>[
     });
 }
 
-describe('buildServerInterfaceSummary()', () => {
+describe('summarizing a server interface in one line', () => {
     it('states the tenancy, names each operation and the fetch-actor-details call that lists them', () => {
         expect(summary()).toBe(
             'Server interface: enabled, single-tenant, 3 documented operations: GET /add, POST /add, GET /empty. ' +
@@ -118,7 +123,7 @@ describe('buildServerInterfaceSummary()', () => {
     });
 });
 
-describe('buildServerInterfaceSection()', () => {
+describe('rendering the server-interface section', () => {
     describe('the operation list', () => {
         it('says the interface is undocumented for a Server Actor without an API schema', () => {
             expect(textOfSection({ schema: undefined })).toBe(
@@ -143,7 +148,7 @@ describe('buildServerInterfaceSection()', () => {
             expect(text).toContain('- GET /add: Add two numbers (query). Required: firstNumber.');
             expect(text).toContain('- POST /add: Add two numbers (JSON body). Required: request body.');
             expect(text).toContain('- GET /empty: Return no content\n');
-            const schema = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+            const schema = parseJsonBlock(text);
             expect(schema).toEqual(SCHEMA);
         });
 
@@ -288,7 +293,7 @@ describe('buildServerInterfaceSection()', () => {
                 `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends this request: ` +
                     `{"actor":"${ACTOR_FULL_NAME}","method":"GET","path":"/add"}`,
             );
-            const detail = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+            const detail = parseJsonBlock(text);
             expect(detail).toEqual({
                 openapi: '3.0.0',
                 operation: {
@@ -315,7 +320,7 @@ describe('buildServerInterfaceSection()', () => {
             const schema = { ...SCHEMA, description: 'a'.repeat(MAX_INLINE_BYTES) };
 
             const text = textOfSection({ schema, serverInterface: 'POST /add' });
-            const detail = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+            const detail = parseJsonBlock(text);
 
             expect(detail.operation.requestBody.content['application/json'].schema).toEqual({
                 $ref: '#/components/schemas/AddRequest',
@@ -338,7 +343,7 @@ describe('buildServerInterfaceSection()', () => {
             };
 
             const text = textOfSection({ schema, serverInterface: 'GET /search' });
-            const detail = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+            const detail = parseJsonBlock(text);
 
             expect(detail).toEqual({
                 openapi: '3.1.0',
@@ -408,7 +413,7 @@ describe('buildServerInterfaceSection()', () => {
             const original = structuredClone(schema);
 
             const text = textOfSection({ schema, serverInterface: true });
-            const detail = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+            const detail = parseJsonBlock(text);
             expect(detail).toEqual(original);
             expect(schema).toEqual(original);
         });
@@ -452,7 +457,7 @@ describe('buildServerInterfaceSection()', () => {
     describe('a schema node', () => {
         it('returns a referenced component at its original local JSON pointer', () => {
             const text = textOfSection({ serverInterface: '#/components/schemas/AddRequest' });
-            const node = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+            const node = parseJsonBlock(text);
 
             expect(node).toEqual({
                 type: 'object',
@@ -465,16 +470,20 @@ describe('buildServerInterfaceSection()', () => {
             const schema = { ...SCHEMA, components: { schemas: { 'Forbidden/~': false } } };
 
             const text = textOfSection({ schema, serverInterface: '#/components/schemas/Forbidden~1~0' });
-            const node = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+            const node = parseJsonBlock(text);
 
             expect(node).toBe(false);
         });
 
-        it('reports a missing pointer target', () => {
-            expect(section({ serverInterface: '#/components/schemas/Missing' })).toEqual({
-                error: expect.stringContaining('no schema node at "#/components/schemas/Missing"'),
-            });
-        });
+        // `constructor` is inherited by every object; only the schema's own keys are nodes.
+        it.each(['#/components/schemas/Missing', '#/components/schemas/constructor'])(
+            'reports a missing pointer target at %j',
+            (serverInterface) => {
+                expect(section({ serverInterface })).toEqual({
+                    error: expect.stringContaining(`no schema node at "${serverInterface}"`),
+                });
+            },
+        );
 
         it('rejects a selected node that exceeds the byte cap without returning partial JSON', () => {
             const schema = {
@@ -490,7 +499,7 @@ describe('buildServerInterfaceSection()', () => {
     });
 });
 
-describe('buildFetchActorDetailsResult() with a Server Actor', () => {
+describe('fetching details of a Server Actor', () => {
     const call = async (output?: Record<string, unknown>) => {
         const { apifyClient } = mockActorBuildClient({
             actor: mockActor({ id: 'server-actor-id', name: 'server-actor-test', username: 'apify', ...serverActor() }),
@@ -543,7 +552,7 @@ describe('buildFetchActorDetailsResult() with a Server Actor', () => {
         expect(result.isError).not.toBe(true);
         const texts = (result.content ?? []).map(textOf);
         const text = texts.at(-1)!;
-        const schema = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+        const schema = parseJsonBlock(text);
         expect(schema).toEqual(SCHEMA);
         expect((result.structuredContent as { serverInterface?: string }).serverInterface).toBe(text);
     });

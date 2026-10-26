@@ -292,15 +292,6 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         return buildActorNotFoundResponse(actorName, loadedToolNames);
     }
 
-    let actorOutputSchema: Record<string, unknown> | null | undefined;
-    if (resolvedOutput.outputSchema) {
-        actorOutputSchema = actorStore
-            ? await actorStore.getActorOutputSchemaAsTypeObject(actorName).catch(() => null)
-            : null;
-    }
-    const mcpToolsMessage = resolvedOutput.mcpTools
-        ? await getMcpToolsMessage(actorName, apifyClient, apifyToken, paymentProvider, mcpSessionId)
-        : undefined;
     let serverInterfaceMessage: string | undefined;
     const serverInterfaceParams = {
         actor: details.actorInfo,
@@ -319,6 +310,16 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     } else {
         serverInterfaceMessage = buildServerInterfaceSummary(serverInterfaceParams);
     }
+
+    let actorOutputSchema: Record<string, unknown> | null | undefined;
+    if (resolvedOutput.outputSchema) {
+        actorOutputSchema = actorStore
+            ? await actorStore.getActorOutputSchemaAsTypeObject(actorName).catch(() => null)
+            : null;
+    }
+    const mcpToolsMessage = resolvedOutput.mcpTools
+        ? await getMcpToolsMessage(actorName, apifyClient, apifyToken, paymentProvider, mcpSessionId)
+        : undefined;
 
     // NOTE: Data duplication between texts and structuredContent is intentional and required.
     // Some MCP clients only read text content, while others only read structured content.
