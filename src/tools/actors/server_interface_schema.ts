@@ -30,13 +30,16 @@ function resolveLocalRef(spec: unknown, ref: string): unknown {
     return node;
 }
 
+/** Alias hops followed per parameter; real chains take one or two, and a long creator-written chain costs a hop per parameter. */
+const MAX_ALIAS_HOPS = 16;
+
 /** Follows local parameter or request-body aliases for the operation list, without expanding nested schemas. */
 function resolveRef(node: unknown, spec: unknown): unknown {
     const seen = new Set<string>();
     let resolved = node;
     while (isRecord(resolved) && typeof resolved.$ref === 'string' && resolved.$ref.startsWith('#/')) {
         const ref = resolved.$ref;
-        if (seen.has(ref)) return undefined;
+        if (seen.has(ref) || seen.size >= MAX_ALIAS_HOPS) return undefined;
         seen.add(ref);
         resolved = resolveLocalRef(spec, ref);
     }

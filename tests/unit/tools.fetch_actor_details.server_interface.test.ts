@@ -254,6 +254,21 @@ describe('rendering the server-interface section', () => {
             expect(textOfSection({ schema })).toContain('- GET /search Required: q.');
         });
 
+        it('stops following a parameter alias chain after a few hops', () => {
+            // A creator-written chain followed once per parameter would cost parameters × hops.
+            const hops = 100;
+            const parameters: Record<string, unknown> = {
+                [`P${hops}`]: { name: 'q', in: 'query', required: true },
+            };
+            for (let i = 0; i < hops; i++) parameters[`P${i}`] = { $ref: `#/components/parameters/P${i + 1}` };
+            const schema = {
+                paths: { '/search': { get: { parameters: [{ $ref: '#/components/parameters/P0' }] } } },
+                components: { parameters },
+            };
+
+            expect(textOfSection({ schema })).not.toContain('Required: q');
+        });
+
         it("gives the Actor's standby URL as the base URL instead of the send tool when the session lacks it", () => {
             const text = textOfSection({ serverInterface: true, loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS] });
 
