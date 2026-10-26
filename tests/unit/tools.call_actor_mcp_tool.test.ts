@@ -237,7 +237,7 @@ describe('call-actor-mcp-tool', () => {
         const result = await callTool({ actor: 'apify/server-actor-test' });
 
         expectSoftFailInvalidInput(result);
-        expect(result.content[0].text).toBe(
+        expect((result.content as { text: string }[])[0].text).toBe(
             `Actor 'apify/server-actor-test' is not an MCP server. Its HTTP API can be called with ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}.`,
         );
         expect(result.toolTelemetry).toMatchObject({ actorId: 'server-actor-test-id' });
