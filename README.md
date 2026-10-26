@@ -108,11 +108,24 @@ Use the one-click install link from the [configurator](https://mcp.apify.com), r
 </details>
 
 <details>
-<summary><b>Claude.ai, Claude Desktop, and ChatGPT</b></summary>
+<summary><b>Claude</b></summary>
 
-**Claude.ai and Claude Desktop:** open **Settings** > **Connectors**, select **Add custom connector**, name it `Apify`, and enter `https://mcp.apify.com` as the remote MCP server URL. The same connector works in both apps. See the [Claude guide](https://docs.apify.com/integrations/claude-desktop).
+Open **Settings** > **Connectors**, select **Add custom connector**, name it `Apify`, and enter `https://mcp.apify.com` as the remote MCP server URL. Sign in with Apify when prompted. The same connector works on Claude.ai and in Claude Desktop. See the [Claude guide](https://docs.apify.com/integrations/claude-desktop).
 
-**ChatGPT:** turn on Developer mode, then go to **Settings** > **Apps & Connectors** > **Create** and enter `https://mcp.apify.com` as the MCP server URL with OAuth authentication. You don't need a client ID or secret. See the [ChatGPT guide](https://docs.apify.com/integrations/chatgpt).
+</details>
+
+<details>
+<summary><b>ChatGPT</b></summary>
+
+1. Open [ChatGPT Plugins](https://chatgpt.com/plugins), select **+**, then **Add custom MCP server**.
+2. Name it `Apify`, enter `https://mcp.apify.com` as the server URL, and choose **OAuth** authentication.
+3. Review the risk warning, select **I understand and want to continue**, then **Create as a plugin**.
+4. Sign in with Apify, review the tools, and install the plugin. No API token is needed.
+5. Start a new conversation, type `@`, and select **Apify**.
+
+In Business, Enterprise, and Edu workspaces, an admin or owner may need to create or publish the plugin. If the option is missing, ask your workspace admin. When the server's tools change, open the plugin and select **Refresh**.
+
+The ChatGPT desktop app uses local MCP configuration shared with Codex instead: go to **Settings** > **MCP servers** > **Add server**, choose Streamable HTTP, and enter `https://mcp.apify.com`. See OpenAI's [custom MCP server guide](https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt).
 
 </details>
 
@@ -348,7 +361,7 @@ It's the official [Model Context Protocol](https://modelcontextprotocol.io) serv
 When an agent needs data from many different sites. A typical case is Google Maps one day, Instagram or an online store the next. The agent picks a ready-made Actor for each site from Apify Store instead of you writing and maintaining a scraper. Actors run on the Apify platform, which handles scaling, proxies, and storage of the results.
 
 **Can ChatGPT or Claude scrape websites with it?**
-Yes. Connect ChatGPT, Claude.ai, Claude Desktop, or Claude Code to `https://mcp.apify.com`, then ask in plain language. The model searches for a suitable Actor, runs it, and reads the results.
+Yes. Connect ChatGPT, Claude, or Claude Code to `https://mcp.apify.com`, then ask in plain language. The model searches for a suitable Actor, runs it, and reads the results.
 
 **Is it free?**
 Connecting is free, and some discovery tools work without an account. Actor runs bill to your Apify account at each Actor's price, and the free plan includes $5 of monthly platform usage.
