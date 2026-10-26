@@ -3,6 +3,7 @@ import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
+import { HELPER_TOOLS } from '../../src/const.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import type { ActorExecutionParams } from '../../src/types.js';
 import { mockApifyClient, textOf } from './helpers/tool_context.js';
@@ -105,6 +106,7 @@ function buildParams(
             apifyClient: client,
             callOptions: {},
             mcpSessionId: 'test-session',
+            loadedToolNames: [],
             ...overrides,
         },
     };
@@ -217,6 +219,22 @@ describe('actorExecutor', () => {
             expect((structuredContent as Record<string, unknown>).items).toBeUndefined();
             expect((structuredContent as Record<string, unknown>).datasetId).toBeUndefined();
             expect((structuredContent as Record<string, unknown>).instructions).toBeUndefined();
+        });
+    });
+
+    describe('FAILED run nextStep', () => {
+        it("names the run log tool in a FAILED run's nextStep when the session has it", async () => {
+            const { params } = buildParams({ query: 'foo' }, { loadedToolNames: [HELPER_TOOLS.ACTOR_RUNS_LOG] });
+            const failedRun = { ...mockSucceededRun(), status: 'FAILED', exitCode: 91 };
+            params.apifyClient = mockApifyClient({
+                ...params.apifyClient,
+                run: () => ({ get: async () => failedRun, waitForFinish: async () => failedRun }),
+            });
+
+            const result = await actorExecutor.executeActorTool(params);
+
+            const { structuredContent } = result as { structuredContent?: { nextStep?: string } };
+            expect(structuredContent?.nextStep).toContain(HELPER_TOOLS.ACTOR_RUNS_LOG);
         });
     });
 

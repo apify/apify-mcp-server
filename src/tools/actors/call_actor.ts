@@ -683,7 +683,12 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
 
         // waitSecs:0 means "fire and forget" — start() already returned the full run, skip re-fetch.
         if (waitSecs === 0) {
-            const response = buildStartRunResponse({ actorName: baseActorName, actorRun, linkContext });
+            const response = buildStartRunResponse({
+                actorName: baseActorName,
+                actorRun,
+                loadedToolNames: toolArgs.loadedToolNames,
+                linkContext,
+            });
             return { ...response, toolTelemetry: { actorId: resolvedActorId } };
         }
 
@@ -692,6 +697,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
             waitSecs,
             actorName: baseActorName,
             client: apifyClient,
+            loadedToolNames: toolArgs.loadedToolNames,
             progressTracker: toolArgs.progressTracker,
             abortSignal,
             mcpSessionId: toolArgs.mcpSessionId,

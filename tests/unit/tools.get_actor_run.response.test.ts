@@ -13,6 +13,7 @@ import {
     type RunResponse,
 } from '../../src/tools/actors/actor_run_response.js';
 import { getActorRun } from '../../src/tools/runs/get_actor_run.js';
+import { RUN_LOG_LINES_MAX } from '../../src/tools/runs/get_actor_run_log.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
@@ -137,11 +138,6 @@ describe('get-actor-run default response', () => {
             'Inspect statusMessage and stats in this response. If the user wants another attempt, adjust the input before retrying.',
         ],
         [
-            'FAILED',
-            { exitCode: 1 },
-            'Diagnose using statusMessage and exitCode in this response. If the user wants another attempt, fix the cause before retrying.',
-        ],
-        [
             'ABORTED',
             {},
             "Items written before the abort, if any, remain in the run's default dataset (datasetId=dataset-xyz). Retry only if the user wants another run.",
@@ -163,6 +159,21 @@ describe('get-actor-run default response', () => {
             expect(content[1].text).toContain('the user wants');
         },
     );
+
+    it('names the run log tool in a FAILED nextStep when the session has it', async () => {
+        const run = mockSucceededRun({ status: 'FAILED', exitCode: 91 });
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext(
+                { runId: 'run-1', waitSecs: 0 },
+                stubClient({ run, dataset: mockDataset({ itemCount: 0 }) }),
+                { loadedToolNames: [HELPER_TOOLS.ACTOR_RUNS_GET, HELPER_TOOLS.ACTOR_RUNS_LOG] },
+            ),
+        );
+
+        const { structuredContent, content } = result as TextToolResult & { structuredContent: RunResponse };
+        expect(structuredContent.nextStep).toContain(`${HELPER_TOOLS.ACTOR_RUNS_LOG} with runId run-1`);
+        expect(content[1].text).toContain(structuredContent.nextStep);
+    });
 
     it('surfaces dataset inflatedBytes from stats in structuredContent', async () => {
         // The single-dataset GET does not return `inflatedBytes` (only the dataset-list endpoint does);
@@ -1007,7 +1018,7 @@ const actorRun = {
 
 describe('buildStartRunResponse()', () => {
     it('builds correct RunResponse shape without widget metadata', () => {
-        const result = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun });
+        const result = buildStartRunResponse({ loadedToolNames: [], actorName: 'apify/rag-web-browser', actorRun });
 
         const { structuredContent, content, _meta } = result as {
             structuredContent: RunResponse;
@@ -1042,7 +1053,11 @@ describe('buildStartRunResponse()', () => {
             },
         } as unknown as ActorRun;
 
-        const result = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun: runWithAliases });
+        const result = buildStartRunResponse({
+            loadedToolNames: [],
+            actorName: 'apify/rag-web-browser',
+            actorRun: runWithAliases,
+        });
         const { structuredContent } = result as { structuredContent: RunResponse };
 
         expect(structuredContent.storages.datasets).toEqual({
@@ -1058,6 +1073,7 @@ describe('buildStartRunResponse()', () => {
     // Org-prefixed URL variants are covered by the builder tests in console_link.test.ts.
     it('mints Console links and appends the Console line when linkContext is set', () => {
         const result = buildStartRunResponse({
+            loadedToolNames: [],
             actorName: 'apify/rag-web-browser',
             actorRun,
             linkContext: {},
@@ -1084,6 +1100,7 @@ describe('buildStartRunResponse()', () => {
 describe('buildStartRunWidgetResponse()', () => {
     it('includes widget metadata and a no-poll nextStep', () => {
         const result = buildStartRunWidgetResponse({
+            loadedToolNames: [],
             actorName: 'apify/rag-web-browser',
             actorRun,
         });
@@ -1129,6 +1146,7 @@ const kvWithRecords: RunKeyValueStore = { id: 'kv-1', keys: ['result-a', 'result
 describe('buildStatusTemplate', () => {
     it('SUCCEEDED with dataset items routes to dataset-items nextStep', () => {
         const t = buildStatusSummaryNextStep({
+            loadedToolNames: [],
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
         });
@@ -1140,6 +1158,7 @@ describe('buildStatusTemplate', () => {
 
     it('SUCCEEDED dataset nextStep uses DEFAULT_DATASET_ITEMS_LIMIT as example limit', () => {
         const t = buildStatusSummaryNextStep({
+            loadedToolNames: [],
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
         });
@@ -1148,7 +1167,7 @@ describe('buildStatusTemplate', () => {
 
     it('SUCCEEDED steers nextStep away from fetching a large dataset', () => {
         const dataset: RunDataset = { id: 'ds-1', itemCount: 47, fields: ['metadata.url'], inflatedBytes: 2_400_000 };
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
+        const t = buildStatusSummaryNextStep({ loadedToolNames: [], run: makeRun('SUCCEEDED'), dataset });
         expect(t.summary).toContain('47 items; 1 fields available');
         expect(t.nextStep).toContain('Full output is ~2400000 bytes');
         expect(t.nextStep).toContain('page with offset');
@@ -1156,7 +1175,7 @@ describe('buildStatusTemplate', () => {
 
     it('SUCCEEDED reports size but omits the large-output warning below the threshold', () => {
         const dataset: RunDataset = { id: 'ds-1', itemCount: 2, fields: [], inflatedBytes: 4000 };
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
+        const t = buildStatusSummaryNextStep({ loadedToolNames: [], run: makeRun('SUCCEEDED'), dataset });
         expect(t.summary).toContain('2 items');
         expect(t.nextStep).toContain('Full output is ~4000 bytes');
         expect(t.nextStep).not.toContain('may exceed context');
@@ -1164,13 +1183,13 @@ describe('buildStatusTemplate', () => {
 
     it('SUCCEEDED omits the size hint entirely when the dataset size is unknown', () => {
         const dataset: RunDataset = { id: 'ds-1', itemCount: 2, fields: [] };
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
+        const t = buildStatusSummaryNextStep({ loadedToolNames: [], run: makeRun('SUCCEEDED'), dataset });
         expect(t.nextStep).not.toContain('Full output');
     });
 
     it('SUCCEEDED with items but no fields metadata omits the fields hint without a dangling em-dash', () => {
         const dataset: RunDataset = { id: 'ds-1', itemCount: 5, fields: [] };
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
+        const t = buildStatusSummaryNextStep({ loadedToolNames: [], run: makeRun('SUCCEEDED'), dataset });
         expect(t.nextStep).toContain('get-dataset-items');
         expect(t.nextStep).not.toContain('Available fields');
         expect(t.nextStep).not.toContain('—');
@@ -1178,6 +1197,7 @@ describe('buildStatusTemplate', () => {
 
     it('SUCCEEDED with empty dataset + KV records: nextStep points at dataset, not KV', () => {
         const t = buildStatusSummaryNextStep({
+            loadedToolNames: [],
             run: makeRun('SUCCEEDED'),
             dataset: datasetEmpty,
             keyValueStore: kvWithRecords,
@@ -1195,7 +1215,7 @@ describe('buildStatusTemplate', () => {
     });
 
     it('SUCCEEDED with neither dataset items nor KV records routes to "no output" nextStep', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED') });
+        const t = buildStatusSummaryNextStep({ loadedToolNames: [], run: makeRun('SUCCEEDED') });
         expect(t.summary).toContain('No dataset items found');
         expect(t.summary).not.toContain('Key-value store');
         expect(t.nextStep).toBe(
@@ -1203,23 +1223,52 @@ describe('buildStatusTemplate', () => {
         );
     });
 
-    it.each([
-        [
-            'FAILED',
-            'Diagnose using statusMessage and exitCode in this response. If the user wants another attempt, fix the cause before retrying.',
-        ],
-        [
-            'ABORTED',
+    it('ABORTED nextStep leaves a retry to the user and names no tool', () => {
+        const t = buildStatusSummaryNextStep({
+            loadedToolNames: [],
+            run: makeRun('ABORTED'),
+            dataset: datasetWithItems,
+        });
+        expect(t.nextStep).toBe(
             "Items written before the abort, if any, remain in the run's default dataset (datasetId=ds-1). Retry only if the user wants another run.",
-        ],
-    ])('%s nextStep leaves a retry to the user and names no tool', (status, expected) => {
-        const t = buildStatusSummaryNextStep({ run: makeRun(status), dataset: datasetWithItems });
-        expect(t.nextStep).toBe(expected);
+        );
+        expect(t.nextStep).toContain('the user wants');
+    });
+
+    it('FAILED nextStep without the log tool points at the log, leaves a retry to the user and names no tool', () => {
+        // #1559: no re-run request. #1698: a run with no status message has its cause only in the log.
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('FAILED'),
+            dataset: datasetWithItems,
+            loadedToolNames: [],
+        });
+        expect(t.nextStep).toContain('no status message');
+        expect(t.nextStep).toContain('run log');
+        expect(t.nextStep).toContain('the user wants');
+        expect(Object.values(HELPER_TOOLS).filter((name) => t.nextStep.includes(name))).toEqual([]);
+    });
+
+    it('FAILED nextStep points at the Actor status when the run wrote one', () => {
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('FAILED', 'Input URL is not valid.'),
+            loadedToolNames: [],
+        });
+        expect(t.nextStep).toContain('Actor status in the summary');
+        expect(t.nextStep).not.toContain('no status message');
+    });
+
+    it('FAILED nextStep names the run log tool and its line limit when the session has it', () => {
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('FAILED'),
+            loadedToolNames: [HELPER_TOOLS.ACTOR_RUNS_LOG],
+        });
+        expect(t.nextStep).toContain(`${HELPER_TOOLS.ACTOR_RUNS_LOG} with runId run-X`);
+        expect(t.nextStep).toContain(`up to ${RUN_LOG_LINES_MAX}`);
         expect(t.nextStep).toContain('the user wants');
     });
 
     it('ABORTED nextStep without a dataset gives no datasetId', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('ABORTED') });
+        const t = buildStatusSummaryNextStep({ loadedToolNames: [], run: makeRun('ABORTED') });
         expect(t.nextStep).toBe(
             "Items written before the abort, if any, remain in the run's default dataset. Retry only if the user wants another run.",
         );
@@ -1227,6 +1276,7 @@ describe('buildStatusTemplate', () => {
 
     it('SUCCEEDED with both dataset items and KV records picks dataset for nextStep, mentions both in summary', () => {
         const t = buildStatusSummaryNextStep({
+            loadedToolNames: [],
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
             keyValueStore: kvWithRecords,
@@ -1240,6 +1290,7 @@ describe('buildStatusTemplate', () => {
     it('SUCCEEDED with a KV store holding only the INPUT record omits the KV suffix', () => {
         const inputOnlyKv: RunKeyValueStore = { id: 'kv-1', keys: ['INPUT'], keyCount: 1 };
         const t = buildStatusSummaryNextStep({
+            loadedToolNames: [],
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
             keyValueStore: inputOnlyKv,
@@ -1250,6 +1301,7 @@ describe('buildStatusTemplate', () => {
     it('SUCCEEDED does not count the INPUT record among KV keys', () => {
         const kvWithInput: RunKeyValueStore = { id: 'kv-1', keys: ['INPUT', 'OUTPUT'], keyCount: 2 };
         const t = buildStatusSummaryNextStep({
+            loadedToolNames: [],
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
             keyValueStore: kvWithInput,
@@ -1264,6 +1316,7 @@ describe('buildStatusTemplate', () => {
             // keyCount intentionally omitted — buildKeyValueStoreBlock omits it on truncation.
         };
         const t = buildStatusSummaryNextStep({
+            loadedToolNames: [],
             run: makeRun('SUCCEEDED'),
             dataset: datasetEmpty,
             keyValueStore: truncatedKv,
@@ -1279,6 +1332,7 @@ describe('buildStatusTemplate', () => {
             // keyCount intentionally omitted — buildKeyValueStoreBlock omits it on truncation.
         };
         const t = buildStatusSummaryNextStep({
+            loadedToolNames: [],
             run: makeRun('SUCCEEDED'),
             dataset: datasetEmpty,
             keyValueStore: truncatedKvWithInput,
@@ -1290,6 +1344,7 @@ describe('buildStatusTemplate', () => {
 
     it('TIMED-OUT with dataset routes to partial-output nextStep', () => {
         const t = buildStatusSummaryNextStep({
+            loadedToolNames: [],
             run: makeRun('TIMED-OUT'),
             dataset: datasetWithItems,
         });
@@ -1298,6 +1353,7 @@ describe('buildStatusTemplate', () => {
 
     it('TIMED-OUT with both dataset and KV records picks dataset for nextStep', () => {
         const t = buildStatusSummaryNextStep({
+            loadedToolNames: [],
             run: makeRun('TIMED-OUT'),
             dataset: datasetWithItems,
             keyValueStore: kvWithRecords,
@@ -1308,7 +1364,7 @@ describe('buildStatusTemplate', () => {
     });
 
     it('TIMED-OUT without dataset routes to "no dataset to fetch" nextStep', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('TIMED-OUT') });
+        const t = buildStatusSummaryNextStep({ loadedToolNames: [], run: makeRun('TIMED-OUT') });
         expect(t.nextStep).toContain('no dataset to fetch');
     });
 
@@ -1318,21 +1374,20 @@ describe('buildStatusTemplate', () => {
     // naive reader doesn't mistake the actor's own message for our narrative.
 
     it('RUNNING with upstream statusMessage attributes it as Actor status and drops trailing period', () => {
-        const t = buildStatusSummaryNextStep({
-            run: makeRun('RUNNING', 'Starting the crawler.'),
-        });
+        const t = buildStatusSummaryNextStep({ loadedToolNames: [], run: makeRun('RUNNING', 'Starting the crawler.') });
         expect(t.summary).toContain('Actor status: "Starting the crawler"');
         expect(t.summary).not.toMatch(/\.\./);
     });
 
     it('RUNNING without statusMessage falls back to In progress (no Actor status attribution)', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING') });
+        const t = buildStatusSummaryNextStep({ loadedToolNames: [], run: makeRun('RUNNING') });
         expect(t.summary).toContain('In progress.');
         expect(t.summary).not.toContain('Actor status:');
     });
 
     it('RUNNING with dataset items appends "N results so far" so polling agents see real progress', () => {
         const t = buildStatusSummaryNextStep({
+            loadedToolNames: [],
             run: makeRun('RUNNING'),
             dataset: datasetWithItems,
         });
@@ -1343,16 +1398,14 @@ describe('buildStatusTemplate', () => {
     });
 
     it('RUNNING with empty dataset omits the progress suffix (no "0 results so far")', () => {
-        const t = buildStatusSummaryNextStep({
-            run: makeRun('RUNNING'),
-            dataset: datasetEmpty,
-        });
+        const t = buildStatusSummaryNextStep({ loadedToolNames: [], run: makeRun('RUNNING'), dataset: datasetEmpty });
         expect(t.summary).not.toMatch(/results so far/);
         expect(t.summary).not.toContain('0 results');
     });
 
     it('RUNNING with exactly 1 item uses singular "result"', () => {
         const t = buildStatusSummaryNextStep({
+            loadedToolNames: [],
             run: makeRun('RUNNING'),
             dataset: { id: 'ds-1', itemCount: 1 },
         });
@@ -1362,6 +1415,7 @@ describe('buildStatusTemplate', () => {
 
     it('TIMING-OUT with dataset items surfaces progress in the summary', () => {
         const t = buildStatusSummaryNextStep({
+            loadedToolNames: [],
             run: makeRun('TIMING-OUT'),
             dataset: datasetWithItems,
         });
@@ -1370,6 +1424,7 @@ describe('buildStatusTemplate', () => {
 
     it('ABORTING with dataset items surfaces progress in the summary', () => {
         const t = buildStatusSummaryNextStep({
+            loadedToolNames: [],
             run: makeRun('ABORTING'),
             dataset: datasetWithItems,
         });
@@ -1380,7 +1435,7 @@ describe('buildStatusTemplate', () => {
         // The agent reading text-only must see the actor's diagnostic; we pass it through with
         // attribution so it's clear the wording is upstream, not ours.
         const run = makeRun('SUCCEEDED', 'Finished! Total 1 requests: 1 succeeded, 0 failed.');
-        const t = buildStatusSummaryNextStep({ run, dataset: datasetEmpty });
+        const t = buildStatusSummaryNextStep({ loadedToolNames: [], run, dataset: datasetEmpty });
         expect(t.summary).toContain('Actor status: "Finished! Total 1 requests: 1 succeeded, 0 failed"');
         expect(t.summary).not.toMatch(/\.\./);
     });
@@ -1389,6 +1444,7 @@ describe('buildStatusTemplate', () => {
         // Pinned to prevent the `to project..` regression: the fields-hint template already
         // terminates the sentence, so the outer nextStep template must not append its own `.`.
         const t = buildStatusSummaryNextStep({
+            loadedToolNames: [],
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
         });

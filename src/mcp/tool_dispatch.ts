@@ -261,6 +261,7 @@ export async function dispatchToolCall(params: {
                     datasetItemsSchema: tool.datasetItemsSchema,
                     taskMode,
                     hasCallActorTool: tools.has(HELPER_TOOLS.ACTOR_CALL),
+                    loadedToolNames: Array.from(tools.keys()),
                 });
 
                 if (!executorResult) {
