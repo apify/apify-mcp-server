@@ -30,13 +30,16 @@ function resolveLocalRef(spec: unknown, ref: string): unknown {
     return node;
 }
 
+/** Alias hops followed per parameter; real chains take one or two, and a long creator-written chain costs a hop per parameter. */
+const MAX_ALIAS_HOPS = 16;
+
 /** Follows local parameter or request-body aliases for the operation list, without expanding nested schemas. */
 function resolveRef(node: unknown, spec: unknown): unknown {
     const seen = new Set<string>();
     let resolved = node;
     while (isRecord(resolved) && typeof resolved.$ref === 'string' && resolved.$ref.startsWith('#/')) {
         const ref = resolved.$ref;
-        if (seen.has(ref)) return undefined;
+        if (seen.has(ref) || seen.size >= MAX_ALIAS_HOPS) return undefined;
         seen.add(ref);
         resolved = resolveLocalRef(spec, ref);
     }
@@ -138,7 +141,7 @@ function formatTenancy(actor: Pick<Actor, 'actorStandby'>): string {
     return `${ACTOR_TENANCY.SINGLE_TENANT}: the first request starts a run in your account, kept for ${idleTimeout}`;
 }
 
-/** What the list and the detail share: the tenancy or payment notice, and the base URL when the send tool is absent. */
+/** What every section shares: the tenancy or payment notice, and the base URL when the send tool is absent. */
 type SectionContext = { actorFullName: string; header: string; canSend: boolean };
 
 /** E.g. `send-server-actor-request sends this request: {"actor":"apify/search","method":"GET","path":"/search"}` */
