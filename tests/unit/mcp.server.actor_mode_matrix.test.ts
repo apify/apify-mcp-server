@@ -157,6 +157,13 @@ describe('Actor run/standby mode decision table', () => {
             expect(withoutMcpTool).toContain('cannot be called in this configuration');
         });
 
+        it('answers the removed actorName:toolName form with the MCP server rejection', async () => {
+            const text = earlyText(await preExecute(`${STANDBY_MCP}:add`));
+
+            expect(text).toContain(STANDBY_MCP);
+            expect(text).toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
+        });
+
         it('rejects a bare unsupported standby Actor during pre-execution', async () => {
             const result = await preExecute(STANDBY_EMPTY);
 
