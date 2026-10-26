@@ -36,7 +36,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     If the full section exceeds `MAX_INLINE_BYTES` UTF-8 bytes, the operation list remains with an explicit omission
     notice. `"METHOD /path"` returns an operation excerpt with inherited parameters and root schema/security context;
     `"#/..."` returns the raw node at that local JSON pointer, so referenced components can be read separately.
-    A selected node or operation list over the cap returns an explicit error without partial JSON. References,
+    A selected node, operation or operation list over the cap returns an explicit error without partial JSON. References,
     examples, extensions, and the creator's `servers` arrays stay as written; requests use the Actor's assigned URL.
     References are not expanded or fetched. Its private
     operation reader merges path-level and operation-level parameters by resolved name and location, with operation

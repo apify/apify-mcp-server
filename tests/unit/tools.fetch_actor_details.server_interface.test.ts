@@ -311,6 +311,68 @@ describe('buildServerInterfaceSection()', () => {
             expect(text).toContain(`# Server interface of ${ACTOR_FULL_NAME}: POST /add`);
         });
 
+        it('keeps an operation navigable when unrelated schema detail is too large', () => {
+            const schema = { ...SCHEMA, description: 'a'.repeat(MAX_INLINE_BYTES) };
+
+            const text = textOfSection({ schema, serverInterface: 'POST /add' });
+            const detail = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+
+            expect(detail.operation.requestBody.content['application/json'].schema).toEqual({
+                $ref: '#/components/schemas/AddRequest',
+            });
+            expect(text).toContain('Components are omitted');
+            expect(text).not.toContain('a'.repeat(100));
+        });
+
+        it('preserves inherited parameters and security context in an operation excerpt', () => {
+            const schema = {
+                openapi: '3.1.0',
+                jsonSchemaDialect: 'https://json-schema.org/draft/2020-12/schema',
+                security: [{ ActorKey: [] }],
+                paths: {
+                    '/search': {
+                        parameters: [{ name: 'q', in: 'query', required: true }],
+                        get: { responses: { '200': { description: 'OK' } } },
+                    },
+                },
+            };
+
+            const text = textOfSection({ schema, serverInterface: 'GET /search' });
+            const detail = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+
+            expect(detail).toEqual({
+                openapi: '3.1.0',
+                jsonSchemaDialect: 'https://json-schema.org/draft/2020-12/schema',
+                security: [{ ActorKey: [] }],
+                operation: {
+                    parameters: [{ name: 'q', in: 'query', required: true }],
+                    responses: { '200': { description: 'OK' } },
+                },
+            });
+        });
+
+        it.each([true, 'GET /search'] as const)(
+            'reports an oversized operation list or selected operation for %j',
+            (serverInterface) => {
+                const schema = { paths: { '/search': { get: { summary: 'a'.repeat(MAX_INLINE_BYTES) } } } };
+
+                const result = section({ schema, serverInterface });
+
+                expect(result).toMatchObject({ error: expect.stringContaining(`${MAX_INLINE_BYTES}`) });
+                expect(JSON.stringify(result)).not.toContain('```json');
+            },
+        );
+
+        it.each(['GET /nope', 'add'])('returns a selection error listing the operations for %j', (serverInterface) => {
+            expect(section({ serverInterface })).toEqual({
+                error:
+                    `Actor '${ACTOR_FULL_NAME}' has no operation "${serverInterface}". ` +
+                    'Documented operations: GET /add, POST /add, GET /empty.',
+            });
+        });
+    });
+
+    describe('the full schema', () => {
         it('leaves reference siblings, inherited context, examples, and extensions unchanged', () => {
             const schema = {
                 ...SCHEMA,
@@ -385,47 +447,9 @@ describe('buildServerInterfaceSection()', () => {
             expect(text).toContain('Full API schema omitted');
             expect(text).not.toContain('```json');
         });
+    });
 
-        it('keeps an operation navigable when unrelated schema detail is too large', () => {
-            const schema = { ...SCHEMA, description: 'a'.repeat(MAX_INLINE_BYTES) };
-
-            const text = textOfSection({ schema, serverInterface: 'POST /add' });
-            const detail = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
-
-            expect(detail.operation.requestBody.content['application/json'].schema).toEqual({
-                $ref: '#/components/schemas/AddRequest',
-            });
-            expect(text).toContain('Components are omitted');
-            expect(text).not.toContain('a'.repeat(100));
-        });
-
-        it('preserves inherited parameters and security context in an operation excerpt', () => {
-            const schema = {
-                openapi: '3.1.0',
-                jsonSchemaDialect: 'https://json-schema.org/draft/2020-12/schema',
-                security: [{ ActorKey: [] }],
-                paths: {
-                    '/search': {
-                        parameters: [{ name: 'q', in: 'query', required: true }],
-                        get: { responses: { '200': { description: 'OK' } } },
-                    },
-                },
-            };
-
-            const text = textOfSection({ schema, serverInterface: 'GET /search' });
-            const detail = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
-
-            expect(detail).toEqual({
-                openapi: '3.1.0',
-                jsonSchemaDialect: 'https://json-schema.org/draft/2020-12/schema',
-                security: [{ ActorKey: [] }],
-                operation: {
-                    parameters: [{ name: 'q', in: 'query', required: true }],
-                    responses: { '200': { description: 'OK' } },
-                },
-            });
-        });
-
+    describe('a schema node', () => {
         it('returns a referenced component at its original local JSON pointer', () => {
             const text = textOfSection({ serverInterface: '#/components/schemas/AddRequest' });
             const node = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
@@ -462,26 +486,6 @@ describe('buildServerInterfaceSection()', () => {
 
             expect(result).toMatchObject({ error: expect.stringContaining(`${MAX_INLINE_BYTES}`) });
             expect(JSON.stringify(result)).not.toContain('```json');
-        });
-
-        it.each([true, 'GET /search'] as const)(
-            'reports an oversized operation list or selected operation for %j',
-            (serverInterface) => {
-                const schema = { paths: { '/search': { get: { summary: 'a'.repeat(MAX_INLINE_BYTES) } } } };
-
-                const result = section({ schema, serverInterface });
-
-                expect(result).toMatchObject({ error: expect.stringContaining(`${MAX_INLINE_BYTES}`) });
-                expect(JSON.stringify(result)).not.toContain('```json');
-            },
-        );
-
-        it.each(['GET /nope', 'add'])('returns a selection error listing the operations for %j', (serverInterface) => {
-            expect(section({ serverInterface })).toEqual({
-                error:
-                    `Actor '${ACTOR_FULL_NAME}' has no operation "${serverInterface}". ` +
-                    'Documented operations: GET /add, POST /add, GET /empty.',
-            });
         });
     });
 });

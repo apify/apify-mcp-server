@@ -227,7 +227,7 @@ export function buildServerInterfaceSummary({
  *
  * Example `true` output (schema abbreviated here):
  * ````
- * # Server interface of apify/web-search
+ * # Server interface of apify/search
  * single-tenant: the first request starts a run in your account, kept for its idle timeout of 300 s.
  * Operations (1):
  * - GET /search: Search the web. Required: q.
@@ -242,8 +242,9 @@ export function buildServerInterfaceSummary({
  *
  * Without the send tool, or in agentic payment mode (whose notice replaces the tenancy line), the send line is
  * absent and the Actor's assigned `standbyUrl` is shown as the base URL. Schema `servers` are never used for requests.
- * Unknown operations/pointers return selection errors. A selected node or operation list over the byte cap returns
- * a size error without partial JSON. No references are expanded or fetched, and no schema validation is performed.
+ * Unknown operations/pointers return selection errors. A selected node, operation or operation list over the byte
+ * cap returns a size error without partial JSON. No references are expanded or fetched, and no schema validation is
+ * performed.
  */
 export function buildServerInterfaceSection({
     actor,
