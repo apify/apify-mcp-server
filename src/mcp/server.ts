@@ -19,6 +19,8 @@ import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv } from '../telemetry.js';
+import { searchActors, addUseCaseToSearchTool } from '../tools/actors/search_actors.js';
+import { searchActorsWidget } from '../tools/widgets/search_actors_widget.js';
 import type {
     ActorsMcpServerOptions,
     ActorStore,
@@ -29,7 +31,11 @@ import type {
     ToolEntry,
 } from '../types.js';
 import { SERVER_MODE, TOOL_TYPE } from '../types.js';
-import { getRequestOriginForClient, isReportProblemBlockedForClient } from '../utils/mcp_clients.js';
+import {
+    getRequestOriginForClient,
+    isReportProblemBlockedForClient,
+    isStoreUseCaseServable,
+} from '../utils/mcp_clients.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
 import {
@@ -102,6 +108,12 @@ async function resolveServableWidgets(): Promise<Map<string, AvailableWidget>> {
 
     return resolved;
 }
+
+/** The search tools as served to a client that takes a `useCase`, by the name of the tool they replace. */
+const USE_CASE_VARIANTS = new Map<string, ToolEntry>([
+    [HELPER_TOOLS.STORE_SEARCH, addUseCaseToSearchTool(searchActors)],
+    [HELPER_TOOLS.STORE_SEARCH_WIDGET, addUseCaseToSearchTool(searchActorsWidget)],
+]);
 
 /**
  * The shared-Apify-behavior facade: owns the tool registry + loaders, server-mode resolution,
@@ -363,8 +375,13 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      */
     private composeToolsForClient(source: ToolSource, view: ServingContext): ToolEntry[] {
         const tools = getToolsForServerMode(source.input, source.actorTools, view.serverMode);
-        if (this.isReportProblemServable(view, source.input)) return tools;
-        return tools.filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT);
+        const served = this.isReportProblemServable(view, source.input)
+            ? tools
+            : tools.filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT);
+        const offersUseCase =
+            this.telemetryEnabled && isStoreUseCaseServable(view.clientContext, this.options.clientParam);
+        if (!offersUseCase) return served;
+        return served.map((tool) => USE_CASE_VARIANTS.get(tool.name) ?? tool);
     }
 
     /**

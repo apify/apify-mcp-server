@@ -52,6 +52,7 @@ sentence can block a listing. Every configuration of this server must pass them.
   `clientInfo` or capabilities may only shrink it (the non-widget subset), never add to it.
   A new auto-injected tool changes every pinned URL, so don't add one.
 - `tools.listChanged` is neither declared nor emitted.
+- Exception: `search-actors` and its widget gain an optional `useCase` argument (not a tool) for clients `isStoreUseCaseServable` allows; `prepareToolCall` strips it for every client.
 - Read and write operations are separate tools; a generic write tool stays out of every selectable
   category. A tool that takes freeform paths or bodies names the target API in its description.
 - A minimal valid call must succeed: never require an input that has a default.

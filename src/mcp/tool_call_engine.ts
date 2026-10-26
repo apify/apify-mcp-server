@@ -25,7 +25,7 @@ import type { ActorStore, CallDiagnostics, ToolCallTelemetryProperties, ToolEntr
 import { TOOL_TYPE } from '../types.js';
 import { logHttpError } from '../utils/logging.js';
 import { respondOk } from '../utils/mcp.js';
-import { getRequestOriginForClient, resolveStoreSearchTracking } from '../utils/mcp_clients.js';
+import { getRequestOriginForClient, resolveStoreSearchTracking, sanitizeUseCase } from '../utils/mcp_clients.js';
 import type { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { extractAjvErrorDetails, isMcpError } from '../utils/tool_status.js';
@@ -42,6 +42,9 @@ const PROGRESS_TRACKER_INTERNAL_TOOLS = new Set<string>([
     HELPER_TOOLS.ACTOR_BUILD_GET,
     HELPER_TOOLS.ACTOR_BUILD,
 ]);
+
+/** The Store search tools; `useCase` is a search argument only. */
+const SEARCH_TOOL_NAMES = new Set<string>([HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.STORE_SEARCH_WIDGET]);
 
 /** A pre-dispatch failure that the shell converts to v1's protocol-error sequence. */
 export type InvalidToolCall = {
@@ -208,6 +211,15 @@ export async function prepareToolCall(params: {
             },
             resolvedToolName,
         };
+    }
+
+    // Strip `useCase` for every client before anything can log it; keep it only if this tool is the variant the client was served.
+    if (SEARCH_TOOL_NAMES.has(tool.name)) {
+        const { useCase, ...withoutUseCase } = args;
+        args = withoutUseCase;
+        if (storeSearchTracking && 'useCase' in (tool.inputSchema.properties ?? {})) {
+            storeSearchTracking.useCase = sanitizeUseCase(useCase);
+        }
     }
 
     // Preserve the raw value if decoding throws before reassignment.

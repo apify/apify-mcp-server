@@ -473,7 +473,8 @@ Expected output: The tool returns the next page of structured data items from th
 The Apify MCP Server collects telemetry data about tool calls to help Apify understand usage patterns and improve the service.
 By default, telemetry is **enabled** for all tool calls.
 With telemetry enabled, Actor searches in the Apify Store send the MCP session id as `_traceId`, and tool-call events carry it as `trace_id`.
-Opting out of telemetry disables both.
+`search-actors` also takes an optional `useCase`, one sentence on why the user is searching. It goes to the Store search as `_useCase` (Apify API access logs record it), is not logged or put in telemetry by this server, and is offered only to clients that declare a name without `claude`, `anthropic` or `local-agent-mode-apify` (also in the `?client=` value). Other clients' values are dropped.
+Opting out of telemetry disables all of this.
 
 The stdio transport also uses [Sentry](https://sentry.io) for error tracking, which helps us identify and fix issues faster.
 Sentry is automatically disabled when telemetry is opted out.

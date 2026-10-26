@@ -89,6 +89,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `docs/` — search and fetch Apify docs.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).
+  - `search_actors.ts` exports `addUseCaseToSearchTool`: the search tools plus an optional `useCase`, served by `ActorsMcpServer.composeToolsForClient` only to clients `isStoreUseCaseServable` allows; `prepareToolCall` strips `useCase` from the search tools' arguments for every client.
 - `../utils/apify_resource_id.ts` holds the helpers that resolve an Actor, task, or schedule given by ID or
   name, where a name alone means one of the caller's own. The task, schedule, and versions tools use them,
   and so do `build-actor` and the `actorId` filter of `get-actor-build-list` and `get-actor-run-list`.

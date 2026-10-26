@@ -113,16 +113,8 @@ export const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set([
     'source',
 ]);
 
-/**
- * Client-name substrings (lowercased, matched against `clientInfo.name`) that `report-problem` is
- * hidden from: Anthropic surfaces (Claude.ai / Claude Desktop / Claude Code /
- * `local-agent-mode-apify`) pending the directory review. Applied in the compose step — once per
- * connection on the 2025 path, per request on the 2026-07-28 one. Stateless `client-info` is
- * optional; a request declaring no client name matches no blocked substring and is served the tool
- * by policy. Substring matching covers new client builds without a maintained allowlist;
- * over-matching only hides an optional tool. Bypassed by explicit `?tools=report-problem`/`dev`.
- */
-export const REPORT_PROBLEM_BLOCKED_CLIENTS: string[] = ['claude', 'anthropic', 'local-agent-mode-apify'];
+/** Anthropic client-name substrings (lowercased): not offered `report-problem` or the `useCase` argument. A request with no name matches none. */
+export const ANTHROPIC_CLIENT_NAMES: string[] = ['claude', 'anthropic', 'local-agent-mode-apify'];
 
 /**
  * `clientInfo.name` sent by the Apify AI agent service (apify/apify-ai-agent) during the MCP
