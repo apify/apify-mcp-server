@@ -47,17 +47,16 @@ export async function searchActorsByKeywords(options: SearchActorsByKeywordsOpti
 }
 
 /**
- * Preset around `searchActorsByKeywords` for the agent-facing search tool:
- * always sets `includeInputSchema=true` and forwards `allowsAgenticUsers`
- * when a `paymentProvider` is in play. The public arg schema caps `limit`
- * at apify-core's hard cap (`MAX_LIMIT_WITH_INPUT_SCHEMA`).
+ * Store search used by the `search-actors` tools (plain and widget).
+ * Always requests input schemas, so `limit` must stay within `MAX_LIMIT_WITH_INPUT_SCHEMA` (the tool's arg schema enforces it).
+ * With a payment provider, returns only Actors that allow agentic users.
  */
 export async function searchAgentSafeActors(options: SearchAgentSafeActorsOptions): Promise<ActorStoreList[]> {
     const { keywords, apifyClient, limit, offset, paymentProvider } = options;
 
     return searchActorsByKeywords({
-        // The Store returns no Actors for keywords without letters or digits (" ", "%", "...");
-        // send them as empty keywords. See apify/apify-mcp-server#1673.
+        // The Store returns no Actors for keywords without letters or digits (" ", "%", "..."),
+        // so send them as empty keywords.
         search: /[\p{L}\p{N}]/u.test(keywords) ? keywords : '',
         apifyClient,
         limit,

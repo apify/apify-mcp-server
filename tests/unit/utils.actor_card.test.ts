@@ -200,7 +200,6 @@ describe('formatActorToActorCard', () => {
             expect(result).not.toContain('- **Pricing');
         });
 
-        // The new Store backend dropped bookmarks; the Actor API still returns them (see apify/apify-mcp-server#1673).
         it('omits bookmarks the Actor API returns', () => {
             const result = formatActorToActorCard(mockActor, {
                 includeDescription: false,
