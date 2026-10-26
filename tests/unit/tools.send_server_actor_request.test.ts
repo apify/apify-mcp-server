@@ -10,6 +10,7 @@ import { FAILURE_CATEGORY, HELPER_TOOLS, MAX_INLINE_BYTES, TOOL_STATUS } from '.
 import { actorDefinitionCache } from '../../src/state.js';
 import {
     executeSendServerActorRequest,
+    RECOVERY_MAX_OPERATIONS,
     sendServerActorRequest,
 } from '../../src/tools/actors/send_server_actor_request.js';
 import { serverActorRequestOutputSchema } from '../../src/tools/structured_output_schemas.js';
@@ -515,6 +516,33 @@ describe('returning an Actor Server error', () => {
             }
         },
     );
+
+    it('lists the documented operations on a rejected request, so the agent can retry without a lookup', async () => {
+        const webSearch = 'apify/web-search';
+        seedActor(webSearch, {
+            definition: { webServerOperations: ['GET / (required: query)', 'POST / (required: request body)'] },
+        });
+
+        const result = await callTool({ actor: webSearch, path: '/status/404' });
+
+        expect(result.structuredContent).toMatchObject({
+            nextStep: expect.stringContaining(
+                'Documented operations: GET / (required: query), POST / (required: request body).',
+            ),
+        });
+    });
+
+    it('lists at most the operation limit and counts the rest', async () => {
+        const manyOperations = 'acme/many-operations';
+        const operations = Array.from({ length: RECOVERY_MAX_OPERATIONS + 3 }, (_, i) => `GET /op${i}`);
+        seedActor(manyOperations, { definition: { webServerOperations: operations } });
+
+        const result = await callTool({ actor: manyOperations, path: '/status/404' });
+        const { nextStep } = result.structuredContent as { nextStep: string };
+
+        expect(nextStep).toContain(`GET /op${RECOVERY_MAX_OPERATIONS - 1}, and 3 more.`);
+        expect(nextStep).not.toContain(`GET /op${RECOVERY_MAX_OPERATIONS},`);
+    });
 
     it('names the Actor Server error before the README only when the body carries one', async () => {
         const withError = await callTool({ path: '/fetch' });

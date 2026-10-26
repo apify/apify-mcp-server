@@ -15,6 +15,7 @@ import type {
 import { getHttpStatusCode } from '../../utils/logging.js';
 import { isRecord } from '../api/apify_api_spec.js';
 import type { BuildListItem } from '../builds/get_actor_build_list.js';
+import { listDocumentedOperations } from './server_interface_schema.js';
 
 const BUILD_NUMBER_PATTERN = /^\d+\.\d+\.\d+$/;
 
@@ -170,6 +171,7 @@ function pruneActorDefinition(
         defaultRunOptions: response.defaultRunOptions,
         webServerMcpPath: serverDefinition?.webServerMcpPath,
         hasWebServerSchema: hasWebServerSchemaOperations(serverDefinition?.webServerSchema),
+        webServerOperations: listDocumentedOperations(serverDefinition?.webServerSchema),
         pictureUrl: 'pictureUrl' in response ? (response.pictureUrl as string | undefined) : undefined,
     };
 }

@@ -277,3 +277,29 @@ describe('hasWebServerSchema on the pruned definition', () => {
         expect(result?.definition.hasWebServerSchema).toBe(false);
     });
 });
+
+describe('documented operations on the pruned definition', () => {
+    it('lists each operation with its required inputs', async () => {
+        const webServerSchema = {
+            paths: {
+                '/': {
+                    get: { parameters: [{ name: 'query', in: 'query', required: true }] },
+                    post: { requestBody: { required: true } },
+                },
+                '/status': { get: {} },
+            },
+        };
+        const { apifyClient } = mockActorBuildClient({
+            actor: mockActor(),
+            defaultBuild: mockDefaultBuild({ webServerSchema }),
+        });
+
+        const result = await getActorDefinition('acme/mcp-server', apifyClient);
+
+        expect(result?.definition.webServerOperations).toEqual([
+            'GET / (required: query)',
+            'POST / (required: request body)',
+            'GET /status',
+        ]);
+    });
+});

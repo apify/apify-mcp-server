@@ -101,6 +101,18 @@ function listRequiredInputs(operation: Record<string, unknown>, schema: Record<s
     return names;
 }
 
+/**
+ * Each operation with its required inputs, short enough to cache, e.g.
+ * `['GET / (required: query)', 'POST / (required: request body)', 'GET /status']`.
+ */
+export function listDocumentedOperations(schema: Record<string, unknown> | undefined): string[] {
+    if (!schema) return [];
+    return listServerOperations(schema).map(({ method, path, operation }) => {
+        const required = listRequiredInputs(operation, schema);
+        return required.length > 0 ? `${method} ${path} (required: ${required.join(', ')})` : `${method} ${path}`;
+    });
+}
+
 /** E.g. `- GET /search: Search the web. Required: q.` */
 function formatOperationLine({ method, path, operation }: ServerOperation, schema: Record<string, unknown>): string {
     const required = listRequiredInputs(operation, schema);

@@ -258,18 +258,33 @@ function getReadableErrorMessage(body: string): string | undefined {
     return undefined;
 }
 
+/** A rejected request's recovery text lists up to this many documented operations, then counts the rest. */
+export const RECOVERY_MAX_OPERATIONS = 20;
+
+/** E.g. `Documented operations: GET / (required: query), POST / (required: request body). `; empty without any. */
+function formatDocumentedOperations(operations: readonly string[] = []): string {
+    if (operations.length === 0) return '';
+    const listed = operations.slice(0, RECOVERY_MAX_OPERATIONS);
+    const rest = operations.length - listed.length;
+    return `Documented operations: ${listed.join(', ')}${rest > 0 ? `, and ${rest} more` : ''}. `;
+}
+
 function buildRequestRecoveryText(
     status: number,
     actorName: string,
     loadedToolNames: readonly string[],
     hasErrorMessage: boolean,
+    operations: readonly string[] | undefined,
 ): string | undefined {
     if (status === 429) return 'The Actor Server rate limit was reached.';
     if (status === 503) return 'The Actor Server is temporarily unavailable.';
     if (![400, 404, 405, 422].includes(status)) return undefined;
-    const documentation = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)
-        ? `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorName, output: { serverInterface: true } })} lists the documented HTTP operations.`
-        : 'The Actor README may describe its HTTP endpoints.';
+    // Listed here so the agent can retry without first looking the operations up.
+    const documentation =
+        formatDocumentedOperations(operations) +
+        (loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)
+            ? `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorName, output: { serverInterface: true } })} lists the documented HTTP operations.`
+            : 'The Actor README may describe its HTTP endpoints.');
     return hasErrorMessage
         ? `The Actor Server error may name the expected HTTP method, path, or parameters. ${documentation}`
         : documentation;
@@ -280,6 +295,7 @@ function buildResponse(
     request: ServerActorRequest,
     response: ServerActorResponse,
     { apifyToken: token, loadedToolNames }: Pick<InternalToolArgs, 'apifyToken' | 'loadedToolNames'>,
+    operations: readonly string[] | undefined,
 ): ToolResponse {
     const { status } = response;
     const contentType = response.contentType?.replaceAll(token, REDACTED);
@@ -306,7 +322,13 @@ function buildResponse(
     const redirectNote = location ? ` The redirect to ${location} was not followed.` : '';
     const summary = `${outcome} with ${bodyNote}.${redirectNote}`;
     const errorMessage = status >= 400 && body ? getReadableErrorMessage(body) : undefined;
-    const nextStep = buildRequestRecoveryText(status, request.actorName, loadedToolNames, errorMessage !== undefined);
+    const nextStep = buildRequestRecoveryText(
+        status,
+        request.actorName,
+        loadedToolNames,
+        errorMessage !== undefined,
+        operations,
+    );
     const structuredContent = {
         ...request,
         status,
@@ -414,7 +436,10 @@ export async function executeSendServerActorRequest(
             signal,
             timeoutMillis,
         });
-        return withActorTelemetry(buildResponse(request, response, { apifyToken, loadedToolNames }), response.status);
+        return withActorTelemetry(
+            buildResponse(request, response, { apifyToken, loadedToolNames }, definition.webServerOperations),
+            response.status,
+        );
     } catch (error) {
         if (signal.aborted) return respondAborted();
         if (!(error instanceof IncompleteResponseError)) throw error;
