@@ -802,6 +802,11 @@ export const actorRunOutputSchema = {
             type: 'number',
             description: 'Actor process exit code; populated for terminal states (especially FAILED)',
         },
+        logTail: {
+            type: 'string',
+            description:
+                'Last lines of the run log with secrets redacted; present only for a FAILED run that wrote no statusMessage',
+        },
         startedAt: { type: 'string', description: 'ISO timestamp when the run started' },
         finishedAt: { type: 'string', description: 'ISO timestamp when the run finished (terminal states only)' },
         stats: {

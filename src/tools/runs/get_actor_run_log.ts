@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
+import { REDACTED, redactJsonSecrets } from '../../resources/api_resources.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -9,6 +10,59 @@ import { getActorRunLogToolOutputSchema } from '../structured_output_schemas.js'
 
 /** Largest `lines` value; `lines: 0` returns the entire log. */
 export const RUN_LOG_LINES_MAX = 50;
+
+/** Lines of the run log that a FAILED run response carries in `logTail`. */
+export const RUN_LOG_TAIL_LINES = 30;
+
+/** Character limit of `logTail`. */
+export const RUN_LOG_TAIL_MAX_CHARS = 3000;
+
+const APIFY_API_TOKEN_RE = /apify_api_[A-Za-z0-9]+/g;
+
+/**
+ * The password of `scheme://user:password@host`, for example an Apify Proxy URL. The user can be
+ * empty, and the greedy password runs to the last `@` before whitespace or `/`, so a raw `@` in the
+ * password is hidden too.
+ */
+const URL_PASSWORD_RE = /(:\/\/[^\s:/@]*:)[^\s/]+@/g;
+
+/** The Apify Proxy password as an env var line or a printed `process.env` entry. */
+const PROXY_PASSWORD_ENV_RE = /(APIFY_PROXY_PASSWORD['"]?\s*[:=]\s*['"]?)[^\s'",]+/g;
+
+/**
+ * Hide the secrets an Actor can print to its log: the session token, any Apify API token, a password
+ * in a URL such as an Apify Proxy URL, the Apify Proxy password env var, and `password` values in
+ * JSON. Other secrets an Actor prints cannot be detected.
+ */
+export function redactLogSecrets(text: string, sessionToken: string | undefined): string {
+    const masked = sessionToken ? text.replaceAll(sessionToken, REDACTED) : text;
+    return redactJsonSecrets(
+        masked
+            .replace(APIFY_API_TOKEN_RE, REDACTED)
+            .replace(URL_PASSWORD_RE, `$1${REDACTED}@`)
+            .replace(PROXY_PASSWORD_ENV_RE, `$1${REDACTED}`),
+    );
+}
+
+/**
+ * The end of a run log: the last {@link RUN_LOG_TAIL_LINES} lines, redacted, then cut to
+ * {@link RUN_LOG_TAIL_MAX_CHARS} by dropping whole leading lines. A last line that is still too long
+ * keeps only its end. Redaction comes before the cut, so a cut never leaves part of a secret.
+ */
+export function buildLogTail(runLog: string, sessionToken: string | undefined): string {
+    const lastLines = runLog
+        .replace(/\r?\n$/, '')
+        .split(/\r?\n/)
+        .slice(-RUN_LOG_TAIL_LINES)
+        .join('\n');
+    const redacted = redactLogSecrets(lastLines, sessionToken);
+    const lines = redacted.split('\n');
+    let { length } = redacted;
+    while (lines.length > 1 && length > RUN_LOG_TAIL_MAX_CHARS) {
+        length -= (lines.shift() as string).length + 1;
+    }
+    return lines.join('\n').slice(-RUN_LOG_TAIL_MAX_CHARS);
+}
 
 const GetRunLogArgs = z.object({
     runId: z.string().describe('The ID of the Actor run.'),
