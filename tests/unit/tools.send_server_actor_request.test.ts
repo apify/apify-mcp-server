@@ -68,6 +68,18 @@ async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
             res.writeHead(400, { 'content-type': 'application/json' });
             res.end(JSON.stringify({ error: TOKEN }).replace('test-token', '\\u0074est-token'));
             return;
+        case '/escaped-token-number':
+            res.writeHead(400, { 'content-type': 'application/json' });
+            res.end('{"n": 12345678901234567890, "error": "\\u0074est-token"}');
+            return;
+        case '/big-error':
+            res.writeHead(400, { 'content-type': 'application/json' });
+            res.end(JSON.stringify({ error: 'e'.repeat(200_000) }));
+            return;
+        case '/raw-500':
+            res.writeHead(500);
+            res.end('Internal error');
+            return;
         case '/text-error':
             res.writeHead(400, { 'content-type': 'text/plain' });
             res.end('The "url" query parameter is required.');
@@ -472,6 +484,22 @@ describe('returning an Actor Server error', () => {
         expect(JSON.stringify(result)).not.toContain(TOKEN);
     });
 
+    it('returns a long Actor error once in the text and caps the extracted message', async () => {
+        const result = await callTool({ path: '/big-error' });
+        const { errorMessage } = result.structuredContent as { errorMessage: string };
+
+        expect(errorMessage.length).toBeLessThan(2_000);
+        // The text holds the body once, inside the structuredContent JSON; the message copies are capped.
+        expect(JSON.stringify(result.content).length).toBeLessThan(210_000);
+    });
+
+    it('keeps numbers as sent when it masks a token that JSON escapes hide', async () => {
+        const result = await callTool({ path: '/escaped-token-number' });
+        const { body } = result.structuredContent as { body: string };
+
+        expect(body).toBe('{"n": 12345678901234567890, "error": "[REDACTED]"}');
+    });
+
     it('returns a non-JSON error body only once, as the body', async () => {
         const result = await callTool({ path: '/text-error' });
         const message = 'The "url" query parameter is required.';
@@ -538,6 +566,19 @@ describe('returning an Actor Server error', () => {
         expect(received).toHaveLength(1);
         expect(result.isError).toBe(true);
         expect(result.content.at(-1)?.text).toBe(hint);
+    });
+
+    it('reports a 5xx whose body is not returned as a failure', async () => {
+        const result = await callTool({ path: '/raw-500' });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain('The body is not returned');
+        expect(result.toolTelemetry).toMatchObject({
+            toolStatus: TOOL_STATUS.FAILED,
+            failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
+            failureHttpStatus: 500,
+            httpStatus: 500,
+        });
     });
 
     it('reports a 5xx from the Actor Server as a failure that keeps the status and the body', async () => {
