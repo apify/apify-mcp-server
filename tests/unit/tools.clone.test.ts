@@ -94,13 +94,6 @@ describe('cloneToolEntry', () => {
         expect(cloned.redactArgs).toBe(redactArgs);
     });
 
-    it('keeps rejectArgs, so a payment-decorated copy still rejects arguments before the payment check', () => {
-        const rejectArgs = vi.fn(() => null);
-        const cloned = cloneToolEntry(makeInternalTool({ rejectArgs })) as HelperTool;
-
-        expect(cloned.rejectArgs).toBe(rejectArgs);
-    });
-
     it('works for actor tools (no call function)', () => {
         const original = makeActorTool();
         const cloned = cloneToolEntry(original);

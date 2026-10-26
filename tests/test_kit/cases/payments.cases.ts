@@ -187,26 +187,6 @@ export const paymentsCases: Case[] = [
         },
     },
     {
-        // The removed form is refused before the payment-related Actor lookup, so neither the standby rejection nor a 402.
-        name: 'rejects the actor:tool form of call-actor in x402 payment mode',
-        isDeploymentTest: false,
-        skipIf: skipOnStdio,
-        run: async (ctx) => {
-            const client = await ctx.createClientFn({ payment: 'x402' });
-            try {
-                const result = await client.callTool({
-                    name: 'call-actor',
-                    arguments: { actor: `${ACTOR_EXAMPLE_MCP_SERVER}:add`, input: {} },
-                });
-                expect(result.isError).toBe(true);
-                const content = result.content as { text: string }[];
-                expect(content[0].text).toContain('"actorName:toolName" form is no longer supported');
-            } finally {
-                await client.close();
-            }
-        },
-    },
-    {
         // Regression #893: task-mode call-actor must hit the same standby guard (legacy HTTP only).
         name: 'should reject standby Actor in task-mode call-actor under x402 (not 402, not platform error)',
         isDeploymentTest: false,

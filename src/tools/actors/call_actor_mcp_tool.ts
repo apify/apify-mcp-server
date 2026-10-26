@@ -35,7 +35,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         : '';
     return dedent`
         Call one tool on an Actor's MCP server and return its result.${toolList}
-        It connects with your Apify API token. Connecting can start a standby run of the Actor in your account, kept until its idle timeout; a multi-tenant Actor charges per event. What the tool itself does depends on the Actor.
+        It connects with your Apify API token. Connecting can start a Server Actor run in your account, kept until its idle timeout; a multi-tenant Server Actor charges per event. What the tool itself does depends on the Actor.
 
         Example call: {"actor": "username/name", "tool": "search", "arguments": {"query": "apify"}}
 
@@ -148,7 +148,7 @@ export const callActorMcpTool: ToolEntry = Object.freeze({
     buildDescription,
     inputSchema: z.toJSONSchema(callActorMcpToolArgs) as ToolInputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(callActorMcpToolArgs)),
-    // A third-party payment provider cannot pay for a standby run, so such a session is rejected before the call.
+    // A third-party payment provider cannot pay for a Server Actor run, so such a session is rejected before the call.
     hasPaymentProviderStandbyCheck: true,
     annotations: {
         title: 'Call Actor MCP tool',

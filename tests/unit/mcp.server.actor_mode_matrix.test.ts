@@ -3,18 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApifyClient } from '../../src/apify_client.js';
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
-import {
-    callActor as callActorTool,
-    callActorPreExecute,
-    executeCallActor,
-} from '../../src/tools/actors/call_actor.js';
-import { callActorMcpTool } from '../../src/tools/actors/call_actor_mcp_tool.js';
-import { callActorWidget } from '../../src/tools/widgets/call_actor_widget.js';
-import type { ActorDefinitionWithInfo, ToolEntry } from '../../src/types.js';
-import * as actorUtils from '../../src/utils/actor.js';
+import { callActorPreExecute, executeCallActor } from '../../src/tools/actors/call_actor.js';
+import type { ActorDefinitionWithInfo } from '../../src/types.js';
 import type { ToolResponse } from '../../src/utils/mcp.js';
-import { cloneToolEntry } from '../../src/utils/tools.js';
-import { getRequestHandler, makePaymentProvider, withServer } from './helpers/mcp_server.js';
+import { withServer } from './helpers/mcp_server.js';
 import { textOf, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 // Any Actor not seeded into the definition cache is unknown; the fetch fallback must not hit the network.
@@ -169,70 +161,6 @@ describe('Actor run/standby mode decision table', () => {
             const result = await preExecute(STANDBY_EMPTY);
 
             expect('earlyResponse' in result).toBe(true);
-        });
-
-        describe('the removed actor:tool form', () => {
-            // Like the real x402 and Skyfire providers, which store a decorated copy of each paid tool.
-            const cloningPaymentProvider = { ...makePaymentProvider(), decorateToolSchema: cloneToolEntry };
-
-            async function dispatch(
-                tools: ToolEntry[],
-                name: string,
-                paymentProvider?: ReturnType<typeof makePaymentProvider>,
-            ) {
-                return withServer(
-                    async (server) => {
-                        server.upsertTools(tools);
-                        return getRequestHandler(server, 'tools/call')(
-                            {
-                                method: 'tools/call',
-                                params: {
-                                    name,
-                                    arguments: { actor: `${STANDBY_MCP}:add`, input: {} },
-                                    _meta: { mcpSessionId: 's1' },
-                                },
-                            },
-                            { signal: new AbortController().signal, sendNotification: vi.fn() },
-                        );
-                    },
-                    { paymentProvider },
-                );
-            }
-
-            // Each tool and each session kind once: the rejection does not depend on how they combine.
-            it.each([
-                [HELPER_TOOLS.ACTOR_CALL, 'with', cloningPaymentProvider],
-                [HELPER_TOOLS.ACTOR_CALL_WIDGET, 'without', undefined],
-            ])(
-                'is rejected by %s before any Actor lookup, %s a payment provider',
-                async (name, _label, paymentProvider) => {
-                    const definitionSpy = vi.spyOn(actorUtils, 'getActorDefinitionCached');
-                    const resolutionSpy = vi.spyOn(actorUtils, 'getActorToolResolutionCached');
-
-                    const result = await dispatch(
-                        [callActorTool, callActorWidget, callActorMcpTool],
-                        name,
-                        paymentProvider,
-                    );
-
-                    expect(result.isError).toBe(true);
-                    expect(JSON.stringify(result.content)).toContain(
-                        '"actorName:toolName\\" form is no longer supported',
-                    );
-                    expect(JSON.stringify(result.content)).toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
-                    expect(result).not.toHaveProperty('toolTelemetry');
-                    expect(definitionSpy).not.toHaveBeenCalled();
-                    expect(resolutionSpy).not.toHaveBeenCalled();
-                },
-            );
-
-            it('names call-actor-mcp-tool only when the session has it, and otherwise the own-server remedy', async () => {
-                const result = await dispatch([callActorTool], HELPER_TOOLS.ACTOR_CALL);
-
-                expect(result.isError).toBe(true);
-                expect(JSON.stringify(result.content)).not.toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
-                expect(JSON.stringify(result.content)).toContain('cannot be called in this configuration');
-            });
         });
 
         it('answers the standby-without-MCP message with the canonical Actor name when addressed by Actor ID', async () => {
