@@ -52,8 +52,8 @@ const sendServerActorRequestArgs = z.object({
         .string()
         .min(1)
         .describe(
-            'The path on the Actor Server, starting with /, such as /search. A query string written into the ' +
-                'path is sent too.',
+            'The path of an operation in the Actor API schema, starting with /. Take it from the schema; do not ' +
+                'guess it. A query string written into the path is sent too.',
         ),
     query: apiCallArgsShape.query.describe(
         'Query parameters, by name, for example {"limit": 10, "verbose": true}; a boolean is sent as true or ' +
@@ -350,7 +350,7 @@ export async function executeSendServerActorRequest(
         });
     }
     // The path is not echoed: it can carry the session token.
-    if (!args.path.startsWith('/')) return respondUserError('The path must start with "/", for example "/search".');
+    if (!args.path.startsWith('/')) return respondUserError('The path must start with "/".');
     if (args.method === 'GET' && args.body !== undefined) {
         return respondUserError('A GET request cannot have a body. Send the data in query instead.');
     }

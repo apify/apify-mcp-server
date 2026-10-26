@@ -146,12 +146,16 @@ function formatUndocumented(tenancy: string): string {
     return `Server interface: enabled, ${tenancy}, undocumented: no API schema. See the README.`;
 }
 
+/** Up to this many operations, the summary names each one, so an agent can send a request without guessing a path. */
+const SUMMARY_MAX_NAMED_OPERATIONS = 5;
+
 /**
  * The one line the default output (no `output` given) carries for a Server Actor; `undefined` for any other Actor.
  * For a single-tenant Server Actor documenting `GET /search` and `GET /status`:
  * ```
- * Server interface: enabled, single-tenant, 2 documented operations. fetch-actor-details with {"actor":"apify/search","output":{"serverInterface":true}} lists them.
+ * Server interface: enabled, single-tenant, 2 documented operations: GET /search, GET /status. fetch-actor-details with {"actor":"apify/search","output":{"serverInterface":true}} lists them.
  * ```
+ * Over {@link SUMMARY_MAX_NAMED_OPERATIONS} operations, only their count.
  * Without an API schema: `Server interface: enabled, single-tenant, undocumented: no API schema. See the README.`
  */
 export function buildServerInterfaceSummary({
@@ -164,7 +168,11 @@ export function buildServerInterfaceSummary({
     const operations = listServerOperations(schema);
     if (operations.length === 0) return formatUndocumented(tenancy);
     const count = `${operations.length} documented operation${operations.length === 1 ? '' : 's'}`;
-    return `Server interface: enabled, ${tenancy}, ${count}. ${formatDetailsCall(actorFullName, true)} lists them.`;
+    const names =
+        operations.length <= SUMMARY_MAX_NAMED_OPERATIONS
+            ? `: ${operations.map(({ method, path }) => `${method} ${path}`).join(', ')}`
+            : '';
+    return `Server interface: enabled, ${tenancy}, ${count}${names}. ${formatDetailsCall(actorFullName, true)} lists them.`;
 }
 
 /**

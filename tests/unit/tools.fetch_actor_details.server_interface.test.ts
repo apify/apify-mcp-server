@@ -90,9 +90,18 @@ function summary(params: Partial<Parameters<typeof buildServerInterfaceSummary>[
 }
 
 describe('buildServerInterfaceSummary()', () => {
-    it('states the tenancy, the operation count and the fetch-actor-details call that lists them', () => {
+    it('states the tenancy, names each operation and the fetch-actor-details call that lists them', () => {
         expect(summary()).toBe(
-            'Server interface: enabled, single-tenant, 3 documented operations. ' +
+            'Server interface: enabled, single-tenant, 3 documented operations: GET /add, POST /add, GET /empty. ' +
+                `${HELPER_TOOLS.ACTOR_GET_DETAILS} with {"actor":"${ACTOR_FULL_NAME}","output":{"serverInterface":true}} lists them.`,
+        );
+    });
+
+    it('states only the operation count over five operations', () => {
+        const paths = Object.fromEntries(['/a', '/b', '/c', '/d', '/e', '/f'].map((path) => [path, { get: {} }]));
+
+        expect(summary({ schema: { paths } })).toBe(
+            'Server interface: enabled, single-tenant, 6 documented operations. ' +
                 `${HELPER_TOOLS.ACTOR_GET_DETAILS} with {"actor":"${ACTOR_FULL_NAME}","output":{"serverInterface":true}} lists them.`,
         );
     });
@@ -330,7 +339,9 @@ describe('buildFetchActorDetailsResult() with a Server Actor', () => {
         const result = await call();
 
         const texts = (result.content ?? []).map(textOf);
-        expect(texts.at(-1)).toContain('Server interface: enabled, single-tenant, 3 documented operations.');
+        expect(texts.at(-1)).toContain(
+            'Server interface: enabled, single-tenant, 3 documented operations: GET /add, POST /add, GET /empty.',
+        );
         expect((result.structuredContent as { serverInterface?: string }).serverInterface).toBe(texts.at(-1));
     });
 
@@ -338,7 +349,9 @@ describe('buildFetchActorDetailsResult() with a Server Actor', () => {
         const result = await call({ inputSchema: true });
 
         const texts = (result.content ?? []).map(textOf);
-        expect(texts.at(-1)).toContain('Server interface: enabled, single-tenant, 3 documented operations.');
+        expect(texts.at(-1)).toContain(
+            'Server interface: enabled, single-tenant, 3 documented operations: GET /add, POST /add, GET /empty.',
+        );
         expect((result.structuredContent as { serverInterface?: string }).serverInterface).toBe(texts.at(-1));
     });
 
