@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
 import type {
     ConsoleLinkContext,
     HelperTool,
@@ -27,7 +27,7 @@ import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunActor, getOwnServerRemedy } from '../actor_tool_naming.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
-import { buildServerInterfaceSection } from './server_interface_schema.js';
+import { buildServerInterfaceSection, buildServerInterfaceSummary } from './server_interface_schema.js';
 
 /**
  * Shared schema for actor details output options.
@@ -59,8 +59,9 @@ export const actorDetailsOutputOptionsSchema = z.object({
         .union([z.boolean(), z.string()])
         .optional()
         .describe(
-            "true lists a Server Actor's documented HTTP operations with its base URL and tenancy; " +
-                '"METHOD /path" details one operation\'s parameters, request body and responses.',
+            'Server Actor HTTP API. true: full schema with guidance when it fits; otherwise operation navigation. ' +
+                '"METHOD /path" (e.g. "GET /search"): operation excerpt. "#/...": raw node at a local JSON pointer. ' +
+                `Each section is limited to ${MAX_INLINE_BYTES} UTF-8 bytes including guidance. References are not expanded or fetched.`,
         ),
 });
 
@@ -74,10 +75,7 @@ export const actorDetailsOutputDefaults = {
     readme: true,
     outputSchema: false,
     mcpTools: false,
-    /** `true` lists a Server Actor's operations, a `METHOD /path` string details one. */
     serverInterface: false as boolean | string,
-    /** The one-line server-interface summary the default output carries for every Server Actor. */
-    serverInterfaceSummary: true,
 };
 
 export type ResolvedOutputOptions = typeof actorDetailsOutputDefaults;
@@ -104,7 +102,6 @@ export function resolveOutputOptions(output?: z.infer<typeof actorDetailsOutputO
         outputSchema: output?.outputSchema === true,
         mcpTools: output?.mcpTools === true,
         serverInterface: output?.serverInterface ?? false,
-        serverInterfaceSummary: false,
     };
 }
 
@@ -133,11 +130,10 @@ find it with ${HELPER_TOOLS.STORE_SEARCH} first.`
             : ''
     }
 
-Use 'output' parameter with boolean flags to control returned information:
-- Default: All fields true except mcpTools and serverInterface; a Server Actor gets a one-line server interface summary
-- Selective: Set desired fields to true (e.g., output: { inputSchema: true })
-- Common patterns: inputSchema only, description + readme, mcpTools for MCP Actors, serverInterface for Server Actors
-- serverInterface: true lists a Server Actor's HTTP operations, "METHOD /path" details one
+Use 'output' to control returned information:
+- Default: all fields except outputSchema, mcpTools and serverInterface. Server Actors always get a one-line server interface summary unless serverInterface is set.
+- Selective: set only the fields you need to true, e.g. output: { inputSchema: true }
+- Common patterns: inputSchema only, description + readme, mcpTools for MCP Actors, serverInterface: true (full API schema when it fits, operation navigation otherwise), "GET /search" (operation excerpt), or "#/components/schemas/Name" (referenced schema node) for Server Actors
 
 The 'readme' field returns the summary when available, full README otherwise.
 Use when querying Actor details, documentation, input requirements, or MCP tools.
@@ -145,7 +141,8 @@ Use when querying Actor details, documentation, input requirements, or MCP tools
 EXAMPLES:
 - What does apify/web-fetch do?
 - What is the input schema for apify/web-scraper?
-- What tools does this MCP server Actor provide?`;
+- What tools does this MCP server Actor provide?
+- What HTTP operations does this Server Actor expose?`;
 }
 
 /**
@@ -295,6 +292,25 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         return buildActorNotFoundResponse(actorName, loadedToolNames);
     }
 
+    let serverInterfaceMessage: string | undefined;
+    const serverInterfaceParams = {
+        actor: details.actorInfo,
+        actorFullName: `${details.actorInfo.username}/${details.actorInfo.name}`,
+        schema: details.webServerSchema,
+    };
+    if (resolvedOutput.serverInterface !== false) {
+        const section = buildServerInterfaceSection({
+            ...serverInterfaceParams,
+            serverInterface: resolvedOutput.serverInterface,
+            loadedToolNames,
+            hasPaymentProvider: paymentProvider !== undefined,
+        });
+        if ('error' in section) return respondUserError(section.error);
+        serverInterfaceMessage = section.text;
+    } else {
+        serverInterfaceMessage = buildServerInterfaceSummary(serverInterfaceParams);
+    }
+
     let actorOutputSchema: Record<string, unknown> | null | undefined;
     if (resolvedOutput.outputSchema) {
         actorOutputSchema = actorStore
@@ -304,17 +320,6 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     const mcpToolsMessage = resolvedOutput.mcpTools
         ? await getMcpToolsMessage(actorName, apifyClient, apifyToken, paymentProvider, mcpSessionId)
         : undefined;
-    const serverInterface =
-        resolvedOutput.serverInterfaceSummary || resolvedOutput.serverInterface !== false
-            ? buildServerInterfaceSection({
-                  actor: details.actorInfo,
-                  actorFullName: `${details.actorInfo.username}/${details.actorInfo.name}`,
-                  schema: details.webServerSchema,
-                  selection: resolvedOutput.serverInterface,
-                  loadedToolNames,
-              })
-            : undefined;
-    if (serverInterface && 'error' in serverInterface) return respondUserError(serverInterface.error);
 
     // NOTE: Data duplication between texts and structuredContent is intentional and required.
     // Some MCP clients only read text content, while others only read structured content.
@@ -323,7 +328,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         output: resolvedOutput,
         actorOutputSchema,
         mcpToolsMessage,
-        serverInterfaceMessage: serverInterface?.text,
+        serverInterfaceMessage,
         linkContext,
     });
 

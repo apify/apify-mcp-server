@@ -40,7 +40,10 @@ export async function getActorDefinitionCached(
     const cached = actorDefinitionCache.get(actorIdOrName);
     if (cached && (await callerMaySeeCachedActor(cached, apifyClient))) return cached;
     const fetched = await getActorDefinition(actorIdOrName, apifyClient);
-    // Anonymous reads can skip standby build resolution; don't cache missing interfaces for other callers (#1642).
+    // Without a token, a Standby build named by an untagged build number can't be resolved (listing builds needs
+    // auth), so the definition comes back with no server interface. Caching it would hide the interface from later
+    // callers with a token. The definition can't tell that apart from a Standby Actor that declares no interface,
+    // so neither is cached for anonymous reads; they re-fetch every time.
     const isUnresolvedAnonymousServer =
         !apifyClient.token &&
         fetched?.info.actorStandby?.isEnabled === true &&
@@ -52,8 +55,8 @@ export async function getActorDefinitionCached(
 
 /**
  * Resolve how an Actor is exposed as a tool at call time, by name: its interface set and the tool slot derived
- * from it. The only place `resolveActorToolMode` is consulted outside the tool-loading factory, so `call-actor`
- * routing and tool loading share one rule.
+ * from it. The only place outside the tool-loading factory that resolves them (`resolveActorInterfaces`), so
+ * `call-actor` routing and tool loading share one rule.
  *
  * Returns `null` when there is no definition to classify (unknown Actor). It does not resolve the MCP server URL,
  * so a bad `webServerMcpPath` fails only the MCP call that needs it (`runOnActorMcpServer`).

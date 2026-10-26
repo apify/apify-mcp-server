@@ -247,8 +247,9 @@ export const actorDetailsOutputSchema = {
         serverInterface: {
             type: 'string',
             description:
-                "The Actor's server interface: a one-line summary by default, the documented HTTP operations with " +
-                '`output.serverInterface: true`, or one operation with `output.serverInterface: "METHOD /path"`.',
+                "The Actor's server interface: a one-line summary by default. `output.serverInterface: true` returns " +
+                'the full API schema with guidance when it fits, or operation navigation otherwise. ' +
+                'A "METHOD /path" string returns an operation excerpt; "#/..." returns a raw local schema node.',
         },
     },
 };
@@ -1254,12 +1255,12 @@ export const serverActorRequestOutputSchema = {
     properties: {
         actorId: { type: 'string', description: 'Actor ID' },
         actorName: { type: 'string', description: 'Actor full name (username/name)' },
-        interface: { type: 'string', enum: ['server'], description: 'The Actor interface used: its HTTP server' },
+        interface: { type: 'string', enum: ['server'], description: 'The Actor interface used: its Actor Server' },
         tenancy: {
             type: 'string',
             enum: Object.values(ACTOR_TENANCY),
             description:
-                'single-tenant: a standby run in your account served the request; multi-tenant: a run of the ' +
+                'single-tenant: a run of the Actor in your account served the request; multi-tenant: a run of the ' +
                 "Actor's owner did, charged per event",
         },
         method: { type: 'string', description: 'HTTP method sent' },
@@ -1269,6 +1270,15 @@ export const serverActorRequestOutputSchema = {
         body: { type: 'string', description: 'Response body as text; empty when the response had none' },
         bytes: { type: 'integer', description: 'Response body size in bytes, after decompression' },
         location: { type: 'string', description: 'Location header of a redirect, which is not followed' },
+        summary: { type: 'string', description: 'Readable summary of the HTTP response' },
+        errorMessage: {
+            type: 'string',
+            description: 'The error string of a JSON {"error": ...} error body; other error bodies are only in body',
+        },
+        nextStep: {
+            type: 'string',
+            description: 'Where to look to correct the request, or why the Actor Server refused it',
+        },
     },
-    required: ['actorId', 'actorName', 'interface', 'tenancy', 'method', 'path', 'status', 'body', 'bytes'],
+    required: ['actorId', 'actorName', 'interface', 'tenancy', 'method', 'path', 'status', 'body', 'bytes', 'summary'],
 };

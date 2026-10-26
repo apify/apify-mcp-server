@@ -50,6 +50,8 @@ export class ApifyClient extends _ApifyClient {
      * so a plain apify-client `ApifyClient`, which public methods such as `loadToolsFromInput` accept, stays assignable.
      */
     readonly requestOrigin?: REQUEST_ORIGIN;
+    /** Call tracking sent with Store searches. */
+    storeSearchTracking?: { traceId?: string; useCase?: string };
 
     constructor(options: ExtendedApifyClientOptions) {
         /**

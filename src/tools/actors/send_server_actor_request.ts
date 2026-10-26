@@ -1,22 +1,29 @@
 import Ajv from 'ajv';
+import type { AxiosResponse } from 'axios';
 import dedent from 'dedent';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { readBodyUnderCap, sendApifyApiRequest } from '../../apify_client.js';
-import { FAILURE_CATEGORY, HELPER_TOOLS, HTTP_FORBIDDEN, HTTP_UNAUTHORIZED, MAX_INLINE_BYTES } from '../../const.js';
-import { TimeoutError } from '../../errors.js';
+import {
+    FAILURE_CATEGORY,
+    HELPER_TOOLS,
+    HTTP_FORBIDDEN,
+    HTTP_UNAUTHORIZED,
+    MAX_INLINE_BYTES,
+    SERVER_ACTOR_REQUEST_METHODS,
+} from '../../const.js';
 import { getActorMCPServerPath, resolveOnStandbyOrigin } from '../../mcp/actors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import { isTextualMimeType, maskSessionToken, parseCharset, REDACTED } from '../../resources/api_resources.js';
 import type {
+    Actor,
     ActorInterfaces,
     ActorTenancy,
     InternalToolArgs,
     ToolDescriptionContext,
     ToolEntry,
     ToolInputSchema,
-    ToolTelemetryContext,
 } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
@@ -26,13 +33,13 @@ import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondServerError, respondUserError } from '../../utils/mcp.js';
 import { resolveActorInterfaces, resolveActorTenancy } from '../actor_tool_naming.js';
 import { apiCallArgsShape, redactApiCallArgs } from '../api/apify_api_request.js';
+import { isRecord } from '../api/apify_api_spec.js';
 import { parseBaseMimeType } from '../storage/storage_helpers.js';
 import { anyJsonValueSchema, serverActorRequestOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 
-const SERVER_ACTOR_REQUEST_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
-export type ServerActorRequestMethod = (typeof SERVER_ACTOR_REQUEST_METHODS)[number];
+type ServerActorRequestMethod = (typeof SERVER_ACTOR_REQUEST_METHODS)[number];
 
 const sendServerActorRequestArgs = z.object({
     actor: z
@@ -46,8 +53,8 @@ const sendServerActorRequestArgs = z.object({
         .string()
         .min(1)
         .describe(
-            "The path on the Actor's server, starting with /, such as /search. A query string written into the " +
-                'path is sent too.',
+            'The path of an operation in the Actor API schema, starting with /. Take it from the schema; do not ' +
+                'guess it. A query string written into the path is sent too.',
         ),
     query: apiCallArgsShape.query.describe(
         'Query parameters, by name, for example {"limit": 10, "verbose": true}; a boolean is sent as true or ' +
@@ -55,55 +62,141 @@ const sendServerActorRequestArgs = z.object({
     ),
     body: z.unknown().optional().describe('The JSON request body, sent as application/json. Not allowed with GET.'),
 });
+type SendServerActorRequestArgs = z.infer<typeof sendServerActorRequestArgs>;
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    const callActor = hasTool(HELPER_TOOLS.ACTOR_CALL)
-        ? ` Unlike ${HELPER_TOOLS.ACTOR_CALL}, it starts no run from an input; an Actor can have both interfaces.`
-        : '';
     const details = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
         ? ` ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface lists the documented operations.`
         : '';
     return dedent`
-        Send one HTTP request to a Server Actor's API: the server interface its API schema (OpenAPI) and README document.${callActor}${details}
-        The server adds the host and the Apify API token; give the method, the path, and optionally query parameters and a JSON body.
-        Only an Actor with Actor Standby enabled and an API schema takes requests here, and the Actor itself accepts or rejects the method and path.
-        A request can start a standby run of the Actor in your account, kept for its idle timeout, or is charged per event when the Actor is multi-tenant.
-        The request is sent once, with no retries and without following redirects. The response body comes back as text (JSON, text, or XML); a body over ${MAX_INLINE_BYTES} bytes is not returned.
+        Send one HTTP request to an Actor Server: the HTTP API of a Server Actor, documented in its API schema (OpenAPI) and README.${details}
+        Give the method, the path, and optionally query parameters and a JSON body; the Actor Server's host and your Apify API token are added for you.
+        Only an Actor with an Actor Server and an API schema takes requests here; the Actor accepts or rejects the method and path.
+        A request to a single-tenant Actor Server can start a run of the Actor in your account, kept until its idle timeout; a multi-tenant Actor Server charges per event.
+        The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text; other content types, and bodies over ${MAX_INLINE_BYTES} bytes, are not returned.
 
-        Example call: {"actor": "username/name", "method": "POST", "path": "/search", "body": {"query": "apify"}}
+        Example call: {"actor": "apify/web-search", "method": "GET", "path": "/", "query": {"query": "AI news", "maxResults": 5}}
 
         USAGE:
-        - Use when the user asks for an Actor's HTTP endpoint, or the Actor's documentation names one.
+        - Use when the Actor that fits the user's request has an Actor Server, and its API schema or README names the endpoint for the task.
+        - Fits requests for one or a few results returned in the HTTP response. Larger batches depend on the endpoint and the response size and time limits.
 
         USAGE EXAMPLES:
-        - user_input: Send GET /status to username/name
+        - user_input: Search the web for the latest AI news with apify/web-search
+        - user_input: Find articles about Apify from the past week with apify/web-search
+        - user_input: Get the content of https://example.com with apify/web-fetch
     `;
 }
 
-/** What one request got back; `body` is absent when it exceeded `MAX_INLINE_BYTES`, where reading stopped. */
-export type ServerActorResponse = {
+/** The Actor and the request as sent: the fields every response about a sent request starts with. */
+type ServerActorRequest = {
+    actorId: string;
+    actorName: string;
+    interface: 'server';
+    tenancy: ActorTenancy;
+    method: ServerActorRequestMethod;
+    /** With its query, the session token masked: the agent can write the token into a query value. */
+    path: string;
+};
+
+/** What the Actor Server sent back; `body` is absent when it exceeded `MAX_INLINE_BYTES`, where reading stopped. */
+type ServerActorResponse = {
     status: number;
     contentType?: string;
     location?: string;
     body?: Buffer;
 };
 
+/** The request may have gone out, but its response did not fully arrive; `status` is set when the headers did. */
+class IncompleteResponseError extends Error {
+    override readonly name = 'IncompleteResponseError';
+
+    constructor(
+        message: string,
+        public readonly status: number | undefined,
+        public readonly isTimeout: boolean,
+    ) {
+        super(message);
+    }
+}
+
+function buildNoServerInterfaceText(
+    actorName: string,
+    interfaces: ActorInterfaces,
+    loadedToolNames: readonly string[],
+): string {
+    const text =
+        `Actor '${actorName}' has no Actor Server with an API schema, and this tool sends requests only to ` +
+        'such Actors. Its README describes how to use it.';
+    if (interfaces.mcp && loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL)) {
+        return `${text} Its MCP tools can be called with ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL}.`;
+    }
+    if (interfaces.input && loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL)) {
+        return `${text} It can be run from an input with ${HELPER_TOOLS.ACTOR_CALL}.`;
+    }
+    return text;
+}
+
 /**
- * Sends one request to a URL on an Actor's standby origin, which the caller has checked, through
- * `sendApifyApiRequest`: the session token and the request-origin header go along, there are no retries,
- * redirects are not followed, and the body is read as raw bytes, capped at `MAX_INLINE_BYTES` after
- * decompression. The deadline covers reading the body; when it passes before the client cancels, a
- * `TimeoutError` is thrown. A failure after the status arrived, a timeout included, carries it as `status`.
+ * The URL of `path` on the Actor's standby origin, with `query` added after a query written into the path, or
+ * the error response when the request cannot be sent there.
  */
-export async function fetchServerActorResponse(params: {
+function buildRequestUrl(
+    actor: Pick<Actor, 'standbyUrl'>,
+    actorName: string,
+    { path, query }: Pick<SendServerActorRequestArgs, 'path' | 'query'>,
+): { url: URL } | { error: ToolResponse } {
+    const resolved = resolveOnStandbyOrigin(actor, path);
+    if (!resolved) {
+        return {
+            error: respondServerError(`Actor '${actorName}' has no valid Actor Server URL. The request was not sent.`),
+        };
+    }
+    // Unlike the MCP URL, a path with credentials is refused rather than stripped: the agent wrote them.
+    const { url, standbyOrigin } = resolved;
+    if (!url || url.username || url.password) {
+        return {
+            error: respondUserError(
+                `The path must be a valid path on the Actor Server at ${standbyOrigin}, with no credentials. ` +
+                    'The request was not sent.',
+            ),
+        };
+    }
+    // Not axios `params`: apify-client's serializer sends a boolean as 1 or 0. Not `url.searchParams`: it would
+    // encode the query written into the path again.
+    const addedQuery = new URLSearchParams(
+        Object.entries(query ?? {}).map(([name, value]): [string, string] => [name, String(value)]),
+    ).toString();
+    if (addedQuery) url.search = url.search ? `${url.search}&${addedQuery}` : addedQuery;
+    return { url };
+}
+
+/** A response header's value; `undefined` when it is absent or not a single string. */
+function readHeader(headers: AxiosResponse['headers'], name: string): string | undefined {
+    const value: unknown = headers[name];
+    return typeof value === 'string' ? value : undefined;
+}
+
+/**
+ * Sends the request once, without following redirects, and reads the body up to `MAX_INLINE_BYTES`. The deadline
+ * covers reading the body too. Any failure is thrown as an `IncompleteResponseError`: even a connection that drops
+ * before the status may have delivered the request.
+ */
+async function sendRequest({
+    client,
+    url,
+    method,
+    body,
+    signal,
+    timeoutMillis,
+}: {
     client: ApifyClient;
     url: URL;
     method: ServerActorRequestMethod;
-    body?: unknown;
+    body: unknown;
     signal: AbortSignal;
     timeoutMillis: number;
 }): Promise<ServerActorResponse> {
-    const { client, url, method, body, signal, timeoutMillis } = params;
     const deadline = AbortSignal.timeout(timeoutMillis);
     let status: number | undefined;
     try {
@@ -121,116 +214,138 @@ export async function fetchServerActorResponse(params: {
             signal: AbortSignal.any([signal, deadline]),
         });
         status = response.status;
-        const header = (name: string): string | undefined => {
-            const value: unknown = response.headers[name];
-            return typeof value === 'string' ? value : undefined;
-        };
         return {
             status,
-            contentType: header('content-type'),
-            location: header('location'),
+            contentType: readHeader(response.headers, 'content-type'),
+            location: readHeader(response.headers, 'location'),
             body: await readBodyUnderCap(response),
         };
     } catch (error) {
-        const failure =
-            deadline.aborted && !signal.aborted
-                ? new TimeoutError(`The Actor server did not finish responding within ${timeoutMillis} ms`)
-                : toPlainError(error);
-        throw status === undefined ? failure : Object.assign(failure, { status });
+        throw new IncompleteResponseError(toPlainError(error).message, status, deadline.aborted);
     }
 }
 
-/** The response with the Actor fields, and the status once one arrived, for the response telemetry. */
-function withServerActorTelemetry(response: ToolResponse, telemetry: ToolTelemetryContext): ToolResponse {
-    return { ...response, toolTelemetry: { ...response.toolTelemetry, ...telemetry } };
+/**
+ * The body decoded with `charset`, the session token masked before and after decoding; `undefined` when
+ * `TextDecoder` does not support the charset. A JSON body whose escapes hide the token comes back
+ * re-serialized with the token masked; any other body keeps its text.
+ */
+function decodeBody(body: Buffer, charset: string, token: string): string | undefined {
+    let text: string;
+    try {
+        text = new TextDecoder(charset).decode(maskSessionToken(body, token)).replaceAll(token, REDACTED);
+    } catch {
+        return undefined;
+    }
+    try {
+        const serialized = JSON.stringify(JSON.parse(text));
+        return serialized.includes(token) ? serialized.replaceAll(token, REDACTED) : text;
+    } catch {
+        return text;
+    }
 }
 
-function buildNoServerInterfaceText(
+/**
+ * The `error` string of a JSON `{"error": ...}` body; `undefined` for any other body, which the response already
+ * carries as `body`.
+ */
+function getReadableErrorMessage(body: string): string | undefined {
+    try {
+        const parsed = z.object({ error: z.string() }).safeParse(JSON.parse(body));
+        if (parsed.success) return parsed.data.error;
+    } catch {
+        // An Actor can return plain text or malformed JSON.
+    }
+    return undefined;
+}
+
+function buildRequestRecoveryText(
+    status: number,
     actorName: string,
-    interfaces: ActorInterfaces,
     loadedToolNames: readonly string[],
-): string {
-    const text =
-        `Actor '${actorName}' has no HTTP API documented by an API schema, so this tool cannot send it a ` +
-        'request. See its README for how to use it.';
-    if (interfaces.mcp && loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL)) {
-        return `${text} Its MCP tools are called with ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL}.`;
-    }
-    if (interfaces.input && loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL)) {
-        return `${text} It runs from an input with ${HELPER_TOOLS.ACTOR_CALL}.`;
-    }
-    return text;
+    hasErrorMessage: boolean,
+): string | undefined {
+    if (status === 429) return 'The Actor Server rate limit was reached.';
+    if (status === 503) return 'The Actor Server is temporarily unavailable.';
+    if (![400, 404, 405, 422].includes(status)) return undefined;
+    const documentation = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)
+        ? `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorName, output: { serverInterface: true } })} lists the documented HTTP operations.`
+        : 'The Actor README may describe its HTTP endpoints.';
+    return hasErrorMessage
+        ? `The Actor Server error may name the expected HTTP method, path, or parameters. ${documentation}`
+        : documentation;
 }
 
-function buildResponse(params: {
-    response: ServerActorResponse;
-    method: ServerActorRequestMethod;
-    path: string;
-    actorId: string;
-    actorName: string;
-    tenancy: ActorTenancy;
-    /** The session's token, masked in the body, the content type and the location; the path comes masked. */
-    token: string;
-}): ToolResponse {
-    const { response, method, path, actorId, actorName, tenancy, token } = params;
+/** The tool response for what the Actor Server sent back, with the session token masked. */
+function buildResponse(
+    request: ServerActorRequest,
+    response: ServerActorResponse,
+    { apifyToken: token, loadedToolNames }: Pick<InternalToolArgs, 'apifyToken' | 'loadedToolNames'>,
+): ToolResponse {
     const { status } = response;
     const contentType = response.contentType?.replaceAll(token, REDACTED);
     const location = response.location?.replaceAll(token, REDACTED);
-    const outcome = `${method} ${path} on ${actorName} returned HTTP ${status}`;
-    if (response.body === undefined) {
-        return respondUserError(
-            `${outcome} with a body larger than ${MAX_INLINE_BYTES} bytes, so the body is not returned. ` +
-                'The request itself was sent.',
-            { httpStatus: status },
-        );
-    }
+    const outcome = `${request.method} ${request.path} on ${request.actorName} returned HTTP ${status}`;
+    const rejectBody = (reason: string) =>
+        respondUserError(`${outcome}. The body is not returned: ${reason}. The request itself was sent.`, {
+            httpStatus: status,
+        });
+
+    if (response.body === undefined) return rejectBody(`it is larger than ${MAX_INLINE_BYTES} bytes`);
     const bytes = response.body.length;
-    const baseMimeType = parseBaseMimeType(contentType);
-    if (bytes > 0 && !isTextualMimeType(baseMimeType)) {
-        return respondUserError(
-            `${outcome} with ${bytes} bytes of ${baseMimeType ?? 'an unknown type'}, which this tool does not ` +
-                'return; it returns JSON, text, and XML bodies. The request itself was sent.',
-            { httpStatus: status },
+    const mimeType = parseBaseMimeType(contentType);
+    if (bytes > 0 && !isTextualMimeType(mimeType)) {
+        return rejectBody(
+            `it is ${bytes} bytes of ${mimeType ?? 'an unknown type'}, and only JSON, text, and XML bodies are returned`,
         );
     }
     const charset = parseCharset(contentType) ?? 'utf-8';
-    let body = '';
-    if (bytes > 0) {
-        try {
-            body = new TextDecoder(charset).decode(maskSessionToken(response.body, token)).replaceAll(token, REDACTED);
-        } catch {
-            return respondUserError(
-                `${outcome} with unsupported charset "${charset}", so the body is not returned. ` +
-                    'The request itself was sent.',
-                { httpStatus: status },
-            );
-        }
-    }
+    const body = bytes === 0 ? '' : decodeBody(response.body, charset, token);
+    if (body === undefined) return rejectBody(`its charset "${charset}" is not supported`);
+
+    const bodyNote = bytes === 0 ? 'an empty body' : `${bytes} bytes of ${mimeType}`;
+    const redirectNote = location ? ` The redirect to ${location} was not followed.` : '';
+    const summary = `${outcome} with ${bodyNote}.${redirectNote}`;
+    const errorMessage = status >= 400 && body ? getReadableErrorMessage(body) : undefined;
+    const nextStep = buildRequestRecoveryText(status, request.actorName, loadedToolNames, errorMessage !== undefined);
     const structuredContent = {
-        actorId,
-        actorName,
-        interface: 'server',
-        tenancy,
-        method,
-        path,
+        ...request,
         status,
         ...(contentType && { contentType }),
         body,
         bytes,
         ...(location && { location }),
+        summary,
+        ...(errorMessage && { errorMessage }),
+        ...(nextStep && { nextStep }),
     };
-    const bodyNote = bytes === 0 ? 'an empty body' : `${bytes} bytes of ${baseMimeType}`;
-    const redirectNote = location ? `, redirecting to ${location}, which is not followed` : '';
-    const texts = [JSON.stringify(structuredContent), `${outcome} with ${bodyNote}${redirectNote}.`];
+    const texts = [JSON.stringify(structuredContent), summary];
+    if (errorMessage) texts.push(`Actor Server error: ${errorMessage}`);
+    if (nextStep) texts.push(nextStep);
     if (status < 400) return respondOk(texts, { structuredContent });
-    if (status === 429 || status === 503) {
-        texts.push('The Actor server is busy; wait, then send requests one at a time.');
-    }
+    // Classified like an Apify API 5xx in the API tools: a failure, with the status kept.
+    if (status >= 500) return respondServerError(texts, { error: { statusCode: status }, structuredContent });
     return respondUserError(texts, {
         ...((status === HTTP_UNAUTHORIZED || status === HTTP_FORBIDDEN) && { category: FAILURE_CATEGORY.AUTH }),
         httpStatus: status,
         structuredContent,
     });
+}
+
+/** The tool response when the request went out but its response did not fully arrive. */
+function buildIncompleteResponse(
+    request: ServerActorRequest,
+    error: IncompleteResponseError,
+    timeoutMillis: number,
+): ToolResponse {
+    const got =
+        error.status === undefined ? 'got no complete response' : `got HTTP ${error.status} but not the whole body`;
+    const why = error.isTimeout ? `within ${timeoutMillis / 1000} seconds` : `(${error.message})`;
+    return respondServerError(
+        `${request.method} ${request.path} on ${request.actorName} ${got} ${why}. Nothing is returned, and the ` +
+            'Actor may still have processed the request.',
+        { detail: error.isTimeout ? 'timeout' : error.status === undefined ? 'no response' : 'incomplete body' },
+    );
 }
 
 /** `timeoutMillis` shortens the deadline in local tests; production keeps `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`. */
@@ -239,26 +354,34 @@ export async function executeSendServerActorRequest(
     { timeoutMillis = EXTERNAL_TOOL_CALL_TIMEOUT_MSEC }: { timeoutMillis?: number } = {},
 ): Promise<ToolResponse> {
     const { apifyToken, apifyClient, mcpSessionId, loadedToolNames, signal } = toolArgs;
-    const parsed = sendServerActorRequestArgs.parse(toolArgs.args);
+    const args = sendServerActorRequestArgs.parse(toolArgs.args);
     if (!apifyToken) {
-        return respondUserError('An Apify API token is required: the request to the Actor server carries it.', {
+        return respondUserError('An Apify API token is required to send requests to an Actor Server.', {
             category: FAILURE_CATEGORY.AUTH,
         });
     }
-    if (!parsed.path.startsWith('/')) {
-        return respondUserError('The path must start with /, as in /search.');
-    }
-    if (parsed.method === 'GET' && parsed.body !== undefined) {
-        return respondUserError('A GET request carries no body; leave body out, or send the data as query parameters.');
+    // The path is not echoed: it can carry the session token.
+    if (!args.path.startsWith('/')) return respondUserError('The path must start with "/".');
+    if (args.method === 'GET' && args.body !== undefined) {
+        return respondUserError('A GET request cannot have a body. Send the data in query instead.');
     }
 
-    const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_SERVER_REQUEST });
+    const actorName = fixActorNameInputAndLog(args.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_SERVER_REQUEST });
     const cached = await getActorDefinitionCached(actorName, apifyClient);
     if (!cached) return buildActorNotFoundResponse(actorName, loadedToolNames);
     const { definition, info } = cached;
-    const { actorFullName } = definition;
     const tenancy = resolveActorTenancy(info);
-    const telemetry: ToolTelemetryContext = { actorId: info.id, actorTenancy: tenancy };
+    // Every response from here on names the Actor, and the status once one arrived, in telemetry.
+    const withActorTelemetry = (response: ToolResponse, httpStatus?: number): ToolResponse => ({
+        ...response,
+        toolTelemetry: {
+            ...response.toolTelemetry,
+            actorId: info.id,
+            // With Actor Standby off there is no tenancy; `resolveActorTenancy` would report its single-tenant default.
+            ...(info.actorStandby?.isEnabled === true && { actorTenancy: tenancy }),
+            ...(httpStatus !== undefined && { httpStatus }),
+        },
+    });
 
     const interfaces = resolveActorInterfaces({
         definition,
@@ -266,78 +389,37 @@ export async function executeSendServerActorRequest(
         webServerMcpPath: getActorMCPServerPath(definition),
     });
     if (!interfaces.server) {
-        return withServerActorTelemetry(
-            respondUserError(buildNoServerInterfaceText(actorFullName, interfaces, loadedToolNames)),
-            telemetry,
+        return withActorTelemetry(
+            respondUserError(buildNoServerInterfaceText(definition.actorFullName, interfaces, loadedToolNames)),
         );
     }
-    const resolved = resolveOnStandbyOrigin(info, parsed.path);
-    if (!resolved) {
-        return withServerActorTelemetry(
-            respondServerError(
-                `Actor '${actorFullName}' has no valid standby URL in its Actor Standby configuration, so its ` +
-                    'server cannot be reached.',
-            ),
-            telemetry,
-        );
-    }
-    // Unlike the MCP URL, a path with credentials is refused rather than stripped: the agent wrote them.
-    const { url, standbyOrigin } = resolved;
-    if (!url || url.username || url.password) {
-        return withServerActorTelemetry(
-            respondUserError(`The path leaves the Actor's server at ${standbyOrigin}, so it is not sent.`),
-            telemetry,
-        );
-    }
-    // Not axios `params`: apify-client's serializer sends a boolean as 1 or 0. Not `url.searchParams`: it would
-    // encode the query written into the path again.
-    const query = new URLSearchParams(
-        Object.entries(parsed.query ?? {}).map(([name, value]): [string, string] => [name, String(value)]),
-    ).toString();
-    if (query) url.search = url.search ? `${url.search}&${query}` : query;
-    // The path as sent, for the response text: the agent can write the token into a query value.
-    const path = `${url.pathname}${url.search}`.replaceAll(apifyToken, REDACTED);
+    const target = buildRequestUrl(info, definition.actorFullName, args);
+    if ('error' in target) return withActorTelemetry(target.error);
 
-    let response: ServerActorResponse;
+    const { url } = target;
+    const request: ServerActorRequest = {
+        actorId: info.id,
+        actorName: definition.actorFullName,
+        interface: 'server',
+        tenancy,
+        method: args.method,
+        path: `${url.pathname}${url.search}`.replaceAll(apifyToken, REDACTED),
+    };
     try {
-        response = await fetchServerActorResponse({
+        const response = await sendRequest({
             client: apifyClient,
             url,
-            method: parsed.method,
-            body: parsed.body,
+            method: args.method,
+            body: args.body,
             signal,
             timeoutMillis,
         });
+        return withActorTelemetry(buildResponse(request, response, { apifyToken, loadedToolNames }), response.status);
     } catch (error) {
         if (signal.aborted) return respondAborted();
-        const failure = error as Error & { status?: number };
-        const isTimeout = error instanceof TimeoutError;
-        // A failure before any status, other than the deadline, is reported by the engine.
-        if (!isTimeout && failure.status === undefined) throw error;
-        const { status } = failure;
-        const got = status === undefined ? 'got no complete response' : `got HTTP ${status} but not the whole body`;
-        const why = isTimeout ? `within ${timeoutMillis / 1000} seconds` : `(${failure.message})`;
-        return withServerActorTelemetry(
-            respondServerError(
-                `${parsed.method} ${path} on ${actorFullName} ${got} ${why}, so nothing is returned. ` +
-                    'The Actor may still have processed the request.',
-                { detail: isTimeout ? 'timeout' : 'incomplete body' },
-            ),
-            { ...telemetry, ...(status !== undefined && { httpStatus: status }) },
-        );
+        if (!(error instanceof IncompleteResponseError)) throw error;
+        return withActorTelemetry(buildIncompleteResponse(request, error, timeoutMillis), error.status);
     }
-    return withServerActorTelemetry(
-        buildResponse({
-            response,
-            method: parsed.method,
-            path,
-            actorId: info.id,
-            actorName: actorFullName,
-            tenancy,
-            token: apifyToken,
-        }),
-        { ...telemetry, httpStatus: response.status },
-    );
 }
 
 /** Sends one HTTP request to a Server Actor's API, the server interface its `webServerSchema` documents. */
@@ -356,7 +438,7 @@ export const sendServerActorRequest: ToolEntry = Object.freeze({
     ajvValidate: new Ajv({ coerceTypes: false, strict: false, removeAdditional: true }).compile(
         fixZodSchemaRequired(z.toJSONSchema(sendServerActorRequestArgs)),
     ),
-    // A third-party payment provider cannot pay for a standby run, so such a session is rejected before the call.
+    // A third-party payment provider cannot pay for an Actor Server run, so such a session is rejected before the call.
     hasPaymentProviderStandbyCheck: true,
     annotations: {
         title: 'Send Server Actor request',
@@ -366,7 +448,13 @@ export const sendServerActorRequest: ToolEntry = Object.freeze({
         idempotentHint: false,
         openWorldHint: true,
     },
-    // The body can carry secrets, and a query value can be a token.
-    redactArgs: ({ actor, ...rest }: Record<string, unknown>) => ({ actor, ...redactApiCallArgs(rest) }),
+    // The body can carry secrets, and an Actor Server can take a credential under any query name.
+    redactArgs: ({ actor, query, ...rest }: Record<string, unknown>) => ({
+        actor,
+        ...redactApiCallArgs(rest),
+        ...(query !== undefined && {
+            query: isRecord(query) ? Object.fromEntries(Object.keys(query).map((name) => [name, REDACTED])) : REDACTED,
+        }),
+    }),
     call: async (toolArgs: InternalToolArgs) => executeSendServerActorRequest(toolArgs),
 } as const);

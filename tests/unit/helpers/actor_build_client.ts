@@ -2,6 +2,7 @@ import type { Build } from 'apify-client';
 import { vi } from 'vitest';
 
 import type { ApifyClient } from '../../../src/apify_client.js';
+import type { BuildListItem } from '../../../src/tools/builds/get_actor_build_list.js';
 import type { Actor, ActorDefinitionWithServerInterface } from '../../../src/types.js';
 import { mockApifyClient } from './tool_context.js';
 
@@ -82,7 +83,8 @@ export function mockDefaultBuild(definitionOverrides: Partial<ActorDefinitionWit
     });
 }
 
-export type BuildListItem = { id: string; buildNumber: string };
+/** The fields of a real build-list item the resolver reads. */
+export type FakeBuildListItem = Pick<BuildListItem, 'id' | 'buildNumber'>;
 
 /**
  * Fake ApifyClient covering what the two definition readers call: `actor().get/defaultBuild/builds().list()`
@@ -102,7 +104,7 @@ export function mockActorBuildClient({
     actor: Actor;
     defaultBuild: Build;
     builds?: Record<string, Build | undefined>;
-    buildList?: BuildListItem[];
+    buildList?: FakeBuildListItem[];
     buildListFailure?: unknown;
     /** `false` is a token-less (payment provider) session. */
     hasToken?: boolean;

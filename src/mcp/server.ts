@@ -362,7 +362,11 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      * An explicit opt-in in `source.input` applies to every request reusing this retained source.
      */
     private composeToolsForClient(source: ToolSource, view: ServingContext): ToolEntry[] {
-        const tools = getToolsForServerMode(source.input, source.actorTools, view.serverMode);
+        let tools = getToolsForServerMode(source.input, source.actorTools, view.serverMode);
+        // A payment provider cannot pay for an Actor Server run, so every call would be rejected.
+        if (this.options.paymentProvider) {
+            tools = tools.filter((tool) => tool.name !== HELPER_TOOLS.ACTOR_SERVER_REQUEST);
+        }
         if (this.isReportProblemServable(view, source.input)) return tools;
         return tools.filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT);
     }

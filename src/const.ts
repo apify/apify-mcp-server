@@ -25,6 +25,12 @@ export const CODE_RUNTIME_ACTOR_NAME = 'apify/code-runtime';
 export const MAX_INLINE_BYTES = 256 * 1024;
 
 /**
+ * HTTP methods `send-server-actor-request` sends; an API schema operation under another method is neither counted
+ * nor listed.
+ */
+export const SERVER_ACTOR_REQUEST_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
+
+/**
  * Advisory threshold (uncompressed bytes) above which dataset tools append a size hint steering the
  * caller to narrow the fetch. A soft hint, not a truncation cap; ~50 KB mirrors the ~25k-token budget.
  */
@@ -146,6 +152,10 @@ export const defaults = {
 
 /** API rejects `includeInputSchema=true` above this; mirrors apify-core `MAX_LIMIT_WITH_INPUT_SCHEMA`. */
 export const MAX_LIMIT_WITH_INPUT_SCHEMA = 10;
+/** Max `_useCase` length (UTF-16 code units) the API accepts. */
+export const STORE_USE_CASE_MAX_LENGTH = 1024;
+/** Max `_traceId` length (UTF-16 code units) the API accepts. */
+export const STORE_TRACE_ID_MAX_LENGTH = 256;
 /** Max input fields shown inline in text and structured Actor cards. */
 export const MAX_INPUT_FIELDS_IN_ACTOR_CARD = 20;
 

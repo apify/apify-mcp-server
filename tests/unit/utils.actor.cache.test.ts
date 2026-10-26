@@ -156,6 +156,20 @@ describe('getActorToolResolutionCached()', () => {
         });
     });
 
+    it('reports both the input and HTTP interfaces for a server Actor with an input schema', async () => {
+        seedCache('acme/input-and-http', true, 'owner-16', {
+            isStandbyEnabled: true,
+            input: { type: 'object', properties: { url: { type: 'string' } } },
+            hasWebServerSchema: true,
+        });
+
+        await expect(getActorToolResolutionCached('acme/input-and-http', client)).resolves.toEqual({
+            toolMode: ACTOR_TOOL_MODE.RUN,
+            actorFullName: 'acme/input-and-http',
+            interfaces: { input: true, mcp: false, server: true },
+        });
+    });
+
     it('reports the server-only interface set and the canonical Actor full name when addressed by ID', async () => {
         const entry = seedCache('acme/standby-empty-by-id', true, 'owner-15', {
             isStandbyEnabled: true,
