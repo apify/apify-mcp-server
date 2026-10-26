@@ -1312,6 +1312,18 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).toContain('no dataset to fetch');
     });
 
+    it.each([
+        ['with', datasetWithItems],
+        ['without', undefined],
+    ])('TIMED-OUT summary %s dataset shows the Actor status', (_label, dataset) => {
+        // The last status message of a run that timed out tells how far the run got.
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('TIMED-OUT', 'Crawled 120 of 500 pages.'),
+            dataset,
+        });
+        expect(t.summary).toContain('Actor status: "Crawled 120 of 500 pages"');
+    });
+
     // ---- statusMessage attribution + double-period invariants ----
     // The upstream statusMessage can be stale relative to elapsedSecs and often arrives with a
     // trailing period. We always render it as ` Actor status: "..."` (no double period) so a
