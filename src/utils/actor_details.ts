@@ -83,7 +83,7 @@ export type ActorDetailsResult = {
     readme: string;
     readmeSummary?: string;
     /** API schema of the build standby serves (`resolveServerInterfaceDefinition`); absent when unresolved. */
-    webServerSchema?: Record<string, unknown>;
+    webServerSchema?: unknown;
 };
 
 type FetchActorDetailsOptions = {
