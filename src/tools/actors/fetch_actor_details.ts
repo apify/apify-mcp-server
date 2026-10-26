@@ -309,7 +309,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
                   actor: details.actorInfo,
                   actorFullName: `${details.actorInfo.username}/${details.actorInfo.name}`,
                   schema: details.webServerSchema,
-                  selection: resolvedOutput.serverInterface,
+                  serverInterface: resolvedOutput.serverInterface,
                   loadedToolNames,
                   hasPaymentProvider: paymentProvider !== undefined,
               })
