@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import { buildFetchActorDetailsResult } from '../../src/tools/actors/fetch_actor_details.js';
-import { buildServerInterfaceSection } from '../../src/tools/actors/server_interface_schema.js';
+import {
+    buildServerInterfaceSection,
+    buildServerInterfaceSummary,
+} from '../../src/tools/actors/server_interface_schema.js';
 import type { Actor } from '../../src/types.js';
 import { mockActor, mockActorBuildClient, mockDefaultBuild } from './helpers/actor_build_client.js';
 import { mockApifyClient, stubToolCallContext, textOf } from './helpers/tool_context.js';
@@ -64,7 +67,7 @@ function section(params: Partial<Parameters<typeof buildServerInterfaceSection>[
         actor: serverActor(),
         actorFullName: ACTOR_FULL_NAME,
         schema: SCHEMA,
-        serverInterface: false,
+        serverInterface: true,
         loadedToolNames: Object.values(HELPER_TOOLS),
         hasPaymentProvider: false,
         ...params,
@@ -77,29 +80,35 @@ function textOfSection(params: Partial<Parameters<typeof buildServerInterfaceSec
     return result.text;
 }
 
+describe('buildServerInterfaceSummary()', () => {
+    it('states the tenancy, the operation count and how to expand it for a Server Actor with an API schema', () => {
+        expect(buildServerInterfaceSummary({ actor: serverActor(), schema: SCHEMA })).toBe(
+            'Server interface: enabled, single-tenant, 3 documented operations. ' +
+                'output.serverInterface: true lists them, "METHOD /path" details one.',
+        );
+    });
+
+    it.each([undefined, { paths: {} }])('says the interface is undocumented when the schema is %s', (schema) => {
+        expect(buildServerInterfaceSummary({ actor: serverActor(), schema })).toBe(
+            'Server interface: enabled, single-tenant, undocumented: no API schema. See the README.',
+        );
+    });
+
+    it('is absent for an Actor without a server interface', () => {
+        expect(buildServerInterfaceSummary({ actor: { actorStandby: { isEnabled: false } }, schema: SCHEMA })).toBe(
+            undefined,
+        );
+    });
+});
+
 describe('buildServerInterfaceSection()', () => {
-    describe('the one-line summary of the default output', () => {
-        it('states the tenancy, the operation count and how to expand it for a Server Actor with an API schema', () => {
-            const text = textOfSection();
-
-            expect(text).toBe(
-                'Server interface: enabled, single-tenant, 3 documented operations. ' +
-                    'output.serverInterface: true lists them, "METHOD /path" details one.',
-            );
-        });
-
-        it.each([undefined, { paths: {} }])('says the interface is undocumented when the schema is %s', (schema) => {
-            expect(textOfSection({ schema })).toBe(
+    describe('the operation list', () => {
+        it('says the interface is undocumented for a Server Actor without an API schema', () => {
+            expect(textOfSection({ schema: undefined })).toBe(
                 'Server interface: enabled, single-tenant, undocumented: no API schema. See the README.',
             );
         });
 
-        it('is absent for an Actor without a server interface', () => {
-            expect(section({ actor: { actorStandby: { isEnabled: false } } })).toBeUndefined();
-        });
-    });
-
-    describe('the operation list', () => {
         it("lists each operation with its summary and required inputs, the Actor's standby URL as the base URL, and the send tool", () => {
             const text = textOfSection({ serverInterface: true });
 

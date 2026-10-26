@@ -27,7 +27,7 @@ import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunActor, getOwnServerRemedy } from '../actor_tool_naming.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
-import { buildServerInterfaceSection } from './server_interface_schema.js';
+import { buildServerInterfaceSection, buildServerInterfaceSummary } from './server_interface_schema.js';
 
 /**
  * Shared schema for actor details output options.
@@ -303,18 +303,24 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     const mcpToolsMessage = resolvedOutput.mcpTools
         ? await getMcpToolsMessage(actorName, apifyClient, apifyToken, paymentProvider, mcpSessionId)
         : undefined;
-    const serverInterface =
-        resolvedOutput.serverInterfaceSummary || resolvedOutput.serverInterface !== false
-            ? buildServerInterfaceSection({
-                  actor: details.actorInfo,
-                  actorFullName: `${details.actorInfo.username}/${details.actorInfo.name}`,
-                  schema: details.webServerSchema,
-                  serverInterface: resolvedOutput.serverInterface,
-                  loadedToolNames,
-                  hasPaymentProvider: paymentProvider !== undefined,
-              })
-            : undefined;
-    if (serverInterface && 'error' in serverInterface) return respondUserError(serverInterface.error);
+    let serverInterfaceMessage: string | undefined;
+    if (resolvedOutput.serverInterface !== false) {
+        const section = buildServerInterfaceSection({
+            actor: details.actorInfo,
+            actorFullName: `${details.actorInfo.username}/${details.actorInfo.name}`,
+            schema: details.webServerSchema,
+            serverInterface: resolvedOutput.serverInterface,
+            loadedToolNames,
+            hasPaymentProvider: paymentProvider !== undefined,
+        });
+        if ('error' in section) return respondUserError(section.error);
+        serverInterfaceMessage = section.text;
+    } else if (resolvedOutput.serverInterfaceSummary) {
+        serverInterfaceMessage = buildServerInterfaceSummary({
+            actor: details.actorInfo,
+            schema: details.webServerSchema,
+        });
+    }
 
     // NOTE: Data duplication between texts and structuredContent is intentional and required.
     // Some MCP clients only read text content, while others only read structured content.
@@ -323,7 +329,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         output: resolvedOutput,
         actorOutputSchema,
         mcpToolsMessage,
-        serverInterfaceMessage: serverInterface?.text,
+        serverInterfaceMessage,
         linkContext,
     });
 

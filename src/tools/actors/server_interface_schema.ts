@@ -14,8 +14,8 @@ type ServerInterfaceSectionParams = {
     actorFullName: string;
     /** The server-interface build's API schema; absent when the Actor has none. */
     schema: Record<string, unknown> | undefined;
-    /** `true` lists operations, a `METHOD /path` string details one, `false` gives the one-line summary. */
-    serverInterface: boolean | string;
+    /** `true` lists operations, a `METHOD /path` string details one. */
+    serverInterface: true | string;
     loadedToolNames: readonly string[];
     /** An agentic payment provider (x402, Skyfire) cannot pay for an Actor Server request. */
     hasPaymentProvider: boolean;
@@ -104,16 +104,13 @@ function formatTenancy(actor: Pick<Actor, 'actorStandby'>): string {
     return `${ACTOR_TENANCY.SINGLE_TENANT}: the first request starts a run in your account, kept for ${idleTimeout}`;
 }
 
-/** `# Server interface`, the header, then `Operations (2):` with one `formatOperationLine` per operation. */
+/** The `serverInterface: true` output; see {@link buildServerInterfaceSection}. */
 function buildOperationList(operations: ServerOperation[], schema: Record<string, unknown>, header: string): string {
     const lines = operations.map((operation) => formatOperationLine(operation, schema)).join('\n');
     return `# Server interface\n${header}Operations (${operations.length}):\n${lines}\noutput.serverInterface: "METHOD /path" details one operation.`;
 }
 
-/**
- * `# Server interface: GET /search`, the summary, the header, then the operation's description, parameters,
- * request body and responses as JSON with local references resolved.
- */
+/** The `serverInterface: "METHOD /path"` output; see {@link buildServerInterfaceSection}. */
 function buildOperationDetail(
     { method, path, operation }: ServerOperation,
     schema: Record<string, unknown>,
@@ -125,14 +122,64 @@ function buildOperationDetail(
     return `# Server interface: ${method} ${path}${title}\n${header}${wrapJsonText(detail)}`;
 }
 
+function formatUndocumented(tenancy: string): string {
+    return `Server interface: enabled, ${tenancy}, undocumented: no API schema. See the README.`;
+}
+
 /**
- * The default summary, an operation list, or one operation with its local references resolved. The base URL
- * is the Actor's assigned `standbyUrl`, never the document's `servers` value.
+ * The one line the default output (no `output` given) carries for a Server Actor; `undefined` for any other Actor.
+ * For a single-tenant Server Actor documenting `GET /search` and `GET /status`:
+ * ```
+ * Server interface: enabled, single-tenant, 2 documented operations. output.serverInterface: true lists them, "METHOD /path" details one.
+ * ```
+ * Without an API schema: `Server interface: enabled, single-tenant, undocumented: no API schema. See the README.`
+ */
+export function buildServerInterfaceSummary({
+    actor,
+    schema = {},
+}: Pick<ServerInterfaceSectionParams, 'actor' | 'schema'>): string | undefined {
+    if (actor.actorStandby?.isEnabled !== true) return undefined;
+    const tenancy = resolveActorTenancy(actor);
+    const operations = listServerOperations(schema);
+    if (operations.length === 0) return formatUndocumented(tenancy);
+    const count = `${operations.length} documented operation${operations.length === 1 ? '' : 's'}`;
+    return `Server interface: enabled, ${tenancy}, ${count}. ${EXPAND_HINT}`;
+}
+
+/**
+ * The section `output.serverInterface` asks for: an operation list, or one operation with its local references
+ * resolved. The base URL is the Actor's assigned `standbyUrl`, never the document's `servers` value.
  *
- * By `serverInterface`:
- * - `false` → `Server interface: enabled, multi-tenant, 2 documented operations. output.serverInterface: …`
- * - `true` → the operation list (`buildOperationList`)
- * - `'GET /search'` → that operation's detail (`buildOperationDetail`); an undocumented one is an error
+ * Output for a single-tenant Server Actor documenting `GET /search` and `GET /status`:
+ *
+ * `serverInterface: true`:
+ * ```
+ * # Server interface
+ * single-tenant: the first request starts a run in your account, kept for its idle timeout of 300 s.
+ * Base URL: https://search.apify.actor
+ * Requests go through send-server-actor-request.
+ * Operations (2):
+ * - GET /search: Search the web. Required: q.
+ * - GET /status: Return the server status
+ * output.serverInterface: "METHOD /path" details one operation.
+ * ```
+ *
+ * `serverInterface: 'GET /search'`:
+ * ````
+ * # Server interface: GET /search
+ * Search the web
+ * single-tenant: the first request starts a run in your account, kept for its idle timeout of 300 s.
+ * Base URL: https://search.apify.actor
+ * Requests go through send-server-actor-request.
+ * ```json
+ * {"parameters":[{"name":"q","in":"query","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"Search results."}}}
+ * ```
+ * ````
+ *
+ * Other cases:
+ * - no API schema: `Server interface: enabled, single-tenant, undocumented: no API schema. See the README.`
+ * - not a Server Actor: `Actor 'apify/search' has no server interface.`
+ * - undocumented operation: `{ error: 'Actor \'apify/search\' has no operation "GET /nope". Documented operations: GET /search, GET /status.' }`
  */
 export function buildServerInterfaceSection({
     actor,
@@ -141,19 +188,10 @@ export function buildServerInterfaceSection({
     serverInterface,
     loadedToolNames,
     hasPaymentProvider,
-}: ServerInterfaceSectionParams): { text: string } | { error: string } | undefined {
-    if (actor.actorStandby?.isEnabled !== true) {
-        return serverInterface === false ? undefined : { text: `Actor '${actorFullName}' has no server interface.` };
-    }
-    const tenancy = resolveActorTenancy(actor);
+}: ServerInterfaceSectionParams): { text: string } | { error: string } {
+    if (actor.actorStandby?.isEnabled !== true) return { text: `Actor '${actorFullName}' has no server interface.` };
     const operations = listServerOperations(schema);
-    if (operations.length === 0) {
-        return { text: `Server interface: enabled, ${tenancy}, undocumented: no API schema. See the README.` };
-    }
-    if (serverInterface === false) {
-        const count = `${operations.length} documented operation${operations.length === 1 ? '' : 's'}`;
-        return { text: `Server interface: enabled, ${tenancy}, ${count}. ${EXPAND_HINT}` };
-    }
+    if (operations.length === 0) return { text: formatUndocumented(resolveActorTenancy(actor)) };
     const baseUrl = `Base URL: ${actor.standbyUrl ?? 'not configured'}\n`;
     const sendTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)
         ? `Requests go through ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}.\n`
