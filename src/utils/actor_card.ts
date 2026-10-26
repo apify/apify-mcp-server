@@ -132,7 +132,6 @@ function extractActorData(actor: Actor | ActorStoreList, options: ActorCardOptio
         isDeprecated: false,
     };
 
-    // Extract stats — each field checked independently to match original markdown behavior
     if (options.includeStats && 'stats' in actor) {
         const { stats } = actor;
 
