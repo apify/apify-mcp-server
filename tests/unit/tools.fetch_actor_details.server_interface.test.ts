@@ -515,7 +515,10 @@ describe('rendering the server-interface section', () => {
 });
 
 describe('fetching details of a Server Actor', () => {
-    const call = async (output?: Record<string, unknown>) => {
+    const call = async (
+        output?: Record<string, unknown>,
+        loadedToolNames: string[] = [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.ACTOR_SERVER_REQUEST],
+    ) => {
         const { apifyClient } = mockActorBuildClient({
             actor: mockActor({ id: 'server-actor-id', name: 'server-actor-test', username: 'apify', ...serverActor() }),
             defaultBuild: mockDefaultBuild({ webServerSchema: SCHEMA }),
@@ -528,7 +531,7 @@ describe('fetching details of a Server Actor', () => {
             }),
         });
         const context = stubToolCallContext({ actor: ACTOR_FULL_NAME, ...(output && { output }) }, client, {
-            loadedToolNames: [HELPER_TOOLS.ACTOR_CALL],
+            loadedToolNames,
         });
         context.apifyToken = '';
         return buildFetchActorDetailsResult(context);
@@ -552,6 +555,13 @@ describe('fetching details of a Server Actor', () => {
             'Server interface: enabled, single-tenant, 3 documented operations: GET /add, POST /add, GET /empty.',
         );
         expect((result.structuredContent as { serverInterface?: string }).serverInterface).toBe(texts.at(-1));
+    });
+
+    it('leaves the summary line out when the session cannot send requests', async () => {
+        const result = await call(undefined, [HELPER_TOOLS.ACTOR_CALL]);
+
+        expect(JSON.stringify(result.content)).not.toContain('Server interface:');
+        expect((result.structuredContent as { serverInterface?: string }).serverInterface).toBeUndefined();
     });
 
     it('returns the selection error for an unknown operation', async () => {

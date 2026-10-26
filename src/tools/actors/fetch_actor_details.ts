@@ -131,7 +131,11 @@ find it with ${HELPER_TOOLS.STORE_SEARCH} first.`
     }
 
 Use 'output' to control returned information:
-- Default: all fields except outputSchema, mcpTools and serverInterface. Server Actors always get a one-line server interface summary unless serverInterface is set.
+- Default: all fields except outputSchema, mcpTools and serverInterface.${
+        hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST)
+            ? ' Server Actors always get a one-line server interface summary unless serverInterface is set.'
+            : ''
+    }
 - Selective: set only the fields you need to true, e.g. output: { inputSchema: true }
 - Common patterns: inputSchema only, description + readme, mcpTools for MCP Actors, serverInterface: true (full API schema when it fits, operation navigation otherwise), "GET /search" (operation excerpt), or "#/components/schemas/Name" (referenced schema node) for Server Actors
 
@@ -307,7 +311,8 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         });
         if ('error' in section) return respondUserError(section.error);
         serverInterfaceMessage = section.text;
-    } else {
+    } else if (loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)) {
+        // Without the send tool, the summary would point the agent at an interface it cannot call.
         serverInterfaceMessage = buildServerInterfaceSummary(serverInterfaceParams);
     }
 

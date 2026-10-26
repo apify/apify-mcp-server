@@ -1091,7 +1091,7 @@ export const actorsCases: Case[] = [
     {
         name: 'sends a JSON body to a Server Actor and returns its JSON response as text',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors'] }, async (client) => {
+        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
             const { result, sc } = await sendServerActorRequest(client, {
                 method: 'POST',
                 path: '/add',
@@ -1114,7 +1114,7 @@ export const actorsCases: Case[] = [
         // The fixture answers asText=1 with a 400, so this pins the true/false encoding.
         name: 'sends a query boolean to a Server Actor as true and returns its text response',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors'] }, async (client) => {
+        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
             const { sc } = await sendServerActorRequest(client, {
                 method: 'GET',
                 path: '/add',
@@ -1129,7 +1129,7 @@ export const actorsCases: Case[] = [
     {
         name: 'returns a Server Actor error body with its status as an error',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors'] }, async (client) => {
+        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
             const { result, sc } = await sendServerActorRequest(client, { method: 'GET', path: '/status/404' });
 
             expect(result.isError).toBe(true);
@@ -1140,7 +1140,7 @@ export const actorsCases: Case[] = [
     {
         name: 'returns an empty body for a 204 from a Server Actor',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors'] }, async (client) => {
+        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
             const { result, sc } = await sendServerActorRequest(client, { method: 'GET', path: '/empty' });
 
             expect(result.isError).not.toBe(true);
@@ -1151,7 +1151,7 @@ export const actorsCases: Case[] = [
     {
         name: 'rejects a binary Server Actor response by its content type',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors'] }, async (client) => {
+        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
             const { result, text } = await sendServerActorRequest(client, { method: 'GET', path: '/binary' });
 
             expect(result.isError).toBe(true);
@@ -1161,7 +1161,7 @@ export const actorsCases: Case[] = [
     {
         name: 'returns a Server Actor redirect with its location without following it',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors'] }, async (client) => {
+        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
             const { result, sc } = await sendServerActorRequest(client, { method: 'GET', path: '/redirect' });
 
             expect(result.isError).not.toBe(true);
@@ -1171,7 +1171,7 @@ export const actorsCases: Case[] = [
     {
         name: 'returns a Server Actor body of exactly the inline limit and rejects one byte more, compressed too',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors'] }, async (client) => {
+        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
             const exact = await sendServerActorRequest(client, {
                 method: 'GET',
                 path: '/bytes',
@@ -1199,7 +1199,7 @@ export const actorsCases: Case[] = [
         // The router strips the Authorization header, so the token travels in the body the fixture echoes.
         name: 'masks the session token a Server Actor echoes',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors'] }, async (client) => {
+        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
             const token = resolveToken()!;
             const { result, sc } = await sendServerActorRequest(client, {
                 method: 'POST',
@@ -1216,7 +1216,7 @@ export const actorsCases: Case[] = [
         name: 'returns nothing for a Server Actor request the client cancels',
         isDeploymentTest: false,
         skipIf: skipUnlessStdio,
-        run: withClient({ tools: ['actors'] }, async (client) => {
+        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
             const controller = new AbortController();
             setTimeout(() => controller.abort(), 1_000);
 
@@ -1242,7 +1242,7 @@ export const actorsCases: Case[] = [
         isDeploymentTest: false,
         skipIf: skipUnlessStdio,
         timeout: 150_000,
-        run: withClient({ tools: ['actors'] }, async (client) => {
+        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
             const result = await (client as ClientV1).callTool(
                 {
                     name: 'send-server-actor-request',
@@ -1264,7 +1264,7 @@ export const actorsCases: Case[] = [
     {
         name: 'summarizes a Server Actor interface in the default fetch-actor-details output',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors'] }, async (client) => {
+        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
             const result = await client.callTool({
                 name: 'fetch-actor-details',
                 arguments: { actor: ACTOR_SERVER_ACTOR_TEST },
@@ -1278,7 +1278,7 @@ export const actorsCases: Case[] = [
     {
         name: 'returns a Server Actor full schema with operation and reference navigation',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors'] }, async (client) => {
+        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
             const list = await client.callTool({
                 name: 'fetch-actor-details',
                 arguments: { actor: ACTOR_SERVER_ACTOR_TEST, output: { serverInterface: true } },
@@ -1324,7 +1324,7 @@ export const actorsCases: Case[] = [
     {
         name: 'says an Actor without a server interface has none when fetch-actor-details is asked for it',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors'] }, async (client) => {
+        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
             const result = await client.callTool({
                 name: 'fetch-actor-details',
                 arguments: { actor: ACTOR_NORMAL_MODE, output: { serverInterface: true } },

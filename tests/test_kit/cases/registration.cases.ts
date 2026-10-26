@@ -84,12 +84,7 @@ export const registrationCases: Case[] = [
             const names = getToolNames(tools);
 
             // Equivalent to tools=actors,docs,apify/rag-web-browser,apify/web-fetch (no widgets outside apps).
-            const expectedActorsTools = [
-                'fetch-actor-details',
-                'search-actors',
-                'call-actor',
-                'send-server-actor-request',
-            ];
+            const expectedActorsTools = ['fetch-actor-details', 'search-actors', 'call-actor'];
             const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
             const expectedActors = [
                 actorNameToToolName('apify/rag-web-browser'),

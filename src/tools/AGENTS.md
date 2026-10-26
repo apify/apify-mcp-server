@@ -11,7 +11,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 ## Files
 
 - `registry.ts` — tool categories and the tools in each (`index.ts` re-exports them), plus tools in no
-  category (`ALL_WIDGET_TOOLS`, `UNCATEGORIZED_TOOLS`).
+  category (`ALL_WIDGET_TOOLS`, `UNCATEGORIZED_TOOLS`; `send-server-actor-request` is there until it is enabled by
+  default).
 - `structured_output_schemas.ts` — shared JSON-schema definitions for structured
   output across tools.
 - `utils.ts` — shared tool helpers (schema property shaping, AJV compile).
@@ -32,7 +33,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     can call in the publisher's schema; `webServerOperations` caches each operation with its required inputs, which
     the send tool lists after a 400/404/405/422),
     `server_interface_schema.ts` (the server-interface section of `fetch-actor-details`: the one-line summary
-    shown unless `output.serverInterface` is set, the operation list with tenancy and a `send-server-actor-request`
+    shown unless `output.serverInterface` is set, only in sessions that have `send-server-actor-request`, the operation list with tenancy and a `send-server-actor-request`
     call (the Actor's `standbyUrl` when that tool is absent) and the complete creator-written API schema unchanged
     for `output.serverInterface: true`. If the full section exceeds `MAX_INLINE_BYTES` UTF-8 bytes, the operation
     list remains with an explicit omission notice. `"METHOD /path"` returns an operation excerpt with inherited
