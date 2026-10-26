@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
-import { type RunResponse, WIDGET_NO_POLL_NEXT_STEP } from '../../src/tools/actors/actor_run_response.js';
+import type { RunResponse } from '../../src/tools/actors/actor_run_response.js';
 import { getActorRun } from '../../src/tools/runs/get_actor_run.js';
 import { getActorRunWidget } from '../../src/tools/widgets/get_actor_run_widget.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -82,17 +82,16 @@ describe('get-actor-run-widget response', () => {
         });
     });
 
-    it('keeps the get-actor-run nextStep for a run that has ended', async () => {
+    it.each(['FAILED', 'SUCCEEDED'])('keeps the get-actor-run nextStep for a %s run', async (status) => {
         // The no-poll text says the run is in progress, which is false once the run has ended.
-        const failedRun = { ...MOCK_RUN_RUNNING, status: 'FAILED', exitCode: 91 };
+        const endedRun = { ...MOCK_RUN_RUNNING, status };
         const widget = (await (getActorRunWidget as HelperTool).call(
-            stubToolCallContext({ runId: 'run-widget-1' }, stubApifyClient(failedRun)),
+            stubToolCallContext({ runId: 'run-widget-1' }, stubApifyClient(endedRun)),
         )) as { structuredContent: RunResponse };
         const plain = (await (getActorRun as HelperTool).call(
-            stubToolCallContext({ runId: 'run-widget-1', waitSecs: 0 }, stubApifyClient(failedRun)),
+            stubToolCallContext({ runId: 'run-widget-1', waitSecs: 0 }, stubApifyClient(endedRun)),
         )) as { structuredContent: RunResponse };
 
-        expect(widget.structuredContent.nextStep).not.toBe(WIDGET_NO_POLL_NEXT_STEP);
         expect(widget.structuredContent.nextStep).toBe(plain.structuredContent.nextStep);
     });
 
