@@ -476,22 +476,37 @@ async function actorNameForActorId(
     }
 }
 
+/** Sentinel the run log timeout resolves with. */
+const LOG_TIMEOUT = Symbol('LOG_TIMEOUT');
+
 /**
- * Fetch the end of the run log. apify-client has no bounded read, so the whole log downloads; the wait
- * is capped instead. A timeout, a failure, or an empty log logs and yields undefined so the response
+ * Fetch the end of the run log. apify-client has no bounded read, so the whole log downloads; only
+ * the wait is capped, and after a timeout the download (with client retries) goes on in the
+ * background. A timeout, a cancelled call, a failure, or a blank log yields undefined so the response
  * omits `logTail`. The timer is the global `setTimeout`, not `node:timers/promises`, so fake timers
  * in tests can drive it.
  */
-async function fetchRunLogTail(client: ApifyClient, runId: string, mcpSessionId?: string): Promise<string | undefined> {
+async function fetchRunLogTail(params: {
+    client: ApifyClient;
+    runId: string;
+    abortSignal?: AbortSignal;
+    mcpSessionId?: string;
+}): Promise<string | undefined> {
+    const { client, runId, abortSignal, mcpSessionId } = params;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<undefined>((resolve) => {
-        timer = setTimeout(() => resolve(undefined), RUN_LOG_TAIL_TIMEOUT_MS);
+    const timeout = new Promise<typeof LOG_TIMEOUT>((resolve) => {
+        timer = setTimeout(() => resolve(LOG_TIMEOUT), RUN_LOG_TAIL_TIMEOUT_MS);
     });
     try {
-        const runLog = await Promise.race([client.run(runId).log().get(), timeout]);
+        const runLog = await raceAbort(Promise.race([client.run(runId).log().get(), timeout]), abortSignal);
+        if (runLog === ABORT) return undefined;
+        if (runLog === LOG_TIMEOUT) {
+            log.warning('Run log read timed out', { runId, mcpSessionId, timeoutMs: RUN_LOG_TAIL_TIMEOUT_MS });
+            return undefined;
+        }
         const logTail = runLog ? buildLogTail(runLog, client.token) : '';
-        if (logTail) return logTail;
-        log.warning('Run log tail unavailable', { runId, mcpSessionId });
+        if (logTail.trim()) return logTail;
+        log.warning('Run log is missing or blank', { runId, mcpSessionId });
     } catch (error) {
         log.warning('Failed to fetch run log tail', { runId, mcpSessionId, errMessage: errMessage(error) });
     } finally {
@@ -1037,7 +1052,7 @@ export async function fetchActorRunData(params: {
             const keys = isTerminal ? await fetchKvKeys(client, id, mcpSessionId) : null;
             return buildRunKeyValueStore(id, keys);
         }),
-        shouldFetchLogTail ? fetchRunLogTail(client, run.id, mcpSessionId) : undefined,
+        shouldFetchLogTail ? fetchRunLogTail({ client, runId: run.id, abortSignal, mcpSessionId }) : undefined,
     ]);
 
     // Narrative summarizes the default storages only; aliases are surfaced in structured output.

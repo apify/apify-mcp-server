@@ -1084,6 +1084,38 @@ describe('a FAILED run with no status message carries the end of its log', () =>
         }
     });
 
+    it.each([undefined, '', ' \n  \n'])('omits the log tail when the log is %j', async (emptyLog) => {
+        const result = await callGetActorRun(stubClient({ run: failedRun(), getRunLog: async () => emptyLog }));
+
+        expect(result.structuredContent.logTail).toBeUndefined();
+        expect(result.structuredContent.nextStep).toContain('The run log has the error details');
+    });
+
+    it('does not wait for the log when the call is cancelled', async () => {
+        // Fake timers are never advanced: without the abort race, the call would wait for the timeout forever.
+        vi.useFakeTimers();
+        try {
+            const controller = new AbortController();
+            const client = stubClient({
+                run: failedRun(),
+                getRunLog: async () => {
+                    controller.abort();
+                    return new Promise<string>(() => {});
+                },
+            });
+            const context = {
+                ...stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
+                signal: controller.signal,
+            };
+
+            const result = (await (getActorRun as HelperTool).call(context)) as { structuredContent?: RunResponse };
+
+            expect(result.structuredContent?.logTail).toBeUndefined();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it.each([
         ['FAILED with a status message', { status: 'FAILED', statusMessage: 'Input URL is not valid.' }],
         ['SUCCEEDED', {}],
