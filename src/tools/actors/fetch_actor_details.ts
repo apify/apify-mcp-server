@@ -266,10 +266,9 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_GET_DETAILS });
 
     const resolvedOutput = resolveOutputOptions(parsed.output);
-    // Skip the /users/me round-trip when pricing isn't rendered (e.g. inputSchema-only
-    // requests). In that case `userTier` is only used to fill the
-    // placeholder `{ model: 'FREE', userTier }` in the structured card, where it's never
-    // read, so defaulting to 'FREE' is safe and saves a request.
+    // Skip the /users/me round-trip when pricing isn't rendered (e.g. inputSchema-only requests). In that case
+    // `userTier` is only used to fill the placeholder `{ model: 'FREE', userTier }` in the structured card, where
+    // it's never read, so defaulting to 'FREE' is safe and saves a request.
     const userPlanTier = resolvedOutput.pricing
         ? (await getUserInfoCached(apifyToken, apifyClient)).userPlanTier
         : 'FREE';

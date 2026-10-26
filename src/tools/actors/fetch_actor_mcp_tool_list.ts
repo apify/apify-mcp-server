@@ -1,10 +1,9 @@
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
-import { ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, ListToolsResultSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
 import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
-import { TimeoutError } from '../../errors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
@@ -51,22 +50,19 @@ export async function executeFetchActorMcpToolList(toolArgs: InternalToolArgs): 
     return runOnActorMcpServer(toolArgs, {
         actor,
         operation: 'list the MCP tools',
-        // Follows `nextCursor` within one external tool-call timeout for all pages; a failed page fails the listing.
         // Not `client.listTools`: it compiles every remote output schema, so one that does not compile would fail it.
         run: async (client) => {
             const tools: Tool[] = [];
             let cursor: string | undefined;
             const deadline = Date.now() + EXTERNAL_TOOL_CALL_TIMEOUT_MSEC;
             for (let page = 0; page < MAX_TOOL_LIST_PAGES; page++) {
-                const timeout = deadline - Date.now();
-                // An expired SDK timer can lose to an immediate response; see apify/apify-mcp-server#1644.
-                if (timeout <= 0) throw new TimeoutError('MCP tool listing timed out');
                 const result = await client.request(
                     { method: 'tools/list', params: cursor === undefined ? undefined : { cursor } },
                     ListToolsResultSchema,
-                    { timeout, signal: toolArgs.signal },
+                    { timeout: deadline - Date.now(), signal: toolArgs.signal },
                 );
-                if (Date.now() >= deadline) throw new TimeoutError('MCP tool listing timed out');
+                // The SDK's expired timer can lose to an immediate response, so the deadline is checked here too.
+                if (Date.now() >= deadline) throw new McpError(ErrorCode.RequestTimeout, 'Request timed out');
                 tools.push(...result.tools);
                 cursor = result.nextCursor;
                 if (cursor === undefined) return buildToolListResponse(tools);
@@ -88,11 +84,11 @@ export const fetchActorMcpToolList: ToolEntry = Object.freeze({
     inputSchema: z.toJSONSchema(fetchActorMcpToolListArgs) as ToolInputSchema,
     outputSchema: actorMcpToolListOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(fetchActorMcpToolListArgs)),
-    // A third-party payment provider cannot pay for a standby run, so such a session is rejected before the call.
+    // A third-party payment provider cannot pay for a Server Actor run, so such a session is rejected before the call.
     hasPaymentProviderStandbyCheck: true,
     annotations: {
         title: 'Fetch Actor MCP tool list',
-        // Each call can start or charge a standby run, so it is neither read-only nor idempotent.
+        // Each call can start or charge a Server Actor run, so it is neither read-only nor idempotent.
         readOnlyHint: false,
         destructiveHint: false,
         idempotentHint: false,

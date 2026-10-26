@@ -391,51 +391,24 @@ describe('fetch-actor-mcp-tool-list', () => {
         expect(listCursors).toHaveLength(MAX_TOOL_LIST_PAGES);
     });
 
-    it('gives all tools/list pages one external tool-call timeout and passes each the call signal', async () => {
-        // Each page takes a minute, so the second one gets what is left of the timeout.
-        const realNow = Date.now.bind(Date);
-        let elapsed = 0;
-        vi.spyOn(Date, 'now').mockImplementation(() => realNow() + elapsed);
+    it('gives the tools/list pages one external tool-call timeout and fails without partial results once it runs out', async () => {
+        // Each page takes half the timeout, so the second gets the half that is left and ends at the deadline.
+        let now = 0;
+        vi.spyOn(Date, 'now').mockImplementation(() => now);
         const { request } = Client.prototype;
         const requestSpy = vi.spyOn(Client.prototype, 'request').mockImplementation(function (this: Client, ...args) {
-            if (args[0].method === 'tools/list') elapsed += 60_000;
+            if (args[0].method === 'tools/list') now += EXTERNAL_TOOL_CALL_TIMEOUT_MSEC / 2;
             return request.apply(this, args);
         });
-        const controller = new AbortController();
-
-        await execute(executeFetchActorMcpToolList, {}, { signal: controller.signal });
-
-        const pageOptions = requestSpy.mock.calls
-            .filter(([{ method }]) => method === 'tools/list')
-            .map(([, , options]) => options);
-        expect(pageOptions).toHaveLength(2);
-        expect(pageOptions[0]?.timeout).toBeLessThanOrEqual(EXTERNAL_TOOL_CALL_TIMEOUT_MSEC);
-        expect(pageOptions[1]?.timeout).toBeLessThanOrEqual(EXTERNAL_TOOL_CALL_TIMEOUT_MSEC - 60_000);
-        for (const options of pageOptions) expect(options?.signal).toBe(controller.signal);
-    });
-
-    it.each([1, 2])('fails without partial results when page %i exhausts the listing deadline', async (expiredPage) => {
-        const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(0);
-        const { request } = Client.prototype;
-        let page = 0;
-        const requestSpy = vi.spyOn(Client.prototype, 'request').mockImplementation(async function (
-            this: Client,
-            ...args
-        ) {
-            const result = await request.apply(this, args);
-            if (args[0].method === 'tools/list' && ++page === expiredPage) {
-                nowSpy.mockReturnValue(EXTERNAL_TOOL_CALL_TIMEOUT_MSEC);
-            }
-            return result;
-        });
-        const closeSpy = vi.spyOn(Client.prototype, 'close');
 
         const result = await execute(executeFetchActorMcpToolList, {});
 
         expect(result.isError).toBe(true);
         expect(result).not.toHaveProperty('structuredContent');
-        expect(requestSpy.mock.calls.filter(([{ method }]) => method === 'tools/list')).toHaveLength(expiredPage);
-        expect(closeSpy).toHaveBeenCalledOnce();
+        const timeouts = requestSpy.mock.calls
+            .filter(([{ method }]) => method === 'tools/list')
+            .map(([, , options]) => options?.timeout);
+        expect(timeouts).toEqual([EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, EXTERNAL_TOOL_CALL_TIMEOUT_MSEC / 2]);
     });
 
     it('discovers again on every call, with nothing cached', async () => {

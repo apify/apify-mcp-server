@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import * as mcpClient from '../../src/mcp/client.js';
@@ -121,6 +121,10 @@ describe('buildFetchActorDetailsResult()', () => {
         vi.mocked(fetchActorDetails).mockResolvedValue(MOCK_DETAILS);
     });
 
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
     // pricing: false → the users/me lookup is needed only for Console UI tokens.
     // call-actor loaded so these unrelated assertions aren't perturbed by the not-runnable guidance.
     const callWithToken = async (apifyToken: string) => {
@@ -154,7 +158,6 @@ describe('buildFetchActorDetailsResult()', () => {
         );
 
         expect(connectSpy).not.toHaveBeenCalled();
-        connectSpy.mockRestore();
     });
 
     it('skips the users/me lookup for API tokens when pricing is not rendered', async () => {
