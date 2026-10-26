@@ -1,12 +1,8 @@
 <p align="center">
     <a href="https://mcp.apify.com">
-        <picture>
-            <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/apify_mcp_server_dark_background.png">
-            <img alt="Apify MCP server logo" src="https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/apify_mcp_server_white_background.png" width="500">
-        </picture>
+        <img alt="Apify MCP server" src="docs/apify-mcp-server-header.png" width="100%">
     </a>
 </p>
-
 <p align="center">
     <a href="https://www.npmjs.com/package/@apify/actors-mcp-server"><img src="https://img.shields.io/npm/v/@apify/actors-mcp-server.svg" alt="npm version"></a>
     <a href="https://www.npmjs.com/package/@apify/actors-mcp-server"><img src="https://img.shields.io/npm/dm/@apify/actors-mcp-server.svg" alt="npm downloads"></a>
