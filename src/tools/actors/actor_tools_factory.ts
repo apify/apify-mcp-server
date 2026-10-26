@@ -408,7 +408,7 @@ export async function getActorsAsTools(
         const toolMode = resolveActorToolMode(actorInfo);
         if (toolMode === ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP) {
             const error = ActorLoadError.serverActorWithoutMcpNotSupported(actorInfo.definition.actorFullName);
-            log.softFail('Skipping standby Actor with no MCP server and an empty input schema', {
+            log.softFail('Skipping server Actor with no MCP server and an empty input schema', {
                 actorName: actorInfo.definition.actorFullName,
                 mcpSessionId,
                 actorLoadErrorKind: error.kind,

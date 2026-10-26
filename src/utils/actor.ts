@@ -79,7 +79,8 @@ export async function getActorToolResolutionCached(
     const interfaces = resolveActorInterfaces(actorInfo);
     const toolMode = getActorToolModeFromInterfaces(interfaces);
     const { actorFullName } = cached.definition;
-    // `getActorToolModeFromInterfaces` returns MCP only when `webServerMcpPath` is set.
+    // `resolveActorInterfaces` sets `mcp` only when `webServerMcpPath` is set, and `getActorToolModeFromInterfaces`
+    // returns MCP only for `mcp`, so the non-null assertion below holds.
     if (toolMode === ACTOR_TOOL_MODE.MCP) {
         return {
             toolMode,

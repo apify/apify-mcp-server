@@ -218,8 +218,9 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         });
     }
 
-    // The two standby kinds are sanitized, user-facing reasons — forward them verbatim instead of
-    // wrapping them in the generic server-error text. LOAD_FAILED masks a backend fault and stays below.
+    // These two kinds (a server Actor without MCP, and a standby Actor under a payment provider) are sanitized,
+    // user-facing reasons: forward them verbatim instead of wrapping them in the generic server-error text.
+    // LOAD_FAILED masks a backend fault and stays below.
     if (
         error instanceof ActorLoadError &&
         (error.kind === ACTOR_LOAD_ERROR_KIND.SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED ||
