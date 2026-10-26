@@ -249,13 +249,13 @@ describe('resolveLocalRefs()', () => {
             },
         });
         expect(resolveLocalRefs({ schema: { $ref: '#/components/schemas/Missing', maxLength: 10 } }, spec)).toEqual({
-            schema: { $ref: '#/components/schemas/Missing', maxLength: 10, unavailableDetail: 'reference not found' },
+            schema: { $ref: '#/components/schemas/Missing', maxLength: 10, unavailableDetail: 'reference unavailable' },
         });
         expect(resolveLocalRefs({ schema: { $ref: 'https://example.com/schema.json', maxLength: 10 } }, spec)).toEqual({
             schema: {
                 $ref: 'https://example.com/schema.json',
                 maxLength: 10,
-                unavailableDetail: 'external reference, not fetched',
+                unavailableDetail: 'reference unavailable',
             },
         });
     });
@@ -322,8 +322,8 @@ describe('resolveLocalRefs()', () => {
                     next: { $ref: '#/components/schemas/Node', unavailableDetail: 'circular reference' },
                 },
             },
-            { $ref: '#/components/schemas/Missing', unavailableDetail: 'reference not found' },
-            { $ref: 'https://example.com/schema.json#/Thing', unavailableDetail: 'external reference, not fetched' },
+            { $ref: '#/components/schemas/Missing', unavailableDetail: 'reference unavailable' },
+            { $ref: 'https://example.com/schema.json#/Thing', unavailableDetail: 'reference unavailable' },
         ]);
     });
 
@@ -349,10 +349,10 @@ describe('resolveLocalRefs()', () => {
         expect(resolveLocalRefs({ $ref: '#/components/schemas/a~1b' }, root)).toEqual({ type: 'string' });
     });
 
-    it('reports a reference to a name an object only inherits, such as toString, as not found', () => {
+    it('reports a reference to a name an object only inherits, such as toString, as unavailable', () => {
         expect(resolveLocalRefs({ $ref: '#/components/schemas/toString' }, { components: { schemas: {} } })).toEqual({
             $ref: '#/components/schemas/toString',
-            unavailableDetail: 'reference not found',
+            unavailableDetail: 'reference unavailable',
         });
     });
 });

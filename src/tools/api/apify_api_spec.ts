@@ -128,7 +128,7 @@ function mergeRefSiblings(resolved: unknown, siblings: Record<string, unknown>, 
  *
  * For example, with components.schemas.Text = { type: 'string' }:
  * { schema: { $ref: '#/components/schemas/Text' } } → { schema: { type: 'string' } }.
- * A missing target stays { $ref: '#/components/schemas/Missing', unavailableDetail: 'reference not found' }.
+ * A missing target stays { $ref: '#/components/schemas/Missing', unavailableDetail: 'reference unavailable' }.
  */
 export function resolveLocalRefs(node: unknown, spec: unknown, prune?: (value: unknown) => unknown): unknown {
     const hasRefSiblings = isRecord(spec) && typeof spec.openapi === 'string' && /^3\.[1-9]\d*\./.test(spec.openapi);
@@ -167,9 +167,8 @@ export function resolveLocalRefs(node: unknown, spec: unknown, prune?: (value: u
         });
 
         if (seen.includes($ref)) return buildUnavailableReference('circular reference');
-        if (!$ref.startsWith('#/')) return buildUnavailableReference('external reference, not fetched');
         const rawTarget = resolveLocalRef(spec, $ref);
-        if (rawTarget === undefined) return buildUnavailableReference('reference not found');
+        if (rawTarget === undefined) return buildUnavailableReference('reference unavailable');
         const target = prune ? prune(rawTarget) : rawTarget;
 
         // A refused reference leaves the budget for smaller ones.
