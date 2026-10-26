@@ -4,6 +4,7 @@ import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
+import { TimeoutError } from '../../errors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
@@ -57,11 +58,15 @@ export async function executeFetchActorMcpToolList(toolArgs: InternalToolArgs): 
             let cursor: string | undefined;
             const deadline = Date.now() + EXTERNAL_TOOL_CALL_TIMEOUT_MSEC;
             for (let page = 0; page < MAX_TOOL_LIST_PAGES; page++) {
+                const timeout = deadline - Date.now();
+                // An expired SDK timer can lose to an immediate response; see apify/apify-mcp-server#1644.
+                if (timeout <= 0) throw new TimeoutError('MCP tool listing timed out');
                 const result = await client.request(
                     { method: 'tools/list', params: cursor === undefined ? undefined : { cursor } },
                     ListToolsResultSchema,
-                    { timeout: deadline - Date.now(), signal: toolArgs.signal },
+                    { timeout, signal: toolArgs.signal },
                 );
+                if (Date.now() >= deadline) throw new TimeoutError('MCP tool listing timed out');
                 tools.push(...result.tools);
                 cursor = result.nextCursor;
                 if (cursor === undefined) return buildToolListResponse(tools);

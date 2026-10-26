@@ -411,6 +411,30 @@ describe('fetch-actor-mcp-tool-list', () => {
         for (const options of pageOptions) expect(options?.signal).toBe(controller.signal);
     });
 
+    it.each([1, 2])('fails without partial results when page %i exhausts the listing deadline', async (expiredPage) => {
+        const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(0);
+        const { request } = Client.prototype;
+        let page = 0;
+        const requestSpy = vi.spyOn(Client.prototype, 'request').mockImplementation(async function (
+            this: Client,
+            ...args
+        ) {
+            const result = await request.apply(this, args);
+            if (args[0].method === 'tools/list' && ++page === expiredPage) {
+                nowSpy.mockReturnValue(EXTERNAL_TOOL_CALL_TIMEOUT_MSEC);
+            }
+            return result;
+        });
+        const closeSpy = vi.spyOn(Client.prototype, 'close');
+
+        const result = await execute(executeFetchActorMcpToolList, {});
+
+        expect(result.isError).toBe(true);
+        expect(result).not.toHaveProperty('structuredContent');
+        expect(requestSpy.mock.calls.filter(([{ method }]) => method === 'tools/list')).toHaveLength(expiredPage);
+        expect(closeSpy).toHaveBeenCalledOnce();
+    });
+
     it('discovers again on every call, with nothing cached', async () => {
         await execute(executeFetchActorMcpToolList, {});
         await execute(executeFetchActorMcpToolList, {});
