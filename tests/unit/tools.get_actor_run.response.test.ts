@@ -2,22 +2,31 @@ import type { ActorRun } from 'apify-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS, KV_KEYS_LIMIT, TIP_MESSAGE_LIMIT } from '../../src/const.js';
+import { REDACTED } from '../../src/resources/api_resources.js';
 import { ACTOR_TIP_CAVEAT } from '../../src/tools/actor_tool_naming.js';
 import {
     buildStartRunResponse,
     buildStartRunWidgetResponse,
     buildStatusSummaryNextStep,
     collapseArrayIndices,
+    RUN_LOG_TAIL_TIMEOUT_MS,
     type RunDataset,
     type RunKeyValueStore,
     type RunResponse,
 } from '../../src/tools/actors/actor_run_response.js';
 import { getActorRun } from '../../src/tools/runs/get_actor_run.js';
 import { RUN_LOG_LINES_MAX } from '../../src/tools/runs/get_actor_run_log.js';
+import { actorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockApifyClient, mockUserInfo, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import {
+    expectSchemaConformingStructuredContent,
+    mockApifyClient,
+    mockUserInfo,
+    stubToolCallContext,
+    type TextToolResult,
+} from './helpers/tool_context.js';
 
 // Only Console UI token sessions reach the users/me lookup; the default 'test-token'
 // stub never triggers it.
@@ -71,12 +80,15 @@ function stubClient(opts: {
     dataset?: unknown;
     listKeys?: { items: { key: string }[]; isTruncated: boolean; count?: number };
     listItemsProbe?: { items: unknown[]; total?: number };
+    getRunLog?: () => Promise<string | undefined>;
 }): InternalToolArgs['apifyClient'] {
-    const { run, dataset, listKeys, listItemsProbe } = opts;
+    const { run, dataset, listKeys, listItemsProbe, getRunLog = async () => undefined } = opts;
     return mockApifyClient({
+        token: 'test-token',
         run: (_id: string) => ({
             get: async () => run,
             waitForFinish: async () => run,
+            log: () => ({ get: getRunLog }),
         }),
         actor: (_id: string) => ({ get: async () => ACTOR }),
         dataset: (_id: string) => ({
@@ -1016,6 +1028,75 @@ const actorRun = {
     defaultKeyValueStoreId: 'kv-abc',
 } as unknown as ActorRun;
 
+describe('a FAILED run with no status message carries the end of its log', () => {
+    const failedRun = () => mockSucceededRun({ status: 'FAILED', exitCode: 91 });
+    const runLog = [
+        '2026-10-26T14:54:17.514Z Using token test-token',
+        '2026-10-26T14:54:17.631Z   ApifyApiError: Insufficient permissions for the dataset.',
+        '2026-10-26T14:54:17.634Z     statusCode: 403',
+        '',
+    ].join('\n');
+
+    const callGetActorRun = async (client: InternalToolArgs['apifyClient']) =>
+        (await (getActorRun as HelperTool).call(stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client))) as {
+            structuredContent: RunResponse;
+        };
+
+    it('adds the redacted log tail and points nextStep at it', async () => {
+        const result = await callGetActorRun(stubClient({ run: failedRun(), getRunLog: async () => runLog }));
+        const { logTail, nextStep } = result.structuredContent;
+
+        expect(logTail).toContain('ApifyApiError: Insufficient permissions');
+        expect(logTail).toContain(REDACTED);
+        expect(logTail).not.toContain('test-token');
+        expect(nextStep).toContain('logTail');
+        expect(nextStep).toContain(`${HELPER_TOOLS.ACTOR_RUNS_LOG} with runId run-1`);
+        expectSchemaConformingStructuredContent(result, actorRunOutputSchema);
+    });
+
+    it('omits the log tail and keeps the run log nextStep when the log read fails', async () => {
+        const result = await callGetActorRun(
+            stubClient({
+                run: failedRun(),
+                getRunLog: async () => {
+                    throw new Error('socket hang up');
+                },
+            }),
+        );
+
+        expect(result.structuredContent.logTail).toBeUndefined();
+        expect(result.structuredContent.nextStep).toContain('The run log has the error details');
+    });
+
+    it('omits the log tail when the log read does not finish in time', async () => {
+        vi.useFakeTimers();
+        try {
+            const callPromise = callGetActorRun(
+                stubClient({ run: failedRun(), getRunLog: async () => new Promise<string>(() => {}) }),
+            );
+            await vi.advanceTimersByTimeAsync(RUN_LOG_TAIL_TIMEOUT_MS);
+            const result = await callPromise;
+
+            expect(result.structuredContent.logTail).toBeUndefined();
+            expect(result.structuredContent.nextStep).toContain('The run log has the error details');
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it.each([
+        ['FAILED with a status message', { status: 'FAILED', statusMessage: 'Input URL is not valid.' }],
+        ['SUCCEEDED', {}],
+    ])('does not read the log for a run that is %s', async (_name, overrides) => {
+        const getRunLog = vi.fn(async () => runLog);
+
+        const result = await callGetActorRun(stubClient({ run: mockSucceededRun(overrides), getRunLog }));
+
+        expect(getRunLog).not.toHaveBeenCalled();
+        expect(result.structuredContent.logTail).toBeUndefined();
+    });
+});
+
 describe('buildStartRunResponse()', () => {
     it('builds correct RunResponse shape without widget metadata', () => {
         const result = buildStartRunResponse({ loadedToolNames: [], actorName: 'apify/rag-web-browser', actorRun });
@@ -1244,6 +1325,13 @@ describe('buildStatusTemplate', () => {
         });
         expect(t.nextStep).toContain('no status message');
         expect(t.nextStep).toContain('run log');
+        expect(t.nextStep).toContain('the user wants');
+        expect(Object.values(HELPER_TOOLS).filter((name) => t.nextStep.includes(name))).toEqual([]);
+    });
+
+    it('FAILED nextStep points at the log tail without the log tool and names no tool', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('FAILED'), loadedToolNames: [], hasLogTail: true });
+        expect(t.nextStep).toContain('logTail');
         expect(t.nextStep).toContain('the user wants');
         expect(Object.values(HELPER_TOOLS).filter((name) => t.nextStep.includes(name))).toEqual([]);
     });
