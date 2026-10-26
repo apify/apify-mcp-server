@@ -59,8 +59,8 @@ export const actorDetailsOutputOptionsSchema = z.object({
         .union([z.boolean(), z.string()])
         .optional()
         .describe(
-            "true lists a Server Actor's documented HTTP operations with its base URL and tenancy; " +
-                '"METHOD /path" details one operation\'s parameters, request body and responses.',
+            'List HTTP operations (only for Server Actors). true: all operations with base URL and tenancy. ' +
+                '"METHOD /path" (e.g. "GET /search"): one operation\'s parameters, request body and responses.',
         ),
 });
 
@@ -74,7 +74,6 @@ export const actorDetailsOutputDefaults = {
     readme: true,
     outputSchema: false,
     mcpTools: false,
-    /** `true` lists a Server Actor's operations, a `METHOD /path` string details one. */
     serverInterface: false as boolean | string,
     /** The one-line server-interface summary the default output carries for every Server Actor. */
     serverInterfaceSummary: true,
@@ -134,10 +133,9 @@ find it with ${HELPER_TOOLS.STORE_SEARCH} first.`
     }
 
 Use 'output' to control returned information:
-- Default: All fields true except outputSchema, mcpTools, and serverInterface; a Server Actor gets a one-line server interface summary
-- Selective: Set desired fields to true (e.g., output: { inputSchema: true })
+- Default: all fields except outputSchema, mcpTools and serverInterface. Server Actors also get a one-line server interface summary.
+- Selective: set only the fields you need to true, e.g. output: { inputSchema: true }
 - Common patterns: inputSchema only, description + readme, mcpTools for MCP Actors, serverInterface for Server Actors
-- serverInterface: true lists a Server Actor's HTTP operations, "METHOD /path" details one
 
 The 'readme' field returns the summary when available, full README otherwise.
 Use when querying Actor details, documentation, input requirements, or MCP tools.
@@ -145,7 +143,8 @@ Use when querying Actor details, documentation, input requirements, or MCP tools
 EXAMPLES:
 - What does apify/web-fetch do?
 - What is the input schema for apify/web-scraper?
-- What tools does this MCP server Actor provide?`;
+- What tools does this MCP server Actor provide?
+- What HTTP operations does this Server Actor expose?`;
 }
 
 /**
