@@ -120,7 +120,6 @@ export function cloneToolEntry(toolEntry: ToolEntry): ToolEntry {
     const originalAjvValidate = toolEntry.ajvValidate;
     const originalCall = toolEntry.type === TOOL_TYPE.INTERNAL ? toolEntry.call : undefined;
     const originalRedactArgs = toolEntry.type === TOOL_TYPE.INTERNAL ? toolEntry.redactArgs : undefined;
-    const originalRejectArgs = toolEntry.type === TOOL_TYPE.INTERNAL ? toolEntry.rejectArgs : undefined;
     const originalBuildDescription = toolEntry.buildDescription;
 
     // Create a deep copy using JSON serialization (excluding functions)
@@ -138,9 +137,6 @@ export function cloneToolEntry(toolEntry: ToolEntry): ToolEntry {
     }
     if (originalRedactArgs) {
         (cloned as HelperTool).redactArgs = originalRedactArgs;
-    }
-    if (originalRejectArgs) {
-        (cloned as HelperTool).rejectArgs = originalRejectArgs;
     }
     if (originalBuildDescription) {
         cloned.buildDescription = originalBuildDescription;

@@ -75,21 +75,6 @@ export const toolsCases: Case[] = [
         }),
     },
     {
-        name: 'rejects the actor:tool form of call-actor and names call-actor-mcp-tool',
-        isDeploymentTest: false,
-        run: withClient({ tools: ['actors'] }, async (client) => {
-            const response = await client.callTool({
-                name: 'call-actor',
-                arguments: { actor: `${ACTOR_EXAMPLE_MCP_SERVER}:add`, input: { firstNumber: 2, secondNumber: 3 } },
-            });
-
-            const content = response.content as { text: string }[];
-            expect(response.isError).toBe(true);
-            expect(content[0].text).toContain('"actorName:toolName" form is no longer supported');
-            expect(content[0].text).toContain('call-actor-mcp-tool');
-        }),
-    },
-    {
         name: 'should search Apify documentation',
         isDeploymentTest: false,
         run: withClient({ tools: ['docs'] }, async (client) => {

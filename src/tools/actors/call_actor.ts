@@ -372,21 +372,6 @@ export async function checkPaymentProviderStandbyConflict(params: {
     return respondStandbyRejection(error, { mcpSessionId, paymentProviderId: paymentProvider.id });
 }
 
-/** Rejects the removed `actorName:toolName` form of `actor` (#1624); an Actor ID or name never contains a colon. */
-export function rejectMcpToolSyntax(
-    args: Record<string, unknown>,
-    loadedToolNames: readonly string[],
-): ToolResponse | null {
-    if (typeof args.actor !== 'string' || !args.actor.includes(':')) return null;
-    const replacement = loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL)
-        ? ` ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} calls an Actor's MCP tool, with the tool name as its own argument.`
-        : ` An Actor's MCP tools cannot be called in this configuration. To call them, ${getOwnServerRemedy()}`;
-    return respondUserError(
-        `The "actor" argument takes an Actor ID or name; the "actorName:toolName" form is no longer supported.${replacement}`,
-        { detail: 'actor:tool syntax' },
-    );
-}
-
 /** Rejection for an Actor that is an MCP server: its input interface is unused, so a run of it is a mistake. */
 function respondMcpServerActor(actorFullName: string, route: string, loadedToolNames: readonly string[]): ToolResponse {
     const replacement = loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL)
@@ -618,7 +603,6 @@ export const callActor: ToolEntry = Object.freeze({
     ajvValidate: callActorAjvValidate,
     paymentRequired: true,
     hasPaymentProviderStandbyCheck: true,
-    rejectArgs: rejectMcpToolSyntax,
     annotations: {
         title: 'Call Actor',
         readOnlyHint: false,

@@ -251,11 +251,6 @@ export type HelperTool = ToolBase & {
      * arguments; it also sees undeclared keys, so build the copy as an allowlist.
      */
     redactArgs?: (args: Record<string, unknown>) => Record<string, unknown>;
-    /**
-     * Returns a rejection for arguments the tool refuses before the payment checks and any Actor lookup, or
-     * null. It runs in `prepareToolCall` after AJV validation; `loadedToolNames` gates the tools it may name.
-     */
-    rejectArgs?: (args: Record<string, unknown>, loadedToolNames: readonly string[]) => ToolResponse | null;
 };
 
 /**
