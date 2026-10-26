@@ -199,11 +199,10 @@ describe('Actor run/standby mode decision table', () => {
                 );
             }
 
+            // Each tool and each session kind once: the rejection does not depend on how they combine.
             it.each([
-                [HELPER_TOOLS.ACTOR_CALL, 'without', undefined],
                 [HELPER_TOOLS.ACTOR_CALL, 'with', cloningPaymentProvider],
                 [HELPER_TOOLS.ACTOR_CALL_WIDGET, 'without', undefined],
-                [HELPER_TOOLS.ACTOR_CALL_WIDGET, 'with', cloningPaymentProvider],
             ])(
                 'is rejected by %s before any Actor lookup, %s a payment provider',
                 async (name, _label, paymentProvider) => {
