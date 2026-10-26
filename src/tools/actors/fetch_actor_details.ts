@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
 import type {
     ConsoleLinkContext,
     HelperTool,
@@ -59,8 +59,9 @@ export const actorDetailsOutputOptionsSchema = z.object({
         .union([z.boolean(), z.string()])
         .optional()
         .describe(
-            'List HTTP operations (only for Server Actors). true: all operations with base URL and tenancy. ' +
-                '"METHOD /path" (e.g. "GET /search"): one operation\'s parameters, request body and responses.',
+            'Server Actor HTTP API. true: full schema with guidance when it fits; otherwise operation navigation. ' +
+                '"METHOD /path" (e.g. "GET /search"): operation excerpt. "#/...": raw node at a local JSON pointer. ' +
+                `Each section is limited to ${MAX_INLINE_BYTES} UTF-8 bytes including guidance. References are not expanded or fetched.`,
         ),
 });
 
@@ -132,7 +133,7 @@ find it with ${HELPER_TOOLS.STORE_SEARCH} first.`
 Use 'output' to control returned information:
 - Default: all fields except outputSchema, mcpTools and serverInterface. Server Actors always get a one-line server interface summary unless serverInterface is set.
 - Selective: set only the fields you need to true, e.g. output: { inputSchema: true }
-- Common patterns: inputSchema only, description + readme, mcpTools for MCP Actors, serverInterface: true (all operations) or "GET /search" (one operation) for Server Actors
+- Common patterns: inputSchema only, description + readme, mcpTools for MCP Actors, serverInterface: true (full API schema when it fits, operation navigation otherwise), "GET /search" (operation excerpt), or "#/components/schemas/Name" (referenced schema node) for Server Actors
 
 The 'readme' field returns the summary when available, full README otherwise.
 Use when querying Actor details, documentation, input requirements, or MCP tools.

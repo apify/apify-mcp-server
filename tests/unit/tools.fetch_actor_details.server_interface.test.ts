@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { HELPER_TOOLS } from '../../src/const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { buildFetchActorDetailsResult } from '../../src/tools/actors/fetch_actor_details.js';
 import {
     buildServerInterfaceSection,
@@ -16,6 +16,7 @@ const STANDBY_URL = 'https://server-actor-test.apify.actor';
 /** The fixture's schema shapes: parameter, request body and response references, like apify/web-fetch's `FetchRequest`. */
 const SCHEMA: Record<string, unknown> = {
     openapi: '3.0.0',
+    info: { title: 'Server Actor test', version: '1' },
     // The creator's servers are not the base URL.
     servers: [{ url: 'https://example-server-actor.apify.actor' }],
     paths: {
@@ -136,12 +137,14 @@ describe('buildServerInterfaceSection()', () => {
             );
             expect(text).toContain(
                 `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ` +
-                    `{"actor":"${ACTOR_FULL_NAME}","output":{"serverInterface":"GET /add"}} returns one operation's`,
+                    `{"actor":"${ACTOR_FULL_NAME}","output":{"serverInterface":"GET /add"}} returns one operation excerpt`,
             );
             expect(text).toContain('Operations (3):');
             expect(text).toContain('- GET /add: Add two numbers (query). Required: firstNumber.');
             expect(text).toContain('- POST /add: Add two numbers (JSON body). Required: request body.');
             expect(text).toContain('- GET /empty: Return no content\n');
+            const schema = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+            expect(schema).toEqual(SCHEMA);
         });
 
         it('keeps one period after a summary that already ends with one', () => {
@@ -213,9 +216,37 @@ describe('buildServerInterfaceSection()', () => {
             };
 
             expect(textOfSection({ schema, serverInterface: true })).toContain('- GET /search: Search\n');
-            const text = textOfSection({ schema, serverInterface: 'GET /search' });
-            const detail = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
-            expect(detail.parameters).toEqual([{ name: 'q', in: 'query', schema: { type: 'integer' } }]);
+        });
+
+        it('reads required parameters through escaped JSON pointer segments', () => {
+            const schema = {
+                paths: { '/search': { get: { parameters: [{ $ref: '#/components/parameters/Search~1query~0' }] } } },
+                components: {
+                    parameters: { 'Search/query~': { name: 'q', in: 'query', required: true } },
+                },
+            };
+
+            expect(textOfSection({ schema })).toContain('- GET /search Required: q.');
+        });
+
+        it('keeps the list usable when parameter aliases are circular, missing, or external', () => {
+            const schema = {
+                paths: {
+                    '/search': {
+                        get: {
+                            parameters: [
+                                { $ref: '#/components/parameters/Loop' },
+                                { $ref: '#/components/parameters/Missing' },
+                                { $ref: 'https://example.com/parameter.json' },
+                                { name: 'q', in: 'query', required: true },
+                            ],
+                        },
+                    },
+                },
+                components: { parameters: { Loop: { $ref: '#/components/parameters/Loop' } } },
+            };
+
+            expect(textOfSection({ schema })).toContain('- GET /search Required: q.');
         });
 
         it("gives the Actor's standby URL as the base URL instead of the send tool when the session lacks it", () => {
@@ -223,7 +254,7 @@ describe('buildServerInterfaceSection()', () => {
 
             expect(text).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
             expect(text).toContain(`Base URL: ${STANDBY_URL}`);
-            expect(text).not.toContain('example-server-actor');
+            expect(text.slice(0, text.indexOf('```json'))).not.toContain('example-server-actor');
         });
 
         it.each([
@@ -249,7 +280,7 @@ describe('buildServerInterfaceSection()', () => {
     });
 
     describe('one operation', () => {
-        it('renders the parameters with a parameter reference and the responses with a response reference resolved', () => {
+        it('returns the selected operation with raw references and component navigation', () => {
             const text = textOfSection({ serverInterface: 'GET /add' });
 
             expect(text).toContain(`# Server interface of ${ACTOR_FULL_NAME}: GET /add\nAdd two numbers (query)`);
@@ -257,31 +288,38 @@ describe('buildServerInterfaceSection()', () => {
                 `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends this request: ` +
                     `{"actor":"${ACTOR_FULL_NAME}","method":"GET","path":"/add"}`,
             );
-            const detail = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```'))) as {
-                parameters: { name: string }[];
-                responses: Record<string, { content: Record<string, { schema: unknown }> }>;
-            };
-            expect(detail.parameters.map((parameter) => parameter.name)).toEqual(['firstNumber', 'asText']);
-            expect(detail.responses['200'].content['application/json'].schema).toEqual({
-                type: 'object',
-                properties: { sum: { type: 'integer' } },
+            const detail = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+            expect(detail).toEqual({
+                openapi: '3.0.0',
+                operation: {
+                    summary: 'Add two numbers (query)',
+                    parameters: [
+                        { name: 'firstNumber', in: 'query', required: true, schema: { type: 'integer' } },
+                        { $ref: '#/components/parameters/AsText' },
+                    ],
+                    responses: { '200': { $ref: '#/components/responses/Add' } },
+                },
             });
-            expect(text).not.toContain('$ref');
+            expect(text).toContain('Components are omitted');
+            expect(text).toContain('"serverInterface":"#/components/schemas/Name"');
+            expect(text).toContain("schema's servers are not used");
         });
 
-        it('renders the request body with its schema reference resolved, accepting a lower-case method', () => {
+        it('accepts a lower-case method', () => {
             const text = textOfSection({ serverInterface: 'post /add' });
 
             expect(text).toContain(`# Server interface of ${ACTOR_FULL_NAME}: POST /add`);
-            expect(text).toContain('"required":["firstNumber"]');
-            expect(text).not.toContain('/empty');
         });
 
-        it('renders OpenAPI 3.1 schema constraints next to a resolved request-body reference', () => {
+        it('leaves reference siblings, inherited context, examples, and extensions unchanged', () => {
             const schema = {
+                ...SCHEMA,
                 openapi: '3.1.0',
+                jsonSchemaDialect: 'https://json-schema.org/draft/2020-12/schema',
+                security: [{ ActorKey: [] }],
                 paths: {
                     '/search': {
+                        parameters: [{ $ref: '#/components/parameters/Search' }],
                         post: {
                             requestBody: {
                                 content: {
@@ -294,16 +332,149 @@ describe('buildServerInterfaceSection()', () => {
                         },
                     },
                 },
-                components: { schemas: { Text: { type: 'string' } } },
+                components: {
+                    schemas: {
+                        Text: { type: 'string', examples: ['Apify'], 'x-display-name': 'Search text' },
+                        Node: { $ref: '#/components/schemas/Node' },
+                        Missing: { $ref: '#/components/schemas/MissingTarget' },
+                        External: { $ref: 'https://example.com/schema.json' },
+                    },
+                    parameters: { Search: { name: 'q', in: 'query', required: true, schema: { type: 'string' } } },
+                    securitySchemes: { ActorKey: { type: 'apiKey', in: 'header', name: 'X-Actor-Key' } },
+                },
+            };
+            const original = structuredClone(schema);
+
+            const text = textOfSection({ schema, serverInterface: true });
+            const detail = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+            expect(detail).toEqual(original);
+            expect(schema).toEqual(original);
+        });
+
+        it('returns the full schema exactly at the inline byte limit', () => {
+            const schema = { ...SCHEMA, description: '' };
+            const emptyText = textOfSection({ schema, serverInterface: true });
+            schema.description = 'a'.repeat(MAX_INLINE_BYTES - Buffer.byteLength(emptyText));
+
+            const text = textOfSection({ schema, serverInterface: true });
+
+            expect(Buffer.byteLength(text)).toBe(MAX_INLINE_BYTES);
+            expect(text).toContain(JSON.stringify(schema));
+        });
+
+        it('falls back to operation navigation when the full schema exceeds the UTF-8 byte cap', () => {
+            const schema = { ...SCHEMA, description: '漢'.repeat(Math.ceil(MAX_INLINE_BYTES / 3)) };
+
+            const text = textOfSection({ schema, serverInterface: true });
+
+            expect(text).toContain(`Full API schema omitted: exceeds the ${MAX_INLINE_BYTES}-byte limit`);
+            expect(text).toContain('- POST /add');
+            expect(text).toContain('"serverInterface":"GET /add"');
+            expect(text).not.toContain('```json');
+            expect(Buffer.byteLength(text)).toBeLessThanOrEqual(MAX_INLINE_BYTES);
+        });
+
+        it('includes guidance in the byte limit even when the schema alone fits', () => {
+            const schema = { ...SCHEMA, description: '' };
+            const emptyText = textOfSection({ schema, serverInterface: true });
+            schema.description = 'a'.repeat(MAX_INLINE_BYTES - Buffer.byteLength(emptyText) + 1);
+
+            const text = textOfSection({ schema, serverInterface: true });
+
+            expect(Buffer.byteLength(JSON.stringify(schema))).toBeLessThan(MAX_INLINE_BYTES);
+            expect(text).toContain('Full API schema omitted');
+            expect(text).not.toContain('```json');
+        });
+
+        it('keeps an operation navigable when unrelated schema detail is too large', () => {
+            const schema = { ...SCHEMA, description: 'a'.repeat(MAX_INLINE_BYTES) };
+
+            const text = textOfSection({ schema, serverInterface: 'POST /add' });
+            const detail = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+
+            expect(detail.operation.requestBody.content['application/json'].schema).toEqual({
+                $ref: '#/components/schemas/AddRequest',
+            });
+            expect(text).toContain('Components are omitted');
+            expect(text).not.toContain('a'.repeat(100));
+        });
+
+        it('preserves inherited parameters and security context in an operation excerpt', () => {
+            const schema = {
+                openapi: '3.1.0',
+                jsonSchemaDialect: 'https://json-schema.org/draft/2020-12/schema',
+                security: [{ ActorKey: [] }],
+                paths: {
+                    '/search': {
+                        parameters: [{ name: 'q', in: 'query', required: true }],
+                        get: { responses: { '200': { description: 'OK' } } },
+                    },
+                },
             };
 
-            const text = textOfSection({ schema, serverInterface: 'POST /search' });
+            const text = textOfSection({ schema, serverInterface: 'GET /search' });
             const detail = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
-            expect(detail.requestBody.content['application/json'].schema).toEqual({
-                maxLength: 10,
-                allOf: [{ type: 'string' }],
+
+            expect(detail).toEqual({
+                openapi: '3.1.0',
+                jsonSchemaDialect: 'https://json-schema.org/draft/2020-12/schema',
+                security: [{ ActorKey: [] }],
+                operation: {
+                    parameters: [{ name: 'q', in: 'query', required: true }],
+                    responses: { '200': { description: 'OK' } },
+                },
             });
         });
+
+        it('returns a referenced component at its original local JSON pointer', () => {
+            const text = textOfSection({ serverInterface: '#/components/schemas/AddRequest' });
+            const node = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+
+            expect(node).toEqual({
+                type: 'object',
+                properties: { firstNumber: { type: 'integer' } },
+                required: ['firstNumber'],
+            });
+        });
+
+        it('keeps false schema nodes and decodes escaped pointer segments', () => {
+            const schema = { ...SCHEMA, components: { schemas: { 'Forbidden/~': false } } };
+
+            const text = textOfSection({ schema, serverInterface: '#/components/schemas/Forbidden~1~0' });
+            const node = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+
+            expect(node).toBe(false);
+        });
+
+        it('reports a missing pointer target', () => {
+            expect(section({ serverInterface: '#/components/schemas/Missing' })).toEqual({
+                error: expect.stringContaining('no schema node at "#/components/schemas/Missing"'),
+            });
+        });
+
+        it('rejects a selected node that exceeds the byte cap without returning partial JSON', () => {
+            const schema = {
+                ...SCHEMA,
+                components: { schemas: { Huge: { description: 'a'.repeat(MAX_INLINE_BYTES) } } },
+            };
+
+            const result = section({ schema, serverInterface: '#/components/schemas/Huge' });
+
+            expect(result).toMatchObject({ error: expect.stringContaining(`${MAX_INLINE_BYTES}`) });
+            expect(JSON.stringify(result)).not.toContain('```json');
+        });
+
+        it.each([true, 'GET /search'] as const)(
+            'reports an oversized operation list or selected operation for %j',
+            (serverInterface) => {
+                const schema = { paths: { '/search': { get: { summary: 'a'.repeat(MAX_INLINE_BYTES) } } } };
+
+                const result = section({ schema, serverInterface });
+
+                expect(result).toMatchObject({ error: expect.stringContaining(`${MAX_INLINE_BYTES}`) });
+                expect(JSON.stringify(result)).not.toContain('```json');
+            },
+        );
 
         it.each(['GET /nope', 'add'])('returns a selection error listing the operations for %j', (serverInterface) => {
             expect(section({ serverInterface })).toEqual({
@@ -360,5 +531,16 @@ describe('buildFetchActorDetailsResult() with a Server Actor', () => {
 
         expect(result.isError).toBe(true);
         expect(textOf(result.content![0])).toContain('Documented operations: GET /add, POST /add, GET /empty.');
+    });
+
+    it('returns the full schema in text and structuredContent when serverInterface is true', async () => {
+        const result = await call({ serverInterface: true });
+
+        expect(result.isError).not.toBe(true);
+        const texts = (result.content ?? []).map(textOf);
+        const text = texts.at(-1)!;
+        const schema = JSON.parse(text.slice(text.indexOf('```json\n') + 8, text.lastIndexOf('\n```')));
+        expect(schema).toEqual(SCHEMA);
+        expect((result.structuredContent as { serverInterface?: string }).serverInterface).toBe(text);
     });
 });

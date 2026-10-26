@@ -1276,7 +1276,7 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        name: 'lists a Server Actor operations and details one with its references resolved',
+        name: 'returns a Server Actor full schema with operation and reference navigation',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const list = await client.callTool({
@@ -1291,17 +1291,32 @@ export const actorsCases: Case[] = [
                 name: 'fetch-actor-details',
                 arguments: { actor: ACTOR_SERVER_ACTOR_TEST, output: { serverInterface: 'GET /nope' } },
             });
+            const parameter = await client.callTool({
+                name: 'fetch-actor-details',
+                arguments: {
+                    actor: ACTOR_SERVER_ACTOR_TEST,
+                    output: { serverInterface: '#/components/parameters/AsText' },
+                },
+            });
 
             const listText = (list.content as { text: string }[]).map((item) => item.text).join('\n');
             expect(listText).toContain(
                 `send-server-actor-request sends a request to one of them: {"actor":"${ACTOR_SERVER_ACTOR_TEST}"`,
             );
             expect(listText).toContain('- POST /add: Add two numbers (JSON body). Required: request body.');
-            // `asText` comes from `#/components/parameters/AsText`, the sum schema from `#/components/responses/Add`.
+            expect(listText).toContain('"openapi":');
+            expect(listText).toContain('"paths":');
+            expect(listText).toContain('"components":');
             const operationText = (operation.content as { text: string }[]).map((item) => item.text).join('\n');
-            expect(operationText).toContain('"name":"asText"');
-            expect(operationText).toContain('"sum"');
-            expect(operationText).not.toContain('$ref');
+            expect(operation.isError).not.toBe(true);
+            expect(operationText).toContain('"operation":');
+            expect(operationText).toContain('Components are omitted');
+            expect(operationText).toContain('"$ref":"#/components/parameters/AsText"');
+            expect(operationText).toContain('"$ref":"#/components/responses/Add"');
+            expect(parameter.isError).not.toBe(true);
+            expect((parameter.content as { text: string }[]).map((item) => item.text).join('\n')).toContain(
+                '"name":"asText"',
+            );
             expect(unknown.isError).toBe(true);
             expect((unknown.content as { text: string }[])[0].text).toContain('GET /add');
         }),

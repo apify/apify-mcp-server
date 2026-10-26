@@ -32,9 +32,15 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     can call in the publisher's schema),
     `server_interface_schema.ts` (the server-interface section of `fetch-actor-details`: the one-line summary
     shown unless `output.serverInterface` is set, the operation list with tenancy and a `send-server-actor-request` call (the Actor's `standbyUrl` when
-    that tool is absent) for `output.serverInterface: true`, or one operation for `"METHOD /path"`; its private
+    that tool is absent) and the complete creator-written API schema unchanged for `output.serverInterface: true`.
+    If the full section exceeds `MAX_INLINE_BYTES` UTF-8 bytes, the operation list remains with an explicit omission
+    notice. `"METHOD /path"` returns an operation excerpt with inherited parameters and root schema/security context;
+    `"#/..."` returns the raw node at that local JSON pointer, so referenced components can be read separately.
+    A selected node or operation list over the cap returns an explicit error without partial JSON. References,
+    examples, extensions, and the creator's `servers` arrays stay as written; requests use the Actor's assigned URL.
+    References are not expanded or fetched. Its private
     operation reader merges path-level and operation-level parameters by resolved name and location, with operation
-    parameters taking precedence; local `$ref`s are resolved by `resolveLocalRefs` in `api/apify_api_spec.ts`),
+    parameters taking precedence; a local alias-chain lookup reads required inputs without expanding nested schemas),
     `send_server_actor_request.ts` (`send-server-actor-request`: one HTTP request to a Server Actor's API, gated on
     the `server` interface and sent through `sendApifyApiRequest` with raw response
     bytes, no redirects, the `MAX_INLINE_BYTES` cap after decompression and the `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`
@@ -85,12 +91,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     refuses a path whose dot segments climb out of `/v2/`; the index leaves out each operation a rule matches
     (`isEndpointBlocked`), so search, details, the closest-path hints, and the write tool's method
     choice never offer it.
-    `apify_api_spec.ts` builds the operation index from the spec (cached for a day) and owns `resolveLocalRefs`,
-    the one `$ref` resolver (circular, missing or external references, and those past `MAX_INLINE_BYTES` of
-    expanded detail, are kept with a note; nothing is fetched), preserving OpenAPI 3.1 schema siblings as
-    conjunctive constraints and Reference Object summary/description overrides, with `resolveRef` following only
-    top-level local reference chains, also used
-    for Actors' API schemas; search and
+    `apify_api_spec.ts` builds the operation index from the spec (cached for a day); its private dereference helper
+    resolves local references and drops examples and vendor extensions for the Apify API tools. Search and
     details use it, the write tool uses it to choose a method that was not given, and a call uses it
     otherwise only for hints, waiting at most a few seconds, so a failed download does not stop a
     call. `apify_api_request.ts` normalizes the path as the CLI does (`actors`, `v2/actors`, and

@@ -1,9 +1,9 @@
-import { HELPER_TOOLS, SERVER_ACTOR_REQUEST_METHODS } from '../../const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES, SERVER_ACTOR_REQUEST_METHODS } from '../../const.js';
 import type { Actor } from '../../types.js';
 import { ACTOR_TENANCY } from '../../types.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { resolveActorTenancy } from '../actor_tool_naming.js';
-import { isRecord, resolveLocalRefs, resolveRef } from '../api/apify_api_spec.js';
+import { isRecord } from '../api/apify_api_spec.js';
 
 type ServerOperation = { method: string; path: string; operation: Record<string, unknown> };
 
@@ -12,12 +12,36 @@ type ServerInterfaceSectionParams = {
     actorFullName: string;
     /** The server-interface build's API schema; absent when the Actor has none. */
     schema: Record<string, unknown> | undefined;
-    /** `true` lists operations, a `METHOD /path` string details one. */
+    /** `true` returns the full schema when it fits; a string selects an operation or local JSON pointer. */
     serverInterface: true | string;
     loadedToolNames: readonly string[];
     /** An agentic payment provider (x402, Skyfire) cannot pay for an Actor Server request. */
     hasPaymentProvider: boolean;
 };
+
+/** Reads a raw local JSON pointer; own-property checks keep missing targets from resolving through prototypes. */
+function resolveLocalRef(spec: unknown, ref: string): unknown {
+    let node = spec;
+    for (const segment of ref.slice(2).split('/')) {
+        const key = segment.replaceAll('~1', '/').replaceAll('~0', '~');
+        if (typeof node !== 'object' || node === null || !Object.hasOwn(node, key)) return undefined;
+        node = (node as Record<string, unknown>)[key];
+    }
+    return node;
+}
+
+/** Follows local parameter or request-body aliases for the operation list, without expanding nested schemas. */
+function resolveRef(node: unknown, spec: unknown): unknown {
+    const seen = new Set<string>();
+    let resolved = node;
+    while (isRecord(resolved) && typeof resolved.$ref === 'string' && resolved.$ref.startsWith('#/')) {
+        const ref = resolved.$ref;
+        if (seen.has(ref)) return undefined;
+        seen.add(ref);
+        resolved = resolveLocalRef(spec, ref);
+    }
+    return resolved;
+}
 
 /**
  * Operation parameters override path-level parameters by their resolved name and location, e.g.
@@ -115,6 +139,19 @@ function formatDetailsCall(actorFullName: string, serverInterface: true | string
     return `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorFullName, output: { serverInterface } })}`;
 }
 
+function formatSchemaGuidance(actorFullName: string): string {
+    return `References are not expanded or fetched. ${formatDetailsCall(actorFullName, '#/components/schemas/Name')} returns the raw node at a local JSON pointer. The schema's servers are not used.\n`;
+}
+
+function buildSectionResult(text: string, actorFullName: string): { text: string } | { error: string } {
+    if (Buffer.byteLength(text) > MAX_INLINE_BYTES) {
+        return {
+            error: `Actor '${actorFullName}' server-interface output exceeds the ${MAX_INLINE_BYTES}-byte limit and was not returned. A smaller operation or schema node may fit.`,
+        };
+    }
+    return { text };
+}
+
 /** The `serverInterface: true` output; see {@link buildServerInterfaceSection}. */
 function buildOperationList(
     operations: ServerOperation[],
@@ -124,8 +161,8 @@ function buildOperationList(
     const lines = operations.map((operation) => formatOperationLine(operation, schema)).join('\n');
     const send = canSend ? formatSendExample('a request to one of them', actorFullName, operations[0]) : '';
     const { method, path } = operations[0];
-    const details = `${formatDetailsCall(actorFullName, `${method} ${path}`)} returns one operation's parameters, request body and responses.`;
-    return `# Server interface of ${actorFullName}\n${header}Operations (${operations.length}):\n${lines}\n${send}${details}`;
+    const details = `${formatDetailsCall(actorFullName, `${method} ${path}`)} returns one operation excerpt.\n`;
+    return `# Server interface of ${actorFullName}\n${header}Operations (${operations.length}):\n${lines}\n${send}${details}${formatSchemaGuidance(actorFullName)}`;
 }
 
 /** The `serverInterface: "METHOD /path"` output; see {@link buildServerInterfaceSection}. */
@@ -135,11 +172,16 @@ function buildOperationDetail(
     { actorFullName, header, canSend }: SectionContext,
 ): string {
     const { method, path, operation } = serverOperation;
-    const { summary, description, parameters, requestBody, responses } = operation;
-    const detail = resolveLocalRefs({ description, parameters, requestBody, responses }, schema);
-    const title = typeof summary === 'string' ? `\n${summary}` : '';
+    const title = typeof operation.summary === 'string' ? `\n${operation.summary}` : '';
     const send = canSend ? formatSendExample('this request', actorFullName, serverOperation) : '';
-    return `# Server interface of ${actorFullName}: ${method} ${path}${title}\n${header}${send}${wrapJsonText(detail)}`;
+    const detail = {
+        openapi: schema.openapi,
+        jsonSchemaDialect: schema.jsonSchemaDialect,
+        security: schema.security,
+        operation,
+    };
+    const note = `Operation excerpt. Components are omitted.\n${formatSchemaGuidance(actorFullName)}`;
+    return `# Server interface of ${actorFullName}: ${method} ${path}${title}\n${header}${send}${note}${wrapJsonText(detail)}`;
 }
 
 function formatUndocumented(tenancy: string): string {
@@ -176,40 +218,32 @@ export function buildServerInterfaceSummary({
 }
 
 /**
- * The section `output.serverInterface` asks for: an operation list, or one operation with its local references
- * resolved. The base URL is the Actor's assigned `standbyUrl`, never the document's `servers` value.
+ * Server-interface navigation with tenancy and session-gated request guidance:
+ * - `true`: operation list plus the full creator-written schema unchanged when the section fits `MAX_INLINE_BYTES`.
+ *   Otherwise the list remains, with an explicit schema-omission notice.
+ * - `"GET /search"`: one operation excerpt, including inherited parameters and root schema/security context.
+ *   Components are omitted; the excerpt's references can be followed with the pointer form below.
+ * - `"#/components/schemas/Search"`: the raw node at that JSON pointer in the original schema.
  *
- * Output for a single-tenant Server Actor documenting `GET /search` and `GET /status`:
- *
- * `serverInterface: true`:
- * ```
- * # Server interface of apify/search
+ * Example `true` output (schema abbreviated here):
+ * ````
+ * # Server interface of apify/web-search
  * single-tenant: the first request starts a run in your account, kept for its idle timeout of 300 s.
- * Operations (2):
+ * Operations (1):
  * - GET /search: Search the web. Required: q.
- * - GET /status: Return the server status
  * send-server-actor-request sends a request to one of them: {"actor":"apify/search","method":"GET","path":"/search"}
- * fetch-actor-details with {"actor":"apify/search","output":{"serverInterface":"GET /search"}} returns one operation's parameters, request body and responses.
- * ```
- *
- * `serverInterface: 'GET /search'`:
- * ````
- * # Server interface of apify/search: GET /search
- * Search the web
- * single-tenant: the first request starts a run in your account, kept for its idle timeout of 300 s.
- * send-server-actor-request sends this request: {"actor":"apify/search","method":"GET","path":"/search"}
+ * fetch-actor-details with {"actor":"apify/search","output":{"serverInterface":"GET /search"}} returns one operation excerpt.
+ * References are not expanded or fetched. fetch-actor-details with {"actor":"apify/search","output":{"serverInterface":"#/components/schemas/Name"}} returns the raw node at a local JSON pointer. The schema's servers are not used.
+ * Full API schema:
  * ```json
- * {"parameters":[{"name":"q","in":"query","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"Search results."}}}
+ * {"openapi":"3.0.3","info":{"title":"Search","version":"1"},"paths":{"/search":{"get":{"summary":"Search the web","parameters":[{"name":"q","in":"query","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"Search results."}}}}}}
  * ```
  * ````
  *
- * Without the send tool, or with an agentic payment provider (whose notice replaces the tenancy line), the
- * send line is absent and `Base URL: https://search.apify.actor` follows the notice.
- *
- * Other cases:
- * - no API schema: `Server interface: enabled, single-tenant, undocumented: no API schema. See the README.`
- * - not a Server Actor: `Actor 'apify/search' has no server interface.`
- * - undocumented operation: `{ error: 'Actor \'apify/search\' has no operation "GET /nope". Documented operations: GET /search, GET /status.' }`
+ * Without the send tool, or in agentic payment mode (whose notice replaces the tenancy line), the send line is
+ * absent and the Actor's assigned `standbyUrl` is shown as the base URL. Schema `servers` are never used for requests.
+ * Unknown operations/pointers return selection errors. A selected node or operation list over the byte cap returns
+ * a size error without partial JSON. No references are expanded or fetched, and no schema validation is performed.
  */
 export function buildServerInterfaceSection({
     actor,
@@ -229,7 +263,22 @@ export function buildServerInterfaceSection({
     // The send tool adds the host itself; without it, the base URL is how the user reaches the API.
     const baseUrl = canSend ? '' : `Base URL: ${actor.standbyUrl ?? 'not configured'}\n`;
     const context = { actorFullName, header: `${notice}\n${baseUrl}`, canSend };
-    if (serverInterface === true) return { text: buildOperationList(operations, schema, context) };
+    if (serverInterface === true) {
+        const list = buildOperationList(operations, schema, context);
+        const full = `${list}Full API schema:\n${wrapJsonText(schema)}`;
+        const text =
+            Buffer.byteLength(full) <= MAX_INLINE_BYTES
+                ? full
+                : `${list}Full API schema omitted: exceeds the ${MAX_INLINE_BYTES}-byte limit. Operation excerpts and referenced nodes are available through the navigation above.`;
+        return buildSectionResult(text, actorFullName);
+    }
+    if (serverInterface.startsWith('#/')) {
+        const node = resolveLocalRef(schema, serverInterface);
+        if (node === undefined)
+            return { error: `Actor '${actorFullName}' has no schema node at "${serverInterface}".` };
+        const text = `# Server interface of ${actorFullName}: ${serverInterface}\n${context.header}${formatSchemaGuidance(actorFullName)}${wrapJsonText(node)}`;
+        return buildSectionResult(text, actorFullName);
+    }
 
     const match = /^\s*([A-Za-z]+)\s+(\S+)\s*$/.exec(serverInterface);
     const operation = operations.find(({ method, path }) => method === match?.[1].toUpperCase() && path === match[2]);
@@ -239,5 +288,5 @@ export function buildServerInterfaceSection({
             error: `Actor '${actorFullName}' has no operation "${serverInterface}". Documented operations: ${documented}.`,
         };
     }
-    return { text: buildOperationDetail(operation, schema, context) };
+    return buildSectionResult(buildOperationDetail(operation, schema, context), actorFullName);
 }
