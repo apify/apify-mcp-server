@@ -75,8 +75,6 @@ export const actorDetailsOutputDefaults = {
     outputSchema: false,
     mcpTools: false,
     serverInterface: false as boolean | string,
-    /** The one-line server-interface summary the default output carries for every Server Actor. */
-    serverInterfaceSummary: true,
 };
 
 export type ResolvedOutputOptions = typeof actorDetailsOutputDefaults;
@@ -103,7 +101,6 @@ export function resolveOutputOptions(output?: z.infer<typeof actorDetailsOutputO
         outputSchema: output?.outputSchema === true,
         mcpTools: output?.mcpTools === true,
         serverInterface: output?.serverInterface ?? false,
-        serverInterfaceSummary: false,
     };
 }
 
@@ -133,7 +130,7 @@ find it with ${HELPER_TOOLS.STORE_SEARCH} first.`
     }
 
 Use 'output' to control returned information:
-- Default: all fields except outputSchema, mcpTools and serverInterface. Server Actors also get a one-line server interface summary.
+- Default: all fields except outputSchema, mcpTools and serverInterface. Server Actors always get a one-line server interface summary unless serverInterface is set.
 - Selective: set only the fields you need to true, e.g. output: { inputSchema: true }
 - Common patterns: inputSchema only, description + readme, mcpTools for MCP Actors, serverInterface for Server Actors
 
@@ -304,24 +301,22 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         ? await getMcpToolsMessage(actorName, apifyClient, apifyToken, paymentProvider, mcpSessionId)
         : undefined;
     let serverInterfaceMessage: string | undefined;
+    const serverInterfaceParams = {
+        actor: details.actorInfo,
+        actorFullName: `${details.actorInfo.username}/${details.actorInfo.name}`,
+        schema: details.webServerSchema,
+    };
     if (resolvedOutput.serverInterface !== false) {
         const section = buildServerInterfaceSection({
-            actor: details.actorInfo,
-            actorFullName: `${details.actorInfo.username}/${details.actorInfo.name}`,
-            schema: details.webServerSchema,
+            ...serverInterfaceParams,
             serverInterface: resolvedOutput.serverInterface,
             loadedToolNames,
             hasPaymentProvider: paymentProvider !== undefined,
         });
         if ('error' in section) return respondUserError(section.error);
         serverInterfaceMessage = section.text;
-    } else if (resolvedOutput.serverInterfaceSummary) {
-        serverInterfaceMessage = buildServerInterfaceSummary({
-            actor: details.actorInfo,
-            actorFullName: `${details.actorInfo.username}/${details.actorInfo.name}`,
-            schema: details.webServerSchema,
-            loadedToolNames,
-        });
+    } else {
+        serverInterfaceMessage = buildServerInterfaceSummary(serverInterfaceParams);
     }
 
     // NOTE: Data duplication between texts and structuredContent is intentional and required.

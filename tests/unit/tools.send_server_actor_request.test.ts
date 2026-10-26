@@ -606,6 +606,7 @@ describe('rejecting a call before sending', () => {
         expectSoftFailInvalidInput(withCallActor);
         expect(withCallActor.content[0].text).toContain(`It can be run from an input with ${HELPER_TOOLS.ACTOR_CALL}.`);
         expect(withoutCallActor.content[0].text).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+        expect(withCallActor.toolTelemetry?.actorTenancy).toBeUndefined();
         expect(received).toHaveLength(0);
     });
 

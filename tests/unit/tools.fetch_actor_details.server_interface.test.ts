@@ -85,7 +85,6 @@ function summary(params: Partial<Parameters<typeof buildServerInterfaceSummary>[
         actor: serverActor(),
         actorFullName: ACTOR_FULL_NAME,
         schema: SCHEMA,
-        loadedToolNames: Object.values(HELPER_TOOLS),
         ...params,
     });
 }
@@ -95,12 +94,6 @@ describe('buildServerInterfaceSummary()', () => {
         expect(summary()).toBe(
             'Server interface: enabled, single-tenant, 3 documented operations. ' +
                 `${HELPER_TOOLS.ACTOR_GET_DETAILS} with {"actor":"${ACTOR_FULL_NAME}","output":{"serverInterface":true}} lists them.`,
-        );
-    });
-
-    it('leaves out the fetch-actor-details call when the session lacks that tool', () => {
-        expect(summary({ loadedToolNames: [HELPER_TOOLS.ACTOR_CALL] })).toBe(
-            'Server interface: enabled, single-tenant, 3 documented operations.',
         );
     });
 
@@ -341,11 +334,12 @@ describe('buildFetchActorDetailsResult() with a Server Actor', () => {
         expect((result.structuredContent as { serverInterface?: string }).serverInterface).toBe(texts.at(-1));
     });
 
-    it('leaves the server interface out of a selective output that does not ask for it', async () => {
+    it('carries the summary line in a selective output that does not ask for the server interface', async () => {
         const result = await call({ inputSchema: true });
 
-        expect((result.content ?? []).map(textOf).join('\n')).not.toContain('Server interface');
-        expect((result.structuredContent as { serverInterface?: string }).serverInterface).toBeUndefined();
+        const texts = (result.content ?? []).map(textOf);
+        expect(texts.at(-1)).toContain('Server interface: enabled, single-tenant, 3 documented operations.');
+        expect((result.structuredContent as { serverInterface?: string }).serverInterface).toBe(texts.at(-1));
     });
 
     it('returns the selection error for an unknown operation', async () => {

@@ -30,8 +30,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `resolveServerInterfaceDefinition`, shared with `fetchActorDetails` in `../utils/actor_details.ts`; the input
     schema and README stay on the default build; `hasWebServerSchemaOperations` detects operations the send tool
     can call in the publisher's schema),
-    `server_interface_schema.ts` (the server-interface section of `fetch-actor-details`: the one-line default
-    summary, the operation list with tenancy and a `send-server-actor-request` call (the Actor's `standbyUrl` when
+    `server_interface_schema.ts` (the server-interface section of `fetch-actor-details`: the one-line summary
+    shown unless `output.serverInterface` is set, the operation list with tenancy and a `send-server-actor-request` call (the Actor's `standbyUrl` when
     that tool is absent) for `output.serverInterface: true`, or one operation for `"METHOD /path"`; its private
     operation reader merges path-level and operation-level parameters by resolved name and location, with operation
     parameters taking precedence; local `$ref`s are resolved by `resolveLocalRefs` in `api/apify_api_spec.ts`),

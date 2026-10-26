@@ -152,24 +152,19 @@ function formatUndocumented(tenancy: string): string {
  * ```
  * Server interface: enabled, single-tenant, 2 documented operations. fetch-actor-details with {"actor":"apify/search","output":{"serverInterface":true}} lists them.
  * ```
- * The second sentence is left out when the session lacks `fetch-actor-details` (only its widget sibling).
  * Without an API schema: `Server interface: enabled, single-tenant, undocumented: no API schema. See the README.`
  */
 export function buildServerInterfaceSummary({
     actor,
     actorFullName,
     schema = {},
-    loadedToolNames,
-}: Pick<ServerInterfaceSectionParams, 'actor' | 'actorFullName' | 'schema' | 'loadedToolNames'>): string | undefined {
+}: Pick<ServerInterfaceSectionParams, 'actor' | 'actorFullName' | 'schema'>): string | undefined {
     if (actor.actorStandby?.isEnabled !== true) return undefined;
     const tenancy = resolveActorTenancy(actor);
     const operations = listServerOperations(schema);
     if (operations.length === 0) return formatUndocumented(tenancy);
     const count = `${operations.length} documented operation${operations.length === 1 ? '' : 's'}`;
-    const list = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)
-        ? ` ${formatDetailsCall(actorFullName, true)} lists them.`
-        : '';
-    return `Server interface: enabled, ${tenancy}, ${count}.${list}`;
+    return `Server interface: enabled, ${tenancy}, ${count}. ${formatDetailsCall(actorFullName, true)} lists them.`;
 }
 
 /**

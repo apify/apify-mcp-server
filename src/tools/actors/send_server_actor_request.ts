@@ -366,7 +366,8 @@ export async function executeSendServerActorRequest(
         toolTelemetry: {
             ...response.toolTelemetry,
             actorId: info.id,
-            actorTenancy: tenancy,
+            // With Actor Standby off there is no tenancy; `resolveActorTenancy` would report its single-tenant default.
+            ...(info.actorStandby?.isEnabled === true && { actorTenancy: tenancy }),
             ...(httpStatus !== undefined && { httpStatus }),
         },
     });
