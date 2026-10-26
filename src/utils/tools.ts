@@ -50,7 +50,7 @@ export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>
     if (tool.type === TOOL_TYPE.ACTOR) return tool.actorFullName;
     if (tool.type === TOOL_TYPE.ACTOR_MCP) return tool.actorId;
 
-    // A legacy "username/name:toolName" value, which call-actor rejects, is logged by its Actor name.
+    // A legacy "username/name:toolName" value is logged by its Actor name.
     const actorArg = args?.actor;
     if (typeof actorArg !== 'string') return undefined;
     return actorArg.split(':')[0]?.trim() || undefined;

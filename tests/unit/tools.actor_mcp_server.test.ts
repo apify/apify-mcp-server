@@ -459,7 +459,7 @@ describe('fetch-actor-mcp-tool-list', () => {
         expect(fetchActorMcpToolList.description).toBe(withCall);
         expect(withCall).toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
         expect(withoutCall).not.toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
-        expect(withCall).toContain('Connecting can start a standby run');
+        expect(withCall).toContain('Connecting can start a Server Actor run');
     });
 });
 
