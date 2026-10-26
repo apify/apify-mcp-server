@@ -57,7 +57,10 @@ const REMOTE_RESULTS: Record<string, CallToolResult> = {
     spoof: { content: [], toolTelemetry: { toolStatus: 'FAILED', actorId: 'spoofed' } },
 };
 
-/** The two pages of `tools/list` on `/mcp`; `add` also carries a title, an output schema, annotations and `_meta`. */
+/**
+ * The two pages of `tools/list` on `/mcp`; `add` also carries a title, an output schema, annotations and `_meta`, and
+ * `subtract` an output schema with a `$ref` that does not resolve.
+ */
 const REMOTE_TOOL_PAGES: Tool[][] = [
     [
         {
@@ -70,7 +73,13 @@ const REMOTE_TOOL_PAGES: Tool[][] = [
             _meta: { 'example/version': '1' },
         },
     ],
-    [{ name: 'subtract', inputSchema: { type: 'object' } }],
+    [
+        {
+            name: 'subtract',
+            inputSchema: { type: 'object' },
+            outputSchema: { type: 'object', properties: { difference: { $ref: '#/$defs/missing' } } },
+        },
+    ],
 ];
 
 type ToolResult = Record<string, unknown> & { toolTelemetry?: ToolTelemetryContext };
@@ -384,13 +393,14 @@ describe('fetch-actor-mcp-tool-list', () => {
     });
 
     it('passes the external tool-call timeout and the call signal to every tools/list page', async () => {
-        const listToolsSpy = vi.spyOn(Client.prototype, 'listTools');
+        const requestSpy = vi.spyOn(Client.prototype, 'request');
         const controller = new AbortController();
 
         await execute(executeFetchActorMcpToolList, {}, { signal: controller.signal });
 
-        expect(listToolsSpy).toHaveBeenCalledTimes(2);
-        for (const [, options] of listToolsSpy.mock.calls) {
+        const listCalls = requestSpy.mock.calls.filter(([request]) => request.method === 'tools/list');
+        expect(listCalls).toHaveLength(2);
+        for (const [, , options] of listCalls) {
             expect(options).toMatchObject({ timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, signal: controller.signal });
         }
     });

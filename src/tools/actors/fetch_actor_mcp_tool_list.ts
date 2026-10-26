@@ -1,5 +1,5 @@
-import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -36,22 +36,6 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
     `;
 }
 
-/** Every page of `tools/list`, following `nextCursor`; a failed page fails the listing. Null past the page cap. */
-async function fetchAllTools(client: Client, signal: AbortSignal): Promise<Tool[] | null> {
-    const tools: Tool[] = [];
-    let cursor: string | undefined;
-    for (let page = 0; page < MAX_TOOL_LIST_PAGES; page++) {
-        const result = await client.listTools(cursor === undefined ? undefined : { cursor }, {
-            timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
-            signal,
-        });
-        tools.push(...result.tools);
-        cursor = result.nextCursor;
-        if (cursor === undefined) return tools;
-    }
-    return null;
-}
-
 function buildToolListResponse(tools: Tool[]): ToolResponse {
     const count = `The Actor's MCP server has ${tools.length} ${tools.length === 1 ? 'tool' : 'tools'}.`;
     const texts = tools.map(
@@ -66,9 +50,21 @@ export async function executeFetchActorMcpToolList(toolArgs: InternalToolArgs): 
     return runOnActorMcpServer(toolArgs, {
         actor,
         operation: 'list the MCP tools',
+        // Follows `nextCursor`; a failed page fails the listing. Not `client.listTools`: it compiles every remote
+        // output schema, so one that does not compile would fail the listing.
         run: async (client) => {
-            const tools = await fetchAllTools(client, toolArgs.signal);
-            if (tools) return buildToolListResponse(tools);
+            const tools: Tool[] = [];
+            let cursor: string | undefined;
+            for (let page = 0; page < MAX_TOOL_LIST_PAGES; page++) {
+                const result = await client.request(
+                    { method: 'tools/list', params: cursor === undefined ? undefined : { cursor } },
+                    ListToolsResultSchema,
+                    { timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, signal: toolArgs.signal },
+                );
+                tools.push(...result.tools);
+                cursor = result.nextCursor;
+                if (cursor === undefined) return buildToolListResponse(tools);
+            }
             return respondServerError(
                 `The Actor's MCP server returned more than ${MAX_TOOL_LIST_PAGES} pages of tools, so the listing stopped.`,
             );
