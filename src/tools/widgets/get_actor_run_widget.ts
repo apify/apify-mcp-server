@@ -58,7 +58,7 @@ export const getActorRunWidget: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, mcpSessionId } = toolArgs;
+        const { args, apifyClient: client, mcpSessionId, loadedToolNames } = toolArgs;
         const parsed = getActorRunWidgetArgsSchema.parse(args);
 
         try {
@@ -66,6 +66,7 @@ export const getActorRunWidget: ToolEntry = Object.freeze({
                 runId: parsed.runId,
                 waitSecs: 0,
                 client,
+                loadedToolNames,
                 mcpSessionId,
             });
 

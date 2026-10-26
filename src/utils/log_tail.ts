@@ -28,12 +28,15 @@ const STREAM_NETWORK_ERROR_CODES: ReadonlySet<string | undefined> = new Set([
 
 const NEWLINE = 0x0a;
 
+/** Largest `lines` value of the run and build log tools; `lines: 0` returns the whole log. */
+export const LOG_LINES_MAX = 50;
+
 /** The `lines` argument of the run and build log tools. */
 export const logLinesSchema = z
     .number()
     .int()
     .min(0)
-    .max(50)
+    .max(LOG_LINES_MAX)
     .describe(
         `Output the last NUM lines, instead of the last 10. Pass 0 to return the entire log, up to its last ${MAX_INLINE_BYTES} bytes.`,
     )
