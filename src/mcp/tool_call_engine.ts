@@ -364,21 +364,15 @@ export async function prepareToolCall(params: {
         // A tool's own argument rejection and, for standby Actors, a specific rejection come before a generic 402 in
         // both modes; the tool declares both checks.
         const argsRejection = tool.type === TOOL_TYPE.INTERNAL ? tool.rejectArgs?.(toolArgs, [...tools.keys()]) : null;
-        const actorArg = (toolArgs as { actor?: unknown } | undefined)?.actor;
-
         const preflightRejection =
             argsRejection ??
-            (paymentProvider &&
-            tool.hasPaymentProviderStandbyCheck &&
-            typeof actorArg === 'string' &&
-            actorArg.length > 0
-                ? await checkPaymentProviderStandbyConflict({
-                      actorName: actorArg,
-                      paymentProvider,
-                      apifyToken,
-                      mcpSessionId: params.mcpSessionId,
-                  })
-                : null);
+            (await checkPaymentProviderStandbyConflict({
+                tool,
+                args: toolArgs,
+                paymentProvider,
+                apifyToken,
+                mcpSessionId: params.mcpSessionId,
+            }));
 
         return {
             tool,

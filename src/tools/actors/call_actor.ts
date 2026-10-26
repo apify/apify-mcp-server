@@ -343,12 +343,17 @@ export type CallActorParsedArgs = z.infer<typeof callActorArgs>;
  * Uses `actorDefinitionCache` — one definition fetch on a cold cache.
  */
 export async function checkPaymentProviderStandbyConflict(params: {
-    actorName: string;
-    paymentProvider: PaymentProvider;
+    tool: ToolEntry;
+    args: Record<string, unknown>;
+    paymentProvider: PaymentProvider | undefined;
     apifyToken: ApifyToken;
     mcpSessionId?: string;
 }): Promise<Record<string, unknown> | null> {
-    const { actorName, paymentProvider, apifyToken, mcpSessionId } = params;
+    const { tool, args, paymentProvider, apifyToken, mcpSessionId } = params;
+    if (!paymentProvider || !tool.hasPaymentProviderStandbyCheck) return null;
+    const actorName = args.actor;
+    if (typeof actorName !== 'string' || !actorName) return null;
+
     const normalizedActorName = fixActorNameInputAndLog(actorName, { mcpSessionId });
 
     // Token-based client — payment headers are only relevant for actual Actor runs.
