@@ -172,7 +172,7 @@ export function resolveLocalRefs(node: unknown, spec: unknown, prune?: (value: u
         const target = prune ? prune(rawTarget) : rawTarget;
 
         // A refused reference leaves the budget for smaller ones.
-        const targetSize = JSON.stringify(target).length;
+        const targetSize = Buffer.byteLength(JSON.stringify(target));
         if (expandedSize + targetSize > MAX_INLINE_BYTES)
             return buildUnavailableReference('not expanded, size cap reached');
         expandedSize += targetSize;

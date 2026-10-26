@@ -139,6 +139,14 @@ describe('local reference chains', () => {
 });
 
 describe('resolveLocalRefs()', () => {
+    it('counts the expansion budget in UTF-8 bytes', () => {
+        const spec = { components: { schemas: { Big: { description: '漢'.repeat(131072) } } } };
+
+        expect(resolveLocalRefs({ $ref: '#/components/schemas/Big' }, spec)).toMatchObject({
+            unavailableDetail: 'not expanded, size cap reached',
+        });
+    });
+
     it('preserves OpenAPI 3.1 schema siblings as constraints alongside the referenced schema', () => {
         const spec = {
             openapi: '3.1.0',
