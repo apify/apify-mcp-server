@@ -363,7 +363,7 @@ Ask in plain language. The agent finds a suitable Actor, checks its input and pr
 
 | Use case | Example prompt | Actor the agent typically picks |
 | :--- | :--- | :--- |
-| Web research | "Find the latest news about autonomous AI agents and summarize the key developments." | [RAG Web Browser](https://apify.com/apify/rag-web-browser), [Web Fetch](https://apify.com/apify/web-fetch) |
+| Web research | "Find what people on X and Hacker News said about autonomous AI agents this week and summarize the key developments." | [Tweet Scraper V2](https://apify.com/apidojo/tweet-scraper), [Hacker News Data Scraper](https://apify.com/epctex/hackernews-scraper) |
 | Read a webpage | "Fetch https://example.com/pricing as Markdown and summarize this webpage in five bullets." | [Web Fetch](https://apify.com/apify/web-fetch) |
 | Search results (SERP) | "Get the top 20 Google results for 'best CRM for startups' in the US and show who ranks where." | [Google Search Results Scraper](https://apify.com/apify/google-search-scraper) |
 | Lead generation | "Find dentists in Austin, Texas on Google Maps with their phone numbers, websites, and ratings." | [Google Maps Scraper](https://apify.com/compass/crawler-google-places) |
