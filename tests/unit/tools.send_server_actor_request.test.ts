@@ -761,18 +761,21 @@ describe('rejecting a call before sending', () => {
         expect(received).toHaveLength(0);
     });
 
-    it('is not listed in a payment-provider session', async () => {
-        const listActorsTools = async (options: Parameters<typeof withServer>[1]) =>
+    it('is not listed in a payment-provider session, even when requested by name', async () => {
+        const listRequestedTools = async (options: Parameters<typeof withServer>[1]) =>
             withServer(
                 async (server) => {
-                    await server.loadToolsFromInput({ tools: ['actors'] }, mockApifyClient());
+                    await server.loadToolsFromInput(
+                        { tools: ['actors', HELPER_TOOLS.ACTOR_SERVER_REQUEST] },
+                        mockApifyClient(),
+                    );
                     return server.listToolNames();
                 },
                 { serverMode: SERVER_MODE.DEFAULT, ...options },
             );
 
-        expect(await listActorsTools({})).toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
-        expect(await listActorsTools({ paymentProvider: makePaymentProvider() })).not.toContain(
+        expect(await listRequestedTools({})).toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
+        expect(await listRequestedTools({ paymentProvider: makePaymentProvider() })).not.toContain(
             HELPER_TOOLS.ACTOR_SERVER_REQUEST,
         );
     });

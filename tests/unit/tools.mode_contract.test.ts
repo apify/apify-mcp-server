@@ -71,12 +71,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
 
     describe('per-mode tool lists', () => {
         it('has correct tools in actors category (both modes)', () => {
-            const expected = [
-                HELPER_TOOLS.STORE_SEARCH,
-                HELPER_TOOLS.ACTOR_GET_DETAILS,
-                HELPER_TOOLS.ACTOR_CALL,
-                HELPER_TOOLS.ACTOR_SERVER_REQUEST,
-            ];
+            const expected = [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS, HELPER_TOOLS.ACTOR_CALL];
             expect(toolNames(defaultCategories.actors)).toEqual(expected);
             expect(toolNames(appsCategories.actors)).toEqual(expected);
         });

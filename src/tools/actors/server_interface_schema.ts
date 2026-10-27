@@ -119,7 +119,8 @@ function checkSize(text: string, actorFullName: string): { text: string } | { er
 /**
  * The server-interface text of `fetch-actor-details`, by `output.serverInterface`; none for an Actor without
  * Actor Standby unless asked for. References are not expanded or fetched, and the schema's `servers` are not used.
- * - `false`: one summary line with the tenancy and the operation count, naming the operations while few and short.
+ * - `false`: one summary line with the tenancy and the operation count, naming the operations while few and short;
+ *   none in a session without `send-server-actor-request`.
  * - `true`: the operation list, plus the creator-written schema as is when the text fits `MAX_INLINE_BYTES`.
  * - `"GET /search"`: one operation excerpt with inherited parameters and the root schema/security context.
  * - `"#/components/schemas/Search"`: the raw node at that local JSON pointer.
@@ -142,6 +143,8 @@ export function buildServerInterfaceText({
     /** An agentic payment provider (x402, Skyfire) cannot pay for an Actor Server request. */
     hasPaymentProvider: boolean;
 }): { text?: string } | { error: string } {
+    // The summary helps choose between call-actor and the send tool, so it follows the send tool.
+    if (serverInterface === false && !loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)) return {};
     if (actor.actorStandby?.isEnabled !== true) {
         return { text: serverInterface === false ? undefined : `Actor '${actorFullName}' has no server interface.` };
     }
