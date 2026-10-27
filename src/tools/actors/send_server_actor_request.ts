@@ -26,14 +26,11 @@ import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondServerError, respondUserError } from '../../utils/mcp.js';
 import { resolveActorInterfaces, resolveActorTenancy } from '../actor_tool_naming.js';
 import { apiCallArgsShape, redactApiCallArgs } from '../api/apify_api_request.js';
-import { isRecord } from '../api/apify_api_spec.js';
+import { API_METHODS, type ApiMethod, isRecord } from '../api/apify_api_spec.js';
 import { parseBaseMimeType } from '../storage/storage_helpers.js';
 import { anyJsonValueSchema, serverActorRequestOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
-
-const SERVER_ACTOR_REQUEST_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
-type ServerActorRequestMethod = (typeof SERVER_ACTOR_REQUEST_METHODS)[number];
 
 const sendServerActorRequestArgs = z.object({
     actor: z
@@ -41,7 +38,7 @@ const sendServerActorRequestArgs = z.object({
         .min(1)
         .describe('The Actor: its ID, or its name in the "username/name" form, such as "apify/web-fetch".'),
     method: z
-        .enum(SERVER_ACTOR_REQUEST_METHODS)
+        .enum(API_METHODS)
         .describe('HTTP method: GET, POST, PUT, PATCH, or DELETE. The Actor accepts or rejects it.'),
     path: z.string().min(1).describe(dedent`
             The path of an operation in the Actor API schema, starting with /. Take it from the schema; do not guess it.
@@ -61,7 +58,7 @@ type ServerActorRequest = {
     actorName: string;
     interface: 'server';
     tenancy: ActorTenancy;
-    method: ServerActorRequestMethod;
+    method: ApiMethod;
     /** With its query, the session token masked: the agent can write the token into a query value. */
     path: string;
 };
@@ -158,7 +155,7 @@ async function sendRequest({
 }: {
     client: ApifyClient;
     url: URL;
-    method: ServerActorRequestMethod;
+    method: ApiMethod;
     body: unknown;
     signal: AbortSignal;
     timeoutMillis: number;

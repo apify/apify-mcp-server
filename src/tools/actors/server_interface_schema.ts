@@ -15,11 +15,13 @@ const MAX_NAMED_OPERATIONS_LENGTH = 300;
 
 /** Follows local parameter or request-body aliases, without expanding nested schemas. */
 function resolveRef(node: unknown, spec: unknown): unknown {
+    const seen = new Set<string>();
     let resolved = node;
-    let hops = 0;
     while (isRecord(resolved) && typeof resolved.$ref === 'string' && resolved.$ref.startsWith('#/')) {
-        if (hops++ === MAX_ALIAS_HOPS) return undefined;
-        resolved = resolveLocalRef(spec, resolved.$ref);
+        const ref = resolved.$ref;
+        if (seen.has(ref) || seen.size >= MAX_ALIAS_HOPS) return undefined;
+        seen.add(ref);
+        resolved = resolveLocalRef(spec, ref);
     }
     return resolved;
 }
