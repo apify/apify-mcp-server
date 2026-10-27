@@ -76,8 +76,7 @@ export class ActorLoadError extends Error {
         return new ActorLoadError(
             ACTOR_LOAD_ERROR_KIND.SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED,
             actorName,
-            `Actor "${actorName}" runs in standby mode without an MCP server and has an empty input schema,` +
-                ' which is not supported yet.',
+            `Actor "${actorName}" has no MCP tools or input interface.`,
         );
     }
 

@@ -32,17 +32,11 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     schema and README stay on the default build; `hasWebServerSchemaOperations` detects operations the send tool
     can call in the publisher's schema; `webServerOperations` caches each operation with its required inputs, which
     the send tool lists after a 400/404/405/422),
-    `server_interface_schema.ts` (the server-interface section of `fetch-actor-details`: the one-line summary
-    shown unless `output.serverInterface` is set, only in sessions that have `send-server-actor-request`, the operation list with tenancy and a `send-server-actor-request`
-    call (the Actor's `standbyUrl` when that tool is absent) and the complete creator-written API schema unchanged
-    for `output.serverInterface: true`. If the full section exceeds `MAX_INLINE_BYTES` UTF-8 bytes, the operation
-    list remains with an explicit omission notice. `"METHOD /path"` returns an operation excerpt with inherited
-    parameters and root schema/security context; `"#/..."` returns the raw node at that local JSON pointer, so
-    referenced components can be read separately. A selected node, operation or operation list over the cap returns
-    an explicit error without partial JSON. References, examples, extensions, and the creator's `servers` arrays
-    stay as written; requests use the Actor's assigned URL. References are not expanded or fetched. Its private
-    operation reader merges path-level and operation-level parameters by resolved name and location, with operation
-    parameters taking precedence; a local alias-chain lookup reads required inputs without expanding nested schemas),
+    `server_interface_schema.ts` (the server-interface text of `fetch-actor-details`: one summary line by default, only in sessions that
+    have `send-server-actor-request`;
+    `output.serverInterface: true` lists the operations, with the API schema as written while it fits `MAX_INLINE_BYTES`;
+    `"METHOD /path"` returns one operation excerpt and `"#/..."` the raw node at a local JSON pointer; references are
+    not expanded or fetched),
     `send_server_actor_request.ts` (`send-server-actor-request`: one HTTP request to a Server Actor's API, gated on
     the `server` interface and sent through `sendApifyApiRequest` with raw response
     bytes, no redirects, the `MAX_INLINE_BYTES` cap after decompression and the `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`
