@@ -77,6 +77,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
                 limit: parsed.limit,
                 offset: parsed.offset,
                 paymentProvider,
+                useCase: parsed.useCase,
             }),
             getUserInfoCached(apifyToken, apifyClient),
         ]);

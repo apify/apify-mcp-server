@@ -259,7 +259,7 @@ Here is an overview list of all the tools provided by the Apify MCP Server.
 Legend for the **Enabled by default** column:
 - ✅ — in the default tool set.
 - ⚡ — auto-injected when `call-actor`, an Actor tool, or `get-actor-run` is present (which is true in the default configuration).
-- ✅¹ — served by default, but only when telemetry is enabled and the client is not withheld: Anthropic surfaces (Claude.ai / Claude Desktop / Claude Code) or `local-agent-mode-apify`. To disable, pass an explicit `tools=` list that omits it. Explicitly selecting it (`tools=report-problem` or `tools=dev`) serves it regardless of client — telemetry still must be enabled.
+- ✅¹ — served by default, but only when telemetry is enabled and the client is not withheld: Anthropic surfaces (Claude.ai / Claude Desktop, including its local agent mode / Claude Code). To disable, pass an explicit `tools=` list that omits it. Explicitly selecting it (`tools=report-problem` or `tools=dev`) serves it regardless of client — telemetry still must be enabled.
 
 | Tool name | Category | Description | Enabled by default |
 | :--- | :--- | :--- | :---: |
@@ -474,7 +474,7 @@ Expected output: The tool returns the next page of structured data items from th
 The Apify MCP Server collects telemetry data about tool calls to help Apify understand usage patterns and improve the service.
 By default, telemetry is **enabled** for all tool calls.
 With telemetry enabled, Actor searches in the Apify Store send the MCP session id as `_traceId`, and tool-call events carry it as `trace_id`.
-`search-actors` also takes an optional `useCase`, one sentence on why the user is searching. It goes to the Store search as `_useCase` (Apify API access logs record it), is not logged or put in telemetry by this server, and is offered only to clients that declare a name without `claude`, `anthropic` or `local-agent-mode-apify` (also in the `?client=` value). Other clients' values are dropped.
+`search-actors` also takes an optional `useCase`: one sentence, written by the model, on why the user is searching. It is sent with the Store search as `_useCase`, and Apify records it in its Store search analytics to improve search results.
 Opting out of telemetry disables all of this.
 
 The stdio transport also uses [Sentry](https://sentry.io) for error tracking, which helps us identify and fix issues faster.

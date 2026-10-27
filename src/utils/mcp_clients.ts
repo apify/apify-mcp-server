@@ -22,14 +22,10 @@ export function getRequestOriginForClient(context: McpClientContext | undefined)
     return clientName === APIFY_AI_CLIENT_NAME ? REQUEST_ORIGIN.APIFY_AI : REQUEST_ORIGIN.MCP;
 }
 
-/** Whether `search-actors` takes a `useCase` for this client: a declared name, and neither it nor `?client=` on {@link ANTHROPIC_CLIENT_NAMES}. */
-export function isStoreUseCaseServable(
-    context: McpClientContext | undefined,
-    clientParam: string | undefined,
-): boolean {
+/** Whether `search-actors` takes a `useCase` for this client: a declared name not on {@link ANTHROPIC_CLIENT_NAMES}. */
+export function isStoreUseCaseServable(context: McpClientContext | undefined): boolean {
     const name = context?.clientInfo?.name?.trim().toLowerCase();
-    const blocked = (value: string) => ANTHROPIC_CLIENT_NAMES.some((entry) => value.includes(entry));
-    return !!name && !blocked(name) && !blocked((clientParam ?? '').toLowerCase());
+    return !!name && !ANTHROPIC_CLIENT_NAMES.some((entry) => name.includes(entry));
 }
 
 /** Trace id of a call: Apify AI's `_meta` thread id, else the MCP session id; omitted over the API limit. */

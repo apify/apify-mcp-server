@@ -7,7 +7,6 @@ import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { InvalidToolCall, PreparedCall } from '../../src/mcp/tool_call_engine.js';
 import { classifyToolCallError, executeSyncToolCall, prepareToolCall } from '../../src/mcp/tool_call_engine.js';
 import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
-import { addUseCaseToSearchTool } from '../../src/tools/actors/search_actors.js';
 import { sendServerActorRequest } from '../../src/tools/actors/send_server_actor_request.js';
 import {
     REPORT_PROBLEM_INVALID_INPUT_NUDGE,
@@ -173,77 +172,6 @@ describe('prepareToolCall()', () => {
 
             const untracked = await call(null);
             expect(untracked.apifyClient.storeSearchTracking).toBeUndefined();
-        });
-    });
-
-    describe('search use case', () => {
-        const USE_CASE = 'compare prices for apify_api_SECRET123';
-
-        async function searchCall(
-            toolName: string,
-            options: { served: boolean; telemetry?: boolean; args?: Record<string, unknown> },
-        ) {
-            return withServer(async (server) => {
-                const { tool } = makeRecorderTool(toolName);
-                server.upsertTools([options.served ? addUseCaseToSearchTool(tool) : tool]);
-                const telemetryData =
-                    options.telemetry === false
-                        ? null
-                        : ({ tool_name: toolName } as unknown as ToolCallTelemetryProperties);
-                const prepared = (await prepareToolCall({
-                    ...prepareFields(server),
-                    apifyToken: 'fake-token',
-                    name: toolName,
-                    args: options.args ?? { keywords: 'shops', useCase: USE_CASE },
-                    meta: {},
-                    requestHeaders: undefined,
-                    isTaskRequest: false,
-                    mcpSessionId: 's1',
-                    telemetryData,
-                    clientContext: undefined,
-                })) as PreparedCall;
-                return { prepared, telemetryData };
-            });
-        }
-
-        it.each([HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.STORE_SEARCH_WIDGET])(
-            '%s: takes the use case off the arguments and sends it, redacted, when the client was served the field',
-            async (toolName) => {
-                const spies = (['debug', 'info', 'warning', 'softFail', 'error', 'exception'] as const).map((level) =>
-                    vi.spyOn(log, level).mockImplementation(() => log),
-                );
-                const { prepared, telemetryData } = await searchCall(toolName, { served: true });
-                expect(prepared.toolArgs).toEqual({ keywords: 'shops' });
-                expect(prepared.decodedArgs).toEqual({ keywords: 'shops' });
-                expect(prepared.apifyClient.storeSearchTracking).toMatchObject({
-                    traceId: 's1',
-                    useCase: 'compare prices for apify_api_***',
-                });
-                const leaked = JSON.stringify([
-                    prepared.logSafeArgs,
-                    telemetryData,
-                    ...spies.flatMap((spy) => spy.mock.calls),
-                ]);
-                expect(leaked).not.toContain('compare prices');
-                expect(leaked).not.toContain('SECRET123');
-            },
-        );
-
-        it('drops a use case from a client that was not served the field, and with telemetry off', async () => {
-            const notServed = await searchCall(HELPER_TOOLS.STORE_SEARCH, { served: false });
-            expect(notServed.prepared.toolArgs).toEqual({ keywords: 'shops' });
-            expect(notServed.prepared.apifyClient.storeSearchTracking?.useCase).toBeUndefined();
-            expect(notServed.prepared.apifyClient.storeSearchTracking?.traceId).toBe('s1');
-
-            const off = await searchCall(HELPER_TOOLS.STORE_SEARCH, { served: true, telemetry: false });
-            expect(off.prepared.toolArgs).toEqual({ keywords: 'shops' });
-            expect(off.prepared.apifyClient.storeSearchTracking).toBeUndefined();
-        });
-
-        it('leaves the arguments of every other tool alone, even one with a useCase argument', async () => {
-            const { prepared } = await searchCall('some-other-tool', { served: true, args: { useCase: 'mine' } });
-            expect(prepared.toolArgs).toEqual({ useCase: 'mine' });
-            expect(prepared.apifyClient.storeSearchTracking?.useCase).toBeUndefined();
         });
     });
 

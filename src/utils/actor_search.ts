@@ -10,6 +10,7 @@
 import type { ApifyClient } from '../apify_client.js';
 import type { PaymentProvider } from '../payments/types.js';
 import type { ActorStoreList } from '../types.js';
+import { sanitizeUseCase } from './mcp_clients.js';
 
 export type SearchActorsByKeywordsOptions = {
     search: string;
@@ -30,6 +31,8 @@ export type SearchAgentSafeActorsOptions = {
     limit: number;
     offset: number;
     paymentProvider?: PaymentProvider;
+    /** Why the user is searching, as the model wrote it; sent as `_useCase` after {@link sanitizeUseCase}. */
+    useCase?: string;
 };
 
 export async function searchActorsByKeywords(options: SearchActorsByKeywordsOptions): Promise<ActorStoreList[]> {
@@ -42,17 +45,8 @@ export async function searchActorsByKeywords(options: SearchActorsByKeywordsOpti
     if (traceId) storeClient.params = { ...storeClient.params, _traceId: traceId };
     if (useCase) storeClient.params = { ...storeClient.params, _useCase: useCase };
 
-    try {
-        const results = await storeClient.list({ search, limit, offset });
-        return results.items as ActorStoreList[];
-    } catch (error) {
-        // Mask a use case the API echoes back, so it stays out of logs and telemetry.
-        if (useCase && error instanceof Error) {
-            error.message = error.message.replaceAll(useCase, '[use case]');
-            error.stack = error.stack?.replaceAll(useCase, '[use case]');
-        }
-        throw error;
-    }
+    const results = await storeClient.list({ search, limit, offset });
+    return results.items as ActorStoreList[];
 }
 
 /**
@@ -61,7 +55,7 @@ export async function searchActorsByKeywords(options: SearchActorsByKeywordsOpti
  * With a payment provider, returns only Actors that allow agentic users.
  */
 export async function searchAgentSafeActors(options: SearchAgentSafeActorsOptions): Promise<ActorStoreList[]> {
-    const { keywords, apifyClient, limit, offset, paymentProvider } = options;
+    const { keywords, apifyClient, limit, offset, paymentProvider, useCase } = options;
 
     return searchActorsByKeywords({
         // The Store returns no Actors for keywords without letters or digits (" ", "%", "..."),
@@ -70,7 +64,7 @@ export async function searchAgentSafeActors(options: SearchAgentSafeActorsOption
         apifyClient,
         limit,
         offset,
-        tracking: apifyClient.storeSearchTracking,
+        tracking: { ...apifyClient.storeSearchTracking, useCase: sanitizeUseCase(useCase) },
         allowsAgenticUsers: paymentProvider ? true : undefined,
         includeInputSchema: true,
     });

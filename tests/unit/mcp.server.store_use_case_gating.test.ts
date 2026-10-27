@@ -6,6 +6,7 @@ import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { searchActors } from '../../src/tools/actors/search_actors.js';
 import { SERVER_MODE, type ToolEntry } from '../../src/types.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
+import { withoutUseCaseField } from '../../src/utils/tools_loader.js';
 import { getRequestHandler } from './helpers/mcp_server.js';
 import { mockApifyClient } from './helpers/tool_context.js';
 
@@ -18,15 +19,12 @@ const properties = (tool: ToolEntry | undefined) =>
     (tool?.inputSchema as { properties?: Record<string, { description?: string }> } | undefined)?.properties ?? {};
 const hasUseCase = (tool: ToolEntry | undefined) => 'useCase' in properties(tool);
 
-function makeServer(
-    options: { telemetryEnabled?: boolean; clientParam?: string; serverMode?: SERVER_MODE } = {},
-): ActorsMcpServer {
+function makeServer(options: { telemetryEnabled?: boolean; serverMode?: SERVER_MODE } = {}): ActorsMcpServer {
     return new ActorsMcpServer({
         taskStore: new InMemoryTaskStore(),
         setupSigintHandler: false,
         serverMode: options.serverMode ?? SERVER_MODE.DEFAULT,
         telemetry: { enabled: options.telemetryEnabled ?? true },
-        clientParam: options.clientParam,
     });
 }
 
@@ -79,7 +77,6 @@ describe('search-actors useCase gating', () => {
 
     it.each([
         { name: 'an Anthropic client', client: 'claude-ai', options: {} },
-        { name: 'a ?client=claude connection', client: 'cursor', options: { clientParam: 'claude' } },
         { name: 'a client with telemetry off', client: 'cursor', options: { telemetryEnabled: false } },
     ])('hides the use case from $name', async ({ client, options }) => {
         const server = track(makeServer(options));
@@ -112,20 +109,46 @@ describe('search-actors useCase gating', () => {
         expect(hasUseCase(claude.tools.get(HELPER_TOOLS.STORE_SEARCH))).toBe(false);
         expect(hasUseCase(unnamed.tools.get(HELPER_TOOLS.STORE_SEARCH))).toBe(false);
         // The shared tool is never written to.
-        expect(hasUseCase(searchActors)).toBe(false);
+        expect(hasUseCase(searchActors)).toBe(true);
     });
 
-    it('tells the model never to send personal information or secrets, in the field and in the tool description', async () => {
-        const server = track(makeServer());
-        await dispatchInitialize(server, 'cursor');
-        await loadSearch(server);
-        const tool = server.tools.get(HELPER_TOOLS.STORE_SEARCH);
-        const description = properties(tool).useCase.description ?? '';
+    it('tells the model never to send personal information or secrets', () => {
+        const description = properties(searchActors).useCase.description ?? '';
         expect(description).toMatch(/Never include personal information/);
         expect(description).toMatch(/secrets, API tokens or credentials/);
         expect(description).toMatch(/Respect the user's privacy/);
-        expect(tool?.description).toMatch(/Never send personal information or secrets/);
-        expect(tool?.description).toMatch(/respect the user's privacy/);
-        expect(tool?.buildDescription?.({ hasTool: () => true })).toMatch(/Never send personal information/);
+    });
+
+    it('removes only the use case from the served schema and validator, once per tool, and leaves a tool without one as is', () => {
+        const tool = {
+            ...searchActors,
+            inputSchema: {
+                type: 'object',
+                properties: { keywords: { type: 'string' }, useCase: { type: 'string' } },
+                required: ['keywords'],
+                additionalProperties: false,
+            },
+        } as ToolEntry;
+        const served = withoutUseCaseField(tool);
+        expect(served.inputSchema).toEqual({
+            type: 'object',
+            properties: { keywords: { type: 'string' } },
+            required: ['keywords'],
+            additionalProperties: false,
+        });
+        const args = { keywords: 'shops', useCase: 'compare prices' };
+        expect(served.ajvValidate(args)).toBe(true);
+        expect(args).not.toHaveProperty('useCase');
+        expect(withoutUseCaseField(tool)).toBe(served);
+        expect(hasUseCase(tool)).toBe(true);
+
+        const other = { ...tool, inputSchema: { type: 'object', properties: { id: { type: 'string' } } } } as ToolEntry;
+        expect(withoutUseCaseField(other)).toBe(other);
+    });
+
+    it('validates the use case with the one shared validator', () => {
+        const args = { keywords: 'shops', useCase: 'compare prices' };
+        expect(searchActors.ajvValidate(args)).toBe(true);
+        expect(args).toHaveProperty('useCase', 'compare prices');
     });
 });

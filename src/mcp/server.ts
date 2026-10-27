@@ -19,8 +19,6 @@ import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv } from '../telemetry.js';
-import { searchActors, addUseCaseToSearchTool } from '../tools/actors/search_actors.js';
-import { searchActorsWidget } from '../tools/widgets/search_actors_widget.js';
 import type {
     ActorsMcpServerOptions,
     ActorStore,
@@ -44,6 +42,7 @@ import {
     isReportProblemExplicitlySelected,
     resolveToolNamesFromInput,
     toolNamesToInput,
+    withoutUseCaseField,
 } from '../utils/tools_loader.js';
 import { buildMcpClientContext, isUiSupportedByClient } from './client_context.js';
 import type { McpClientContext } from './client_context.js';
@@ -108,12 +107,6 @@ async function resolveServableWidgets(): Promise<Map<string, AvailableWidget>> {
 
     return resolved;
 }
-
-/** The search tools as served to a client that takes a `useCase`, by the name of the tool they replace. */
-const USE_CASE_VARIANTS = new Map<string, ToolEntry>([
-    [HELPER_TOOLS.STORE_SEARCH, addUseCaseToSearchTool(searchActors)],
-    [HELPER_TOOLS.STORE_SEARCH_WIDGET, addUseCaseToSearchTool(searchActorsWidget)],
-]);
 
 /**
  * The shared-Apify-behavior facade: owns the tool registry + loaders, server-mode resolution,
@@ -367,11 +360,10 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * Compose one source's tool list against `view`: resolve mode-specific tools, then drop
-     * report-problem unless servable for that view ({@link isReportProblemServable}). Load paths
-     * and the initialize flush pass the instance's own {@link servingContext};
-     * {@link createRequestSnapshot} passes a view derived from one stateless request.
-     * An explicit opt-in in `source.input` applies to every request reusing this retained source.
+     * One source's tool list for `view`: the mode's tools, minus report-problem and the search tools'
+     * `useCase` input where `view`'s client is not served them. Load paths and the initialize flush
+     * pass {@link servingContext}; {@link createRequestSnapshot} passes a per-request view. An explicit
+     * report-problem opt-in in `source.input` applies to every request reusing the source.
      */
     private composeToolsForClient(source: ToolSource, view: ServingContext): ToolEntry[] {
         let tools = getToolsForServerMode(source.input, source.actorTools, view.serverMode);
@@ -382,10 +374,8 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         const served = this.isReportProblemServable(view, source.input)
             ? tools
             : tools.filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT);
-        const offersUseCase =
-            this.telemetryEnabled && isStoreUseCaseServable(view.clientContext, this.options.clientParam);
-        if (!offersUseCase) return served;
-        return served.map((tool) => USE_CASE_VARIANTS.get(tool.name) ?? tool);
+        if (this.telemetryEnabled && isStoreUseCaseServable(view.clientContext)) return served;
+        return served.map(withoutUseCaseField);
     }
 
     /**
