@@ -4,7 +4,9 @@ import type { McpClientContext } from '../../src/mcp/client_context.js';
 import {
     getRequestOriginForClient,
     isReportProblemBlockedForClient,
+    isStoreUseCaseServable,
     resolveStoreSearchTracking,
+    sanitizeUseCase,
 } from '../../src/utils/mcp_clients.js';
 
 function clientContext(clientName?: string): McpClientContext | undefined {
@@ -62,23 +64,18 @@ describe('getRequestOriginForClient()', () => {
 });
 
 describe('resolveStoreSearchTracking()', () => {
-    const meta = { 'com.apify/traceId': 'thread-1', 'com.apify/useCase': '  find a scraper  ' };
+    const meta = { 'com.apify/traceId': 'thread-1', 'com.apify/useCase': 'find a scraper' };
 
-    it('takes the trace id and use case from _meta for Apify AI, falling back to the session id', () => {
-        expect(resolveStoreSearchTracking('APIFY_AI', meta, 'session-1')).toEqual({
-            traceId: 'thread-1',
-            useCase: 'find a scraper',
-        });
+    it('takes the trace id from _meta for Apify AI, falling back to the session id', () => {
+        expect(resolveStoreSearchTracking('APIFY_AI', meta, 'session-1')).toEqual({ traceId: 'thread-1' });
         expect(resolveStoreSearchTracking('APIFY_AI', { 'com.apify/traceId': ' ' }, 'session-1').traceId).toBe(
             'session-1',
         );
     });
 
-    it('uses only the session id for other clients', () => {
-        expect(resolveStoreSearchTracking('MCP', meta, 'session-1')).toEqual({
-            traceId: 'session-1',
-            useCase: undefined,
-        });
+    it('uses only the session id for other clients, and never a use case from _meta', () => {
+        expect(resolveStoreSearchTracking('MCP', meta, 'session-1')).toEqual({ traceId: 'session-1' });
+        expect(resolveStoreSearchTracking('APIFY_AI', meta, 'session-1')).not.toHaveProperty('useCase');
     });
 
     it('keeps a trace id of 256 UTF-16 units and omits a longer one', () => {
@@ -91,18 +88,50 @@ describe('resolveStoreSearchTracking()', () => {
     it('omits an empty session id as the trace id', () => {
         expect(resolveStoreSearchTracking('MCP', undefined, '').traceId).toBe(undefined);
     });
+});
 
-    it('truncates the use case to 1024 UTF-16 units without splitting a surrogate pair', () => {
-        const useCase = `${'a'.repeat(1023)}😀`;
-        expect(resolveStoreSearchTracking('APIFY_AI', { 'com.apify/useCase': useCase }, undefined).useCase).toBe(
-            'a'.repeat(1023),
-        );
+describe('sanitizeUseCase()', () => {
+    it('trims, and drops anything that is not text or is empty', () => {
+        expect(sanitizeUseCase('  find a scraper  ')).toBe('find a scraper');
+        expect(sanitizeUseCase('   ')).toBe(undefined);
+        expect(sanitizeUseCase('')).toBe(undefined);
+        expect(sanitizeUseCase(undefined)).toBe(undefined);
+        expect(sanitizeUseCase(42)).toBe(undefined);
+        expect(sanitizeUseCase({ text: 'x' })).toBe(undefined);
     });
 
-    it('redacts Apify API tokens from the use case before cutting it', () => {
-        const useCase = `${'a'.repeat(1011)} apify_api_${'x'.repeat(36)}`;
-        expect(resolveStoreSearchTracking('APIFY_AI', { 'com.apify/useCase': useCase }, undefined).useCase).toBe(
+    it('truncates to 1024 UTF-16 units without splitting a surrogate pair', () => {
+        expect(sanitizeUseCase(`${'a'.repeat(1023)}😀`)).toBe('a'.repeat(1023));
+        expect(sanitizeUseCase('a'.repeat(2000))).toBe('a'.repeat(1024));
+    });
+
+    it('redacts Apify API tokens before cutting', () => {
+        expect(sanitizeUseCase(`${'a'.repeat(1011)} apify_api_${'x'.repeat(36)}`)).toBe(
             `${'a'.repeat(1011)} apify_api_**`,
         );
+    });
+});
+
+describe('isStoreUseCaseServable()', () => {
+    const servable = (clientName: string | undefined, clientParam?: string) =>
+        isStoreUseCaseServable(clientContext(clientName), clientParam);
+
+    it.each(['apify-ai', 'cursor', 'Visual Studio Code'])('serves %s', (name) => {
+        expect(servable(name)).toBe(true);
+    });
+
+    it.each(['Claude Desktop', 'claude-code', 'Anthropic', 'local-agent-mode-apify'])('does not serve %s', (name) => {
+        expect(servable(name)).toBe(false);
+    });
+
+    it('does not serve a client that declares no name, an empty name, or no initialize at all', () => {
+        expect(servable('')).toBe(false);
+        expect(servable('   ')).toBe(false);
+        expect(servable(undefined)).toBe(false);
+    });
+
+    it('does not serve a connection opened with ?client=claude, whatever name it declares', () => {
+        expect(servable('cursor', 'Claude-Desktop')).toBe(false);
+        expect(servable('cursor', 'vscode')).toBe(true);
     });
 });
