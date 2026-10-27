@@ -1262,76 +1262,42 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        name: 'summarizes a Server Actor interface in the default fetch-actor-details output',
+        name: 'summarizes a Server Actor interface and navigates it with fetch-actor-details',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
-            const result = await client.callTool({
-                name: 'fetch-actor-details',
-                arguments: { actor: ACTOR_SERVER_ACTOR_TEST },
-            });
+            const call = async (actor: string, output?: Record<string, unknown>) => {
+                const result = await client.callTool({
+                    name: 'fetch-actor-details',
+                    arguments: { actor, ...(output && { output }) },
+                });
+                return { result, text: (result.content as { text: string }[]).map((item) => item.text).join('\n') };
+            };
 
-            const text = (result.content as { text: string }[]).map((item) => item.text).join('\n');
-            expect(text).toMatch(/Server interface: enabled, single-tenant, [1-9]\d* documented operations\./);
-            validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
-        }),
-    },
-    {
-        name: 'returns a Server Actor full schema with operation and reference navigation',
-        isDeploymentTest: false,
-        run: withClient({ tools: ['actors'] }, async (client) => {
-            const list = await client.callTool({
-                name: 'fetch-actor-details',
-                arguments: { actor: ACTOR_SERVER_ACTOR_TEST, output: { serverInterface: true } },
-            });
-            const operation = await client.callTool({
-                name: 'fetch-actor-details',
-                arguments: { actor: ACTOR_SERVER_ACTOR_TEST, output: { serverInterface: 'GET /add' } },
-            });
-            const unknown = await client.callTool({
-                name: 'fetch-actor-details',
-                arguments: { actor: ACTOR_SERVER_ACTOR_TEST, output: { serverInterface: 'GET /nope' } },
-            });
-            const parameter = await client.callTool({
-                name: 'fetch-actor-details',
-                arguments: {
-                    actor: ACTOR_SERVER_ACTOR_TEST,
-                    output: { serverInterface: '#/components/parameters/AsText' },
-                },
-            });
-
-            const listText = (list.content as { text: string }[]).map((item) => item.text).join('\n');
-            expect(listText).toContain(
+            const summary = await call(ACTOR_SERVER_ACTOR_TEST);
+            expect(summary.text).toMatch(/Server interface: enabled, single-tenant, [1-9]\d* documented operations\./);
+            validateStructuredOutputForTool(summary.result, 'fetch-actor-details', 'default');
+            const list = await call(ACTOR_SERVER_ACTOR_TEST, { serverInterface: true });
+            expect(list.text).toContain(
                 `send-server-actor-request sends a request to one of them: {"actor":"${ACTOR_SERVER_ACTOR_TEST}"`,
             );
-            expect(listText).toContain('- POST /add: Add two numbers (JSON body). Required: request body.');
-            expect(listText).toContain('"openapi":');
-            expect(listText).toContain('"paths":');
-            expect(listText).toContain('"components":');
-            const operationText = (operation.content as { text: string }[]).map((item) => item.text).join('\n');
-            expect(operation.isError).not.toBe(true);
-            expect(operationText).toContain('"operation":');
-            expect(operationText).toContain('Components are omitted');
-            expect(operationText).toContain('"$ref":"#/components/parameters/AsText"');
-            expect(operationText).toContain('"$ref":"#/components/responses/Add"');
-            expect(parameter.isError).not.toBe(true);
-            expect((parameter.content as { text: string }[]).map((item) => item.text).join('\n')).toContain(
-                '"name":"asText"',
-            );
-            expect(unknown.isError).toBe(true);
-            expect((unknown.content as { text: string }[])[0].text).toContain('GET /add');
-        }),
-    },
-    {
-        name: 'says an Actor without a server interface has none when fetch-actor-details is asked for it',
-        isDeploymentTest: false,
-        run: withClient({ tools: ['actors'] }, async (client) => {
-            const result = await client.callTool({
-                name: 'fetch-actor-details',
-                arguments: { actor: ACTOR_NORMAL_MODE, output: { serverInterface: true } },
+            expect(list.text).toContain('- POST /add: Add two numbers (JSON body). Required: request body.');
+            for (const key of ['openapi', 'paths', 'components']) expect(list.text).toContain(`"${key}":`);
+            const operation = await call(ACTOR_SERVER_ACTOR_TEST, { serverInterface: 'GET /add' });
+            expect(operation.result.isError).not.toBe(true);
+            for (const part of ['"operation":', 'Components are omitted', '"$ref":"#/components/parameters/AsText"']) {
+                expect(operation.text).toContain(part);
+            }
+            expect(operation.text).toContain('"$ref":"#/components/responses/Add"');
+            const parameter = await call(ACTOR_SERVER_ACTOR_TEST, {
+                serverInterface: '#/components/parameters/AsText',
             });
-
-            const text = (result.content as { text: string }[]).map((item) => item.text).join('\n');
-            expect(text).toContain(`Actor '${ACTOR_NORMAL_MODE}' has no server interface.`);
+            expect(parameter.result.isError).not.toBe(true);
+            expect(parameter.text).toContain('"name":"asText"');
+            const unknown = await call(ACTOR_SERVER_ACTOR_TEST, { serverInterface: 'GET /nope' });
+            expect(unknown.result.isError).toBe(true);
+            expect(unknown.text).toContain('GET /add');
+            const normal = await call(ACTOR_NORMAL_MODE, { serverInterface: true });
+            expect(normal.text).toContain(`Actor '${ACTOR_NORMAL_MODE}' has no server interface.`);
         }),
     },
 ];

@@ -66,9 +66,8 @@ export function buildCallActorMcpServerSection({ hasTool }: ToolDescriptionConte
 ${hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? `- Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output={ mcpTools: true } to list available tools\n` : ''}- Call using format: "actorName:toolName" (e.g., "username/name:tool-name")`;
 }
 
-/** Points at the Actor Server for results that do not need a batch run; empty when the send tool is absent. */
+/** Points at the Actor Server for results that do not need a batch run. */
 function buildCallActorServerActorSection({ hasTool }: ToolDescriptionContext): string {
-    if (!hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST)) return '';
     const operations = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
         ? `\n- ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output={ serverInterface: true } lists its HTTP operations`
         : '';
@@ -153,7 +152,7 @@ export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOL
         'Call any Actor from the Apify Store.',
         workflowSection,
         buildCallActorMcpServerSection(ctx),
-        buildCallActorServerActorSection(ctx),
+        ...(hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST) ? [buildCallActorServerActorSection(ctx)] : []),
         dedent`
             IMPORTANT:
             - Waits up to waitSecs (default 30s) for completion; returns run status and storage IDs, and with waitSecs > 0 also reports dataset field metadata
@@ -169,7 +168,7 @@ export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOL
 
     if (hasTool(HELPER_TOOLS.ACTOR_CALL_WIDGET)) sections.push(buildWidgetAddendum(ctx));
 
-    return sections.filter(Boolean).join('\n\n');
+    return sections.join('\n\n');
 }
 
 /**

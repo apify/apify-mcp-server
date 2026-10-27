@@ -25,10 +25,9 @@ import { wrapJsonText } from '../../utils/encode_text.js';
 import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunActor, getOwnServerRemedy } from '../actor_tool_naming.js';
-import { isRecord } from '../api/apify_api_spec.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
-import { buildServerInterfaceSection, buildServerInterfaceSummary } from './server_interface_schema.js';
+import { buildServerInterfaceText } from './server_interface_schema.js';
 
 /**
  * Shared schema for actor details output options.
@@ -239,9 +238,7 @@ export function buildActorDetailsTextResponse(options: {
         texts.push(mcpToolsMessage);
     }
 
-    if (serverInterfaceMessage) {
-        texts.push(serverInterfaceMessage);
-    }
+    if (serverInterfaceMessage) texts.push(serverInterfaceMessage);
 
     if (linkContext) {
         texts.push(VERBATIM_LINKS_NUDGE);
@@ -293,24 +290,15 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         return buildActorNotFoundResponse(actorName, loadedToolNames);
     }
 
-    let serverInterfaceMessage: string | undefined;
-    const serverInterfaceParams = {
+    const serverInterface = buildServerInterfaceText({
         actor: details.actorInfo,
         actorFullName: `${details.actorInfo.username}/${details.actorInfo.name}`,
-        schema: isRecord(details.webServerSchema) ? details.webServerSchema : undefined,
-    };
-    if (resolvedOutput.serverInterface !== false) {
-        const section = buildServerInterfaceSection({
-            ...serverInterfaceParams,
-            serverInterface: resolvedOutput.serverInterface,
-            loadedToolNames,
-            hasPaymentProvider: paymentProvider !== undefined,
-        });
-        if ('error' in section) return respondUserError(section.error);
-        serverInterfaceMessage = section.text;
-    } else {
-        serverInterfaceMessage = buildServerInterfaceSummary(serverInterfaceParams);
-    }
+        schema: details.webServerSchema,
+        serverInterface: resolvedOutput.serverInterface,
+        loadedToolNames,
+        hasPaymentProvider: paymentProvider !== undefined,
+    });
+    if ('error' in serverInterface) return respondUserError(serverInterface.error);
 
     let actorOutputSchema: Record<string, unknown> | null | undefined;
     if (resolvedOutput.outputSchema) {
@@ -329,7 +317,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         output: resolvedOutput,
         actorOutputSchema,
         mcpToolsMessage,
-        serverInterfaceMessage,
+        serverInterfaceMessage: serverInterface.text,
         linkContext,
     });
 

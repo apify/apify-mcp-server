@@ -14,7 +14,7 @@ import {
 } from '../../src/tools/actors/send_server_actor_request.js';
 import { serverActorRequestOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { Actor, ActorDefinitionPruned, HelperTool, ToolTelemetryContext } from '../../src/types.js';
-import { ACTOR_TENANCY, ALL_TOOLS_PRESENT, SERVER_MODE } from '../../src/types.js';
+import { ACTOR_TENANCY, SERVER_MODE } from '../../src/types.js';
 import { mockActor } from './helpers/actor_build_client.js';
 import { getRequestHandler, makePaymentProvider, withServer } from './helpers/mcp_server.js';
 import {
@@ -529,17 +529,16 @@ describe('returning an Actor Server error', () => {
                 { path: '/status/404' },
                 { loadedToolNames: hasDetails ? [HELPER_TOOLS.ACTOR_GET_DETAILS] : [] },
             );
-            const { nextStep } = result.structuredContent as { nextStep: string };
+            const text = result.content.map((block) => block.text).join('\n');
 
             expect(received).toHaveLength(1);
             expect(result.isError).toBe(true);
-            expect(result.content.at(-1)?.text).toBe(nextStep);
+            expect(result.content.at(-1)?.text).toBe((result.structuredContent as { nextStep: string }).nextStep);
             if (hasDetails) {
-                // The whole list, not the failed operation: on a 404 the path itself may be wrong.
-                expect(nextStep).toContain(JSON.stringify({ actor: SERVER_ACTOR, output: { serverInterface: true } }));
+                expect(text).toContain(JSON.stringify({ actor: SERVER_ACTOR, output: { serverInterface: true } }));
             } else {
-                expect(nextStep).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
-                expect(nextStep).toContain('README');
+                expect(text).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+                expect(text).toContain('README');
             }
         },
     );
@@ -762,12 +761,10 @@ describe('reporting an incomplete response', () => {
 
 describe('describing the tool', () => {
     it('names fetch-actor-details in the description only when the session has it', () => {
-        const withDetails = sendServerActorRequest.buildDescription!(ALL_TOOLS_PRESENT);
-        const withoutDetails = sendServerActorRequest.buildDescription!(only(HELPER_TOOLS.ACTOR_SERVER_REQUEST));
-
-        expect(sendServerActorRequest.description).toBe(withDetails);
-        expect(withDetails).toContain(`${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface`);
-        expect(withoutDetails).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+        expect(sendServerActorRequest.description).toContain(
+            `${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface`,
+        );
+        expect(sendServerActorRequest.buildDescription!(only())).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
     });
 });
 

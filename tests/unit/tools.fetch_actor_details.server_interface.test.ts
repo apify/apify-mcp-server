@@ -2,16 +2,15 @@ import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { buildFetchActorDetailsResult } from '../../src/tools/actors/fetch_actor_details.js';
-import {
-    buildServerInterfaceSection,
-    buildServerInterfaceSummary,
-} from '../../src/tools/actors/server_interface_schema.js';
+import { buildServerInterfaceText } from '../../src/tools/actors/server_interface_schema.js';
 import type { Actor } from '../../src/types.js';
 import { mockActor, mockActorBuildClient, mockDefaultBuild } from './helpers/actor_build_client.js';
 import { mockApifyClient, stubToolCallContext, textOf } from './helpers/tool_context.js';
 
 const ACTOR_FULL_NAME = 'apify/server-actor-test';
 const STANDBY_URL = 'https://server-actor-test.apify.actor';
+const DETAILS = `${HELPER_TOOLS.ACTOR_GET_DETAILS} with {"actor":"${ACTOR_FULL_NAME}","output":`;
+const SUMMARY = 'Server interface: enabled, single-tenant, 3 documented operations: GET /add, POST /add, GET /empty.';
 
 /** The fixture's schema shapes: parameter, request body and response references, like apify/web-fetch's `FetchRequest`. */
 const SCHEMA: Record<string, unknown> = {
@@ -37,21 +36,18 @@ const SCHEMA: Record<string, unknown> = {
                 },
                 responses: { '200': { $ref: '#/components/responses/Add' } },
             },
+            // The send tool does not send HEAD, so it is no operation.
+            head: {},
         },
         '/empty': { get: { summary: 'Return no content', responses: { '204': { description: 'No content.' } } } },
     },
     components: {
         schemas: {
             AddRequest: { type: 'object', properties: { firstNumber: { type: 'integer' } }, required: ['firstNumber'] },
-            AddResponse: { type: 'object', properties: { sum: { type: 'integer' } } },
+            'Forbidden/~': false,
         },
         parameters: { AsText: { name: 'asText', in: 'query', required: false, schema: { type: 'boolean' } } },
-        responses: {
-            Add: {
-                description: 'The sum.',
-                content: { 'application/json': { schema: { $ref: '#/components/schemas/AddResponse' } } },
-            },
-        },
+        responses: { Add: { description: 'The sum.' } },
     },
 };
 
@@ -63,8 +59,10 @@ function serverActor(overrides: Partial<Actor> = {}): Pick<Actor, 'actorStandby'
     };
 }
 
-function section(params: Partial<Parameters<typeof buildServerInterfaceSection>[0]> = {}) {
-    return buildServerInterfaceSection({
+const required = (name: string) => ({ name, in: 'query', required: true });
+
+function build(params: Partial<Parameters<typeof buildServerInterfaceText>[0]> = {}) {
+    return buildServerInterfaceText({
         actor: serverActor(),
         actorFullName: ACTOR_FULL_NAME,
         schema: SCHEMA,
@@ -75,443 +73,254 @@ function section(params: Partial<Parameters<typeof buildServerInterfaceSection>[
     });
 }
 
-function textOfSection(params: Partial<Parameters<typeof buildServerInterfaceSection>[0]> = {}): string {
-    const result = section(params);
-    if ('error' in result) throw new Error(`Expected a section, got ${JSON.stringify(result)}`);
+function textOfBuild(params: Partial<Parameters<typeof buildServerInterfaceText>[0]> = {}): string {
+    const result = build(params);
+    if (!('text' in result) || result.text === undefined) throw new Error(`Expected a text: ${JSON.stringify(result)}`);
     return result.text;
 }
 
-/** Parses the fenced JSON block a section ends with. */
+/** Parses the fenced JSON block a text ends with. */
 function parseJsonBlock(text: string) {
     return JSON.parse(text.slice(text.indexOf('```json\n') + '```json\n'.length, text.lastIndexOf('\n```')));
 }
 
-function summary(params: Partial<Parameters<typeof buildServerInterfaceSummary>[0]> = {}) {
-    return buildServerInterfaceSummary({
-        actor: serverActor(),
-        actorFullName: ACTOR_FULL_NAME,
-        schema: SCHEMA,
-        ...params,
-    });
-}
-
 describe('summarizing a server interface in one line', () => {
-    it('states the tenancy, names each operation and the fetch-actor-details call that lists them', () => {
-        expect(summary()).toBe(
-            'Server interface: enabled, single-tenant, 3 documented operations: GET /add, POST /add, GET /empty. ' +
-                `${HELPER_TOOLS.ACTOR_GET_DETAILS} with {"actor":"${ACTOR_FULL_NAME}","output":{"serverInterface":true}} lists them.`,
-        );
+    const sixPaths = Object.fromEntries(['/a', '/b', '/c', '/d', '/e', '/f'].map((path) => [path, { get: {} }]));
+    it.each([
+        [SCHEMA, SUMMARY],
+        [{ paths: sixPaths }, 'Server interface: enabled, single-tenant, 6 documented operations.'],
+    ])('states the tenancy, the operations, up to five by name, and the call that lists them (%#)', (schema, line) => {
+        expect(build({ schema, serverInterface: false })).toEqual({
+            text: `${line} ${DETAILS}{"serverInterface":true}} lists them.`,
+        });
     });
 
-    it('states only the operation count over five operations', () => {
-        const paths = Object.fromEntries(['/a', '/b', '/c', '/d', '/e', '/f'].map((path) => [path, { get: {} }]));
-
-        expect(summary({ schema: { paths } })).toBe(
-            'Server interface: enabled, single-tenant, 6 documented operations. ' +
-                `${HELPER_TOOLS.ACTOR_GET_DETAILS} with {"actor":"${ACTOR_FULL_NAME}","output":{"serverInterface":true}} lists them.`,
-        );
+    it.each([
+        [false, undefined],
+        [true, `Actor '${ACTOR_FULL_NAME}' has no server interface.`],
+    ])('for an Actor without one, with serverInterface %j, is %j', (serverInterface, text) => {
+        expect(build({ serverInterface, actor: { actorStandby: { isEnabled: false } } })).toEqual({ text });
     });
 
-    it.each([undefined, { paths: {} }])('says the interface is undocumented when the schema is %s', (schema) => {
-        expect(summary({ schema })).toBe(
-            'Server interface: enabled, single-tenant, undocumented: no API schema. See the README.',
-        );
-    });
-
-    it('is absent for an Actor without a server interface', () => {
-        expect(summary({ actor: { actorStandby: { isEnabled: false } } })).toBe(undefined);
+    it.each([
+        [false, undefined],
+        [true, { paths: {} }],
+    ])('says the interface is undocumented, with serverInterface %j and schema %j', (serverInterface, schema) => {
+        expect(build({ schema, serverInterface })).toEqual({
+            text: 'Server interface: enabled, single-tenant, undocumented: no API schema. See the README.',
+        });
     });
 });
 
-describe('rendering the server-interface section', () => {
-    describe('the operation list', () => {
-        it('says the interface is undocumented for a Server Actor without an API schema', () => {
-            expect(textOfSection({ schema: undefined })).toBe(
-                'Server interface: enabled, single-tenant, undocumented: no API schema. See the README.',
-            );
-        });
+describe('the operation list', () => {
+    it('lists each operation with its summary and required inputs, the calls to use, and the full schema', () => {
+        const text = textOfBuild();
 
-        it('lists each operation with its summary and required inputs under the Actor name, and a send tool call for the first', () => {
-            const text = textOfSection({ serverInterface: true });
-
-            expect(text).toContain(`# Server interface of ${ACTOR_FULL_NAME}\n`);
-            expect(text).not.toContain('Base URL');
-            expect(text).toContain(
-                `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends a request to one of them: ` +
-                    `{"actor":"${ACTOR_FULL_NAME}","method":"GET","path":"/add"}`,
-            );
-            expect(text).toContain(
-                `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ` +
-                    `{"actor":"${ACTOR_FULL_NAME}","output":{"serverInterface":"GET /add"}} returns one operation excerpt`,
-            );
-            expect(text).toContain('Operations (3):');
-            expect(text).toContain('- GET /add: Add two numbers (query). Required: firstNumber.');
-            expect(text).toContain('- POST /add: Add two numbers (JSON body). Required: request body.');
-            expect(text).toContain('- GET /empty: Return no content\n');
-            const schema = parseJsonBlock(text);
-            expect(schema).toEqual(SCHEMA);
-        });
-
-        it('keeps one period after a summary that already ends with one', () => {
-            const schema = {
-                openapi: '3.0.3',
-                paths: {
-                    '/': {
-                        get: {
-                            summary: 'Fetch a URL.',
-                            parameters: [{ name: 'url', in: 'query', required: true, schema: { type: 'string' } }],
-                        },
-                    },
-                },
-            };
-
-            expect(textOfSection({ schema, serverInterface: true })).toContain('- GET /: Fetch a URL. Required: url.');
-        });
-
-        it('lists only the methods the send tool accepts', () => {
-            const schema = { openapi: '3.0.3', paths: { '/': { get: { summary: 'Fetch' }, head: {}, options: {} } } };
-
-            const text = textOfSection({ schema, serverInterface: true });
-
-            expect(text).toContain('Operations (1):');
-            expect(text).not.toMatch(/- (HEAD|OPTIONS) \//);
-        });
-
-        it('says requests are not supported, without the send tool or run cost, in a payment-provider session', () => {
-            const text = textOfSection({ serverInterface: true, hasPaymentProvider: true });
-
-            expect(text).toContain('not supported in agentic payment mode');
-            expect(text).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
-            expect(text).not.toContain('starts a run');
-        });
-
-        it('lists required path-level inputs through a parameter alias chain', () => {
-            const schema = {
-                openapi: '3.0.3',
-                paths: { '/search': { parameters: [{ $ref: '#/components/parameters/Alias' }], get: {} } },
-                components: {
-                    parameters: {
-                        Alias: { $ref: '#/components/parameters/Search' },
-                        Search: { name: 'q', in: 'query', required: true, schema: { type: 'string' } },
-                    },
-                },
-            };
-
-            expect(textOfSection({ schema, serverInterface: true })).toContain('- GET /search Required: q.');
-        });
-
-        it('replaces an aliased path-level parameter by its operation-level override', () => {
-            const schema = {
-                openapi: '3.0.3',
-                paths: {
-                    '/search': {
-                        parameters: [{ $ref: '#/components/parameters/Alias' }],
-                        get: {
-                            summary: 'Search',
-                            parameters: [{ name: 'q', in: 'query', schema: { type: 'integer' } }],
-                        },
-                    },
-                },
-                components: {
-                    parameters: {
-                        Alias: { $ref: '#/components/parameters/Search' },
-                        Search: { name: 'q', in: 'query', required: true, schema: { type: 'string' } },
-                    },
-                },
-            };
-
-            expect(textOfSection({ schema, serverInterface: true })).toContain('- GET /search: Search\n');
-        });
-
-        it('reads required parameters through escaped JSON pointer segments', () => {
-            const schema = {
-                paths: { '/search': { get: { parameters: [{ $ref: '#/components/parameters/Search~1query~0' }] } } },
-                components: {
-                    parameters: { 'Search/query~': { name: 'q', in: 'query', required: true } },
-                },
-            };
-
-            expect(textOfSection({ schema })).toContain('- GET /search Required: q.');
-        });
-
-        it('keeps the list usable when parameter aliases are circular, missing, or external', () => {
-            const schema = {
-                paths: {
-                    '/search': {
-                        get: {
-                            parameters: [
-                                { $ref: '#/components/parameters/Loop' },
-                                { $ref: '#/components/parameters/Missing' },
-                                { $ref: 'https://example.com/parameter.json' },
-                                { name: 'q', in: 'query', required: true },
-                            ],
-                        },
-                    },
-                },
-                components: { parameters: { Loop: { $ref: '#/components/parameters/Loop' } } },
-            };
-
-            expect(textOfSection({ schema })).toContain('- GET /search Required: q.');
-        });
-
-        it('stops following a parameter alias chain after a few hops', () => {
-            // A creator-written chain followed once per parameter would cost parameters × hops.
-            const hops = 100;
-            const parameters: Record<string, unknown> = {
-                [`P${hops}`]: { name: 'q', in: 'query', required: true },
-            };
-            for (let i = 0; i < hops; i++) parameters[`P${i}`] = { $ref: `#/components/parameters/P${i + 1}` };
-            const schema = {
-                paths: { '/search': { get: { parameters: [{ $ref: '#/components/parameters/P0' }] } } },
-                components: { parameters },
-            };
-
-            expect(textOfSection({ schema })).not.toContain('Required: q');
-        });
-
-        it("gives the Actor's standby URL as the base URL instead of the send tool when the session lacks it", () => {
-            const text = textOfSection({ serverInterface: true, loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS] });
-
-            expect(text).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
-            expect(text).toContain(`Base URL: ${STANDBY_URL}`);
-            expect(text.slice(0, text.indexOf('```json'))).not.toContain('example-server-actor');
-        });
-
-        it.each([
-            [
-                'SINGLE_TENANT',
-                'single-tenant: the first request starts a run in your account, kept for its idle timeout of 300 s.',
-            ],
-            ['MULTI_TENANT', 'multi-tenant: requests are charged per event and start no run in your account.'],
-        ] as const)('explains the cost of a %s Actor', (tenancy, sentence) => {
-            const text = textOfSection({
-                serverInterface: true,
-                actor: serverActor({ actorStandby: { isEnabled: true, tenancy, idleTimeoutSecs: 300 } }),
-            });
-
-            expect(text).toContain(sentence);
-        });
-
-        it('says there is no server interface when an Actor without one is asked for it', () => {
-            expect(textOfSection({ serverInterface: true, actor: { actorStandby: { isEnabled: false } } })).toBe(
-                `Actor '${ACTOR_FULL_NAME}' has no server interface.`,
-            );
-        });
-    });
-
-    describe('one operation', () => {
-        it('returns the selected operation with raw references and component navigation', () => {
-            const text = textOfSection({ serverInterface: 'GET /add' });
-
-            expect(text).toContain(`# Server interface of ${ACTOR_FULL_NAME}: GET /add\nAdd two numbers (query)`);
-            expect(text).toContain(
-                `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends this request: ` +
-                    `{"actor":"${ACTOR_FULL_NAME}","method":"GET","path":"/add"}`,
-            );
-            const detail = parseJsonBlock(text);
-            expect(detail).toEqual({
-                openapi: '3.0.0',
-                operation: {
-                    summary: 'Add two numbers (query)',
-                    parameters: [
-                        { name: 'firstNumber', in: 'query', required: true, schema: { type: 'integer' } },
-                        { $ref: '#/components/parameters/AsText' },
-                    ],
-                    responses: { '200': { $ref: '#/components/responses/Add' } },
-                },
-            });
-            expect(text).toContain('Components are omitted');
-            expect(text).toContain('"serverInterface":"#/components/schemas/Name"');
-            expect(text).toContain("schema's servers are not used");
-        });
-
-        it('accepts a lower-case method', () => {
-            const text = textOfSection({ serverInterface: 'post /add' });
-
-            expect(text).toContain(`# Server interface of ${ACTOR_FULL_NAME}: POST /add`);
-        });
-
-        it('keeps an operation navigable when unrelated schema detail is too large', () => {
-            const schema = { ...SCHEMA, description: 'a'.repeat(MAX_INLINE_BYTES) };
-
-            const text = textOfSection({ schema, serverInterface: 'POST /add' });
-            const detail = parseJsonBlock(text);
-
-            expect(detail.operation.requestBody.content['application/json'].schema).toEqual({
-                $ref: '#/components/schemas/AddRequest',
-            });
-            expect(text).toContain('Components are omitted');
-            expect(text).not.toContain('a'.repeat(100));
-        });
-
-        it('preserves inherited parameters and security context in an operation excerpt', () => {
-            const schema = {
-                openapi: '3.1.0',
-                jsonSchemaDialect: 'https://json-schema.org/draft/2020-12/schema',
-                security: [{ ActorKey: [] }],
-                paths: {
-                    '/search': {
-                        parameters: [{ name: 'q', in: 'query', required: true }],
-                        get: { responses: { '200': { description: 'OK' } } },
-                    },
-                },
-            };
-
-            const text = textOfSection({ schema, serverInterface: 'GET /search' });
-            const detail = parseJsonBlock(text);
-
-            expect(detail).toEqual({
-                openapi: '3.1.0',
-                jsonSchemaDialect: 'https://json-schema.org/draft/2020-12/schema',
-                security: [{ ActorKey: [] }],
-                operation: {
-                    parameters: [{ name: 'q', in: 'query', required: true }],
-                    responses: { '200': { description: 'OK' } },
-                },
-            });
-        });
-
-        it.each([true, 'GET /search'] as const)(
-            'reports an oversized operation list or selected operation for %j',
-            (serverInterface) => {
-                const schema = { paths: { '/search': { get: { summary: 'a'.repeat(MAX_INLINE_BYTES) } } } };
-
-                const result = section({ schema, serverInterface });
-
-                expect(result).toMatchObject({ error: expect.stringContaining(`${MAX_INLINE_BYTES}`) });
-                expect(JSON.stringify(result)).not.toContain('```json');
-            },
+        expect(text.slice(0, text.indexOf('```json'))).toBe(
+            `# Server interface of ${ACTOR_FULL_NAME}\n` +
+                'single-tenant: the first request starts a run in your account, kept for its idle timeout of 300 s.\n' +
+                'Operations (3):\n' +
+                '- GET /add: Add two numbers (query). Required: firstNumber.\n' +
+                '- POST /add: Add two numbers (JSON body). Required: request body.\n' +
+                '- GET /empty: Return no content\n' +
+                `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends a request to one of them: {"actor":"${ACTOR_FULL_NAME}","method":"GET","path":"/add"}\n` +
+                `${DETAILS}{"serverInterface":"GET /add"}} returns one operation excerpt.\n` +
+                `References are not expanded or fetched. ${DETAILS}{"serverInterface":"#/components/schemas/Name"}} returns the raw node at a local JSON pointer. The schema's servers are not used.\n` +
+                'Full API schema:\n',
         );
-
-        it.each(['GET /nope', 'add'])('returns a selection error listing the operations for %j', (serverInterface) => {
-            expect(section({ serverInterface })).toEqual({
-                error:
-                    `Actor '${ACTOR_FULL_NAME}' has no operation "${serverInterface}". ` +
-                    'Documented operations: GET /add, POST /add, GET /empty.',
-            });
-        });
+        expect(parseJsonBlock(text)).toEqual(SCHEMA);
     });
 
-    describe('the full schema', () => {
-        it('leaves reference siblings, inherited context, examples, and extensions unchanged', () => {
-            const schema = {
-                ...SCHEMA,
-                openapi: '3.1.0',
-                jsonSchemaDialect: 'https://json-schema.org/draft/2020-12/schema',
-                security: [{ ActorKey: [] }],
-                paths: {
-                    '/search': {
-                        parameters: [{ $ref: '#/components/parameters/Search' }],
-                        post: {
-                            requestBody: {
-                                content: {
-                                    'application/json': {
-                                        schema: { $ref: '#/components/schemas/Text', maxLength: 10 },
-                                    },
-                                },
-                            },
-                            responses: { '200': { description: 'OK' } },
-                        },
-                    },
-                },
-                components: {
-                    schemas: {
-                        Text: { type: 'string', examples: ['Apify'], 'x-display-name': 'Search text' },
-                        Node: { $ref: '#/components/schemas/Node' },
-                        Missing: { $ref: '#/components/schemas/MissingTarget' },
-                        External: { $ref: 'https://example.com/schema.json' },
-                    },
-                    parameters: { Search: { name: 'q', in: 'query', required: true, schema: { type: 'string' } } },
-                    securitySchemes: { ActorKey: { type: 'apiKey', in: 'header', name: 'X-Actor-Key' } },
-                },
-            };
-            const original = structuredClone(schema);
-
-            const text = textOfSection({ schema, serverInterface: true });
-            const detail = parseJsonBlock(text);
-            expect(detail).toEqual(original);
-            expect(schema).toEqual(original);
-        });
-
-        it('returns the full schema exactly at the inline byte limit', () => {
-            const schema = { ...SCHEMA, description: '' };
-            const emptyText = textOfSection({ schema, serverInterface: true });
-            schema.description = 'a'.repeat(MAX_INLINE_BYTES - Buffer.byteLength(emptyText));
-
-            const text = textOfSection({ schema, serverInterface: true });
-
-            expect(Buffer.byteLength(text)).toBe(MAX_INLINE_BYTES);
-            expect(text).toContain(JSON.stringify(schema));
-        });
-
-        it('falls back to operation navigation when the full schema exceeds the UTF-8 byte cap', () => {
-            const schema = { ...SCHEMA, description: '漢'.repeat(Math.ceil(MAX_INLINE_BYTES / 3)) };
-
-            const text = textOfSection({ schema, serverInterface: true });
-
-            expect(text).toContain(`Full API schema omitted: exceeds the ${MAX_INLINE_BYTES}-byte limit`);
-            expect(text).toContain('- POST /add');
-            expect(text).toContain('"serverInterface":"GET /add"');
-            expect(text).not.toContain('```json');
-            expect(Buffer.byteLength(text)).toBeLessThanOrEqual(MAX_INLINE_BYTES);
-        });
-
-        it('includes guidance in the byte limit even when the schema alone fits', () => {
-            const schema = { ...SCHEMA, description: '' };
-            const emptyText = textOfSection({ schema, serverInterface: true });
-            schema.description = 'a'.repeat(MAX_INLINE_BYTES - Buffer.byteLength(emptyText) + 1);
-
-            const text = textOfSection({ schema, serverInterface: true });
-
-            expect(Buffer.byteLength(JSON.stringify(schema))).toBeLessThan(MAX_INLINE_BYTES);
-            expect(text).toContain('Full API schema omitted');
-            expect(text).not.toContain('```json');
-        });
-    });
-
-    describe('a schema node', () => {
-        it('returns a referenced component at its original local JSON pointer', () => {
-            const text = textOfSection({ serverInterface: '#/components/schemas/AddRequest' });
-            const node = parseJsonBlock(text);
-
-            expect(node).toEqual({
-                type: 'object',
-                properties: { firstNumber: { type: 'integer' } },
-                required: ['firstNumber'],
-            });
-        });
-
-        it('keeps false schema nodes and decodes escaped pointer segments', () => {
-            const schema = { ...SCHEMA, components: { schemas: { 'Forbidden/~': false } } };
-
-            const text = textOfSection({ schema, serverInterface: '#/components/schemas/Forbidden~1~0' });
-            const node = parseJsonBlock(text);
-
-            expect(node).toBe(false);
-        });
-
-        // `constructor` is inherited by every object; only the schema's own keys are nodes.
-        it.each(['#/components/schemas/Missing', '#/components/schemas/constructor'])(
-            'reports a missing pointer target at %j',
-            (serverInterface) => {
-                expect(section({ serverInterface })).toEqual({
-                    error: expect.stringContaining(`no schema node at "${serverInterface}"`),
-                });
+    const chain: Record<string, unknown> = { P100: required('deep') };
+    for (let i = 0; i < 100; i++) chain[`P${i}`] = { $ref: `#/components/parameters/P${i + 1}` };
+    // Each row: the `get` operation and `components.parameters` under a path-level `Alias` parameter.
+    it.each([
+        [
+            'keeps one period after a summary that ends with one',
+            { summary: 'Hi.', parameters: [required('q')] },
+            {},
+            ': Hi. Required: q.',
+        ],
+        [
+            'reads required inputs through an alias chain and escaped pointer segments',
+            {},
+            { Alias: { $ref: '#/components/parameters/Search~1query~0' }, 'Search/query~': required('q') },
+            ' Required: q.',
+        ],
+        [
+            'replaces an aliased path-level parameter by its operation-level override',
+            { summary: 'Search', parameters: [{ name: 'q', in: 'query' }] },
+            { Alias: { $ref: '#/components/parameters/Search' }, Search: required('q') },
+            ': Search\n',
+        ],
+        [
+            'skips circular, missing and external aliases, and a chain over the hop cap',
+            {
+                parameters: [
+                    ...['Loop', 'Missing', 'P0'].map((name) => ({ $ref: `#/components/parameters/${name}` })),
+                    required('q'),
+                ],
+                requestBody: { $ref: 'https://example.com/body.json' },
             },
+            {
+                Alias: { $ref: 'https://example.com/parameter.json' },
+                Loop: { $ref: '#/components/parameters/Loop' },
+                ...chain,
+            },
+            ' Required: q.\n',
+        ],
+    ])('%s', (_label, get, parameters, line) => {
+        const schema = {
+            paths: { '/search': { parameters: [{ $ref: '#/components/parameters/Alias' }], get } },
+            components: { parameters },
+        };
+
+        expect(textOfBuild({ schema })).toContain(`- GET /search${line}`);
+    });
+
+    it('says requests are not supported, without the send tool or run cost, in agentic payment mode', () => {
+        const text = textOfBuild({ hasPaymentProvider: true });
+
+        expect(text).toContain('Requests to a server interface are not supported in agentic payment mode.\n');
+        expect(text).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
+        expect(text).not.toContain('starts a run');
+    });
+
+    it("gives the Actor's standby URL as the base URL instead of the send tool when the session lacks it", () => {
+        const text = textOfBuild({ loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS] });
+
+        expect(text).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
+        expect(text).toContain(`Base URL: ${STANDBY_URL}`);
+        expect(text.slice(0, text.indexOf('```json'))).not.toContain('example-server-actor');
+    });
+
+    it('explains the cost of a multi-tenant Actor', () => {
+        const actor = serverActor({ actorStandby: { isEnabled: true, tenancy: 'MULTI_TENANT', idleTimeoutSecs: 300 } });
+
+        expect(textOfBuild({ actor })).toContain(
+            'multi-tenant: requests are charged per event and start no run in your account.',
         );
+    });
+});
 
-        it('rejects a selected node that exceeds the byte cap without returning partial JSON', () => {
-            const schema = {
-                ...SCHEMA,
-                components: { schemas: { Huge: { description: 'a'.repeat(MAX_INLINE_BYTES) } } },
-            };
+describe('one operation', () => {
+    it('returns the selected operation, of any method case, with raw references and navigation', () => {
+        const text = textOfBuild({ serverInterface: 'get /add' });
 
-            const result = section({ schema, serverInterface: '#/components/schemas/Huge' });
-
-            expect(result).toMatchObject({ error: expect.stringContaining(`${MAX_INLINE_BYTES}`) });
-            expect(JSON.stringify(result)).not.toContain('```json');
+        expect(text).toContain(`# Server interface of ${ACTOR_FULL_NAME}: GET /add\nAdd two numbers (query)`);
+        expect(text).toContain(
+            `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends this request: ` +
+                `{"actor":"${ACTOR_FULL_NAME}","method":"GET","path":"/add"}`,
+        );
+        expect(text).toContain('Components are omitted');
+        expect(text).toContain('"serverInterface":"#/components/schemas/Name"');
+        expect(parseJsonBlock(text)).toEqual({
+            openapi: '3.0.0',
+            operation: (SCHEMA.paths as Record<string, Record<string, unknown>>)['/add'].get,
         });
     });
+
+    it('keeps an operation navigable when unrelated schema detail is too large', () => {
+        const schema = { ...SCHEMA, description: 'a'.repeat(MAX_INLINE_BYTES) };
+
+        const text = textOfBuild({ schema, serverInterface: 'POST /add' });
+
+        expect(parseJsonBlock(text).operation.requestBody.content['application/json'].schema).toEqual({
+            $ref: '#/components/schemas/AddRequest',
+        });
+        expect(text).not.toContain('a'.repeat(100));
+    });
+
+    it('preserves inherited parameters and security context in an operation excerpt', () => {
+        const schema = {
+            openapi: '3.1.0',
+            jsonSchemaDialect: 'https://json-schema.org/draft/2020-12/schema',
+            security: [{ ActorKey: [] }],
+            paths: { '/search': { parameters: [required('q')], get: {} } },
+        };
+
+        expect(parseJsonBlock(textOfBuild({ schema, serverInterface: 'GET /search' }))).toEqual({
+            ...schema,
+            paths: undefined,
+            operation: { parameters: [required('q')] },
+        });
+    });
+});
+
+describe('the full schema', () => {
+    it('leaves reference siblings, examples, and extensions unchanged', () => {
+        const schema = {
+            ...SCHEMA,
+            components: {
+                schemas: {
+                    Text: { $ref: '#/components/schemas/Node', maxLength: 10, examples: ['Apify'], 'x-name': 'Text' },
+                    Node: { $ref: '#/components/schemas/Node' },
+                    External: { $ref: 'https://example.com/schema.json' },
+                },
+            },
+        };
+        const original = structuredClone(schema);
+
+        expect(parseJsonBlock(textOfBuild({ schema }))).toEqual(original);
+        expect(schema).toEqual(original);
+    });
+
+    // At the limit the full schema fits; one byte over, guidance included, it is left out.
+    it.each([0, 1])('counts the whole text against the byte limit, %i byte over', (over) => {
+        const schema = { ...SCHEMA, description: '' };
+        schema.description = 'a'.repeat(MAX_INLINE_BYTES - Buffer.byteLength(textOfBuild({ schema })) + over);
+
+        const text = textOfBuild({ schema });
+
+        expect(text.includes(JSON.stringify(schema))).toBe(over === 0);
+        expect(text.includes(`Full API schema omitted: exceeds the ${MAX_INLINE_BYTES}-byte limit`)).toBe(over === 1);
+    });
+
+    it('falls back to operation navigation when the full schema exceeds the UTF-8 byte cap', () => {
+        const text = textOfBuild({ schema: { ...SCHEMA, description: '漢'.repeat(Math.ceil(MAX_INLINE_BYTES / 3)) } });
+
+        expect(text).toContain('Full API schema omitted');
+        expect(text).toContain('- POST /add');
+        expect(text).not.toContain('```json');
+        expect(Buffer.byteLength(text)).toBeLessThanOrEqual(MAX_INLINE_BYTES);
+    });
+
+    it.each([
+        [
+            '#/components/schemas/AddRequest',
+            (SCHEMA.components as Record<string, Record<string, unknown>>).schemas.AddRequest,
+        ],
+        ['#/components/schemas/Forbidden~1~0', false],
+    ])('returns the raw node at %j', (serverInterface, node) => {
+        expect(parseJsonBlock(textOfBuild({ serverInterface }))).toEqual(node);
+    });
+});
+
+describe('a selection that cannot be returned', () => {
+    // `constructor` is inherited by every object; only the schema's own keys are nodes.
+    it.each([
+        ['GET /nope', 'has no operation "GET /nope". Documented operations: GET /add, POST /add, GET /empty.'],
+        ['add', 'has no operation "add". Documented operations: GET /add, POST /add, GET /empty.'],
+        ['#/components/schemas/Missing', 'has no schema node at "#/components/schemas/Missing".'],
+        ['#/components/schemas/constructor', 'has no schema node at "#/components/schemas/constructor".'],
+    ])('is an error for %j', (serverInterface, error) => {
+        expect(build({ serverInterface })).toEqual({ error: `Actor '${ACTOR_FULL_NAME}' ${error}` });
+    });
+
+    it.each([true, 'GET /search', '#/components/schemas/Huge'])(
+        'is a size error, no partial JSON, for %j',
+        (serverInterface) => {
+            const huge = 'a'.repeat(MAX_INLINE_BYTES);
+            const schema = {
+                paths: { '/search': { get: { summary: huge } } },
+                components: { schemas: { Huge: { huge } } },
+            };
+
+            expect(build({ schema, serverInterface })).toEqual({
+                error: `Actor '${ACTOR_FULL_NAME}' server-interface output exceeds the ${MAX_INLINE_BYTES}-byte limit and was not returned. A smaller operation or schema node may fit.`,
+            });
+        },
+    );
 });
 
 describe('fetching details of a Server Actor', () => {
@@ -534,24 +343,16 @@ describe('fetching details of a Server Actor', () => {
         return buildFetchActorDetailsResult(context);
     };
 
-    it('carries the summary line in the text and structuredContent of the default output', async () => {
-        const result = await call();
+    it.each([
+        [undefined, SUMMARY],
+        [{ inputSchema: true }, SUMMARY],
+        [{ serverInterface: true }, `# Server interface of ${ACTOR_FULL_NAME}\n`],
+    ])('carries the server interface in the text and structuredContent of output %j', async (output, expected) => {
+        const result = await call(output);
 
-        const texts = (result.content ?? []).map(textOf);
-        expect(texts.at(-1)).toContain(
-            'Server interface: enabled, single-tenant, 3 documented operations: GET /add, POST /add, GET /empty.',
-        );
-        expect((result.structuredContent as { serverInterface?: string }).serverInterface).toBe(texts.at(-1));
-    });
-
-    it('carries the summary line in a selective output that does not ask for the server interface', async () => {
-        const result = await call({ inputSchema: true });
-
-        const texts = (result.content ?? []).map(textOf);
-        expect(texts.at(-1)).toContain(
-            'Server interface: enabled, single-tenant, 3 documented operations: GET /add, POST /add, GET /empty.',
-        );
-        expect((result.structuredContent as { serverInterface?: string }).serverInterface).toBe(texts.at(-1));
+        const text = textOf(result.content!.at(-1)!);
+        expect(text).toContain(expected);
+        expect((result.structuredContent as { serverInterface?: string }).serverInterface).toBe(text);
     });
 
     it('returns the selection error for an unknown operation', async () => {
@@ -559,16 +360,5 @@ describe('fetching details of a Server Actor', () => {
 
         expect(result.isError).toBe(true);
         expect(textOf(result.content![0])).toContain('Documented operations: GET /add, POST /add, GET /empty.');
-    });
-
-    it('returns the full schema in text and structuredContent when serverInterface is true', async () => {
-        const result = await call({ serverInterface: true });
-
-        expect(result.isError).not.toBe(true);
-        const texts = (result.content ?? []).map(textOf);
-        const text = texts.at(-1)!;
-        const schema = parseJsonBlock(text);
-        expect(schema).toEqual(SCHEMA);
-        expect((result.structuredContent as { serverInterface?: string }).serverInterface).toBe(text);
     });
 });
