@@ -15,6 +15,10 @@ All notable changes to this project will be documented in this file.
 - List documented operations on a rejected Actor Server request ([#1696](https://github.com/apify/apify-mcp-server/pull/1696)) ([88adc14](https://github.com/apify/apify-mcp-server/commit/88adc144c6019cd412ba7ef3119582ccea0d5a09)) by [@jirispilka](https://github.com/jirispilka), closes [#1620](https://github.com/apify/apify-mcp-server/issues/1620)
 - Serve send-server-actor-request only when requested ([#1703](https://github.com/apify/apify-mcp-server/pull/1703)) ([753391a](https://github.com/apify/apify-mcp-server/commit/753391a59c93174b3dc80aa532c75b6d637350bf)) by [@jirispilka](https://github.com/jirispilka), closes [#1620](https://github.com/apify/apify-mcp-server/issues/1620)
 
+### 🐛 Bug Fixes
+
+- Close feature gaps after the Store search backend switch ([#1713](https://github.com/apify/apify-mcp-server/pull/1713)) ([790724d](https://github.com/apify/apify-mcp-server/commit/790724de58cb3a06ff784b900b49b5b3704d4473)) by [@jirispilka](https://github.com/jirispilka), closes [#1673](https://github.com/apify/apify-mcp-server/issues/1673)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.19.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.3) (2026-10-21)
