@@ -247,9 +247,9 @@ export const actorDetailsOutputSchema = {
         serverInterface: {
             type: 'string',
             description:
-                "The Actor's server interface: a one-line summary by default. `output.serverInterface: true` returns " +
-                'the full API schema with guidance when it fits, or operation navigation otherwise. ' +
-                'A "METHOD /path" string returns an operation excerpt; "#/..." returns a raw local schema node.',
+                "The Actor's server interface. `output.serverInterface: true` returns the full API schema with " +
+                'guidance when it fits, or operation navigation otherwise. A "METHOD /path" string returns an ' +
+                'operation excerpt; "#/..." returns a raw local schema node.',
         },
     },
 };

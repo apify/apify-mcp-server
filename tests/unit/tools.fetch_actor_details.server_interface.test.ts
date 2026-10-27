@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
-import { buildFetchActorDetailsResult } from '../../src/tools/actors/fetch_actor_details.js';
+import { buildFetchActorDetailsResult, fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
 import { buildServerInterfaceText } from '../../src/tools/actors/server_interface_schema.js';
 import type { Actor } from '../../src/types.js';
 import { mockActor, mockActorBuildClient, mockDefaultBuild } from './helpers/actor_build_client.js';
-import { mockApifyClient, stubToolCallContext, textOf } from './helpers/tool_context.js';
+import { mockApifyClient, only, stubToolCallContext, textOf } from './helpers/tool_context.js';
 
 const ACTOR_FULL_NAME = 'apify/server-actor-test';
 const STANDBY_URL = 'https://server-actor-test.apify.actor';
@@ -341,6 +341,17 @@ describe('a selection that cannot be returned', () => {
             });
         },
     );
+});
+
+describe('the tool description', () => {
+    it('promises the summary line only when the session has send-server-actor-request', () => {
+        const withSend = fetchActorDetails.buildDescription!(only(HELPER_TOOLS.ACTOR_SERVER_REQUEST));
+        const withoutSend = fetchActorDetails.buildDescription!(only());
+
+        expect(withSend).toContain('one-line server interface summary');
+        expect(withoutSend).not.toContain('server interface summary');
+        expect(withoutSend).toContain('mcpTools and serverInterface.\n');
+    });
 });
 
 describe('fetching details of a Server Actor', () => {

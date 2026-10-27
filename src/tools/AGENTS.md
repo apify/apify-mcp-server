@@ -32,11 +32,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     schema and README stay on the default build; `hasWebServerSchemaOperations` detects operations the send tool
     can call in the publisher's schema; `webServerOperations` caches each operation with its required inputs, which
     the send tool lists after a 400/404/405/422),
-    `server_interface_schema.ts` (the server-interface text of `fetch-actor-details`: one summary line by default, only in sessions that
-    have `send-server-actor-request`;
-    `output.serverInterface: true` lists the operations, with the API schema as written while it fits `MAX_INLINE_BYTES`;
-    `"METHOD /path"` returns one operation excerpt and `"#/..."` the raw node at a local JSON pointer; references are
-    not expanded or fetched),
+    `server_interface_schema.ts` (the server-interface text of `fetch-actor-details`: by default one summary line,
+    served only with `send-server-actor-request`; `output.serverInterface: true` lists the operations, with the API
+    schema as written while it fits `MAX_INLINE_BYTES`; `"METHOD /path"` returns one operation excerpt and `"#/..."`
+    the raw node at a local JSON pointer; references are not expanded or fetched),
     `send_server_actor_request.ts` (`send-server-actor-request`: one HTTP request to a Server Actor's API, gated on
     the `server` interface and sent through `sendApifyApiRequest` with raw response
     bytes, no redirects, the `MAX_INLINE_BYTES` cap after decompression and the `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`
