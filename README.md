@@ -364,7 +364,7 @@ Ask in plain language. The agent finds a suitable Actor, checks its input and pr
 | Use case | Example prompt | Actor the agent typically picks |
 | :--- | :--- | :--- |
 | Web research | "Find what people on X and Hacker News said about autonomous AI agents this week and summarize the key developments." | [Tweet Scraper V2](https://apify.com/apidojo/tweet-scraper), [Hacker News Data Scraper](https://apify.com/epctex/hackernews-scraper) |
-| Read a webpage | "Fetch https://example.com/pricing as Markdown and summarize this webpage in five bullets." | [Web Fetch](https://apify.com/apify/web-fetch) |
+| Search and read the web | "Compare the current pricing plans of Notion, Coda, and Airtable and tell me which is cheapest for a 10-person team." The agent searches for each pricing page, then fetches the top results as Markdown to read them. | [Web Search](https://apify.com/apify/web-search), [Web Fetch](https://apify.com/apify/web-fetch) |
 | Search results (SERP) | "Get the top 20 Google results for 'best CRM for startups' in the US and show who ranks where." | [Google Search Results Scraper](https://apify.com/apify/google-search-scraper) |
 | Lead generation | "Find dentists in Austin, Texas on Google Maps with their phone numbers, websites, and ratings." | [Google Maps Scraper](https://apify.com/compass/crawler-google-places) |
 | LinkedIn profiles | "Get the current job title, company, and work history for these 20 LinkedIn profiles." | [LinkedIn Profile Scraper](https://apify.com/harvestapi/linkedin-profile-scraper) |
