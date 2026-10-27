@@ -84,13 +84,7 @@ export const registrationCases: Case[] = [
             const names = getToolNames(tools);
 
             // Equivalent to tools=actors,docs,apify/rag-web-browser,apify/web-fetch (no widgets outside apps).
-            const expectedActorsTools = [
-                'fetch-actor-details',
-                'search-actors',
-                'call-actor',
-                'send-server-actor-request',
-                'call-actor-mcp-tool',
-            ];
+            const expectedActorsTools = ['fetch-actor-details', 'search-actors', 'call-actor', 'call-actor-mcp-tool'];
             const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
             const expectedActors = [
                 actorNameToToolName('apify/rag-web-browser'),
@@ -110,7 +104,7 @@ export const registrationCases: Case[] = [
         isDeploymentTest: true,
         run: withClient({ telemetry: { enabled: true } }, async (client) => {
             const names = getToolNames(await client.listTools());
-            expect(names).toHaveLength(10 + AUTO_INJECTED_TOOL_NAMES.length);
+            expect(names).toHaveLength(9 + AUTO_INJECTED_TOOL_NAMES.length);
             expect(names).toContain('report-problem');
         }),
     },

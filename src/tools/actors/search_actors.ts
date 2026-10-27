@@ -61,7 +61,14 @@ export const searchActorsBaseArgsSchema = z.object({
         .max(MAX_LIMIT_WITH_INPUT_SCHEMA)
         .default(5)
         .describe(`The maximum number of Actors to return (max = ${MAX_LIMIT_WITH_INPUT_SCHEMA}, default = 5).`),
-    offset: z.number().int().min(0).default(0).describe('The number of elements to skip from the start (default = 0)'),
+    offset: z
+        .number()
+        .int()
+        .min(0)
+        .default(0)
+        .describe(
+            'The number of elements to skip from the start (default = 0). Has no effect when keywords are set: every offset returns the first results.',
+        ),
 });
 
 function buildDescription({ hasTool, clientParam }: ToolDescriptionContext): string {
@@ -94,7 +101,7 @@ Returns list of Actor cards with the following info:
 - **URL:** Direct Store link
 - **Description:** Actor description or fallback
 - **Pricing:** Details with pricing link
-- **Stats:** Total and monthly users, bookmarks
+- **Stats:** Total and monthly users
 - **Rating:** Out of 5 (if available)
 - **Developed by:** Username linked to profile, marked (Apify) or (community)
 - **Categories:** Formatted or "Uncategorized"

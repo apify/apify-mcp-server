@@ -15,13 +15,15 @@ import type {
 import { getHttpStatusCode } from '../../utils/logging.js';
 import { API_METHODS, isRecord } from '../api/apify_api_spec.js';
 import type { BuildListItem } from '../builds/get_actor_build_list.js';
+import { listDocumentedOperations } from './server_interface_schema.js';
 
 const BUILD_NUMBER_PATTERN = /^\d+\.\d+\.\d+$/;
 
 /**
  * Get an Actor's pruned definition by Actor ID or name.
- * Input schema and README come from the default build; `webServerMcpPath` and `hasWebServerSchema` come from
- * the build Actor Standby runs, which can be a different one (see `resolveServerInterfaceDefinition`).
+ * Input schema and README come from the default build; `webServerMcpPath`, `hasWebServerSchema` and
+ * `webServerOperations` come from the build Actor Standby runs, which can be a different one (see
+ * `resolveServerInterfaceDefinition`).
  * @param {string} actorIdOrName - Actor ID or Actor full name.
  * @param {ApifyClient} apifyClient - The Apify client instance.
  * @param {number} limit - Truncate the README to this limit.
@@ -167,6 +169,7 @@ function pruneActorDefinition(
         defaultRunOptions: response.defaultRunOptions,
         webServerMcpPath: serverDefinition?.webServerMcpPath,
         hasWebServerSchema: hasWebServerSchemaOperations(serverDefinition?.webServerSchema),
+        webServerOperations: listDocumentedOperations(serverDefinition?.webServerSchema),
         pictureUrl: 'pictureUrl' in response ? (response.pictureUrl as string | undefined) : undefined,
     };
 }
