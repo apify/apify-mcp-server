@@ -92,6 +92,7 @@ function makePaidCallActorTool(): ToolEntry {
         inputSchema: { type: 'object', properties: { actor: { type: 'string' } } } as ToolInputSchema,
         ajvValidate: compileSchema({ type: 'object', properties: { actor: { type: 'string' } } }),
         paymentRequired: true,
+        hasPaymentProviderStandbyCheck: true,
         outputSchema: { type: 'object', properties: { runId: { type: 'string' } }, required: ['runId'] },
         call: async () => respondRaw({ content: [{ type: 'text', text: 'dispatch is never reached' }] }),
     } as ToolEntry;

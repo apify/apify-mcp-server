@@ -339,12 +339,16 @@ export function makeArgsRecorderTool(name = 'recorder-tool'): {
  */
 export function makeRecorderTool(
     name: string,
-    options: { paymentRequired?: boolean; taskSupport?: (typeof ALLOWED_TASK_TOOL_EXECUTION_MODES)[number] } = {},
+    options: {
+        paymentRequired?: boolean;
+        hasPaymentProviderStandbyCheck?: boolean;
+        taskSupport?: (typeof ALLOWED_TASK_TOOL_EXECUTION_MODES)[number];
+    } = {},
 ): {
     tool: ToolEntry;
     received: { called: boolean; progressTracker: InternalToolArgs['progressTracker'] | undefined };
 } {
-    const { paymentRequired = false, taskSupport } = options;
+    const { paymentRequired = false, hasPaymentProviderStandbyCheck = false, taskSupport } = options;
     const received: { called: boolean; progressTracker: InternalToolArgs['progressTracker'] | undefined } = {
         called: false,
         progressTracker: undefined,
@@ -356,6 +360,7 @@ export function makeRecorderTool(
         inputSchema: { type: 'object', properties: {}, additionalProperties: true },
         ajvValidate: Object.assign(() => true, { errors: null }) as unknown as ToolEntry['ajvValidate'],
         paymentRequired,
+        hasPaymentProviderStandbyCheck,
         annotations: {},
         ...(taskSupport ? { execution: { taskSupport } } : {}),
         call: async (toolArgs: InternalToolArgs) => {

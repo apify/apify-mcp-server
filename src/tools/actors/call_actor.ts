@@ -169,7 +169,7 @@ function respondStandbyRejection(
     error: ActorLoadError,
     opts: { mcpSessionId?: string; actorId?: string; paymentProviderId?: string },
 ): ToolResponse {
-    log.softFail('Rejecting call-actor for unsupported standby Actor', {
+    log.softFail('Rejecting a tool call for an unsupported standby Actor', {
         // The error's canonical Actor name, so both call shapes log the same value even when the
         // caller addressed the Actor by ID. `actorLoadErrorKind` distinguishes which cell rejected it.
         actorName: error.actorName,
@@ -584,11 +584,12 @@ export async function callActorPreExecute(
     const resolution = await getActorToolResolutionCached(baseActorName, apifyClientForDefinition);
 
     if (resolution?.toolMode === ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP) {
+        const error = ActorLoadError.serverActorWithoutMcpNotSupported(resolution.actorFullName);
+        if (resolution.interfaces.server && loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)) {
+            error.message += ` Its HTTP API is available through ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}.`;
+        }
         return {
-            earlyResponse: respondStandbyRejection(
-                ActorLoadError.serverActorWithoutMcpNotSupported(resolution.actorFullName),
-                { mcpSessionId },
-            ),
+            earlyResponse: respondStandbyRejection(error, { mcpSessionId }),
         };
     }
 
@@ -729,6 +730,7 @@ export const callActor: ToolEntry = Object.freeze({
     outputSchema: actorRunOutputSchema,
     ajvValidate: callActorAjvValidate,
     paymentRequired: true,
+    hasPaymentProviderStandbyCheck: true,
     annotations: {
         title: 'Call Actor',
         readOnlyHint: false,
