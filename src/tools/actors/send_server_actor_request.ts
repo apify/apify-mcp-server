@@ -5,14 +5,7 @@ import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { readBodyUnderCap, sendApifyApiRequest } from '../../apify_client.js';
-import {
-    FAILURE_CATEGORY,
-    HELPER_TOOLS,
-    HTTP_FORBIDDEN,
-    HTTP_UNAUTHORIZED,
-    MAX_INLINE_BYTES,
-    SERVER_ACTOR_REQUEST_METHODS,
-} from '../../const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, HTTP_FORBIDDEN, HTTP_UNAUTHORIZED, MAX_INLINE_BYTES } from '../../const.js';
 import { getActorMCPServerPath, resolveOnStandbyOrigin } from '../../mcp/actors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import { isTextualMimeType, maskSessionToken, parseCharset, REDACTED } from '../../resources/api_resources.js';
@@ -39,6 +32,7 @@ import { anyJsonValueSchema, serverActorRequestOutputSchema } from '../structure
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 
+const SERVER_ACTOR_REQUEST_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
 type ServerActorRequestMethod = (typeof SERVER_ACTOR_REQUEST_METHODS)[number];
 
 const sendServerActorRequestArgs = z.object({
@@ -63,30 +57,6 @@ const sendServerActorRequestArgs = z.object({
     body: z.unknown().optional().describe('The JSON request body, sent as application/json. Not allowed with GET.'),
 });
 type SendServerActorRequestArgs = z.infer<typeof sendServerActorRequestArgs>;
-
-function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    const details = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
-        ? ` ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface lists the documented operations.`
-        : '';
-    return dedent`
-        Send one HTTP request to an Actor Server: the HTTP API of a Server Actor, documented in its API schema (OpenAPI) and README.${details}
-        Give the method, the path, and optionally query parameters and a JSON body; the Actor Server's host and your Apify API token are added for you.
-        Only an Actor with an Actor Server and an API schema takes requests here; the Actor accepts or rejects the method and path.
-        A request to a single-tenant Actor Server can start a run of the Actor in your account, kept until its idle timeout; a multi-tenant Actor Server charges per event.
-        The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text; other content types, and bodies over ${MAX_INLINE_BYTES} bytes, are not returned.
-
-        Example call: {"actor": "apify/web-search", "method": "GET", "path": "/", "query": {"query": "AI news", "maxResults": 5}}
-
-        USAGE:
-        - Use when the Actor that fits the user's request has an Actor Server, and its API schema or README names the endpoint for the task.
-        - Fits requests for one or a few results returned in the HTTP response. Larger batches depend on the endpoint and the response size and time limits.
-
-        USAGE EXAMPLES:
-        - user_input: Search the web for the latest AI news with apify/web-search
-        - user_input: Find articles about Apify from the past week with apify/web-search
-        - user_input: Get the content of https://example.com with apify/web-fetch
-    `;
-}
 
 /** The Actor and the request as sent: the fields every response about a sent request starts with. */
 type ServerActorRequest = {
@@ -397,7 +367,6 @@ export async function executeSendServerActorRequest(
         toolTelemetry: {
             ...response.toolTelemetry,
             actorId: info.id,
-            // With Actor Standby off there is no tenancy; `resolveActorTenancy` would report its single-tenant default.
             ...(info.actorStandby?.isEnabled === true && { actorTenancy: tenancy }),
             ...(httpStatus !== undefined && { httpStatus }),
         },
@@ -441,6 +410,30 @@ export async function executeSendServerActorRequest(
         if (!(error instanceof IncompleteResponseError)) throw error;
         return withActorTelemetry(buildIncompleteResponse(request, error, timeoutMillis), error.status);
     }
+}
+
+function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    const details = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
+        ? ` ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface lists the documented operations.`
+        : '';
+    return dedent`
+        Send one HTTP request to an Actor Server: the HTTP API of a Server Actor, documented in its API schema (OpenAPI) and README.${details}
+        Give the method, the path, and optionally query parameters and a JSON body; the Actor Server's host and your Apify API token are added for you.
+        Only an Actor with an Actor Server and an API schema takes requests here; the Actor accepts or rejects the method and path.
+        A request to a single-tenant Actor Server can start a run of the Actor in your account, kept until its idle timeout; a multi-tenant Actor Server charges per event.
+        The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text; other content types, and bodies over ${MAX_INLINE_BYTES} bytes, are not returned.
+
+        Example call: {"actor": "apify/web-search", "method": "GET", "path": "/", "query": {"query": "AI news", "maxResults": 5}}
+
+        USAGE:
+        - Use when the Actor that fits the user's request has an Actor Server, and its API schema or README names the endpoint for the task.
+        - Fits requests for one or a few results returned in the HTTP response. Larger batches depend on the endpoint and the response size and time limits.
+
+        USAGE EXAMPLES:
+        - user_input: Search the web for the latest AI news with apify/web-search
+        - user_input: Find articles about Apify from the past week with apify/web-search
+        - user_input: Get the content of https://example.com with apify/web-fetch
+    `;
 }
 
 /** Sends one HTTP request to a Server Actor's API, the server interface its `webServerSchema` documents. */
