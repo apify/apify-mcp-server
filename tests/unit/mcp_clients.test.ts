@@ -19,12 +19,17 @@ function clientContext(clientName?: string): McpClientContext | undefined {
 }
 
 describe('isReportProblemBlockedForClient', () => {
-    it.each(['claude-ai', 'claude-code', 'Claude Desktop', 'Anthropic', 'anthropic-sdk'])(
-        'blocks report-problem for the Anthropic client "%s"',
-        (clientName) => {
-            expect(isReportProblemBlockedForClient(clientContext(clientName))).toBe(true);
-        },
-    );
+    it.each([
+        'claude-ai',
+        'claude-code',
+        'Claude Desktop',
+        'Anthropic',
+        'anthropic-sdk',
+        'local-agent-mode-apify',
+        'local-agent-mode-espn-sports',
+    ])('blocks report-problem for the Anthropic client "%s"', (clientName) => {
+        expect(isReportProblemBlockedForClient(clientContext(clientName))).toBe(true);
+    });
 
     it.each(['cursor', 'test-client', 'vscode', ''])(
         'serves report-problem to the non-Anthropic client "%s"',
@@ -120,7 +125,14 @@ describe('isStoreUseCaseServable()', () => {
         expect(servable(name)).toBe(true);
     });
 
-    it.each(['Claude Desktop', 'claude-code', 'Anthropic', 'local-agent-mode-apify'])('does not serve %s', (name) => {
+    it.each([
+        'Claude Desktop',
+        'claude-code',
+        'Anthropic',
+        'local-agent-mode-apify',
+        'local-agent-mode-Apify MCP server',
+        'local-agent-mode-plugin:apify:apify',
+    ])('does not serve %s', (name) => {
         expect(servable(name)).toBe(false);
     });
 

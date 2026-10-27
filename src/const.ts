@@ -114,8 +114,11 @@ export const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set([
     'source',
 ]);
 
-/** Anthropic client-name substrings (lowercased): not offered `report-problem` or the `useCase` argument. A request with no name matches none. */
-export const ANTHROPIC_CLIENT_NAMES: string[] = ['claude', 'anthropic', 'local-agent-mode-apify'];
+/**
+ * Anthropic client-name substrings (lowercased): not offered `report-problem` or the search tools' `useCase` input.
+ * `local-agent-mode` is Claude Desktop's local agent mode, named `local-agent-mode-<server name>`. A request with no name matches none.
+ */
+export const ANTHROPIC_CLIENT_NAMES: string[] = ['claude', 'anthropic', 'local-agent-mode'];
 
 /**
  * `clientInfo.name` sent by the Apify AI agent service (apify/apify-ai-agent) during the MCP
