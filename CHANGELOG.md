@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.19.4 - **not yet released**
+## [0.19.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.4) (2026-10-27)
 
 ### 🚀 Features
 
@@ -20,7 +19,6 @@ All notable changes to this project will be documented in this file.
 - Close feature gaps after the Store search backend switch ([#1713](https://github.com/apify/apify-mcp-server/pull/1713)) ([790724d](https://github.com/apify/apify-mcp-server/commit/790724de58cb3a06ff784b900b49b5b3704d4473)) by [@jirispilka](https://github.com/jirispilka), closes [#1673](https://github.com/apify/apify-mcp-server/issues/1673)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.19.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.3) (2026-10-21)
 
 
