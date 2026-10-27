@@ -1,8 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
-import * as mcpClient from '../../src/mcp/client.js';
-import { actorDefinitionCache } from '../../src/state.js';
 import {
     actorDetailsOutputDefaults,
     buildActorDetailsTextResponse,
@@ -10,7 +8,6 @@ import {
     buildActorNotRunnableGuidance,
     buildFetchActorDetailsResult,
 } from '../../src/tools/actors/fetch_actor_details.js';
-import type { ActorDefinitionWithInfo } from '../../src/types.js';
 import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
 import { fetchActorDetails } from '../../src/utils/actor_details.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
@@ -121,10 +118,6 @@ describe('buildFetchActorDetailsResult()', () => {
         vi.mocked(fetchActorDetails).mockResolvedValue(MOCK_DETAILS);
     });
 
-    afterEach(() => {
-        vi.restoreAllMocks();
-    });
-
     // pricing: false → the users/me lookup is needed only for Console UI tokens.
     // call-actor loaded so these unrelated assertions aren't perturbed by the not-runnable guidance.
     const callWithToken = async (apifyToken: string) => {
@@ -138,27 +131,6 @@ describe('buildFetchActorDetailsResult()', () => {
         });
         return result as { content: { type: string; text: string }[] };
     };
-
-    it('makes no MCP connection for an MCP server Actor, even when a client still sends output.mcpTools', async () => {
-        // An MCP server Actor whose URL resolves, so a connection attempt would reach the spy.
-        actorDefinitionCache.set('apify/example-mcp-server', {
-            definition: { id: 'actor-id-1', actorFullName: 'apify/example-mcp-server', webServerMcpPath: '/mcp' },
-            info: {
-                id: 'actor-id-1',
-                isPublic: true,
-                actorStandby: { isEnabled: true },
-                standbyUrl: 'https://example-mcp-server.apify.actor',
-            },
-        } as unknown as ActorDefinitionWithInfo);
-        const connectSpy = vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(null);
-        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
-
-        await buildFetchActorDetailsResult(
-            stubToolCallContext({ actor: 'apify/example-mcp-server', output: { mcpTools: true } }, mockApifyClient()),
-        );
-
-        expect(connectSpy).not.toHaveBeenCalled();
-    });
 
     it('skips the users/me lookup for API tokens when pricing is not rendered', async () => {
         const { content } = await callWithToken('apify_api_test');

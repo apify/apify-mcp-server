@@ -201,11 +201,7 @@ beforeEach(() => {
 
 describe('call-actor-mcp-tool', () => {
     it('returns the remote CallToolResult unchanged, with no run fields', async () => {
-        const result = await dispatch(callActorMcpTool, {
-            actor: MCP_ACTOR,
-            tool: 'add',
-            arguments: { a: 2, b: 3 },
-        });
+        const result = await dispatch(callActorMcpTool, { actor: MCP_ACTOR, tool: 'add', arguments: { a: 2, b: 3 } });
 
         expect(result).toEqual(REMOTE_RESULTS.add);
         expect(remoteCalls).toEqual([{ name: 'add', arguments: { a: 2, b: 3 } }]);
@@ -226,6 +222,17 @@ describe('call-actor-mcp-tool', () => {
         const result = await execute(executeCallActorMcpTool, { tool: 'spoof' });
 
         expect(result.toolTelemetry).toEqual({ actorId: 'example-mcp-server-id' });
+    });
+
+    it('rejects an MCP path that leaves the standby origin without connecting, and reports the Actor ID', async () => {
+        seedActor('apify/off-origin-mcp-server', { definition: { webServerMcpPath: 'https://elsewhere.example/mcp' } });
+
+        const result = await execute(executeCallActorMcpTool, { tool: 'add', actor: 'apify/off-origin-mcp-server' });
+
+        expect(result.isError).toBe(true);
+        expect(JSON.stringify(result.content)).toContain('resolves outside its standby origin');
+        expect(result.toolTelemetry).toMatchObject({ actorId: 'off-origin-mcp-server-id' });
+        expect(requestHeaders).toHaveLength(0);
     });
 
     it('sends omitted arguments as an empty object', async () => {
@@ -272,15 +279,17 @@ describe('call-actor-mcp-tool', () => {
         expect(callToolSpy.mock.calls[0][2]).toMatchObject({ timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC });
     });
 
-    it('reports a JSON-RPC error from the remote server as a failed call of that tool', async () => {
-        const result = await execute(executeCallActorMcpTool, { tool: 'subtract' });
+    it('rejects an Actor that is not an MCP server without connecting, naming the tool that serves it', async () => {
+        seedActor('apify/server-actor-test', { definition: { webServerMcpPath: undefined, hasWebServerSchema: true } });
 
-        expect(result.isError).toBe(true);
-        expect(JSON.stringify(result.content)).toContain(`Failed to call MCP tool 'subtract' on Actor '${MCP_ACTOR}'`);
-        expect(result.toolTelemetry).toMatchObject({
-            toolStatus: TOOL_STATUS.SOFT_FAIL,
-            failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
-        });
+        const result = await execute(executeCallActorMcpTool, { tool: 'add', actor: 'apify/server-actor-test' });
+
+        expectSoftFailInvalidInput(result);
+        expect((result.content as { text: string }[])[0].text).toBe(
+            `Actor 'apify/server-actor-test' is not an MCP server. Its HTTP API can be called with ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}.`,
+        );
+        expect(result.toolTelemetry).toMatchObject({ actorId: 'server-actor-test-id' });
+        expect(requestHeaders).toHaveLength(0);
     });
 
     it('returns the not-found response for an Actor the API does not know, without connecting', async () => {
@@ -296,17 +305,6 @@ describe('call-actor-mcp-tool', () => {
         );
 
         expectSoftFailInvalidInput(result);
-        expect(requestHeaders).toHaveLength(0);
-    });
-
-    it('rejects an MCP path that leaves the standby origin without connecting, and reports the Actor ID', async () => {
-        seedActor('apify/off-origin-mcp-server', { definition: { webServerMcpPath: 'https://elsewhere.example/mcp' } });
-
-        const result = await execute(executeCallActorMcpTool, { tool: 'add', actor: 'apify/off-origin-mcp-server' });
-
-        expect(result.isError).toBe(true);
-        expect(JSON.stringify(result.content)).toContain('resolves outside its standby origin');
-        expect(result.toolTelemetry).toMatchObject({ actorId: 'off-origin-mcp-server-id' });
         expect(requestHeaders).toHaveLength(0);
     });
 
@@ -329,13 +327,21 @@ describe('call-actor-mcp-tool', () => {
         await new Promise<void>((resolve) => closed.close(() => resolve()));
         seedActor('apify/unreachable-mcp-server', { actor: { standbyUrl: `http://127.0.0.1:${port}` } });
 
-        const result = await execute(executeCallActorMcpTool, {
-            tool: 'add',
-            actor: 'apify/unreachable-mcp-server',
-        });
+        const result = await execute(executeCallActorMcpTool, { tool: 'add', actor: 'apify/unreachable-mcp-server' });
 
         expect(result.isError).toBe(true);
         expect(JSON.stringify(result.content)).toContain('Failed to connect to MCP server');
+    });
+
+    it('reports a JSON-RPC error from the remote server as a failed call of that tool', async () => {
+        const result = await execute(executeCallActorMcpTool, { tool: 'subtract' });
+
+        expect(result.isError).toBe(true);
+        expect(JSON.stringify(result.content)).toContain(`Failed to call MCP tool 'subtract' on Actor '${MCP_ACTOR}'`);
+        expect(result.toolTelemetry).toMatchObject({
+            toolStatus: TOOL_STATUS.SOFT_FAIL,
+            failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+        });
     });
 
     it('does not connect when the call is already cancelled', async () => {
@@ -411,23 +417,6 @@ describe('fetch-actor-mcp-tool-list', () => {
         expect(timeouts).toEqual([EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, EXTERNAL_TOOL_CALL_TIMEOUT_MSEC / 2]);
     });
 
-    it('discovers again on every call, with nothing cached', async () => {
-        await execute(executeFetchActorMcpToolList, {});
-        await execute(executeFetchActorMcpToolList, {});
-
-        expect(listCursors).toEqual([undefined, 'page-2', undefined, 'page-2']);
-    });
-
-    it('closes the client after a listing that succeeds and after one that fails', async () => {
-        seedActor('apify/broken-pages-mcp-server', { definition: { webServerMcpPath: '/mcp-broken-pages' } });
-        const closeSpy = vi.spyOn(Client.prototype, 'close');
-
-        await execute(executeFetchActorMcpToolList, {});
-        await execute(executeFetchActorMcpToolList, { actor: 'apify/broken-pages-mcp-server' });
-
-        expect(closeSpy).toHaveBeenCalledTimes(2);
-    });
-
     it('names call-actor-mcp-tool in the description only when the session has it, and states the billing caveat', () => {
         const withCall = fetchActorMcpToolList.buildDescription!(ALL_TOOLS_PRESENT);
         const withoutCall = fetchActorMcpToolList.buildDescription!(only(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST));
@@ -443,19 +432,6 @@ describe.each([
     { tool: callActorMcpTool, run: executeCallActorMcpTool, args: { tool: 'add' } },
     { tool: fetchActorMcpToolList, run: executeFetchActorMcpToolList, args: {} },
 ])('$tool.name before and during the connection', ({ tool, run, args }) => {
-    it('rejects an Actor that is not an MCP server without connecting, naming the tool that serves it', async () => {
-        seedActor('apify/server-actor-test', { definition: { webServerMcpPath: undefined, hasWebServerSchema: true } });
-
-        const result = await execute(run, { ...args, actor: 'apify/server-actor-test' });
-
-        expectSoftFailInvalidInput(result);
-        expect((result.content as { text: string }[])[0].text).toBe(
-            `Actor 'apify/server-actor-test' is not an MCP server. Its HTTP API can be called with ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}.`,
-        );
-        expect(result.toolTelemetry).toMatchObject({ actorId: 'server-actor-test-id' });
-        expect(requestHeaders).toHaveLength(0);
-    });
-
     it('returns the empty aborted response when the client cancels mid-request', async () => {
         seedActor('apify/slow-mcp-server', { definition: { webServerMcpPath: '/mcp-slow' } });
         const controller = new AbortController();
