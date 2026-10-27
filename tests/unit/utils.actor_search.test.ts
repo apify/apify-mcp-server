@@ -68,18 +68,6 @@ describe('searchActorsByKeywords', () => {
         expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: 5, offset: 0 });
     });
 
-    it('masks a use case the API echoes back in an error, in its message and stack', async () => {
-        const error = new Error(`rejected use case: ${TRACKING.useCase}`);
-        // apify-client sets the stack as a string when it builds the error.
-        error.stack = `Error: rejected use case: ${TRACKING.useCase}\n    at request`;
-        listMock.mockRejectedValueOnce(error);
-        await expect(
-            searchActorsByKeywords({ search: 'foo', apifyClient: stubApifyClient, limit: 5, tracking: TRACKING }),
-        ).rejects.toBe(error);
-        expect(error.message).toBe('rejected use case: [use case]');
-        expect(error.stack).not.toContain(TRACKING.useCase);
-    });
-
     it('forwards the `tracking` option as `_traceId` and `_useCase`', async () => {
         listMock.mockResolvedValueOnce({ items: [] });
         await searchActorsByKeywords({ search: 'foo', apifyClient: stubApifyClient, limit: 5, tracking: TRACKING });

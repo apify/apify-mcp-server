@@ -42,17 +42,8 @@ export async function searchActorsByKeywords(options: SearchActorsByKeywordsOpti
     if (traceId) storeClient.params = { ...storeClient.params, _traceId: traceId };
     if (useCase) storeClient.params = { ...storeClient.params, _useCase: useCase };
 
-    try {
-        const results = await storeClient.list({ search, limit, offset });
-        return results.items as ActorStoreList[];
-    } catch (error) {
-        // Mask a use case the API echoes back, so it stays out of logs and telemetry.
-        if (useCase && error instanceof Error) {
-            error.message = error.message.replaceAll(useCase, '[use case]');
-            error.stack = error.stack?.replaceAll(useCase, '[use case]');
-        }
-        throw error;
-    }
+    const results = await storeClient.list({ search, limit, offset });
+    return results.items as ActorStoreList[];
 }
 
 /**
