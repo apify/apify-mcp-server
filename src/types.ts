@@ -82,6 +82,8 @@ export type ActorDefinitionPruned = Pick<
     webServerMcpPath?: string; // Optional, used for Actorized MCP server tools
     /** Whether the server-interface build's `webServerSchema` declares at least one operation; the schema itself is not cached. */
     hasWebServerSchema: boolean;
+    /** The schema's operations with their required inputs, e.g. `GET / (required: query)`, for request recovery text. */
+    webServerOperations?: string[];
     pictureUrl?: string; // Optional, URL to the Actor's icon/picture
 };
 

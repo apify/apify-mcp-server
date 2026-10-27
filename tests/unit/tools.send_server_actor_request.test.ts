@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { gzipSync } from 'node:zlib';
 
+import Ajv from 'ajv';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
@@ -10,6 +11,7 @@ import { FAILURE_CATEGORY, HELPER_TOOLS, MAX_INLINE_BYTES, TOOL_STATUS } from '.
 import { actorDefinitionCache } from '../../src/state.js';
 import {
     executeSendServerActorRequest,
+    RECOVERY_MAX_OPERATIONS,
     sendServerActorRequest,
 } from '../../src/tools/actors/send_server_actor_request.js';
 import { serverActorRequestOutputSchema } from '../../src/tools/structured_output_schemas.js';
@@ -394,6 +396,13 @@ describe('returning the response', () => {
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toContain('unsupported-encoding');
         expect(result.content[0].text).toContain('The request itself was sent.');
+        expect(result.structuredContent).toMatchObject({
+            status: 200,
+            bodyOmitted: true,
+            reason: expect.stringContaining('charset'),
+            bytes: Buffer.byteLength('café'),
+        });
+        expect(result.structuredContent).not.toHaveProperty('body');
         expect(result.toolTelemetry).toMatchObject({
             httpStatus: 200,
             failureHttpStatus: 200,
@@ -404,10 +413,29 @@ describe('returning the response', () => {
     });
 
     it('rejects a binary body by its content type and keeps the status', async () => {
-        const result = await callTool({ path: '/binary' });
+        const result = await callTool({ path: '/binary', query: { token: TOKEN } });
 
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toContain('application/octet-stream');
+        expect(result.structuredContent).toMatchObject({
+            actorId: 'server-actor-test-id',
+            actorName: SERVER_ACTOR,
+            interface: 'server',
+            tenancy: ACTOR_TENANCY.SINGLE_TENANT,
+            method: 'GET',
+            path: '/binary?token=[REDACTED]',
+            status: 200,
+            contentType: 'application/octet-stream',
+            bodyOmitted: true,
+            reason: expect.stringContaining('application/octet-stream'),
+            bytes: 3,
+            summary: expect.stringContaining('The request itself was sent.'),
+        });
+        expect(result.structuredContent).not.toHaveProperty('body');
+        const validate = new Ajv({ strict: false }).compile(serverActorRequestOutputSchema);
+        expect(validate(result.structuredContent), JSON.stringify(validate.errors)).toBe(true);
+        expect(result.content[0].text).toBe(JSON.stringify(result.structuredContent));
+        expect(JSON.stringify(result)).not.toContain(TOKEN);
         expect(result.toolTelemetry).toMatchObject({ httpStatus: 200, failureHttpStatus: 200 });
     });
 
@@ -430,6 +458,15 @@ describe('returning the response', () => {
             expect(result.content[0].text).toContain(`larger than ${MAX_INLINE_BYTES} bytes`);
             expect(result.content[0].text).toContain('The request itself was sent.');
             expect(result.content[0].text).not.toContain('aaa');
+            expect(result.structuredContent).toMatchObject({
+                status: 200,
+                bodyOmitted: true,
+                reason: expect.stringContaining(`larger than ${MAX_INLINE_BYTES} bytes`),
+            });
+            expect(result.structuredContent).not.toHaveProperty('body');
+            expect(result.structuredContent).not.toHaveProperty('bytes');
+            const validate = new Ajv({ strict: false }).compile(serverActorRequestOutputSchema);
+            expect(validate(result.structuredContent), JSON.stringify(validate.errors)).toBe(true);
             expect(result.toolTelemetry).toMatchObject({
                 httpStatus: 200,
                 actorTenancy: ACTOR_TENANCY.SINGLE_TENANT,
@@ -543,6 +580,33 @@ describe('returning an Actor Server error', () => {
             }
         },
     );
+
+    it('lists the documented operations on a rejected request, so the agent can retry without a lookup', async () => {
+        const webSearch = 'apify/web-search';
+        seedActor(webSearch, {
+            definition: { webServerOperations: ['GET / (required: query)', 'POST / (required: request body)'] },
+        });
+
+        const result = await callTool({ actor: webSearch, path: '/status/404' });
+
+        expect(result.structuredContent).toMatchObject({
+            nextStep: expect.stringContaining(
+                'Documented operations: GET / (required: query), POST / (required: request body).',
+            ),
+        });
+    });
+
+    it('lists at most the operation limit and counts the rest', async () => {
+        const manyOperations = 'acme/many-operations';
+        const operations = Array.from({ length: RECOVERY_MAX_OPERATIONS + 3 }, (_, i) => `GET /op${i}`);
+        seedActor(manyOperations, { definition: { webServerOperations: operations } });
+
+        const result = await callTool({ actor: manyOperations, path: '/status/404' });
+        const { nextStep } = result.structuredContent as { nextStep: string };
+
+        expect(nextStep).toContain(`GET /op${RECOVERY_MAX_OPERATIONS - 1}, and 3 more.`);
+        expect(nextStep).not.toContain(`GET /op${RECOVERY_MAX_OPERATIONS},`);
+    });
 
     it('names the Actor Server error before the README only when the body carries one', async () => {
         const withError = await callTool({ path: '/fetch' });

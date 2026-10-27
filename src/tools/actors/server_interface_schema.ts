@@ -58,17 +58,35 @@ function listServerOperations(schema: unknown): ServerOperation[] {
     return operations;
 }
 
-/** E.g. `- GET /search: Search the web. Required: q, request body.` */
-function formatOperationLine({ method, path, operation }: ServerOperation, schema: unknown): string {
-    const required: string[] = [];
+/** Required parameter names, then the request body if required, e.g. `['q', 'request body']`. */
+function listRequiredInputs(operation: Record<string, unknown>, schema: unknown): string[] {
+    const names: string[] = [];
     for (const parameter of Array.isArray(operation.parameters) ? operation.parameters : []) {
         const resolved = resolveRef(parameter, schema);
         if (isRecord(resolved) && resolved.required === true && typeof resolved.name === 'string') {
-            required.push(resolved.name);
+            names.push(resolved.name);
         }
     }
     const requestBody = resolveRef(operation.requestBody, schema);
-    if (isRecord(requestBody) && requestBody.required === true) required.push('request body');
+    if (isRecord(requestBody) && requestBody.required === true) names.push('request body');
+    return names;
+}
+
+/**
+ * Each operation with its required inputs, e.g.
+ * `['GET / (required: query)', 'POST / (required: request body)', 'GET /status']`.
+ */
+export function listDocumentedOperations(schema: unknown): string[] {
+    if (!isRecord(schema)) return [];
+    return listServerOperations(schema).map(({ method, path, operation }) => {
+        const required = listRequiredInputs(operation, schema);
+        return required.length > 0 ? `${method} ${path} (required: ${required.join(', ')})` : `${method} ${path}`;
+    });
+}
+
+/** E.g. `- GET /search: Search the web. Required: q, request body.` */
+function formatOperationLine({ method, path, operation }: ServerOperation, schema: unknown): string {
+    const required = listRequiredInputs(operation, schema);
     let text = `- ${method} ${path}`;
     if (typeof operation.summary === 'string') {
         text += `: ${operation.summary}`;

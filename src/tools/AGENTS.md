@@ -28,7 +28,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`, and resolves the build
     the server-interface fields — `webServerMcpPath`, `webServerSchema` — are read from when standby is on,
     `resolveServerInterfaceDefinition`, shared with `fetchActorDetails` in `../utils/actor_details.ts`; the input
-    schema and README stay on the default build),
+    schema and README stay on the default build; `hasWebServerSchemaOperations` detects operations the send tool
+    can call in the publisher's schema; `webServerOperations` caches each operation with its required inputs, which
+    the send tool lists after a 400/404/405/422),
     `server_interface_schema.ts` (the server-interface text of `fetch-actor-details`: one summary line by default;
     `output.serverInterface: true` lists the operations, with the API schema as written while it fits `MAX_INLINE_BYTES`;
     `"METHOD /path"` returns one operation excerpt and `"#/..."` the raw node at a local JSON pointer; references are
@@ -38,7 +40,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     bytes, no redirects, the `MAX_INLINE_BYTES` cap after decompression and the `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`
     deadline; the path is resolved against the Actor's `standbyUrl` and must keep its origin; query values are
     validated without coercion; text uses the declared charset, UTF-8 by default, and rejects unsupported
-    charsets while keeping the HTTP status; session tokens are masked after decoding too),
+    charsets while keeping the HTTP status; refused bodies retain structured request/status metadata with
+    `bodyOmitted` and `reason`, and `bytes` only when the full size is known; session tokens are masked after decoding too),
     `actor_tool_contract.ts` (Actor-specific presentation policies plus direct-tool input restrictions
     and defaults, shared by schema generation, the call engine's denied-input check and execution;
     generic calls skip direct-only restrictions and defaults), and
