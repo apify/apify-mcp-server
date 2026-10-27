@@ -1,6 +1,6 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
-import type { McpServerCredentials } from './client.js';
+import type { McpConnectionOptions } from './client.js';
 import { connectMCPClient } from './client.js';
 
 /** Closed outcome union for {@link withRemoteMcpClient}. */
@@ -13,14 +13,14 @@ export type RemoteMcpCallOutcome<T> =
 /** Connect, run the callback with the live client, always close. */
 export async function withRemoteMcpClient<T>(
     serverUrl: string,
-    credentials: McpServerCredentials,
+    options: McpConnectionOptions,
     mcpSessionId: string | undefined,
     signal: AbortSignal,
     run: (client: Client) => Promise<T>,
 ): Promise<RemoteMcpCallOutcome<T>> {
     let client: Client | null = null;
     try {
-        client = await connectMCPClient(serverUrl, credentials, mcpSessionId);
+        client = await connectMCPClient(serverUrl, options, mcpSessionId);
         if (!client) return { outcome: 'connect-failed' };
         return { outcome: 'success', value: await run(client) };
     } catch (error) {
