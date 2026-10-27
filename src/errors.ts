@@ -27,7 +27,7 @@ export const ACTOR_LOAD_ERROR_KIND = {
     NOT_FOUND: 'not-found',
     LOAD_FAILED: 'load-failed',
     STANDBY_PAYMENT_NOT_SUPPORTED: 'standby-payment-not-supported',
-    STANDBY_WITHOUT_MCP_NOT_SUPPORTED: 'standby-without-mcp-not-supported',
+    SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED: 'server-actor-without-mcp-not-supported',
 } as const;
 export type ActorLoadErrorKind = (typeof ACTOR_LOAD_ERROR_KIND)[keyof typeof ACTOR_LOAD_ERROR_KIND];
 
@@ -72,12 +72,11 @@ export class ActorLoadError extends Error {
         );
     }
 
-    static standbyWithoutMcpNotSupported(actorName: string): ActorLoadError {
+    static serverActorWithoutMcpNotSupported(actorName: string): ActorLoadError {
         return new ActorLoadError(
-            ACTOR_LOAD_ERROR_KIND.STANDBY_WITHOUT_MCP_NOT_SUPPORTED,
+            ACTOR_LOAD_ERROR_KIND.SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED,
             actorName,
-            `Actor "${actorName}" runs in standby mode without an MCP server and has an empty input schema,` +
-                ' which is not supported yet.',
+            `Actor "${actorName}" has no MCP tools or input interface.`,
         );
     }
 

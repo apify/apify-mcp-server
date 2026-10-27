@@ -168,6 +168,22 @@ export const paymentsCases: Case[] = [
         },
     },
     {
+        name: 'does not list send-server-actor-request in x402 or skyfire payment mode',
+        isDeploymentTest: false,
+        skipIf: skipOnStdio,
+        run: async (ctx) => {
+            for (const payment of ['x402', 'skyfire'] as const) {
+                const client = await ctx.createClientFn({ payment, tools: ['actors', 'send-server-actor-request'] });
+                try {
+                    const { tools } = await client.listTools();
+                    expect(tools.map((tool) => tool.name)).not.toContain('send-server-actor-request');
+                } finally {
+                    await client.close();
+                }
+            }
+        },
+    },
+    {
         // Regression #893: task-mode call-actor must hit the same standby guard (legacy HTTP only).
         name: 'should reject standby Actor in task-mode call-actor under x402 (not 402, not platform error)',
         isDeploymentTest: false,

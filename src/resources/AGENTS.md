@@ -33,13 +33,14 @@ unauthenticated). An accepted URI is sent on the egress origin and returned unde
 templates, instructions, refusals and link-out URLs name only the client-facing origin. `readApiResource()`
 then refuses, without a request, what the API tools refuse (`validateApiBlocklist` in
 `../tools/api/apify_api_blocklist.ts`): the `method` query parameter and a GET to the synchronous run
-endpoints. The API tools' `callApi` (`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`, `isMaxContentLengthAbort()`,
+endpoints. The API tools' `callApi` (`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`,
 `maskSessionToken()`, `redactJsonSecrets()` and `REDACTED`, so a change to any changes the
 tools too. `get-key-value-store-record` builds its inlined-record URI with `buildUrlOnOrigin()`.
 
 `sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through
-`httpClient.axios.request` with `maxContentLength: MAX_INLINE_BYTES`. `readApiResource()` sends
-`{ method: 'GET', responseType: 'stream' }` through it, streams the body, and branches
+`httpClient.axios.request` with `maxContentLength: MAX_INLINE_BYTES`; `readBodyUnderCap()` next to it reads a
+streamed body, `undefined` past the cap (shared with `send-server-actor-request`). `readApiResource()` sends
+`{ method: 'GET', responseType: 'stream' }` through `sendApifyApiRequest()`, reads the body, and branches
 on the declared Content-Type: textual base types (text/*, JSON, XML) as `text` with the full
 header, decoded with the declared charset (default utf-8; a charset Node cannot decode falls
 through to blob — lossless beats mangled text, same rule as apify-client's body_parser);

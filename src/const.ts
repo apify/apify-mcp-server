@@ -56,6 +56,7 @@ export const HELPER_TOOLS = {
     ACTOR_CALL: 'call-actor',
     ACTOR_CREATE: 'create-actor',
     ACTOR_CALL_WIDGET: 'call-actor-widget',
+    ACTOR_SERVER_REQUEST: 'send-server-actor-request',
     ACTOR_DELETE: 'delete-actor',
     ACTOR_GET_DETAILS: 'fetch-actor-details',
     ACTOR_GET_DETAILS_WIDGET: 'fetch-actor-details-widget',
@@ -249,7 +250,7 @@ export const CONSOLE_BASE_URL_STAGING = 'https://console-securitybyobscurity.api
 export const API_PUBLIC_BASE_URL = 'https://api.apify.com';
 /** Apify API origin on the staging cluster, selected when running on the staging MCP host. */
 export const API_PUBLIC_BASE_URL_STAGING = 'https://api-securitybyobscurity.apify.com';
-/** Staging MCP host; mirrors the check in `getActorMCPServerURL` to pick staging vs production origins. */
+/** Staging MCP host; `getApifyAPIPublicBaseUrl` and `getConsoleBaseUrl` pick the staging origins when running on it. */
 export const STAGING_MCP_HOSTNAME = 'mcp-securitybyobscurity.apify.com';
 export const APIFY_FAVICON_URL = `${APIFY_STORE_URL}/favicon.ico`;
 export const APIFY_LOGO_URL = `${APIFY_STORE_URL}/apple-icon.png`;

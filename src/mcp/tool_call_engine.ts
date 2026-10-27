@@ -4,6 +4,7 @@
  */
 
 import type { ServerNotification } from '@modelcontextprotocol/sdk/types.js';
+import type { ErrorObject } from 'ajv';
 import dedent from 'dedent';
 
 import log from '@apify/log';
@@ -45,6 +46,57 @@ const PROGRESS_TRACKER_INTERNAL_TOOLS = new Set<string>([
 
 /** The Store search tools; `useCase` is a search argument only. */
 const SEARCH_TOOL_NAMES = new Set<string>([HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.STORE_SEARCH_WIDGET]);
+
+/** The value or subschema at JSON pointer `path`: `undefined` when it does not exist. */
+function resolveJsonPointer(root: unknown, path: string, isSchema: boolean): unknown {
+    const segments = path
+        .split('/')
+        .slice(1)
+        .map((segment) => segment.replaceAll('~1', '/').replaceAll('~0', '~'));
+    return segments.reduce<unknown>((node, segment) => {
+        if (typeof node !== 'object' || node === null) return undefined;
+        if (!isSchema) return (node as Record<string, unknown>)[segment];
+        const { properties, items } = node as { properties?: Record<string, unknown>; items?: unknown };
+        return properties?.[segment] ?? items;
+    }, root);
+}
+
+/** The JSON type of `value`, named as AJV names types. */
+function getJsonTypeName(value: unknown): string {
+    if (value === null) return 'null';
+    return Array.isArray(value) ? 'array' : typeof value;
+}
+
+/**
+ * The validation failure text: each error with the type received for a type error, then the description of each
+ * failing parameter, so the caller learns what the parameter takes without another lookup.
+ */
+function buildAjvFailureText(errors: ErrorObject[], args: unknown, inputSchema: unknown): string {
+    const parameterPaths = new Set<string>();
+    const failures = errors.map((error) => {
+        const { missingProperty } = error.params as { missingProperty?: string };
+        parameterPaths.add(missingProperty ? `${error.instancePath}/${missingProperty}` : error.instancePath);
+        const received =
+            error.keyword === 'type'
+                ? `, got ${getJsonTypeName(resolveJsonPointer(args, error.instancePath, false))}`
+                : '';
+        const allowedValues = error.keyword === 'enum' ? `: ${JSON.stringify(error.params.allowedValues)}` : '';
+        return `${error.instancePath || 'root'}: ${error.message || 'validation error'}${received}${allowedValues}`;
+    });
+    const descriptions = new Set<string>();
+    for (let path of parameterPaths) {
+        // Dictionary values may have no description; their parent explains the accepted shape.
+        while (path) {
+            const { description } = (resolveJsonPointer(inputSchema, path, true) ?? {}) as { description?: unknown };
+            if (typeof description === 'string') {
+                descriptions.add(`Parameter ${path}: ${description}`);
+                break;
+            }
+            path = path.slice(0, path.lastIndexOf('/'));
+        }
+    }
+    return [`Validation errors: ${failures.join('; ')}.`, ...descriptions].join('\n');
+}
 
 /** A pre-dispatch failure that the shell converts to v1's protocol-error sequence. */
 export type InvalidToolCall = {
@@ -269,18 +321,18 @@ export async function prepareToolCall(params: {
         if (!tool.ajvValidate(toolArgs)) {
             const errors = tool.ajvValidate.errors || [];
             const ajvErrorDetails = extractAjvErrorDetails(errors);
-            const errorMessages = errors
-                .map(
-                    (e: { message?: string; instancePath?: string }) =>
-                        `${e.instancePath || 'root'}: ${e.message || 'validation error'}`,
-                )
-                .join('; ');
             return {
-                message: dedent`
-                    Invalid arguments for tool "${tool.name}".
-                    Validation errors: ${errorMessages}.
-                    Please check the tool's input schema ${schemaHint} and ensure all required parameters are provided with correct types and values.
-                `,
+                message: [
+                    `Invalid arguments for tool "${tool.name}".`,
+                    buildAjvFailureText(errors, toolArgs, tool.inputSchema),
+                    // Only an Actor tool's schema is worth a pointer: it is the Actor's input schema. Another
+                    // tool's schema is already in the client's tools/list.
+                    ...(tool.type === TOOL_TYPE.ACTOR
+                        ? [
+                              `Please check the tool's input schema ${schemaHint} and ensure all required parameters are provided with correct types and values.`,
+                          ]
+                        : []),
+                ].join('\n'),
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
                 callDiagnostics: {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
@@ -309,12 +361,14 @@ export async function prepareToolCall(params: {
             };
         }
 
-        // Standby Actors need a specific rejection instead of a generic 402 in both modes.
-        const isCallActorTool = tool.name === HELPER_TOOLS.ACTOR_CALL || tool.name === HELPER_TOOLS.ACTOR_CALL_WIDGET;
+        // Standby Actors need a specific rejection instead of a generic 402 in both modes; the tool declares the check.
         const actorArg = (toolArgs as { actor?: unknown } | undefined)?.actor;
 
         const standbyRejection =
-            paymentProvider && isCallActorTool && typeof actorArg === 'string' && actorArg.length > 0
+            paymentProvider &&
+            tool.hasPaymentProviderStandbyCheck &&
+            typeof actorArg === 'string' &&
+            actorArg.length > 0
                 ? await checkPaymentProviderStandbyConflict({
                       actorName: actorArg,
                       paymentProvider,

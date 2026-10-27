@@ -6,6 +6,7 @@ import type {
     ActorDefaultRunOptions,
     ActorDefinition,
     ActorRunPricingInfo,
+    ActorStandby,
     ActorStats,
     ActorStoreList as ActorStoreListOutdated,
 } from 'apify-client';
@@ -63,6 +64,13 @@ export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
     input?: ActorInputSchema;
 };
 
+/** A build's `actorDefinition` with the server-interface fields apify-client's type omits. */
+export type ActorDefinitionWithServerInterface = ActorDefinition & {
+    webServerMcpPath?: string;
+    /** The Actor's HTTP interface in standby mode: an OpenAPI document as the publisher wrote it, unvalidated. */
+    webServerSchema?: unknown;
+};
+
 /**
  * Pruned Actor definition type.
  * The `id` property is set to Actor ID.
@@ -72,6 +80,10 @@ export type ActorDefinitionPruned = Pick<
     'id' | 'actorFullName' | 'buildTag' | 'readme' | 'readmeSummary' | 'input' | 'description' | 'defaultRunOptions'
 > & {
     webServerMcpPath?: string; // Optional, used for Actorized MCP server tools
+    /** Whether the server-interface build's `webServerSchema` declares at least one operation; the schema itself is not cached. */
+    hasWebServerSchema: boolean;
+    /** The schema's operations with their required inputs, e.g. `GET / (required: query)`, for request recovery text. */
+    webServerOperations?: string[];
     pictureUrl?: string; // Optional, URL to the Actor's icon/picture
 };
 
@@ -81,7 +93,7 @@ export type ActorDefinitionPruned = Pick<
  */
 export type ActorDefinitionWithInfo = {
     definition: ActorDefinitionPruned;
-    info: ActorOutdated;
+    info: Actor;
 };
 
 /**
@@ -107,6 +119,11 @@ export type ToolBase = z.infer<typeof ToolSchema> & {
     ajvValidate: ValidateFunction;
     /** Whether this tool requires payment validation before execution */
     paymentRequired?: boolean;
+    /**
+     * Whether a third-party payment-provider session is rejected before the call when the Actor named in
+     * `args.actor` has Actor Standby enabled; see `checkPaymentProviderStandbyConflict`.
+     */
+    hasPaymentProviderStandbyCheck?: boolean;
     /**
      * Session-exact description builder for descriptions that reference sibling tools.
      * `description` must hold the {@link ALL_TOOLS_PRESENT} render for consumers without a
@@ -138,13 +155,33 @@ export const TOOL_TYPE = {
  */
 export type TOOL_TYPE = (typeof TOOL_TYPE)[keyof typeof TOOL_TYPE];
 
-/** How an Actor definition maps to the tool surface. */
+/** How an Actor definition maps to the tool surface; `resolveActorToolMode` derives it from {@link ActorInterfaces}. */
 export const ACTOR_TOOL_MODE = {
     RUN: 'RUN',
     MCP: 'MCP',
-    STANDBY_WITHOUT_MCP: 'STANDBY_WITHOUT_MCP',
+    SERVER_ACTOR_WITHOUT_MCP: 'SERVER_ACTOR_WITHOUT_MCP',
 } as const;
 export type ACTOR_TOOL_MODE = (typeof ACTOR_TOOL_MODE)[keyof typeof ACTOR_TOOL_MODE];
+
+/** `actorStandby.tenancy` as the API returns it. */
+export type ActorStandbyTenancy = 'SINGLE_TENANT' | 'MULTI_TENANT';
+
+/** Whose run serves an Actor's server interface; `resolveActorTenancy` reads it off the Actor record. */
+export const ACTOR_TENANCY = {
+    SINGLE_TENANT: 'single-tenant',
+    MULTI_TENANT: 'multi-tenant',
+} as const;
+export type ActorTenancy = (typeof ACTOR_TENANCY)[keyof typeof ACTOR_TENANCY];
+
+/** Which interfaces an Actor has; `resolveActorInterfaces` holds the rule. */
+export type ActorInterfaces = {
+    /** The input schema: a run per call. */
+    input: boolean;
+    /** The MCP server at `webServerMcpPath`. */
+    mcp: boolean;
+    /** The HTTP API described by `webServerSchema`. */
+    server: boolean;
+};
 
 /**
  * Type for Actor-based tools - tools that wrap Apify Actors.
@@ -276,28 +313,29 @@ export type TelemetryEnv = (typeof TELEMETRY_ENV)[keyof typeof TELEMETRY_ENV];
  * Type representing the Actor information needed in order to turn it into an MCP server tool.
  */
 export type ActorInfo = {
-    webServerMcpPath: string | null; // Declared MCP endpoint; only means MCP when standby is on — see `resolveActorToolMode`
+    /** Declared MCP endpoint; only means MCP when standby is on — see `resolveActorInterfaces`. */
+    webServerMcpPath: string | null;
     definition: ActorDefinitionPruned;
-    actor: ActorOutdated;
+    actor: Actor;
 };
 
 /**
- * How an Actor is exposed as a tool, resolved once from its definition by `resolveActorToolMode`.
+ * How an Actor is exposed as a tool, resolved once from its definition: the interface set
+ * (`resolveActorInterfaces`) and the tool slot derived from it (`resolveActorToolMode`).
  * `mcpServerUrl` is present exactly when `toolMode` is {@link ACTOR_TOOL_MODE.MCP}, so callers
  * connect without a cast and an un-narrowed read is a compile error.
  * `actorFullName` is the platform-canonical `username/name`, not whatever identifier the caller used —
  * messages built from it read the same whether the Actor was addressed by ID or by name.
  */
-export type ActorToolResolutionResult = { actorFullName: string } & (
+export type ActorToolResolutionResult = { actorFullName: string; interfaces: ActorInterfaces } & (
     | { toolMode: typeof ACTOR_TOOL_MODE.MCP; mcpServerUrl: string }
-    | { toolMode: typeof ACTOR_TOOL_MODE.RUN | typeof ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP }
+    | { toolMode: typeof ACTOR_TOOL_MODE.RUN | typeof ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP }
 );
 
 export type ActorStoreList = ActorStoreListOutdated & {
     actorReviewCount?: number;
     actorReviewRating?: number;
     badge?: string | null;
-    bookmarkCount?: number;
     categories?: string[];
     currentPricingInfo: ActorRunPricingInfo;
     isWhiteListedForAgenticPayments?: boolean;
@@ -308,7 +346,6 @@ export type ActorStoreList = ActorStoreListOutdated & {
     stats: ActorStats & {
         actorReviewCount?: number;
         actorReviewRating?: number;
-        bookmarkCount?: number;
         publicActorRunStats30Days?: Partial<Record<string, number>> & {
             SUCCEEDED?: number;
             TOTAL?: number;
@@ -318,6 +355,7 @@ export type ActorStoreList = ActorStoreListOutdated & {
 
 export type Actor = ActorOutdated & {
     actorPermissionLevel?: string;
+    actorStandby?: ActorStandby & { tenancy?: ActorStandbyTenancy };
     hasNoDataset?: boolean;
     isCritical?: boolean;
     isGeneric?: boolean;
@@ -331,7 +369,6 @@ export type Actor = ActorOutdated & {
         };
         actorReviewCount?: number;
         actorReviewRating?: number;
-        bookmarkCount?: number;
         lastRunStartedAt?: string | Date | null;
     };
 };
@@ -397,6 +434,10 @@ export type ToolCallTelemetryProperties = {
     failure_category?: FailureCategory;
     failure_http_status?: number;
     failure_detail?: string;
+    /** The status an Actor's server returned to `send-server-actor-request`, whatever the tool status. */
+    http_status?: number;
+    /** Whose standby run `send-server-actor-request` reached. */
+    actor_tenancy?: ActorTenancy;
     actor_name?: string;
     actor_id?: string;
     /** Run the call touched. `run_status` is the run's own outcome, distinct from `tool_status`. */
@@ -452,6 +493,8 @@ export type ToolTelemetryContext = {
     failureCategory?: FailureCategory;
     failureHttpStatus?: number;
     failureDetail?: string;
+    httpStatus?: number;
+    actorTenancy?: ActorTenancy;
     actorId?: string;
     ajvErrorDetails?: AjvErrorDetails;
 };
@@ -461,6 +504,8 @@ export type CallDiagnostics = Pick<
     | 'failure_category'
     | 'failure_http_status'
     | 'failure_detail'
+    | 'http_status'
+    | 'actor_tenancy'
     | 'actor_name'
     | 'actor_id'
     | 'run_id'
@@ -703,7 +748,6 @@ export type StructuredActorCard = {
     stats?: {
         totalUsers: number;
         monthlyUsers: number;
-        bookmarks?: number;
     };
     rating?: {
         average: number;
@@ -734,7 +778,7 @@ export type ConsoleLinkContext = {
 export type ActorCardOptions = {
     /** Include description text only */
     includeDescription?: boolean;
-    /** Include usage statistics (users, runs, success rate, bookmarks) */
+    /** Include usage statistics (users, runs, success rate) */
     includeStats?: boolean;
     /** Include pricing information */
     includePricing?: boolean;

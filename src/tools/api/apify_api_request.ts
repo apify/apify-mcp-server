@@ -6,15 +6,9 @@ import { isAxiosError } from 'axios';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { sendApifyApiRequest } from '../../apify_client.js';
+import { isMaxContentLengthAbort, sendApifyApiRequest } from '../../apify_client.js';
 import { APIFY_ERROR_TYPE_PAGE_NOT_FOUND, HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
-import {
-    isApifyApiUri,
-    isMaxContentLengthAbort,
-    maskSessionToken,
-    REDACTED,
-    redactJsonSecrets,
-} from '../../resources/api_resources.js';
+import { isApifyApiUri, maskSessionToken, REDACTED, redactJsonSecrets } from '../../resources/api_resources.js';
 import { toPlainError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { getHttpErrorHint, respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';

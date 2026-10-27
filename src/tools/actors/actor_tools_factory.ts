@@ -247,10 +247,7 @@ export async function getMCPServersAsTools(
         try {
             // getActorMCPServerURL rejects a webServerMcpPath that escapes the Actor's standby origin.
             // Resolve it inside the try so one Actor's bad path skips only that Actor, not the whole batch.
-            const mcpServerUrl = await getActorMCPServerURL(
-                actorInfo.definition.id, // Real ID of the Actor
-                actorInfo.webServerMcpPath,
-            );
+            const mcpServerUrl = await getActorMCPServerURL(actorInfo.actor, actorInfo.webServerMcpPath);
             log.debug('Retrieved MCP server URL for Actor', {
                 actorFullName: actorInfo.definition.actorFullName,
                 actorId,
@@ -409,9 +406,9 @@ export async function getActorsAsTools(
         }
 
         const toolMode = resolveActorToolMode(actorInfo);
-        if (toolMode === ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP) {
-            const error = ActorLoadError.standbyWithoutMcpNotSupported(actorInfo.definition.actorFullName);
-            log.softFail('Skipping standby Actor with no MCP server and an empty input schema', {
+        if (toolMode === ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP) {
+            const error = ActorLoadError.serverActorWithoutMcpNotSupported(actorInfo.definition.actorFullName);
+            log.softFail('Skipping server Actor with no MCP server and an empty input schema', {
                 actorName: actorInfo.definition.actorFullName,
                 mcpSessionId,
                 actorLoadErrorKind: error.kind,

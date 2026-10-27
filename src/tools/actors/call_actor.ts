@@ -66,6 +66,16 @@ export function buildCallActorMcpServerSection({ hasTool }: ToolDescriptionConte
 ${hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? `- Use ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output={ mcpTools: true } to list available tools\n` : ''}- Call using format: "actorName:toolName" (e.g., "username/name:tool-name")`;
 }
 
+/** Points at the Actor Server for results that do not need a batch run. */
+function buildCallActorServerActorSection({ hasTool }: ToolDescriptionContext): string {
+    const operations = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
+        ? `\n- ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output={ serverInterface: true } lists its HTTP operations`
+        : '';
+    return `For Server Actors (Actors with an HTTP API):
+- This tool starts a batch run and stores the results in a dataset; use it when you need batch results
+- For one or a few results, ${HELPER_TOOLS.ACTOR_SERVER_REQUEST} returns them in the HTTP response, without a batch run${operations}`;
+}
+
 /** Shared "two ways to run" + USAGE section — identical in both modes. */
 function buildCallActorUsageSection(): string {
     return `There are two ways to run Actors:
@@ -142,6 +152,7 @@ export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOL
         'Call any Actor from the Apify Store.',
         workflowSection,
         buildCallActorMcpServerSection(ctx),
+        ...(hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST) ? [buildCallActorServerActorSection(ctx)] : []),
         dedent`
             IMPORTANT:
             - Waits up to waitSecs (default 30s) for completion; returns run status and storage IDs, and with waitSecs > 0 also reports dataset field metadata
@@ -169,7 +180,7 @@ function respondStandbyRejection(
     error: ActorLoadError,
     opts: { mcpSessionId?: string; actorId?: string; paymentProviderId?: string },
 ): ToolResponse {
-    log.softFail('Rejecting call-actor for unsupported standby Actor', {
+    log.softFail('Rejecting a tool call for an unsupported standby Actor', {
         // The error's canonical Actor name, so both call shapes log the same value even when the
         // caller addressed the Actor by ID. `actorLoadErrorKind` distinguishes which cell rejected it.
         actorName: error.actorName,
@@ -218,11 +229,12 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         });
     }
 
-    // The two standby kinds are sanitized, user-facing reasons — forward them verbatim instead of
-    // wrapping them in the generic server-error text. LOAD_FAILED masks a backend fault and stays below.
+    // These two kinds (a server Actor without MCP, and a standby Actor under a payment provider) are sanitized,
+    // user-facing reasons: forward them verbatim instead of wrapping them in the generic server-error text.
+    // LOAD_FAILED masks a backend fault and stays below.
     if (
         error instanceof ActorLoadError &&
-        (error.kind === ACTOR_LOAD_ERROR_KIND.STANDBY_WITHOUT_MCP_NOT_SUPPORTED ||
+        (error.kind === ACTOR_LOAD_ERROR_KIND.SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED ||
             error.kind === ACTOR_LOAD_ERROR_KIND.STANDBY_PAYMENT_NOT_SUPPORTED)
     ) {
         return respondStandbyRejection(error, { mcpSessionId, actorId });
@@ -479,7 +491,7 @@ export async function resolveAndValidateActor(params: {
 
     // NOT_FOUND falls through to the structured "Actor not found" response below.
     // Any other error (LOAD_FAILED / STANDBY_PAYMENT_NOT_SUPPORTED /
-    // STANDBY_WITHOUT_MCP_NOT_SUPPORTED) is rethrown so the outer call-actor handler reports it.
+    // SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED) is rethrown so the outer call-actor handler reports it.
     // STANDBY_PAYMENT_NOT_SUPPORTED cannot actually appear here: the call above passes no
     // `paymentProvider`, so `getActorsAsTools`' payment gate never fires. Kept in the list because
     // the rethrow is keyed on "not NOT_FOUND", not on an enumeration of kinds.
@@ -582,12 +594,13 @@ export async function callActorPreExecute(
     const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
     const resolution = await getActorToolResolutionCached(baseActorName, apifyClientForDefinition);
 
-    if (resolution?.toolMode === ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP) {
+    if (resolution?.toolMode === ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP) {
+        const error = ActorLoadError.serverActorWithoutMcpNotSupported(resolution.actorFullName);
+        if (resolution.interfaces.server && loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)) {
+            error.message += ` Its HTTP API is available through ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}.`;
+        }
         return {
-            earlyResponse: respondStandbyRejection(
-                ActorLoadError.standbyWithoutMcpNotSupported(resolution.actorFullName),
-                { mcpSessionId },
-            ),
+            earlyResponse: respondStandbyRejection(error, { mcpSessionId }),
         };
     }
 
@@ -728,6 +741,7 @@ export const callActor: ToolEntry = Object.freeze({
     outputSchema: actorRunOutputSchema,
     ajvValidate: callActorAjvValidate,
     paymentRequired: true,
+    hasPaymentProviderStandbyCheck: true,
     annotations: {
         title: 'Call Actor',
         readOnlyHint: false,
