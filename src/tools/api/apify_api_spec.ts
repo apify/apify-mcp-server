@@ -69,12 +69,13 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** Walks a local `#/...` reference; `undefined` when it does not resolve. */
-function resolveLocalRef(spec: unknown, ref: string): unknown {
+export function resolveLocalRef(spec: unknown, ref: string): unknown {
     if (!ref.startsWith('#/')) return undefined;
     let node: unknown = spec;
     for (const segment of ref.slice(2).split('/')) {
-        if (!isRecord(node)) return undefined;
-        node = node[segment];
+        const key = segment.replaceAll('~1', '/').replaceAll('~0', '~');
+        if (typeof node !== 'object' || node === null || !Object.hasOwn(node, key)) return undefined;
+        node = (node as Record<string, unknown>)[key];
     }
     return node;
 }

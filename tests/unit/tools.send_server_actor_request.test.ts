@@ -21,6 +21,7 @@ import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
     mockApifyClient,
+    only,
     stubToolCallContext,
     type TextToolResult,
 } from './helpers/tool_context.js';
@@ -522,7 +523,7 @@ describe('returning an Actor Server error', () => {
     });
 
     it.each([true, false])(
-        'points a 404 at the Actor README, through fetch-actor-details when served: %s',
+        'points a 404 at the operation list, or at the README without fetch-actor-details: %s',
         async (hasDetails) => {
             const received = recordRequests();
             const result = await callTool(
@@ -533,12 +534,12 @@ describe('returning an Actor Server error', () => {
 
             expect(received).toHaveLength(1);
             expect(result.isError).toBe(true);
-            expect(result.structuredContent).toMatchObject({ nextStep: expect.stringContaining('README') });
             expect(result.content.at(-1)?.text).toBe((result.structuredContent as { nextStep: string }).nextStep);
             if (hasDetails) {
-                expect(text).toContain(JSON.stringify({ actor: SERVER_ACTOR, output: { readme: true } }));
+                expect(text).toContain(JSON.stringify({ actor: SERVER_ACTOR, output: { serverInterface: true } }));
             } else {
                 expect(text).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+                expect(text).toContain('README');
             }
         },
     );
@@ -661,6 +662,7 @@ describe('rejecting a call before sending', () => {
         expectSoftFailInvalidInput(withCallActor);
         expect(withCallActor.content[0].text).toContain(`It can be run from an input with ${HELPER_TOOLS.ACTOR_CALL}.`);
         expect(withoutCallActor.content[0].text).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+        expect(withCallActor.toolTelemetry?.actorTenancy).toBeUndefined();
         expect(received).toHaveLength(0);
     });
 
@@ -755,6 +757,15 @@ describe('reporting an incomplete response', () => {
         controller.abort();
 
         await expect(pending).resolves.toEqual({});
+    });
+});
+
+describe('describing the tool', () => {
+    it('names fetch-actor-details in the description only when the session has it', () => {
+        expect(sendServerActorRequest.description).toContain(
+            `${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface`,
+        );
+        expect(sendServerActorRequest.buildDescription!(only())).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
     });
 });
 

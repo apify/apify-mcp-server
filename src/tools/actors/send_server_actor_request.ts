@@ -14,10 +14,11 @@ import type {
     ActorInterfaces,
     ActorTenancy,
     InternalToolArgs,
+    ToolDescriptionContext,
     ToolEntry,
     ToolInputSchema,
 } from '../../types.js';
-import { TOOL_TYPE } from '../../types.js';
+import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
 import { fixZodSchemaRequired } from '../../utils/ajv.js';
 import { toPlainError } from '../../utils/logging.js';
@@ -25,14 +26,11 @@ import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondServerError, respondUserError } from '../../utils/mcp.js';
 import { resolveActorInterfaces, resolveActorTenancy } from '../actor_tool_naming.js';
 import { apiCallArgsShape, redactApiCallArgs } from '../api/apify_api_request.js';
-import { isRecord } from '../api/apify_api_spec.js';
+import { API_METHODS, type ApiMethod, isRecord } from '../api/apify_api_spec.js';
 import { parseBaseMimeType } from '../storage/storage_helpers.js';
 import { anyJsonValueSchema, serverActorRequestOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
-
-const SERVER_ACTOR_REQUEST_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
-type ServerActorRequestMethod = (typeof SERVER_ACTOR_REQUEST_METHODS)[number];
 
 const sendServerActorRequestArgs = z.object({
     actor: z
@@ -40,15 +38,12 @@ const sendServerActorRequestArgs = z.object({
         .min(1)
         .describe('The Actor: its ID, or its name in the "username/name" form, such as "apify/web-fetch".'),
     method: z
-        .enum(SERVER_ACTOR_REQUEST_METHODS)
+        .enum(API_METHODS)
         .describe('HTTP method: GET, POST, PUT, PATCH, or DELETE. The Actor accepts or rejects it.'),
-    path: z
-        .string()
-        .min(1)
-        .describe(
-            'The path on the Actor Server, starting with /, such as /search. A query string written into the ' +
-                'path is sent too.',
-        ),
+    path: z.string().min(1).describe(dedent`
+            The path of an operation in the Actor API schema, starting with /. Take it from the schema; do not guess it.
+            A query string written into the path is sent too.
+        `),
     query: apiCallArgsShape.query.describe(
         'Query parameters, by name, for example {"limit": 10, "verbose": true}; a boolean is sent as true or ' +
             'false. Added to a query string in the path.',
@@ -63,7 +58,7 @@ type ServerActorRequest = {
     actorName: string;
     interface: 'server';
     tenancy: ActorTenancy;
-    method: ServerActorRequestMethod;
+    method: ApiMethod;
     /** With its query, the session token masked: the agent can write the token into a query value. */
     path: string;
 };
@@ -160,7 +155,7 @@ async function sendRequest({
 }: {
     client: ApifyClient;
     url: URL;
-    method: ServerActorRequestMethod;
+    method: ApiMethod;
     body: unknown;
     signal: AbortSignal;
     timeoutMillis: number;
@@ -250,7 +245,7 @@ function buildRequestRecoveryText({
     if (status === 503) return 'The Actor Server is temporarily unavailable.';
     if (![400, 404, 405, 422].includes(status)) return undefined;
     const documentation = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)
-        ? `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorName, output: { readme: true } })} returns the Actor README or its summary, which may omit HTTP endpoint details.`
+        ? `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorName, output: { serverInterface: true } })} lists the documented HTTP operations.`
         : 'The Actor README may describe its HTTP endpoints.';
     return hasErrorMessage
         ? `The Actor Server error may name the expected HTTP method, path, or parameters. ${documentation}`
@@ -353,7 +348,7 @@ export async function executeSendServerActorRequest(
         });
     }
     // The path is not echoed: it can carry the session token.
-    if (!args.path.startsWith('/')) return respondUserError('The path must start with "/", for example "/search".');
+    if (!args.path.startsWith('/')) return respondUserError('The path must start with "/".');
     if (args.method === 'GET' && args.body !== undefined) {
         return respondUserError('A GET request cannot have a body. Send the data in query instead.');
     }
@@ -369,7 +364,8 @@ export async function executeSendServerActorRequest(
         toolTelemetry: {
             ...response.toolTelemetry,
             actorId: info.id,
-            actorTenancy: tenancy,
+            // With Actor Standby off there is no tenancy; `resolveActorTenancy` would report its single-tenant default.
+            ...(info.actorStandby?.isEnabled === true && { actorTenancy: tenancy }),
             ...(httpStatus !== undefined && { httpStatus }),
         },
     });
@@ -414,13 +410,12 @@ export async function executeSendServerActorRequest(
     }
 }
 
-/** Sends one HTTP request to a Server Actor's API, the server interface its `webServerSchema` documents. */
-export const sendServerActorRequest: ToolEntry = Object.freeze({
-    type: TOOL_TYPE.INTERNAL,
-    name: HELPER_TOOLS.ACTOR_SERVER_REQUEST,
-    title: 'Send Server Actor request',
-    description: dedent`
-        Send one HTTP request to an Actor Server: the HTTP API of a Server Actor, documented in its API schema (OpenAPI) and README.
+function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    const details = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
+        ? ` ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface lists the documented operations.`
+        : '';
+    return dedent`
+        Send one HTTP request to an Actor Server: the HTTP API of a Server Actor, documented in its API schema (OpenAPI) and README.${details}
         Give the method, the path, and optionally query parameters and a JSON body; the Actor Server's host and your Apify API token are added for you.
         Only an Actor with an Actor Server and an API schema takes requests here; the Actor accepts or rejects the method and path.
         A request to a single-tenant Actor Server can start a run of the Actor in your account, kept until its idle timeout; a multi-tenant Actor Server charges per event.
@@ -436,7 +431,16 @@ export const sendServerActorRequest: ToolEntry = Object.freeze({
         - user_input: Search the web for the latest AI news with apify/web-search
         - user_input: Find articles about Apify from the past week with apify/web-search
         - user_input: Get the content of https://example.com with apify/web-fetch
-    `,
+    `;
+}
+
+/** Sends one HTTP request to a Server Actor's API, the server interface its `webServerSchema` documents. */
+export const sendServerActorRequest: ToolEntry = Object.freeze({
+    type: TOOL_TYPE.INTERNAL,
+    name: HELPER_TOOLS.ACTOR_SERVER_REQUEST,
+    title: 'Send Server Actor request',
+    description: buildDescription(ALL_TOOLS_PRESENT),
+    buildDescription,
     // Advertise explicit JSON types without letting AJV coerce the body, as apify-api-write does.
     inputSchema: z.toJSONSchema(
         sendServerActorRequestArgs.extend({ body: sendServerActorRequestArgs.shape.body.meta(anyJsonValueSchema) }),

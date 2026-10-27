@@ -13,13 +13,10 @@ import type {
     SchemaProperties,
 } from '../../types.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
-import { isRecord } from '../api/apify_api_spec.js';
+import { API_METHODS, isRecord } from '../api/apify_api_spec.js';
 import type { BuildListItem } from '../builds/get_actor_build_list.js';
 
 const BUILD_NUMBER_PATTERN = /^\d+\.\d+\.\d+$/;
-
-/** OpenAPI path-item keys that hold an operation; the other keys (`parameters`, `servers`, `summary`, `$ref`) don't. */
-const OPENAPI_OPERATION_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'] as const;
 
 /**
  * Get an Actor's pruned definition by Actor ID or name.
@@ -138,13 +135,13 @@ async function resolveStandbyBuildId(
 }
 
 /**
- * True when the schema declares at least one operation, an object under a method key of a path item.
+ * True when the schema declares an operation the send tool can call: an object under a lowercase `API_METHODS` key.
  * The schema is publisher-written and unvalidated, so any level that is not an object counts as absent.
  */
 function hasWebServerSchemaOperations(schema: unknown): boolean {
     if (!isRecord(schema) || !isRecord(schema.paths)) return false;
     return Object.values(schema.paths).some(
-        (pathItem) => isRecord(pathItem) && OPENAPI_OPERATION_METHODS.some((method) => isRecord(pathItem[method])),
+        (pathItem) => isRecord(pathItem) && API_METHODS.some((method) => isRecord(pathItem[method.toLowerCase()])),
     );
 }
 
