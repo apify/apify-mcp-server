@@ -428,7 +428,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * Returns the unique Actor IDs registered as MCP servers (e.g., 'apify/example-mcp-server').
+     * Returns the unique Actor IDs registered as MCP servers.
      */
     private listActorMcpServerToolIds(): string[] {
         const ids = Array.from(this.tools.values())
