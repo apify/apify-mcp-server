@@ -52,9 +52,8 @@ import { fixActorNameInputAndLog, getActorsAsTools, MCP_TOOL_NAME_SUFFIX } from 
 // Shared call-actor description building blocks
 // ---------------------------------------------------------------------------
 
-/** Points at the Actor Server for results that do not need a batch run; empty when the send tool is absent. */
+/** Points at the Actor Server for results that do not need a batch run. */
 function buildCallActorServerActorSection({ hasTool }: ToolDescriptionContext): string {
-    if (!hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST)) return '';
     const operations = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
         ? `\n- ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output={ serverInterface: true } lists its HTTP operations`
         : '';
@@ -139,7 +138,7 @@ export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOL
         'Call any Actor from the Apify Store.',
         workflowSection,
         `MCP server Actors are not run here${hasTool(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL) ? `; ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} calls their MCP tools` : ''}.`,
-        buildCallActorServerActorSection(ctx),
+        ...(hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST) ? [buildCallActorServerActorSection(ctx)] : []),
         dedent`
             IMPORTANT:
             - Waits up to waitSecs (default 30s) for completion; returns run status and storage IDs, and with waitSecs > 0 also reports dataset field metadata
@@ -155,7 +154,7 @@ export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOL
 
     if (hasTool(HELPER_TOOLS.ACTOR_CALL_WIDGET)) sections.push(buildWidgetAddendum(ctx));
 
-    return sections.filter(Boolean).join('\n\n');
+    return sections.join('\n\n');
 }
 
 /**
@@ -491,11 +490,12 @@ export async function callActorPreExecute(
     const resolution = await getActorToolResolutionCached(actorName, apifyClientForDefinition);
 
     if (resolution?.toolMode === ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP) {
+        const error = ActorLoadError.serverActorWithoutMcpNotSupported(resolution.actorFullName);
+        if (resolution.interfaces.server && loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)) {
+            error.message += ` Its HTTP API is available through ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}.`;
+        }
         return {
-            earlyResponse: respondStandbyRejection(
-                ActorLoadError.serverActorWithoutMcpNotSupported(resolution.actorFullName),
-                { mcpSessionId },
-            ),
+            earlyResponse: respondStandbyRejection(error, { mcpSessionId }),
         };
     }
     if (resolution?.toolMode === ACTOR_TOOL_MODE.MCP) {
