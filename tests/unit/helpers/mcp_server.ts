@@ -169,14 +169,16 @@ async function callStatelessMethod(
             },
         },
     };
-    // The revision requires the method — and, where the body names a target, that target — in
-    // headers as well; the entry refuses a request whose headers and body disagree.
+    // The revision requires the protocol version and the method — and, where the body names a
+    // target, that target — in headers as well; the entry refuses a request whose headers and
+    // body disagree.
     const headers: Record<string, string> = {
         'content-type': 'application/json',
         accept: 'application/json, text/event-stream',
         'mcp-method': method,
+        'mcp-protocol-version': STATELESS_PROTOCOL_VERSION,
     };
-    const target = params.name ?? params.uri;
+    const target = params.name ?? params.uri ?? params.taskId;
     if (typeof target === 'string') headers['mcp-name'] = target;
 
     const response = await handler.fetch(
