@@ -25,12 +25,6 @@ export const CODE_RUNTIME_ACTOR_NAME = 'apify/code-runtime';
 export const MAX_INLINE_BYTES = 256 * 1024;
 
 /**
- * HTTP methods `send-server-actor-request` sends; an API schema operation under another method is neither counted
- * nor listed.
- */
-export const SERVER_ACTOR_REQUEST_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
-
-/**
  * Advisory threshold (uncompressed bytes) above which dataset tools append a size hint steering the
  * caller to narrow the fetch. A soft hint, not a truncation cap; ~50 KB mirrors the ~25k-token budget.
  */

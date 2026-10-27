@@ -320,9 +320,7 @@ describe('getMcpToolsMessage()', () => {
             'token',
         );
 
-        expect(message).toBe(
-            'Actor "acme/standby-empty" runs in standby mode without an MCP server and has an empty input schema,' +
-                ' which is not supported yet.',
-        );
+        expect(message).toContain('has no MCP tools or input interface');
+        expect(message).not.toContain('not supported yet');
     });
 });

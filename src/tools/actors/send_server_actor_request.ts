@@ -5,14 +5,7 @@ import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { readBodyUnderCap, sendApifyApiRequest } from '../../apify_client.js';
-import {
-    FAILURE_CATEGORY,
-    HELPER_TOOLS,
-    HTTP_FORBIDDEN,
-    HTTP_UNAUTHORIZED,
-    MAX_INLINE_BYTES,
-    SERVER_ACTOR_REQUEST_METHODS,
-} from '../../const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, HTTP_FORBIDDEN, HTTP_UNAUTHORIZED, MAX_INLINE_BYTES } from '../../const.js';
 import { getActorMCPServerPath, resolveOnStandbyOrigin } from '../../mcp/actors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import { isTextualMimeType, maskSessionToken, parseCharset, REDACTED } from '../../resources/api_resources.js';
@@ -33,13 +26,11 @@ import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondServerError, respondUserError } from '../../utils/mcp.js';
 import { resolveActorInterfaces, resolveActorTenancy } from '../actor_tool_naming.js';
 import { apiCallArgsShape, redactApiCallArgs } from '../api/apify_api_request.js';
-import { isRecord } from '../api/apify_api_spec.js';
+import { API_METHODS, type ApiMethod, isRecord } from '../api/apify_api_spec.js';
 import { parseBaseMimeType } from '../storage/storage_helpers.js';
 import { anyJsonValueSchema, serverActorRequestOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
-
-type ServerActorRequestMethod = (typeof SERVER_ACTOR_REQUEST_METHODS)[number];
 
 const sendServerActorRequestArgs = z.object({
     actor: z
@@ -47,15 +38,12 @@ const sendServerActorRequestArgs = z.object({
         .min(1)
         .describe('The Actor: its ID, or its name in the "username/name" form, such as "apify/web-fetch".'),
     method: z
-        .enum(SERVER_ACTOR_REQUEST_METHODS)
+        .enum(API_METHODS)
         .describe('HTTP method: GET, POST, PUT, PATCH, or DELETE. The Actor accepts or rejects it.'),
-    path: z
-        .string()
-        .min(1)
-        .describe(
-            'The path of an operation in the Actor API schema, starting with /. Take it from the schema; do not ' +
-                'guess it. A query string written into the path is sent too.',
-        ),
+    path: z.string().min(1).describe(dedent`
+            The path of an operation in the Actor API schema, starting with /. Take it from the schema; do not guess it.
+            A query string written into the path is sent too.
+        `),
     query: apiCallArgsShape.query.describe(
         'Query parameters, by name, for example {"limit": 10, "verbose": true}; a boolean is sent as true or ' +
             'false. Added to a query string in the path.',
@@ -64,37 +52,13 @@ const sendServerActorRequestArgs = z.object({
 });
 type SendServerActorRequestArgs = z.infer<typeof sendServerActorRequestArgs>;
 
-function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    const details = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
-        ? ` ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface lists the documented operations.`
-        : '';
-    return dedent`
-        Send one HTTP request to an Actor Server: the HTTP API of a Server Actor, documented in its API schema (OpenAPI) and README.${details}
-        Give the method, the path, and optionally query parameters and a JSON body; the Actor Server's host and your Apify API token are added for you.
-        Only an Actor with an Actor Server and an API schema takes requests here; the Actor accepts or rejects the method and path.
-        A request to a single-tenant Actor Server can start a run of the Actor in your account, kept until its idle timeout; a multi-tenant Actor Server charges per event.
-        The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text; other content types, and bodies over ${MAX_INLINE_BYTES} bytes, are not returned.
-
-        Example call: {"actor": "apify/web-search", "method": "GET", "path": "/", "query": {"query": "AI news", "maxResults": 5}}
-
-        USAGE:
-        - Use when the Actor that fits the user's request has an Actor Server, and its API schema or README names the endpoint for the task.
-        - Fits requests for one or a few results returned in the HTTP response. Larger batches depend on the endpoint and the response size and time limits.
-
-        USAGE EXAMPLES:
-        - user_input: Search the web for the latest AI news with apify/web-search
-        - user_input: Find articles about Apify from the past week with apify/web-search
-        - user_input: Get the content of https://example.com with apify/web-fetch
-    `;
-}
-
 /** The Actor and the request as sent: the fields every response about a sent request starts with. */
 type ServerActorRequest = {
     actorId: string;
     actorName: string;
     interface: 'server';
     tenancy: ActorTenancy;
-    method: ServerActorRequestMethod;
+    method: ApiMethod;
     /** With its query, the session token masked: the agent can write the token into a query value. */
     path: string;
 };
@@ -192,7 +156,7 @@ async function sendRequest({
 }: {
     client: ApifyClient;
     url: URL;
-    method: ServerActorRequestMethod;
+    method: ApiMethod;
     body: unknown;
     signal: AbortSignal;
     timeoutMillis: number;
@@ -335,18 +299,21 @@ function buildResponse(
         loadedToolNames,
         hasErrorMessage: errorMessage !== undefined,
     });
-    const structuredContent = {
+    const data = {
         ...request,
         status,
         ...(contentType && { contentType }),
         body,
         bytes,
         ...(location && { location }),
+    };
+    const structuredContent = {
+        ...data,
         summary,
         ...(errorMessage && { errorMessage }),
         ...(nextStep && { nextStep }),
     };
-    const texts = [JSON.stringify(structuredContent), summary];
+    const texts = [JSON.stringify(data), summary];
     if (errorMessage) texts.push(`Actor Server error: ${errorMessage}`);
     if (nextStep) texts.push(nextStep);
     if (status < 400) return respondOk(texts, { structuredContent });
@@ -441,6 +408,30 @@ export async function executeSendServerActorRequest(
         if (!(error instanceof IncompleteResponseError)) throw error;
         return withActorTelemetry(buildIncompleteResponse(request, error, timeoutMillis), error.status);
     }
+}
+
+function buildDescription({ hasTool }: ToolDescriptionContext): string {
+    const details = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
+        ? ` ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface lists the documented operations.`
+        : '';
+    return dedent`
+        Send one HTTP request to an Actor Server: the HTTP API of a Server Actor, documented in its API schema (OpenAPI) and README.${details}
+        Give the method, the path, and optionally query parameters and a JSON body; the Actor Server's host and your Apify API token are added for you.
+        Only an Actor with an Actor Server and an API schema takes requests here; the Actor accepts or rejects the method and path.
+        A request to a single-tenant Actor Server can start a run of the Actor in your account, kept until its idle timeout; a multi-tenant Actor Server charges per event.
+        The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text; other content types, and bodies over ${MAX_INLINE_BYTES} bytes, are not returned.
+
+        Example call: {"actor": "apify/web-search", "method": "GET", "path": "/", "query": {"query": "AI news", "maxResults": 5}}
+
+        USAGE:
+        - Use when the Actor that fits the user's request has an Actor Server, and its API schema or README names the endpoint for the task.
+        - Fits requests for one or a few results returned in the HTTP response. Larger batches depend on the endpoint and the response size and time limits.
+
+        USAGE EXAMPLES:
+        - user_input: Search the web for the latest AI news with apify/web-search
+        - user_input: Find articles about Apify from the past week with apify/web-search
+        - user_input: Get the content of https://example.com with apify/web-fetch
+    `;
 }
 
 /** Sends one HTTP request to a Server Actor's API, the server interface its `webServerSchema` documents. */
