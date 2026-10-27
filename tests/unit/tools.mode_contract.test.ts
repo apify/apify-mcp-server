@@ -75,7 +75,6 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
                 HELPER_TOOLS.STORE_SEARCH,
                 HELPER_TOOLS.ACTOR_GET_DETAILS,
                 HELPER_TOOLS.ACTOR_CALL,
-                HELPER_TOOLS.ACTOR_SERVER_REQUEST,
                 HELPER_TOOLS.ACTOR_MCP_TOOL_LIST,
                 HELPER_TOOLS.ACTOR_MCP_TOOL_CALL,
             ];

@@ -142,7 +142,6 @@ export const statsSchema = {
     properties: {
         totalUsers: { type: 'number', description: 'Total users' },
         monthlyUsers: { type: 'number', description: 'Monthly active users' },
-        bookmarks: { type: 'number', description: 'Number of bookmarks' },
     },
 };
 
@@ -242,9 +241,9 @@ export const actorDetailsOutputSchema = {
         serverInterface: {
             type: 'string',
             description:
-                "The Actor's server interface: a one-line summary by default. `output.serverInterface: true` returns " +
-                'the full API schema with guidance when it fits, or operation navigation otherwise. ' +
-                'A "METHOD /path" string returns an operation excerpt; "#/..." returns a raw local schema node.',
+                "The Actor's server interface. `output.serverInterface: true` returns the full API schema with " +
+                'guidance when it fits, or operation navigation otherwise. A "METHOD /path" string returns an ' +
+                'operation excerpt; "#/..." returns a raw local schema node.',
         },
     },
 };
@@ -1275,8 +1274,20 @@ export const serverActorRequestOutputSchema = {
         path: { type: 'string', description: 'Path sent, with its query' },
         status: { type: 'integer', description: 'HTTP status received' },
         contentType: { type: 'string', description: 'Content-Type of the response; absent when it had none' },
-        body: { type: 'string', description: 'Response body as text; empty when the response had none' },
-        bytes: { type: 'integer', description: 'Response body size in bytes, after decompression' },
+        body: {
+            type: 'string',
+            description: 'Response body as text; empty when the response had none; absent when omitted',
+        },
+        bytes: {
+            type: 'integer',
+            description: 'Response body size in bytes, after decompression; absent when over the limit',
+        },
+        bodyOmitted: {
+            type: 'boolean',
+            const: true,
+            description: 'The response arrived, but its body was not returned',
+        },
+        reason: { type: 'string', description: 'Why the response body was omitted' },
         location: { type: 'string', description: 'Location header of a redirect, which is not followed' },
         summary: { type: 'string', description: 'Readable summary of the HTTP response' },
         errorMessage: {
@@ -1288,5 +1299,9 @@ export const serverActorRequestOutputSchema = {
             description: 'Where to look to correct the request, or why the Actor Server refused it',
         },
     },
-    required: ['actorId', 'actorName', 'interface', 'tenancy', 'method', 'path', 'status', 'body', 'bytes', 'summary'],
+    required: ['actorId', 'actorName', 'interface', 'tenancy', 'method', 'path', 'status', 'summary'],
+    oneOf: [
+        { type: 'object', required: ['body', 'bytes'] },
+        { type: 'object', required: ['bodyOmitted', 'reason'] },
+    ],
 };

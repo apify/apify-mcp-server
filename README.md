@@ -266,7 +266,7 @@ Legend for the **Enabled by default** column:
 | `search-actors` | actors | Search for Actors in Apify Store. | ✅ |
 | `fetch-actor-details` | actors | Retrieve detailed information about a specific Actor, including its input schema, README (summary when available, full otherwise), pricing, Actor output schema, and a Server Actor's HTTP operations. | ✅ |
 | `call-actor` | actors | Call an Actor and get its run results. Use fetch-actor-details first to get the Actor's input schema. | ✅ |
-| `send-server-actor-request` | actors | Send one HTTP request to a Server Actor's API, the server interface its API schema documents, and return the response. | ✅ |
+| `send-server-actor-request` | none (select by name: `tools=send-server-actor-request`) | Send one HTTP request to a Server Actor's API, the server interface its API schema documents, and return the response. |  |
 | `fetch-actor-mcp-tool-list` | actors | List an Actor's MCP tools with their schemas, annotations, and metadata. | ✅ |
 | `call-actor-mcp-tool` | actors | Call one tool on an Actor's MCP server and return its result. | ✅ |
 | `get-actor-run` | runs | Get detailed information about a specific Actor run. | ⚡ |

@@ -69,14 +69,7 @@ import { searchActorsWidget } from './widgets/search_actors_widget.js';
 
 /** Unified tool category definitions — single source of truth. */
 export const toolCategories = {
-    actors: [
-        searchActors,
-        fetchActorDetails,
-        callActor,
-        sendServerActorRequest,
-        fetchActorMcpToolList,
-        callActorMcpTool,
-    ],
+    actors: [searchActors, fetchActorDetails, callActor, fetchActorMcpToolList, callActorMcpTool],
     docs: [searchApifyDocs, fetchApifyDocs],
     runs: [getActorRun, getActorRunList, getActorRunLog, abortActorRun],
     storage: [
@@ -127,8 +120,9 @@ export const ALL_WIDGET_TOOLS: readonly ToolEntry[] = [
  * Non-widget tools in no category: never served by default or by a category, only when named in
  * `tools=`, in every mode. Temporary: `get-actor-list` returns to a category once evals cover it.
  * `delete-actor` stays here: it deletes Actors permanently, so a session gets it only by asking for it.
+ * `send-server-actor-request` stays here until it is enabled by default (#1620).
  */
-export const UNCATEGORIZED_TOOLS: readonly ToolEntry[] = [getActorList, deleteActor];
+export const UNCATEGORIZED_TOOLS: readonly ToolEntry[] = [getActorList, deleteActor, sendServerActorRequest];
 
 /**
  * Apps-mode auto-pairing: a widget is added iff its base tool is present — see

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
-import { buildFetchActorDetailsResult } from '../../src/tools/actors/fetch_actor_details.js';
+import { buildFetchActorDetailsResult, fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
 import { buildServerInterfaceText } from '../../src/tools/actors/server_interface_schema.js';
 import type { Actor } from '../../src/types.js';
 import { mockActor, mockActorBuildClient, mockDefaultBuild } from './helpers/actor_build_client.js';
-import { mockApifyClient, stubToolCallContext, textOf } from './helpers/tool_context.js';
+import { mockApifyClient, only, stubToolCallContext, textOf } from './helpers/tool_context.js';
 
 const ACTOR_FULL_NAME = 'apify/server-actor-test';
 const STANDBY_URL = 'https://server-actor-test.apify.actor';
@@ -343,8 +343,25 @@ describe('a selection that cannot be returned', () => {
     );
 });
 
+describe('the tool description', () => {
+    it('promises the summary line only when the session has send-server-actor-request', () => {
+        const withSend = fetchActorDetails.buildDescription!(only(HELPER_TOOLS.ACTOR_SERVER_REQUEST));
+        const withoutSend = fetchActorDetails.buildDescription!(only());
+
+        expect(withSend).toContain('one-line server interface summary');
+        expect(withoutSend).not.toContain('server interface summary');
+        expect(withoutSend).toContain('outputSchema and serverInterface.\n');
+    });
+});
+
 describe('fetching details of a Server Actor', () => {
-    const call = async (output?: Record<string, unknown>, { hasPaymentProvider = false } = {}) => {
+    const call = async (
+        output?: Record<string, unknown>,
+        {
+            hasPaymentProvider = false,
+            loadedToolNames = [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.ACTOR_SERVER_REQUEST],
+        }: { hasPaymentProvider?: boolean; loadedToolNames?: string[] } = {},
+    ) => {
         const { apifyClient } = mockActorBuildClient({
             actor: mockActor({ id: 'server-actor-id', name: 'server-actor-test', username: 'apify', ...serverActor() }),
             defaultBuild: mockDefaultBuild({ webServerSchema: SCHEMA }),
@@ -357,7 +374,7 @@ describe('fetching details of a Server Actor', () => {
             }),
         });
         const context = stubToolCallContext({ actor: ACTOR_FULL_NAME, ...(output && { output }) }, client, {
-            loadedToolNames: [HELPER_TOOLS.ACTOR_CALL],
+            loadedToolNames,
         });
         context.apifyToken = '';
         // The provider is not consumed here; only its presence disables server requests.
@@ -375,6 +392,13 @@ describe('fetching details of a Server Actor', () => {
         const text = textOf(result.content!.at(-1)!);
         expect(text).toContain(expected);
         expect((result.structuredContent as { serverInterface?: string }).serverInterface).toBe(text);
+    });
+
+    it('leaves the summary line out when the session cannot send requests', async () => {
+        const result = await call(undefined, { loadedToolNames: [HELPER_TOOLS.ACTOR_CALL] });
+
+        expect(JSON.stringify(result.content)).not.toContain('Server interface:');
+        expect((result.structuredContent as { serverInterface?: string }).serverInterface).toBeUndefined();
     });
 
     it('returns the selection error for an unknown operation', async () => {

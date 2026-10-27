@@ -174,7 +174,7 @@ export const paymentsCases: Case[] = [
         skipIf: skipOnStdio,
         run: async (ctx) => {
             for (const payment of ['x402', 'skyfire'] as const) {
-                const client = await ctx.createClientFn({ payment, tools: ['actors'] });
+                const client = await ctx.createClientFn({ payment, tools: ['actors', 'send-server-actor-request'] });
                 try {
                     const { tools } = await client.listTools();
                     const names = tools.map((tool) => tool.name);
