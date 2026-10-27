@@ -11,6 +11,7 @@ const ACTOR_FULL_NAME = 'apify/server-actor-test';
 const STANDBY_URL = 'https://server-actor-test.apify.actor';
 const DETAILS = `${HELPER_TOOLS.ACTOR_GET_DETAILS} with {"actor":"${ACTOR_FULL_NAME}","output":`;
 const SUMMARY = 'Server interface: enabled, single-tenant, 3 documented operations: GET /add, POST /add, GET /empty.';
+const LISTS_THEM = `${DETAILS}{"serverInterface":true}} lists them.`;
 
 /** The fixture's schema shapes: parameter, request body and response references, like apify/web-fetch's `FetchRequest`. */
 const SCHEMA: Record<string, unknown> = {
@@ -85,15 +86,23 @@ function parseJsonBlock(text: string) {
 }
 
 describe('summarizing a server interface in one line', () => {
-    const sixPaths = Object.fromEntries(['/a', '/b', '/c', '/d', '/e', '/f'].map((path) => [path, { get: {} }]));
+    const pathsOf = (paths: string[]) => ({ paths: Object.fromEntries(paths.map((path) => [path, { get: {} }])) });
+    const fivePaths = ['/a', '/b', '/c', '/d', '/e'];
     it.each([
         [SCHEMA, SUMMARY],
-        [{ paths: sixPaths }, 'Server interface: enabled, single-tenant, 6 documented operations.'],
-    ])('states the tenancy, the operations, up to five by name, and the call that lists them (%#)', (schema, line) => {
-        expect(build({ schema, serverInterface: false })).toEqual({
-            text: `${line} ${DETAILS}{"serverInterface":true}} lists them.`,
-        });
-    });
+        [pathsOf(['/a']), 'Server interface: enabled, single-tenant, 1 documented operation: GET /a.'],
+        [
+            pathsOf(fivePaths),
+            'Server interface: enabled, single-tenant, 5 documented operations: GET /a, GET /b, GET /c, GET /d, GET /e.',
+        ],
+        [pathsOf([...fivePaths, '/f']), 'Server interface: enabled, single-tenant, 6 documented operations.'],
+        [pathsOf([`/${'a'.repeat(300)}`]), 'Server interface: enabled, single-tenant, 1 documented operation.'],
+    ])(
+        'states the tenancy, the operations by name while few and short, and the call that lists them (%#)',
+        (schema, line) => {
+            expect(build({ schema, serverInterface: false })).toEqual({ text: `${line} ${LISTS_THEM}` });
+        },
+    );
 
     it.each([
         [false, undefined],
@@ -299,12 +308,23 @@ describe('the full schema', () => {
 describe('a selection that cannot be returned', () => {
     // `constructor` is inherited by every object; only the schema's own keys are nodes.
     it.each([
-        ['GET /nope', 'has no operation "GET /nope". Documented operations: GET /add, POST /add, GET /empty.'],
-        ['add', 'has no operation "add". Documented operations: GET /add, POST /add, GET /empty.'],
+        [
+            'GET /nope',
+            `has no operation "GET /nope". 3 documented operations: GET /add, POST /add, GET /empty. ${LISTS_THEM}`,
+        ],
+        ['add', `has no operation "add". 3 documented operations: GET /add, POST /add, GET /empty. ${LISTS_THEM}`],
         ['#/components/schemas/Missing', 'has no schema node at "#/components/schemas/Missing".'],
         ['#/components/schemas/constructor', 'has no schema node at "#/components/schemas/constructor".'],
     ])('is an error for %j', (serverInterface, error) => {
         expect(build({ serverInterface })).toEqual({ error: `Actor '${ACTOR_FULL_NAME}' ${error}` });
+    });
+
+    it('names no operation in the error for an unknown one when the names are long', () => {
+        const schema = { paths: { [`/${'a'.repeat(300)}`]: { get: {} } } };
+
+        expect(build({ schema, serverInterface: 'GET /nope' })).toEqual({
+            error: `Actor '${ACTOR_FULL_NAME}' has no operation "GET /nope". 1 documented operation. ${LISTS_THEM}`,
+        });
     });
 
     it.each([true, 'GET /search', '#/components/schemas/Huge'])(
@@ -324,7 +344,7 @@ describe('a selection that cannot be returned', () => {
 });
 
 describe('fetching details of a Server Actor', () => {
-    const call = async (output?: Record<string, unknown>) => {
+    const call = async (output?: Record<string, unknown>, { hasPaymentProvider = false } = {}) => {
         const { apifyClient } = mockActorBuildClient({
             actor: mockActor({ id: 'server-actor-id', name: 'server-actor-test', username: 'apify', ...serverActor() }),
             defaultBuild: mockDefaultBuild({ webServerSchema: SCHEMA }),
@@ -340,6 +360,8 @@ describe('fetching details of a Server Actor', () => {
             loadedToolNames: [HELPER_TOOLS.ACTOR_CALL],
         });
         context.apifyToken = '';
+        // The provider is not consumed here; only its presence disables server requests.
+        if (hasPaymentProvider) context.paymentProvider = {} as never;
         return buildFetchActorDetailsResult(context);
     };
 
@@ -359,6 +381,12 @@ describe('fetching details of a Server Actor', () => {
         const result = await call({ serverInterface: 'GET /nope' });
 
         expect(result.isError).toBe(true);
-        expect(textOf(result.content![0])).toContain('Documented operations: GET /add, POST /add, GET /empty.');
+        expect(textOf(result.content![0])).toContain('3 documented operations: GET /add, POST /add, GET /empty.');
+    });
+
+    it('says requests are not supported in agentic payment mode', async () => {
+        const result = await call({ serverInterface: true }, { hasPaymentProvider: true });
+
+        expect(textOf(result.content!.at(-1)!)).toContain('not supported in agentic payment mode');
     });
 });

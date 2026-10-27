@@ -55,14 +55,11 @@ export const actorDetailsOutputOptionsSchema = z.object({
         .optional()
         .describe('Include inferred output schema from recent successful runs (TypeScript type).'),
     mcpTools: z.boolean().optional().describe('List available tools (only for MCP server Actors).'),
-    serverInterface: z
-        .union([z.boolean(), z.string()])
-        .optional()
-        .describe(
-            'Server Actor HTTP API. true: full schema with guidance when it fits; otherwise operation navigation. ' +
-                '"METHOD /path" (e.g. "GET /search"): operation excerpt. "#/...": raw node at a local JSON pointer. ' +
-                `Each section is limited to ${MAX_INLINE_BYTES} UTF-8 bytes including guidance. References are not expanded or fetched.`,
-        ),
+    serverInterface: z.union([z.boolean(), z.string()]).optional().describe(dedent`
+            Server Actor HTTP API. true: full schema with guidance when it fits; otherwise operation navigation.
+            "METHOD /path" (e.g. "GET /search"): operation excerpt. "#/...": raw node at a local JSON pointer.
+            Each section is limited to ${MAX_INLINE_BYTES} UTF-8 bytes including guidance. References are not expanded or fetched.
+        `),
 });
 
 export const actorDetailsOutputDefaults = {
@@ -131,7 +128,7 @@ find it with ${HELPER_TOOLS.STORE_SEARCH} first.`
     }
 
 Use 'output' to control returned information:
-- Default: all fields except outputSchema, mcpTools and serverInterface. Server Actors always get a one-line server interface summary unless serverInterface is set.
+- Default: all fields except outputSchema, mcpTools and serverInterface. Server Actors always get a one-line server interface summary unless serverInterface is true or a selector.
 - Selective: set only the fields you need to true, e.g. output: { inputSchema: true }
 - Common patterns: inputSchema only, description + readme, mcpTools for MCP Actors, serverInterface: true (full API schema when it fits, operation navigation otherwise), "GET /search" (operation excerpt), or "#/components/schemas/Name" (referenced schema node) for Server Actors
 

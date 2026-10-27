@@ -43,13 +43,10 @@ const sendServerActorRequestArgs = z.object({
     method: z
         .enum(SERVER_ACTOR_REQUEST_METHODS)
         .describe('HTTP method: GET, POST, PUT, PATCH, or DELETE. The Actor accepts or rejects it.'),
-    path: z
-        .string()
-        .min(1)
-        .describe(
-            'The path of an operation in the Actor API schema, starting with /. Take it from the schema; do not ' +
-                'guess it. A query string written into the path is sent too.',
-        ),
+    path: z.string().min(1).describe(dedent`
+            The path of an operation in the Actor API schema, starting with /. Take it from the schema; do not guess it.
+            A query string written into the path is sent too.
+        `),
     query: apiCallArgsShape.query.describe(
         'Query parameters, by name, for example {"limit": 10, "verbose": true}; a boolean is sent as true or ' +
             'false. Added to a query string in the path.',
@@ -367,6 +364,7 @@ export async function executeSendServerActorRequest(
         toolTelemetry: {
             ...response.toolTelemetry,
             actorId: info.id,
+            // With Actor Standby off there is no tenancy; `resolveActorTenancy` would report its single-tenant default.
             ...(info.actorStandby?.isEnabled === true && { actorTenancy: tenancy }),
             ...(httpStatus !== undefined && { httpStatus }),
         },

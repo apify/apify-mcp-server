@@ -10,8 +10,8 @@ type ServerOperation = { method: string; path: string; operation: Record<string,
 /** Alias hops followed per parameter; real chains take one or two. */
 const MAX_ALIAS_HOPS = 16;
 
-/** Up to this many operations, the summary names each one, so an agent can send a request without guessing a path. */
-const SUMMARY_MAX_NAMED_OPERATIONS = 5;
+const MAX_NAMED_OPERATIONS = 5;
+const MAX_NAMED_OPERATIONS_LENGTH = 300;
 
 /** Follows local parameter or request-body aliases, without expanding nested schemas. */
 function resolveRef(node: unknown, spec: unknown): unknown {
@@ -76,6 +76,14 @@ function formatOperationLine({ method, path, operation }: ServerOperation, schem
     return text;
 }
 
+/** E.g. `3 documented operations: GET /add, POST /add, GET /empty`; over the naming limits, the count alone. */
+function formatOperationCount(operations: ServerOperation[]): string {
+    const count = `${operations.length} documented operation${operations.length === 1 ? '' : 's'}`;
+    const names = operations.map(({ method, path }) => `${method} ${path}`).join(', ');
+    const isNamed = operations.length <= MAX_NAMED_OPERATIONS && names.length <= MAX_NAMED_OPERATIONS_LENGTH;
+    return isNamed ? `${count}: ${names}` : count;
+}
+
 /** E.g. `fetch-actor-details with {"actor":"apify/search","output":{"serverInterface":true}}` */
 function formatDetailsCall(actorFullName: string, serverInterface: true | string): string {
     return `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorFullName, output: { serverInterface } })}`;
@@ -91,7 +99,7 @@ function checkSize(text: string, actorFullName: string): { text: string } | { er
 /**
  * The server-interface text of `fetch-actor-details`, by `output.serverInterface`; none for an Actor without
  * Actor Standby unless asked for. References are not expanded or fetched, and the schema's `servers` are not used.
- * - `false`: one summary line with the tenancy and the operation count, naming up to five operations.
+ * - `false`: one summary line with the tenancy and the operation count, naming the operations while few and short.
  * - `true`: the operation list, plus the creator-written schema as is when the text fits `MAX_INLINE_BYTES`.
  * - `"GET /search"`: one operation excerpt with inherited parameters and the root schema/security context.
  * - `"#/components/schemas/Search"`: the raw node at that local JSON pointer.
@@ -122,15 +130,9 @@ export function buildServerInterfaceText({
     if (!isRecord(schema) || operations.length === 0) {
         return { text: `Server interface: enabled, ${tenancy}, undocumented: no API schema. See the README.` };
     }
+    const listsThem = `${formatDetailsCall(actorFullName, true)} lists them.`;
     if (serverInterface === false) {
-        const count = `${operations.length} documented operation${operations.length === 1 ? '' : 's'}`;
-        const names =
-            operations.length <= SUMMARY_MAX_NAMED_OPERATIONS
-                ? `: ${operations.map(({ method, path }) => `${method} ${path}`).join(', ')}`
-                : '';
-        return {
-            text: `Server interface: enabled, ${tenancy}, ${count}${names}. ${formatDetailsCall(actorFullName, true)} lists them.`,
-        };
+        return { text: `Server interface: enabled, ${tenancy}, ${formatOperationCount(operations)}. ${listsThem}` };
     }
 
     const canSend = !hasPaymentProvider && loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
@@ -170,9 +172,8 @@ export function buildServerInterfaceText({
     const match = /^\s*([A-Za-z]+)\s+(\S+)\s*$/.exec(serverInterface);
     const selected = operations.find(({ method, path }) => method === match?.[1].toUpperCase() && path === match[2]);
     if (!selected) {
-        const documented = operations.map(({ method, path }) => `${method} ${path}`).join(', ');
         return {
-            error: `Actor '${actorFullName}' has no operation "${serverInterface}". Documented operations: ${documented}.`,
+            error: `Actor '${actorFullName}' has no operation "${serverInterface}". ${formatOperationCount(operations)}. ${listsThem}`,
         };
     }
     const { method, path, operation } = selected;
