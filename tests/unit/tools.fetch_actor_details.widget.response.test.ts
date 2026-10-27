@@ -37,7 +37,6 @@ const MOCK_DETAILS = {
         pictureUrl: 'https://example.com/pic.png',
         categories: ['SCRAPING'],
     },
-    buildInfo: {},
     actorCard: '# Actor card',
     actorCardStructured: {
         id: 'actor-id-1',

@@ -56,7 +56,10 @@ function seedActor(
             id,
             isPublic: true,
             userId: 'owner',
-            ...(opts.isStandbyEnabled && { actorStandby: { isEnabled: true } }),
+            ...(opts.isStandbyEnabled && {
+                actorStandby: { isEnabled: true },
+                standbyUrl: `https://${id}.apify.actor`,
+            }),
         },
     } as unknown as ActorDefinitionWithInfo);
 }

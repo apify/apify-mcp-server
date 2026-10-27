@@ -41,7 +41,16 @@ export async function getActorDefinitionCached(
     const cached = actorDefinitionCache.get(actorIdOrName);
     if (cached && (await callerMaySeeCachedActor(cached, apifyClient))) return cached;
     const fetched = await getActorDefinition(actorIdOrName, apifyClient);
-    if (fetched) actorDefinitionCache.set(actorIdOrName, fetched);
+    // Without a token, a Standby build named by an untagged build number can't be resolved (listing builds needs
+    // auth), so the definition comes back with no server interface. Caching it would hide the interface from later
+    // callers with a token. The definition can't tell that apart from a Standby Actor that declares no interface,
+    // so neither is cached for anonymous reads; they re-fetch every time (#1642).
+    const isUnresolvedAnonymousServer =
+        !apifyClient.token &&
+        fetched?.info.actorStandby?.isEnabled === true &&
+        !fetched.definition.webServerMcpPath &&
+        !fetched.definition.hasWebServerSchema;
+    if (fetched && !isUnresolvedAnonymousServer) actorDefinitionCache.set(actorIdOrName, fetched);
     return fetched;
 }
 
@@ -50,8 +59,9 @@ export async function getActorDefinitionCached(
  * is consulted outside the tool-loading factory, so `call-actor` routing and tool loading share one rule.
  *
  * Returns `null` when there is no definition to classify (unknown Actor). The URL is a pure function of
- * the definition (`getActorMCPServerURL` does no I/O), so this rides the authorization-gated
- * `getActorDefinitionCached` instead of a separate cache that would leak a private Actor's URL across tenants.
+ * the Actor record's `standbyUrl` and the definition's path (`getActorMCPServerURL` does no I/O), so this rides
+ * the authorization-gated `getActorDefinitionCached` instead of a separate cache that would leak a private
+ * Actor's URL across tenants.
  */
 export async function getActorToolResolutionCached(
     actorIdOrName: string,
@@ -71,7 +81,7 @@ export async function getActorToolResolutionCached(
     if (toolMode === ACTOR_TOOL_MODE.MCP) {
         return {
             toolMode,
-            mcpServerUrl: await getActorMCPServerURL(cached.definition.id, webServerMcpPath!),
+            mcpServerUrl: await getActorMCPServerURL(cached.info, webServerMcpPath!),
             actorFullName,
         };
     }
