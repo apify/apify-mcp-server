@@ -218,11 +218,12 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         });
     }
 
-    // The two standby kinds are sanitized, user-facing reasons — forward them verbatim instead of
-    // wrapping them in the generic server-error text. LOAD_FAILED masks a backend fault and stays below.
+    // These two kinds (a server Actor without MCP, and a standby Actor under a payment provider) are sanitized,
+    // user-facing reasons: forward them verbatim instead of wrapping them in the generic server-error text.
+    // LOAD_FAILED masks a backend fault and stays below.
     if (
         error instanceof ActorLoadError &&
-        (error.kind === ACTOR_LOAD_ERROR_KIND.STANDBY_WITHOUT_MCP_NOT_SUPPORTED ||
+        (error.kind === ACTOR_LOAD_ERROR_KIND.SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED ||
             error.kind === ACTOR_LOAD_ERROR_KIND.STANDBY_PAYMENT_NOT_SUPPORTED)
     ) {
         return respondStandbyRejection(error, { mcpSessionId, actorId });
@@ -479,7 +480,7 @@ export async function resolveAndValidateActor(params: {
 
     // NOT_FOUND falls through to the structured "Actor not found" response below.
     // Any other error (LOAD_FAILED / STANDBY_PAYMENT_NOT_SUPPORTED /
-    // STANDBY_WITHOUT_MCP_NOT_SUPPORTED) is rethrown so the outer call-actor handler reports it.
+    // SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED) is rethrown so the outer call-actor handler reports it.
     // STANDBY_PAYMENT_NOT_SUPPORTED cannot actually appear here: the call above passes no
     // `paymentProvider`, so `getActorsAsTools`' payment gate never fires. Kept in the list because
     // the rethrow is keyed on "not NOT_FOUND", not on an enumeration of kinds.
@@ -582,10 +583,10 @@ export async function callActorPreExecute(
     const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
     const resolution = await getActorToolResolutionCached(baseActorName, apifyClientForDefinition);
 
-    if (resolution?.toolMode === ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP) {
+    if (resolution?.toolMode === ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP) {
         return {
             earlyResponse: respondStandbyRejection(
-                ActorLoadError.standbyWithoutMcpNotSupported(resolution.actorFullName),
+                ActorLoadError.serverActorWithoutMcpNotSupported(resolution.actorFullName),
                 { mcpSessionId },
             ),
         };

@@ -1,9 +1,9 @@
 import type { ApifyClient } from '../apify_client.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
 import { actorDefinitionCache } from '../state.js';
-import { resolveActorToolMode } from '../tools/actor_tool_naming.js';
+import { getActorToolModeFromInterfaces, resolveActorInterfaces } from '../tools/actor_tool_naming.js';
 import { getActorDefinition } from '../tools/actors/actor_definition.js';
-import type { ActorDefinitionWithInfo, ActorToolResolutionResult } from '../types.js';
+import type { ActorDefinitionWithInfo, ActorInfo, ActorToolResolutionResult } from '../types.js';
 import { ACTOR_TOOL_MODE } from '../types.js';
 import { getUserInfoCached } from './userid_cache.js';
 
@@ -55,8 +55,9 @@ export async function getActorDefinitionCached(
 }
 
 /**
- * Resolve how an Actor is exposed as a tool at call time, by name. The only place `resolveActorToolMode`
- * is consulted outside the tool-loading factory, so `call-actor` routing and tool loading share one rule.
+ * Resolve how an Actor is exposed as a tool at call time, by name: its interface set and the tool slot derived
+ * from it. The only place outside the tool-loading factory that resolves them (`resolveActorInterfaces`), so
+ * `call-actor` routing and tool loading share one rule.
  *
  * Returns `null` when there is no definition to classify (unknown Actor). The URL is a pure function of
  * the Actor record's `standbyUrl` and the definition's path (`getActorMCPServerURL` does no I/O), so this rides
@@ -70,20 +71,23 @@ export async function getActorToolResolutionCached(
     const cached = await getActorDefinitionCached(actorIdOrName, apifyClient);
     if (!cached) return null;
 
-    const webServerMcpPath = getActorMCPServerPath(cached.definition);
-    const toolMode = resolveActorToolMode({
+    const actorInfo: ActorInfo = {
         definition: cached.definition,
         actor: cached.info,
-        webServerMcpPath,
-    });
+        webServerMcpPath: getActorMCPServerPath(cached.definition),
+    };
+    const interfaces = resolveActorInterfaces(actorInfo);
+    const toolMode = getActorToolModeFromInterfaces(interfaces);
     const { actorFullName } = cached.definition;
-    // `resolveActorToolMode` returns MCP only when `webServerMcpPath` is set.
+    // `resolveActorInterfaces` sets `mcp` only when `webServerMcpPath` is set, and `getActorToolModeFromInterfaces`
+    // returns MCP only for `mcp`, so the non-null assertion below holds.
     if (toolMode === ACTOR_TOOL_MODE.MCP) {
         return {
             toolMode,
-            mcpServerUrl: await getActorMCPServerURL(cached.info, webServerMcpPath!),
+            mcpServerUrl: await getActorMCPServerURL(cached.info, actorInfo.webServerMcpPath!),
             actorFullName,
+            interfaces,
         };
     }
-    return { toolMode, actorFullName };
+    return { toolMode, actorFullName, interfaces };
 }

@@ -62,6 +62,7 @@ beforeEach(() => {
     vi.mocked(getActorToolResolutionCached).mockResolvedValue({
         toolMode: ACTOR_TOOL_MODE.RUN,
         actorFullName: ACTOR_FULL_NAME,
+        interfaces: { input: true, mcp: false, server: false },
     });
 });
 

@@ -59,6 +59,7 @@ describe('call-actor-widget response', () => {
         vi.mocked(getActorToolResolutionCached).mockResolvedValue({
             toolMode: ACTOR_TOOL_MODE.RUN,
             actorFullName: 'apify/rag-web-browser',
+            interfaces: { input: true, mcp: false, server: false },
         });
         vi.mocked(getActorsAsTools).mockReset();
         vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [MOCK_ACTOR_TOOL], errors: [] });
