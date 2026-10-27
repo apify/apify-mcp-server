@@ -44,7 +44,7 @@ export async function getActorDefinitionCached(
     // Without a token, a Standby build named by an untagged build number can't be resolved (listing builds needs
     // auth), so the definition comes back with no server interface. Caching it would hide the interface from later
     // callers with a token. The definition can't tell that apart from a Standby Actor that declares no interface,
-    // so neither is cached for anonymous reads; they re-fetch every time.
+    // so neither is cached for anonymous reads; they re-fetch every time (#1642).
     const isUnresolvedAnonymousServer =
         !apifyClient.token &&
         fetched?.info.actorStandby?.isEnabled === true &&
