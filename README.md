@@ -27,6 +27,8 @@ Apify is the marketplace of ready-to-run tools for AI agents. One connection to 
 
 An agent connected to the server can search Apify Store for the right Actor, read its input schema and pricing, run it, and read the structured results. It can also search the Apify documentation. The hosted server uses Streamable HTTP with OAuth, so most clients connect with the URL alone. You can also run it locally over stdio with the [`@apify/actors-mcp-server`](https://www.npmjs.com/package/@apify/actors-mcp-server) npm package.
 
+One MCP server, thousands of tools: your agent picks the right Actor from Apify Store instead of you installing a separate MCP server for every site. Each Actor works like a web scraping API for its site and returns structured JSON.
+
 <img alt="Diagram: AI agents such as Claude, ChatGPT, Cursor, Grok Bot, Hermes Agent, and OpenCode connect to the Apify MCP server, which searches Apify Store, runs Actors like Web Search, Web Fetch, and Google Maps Scraper, and returns structured results" src="docs/apify-mcp-server-diagram.png">
 
 <!-- TODO: add the new setup video here once it is published. The old 2025 Claude tutorial (BKu8H91uCTg) was removed as outdated. -->
@@ -35,7 +37,7 @@ An agent connected to the server can search Apify Store for the right Actor, rea
 
 - [Quickstart](#-quickstart)
 - [Set up your client](#-set-up-your-client)
-- [Hosted or local server](#hosted-or-local-server)
+- [Remote (hosted) or local MCP server](#remote-hosted-or-local-mcp-server)
 - [How an agent uses Apify Actors](#how-an-agent-uses-apify-actors)
 - [Tools, resources, and prompts](#%EF%B8%8F-tools-resources-and-prompts)
 - [Choose which tools load](#choose-which-tools-load)
@@ -129,7 +131,7 @@ Use the one-click install link from the [configurator](https://mcp.apify.com), r
 <details>
 <summary><b>Claude</b></summary>
 
-Open **Settings** > **Connectors**, select **Add custom connector**, name it `Apify`, and enter `https://mcp.apify.com` as the remote MCP server URL. Sign in with Apify when prompted. The same connector works on Claude.ai and in Claude Desktop. See the [Claude guide](https://docs.apify.com/integrations/claude-desktop).
+Apify is available as a Claude connector. Open **Settings** > **Connectors**, find **Apify** in the connector directory, and connect it. You can also select **Add custom connector**, name it `Apify`, and enter `https://mcp.apify.com` as the remote MCP server URL. Sign in with Apify when prompted. The same connector works on Claude.ai and in Claude Desktop. See the [Claude guide](https://docs.apify.com/integrations/claude-desktop).
 
 </details>
 
@@ -175,9 +177,9 @@ If you've run `apify login`, the server can also read the token saved by the Api
 
 The server is also listed in the [Docker MCP catalog](https://hub.docker.com/mcp/server/apify-mcp-server/overview), and each [release](https://github.com/apify/apify-mcp-server/releases/latest) ships an MCP bundle file ([`apify-mcp-server.mcpb`](https://github.com/apify/apify-mcp-server/releases/latest/download/apify-mcp-server.mcpb)) for one-click installation in clients that support it.
 
-## Hosted or local server
+## Remote (hosted) or local MCP server
 
-The hosted server is the recommended option. Use the local server when your client only supports stdio or you need to run everything on your own machine.
+The hosted remote MCP server with OAuth is the recommended option. Use the local server when you need to run everything on your own machine. If your client supports only stdio, you can also bridge it to the hosted server with [`mcp-remote`](https://www.npmjs.com/package/mcp-remote): `npx mcp-remote https://mcp.apify.com`.
 
 | | Hosted (`https://mcp.apify.com`) | Local (`npx @apify/actors-mcp-server`) |
 | :--- | :--- | :--- |
@@ -362,8 +364,11 @@ Ask in plain language. The agent finds a suitable Actor, checks its input and pr
 | Use case | Example prompt | Actor the agent typically picks |
 | :--- | :--- | :--- |
 | Web research | "Find the latest news about autonomous AI agents and summarize the key developments." | [RAG Web Browser](https://apify.com/apify/rag-web-browser), [Web Fetch](https://apify.com/apify/web-fetch) |
+| Read a webpage | "Fetch https://example.com/pricing as Markdown and summarize this webpage in five bullets." | [Web Fetch](https://apify.com/apify/web-fetch) |
 | Search results (SERP) | "Get the top 20 Google results for 'best CRM for startups' in the US and show who ranks where." | [Google Search Results Scraper](https://apify.com/apify/google-search-scraper) |
 | Lead generation | "Find dentists in Austin, Texas on Google Maps with their phone numbers, websites, and ratings." | [Google Maps Scraper](https://apify.com/compass/crawler-google-places) |
+| LinkedIn profiles | "Get the current job title, company, and work history for these 20 LinkedIn profiles." | [LinkedIn Profile Scraper](https://apify.com/harvestapi/linkedin-profile-scraper) |
+| LinkedIn company posts | "Get the 30 latest posts from Apify's LinkedIn company page with their reaction counts." | [LinkedIn Company Posts Scraper](https://apify.com/harvestapi/linkedin-company-posts) |
 | Review analysis | "Pull the latest 100 Google Maps reviews for this hotel and group the complaints by theme." | [Google Maps Reviews Scraper](https://apify.com/compass/Google-Maps-Reviews-Scraper) |
 | Social media monitoring | "Get the 50 latest posts from @nasa on Instagram with likes and comments." | [Instagram Scraper](https://apify.com/apify/instagram-scraper) |
 | Trend research | "Find the most viewed TikTok videos for #skincare this week." | [TikTok Scraper](https://apify.com/clockworks/tiktok-scraper) |
@@ -443,11 +448,17 @@ For more help, see the [MCP documentation](https://docs.apify.com/mcp) or [open 
 
 ## ❓ FAQ
 
+**What is an MCP server?**
+An MCP server exposes tools and data to AI agents through the [Model Context Protocol](https://modelcontextprotocol.io), an open standard supported by clients such as Claude, ChatGPT, and Cursor. The agent connects once and calls the server's tools when a task needs them. The Apify MCP server's tools are the Actors in Apify Store.
+
 **What is the Apify MCP server?**
 It's the official [Model Context Protocol](https://modelcontextprotocol.io) server for Apify. It lets AI agents search Apify Store, run Actors for web scraping, data extraction, and browser automation, and read the structured results.
 
 **When is it a good MCP server for web scraping?**
 When an agent needs data from many different sites. A typical case is Google Maps one day, Instagram or an online store the next. The agent picks a ready-made Actor for each site from Apify Store instead of you writing and maintaining a scraper. Actors run on the Apify platform, which handles scaling, proxies, and storage of the results.
+
+**How does it compare to Playwright MCP?**
+Playwright MCP drives a browser on your machine step by step, through clicks and page snapshots. The Apify MCP server runs Actors in the Apify cloud. Each Actor handles JavaScript rendering, proxies, and blocking for its site and returns structured results, so the agent asks for the data instead of operating a browser. Many agents use both.
 
 **Can ChatGPT or Claude scrape websites with it?**
 Yes. Connect ChatGPT, Claude, or Claude Code to `https://mcp.apify.com`, then ask in plain language. The model searches for a suitable Actor, runs it, and reads the results.
