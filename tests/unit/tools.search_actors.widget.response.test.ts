@@ -190,7 +190,7 @@ describe('search-actors-widget response', () => {
         // Schema-level: strict shape (no extra properties allowed).
         const schema = tool.inputSchema as { additionalProperties?: boolean; properties?: Record<string, unknown> };
         expect(schema.additionalProperties).toBe(false);
-        expect(Object.keys(schema.properties ?? {}).sort()).toEqual(['keywords', 'limit', 'offset']);
+        expect(Object.keys(schema.properties ?? {}).sort()).toEqual(['keywords', 'limit', 'offset', 'useCase']);
 
         // Runtime: AJV is configured with `removeAdditional: true`, so stray keys are silently
         // stripped from the input object in place — the widget contract can't be overridden.
@@ -232,5 +232,13 @@ describe('search-actors-widget buildDescription()', () => {
         );
         expect(description).toContain(FIND_SCHEMA_CALL);
         expect(countCaveats(description)).toBe(0);
+    });
+
+    it('passes the use case to the Store search', async () => {
+        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+        await (searchActorsWidget as HelperTool).call(
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, useCase: 'compare prices' }, mockApifyClient()),
+        );
+        expect(searchAgentSafeActors).toHaveBeenCalledWith(expect.objectContaining({ useCase: 'compare prices' }));
     });
 });

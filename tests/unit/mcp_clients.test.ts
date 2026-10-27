@@ -118,8 +118,7 @@ describe('sanitizeUseCase()', () => {
 });
 
 describe('isStoreUseCaseServable()', () => {
-    const servable = (clientName: string | undefined, clientParam?: string) =>
-        isStoreUseCaseServable(clientContext(clientName), clientParam);
+    const servable = (clientName: string | undefined) => isStoreUseCaseServable(clientContext(clientName));
 
     it.each(['apify-ai', 'cursor', 'Visual Studio Code'])('serves %s', (name) => {
         expect(servable(name)).toBe(true);
@@ -140,10 +139,5 @@ describe('isStoreUseCaseServable()', () => {
         expect(servable('')).toBe(false);
         expect(servable('   ')).toBe(false);
         expect(servable(undefined)).toBe(false);
-    });
-
-    it('does not serve a connection opened with ?client=claude, whatever name it declares', () => {
-        expect(servable('cursor', 'Claude-Desktop')).toBe(false);
-        expect(servable('cursor', 'vscode')).toBe(true);
     });
 });

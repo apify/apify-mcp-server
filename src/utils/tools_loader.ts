@@ -27,6 +27,7 @@ import { getDatasetItems } from '../tools/storage/get_dataset_items.js';
 import { getKeyValueStoreRecord } from '../tools/storage/get_key_value_store_record.js';
 import type { ActorStore, Input, ToolCategory, ToolEntry } from '../types.js';
 import { SERVER_MODE, TOOL_TYPE } from '../types.js';
+import { compileSchema } from './ajv.js';
 
 /**
  * Tools auto-injected alongside any actor-running tool (call-actor / direct
@@ -189,6 +190,25 @@ export function toolNamesToInput(toolNames: string[]): Input {
     }
 
     return input;
+}
+
+const WITHOUT_USE_CASE_FIELD = new WeakMap<ToolEntry, ToolEntry>();
+
+/**
+ * `tool` without its `useCase` input (the search tools' Store search context), for a client that
+ * is not offered it; a tool without the field is returned as is. Built once per tool: the served
+ * schema and a validator that strips `useCase` should such a client send it anyway.
+ */
+export function withoutUseCaseField(tool: ToolEntry): ToolEntry {
+    const { useCase, ...properties } = tool.inputSchema.properties ?? {};
+    if (!useCase) return tool;
+    let served = WITHOUT_USE_CASE_FIELD.get(tool);
+    if (!served) {
+        const inputSchema = { ...tool.inputSchema, properties };
+        served = { ...tool, inputSchema, ajvValidate: compileSchema(inputSchema) };
+        WITHOUT_USE_CASE_FIELD.set(tool, served);
+    }
+    return served;
 }
 
 /**

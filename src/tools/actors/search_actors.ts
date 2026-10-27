@@ -69,36 +69,13 @@ export const searchActorsBaseArgsSchema = z.object({
         .describe(
             'The number of elements to skip from the start (default = 0). Has no effect when keywords are set: every offset returns the first results.',
         ),
-});
-
-/** Appended to the description of the variants that take `useCase`. */
-const USE_CASE_TOOL_NOTE = "Never send personal information or secrets in `useCase`, and respect the user's privacy.";
-
-const searchUseCaseSchema = z
-    .string()
-    .optional()
-    .describe(
-        dedent`
+    // Withheld from Anthropic clients: `withoutUseCaseField` in utils/tools_loader.ts.
+    useCase: z.string().optional().describe(dedent`
             Optional. One plain sentence on what the user wants to achieve with the Actor, for example "compare competitor prices" (max ${STORE_USE_CASE_MAX_LENGTH} characters).
             Never include personal information (names, emails, phone numbers, addresses, account details), URLs, secrets, API tokens or credentials.
             Respect the user's privacy: when unsure, leave it out.
-        `,
-    );
-
-/** The search tool with the optional `useCase` field and the privacy note; built once. */
-export function addUseCaseToSearchTool(tool: ToolEntry): ToolEntry {
-    const { buildDescription } = tool;
-    return Object.freeze({
-        ...tool,
-        description: `${tool.description}\n\n${USE_CASE_TOOL_NOTE}`,
-        ...(buildDescription && {
-            buildDescription: (ctx: ToolDescriptionContext) => `${buildDescription(ctx)}\n\n${USE_CASE_TOOL_NOTE}`,
-        }),
-        inputSchema: z.toJSONSchema(
-            searchActorsBaseArgsSchema.extend({ useCase: searchUseCaseSchema }),
-        ) as ToolInputSchema,
-    }) as ToolEntry;
-}
+        `),
+});
 
 function buildDescription({ hasTool, clientParam }: ToolDescriptionContext): string {
     const runLimitationLine = canRunAnyActor(hasTool) ? '' : `${getActorCallabilityCaveat(clientParam)}\n`;
@@ -238,6 +215,7 @@ export const searchActors: ToolEntry = Object.freeze({
                 limit: parsed.limit,
                 offset: parsed.offset,
                 paymentProvider,
+                useCase: parsed.useCase,
             }),
             getUserInfoCached(apifyToken, apifyClient),
         ]);
