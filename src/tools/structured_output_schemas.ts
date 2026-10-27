@@ -142,7 +142,6 @@ export const statsSchema = {
     properties: {
         totalUsers: { type: 'number', description: 'Total users' },
         monthlyUsers: { type: 'number', description: 'Monthly active users' },
-        bookmarks: { type: 'number', description: 'Number of bookmarks' },
     },
 };
 

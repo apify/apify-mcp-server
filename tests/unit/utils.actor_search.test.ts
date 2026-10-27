@@ -107,6 +107,12 @@ describe('searchAgentSafeActors', () => {
         expect(result).toHaveLength(3);
     });
 
+    it('sends keywords without letters or digits as empty keywords', async () => {
+        listMock.mockResolvedValueOnce({ items: [] });
+        await searchAgentSafeActors({ keywords: ' ... ', apifyClient: stubApifyClient, limit: 5, offset: 0 });
+        expect(listMock).toHaveBeenCalledWith({ search: '', limit: 5, offset: 0 });
+    });
+
     it('forwards allowsAgenticUsers when paymentProvider is set', async () => {
         listMock.mockResolvedValueOnce({ items: [makeActor()] });
         await searchAgentSafeActors({
