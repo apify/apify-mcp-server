@@ -156,17 +156,10 @@ describe('Actor run/standby mode decision table', () => {
             expect(withoutMcpTool).toContain('cannot be called in this configuration');
         });
 
-        it('refuses to run an Actor that is not an MCP server when addressed in the removed actorName:toolName form', async () => {
-            const text = earlyText(await preExecute(`${RUN_ONLY}:search`));
+        it('rejects removed syntax even when the Actor is unknown', async () => {
+            const text = earlyText(await preExecute('apify/unknown-actor:add'));
 
-            expect(text).toContain(`Actor '${RUN_ONLY}' is not an MCP server`);
-            expect(text).toContain(`pass "actor": "${RUN_ONLY}"`);
-        });
-
-        it('answers the removed actorName:toolName form with the MCP server rejection', async () => {
-            const text = earlyText(await preExecute(`${STANDBY_MCP}:add`));
-
-            expect(text).toContain(STANDBY_MCP);
+            expect(text).toContain('no longer supported');
             expect(text).toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
         });
 
@@ -187,13 +180,7 @@ describe('Actor run/standby mode decision table', () => {
             const bare = await executeCallActor(
                 stubToolCallContext({ actor: STANDBY_EMPTY, input: {} }, client, options),
             );
-            const withToolName = await callActorPreExecute(
-                stubToolCallContext({ actor: `${STANDBY_EMPTY}:add`, input: {} }, client, options),
-                { route: HELPER_TOOLS.ACTOR_CALL },
-            );
-
             const text = firstText(bare);
-            expect(text).toBe(earlyText(withToolName));
             expect(text.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)).toBe(hasRequestTool);
             expect(text).toContain('has no MCP tools or input interface');
             expect(bare.toolTelemetry).toMatchObject({

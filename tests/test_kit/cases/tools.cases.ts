@@ -217,19 +217,22 @@ export const toolsCases: Case[] = [
         }),
     },
     {
-        // In the removed actor:tool form, which old clients still send.
-        name: 'rejects call-actor on an MCP server Actor and names call-actor-mcp-tool',
+        name: 'rejects MCP server Actors and legacy MCP syntax in call-actor',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
-            const response = await client.callTool({
-                name: 'call-actor',
-                arguments: { actor: `${ACTOR_EXAMPLE_MCP_SERVER}:add`, input: { firstNumber: 1, secondNumber: 2 } },
-            });
+            for (const actor of [ACTOR_EXAMPLE_MCP_SERVER, `${ACTOR_EXAMPLE_MCP_SERVER}:add`]) {
+                const response = await client.callTool({
+                    name: 'call-actor',
+                    arguments: { actor, input: { firstNumber: 1, secondNumber: 2 } },
+                });
 
-            const content = response.content as { text: string }[];
-            expect(response.isError).toBe(true);
-            expect(content[0].text).toContain(`Actor '${ACTOR_EXAMPLE_MCP_SERVER}' is an MCP server`);
-            expect(content[0].text).toContain('call-actor-mcp-tool');
+                const content = response.content as { text: string }[];
+                expect(response.isError).toBe(true);
+                expect(content[0].text).toContain(
+                    actor === ACTOR_EXAMPLE_MCP_SERVER ? 'is an MCP server' : 'no longer supported',
+                );
+                expect(content[0].text).toContain('call-actor-mcp-tool');
+            }
         }),
     },
     {
