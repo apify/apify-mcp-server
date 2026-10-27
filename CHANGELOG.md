@@ -2,15 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.19.5 - **not yet released**
+## [0.19.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.5) (2026-10-27)
 
 ### 🚀 Features
 
 - Let search-actors take a use case, except for Claude clients ([#1715](https://github.com/apify/apify-mcp-server/pull/1715)) ([464b957](https://github.com/apify/apify-mcp-server/commit/464b957b4e017011dc056b8f18e5da894d45a8a1)) by [@MQ37](https://github.com/MQ37), closes [#272](https://github.com/apify/apify-mcp-server/issues/272)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.19.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.4) (2026-10-27)
 
 ### 🚀 Features
