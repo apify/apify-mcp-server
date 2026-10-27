@@ -143,7 +143,7 @@ export function buildServerInterfaceText({
     /** An agentic payment provider (x402, Skyfire) cannot pay for an Actor Server request. */
     hasPaymentProvider: boolean;
 }): { text?: string } | { error: string } {
-    // Without the send tool, the default summary would point the agent at an interface it cannot call.
+    // The summary helps choose between call-actor and the send tool, so it follows the send tool.
     if (serverInterface === false && !loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)) return {};
     if (actor.actorStandby?.isEnabled !== true) {
         return { text: serverInterface === false ? undefined : `Actor '${actorFullName}' has no server interface.` };
