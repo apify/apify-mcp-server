@@ -47,8 +47,7 @@ export function buildActorFields(
  * Returns undefined for other internal tools or when the arg is missing/invalid.
  */
 export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>): string | undefined {
-    if (tool.type === TOOL_TYPE.ACTOR) return tool.actorFullName;
-    if (tool.type === TOOL_TYPE.ACTOR_MCP) return tool.actorId;
+    if (tool.type === TOOL_TYPE.ACTOR || tool.type === TOOL_TYPE.ACTOR_MCP) return tool.actorFullName;
 
     // For call-actor, the actor name is in `args.actor`.
     // The format can be "username/name" or "username/name:toolName" (MCP server Actors).

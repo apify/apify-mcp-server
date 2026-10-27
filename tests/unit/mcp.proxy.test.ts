@@ -10,6 +10,7 @@ import {
     TOOL_NAME_HASH_LENGTH,
 } from '../../src/mcp/const.js';
 import { getMCPServerID, getMCPServerTools, getProxyMCPServerToolName } from '../../src/mcp/proxy.js';
+import { extractActorId, extractActorName } from '../../src/utils/tools.js';
 
 describe('getMCPServerID()', () => {
     it('returns a stable SERVER_ID_LENGTH hex prefix of sha256(url)', () => {
@@ -218,5 +219,23 @@ describe('getMCPServerTools()', () => {
             'longuser--my-mcp-server--add-34ee',
             'longuser--my-mcp-server--a-tool-name-long-enough-to-push-pa-fa1b',
         ]);
+    });
+
+    it('reports the Actor full name and ID for telemetry', async () => {
+        const client = {
+            listTools: async () => ({
+                tools: [{ name: 'add', description: 'Adds two numbers', inputSchema: { type: 'object' } }],
+            }),
+        } as unknown as Client;
+
+        const [tool] = await getMCPServerTools(
+            'Iei3c51WbI7eKwgSg',
+            client,
+            'https://example-mcp-server.apify.actor/mcp',
+            'apify/example-mcp-server',
+        );
+
+        expect(extractActorName(tool)).toBe('apify/example-mcp-server');
+        expect(extractActorId(tool)).toBe('Iei3c51WbI7eKwgSg');
     });
 });

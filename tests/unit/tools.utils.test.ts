@@ -1047,8 +1047,12 @@ describe('extractActorName', () => {
         expect(extractActorName(tool)).toBe('apify/web-scraper');
     });
 
-    it('returns actorId for actor-mcp tools', () => {
-        const tool = { type: TOOL_TYPE.ACTOR_MCP, actorId: 'apify/example-mcp-server' } as unknown as ToolEntry;
+    it('returns actorFullName for actor-mcp tools', () => {
+        const tool = {
+            type: TOOL_TYPE.ACTOR_MCP,
+            actorId: 'Iei3c51WbI7eKwgSg',
+            actorFullName: 'apify/example-mcp-server',
+        } as unknown as ToolEntry;
         expect(extractActorName(tool)).toBe('apify/example-mcp-server');
     });
 
