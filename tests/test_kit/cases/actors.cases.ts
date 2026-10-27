@@ -1295,7 +1295,9 @@ export const actorsCases: Case[] = [
             expect(parameter.text).toContain('"name":"asText"');
             const unknown = await call(ACTOR_SERVER_ACTOR_TEST, { serverInterface: 'GET /nope' });
             expect(unknown.result.isError).toBe(true);
-            expect(unknown.text).toContain('GET /add');
+            expect(unknown.text).toMatch(
+                /has no operation "GET \/nope"\. \d+ documented operations\. fetch-actor-details with /,
+            );
             const normal = await call(ACTOR_NORMAL_MODE, { serverInterface: true });
             expect(normal.text).toContain(`Actor '${ACTOR_NORMAL_MODE}' has no server interface.`);
         }),
