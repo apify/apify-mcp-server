@@ -147,22 +147,27 @@ export const paymentsCases: Case[] = [
         },
     },
     {
-        // The removed actor:tool form resolves the Actor too, so it gets the same rejection before a 402.
-        name: 'should return error when calling a standby Actor via call-actor in x402 payment mode',
+        name: 'rejects standby Actors and legacy MCP syntax in x402 payment mode',
         isDeploymentTest: false,
         skipIf: skipOnStdio,
         run: async (ctx) => {
             const client = await ctx.createClientFn({ payment: 'x402' });
             try {
-                const result = await client.callTool({
-                    name: 'call-actor',
-                    arguments: { actor: `${ACTOR_EXAMPLE_MCP_SERVER}:add`, input: {} },
-                });
-                expect(result).toBeDefined();
-                expect(result.isError).toBe(true);
-                const content = result.content as { text: string }[];
-                expect(content.length).toBeGreaterThan(0);
-                expect(content[0].text).toContain('is not supported in agentic payment mode');
+                for (const actor of [ACTOR_EXAMPLE_MCP_SERVER, `${ACTOR_EXAMPLE_MCP_SERVER}:add`]) {
+                    const result = await client.callTool({
+                        name: 'call-actor',
+                        arguments: { actor, input: {} },
+                    });
+                    expect(result.isError).toBe(true);
+                    const content = result.content as { text: string }[];
+                    expect(content[0].text).toContain(
+                        actor === ACTOR_EXAMPLE_MCP_SERVER
+                            ? 'is not supported in agentic payment mode'
+                            : 'no longer supported',
+                    );
+                    expect(content[0].text).not.toContain('call-actor-mcp-tool');
+                    expect(result).not.toHaveProperty('toolTelemetry');
+                }
             } finally {
                 await client.close();
             }

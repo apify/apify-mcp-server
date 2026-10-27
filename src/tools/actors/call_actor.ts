@@ -382,6 +382,22 @@ function respondMcpServerActor(actorFullName: string, route: string, loadedToolN
     });
 }
 
+/** Rejects removed MCP call syntax before Actor or payment metadata is fetched. */
+export function buildLegacyMcpSyntaxRejection(
+    toolName: string,
+    actor: unknown,
+    loadedToolNames: readonly string[],
+): ToolResponse | null {
+    if (toolName !== HELPER_TOOLS.ACTOR_CALL && toolName !== HELPER_TOOLS.ACTOR_CALL_WIDGET) return null;
+    if (typeof actor !== 'string' || !MCP_TOOL_NAME_SUFFIX.test(actor)) return null;
+    const replacement = loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL)
+        ? ` Use ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} with separate actor and tool arguments.`
+        : ` MCP tools cannot be called in this configuration. To use them, ${getOwnServerRemedy()}`;
+    return respondUserError(`The "actor:tool" syntax is no longer supported by ${toolName}.${replacement}`, {
+        detail: 'legacy MCP call syntax',
+    });
+}
+
 /**
  * Validates the actor and its input, returning the resolved actor tool or an error response.
  * Shared validation logic used by both default and openai execution paths.
@@ -481,6 +497,8 @@ export async function callActorPreExecute(
 ): Promise<{ earlyResponse: ToolResponse } | { parsed: CallActorParsedArgs }> {
     const { args, apifyToken, mcpSessionId, loadedToolNames } = toolArgs;
     const parsedArgs = callActorArgs.parse(args);
+    const legacyRejection = buildLegacyMcpSyntaxRejection(options.route, parsedArgs.actor, loadedToolNames);
+    if (legacyRejection) return { earlyResponse: legacyRejection };
     const actorName = fixActorNameInputAndLog(parsedArgs.actor, { mcpSessionId, route: options.route });
 
     // For definition resolution we always use a token-based client; payment provider is only for actual Actor runs.
@@ -501,17 +519,6 @@ export async function callActorPreExecute(
     if (resolution?.toolMode === ACTOR_TOOL_MODE.MCP) {
         return { earlyResponse: respondMcpServerActor(resolution.actorFullName, options.route, loadedToolNames) };
     }
-    // The removed "actorName:toolName" form names a tool, which only an MCP server Actor has; never run the Actor.
-    if (resolution && MCP_TOOL_NAME_SUFFIX.test(parsedArgs.actor)) {
-        const name = resolution.actorFullName;
-        return {
-            earlyResponse: respondUserError(
-                `Actor '${name}' is not an MCP server, so "${parsedArgs.actor}" names no tool. To run it from an input, pass "actor": "${name}".`,
-                { detail: 'not an MCP server' },
-            ),
-        };
-    }
-
     return { parsed: { ...parsedArgs, actor: actorName } };
 }
 

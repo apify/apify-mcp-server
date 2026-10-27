@@ -20,7 +20,7 @@ import {
     getDeniedDirectActorInputs,
     getDirectActorPolicy,
 } from '../tools/actors/actor_tool_contract.js';
-import { checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
+import { buildLegacyMcpSyntaxRejection, checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
 import { withReportProblemNudge } from '../tools/dev/report_problem.js';
 import type {
     ActorStore,
@@ -361,13 +361,15 @@ export async function prepareToolCall(params: {
             };
         }
 
-        const standbyRejection = await checkPaymentProviderStandbyConflict({
-            tool,
-            args: toolArgs,
-            paymentProvider,
-            apifyToken,
-            mcpSessionId: params.mcpSessionId,
-        });
+        const standbyRejection =
+            buildLegacyMcpSyntaxRejection(tool.name, toolArgs.actor, Array.from(tools.keys())) ??
+            (await checkPaymentProviderStandbyConflict({
+                tool,
+                args: toolArgs,
+                paymentProvider,
+                apifyToken,
+                mcpSessionId: params.mcpSessionId,
+            }));
 
         return {
             tool,
