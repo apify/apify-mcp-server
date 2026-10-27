@@ -584,11 +584,12 @@ export async function callActorPreExecute(
     const resolution = await getActorToolResolutionCached(baseActorName, apifyClientForDefinition);
 
     if (resolution?.toolMode === ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP) {
+        const error = ActorLoadError.serverActorWithoutMcpNotSupported(resolution.actorFullName);
+        if (resolution.interfaces.server && loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)) {
+            error.message += ` Its HTTP API is available through ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}.`;
+        }
         return {
-            earlyResponse: respondStandbyRejection(
-                ActorLoadError.serverActorWithoutMcpNotSupported(resolution.actorFullName),
-                { mcpSessionId },
-            ),
+            earlyResponse: respondStandbyRejection(error, { mcpSessionId }),
         };
     }
 

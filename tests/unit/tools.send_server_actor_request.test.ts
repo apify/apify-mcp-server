@@ -320,8 +320,9 @@ describe('returning the response', () => {
             bytes: Buffer.byteLength(body),
             summary: expect.stringContaining('returned HTTP 200'),
         });
-        expect(result.content[0].text).toBe(JSON.stringify(result.structuredContent));
-        expect(result.content[1].text).toBe((result.structuredContent as { summary: string }).summary);
+        const { summary, ...data } = result.structuredContent as Record<string, unknown>;
+        expect(JSON.parse(result.content[0].text)).toEqual(data);
+        expect(result.content[1].text).toBe(summary);
         expect(result.toolTelemetry).toEqual({
             actorId: 'server-actor-test-id',
             actorTenancy: ACTOR_TENANCY.SINGLE_TENANT,
@@ -453,7 +454,7 @@ describe('returning an Actor Server error', () => {
         });
     });
 
-    it('mirrors structured output first and exposes a readable Actor error in both response surfaces', async () => {
+    it('mirrors response data first and returns error guidance separately', async () => {
         const received = recordRequests();
         const result = await callTool({ path: '/fetch' });
         const message = 'There is nothing at route GET /fetch. A "url" query parameter is required.';
@@ -464,13 +465,13 @@ describe('returning an Actor Server error', () => {
             errorMessage: message,
             summary: expect.stringContaining('returned HTTP 404'),
         });
-        expect(result.content[0].text).toBe(JSON.stringify(result.structuredContent));
-        expect(
-            result.content
-                .slice(1)
-                .map(({ text }) => text)
-                .join('\n'),
-        ).toContain(message);
+        const { summary, errorMessage, nextStep, ...data } = result.structuredContent as Record<string, unknown>;
+        expect(JSON.parse(result.content[0].text)).toEqual(data);
+        expect(result.content.slice(1).map(({ text }) => text)).toEqual([
+            summary,
+            `Actor Server error: ${errorMessage}`,
+            nextStep,
+        ]);
         expect(received).toHaveLength(1);
     });
 

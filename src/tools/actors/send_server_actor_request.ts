@@ -303,18 +303,21 @@ function buildResponse(
         loadedToolNames,
         hasErrorMessage: errorMessage !== undefined,
     });
-    const structuredContent = {
+    const data = {
         ...request,
         status,
         ...(contentType && { contentType }),
         body,
         bytes,
         ...(location && { location }),
+    };
+    const structuredContent = {
+        ...data,
         summary,
         ...(errorMessage && { errorMessage }),
         ...(nextStep && { nextStep }),
     };
-    const texts = [JSON.stringify(structuredContent), summary];
+    const texts = [JSON.stringify(data), summary];
     if (errorMessage) texts.push(`Actor Server error: ${errorMessage}`);
     if (nextStep) texts.push(nextStep);
     if (status < 400) return respondOk(texts, { structuredContent });
