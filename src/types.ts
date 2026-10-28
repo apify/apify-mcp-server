@@ -97,10 +97,13 @@ export type ServerActorToolInfo = {
     paths: string[];
     /** Whether an operation takes a JSON request body. */
     hasRequestBody: boolean;
-    /** The operations block of the tool description. */
-    operations: string;
-    /** When `operations` is not in full: how `fetch-actor-details` returns one operation in full. */
-    detailsHint?: string;
+    /** Every operation in full; absent when it alone exceeds the description limit. */
+    fullOperations?: string;
+    /** One line per operation, the first ones that can fit the description limit. */
+    operationLines: string[];
+    operationCount: number;
+    /** How `fetch-actor-details` returns one operation in full, for a description that lists lines. */
+    detailsHint: string;
 };
 
 /**

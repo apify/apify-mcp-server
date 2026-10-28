@@ -52,7 +52,7 @@ import {
     executeSendServerActorRequest,
     redactServerActorRequestArgs,
 } from './send_server_actor_request.js';
-import { formatServerRequestCost } from './server_interface_schema.js';
+import { buildServerActorToolDescription, formatServerRequestCost } from './server_interface_schema.js';
 
 /**
  * MCP-only opt-in injected next to the Actor's own input fields. Same contract as `call-actor`'s
@@ -251,15 +251,15 @@ export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
         const isReadOnly = isReadOnlyActor(actorInfo);
         // Names fetch-actor-details only when the session has it, and only when the operations are not in full.
         const buildDescription = ({ hasTool }: ToolDescriptionContext): string => {
-            const detailsHint =
-                toolInfo.detailsHint && hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? `\n${toolInfo.detailsHint}` : '';
-            return `This tool sends one HTTP request to the server interface of the Actor "${actorFullName}" and returns the response.
+            const head = `This tool sends one HTTP request to the server interface of the Actor "${actorFullName}" and returns the response.
 Actor description: ${definition.description}
 ${formatServerRequestCost(actor)}
 The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text; other content types, and bodies over ${MAX_INLINE_BYTES} bytes, are not returned.
 
 Operations:
-${toolInfo.operations}${detailsHint}`;
+`;
+            const detailsHint = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? toolInfo.detailsHint : undefined;
+            return buildServerActorToolDescription(head, toolInfo, detailsHint);
         };
         tools.push({
             type: TOOL_TYPE.ACTOR_SERVER,
@@ -279,8 +279,9 @@ ${toolInfo.operations}${detailsHint}`;
                 openWorldHint: true,
             },
             redactArgs: redactServerActorRequestArgs,
-            // Composition drops the tool in a payment-provider session, but a tool upserted before composition
-            // (auto mode before initialize, `processParamsGetTools`) is still rejected here before any request.
+            // Composition drops the tool in a payment-provider session. A tool upserted without composition (auto mode
+            // before initialize, `processParamsGetTools`) is rejected by the call engine, through this flag, before
+            // any request.
             hasPaymentProviderStandbyCheck: true,
             call: async (toolArgs) =>
                 executeSendServerActorRequest({ ...toolArgs, args: { ...toolArgs.args, actor: actorFullName } }),

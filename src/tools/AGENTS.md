@@ -27,9 +27,11 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), delete
     (`delete_actor.ts`), the actor-tools factory (run tools, proxied MCP tools, and a Server Actor's own tool
     (`getServerActorsAsTools`, type `actor-server`): `send-server-actor-request`'s execution and output with the
-    Actor fixed, `method` and `path` narrowed to the documented ones, and the operations in the description, in
-    full within `SERVER_TOOL_OPERATIONS_MAX_BYTES`, else as `formatOperationLine` lines cut to fit, rendered once
-    per definition by `buildServerActorToolInfo`), the direct actor-tool executor (`actor_executor.ts`),
+    Actor fixed, `method` and `path` narrowed to the documented ones, and the operations in the description. The
+    whole description stays within `CLIENT_DESCRIPTION_MAX_LENGTH` (4,096 characters, the Claude Code cut): the
+    operations in full when it fits, else `formatOperationLine` lines cut to fit (`buildServerActorToolDescription`,
+    from what `buildServerActorToolInfo` renders once per definition)), the direct actor-tool executor
+    (`actor_executor.ts`),
     `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`, and resolves the build
     the server-interface fields — `webServerMcpPath`, `webServerSchema` — are read from when standby is on,
     `resolveServerInterfaceDefinition`, shared with `fetchActorDetails` in `../utils/actor_details.ts`; the input

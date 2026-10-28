@@ -22,8 +22,11 @@ const MAX_ALIAS_HOPS = 16;
 const MAX_NAMED_OPERATIONS = 5;
 const MAX_NAMED_OPERATIONS_LENGTH = 300;
 
-/** Longest operations block in a selected Server Actor's tool description. */
-export const SERVER_TOOL_OPERATIONS_MAX_BYTES = 8 * 1024;
+/**
+ * Longest tool description a client keeps whole: Claude Code keeps the first 4,096 characters of a tool loaded
+ * upfront (https://code.claude.com/docs/en/mcp.md, "Scale with MCP tool search").
+ */
+export const CLIENT_DESCRIPTION_MAX_LENGTH = 4096;
 
 /** Inputs an operation line names in each list; the rest are counted. */
 const MAX_LISTED_INPUTS = 5;
@@ -290,32 +293,54 @@ function checkSize(text: string | undefined, actorFullName: string): { text: str
 }
 
 /**
- * What a selected Server Actor's tool is built from; `undefined` for a schema with no operation. Its operations block
- * is the `serverInterface: true` rendering when that fits `SERVER_TOOL_OPERATIONS_MAX_BYTES`, otherwise one line per
- * operation (`formatOperationLine`), cut to fit with `… and N more`.
+ * What a selected Server Actor's tool is built from; `undefined` for a schema with no operation. Only what can fit
+ * `CLIENT_DESCRIPTION_MAX_LENGTH` is kept: the `serverInterface: true` rendering, and the first operation lines
+ * (`formatOperationLine`).
  */
 export function buildServerActorToolInfo(schema: unknown, actorFullName: string): ServerActorToolInfo | undefined {
     const operations = listServerOperations(schema);
     if (operations.length === 0) return undefined;
-    const surface = {
-        methods: API_METHODS.filter((method) => operations.some((operation) => operation.method === method)),
-        paths: [...new Set(operations.map(({ path }) => path))],
-        hasRequestBody: operations.some(({ operation }) => getRequestBody(operation, schema) !== undefined),
-    };
+    // A character takes at most 4 UTF-8 bytes, and the reference budget counts bytes.
     const full = formatWithinBudget(
         schema,
         (context) => ({ operations: operations.map((operation) => buildServerOperationDetails(operation, context)) }),
-        SERVER_TOOL_OPERATIONS_MAX_BYTES,
+        CLIENT_DESCRIPTION_MAX_LENGTH * 4,
     );
-    if (full !== undefined && Buffer.byteLength(full) <= SERVER_TOOL_OPERATIONS_MAX_BYTES) {
-        return { ...surface, operations: full };
+    const operationLines: string[] = [];
+    let length = 0;
+    for (const operation of operations) {
+        const line = formatOperationLine(operation, schema);
+        length += line.length + 1;
+        if (length > CLIENT_DESCRIPTION_MAX_LENGTH) break;
+        operationLines.push(line);
     }
     const { method, path } = operations[0];
     return {
-        ...surface,
-        operations: formatOperationIndex(operations, schema, SERVER_TOOL_OPERATIONS_MAX_BYTES),
+        methods: API_METHODS.filter((apiMethod) => operations.some((operation) => operation.method === apiMethod)),
+        paths: [...new Set(operations.map((operation) => operation.path))],
+        hasRequestBody: operations.some(({ operation }) => getRequestBody(operation, schema) !== undefined),
+        ...(full !== undefined && full.length <= CLIENT_DESCRIPTION_MAX_LENGTH && { fullOperations: full }),
+        operationLines,
+        operationCount: operations.length,
         detailsHint: `${formatDetailsCall(actorFullName, `${method} ${path}`)} returns one operation in full.`,
     };
+}
+
+/**
+ * A selected Server Actor's tool description, `head` followed by its operations, within
+ * `CLIENT_DESCRIPTION_MAX_LENGTH`: every operation in full when the whole description fits, otherwise one line per
+ * operation, cut with `… and N more`, then `detailsHint`.
+ */
+export function buildServerActorToolDescription(
+    head: string,
+    { fullOperations, operationLines, operationCount }: ServerActorToolInfo,
+    detailsHint: string | undefined,
+): string {
+    const full = fullOperations && `${head}${fullOperations}`;
+    if (full && full.length <= CLIENT_DESCRIPTION_MAX_LENGTH) return full;
+    const tail = detailsHint ? `\n${detailsHint}` : '';
+    const room = CLIENT_DESCRIPTION_MAX_LENGTH - head.length - tail.length;
+    return `${head}${cutOperationLines(operationLines, operationCount, room, (text) => text.length)}${tail}`;
 }
 
 /**
