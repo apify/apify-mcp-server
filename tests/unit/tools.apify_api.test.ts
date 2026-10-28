@@ -1285,7 +1285,7 @@ describe('apify-api-write', () => {
 describe.each([
     { name: HELPER_TOOLS.API_READ, tool: apifyApiRead, args: { path: '/v2/datasets' } },
     { name: HELPER_TOOLS.API_WRITE, tool: apifyApiWrite, args: { path: '/v2/datasets/abc', method: 'DELETE' } },
-])('$name rejects query values of the wrong type instead of coercing them', ({ tool, args }) => {
+])('$name validates query values without coercing them', ({ tool, args }) => {
     it.each([{ value: null }, { value: [10] }])('rejects the query value $value', ({ value }) => {
         expect(tool.ajvValidate({ ...args, query: { limit: value } })).toBe(false);
     });
