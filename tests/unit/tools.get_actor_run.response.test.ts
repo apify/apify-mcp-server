@@ -9,6 +9,7 @@ import {
     buildDatasetShape,
     buildStatusSummaryNextStep,
     collapseArrayIndices,
+    fieldsProjectionHint,
     type RunDataset,
     type RunKeyValueStore,
     type RunResponse,
@@ -1412,8 +1413,17 @@ describe('buildStatusTemplate', () => {
             dataset: datasetWithItems,
             datasetFields: DATASET_FIELDS,
         });
-        expect(t.nextStep).toMatch(/describe the structure\.$/);
+        expect(t.nextStep).toMatch(/\.$/);
         expect(t.nextStep).not.toMatch(/\.\.$/);
+    });
+});
+
+describe('array selection hints', () => {
+    it('keeps a nested scalar array selectable as a whole', () => {
+        const hint = fieldsProjectionHint(['matrix/0/0']);
+        expect(hint).toContain('matrix[][]');
+        expect(hint).toContain('Selectable fields: matrix.');
+        expect(hint).not.toContain('matrix returns empty objects');
     });
 });
 

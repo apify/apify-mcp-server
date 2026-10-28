@@ -218,8 +218,12 @@ describe('get-dataset fields normalization', () => {
         const { structuredContent } = result as { structuredContent: { nextStep: string } };
         expect(structuredContent.nextStep).toContain('{ latestComments: { id, owner: { username } }[], images[] }');
         expect(structuredContent.nextStep).toContain('Selectable fields: latestComments, images.');
-        expect(structuredContent.nextStep).toContain('Pass top-level names via fields=');
-        expect(structuredContent.nextStep).toContain('nested paths describe the structure');
+        expect(structuredContent.nextStep).toContain('to keep whole objects and arrays');
+        expect(structuredContent.nextStep).toContain('fields="latestComments" for the whole top-level value');
+        expect(structuredContent.nextStep).toContain('fields="latestComments.0.id" for one indexed value');
+        expect(structuredContent.nextStep).toContain('Dotted selections return flat keys');
+        expect(structuredContent.nextStep).toContain('latestComments.id returns empty objects');
+        expect(structuredContent.nextStep).toContain('Include an index at each array level');
         expect(structuredContent.nextStep).not.toContain('Pass dot paths');
     });
 

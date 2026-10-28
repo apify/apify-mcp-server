@@ -52,7 +52,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     action) pair, never inline dataset items or KV bodies — except the reserved `TIP` key,
     inlined as `tip` on terminal RAG Web Browser runs only.
     Dataset hints show the inferred item structure with array markers and separately list
-    selectable top-level fields. Nested paths in the structure are descriptive, not selection hints.
+    selectable top-level fields. Dotted selections return flat keys; arrays require explicit
+    zero-based indices for individual values. An unindexed path does not select across array elements.
   - `runs/` — get/abort runs, run logs, run list.
   - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`.
   - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public

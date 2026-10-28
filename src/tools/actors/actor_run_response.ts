@@ -572,9 +572,17 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
 export function fieldsProjectionHint(fields: string[] | undefined): string {
     if (!fields?.length) return '';
     const topLevelFields = [...new Set(fields.map((field) => field.split('/')[0]))];
+    const indexedField = fields.find(
+        (field) => /\/\d+\//.test(field) && normalizeDatasetFields([field])[0] !== field.split('/')[0],
+    );
+    const arrayHint = indexedField
+        ? ` Array projection: ${normalizeDatasetFields([indexedField])[0]} returns empty objects. ` +
+          `Use fields="${indexedField.split('/')[0]}" for the whole top-level value, ` +
+          `or fields="${indexedField.replace(/\//g, '.')}" for one indexed value (zero-based). Include an index at each array level.`
+        : '';
     return (
-        ` Item structure ([] marks an array): ${buildDatasetShape(fields)}. Selectable fields: ${topLevelFields.join(', ')}. ` +
-        'Pass top-level names via fields="..."; nested paths describe the structure.'
+        `${arrayHint} Item structure ([] marks an array): ${buildDatasetShape(fields)}. Selectable fields: ${topLevelFields.join(', ')}. ` +
+        'Pass top-level names via fields="..." to keep whole objects and arrays. Dotted selections return flat keys.'
     );
 }
 
