@@ -105,10 +105,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             };
         }
 
-        const widget =
-            getMode() === SERVER_MODE.APPS && uri.startsWith('ui://widget/')
-                ? getAvailableWidgets().get(uri)
-                : undefined;
+        const widget = getMode() === SERVER_MODE.APPS ? getAvailableWidgets().get(uri) : undefined;
         if (widget) {
             // A missing or unreadable bundle is a server build fault. No adapter logs a resource error, so the path
             // is logged here and left out of the error the client gets.
