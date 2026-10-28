@@ -35,7 +35,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     served only with `send-server-actor-request`; `output.serverInterface: true` returns every operation in the
     `get-apify-api-details` shape (`buildServerOperationDetails`, through the API tools' `dereference`: local
     references inlined, examples kept, no responses, components or `servers`) while the text fits
-    `MAX_INLINE_BYTES`, else one line per operation (`formatOperationLine`), cut with `… and N more`;
+    `MAX_INLINE_BYTES`, else one line per operation with up to five parameters and five top-level JSON body
+    properties, required first (`formatOperationLine`), cut with `… and N more`;
     `"METHOD /path"` returns that one operation; reference expansion has a byte budget, as a creator schema can
     expand exponentially),
     `send_server_actor_request.ts` (`send-server-actor-request`: one HTTP request to a Server Actor's API, gated on

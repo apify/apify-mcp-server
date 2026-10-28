@@ -7,6 +7,7 @@ import type { DereferenceContext } from '../api/apify_api_spec.js';
 import {
     API_METHODS,
     DereferenceBudgetError,
+    isJsonMediaType,
     isRecord,
     parseParameters,
     parseRequestBody,
@@ -20,6 +21,12 @@ const MAX_ALIAS_HOPS = 16;
 
 const MAX_NAMED_OPERATIONS = 5;
 const MAX_NAMED_OPERATIONS_LENGTH = 300;
+
+/** Inputs an operation line names in each list; the rest are counted. */
+const MAX_LISTED_INPUTS = 5;
+
+/** A parameter or a top-level body property, as an operation line names it. */
+type OperationInput = { name: string; type?: string; isRequired: boolean };
 
 /** Follows local parameter or request-body aliases, without expanding nested schemas. */
 function resolveRef(node: unknown, spec: unknown): unknown {
@@ -92,15 +99,86 @@ export function listDocumentedOperations(schema: unknown): string[] {
     });
 }
 
-/** E.g. `- GET /search: Search the web. Required: q, request body.` */
-function formatOperationLine({ method, path, operation }: ServerOperation, schema: unknown): string {
-    const required = listRequiredInputs(operation, schema);
-    let text = `- ${method} ${path}`;
-    if (typeof operation.summary === 'string') {
-        text += `: ${operation.summary}`;
-        if (required.length > 0 && !/[.!?]$/.test(operation.summary)) text += '.';
+/** Follows one local reference: an operation line reads a type without expanding schemas. */
+function resolveOneRef(node: unknown, schema: unknown): unknown {
+    return isRecord(node) && typeof node.$ref === 'string' ? resolveLocalRef(schema, node.$ref) : node;
+}
+
+/** E.g. `string`, or `string|null` for a list of types; `undefined` when the schema names no type. */
+function getTypeName(node: unknown, schema: unknown): string | undefined {
+    const resolved = resolveOneRef(node, schema);
+    if (!isRecord(resolved)) return undefined;
+    const types = [resolved.type].flat().filter((type): type is string => typeof type === 'string');
+    return types.length > 0 ? types.join('|') : undefined;
+}
+
+/** Path and query parameters, read as `parseParameters` reads them: a path parameter is required. */
+function listParameterInputs(operation: Record<string, unknown>, schema: unknown): OperationInput[] {
+    const inputs: OperationInput[] = [];
+    for (const parameter of Array.isArray(operation.parameters) ? operation.parameters : []) {
+        const resolved = resolveRef(parameter, schema);
+        if (!isRecord(resolved) || typeof resolved.name !== 'string') continue;
+        if (resolved.in !== 'path' && resolved.in !== 'query') continue;
+        inputs.push({
+            name: resolved.name,
+            type: getTypeName(resolved.schema, schema),
+            isRequired: resolved.in === 'path' || resolved.required === true,
+        });
     }
-    if (required.length > 0) text += ` Required: ${required.join(', ')}.`;
+    return inputs;
+}
+
+/** The request body with the media type `parseRequestBody` picks; `undefined` when the operation takes none. */
+function getRequestBody(
+    operation: Record<string, unknown>,
+    schema: unknown,
+): { isRequired: boolean; schema: unknown } | undefined {
+    const requestBody = resolveRef(operation.requestBody, schema);
+    if (!isRecord(requestBody) || !isRecord(requestBody.content)) return undefined;
+    const { content } = requestBody;
+    const media = content['application/json'] ?? content[Object.keys(content).find(isJsonMediaType) ?? '*/*'];
+    return isRecord(media) ? { isRequired: requestBody.required === true, schema: media.schema } : undefined;
+}
+
+/** The top-level properties of a body schema; `undefined` when it lists none. */
+function listBodyInputs(bodySchema: unknown, schema: unknown): OperationInput[] | undefined {
+    const resolved = resolveOneRef(bodySchema, schema);
+    if (!isRecord(resolved) || !isRecord(resolved.properties)) return undefined;
+    const required = Array.isArray(resolved.required) ? resolved.required : [];
+    const inputs = Object.entries(resolved.properties).map(([name, property]) => ({
+        name,
+        type: getTypeName(property, schema),
+        isRequired: required.includes(name),
+    }));
+    return inputs.length > 0 ? inputs : undefined;
+}
+
+/** E.g. `q:string required, limit:integer`: required inputs first, then the others, up to `MAX_LISTED_INPUTS`. */
+function formatInputs(inputs: OperationInput[]): string {
+    const ordered = [...inputs.filter((input) => input.isRequired), ...inputs.filter((input) => !input.isRequired)];
+    const listed = ordered
+        .slice(0, MAX_LISTED_INPUTS)
+        .map(({ name, type, isRequired }) => `${name}${type ? `:${type}` : ''}${isRequired ? ' required' : ''}`);
+    const rest = ordered.length - listed.length;
+    return [...listed, ...(rest > 0 ? [`+${rest} more`] : [])].join(', ');
+}
+
+/**
+ * E.g. `- GET /search [q:string required, limit:integer]: Search the web.`, or
+ * `- POST / {url:string required, formats:array}: Fetch a URL.` for a JSON body. A body schema that lists no
+ * properties reads `{request body}`.
+ */
+function formatOperationLine({ method, path, operation }: ServerOperation, schema: unknown): string {
+    let text = `- ${method} ${path}`;
+    const parameters = listParameterInputs(operation, schema);
+    if (parameters.length > 0) text += ` [${formatInputs(parameters)}]`;
+    const body = getRequestBody(operation, schema);
+    if (body) {
+        const bodyInputs = listBodyInputs(body.schema, schema);
+        text += bodyInputs ? ` {${formatInputs(bodyInputs)}}` : ` {request body${body.isRequired ? ' required' : ''}}`;
+    }
+    const { summary } = operation;
+    if (typeof summary === 'string' && summary) text += `: ${summary}${/[.!?]$/.test(summary) ? '' : '.'}`;
     return text;
 }
 
