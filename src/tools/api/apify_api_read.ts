@@ -1,10 +1,11 @@
+import Ajv from 'ajv';
 import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
-import { compileSchema } from '../../utils/ajv.js';
+import { fixZodSchemaRequired } from '../../utils/ajv.js';
 import { apifyApiCallOutputSchema } from '../structured_output_schemas.js';
 import { API_CALL_DESCRIPTION, apiCallArgsShape, callApi, redactApiCallArgs } from './apify_api_request.js';
 
@@ -45,7 +46,10 @@ export const apifyApiRead: ToolEntry = Object.freeze({
     buildDescription,
     inputSchema: z.toJSONSchema(apifyApiReadArgs) as ToolInputSchema,
     outputSchema: apifyApiCallOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(apifyApiReadArgs)),
+    // The shared validator coerces null and singleton arrays into scalar query values.
+    ajvValidate: new Ajv({ coerceTypes: false, strict: false, removeAdditional: true }).compile(
+        fixZodSchemaRequired(z.toJSONSchema(apifyApiReadArgs)),
+    ),
     annotations: {
         title: 'Read Apify API',
         // The blocklist refuses the GETs that would write or start a run: the method query parameter and the
