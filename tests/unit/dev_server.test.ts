@@ -103,6 +103,17 @@ describe('isStatelessRequest()', () => {
         await expect(isStatelessRequest(post(body))).resolves.toBe(false);
     });
 
+    it('keeps a claim-less request over the SDK 4 MiB body limit on the stateful path', async () => {
+        const body = {
+            jsonrpc: '2.0',
+            id: 2,
+            method: 'tools/call',
+            params: { name: 'some-tool', arguments: { content: 'x'.repeat(5 * 1024 * 1024) } },
+        };
+
+        await expect(isStatelessRequest(post(body))).resolves.toBe(false);
+    });
+
     it('keeps session operations on the stateful path', async () => {
         // `express.json()` leaves an empty object behind on a body-less request.
         for (const method of ['GET', 'DELETE']) {
