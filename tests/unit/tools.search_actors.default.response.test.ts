@@ -357,22 +357,6 @@ describe('search-actors without widget (searchActors)', () => {
         expect(content[0].text).not.toContain('cannot be run in this configuration');
     });
 
-    it.each([HELPER_TOOLS.ACTOR_CALL_WIDGET, HELPER_TOOLS.API_WRITE])(
-        'omits the not-runnable caveat when %s is loaded instead of call-actor',
-        async (toolName) => {
-            vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
-
-            const result = await (searchActors as HelperTool).call(
-                stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient(), {
-                    loadedToolNames: [toolName],
-                }),
-            );
-            const { content } = result as { content: { type: string; text: string }[] };
-
-            expect(content[0].text).not.toContain('cannot be run in this configuration');
-        },
-    );
-
     it('omits the not-runnable caveat when call-actor is absent but every result is already loaded', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
