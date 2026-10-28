@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
+import type { DereferenceContext } from '../../src/tools/api/apify_api_spec.js';
 import {
     APIFY_API_OPENAPI_URL,
     buildApiOperationIndex,
+    DereferenceBudgetError,
+    parseParameters,
+    parseRequestBody,
     searchApiOperations,
 } from '../../src/tools/api/apify_api_spec.js';
 import { API_SPEC_FIXTURE } from './helpers/apify_api_spec_fixture.js';
@@ -76,6 +80,29 @@ describe('buildApiOperationIndex()', () => {
         expect(index.get('actorRun_abort_post')?.requestBody).toBeUndefined();
     });
 
+    it('leaves out parameter and media-type examples', () => {
+        const spec = {
+            paths: {
+                '/v2/things': {
+                    post: {
+                        operationId: 'things_post',
+                        parameters: [{ name: 'q', in: 'query', schema: { type: 'string' }, example: 'apify' }],
+                        requestBody: {
+                            content: { 'application/json': { schema: { type: 'object' }, example: { name: 'a' } } },
+                        },
+                    },
+                },
+            },
+        };
+
+        const operation = buildApiOperationIndex(spec).get('things_post');
+
+        expect(operation?.parameters).toEqual([
+            { name: 'q', in: 'query', isRequired: false, schema: { type: 'string' } },
+        ]);
+        expect(operation?.requestBody).toEqual({ isRequired: false, schema: { type: 'object' } });
+    });
+
     it('links each operation to its page in the API reference, at the operation ID in kebab case', () => {
         expect(index.get('actorRun_abort_post')?.docsUrl).toBe('https://docs.apify.com/api/v2/actor-run-abort-post');
         expect(index.get('keyValueStore_record_put')?.docsUrl).toBe(
@@ -86,6 +113,101 @@ describe('buildApiOperationIndex()', () => {
     it('throws for a document without /v2/ operations', () => {
         expect(() => buildApiOperationIndex({})).toThrow('the spec lists no /v2/ operations.');
         expect(() => buildApiOperationIndex('not a spec')).toThrow('the spec lists no /v2/ operations.');
+    });
+});
+
+/** The context for a creator-written schema: examples kept, work bounded. */
+function creatorContext(spec: unknown): DereferenceContext {
+    return { spec, shouldKeepExamples: true, budget: { remainingBytes: 100_000 } };
+}
+
+/** A request body whose JSON schema is `schema`. */
+function jsonBody(schema: unknown) {
+    return { content: { 'application/json': { schema } } };
+}
+
+describe('parseParameters() for a creator schema', () => {
+    it('keeps examples as written, since they are data, not schema', () => {
+        const example = { url: 'https://apify.com', 'x-trace': 'abc', nested: { $ref: '#/info' } };
+        const spec = { info: { title: 'Not an example' } };
+
+        const [parameter] = parseParameters([{ name: 'url', in: 'query', example }], creatorContext(spec));
+
+        expect(parameter.example).toEqual(example);
+    });
+
+    it('resolves the references in an examples map, and keeps one that does not resolve as written', () => {
+        const examples = { short: { $ref: '#/components/examples/Short' }, typo: { $ref: '#/components/examples/T' } };
+        const spec = { components: { examples: { Short: { value: 'apify' } } } };
+
+        const [parameter] = parseParameters([{ name: 'q', in: 'query', examples }], creatorContext(spec));
+
+        expect(parameter.examples).toEqual({ short: { value: 'apify' }, typo: { $ref: '#/components/examples/T' } });
+    });
+});
+
+describe('parseRequestBody() for a creator schema', () => {
+    it('keeps a reference that does not resolve as written', () => {
+        const schema = {
+            type: 'object',
+            required: ['a'],
+            properties: { a: { $ref: 'common.json#/A' } },
+            additionalProperties: { $ref: '#/components/schemas/Typo' },
+        };
+
+        expect(parseRequestBody(jsonBody(schema), creatorContext({}))?.schema).toEqual(schema);
+    });
+
+    it('renders a cyclic reference once, then as an empty schema', () => {
+        const spec = {
+            components: {
+                schemas: { Node: { type: 'object', properties: { child: { $ref: '#/components/schemas/Node' } } } },
+            },
+        };
+
+        const body = parseRequestBody(jsonBody({ $ref: '#/components/schemas/Node' }), creatorContext(spec));
+
+        expect(body?.schema).toEqual({ type: 'object', properties: { child: {} } });
+    });
+
+    const other = { schema: { type: 'string' } };
+    const json = { schema: { type: 'object' } };
+    // The send tool sends application/json, so that media type comes first, then another JSON one, then */*.
+    it.each([
+        ['application/json; charset=utf-8', { '*/*': other, 'application/json; charset=utf-8': json }],
+        ['application/vnd.api+json', { '*/*': other, 'application/vnd.api+json': json }],
+        ['application/json', { 'application/merge-patch+json': other, 'application/json': json }],
+    ])('takes the body of media type %s, preferred to the others', (_mediaType, content) => {
+        expect(parseRequestBody({ content }, creatorContext({}))?.schema).toEqual({ type: 'object' });
+    });
+});
+
+describe('the budget of a creator schema', () => {
+    // Each level references the next ten times: 10^30 nodes in full.
+    const exponential: Record<string, unknown> = { L30: { type: 'string' } };
+    for (let level = 0; level < 30; level++) {
+        const properties = Array.from({ length: 10 }, (_, i) => [
+            `p${i}`,
+            { $ref: `#/components/schemas/L${level + 1}` },
+        ]);
+        exponential[`L${level}`] = { type: 'object', properties: Object.fromEntries(properties) };
+    }
+    // 3000 distinct references, each to the next.
+    const chain: Record<string, unknown> = { C3000: { type: 'string' } };
+    for (let i = 0; i < 3000; i++) chain[`C${i}`] = { $ref: `#/components/schemas/C${i + 1}` };
+    // 5000 levels of inline nesting, no references.
+    let deep: unknown = { type: 'string' };
+    for (let i = 0; i < 5000; i++) deep = { type: 'array', items: deep };
+
+    // Without the budget, the first would not finish and the others could overflow the stack.
+    it.each([
+        ['references that expand exponentially', { $ref: '#/components/schemas/L0' }, exponential],
+        ['a long reference chain', { $ref: '#/components/schemas/C0' }, chain],
+        ['deep inline nesting', deep, {}],
+    ])('stops %s with DereferenceBudgetError', (_label, schema, schemas) => {
+        const spec = { components: { schemas } };
+
+        expect(() => parseRequestBody(jsonBody(schema), creatorContext(spec))).toThrow(DereferenceBudgetError);
     });
 });
 
