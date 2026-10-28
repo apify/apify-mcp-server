@@ -144,12 +144,12 @@ step. Probed 2026-10-28: `formats` is a comma-separated string (`markdown,links`
 returns 400 `INVALID_FORMATS`); `headers` is a JSON object string (`{"Accept-Language":"fr-FR"}`;
 `X-Probe: 1` returns 200 but the header is dropped); a 200 body is a JSON object with `fetch`
 (including `fetch.httpStatusCode`), `metadata` and one field per requested format; a body over
-262144 bytes is not returned and the call fails (#1738). The run-era notes below (probed 2026-08-20)
-still hold for `call-actor` runs but are not yet re-probed over `GET /`: an HTTP 4xx/5xx from the
-target page still ends the run SUCCEEDED with `fetch.httpStatusCode` in the item; an unreachable
-domain either fails the run ("Could not connect…") or succeeds with an empty 502 item, depending on
-unblocker routing; JSON content fails `text`/`markdown` formats with a status message telling the
-agent to add `raw`; `ftp://` fails with "Unsupported URL protocol".
+262144 bytes is not returned and the call fails with `bodyOmitted` (#1738). Error paths over
+`GET /`, probed the same day: a target 404 with a page (GitHub) returns HTTP 200 with
+`fetch.httpStatusCode: 404`; a target 404 with an empty body (httpbin `/status/404`) and an
+unreachable host both return HTTP 502 `UPSTREAM_FETCH_ERROR`, a failed call; `ftp://` returns
+400 `INVALID_URL` ("Unsupported URL protocol"); JSON content with `formats=text` returns 200 with
+a `text` field.
 
 The web-selection family (`merge/web-selection/*`, 9 items: 7 proper + 2 with `expectedErrors`) covers
 the clash between the default web tools: web search by query (`apify/rag-web-browser`) vs
