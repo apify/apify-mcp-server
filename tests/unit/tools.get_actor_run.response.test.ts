@@ -123,8 +123,10 @@ describe('get-actor-run default response', () => {
         expect(JSON.parse(content[0].text)).toEqual(structuredContent);
         expect(content[1].text).toContain('dataset-xyz');
         expect(content[1].text).toContain(
-            'Item shape ([] marks an array): { crawl: { httpStatusCode }, metadata: { url }, markdown }',
+            'Item structure ([] marks an array): { crawl: { httpStatusCode }, metadata: { url }, markdown }',
         );
+        expect(content[1].text).toContain('Selectable fields: crawl, metadata, markdown.');
+        expect(content[1].text).not.toContain('Pass dot paths');
         expect(content[1].text).not.toContain('```json');
 
         // Usage attribution `_meta` flows through end-to-end.
@@ -1119,6 +1121,7 @@ function makeRun(status: string, statusMessage?: string, runTimeSecs = 10) {
 }
 
 const datasetWithItems: RunDataset = { id: 'ds-1', itemCount: 47, fields: ['metadata.url', 'markdown'] };
+const DATASET_FIELDS = ['metadata/url', 'markdown'];
 const DATASET_SHAPE = '{ metadata: { url }, markdown }';
 const datasetEmpty: RunDataset = { id: 'ds-1', itemCount: 0, fields: [] };
 const kvWithRecords: RunKeyValueStore = { id: 'kv-1', keys: ['result-a', 'result-b'], keyCount: 2 };
@@ -1136,12 +1139,13 @@ describe('buildStatusTemplate', () => {
         const t = buildStatusSummaryNextStep({
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
-            datasetShape: DATASET_SHAPE,
+            datasetFields: DATASET_FIELDS,
         });
         expect(t.summary).toContain('47 items; 2 fields available');
         expect(t.nextStep).toContain('get-dataset-items');
         expect(t.nextStep).toContain('datasetId=ds-1');
         expect(t.nextStep).toContain(DATASET_SHAPE);
+        expect(t.nextStep).toContain('Selectable fields: metadata, markdown.');
     });
 
     it('SUCCEEDED dataset nextStep uses DEFAULT_DATASET_ITEMS_LIMIT as example limit', () => {
@@ -1178,7 +1182,7 @@ describe('buildStatusTemplate', () => {
         const dataset: RunDataset = { id: 'ds-1', itemCount: 5, fields: [] };
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
         expect(t.nextStep).toContain('get-dataset-items');
-        expect(t.nextStep).not.toContain('Item shape');
+        expect(t.nextStep).not.toContain('Item structure');
         expect(t.nextStep).not.toContain('—');
     });
 
@@ -1302,13 +1306,14 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).toContain('partial output (47 items written)');
     });
 
-    it('TIMED-OUT with a dataset shape names the item shape for projection', () => {
+    it('TIMED-OUT with a dataset shape names the item structure and selectable fields', () => {
         const t = buildStatusSummaryNextStep({
             run: makeRun('TIMED-OUT'),
             dataset: datasetWithItems,
-            datasetShape: DATASET_SHAPE,
+            datasetFields: DATASET_FIELDS,
         });
         expect(t.nextStep).toContain(DATASET_SHAPE);
+        expect(t.nextStep).toContain('Selectable fields: metadata, markdown.');
     });
 
     it('TIMED-OUT with both dataset and KV records picks dataset for nextStep', () => {
@@ -1401,14 +1406,13 @@ describe('buildStatusTemplate', () => {
     });
 
     it('SUCCEEDED with items ends nextStep with a single period after the fields hint', () => {
-        // Pinned to prevent the `to project..` regression: the fields-hint template already
-        // terminates the sentence, so the outer nextStep template must not append its own `.`.
+        // The hint terminates the sentence, so the outer template must not append its own period.
         const t = buildStatusSummaryNextStep({
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
-            datasetShape: DATASET_SHAPE,
+            datasetFields: DATASET_FIELDS,
         });
-        expect(t.nextStep).toMatch(/to project\.$/);
+        expect(t.nextStep).toMatch(/describe the structure\.$/);
         expect(t.nextStep).not.toMatch(/\.\.$/);
     });
 });

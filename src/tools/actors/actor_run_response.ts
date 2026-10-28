@@ -96,7 +96,7 @@ export type RunDataset = {
     inflatedBytes?: number;
     /**
      * Dot-notation field paths. Pure-numeric segments (array indices) are stripped and the
-     * list is deduped at build time, so callers receive a flat unique projection-valid list
+     * list is deduped at build time, so callers receive a flat unique description of the structure
      * rather than the inflated `entities.hashtags.0.text`, `entities.hashtags.1.text`, ...
      * shape Apify returns for array-heavy datasets.
      */
@@ -173,7 +173,7 @@ export type FetchActorRunResult = {
  * Apify expands array indices in dataset fields (e.g. `entities.hashtags.0.text`,
  * `entities.hashtags.1.text`, ... `entities.hashtags.14.text`), so deeply-nested or
  * array-heavy schemas balloon into hundreds of redundant paths. Strip pure-numeric
- * segments and dedupe; the resulting paths stay valid projections for `fields="..."`.
+ * segments and dedupe; these paths describe the structure, not necessarily valid `fields` selections.
  *
  * Exported for direct unit testing of edge cases (empty input, all-numeric paths) —
  * production callers go through `normalizeDatasetFields`.
@@ -569,9 +569,13 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
     return { hasKv: true, kvId, keys, keyCountLabel, summarySuffix: ` Key-value store has ${keyCountLabel}.` };
 }
 
-export function fieldsProjectionHint(datasetShape: string | undefined): string {
-    if (!datasetShape) return '';
-    return ` Item shape ([] marks an array): ${datasetShape}. Pass dot paths via fields="..." to project.`;
+export function fieldsProjectionHint(fields: string[] | undefined): string {
+    if (!fields?.length) return '';
+    const topLevelFields = [...new Set(fields.map((field) => field.split('/')[0]))];
+    return (
+        ` Item structure ([] marks an array): ${buildDatasetShape(fields)}. Selectable fields: ${topLevelFields.join(', ')}. ` +
+        'Pass top-level names via fields="..."; nested paths describe the structure.'
+    );
 }
 
 /**
@@ -592,7 +596,7 @@ function buildSucceededSummaryNextStep(
     dataset?: RunDataset,
     keyValueStore?: RunKeyValueStore,
     datasetMetadataFetched = true,
-    datasetShape?: string,
+    datasetFields?: string[],
 ): { summary: string; nextStep: string } {
     const itemCount = dataset?.itemCount;
     const datasetId = dataset?.id;
@@ -604,7 +608,7 @@ function buildSucceededSummaryNextStep(
         const fields = dataset?.fields ?? [];
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. ${itemCount} ${itemCount === 1 ? 'item' : 'items'}; ${fields.length} fields available.${kv.summarySuffix}`,
-            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items (${itemCount} total).${datasetSizeNextStepHint(dataset?.inflatedBytes)}${fieldsProjectionHint(datasetShape)}`,
+            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items (${itemCount} total).${datasetSizeNextStepHint(dataset?.inflatedBytes)}${fieldsProjectionHint(datasetFields)}`,
         };
     }
 
@@ -625,7 +629,7 @@ function buildSucceededSummaryNextStep(
     if (itemCount === 0 && datasetId) {
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. Dataset item count reads 0 - counts can lag right after a run finishes.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
-            nextStep: `Fetch ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) before concluding the run produced no output.${fieldsProjectionHint(datasetShape)}`,
+            nextStep: `Fetch ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) before concluding the run produced no output.${fieldsProjectionHint(datasetFields)}`,
         };
     }
 
@@ -646,7 +650,7 @@ function buildTimedOutSummaryNextStep(
     runTimeSecs: number,
     dataset?: RunDataset,
     keyValueStore?: RunKeyValueStore,
-    datasetShape?: string,
+    datasetFields?: string[],
 ): { summary: string; nextStep: string } {
     const datasetId = dataset?.id;
     const kv = summarizeKv(keyValueStore);
@@ -657,7 +661,7 @@ function buildTimedOutSummaryNextStep(
         const itemCount = dataset?.itemCount ?? 0;
         return {
             summary: `TIMED-OUT after ${runTimeSecs}s.${kv.summarySuffix}`,
-            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch any partial output (${itemCount} ${itemCount === 1 ? 'item' : 'items'} written).${fieldsProjectionHint(datasetShape)}`,
+            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch any partial output (${itemCount} ${itemCount === 1 ? 'item' : 'items'} written).${fieldsProjectionHint(datasetFields)}`,
         };
     }
 
@@ -680,9 +684,9 @@ export function buildStatusSummaryNextStep(params: {
     dataset?: RunDataset;
     keyValueStore?: RunKeyValueStore;
     datasetMetadataFetched?: boolean;
-    datasetShape?: string;
+    datasetFields?: string[];
 }): { summary: string; nextStep: string } {
-    const { run, dataset, keyValueStore, datasetMetadataFetched = true, datasetShape } = params;
+    const { run, dataset, keyValueStore, datasetMetadataFetched = true, datasetFields } = params;
     const { id: runId, status, statusMessage } = run;
     // The platform usually populates stats.runTimeSecs on terminal runs, but not always (e.g.
     // ABORTED before stats flushed). Fall back to `elapsedSecs(run)` so summaries don't render
@@ -717,7 +721,7 @@ export function buildStatusSummaryNextStep(params: {
                 dataset,
                 keyValueStore,
                 datasetMetadataFetched,
-                datasetShape,
+                datasetFields,
             );
         case 'FAILED':
             return {
@@ -734,7 +738,7 @@ export function buildStatusSummaryNextStep(params: {
                     'Retry only if the user wants another run.',
             };
         case 'TIMED-OUT':
-            return buildTimedOutSummaryNextStep(runTimeSecs, dataset, keyValueStore, datasetShape);
+            return buildTimedOutSummaryNextStep(runTimeSecs, dataset, keyValueStore, datasetFields);
         default:
             return {
                 summary: `${status}. Run ${runId}.`,
@@ -988,11 +992,11 @@ export async function fetchActorRunData(params: {
     const datasetIds = buildStorageAliasIds(run.storageIds?.datasets, run.defaultDatasetId ?? undefined);
     const kvIds = buildStorageAliasIds(run.storageIds?.keyValueStores, run.defaultKeyValueStoreId ?? undefined);
 
-    let defaultDatasetShape: string | undefined;
+    let defaultDatasetFields: string[] | undefined;
     const [datasets, keyValueStores] = await Promise.all([
         buildStorageEntriesFromIds(datasetIds, async (id) => {
             const meta = await fetchDatasetMeta(client, id, mcpSessionId);
-            if (id === datasetIds.default && meta?.fields?.length) defaultDatasetShape = buildDatasetShape(meta.fields);
+            if (id === datasetIds.default && meta?.fields?.length) defaultDatasetFields = meta.fields;
             let itemCount = meta?.itemCount;
             if (isSucceeded && itemCount === 0) {
                 itemCount = await fetchDatasetItemCountWithLagFallback(client, id, waitSecs, abortSignal);
@@ -1010,7 +1014,7 @@ export async function fetchActorRunData(params: {
         run,
         dataset: datasets?.default,
         keyValueStore: keyValueStores?.default,
-        datasetShape: defaultDatasetShape,
+        datasetFields: defaultDatasetFields,
     });
 
     const defaultKv = keyValueStores?.default;
