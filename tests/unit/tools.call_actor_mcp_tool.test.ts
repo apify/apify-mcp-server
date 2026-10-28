@@ -7,6 +7,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import {
     CallToolRequestSchema,
     type CallToolResult,
+    CancelledNotificationSchema,
     ErrorCode,
     type InitializeRequest,
     McpError,
@@ -18,7 +19,11 @@ import { APIFY_AI_CLIENT_NAME, FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } fro
 import { connectMCPClient } from '../../src/mcp/client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../src/mcp/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
-import { callActorMcpTool, executeCallActorMcpTool } from '../../src/tools/actors/call_actor_mcp_tool.js';
+import {
+    callActorMcpTool,
+    executeCallActorMcpTool,
+    MCP_TOOL_NAME_MAX_LENGTH,
+} from '../../src/tools/actors/call_actor_mcp_tool.js';
 import type { Actor, ActorDefinitionPruned, ToolTelemetryContext } from '../../src/types.js';
 import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../src/types.js';
 import { mockActor } from './helpers/actor_build_client.js';
@@ -48,6 +53,8 @@ type ToolResult = Record<string, unknown> & { toolTelemetry?: ToolTelemetryConte
 /** Since the test started: the headers of every HTTP request to the remote server, and each tools/call it got. */
 let requestHeaders: IncomingMessage['headers'][] = [];
 let remoteCalls: { name: string; arguments: unknown }[] = [];
+/** The reason of each notifications/cancelled the remote server got. */
+let remoteCancellations: string[] = [];
 let httpServer: HttpServer;
 let standbyUrl: string;
 
@@ -65,6 +72,10 @@ function createRemoteServer(): Server {
         const result = REMOTE_RESULTS[params.name];
         if (!result) throw new McpError(ErrorCode.InvalidParams, `Tool ${params.name} not found`);
         return result;
+    });
+    // Each HTTP request gets its own server, so the built-in handler has no request to cancel; record the notification.
+    server.setNotificationHandler(CancelledNotificationSchema, ({ params }) => {
+        remoteCancellations.push(String(params.reason));
     });
     return server;
 }
@@ -150,6 +161,7 @@ afterEach(() => {
 beforeEach(() => {
     requestHeaders = [];
     remoteCalls = [];
+    remoteCancellations = [];
 });
 
 describe('call-actor-mcp-tool', () => {
@@ -282,10 +294,27 @@ describe('call-actor-mcp-tool', () => {
 
         expect(result.isError).toBe(true);
         expect(JSON.stringify(result.content)).toContain(`Failed to call MCP tool 'subtract' on Actor '${MCP_ACTOR}'`);
+        // The server answered, so it is not unavailable.
+        expect(JSON.stringify(result.content)).not.toContain('temporarily unavailable');
         expect(result.toolTelemetry).toMatchObject({
             toolStatus: TOOL_STATUS.SOFT_FAIL,
             failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
         });
+    });
+
+    it('tells the remote server that a call which timed out is cancelled', async () => {
+        const { callTool: callToolOnClient } = Client.prototype;
+        vi.spyOn(Client.prototype, 'callTool').mockImplementation(
+            async function (this: Client, params, schema, options) {
+                return callToolOnClient.call(this, params, schema, { ...options, timeout: 100 });
+            },
+        );
+
+        const result = await callTool({ tool: 'wait' });
+
+        expect(result.isError).toBe(true);
+        expect(JSON.stringify(result.content)).toContain('Request timed out');
+        await vi.waitFor(() => expect(remoteCancellations).toEqual([expect.stringContaining('Request timed out')]));
     });
 
     it('returns the empty aborted response when the client cancels mid-call', async () => {
@@ -295,6 +324,13 @@ describe('call-actor-mcp-tool', () => {
         controller.abort();
 
         expect(await pending).toEqual({});
+    });
+
+    it('rejects a tool name longer than the MCP limit without connecting', async () => {
+        await expect(callTool({ tool: 'a'.repeat(MCP_TOOL_NAME_MAX_LENGTH + 1) })).rejects.toMatchObject({
+            issues: [{ code: 'too_big', path: ['tool'], maximum: MCP_TOOL_NAME_MAX_LENGTH }],
+        });
+        expect(requestHeaders).toHaveLength(0);
     });
 
     it('does not connect when the call is already cancelled', async () => {

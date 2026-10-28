@@ -27,9 +27,12 @@ import { anyJsonObjectSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 
+/** The MCP spec's upper bound for a tool name. */
+export const MCP_TOOL_NAME_MAX_LENGTH = 128;
+
 const callActorMcpToolArgs = z.object({
     actor: z.string().min(1).describe('The MCP server Actor: its ID, or its name in the "username/name" form.'),
-    tool: z.string().min(1).describe("The name of the tool on the Actor's MCP server."),
+    tool: z.string().min(1).max(MCP_TOOL_NAME_MAX_LENGTH).describe("The name of the tool on the Actor's MCP server."),
     arguments: anyJsonObjectSchema
         .optional()
         .describe("The tool's arguments, matching its input schema. Omit for a tool that takes none."),
