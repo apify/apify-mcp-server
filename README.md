@@ -179,7 +179,7 @@ The server is also listed in the [Docker MCP catalog](https://hub.docker.com/mcp
 
 ## Remote (hosted) or local MCP server
 
-The hosted remote MCP server with OAuth is the recommended option. Use the local server when you need to run everything on your own machine. If your client supports only stdio, you can also bridge it to the hosted server with [`mcp-remote`](https://www.npmjs.com/package/mcp-remote): `npx mcp-remote https://mcp.apify.com`.
+The hosted remote MCP server with OAuth is the recommended option. Use the local server when you want to run the MCP process on your own machine; Actors still run and store their results on the Apify platform in both modes. If your client supports only stdio, you can also bridge it to the hosted server with [`mcp-remote`](https://www.npmjs.com/package/mcp-remote): `npx mcp-remote https://mcp.apify.com`.
 
 | | Hosted (`https://mcp.apify.com`) | Local (`npx @apify/actors-mcp-server`) |
 | :--- | :--- | :--- |
