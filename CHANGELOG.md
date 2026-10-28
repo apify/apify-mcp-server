@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.19.6 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Log SSE replay stream conflict as a client fault ([#1723](https://github.com/apify/apify-mcp-server/pull/1723)) ([7d1dfe9](https://github.com/apify/apify-mcp-server/commit/7d1dfe98e8d58ae52856b8f53f8ccb3aef2e27fc)) by [@jirispilka](https://github.com/jirispilka)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.19.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.5) (2026-10-27)
 
 ### 🚀 Features
