@@ -219,12 +219,22 @@ describe('the length of a Server Actor tool description', () => {
     });
 
     it('cuts the lines at the limit and counts the operations left out', () => {
-        const head = 'h'.repeat(CLIENT_DESCRIPTION_MAX_LENGTH - HINT.length - 30);
+        const kept = `${LINES[0]}\n… and 2 more`;
+        // Room for exactly one line, its newline and the cut line.
+        const head = 'h'.repeat(CLIENT_DESCRIPTION_MAX_LENGTH - kept.length - `\n${HINT}`.length);
 
         const description = buildServerActorToolDescription(head, infoWith(CLIENT_DESCRIPTION_MAX_LENGTH), HINT);
 
-        expect(description).toBe(`${head}- GET /a: A.\n… and 2 more\n${HINT}`);
-        expect(description.length).toBeLessThanOrEqual(CLIENT_DESCRIPTION_MAX_LENGTH);
+        expect(description).toBe(`${head}${kept}\n${HINT}`);
+        expect(description.length).toBe(CLIENT_DESCRIPTION_MAX_LENGTH);
+    });
+
+    it('leaves out a line that is one character over the limit, its newline included', () => {
+        const head = 'h'.repeat(CLIENT_DESCRIPTION_MAX_LENGTH - `${LINES[0]}\n… and 2 more\n${HINT}`.length + 1);
+
+        const description = buildServerActorToolDescription(head, infoWith(CLIENT_DESCRIPTION_MAX_LENGTH), HINT);
+
+        expect(description).toBe(`${head}… and 3 more\n${HINT}`);
     });
 
     it('keeps the count of all operations when the fixed text alone exceeds the limit', () => {
