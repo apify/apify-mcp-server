@@ -364,8 +364,9 @@ export type ActorInfo = {
 };
 
 /**
- * How an Actor is exposed as a tool, resolved once from its definition: the interface set
- * (`resolveActorInterfaces`) and the tool slot derived from it (`resolveActorToolMode`).
+ * How `call-actor` reaches an Actor, resolved once from its definition: the interface set
+ * (`resolveActorInterfaces`) and the `call-actor` route derived from it (`getActorToolModeFromInterfaces`),
+ * which never takes the server interface. The Actor's own tool is `resolveActorToolMode`'s.
  * `actorFullName` is the platform-canonical `username/name`, not whatever identifier the caller used —
  * messages built from it read the same whether the Actor was addressed by ID or by name.
  */
