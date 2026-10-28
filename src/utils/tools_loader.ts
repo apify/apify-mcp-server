@@ -115,7 +115,6 @@ export function isReportProblemExplicitlySelected(input: Input): boolean {
 export function resolveActorsToLoad(input: Input): string[] {
     const { selectors, actorsExplicitlyEmpty } = normalizeInput(input);
 
-    // Selectors that aren't categories or internal tools in any mode → Actor names.
     const actorSelectorsFromTools: string[] = [];
     if (selectors !== undefined) {
         for (const sel of selectors) {
