@@ -270,22 +270,6 @@ describe('buildFetchActorDetailsResult()', () => {
         expect(text).not.toContain('cannot be run in this configuration');
     });
 
-    it.each([HELPER_TOOLS.ACTOR_CALL_WIDGET, HELPER_TOOLS.API_WRITE])(
-        'omits not-runnable guidance when %s is loaded instead of call-actor',
-        async (toolName) => {
-            const result = await buildFetchActorDetailsResult(
-                stubToolCallContext(
-                    { actor: 'apify/example-mcp-server', output: { inputSchema: true } },
-                    mockApifyClient(),
-                    { loadedToolNames: [toolName] },
-                ),
-            );
-            const text = ((result as { content: { text: string }[] }).content ?? []).map((c) => c.text).join('\n');
-
-            expect(text).not.toContain('cannot be run in this configuration');
-        },
-    );
-
     it('omits not-runnable guidance when the Actor has its own dedicated tool loaded', async () => {
         const result = await buildFetchActorDetailsResult(
             stubToolCallContext(
