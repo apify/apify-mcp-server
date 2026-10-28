@@ -132,11 +132,11 @@ export function canRunAnyActor(hasTool: ToolDescriptionContext['hasTool']): bool
 /** After an Actor's tip when the session cannot run the Actor the tip recommends. */
 export const ACTOR_TIP_CAVEAT = `This session cannot run the Actor this tip recommends. To use it, ${getOwnServerRemedy()}`;
 
-/** Whether this session can run this Actor (call-actor, or the Actor's own tool, loaded); soft check for a guidance hint, not a hard gate. */
+/** Whether this session can run this Actor (a tool that runs any Actor, or the Actor's own tool, loaded); soft check for a guidance hint, not a hard gate. */
 export function canRunActor(
     actorId: string,
     loadedToolNames: readonly string[],
     loadedActorIds: ReadonlySet<string>,
 ): boolean {
-    return loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL) || loadedActorIds.has(actorId);
+    return canRunAnyActor((name) => loadedToolNames.includes(name)) || loadedActorIds.has(actorId);
 }
