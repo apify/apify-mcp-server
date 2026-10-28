@@ -105,6 +105,8 @@ export function buildGetActorRunWidgetResponse(params: FetchActorRunResult): Too
             structuredContent: widgetContent,
             meta: {
                 ...buildActorRunWidgetMeta(structuredContent.actorName ?? structuredContent.runId),
+                'openai/toolInvocation/invoking': 'Checking Actor run...',
+                'openai/toolInvocation/invoked': 'Actor run status loaded',
                 ...(buildUsageMeta(run) ?? {}),
             },
         },
