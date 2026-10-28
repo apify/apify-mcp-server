@@ -63,7 +63,7 @@ export function buildGetActorRunError(runId: string, error: unknown): ToolRespon
 /**
  * Build the success response. `content[0]` is the JSON-stringified `structuredContent`
  * mirror (per MCP spec); `content[1]` carries an LLM-readable narrative of `summary` + `nextStep`.
- * When `canRunTipActor` is false for the tip's recommended Actor, `tip.caveat` says the session cannot run it; it is also printed after the tip.
+ * When `canRunTipActor` returns false for the tip's recommended Actor, `tip.caveat` says the session cannot run it; it is also printed after the tip.
  */
 export function buildGetActorRunResponse(
     params: FetchActorRunResult & {

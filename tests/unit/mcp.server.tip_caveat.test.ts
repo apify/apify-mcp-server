@@ -6,7 +6,7 @@ import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
 import { getRequestHandler, withServer } from './helpers/mcp_server.js';
 
-const WEB_FETCH_ACTOR_ID = 'shu8hvrXbJbY3Eb9W';
+const WEB_FETCH_ACTOR_ID = 'a6Sqhlnt4touIHTub';
 
 function makeActorTool(actorFullName: string, actorId: string): ToolEntry {
     return {
