@@ -132,10 +132,11 @@ export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
 export const WEB_FETCH = 'apify/web-fetch';
 export const WEB_SEARCH = 'apify/web-search';
 /**
- * Actors served through the input interface (a run per call) although they declare `webServerMcpPath`.
- * Hand-wired for selected Apify Actors so the served tool does not change when the Actor's MCP path does.
+ * Actors served through the input interface (a run per call) although they declare `webServerMcpPath` or a server
+ * interface. Hand-wired for selected Apify Actors so the served tool does not change when the Actor's other
+ * interfaces do. `apify/rag-web-browser` is a default tool with a server interface.
  */
-export const INPUT_INTERFACE_ACTORS: ReadonlySet<string> = new Set([WEB_SEARCH, WEB_FETCH]);
+export const INPUT_INTERFACE_ACTORS: ReadonlySet<string> = new Set([WEB_SEARCH, WEB_FETCH, RAG_WEB_BROWSER]);
 export const defaults = {
     actors: [RAG_WEB_BROWSER, WEB_FETCH],
 };
