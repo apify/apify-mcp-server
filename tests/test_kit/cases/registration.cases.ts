@@ -90,6 +90,7 @@ export const registrationCases: Case[] = [
                 'call-actor',
                 'fetch-actor-mcp-tool-list',
                 'call-actor-mcp-tool',
+                'send-server-actor-request',
             ];
             const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
             const expectedActors = [
@@ -110,7 +111,7 @@ export const registrationCases: Case[] = [
         isDeploymentTest: true,
         run: withClient({ telemetry: { enabled: true } }, async (client) => {
             const names = getToolNames(await client.listTools());
-            expect(names).toHaveLength(10 + AUTO_INJECTED_TOOL_NAMES.length);
+            expect(names).toHaveLength(11 + AUTO_INJECTED_TOOL_NAMES.length);
             expect(names).toContain('report-problem');
         }),
     },
