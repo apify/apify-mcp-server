@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.19.6 - **not yet released**
 
+### 🚀 Features
+
+- [**breaking**] Split MCP calls out of call-actor ([#1685](https://github.com/apify/apify-mcp-server/pull/1685)) ([910c297](https://github.com/apify/apify-mcp-server/commit/910c297173dcf05443e643b91041db78696de8ba)) by [@jirispilka](https://github.com/jirispilka), closes [#1620](https://github.com/apify/apify-mcp-server/issues/1620), [#1624](https://github.com/apify/apify-mcp-server/issues/1624)
+- [**breaking**] Add fetch-actor-mcp-tool-list ([#1686](https://github.com/apify/apify-mcp-server/pull/1686)) ([691acaa](https://github.com/apify/apify-mcp-server/commit/691acaafd9855d87cdd2e2dccb1c4bd4e4c4a06e)) by [@jirispilka](https://github.com/jirispilka), closes [#1620](https://github.com/apify/apify-mcp-server/issues/1620), [#1644](https://github.com/apify/apify-mcp-server/issues/1644)
+
 ### 🐛 Bug Fixes
 
 - Log SSE replay stream conflict as a client fault ([#1723](https://github.com/apify/apify-mcp-server/pull/1723)) ([7d1dfe9](https://github.com/apify/apify-mcp-server/commit/7d1dfe98e8d58ae52856b8f53f8ccb3aef2e27fc)) by [@jirispilka](https://github.com/jirispilka)
