@@ -5,7 +5,7 @@
  * No tool-loading is done here; we only canonicalize values and preserve
  * intent via `undefined` (use defaults later) vs empty (explicitly none).
  */
-import type { Input, ToolSelector } from './types.js';
+import type { Input } from './types.js';
 
 // Normalize lists from comma-separated strings or arrays.
 export function normalizeList(value: string | unknown[] | undefined): string[] | undefined {
@@ -31,29 +31,26 @@ export function normalizeList(value: string | unknown[] | undefined): string[] |
  */
 export function processInput(originalInput: Partial<Input>): Input {
     // Normalize actors (strings and arrays) to a clean array or undefined
-    const actors = normalizeList(originalInput.actors) as unknown as string[] | undefined;
+    const actors = normalizeList(originalInput.actors);
 
     // Normalize tools (strings/arrays) to a clean array or undefined
-    let tools = normalizeList(originalInput.tools as string | string[] | undefined) as unknown as
-        | ToolSelector[]
-        | undefined;
+    let tools = normalizeList(originalInput.tools);
 
     // Merge actors into tools. If tools undefined → tools = actors, then remove actors;
     // otherwise append actors to tools.
     // NOTE (future): Actor names contain '/', unlike internal tool names or categories. We could use that to differentiate between the two.
     if (Array.isArray(actors) && actors.length > 0) {
         if (tools === undefined) {
-            tools = [...actors] as ToolSelector[];
+            tools = [...actors];
         } else {
-            const currentTools: ToolSelector[] = Array.isArray(tools) ? tools : [tools as ToolSelector];
-            tools = [...currentTools, ...actors] as ToolSelector[];
+            tools = [...tools, ...actors];
         }
     }
 
     // Return a new object with all properties explicitly defined
     return {
         ...originalInput,
-        actors: Array.isArray(actors) && actors.length > 0 && tools !== undefined ? undefined : actors,
+        actors: Array.isArray(actors) && actors.length > 0 ? undefined : actors,
         tools,
     };
 }

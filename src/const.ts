@@ -103,8 +103,9 @@ export type HelperToolName = (typeof HELPER_TOOLS)[keyof typeof HELPER_TOOLS];
  * Retired tool selectors: `add-actor` and `experimental` (add-actor was deleted in the stateless
  * migration), the deprecated `preview` pseudo-category, `get-actor-log` (renamed to
  * `get-actor-run-log`), and the `source` category (renamed to `versions`). They name neither a
- * registry category nor a real tool anymore, so they resolve to nothing — never loaded, never
- * treated as an Actor ID, never requiring a token by themselves.
+ * registry category nor a real tool anymore, so they resolve to nothing — never loaded and never
+ * treated as an Actor ID. The token gate drops them before its emptiness check: `docs,add-actor`
+ * needs no token, while an all-retired list needs one, like an empty list.
  */
 export const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set([
     'add-actor',
