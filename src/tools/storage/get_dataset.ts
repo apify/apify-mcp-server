@@ -87,7 +87,7 @@ export const getDataset: ToolEntry = Object.freeze({
         // produces redundant slash-notation paths. Run the same
         // normalization `buildRunDataset` applies so this tool's `fields` matches
         // the structured `storages.datasets.default.fields` shape.
-        const fieldSelection = metadata.fields && buildDatasetFieldSelection(metadata.fields);
+        const fieldSelection = metadata.fields?.length ? buildDatasetFieldSelection(metadata.fields) : undefined;
         const normalized = metadata.fields
             ? {
                   ...metadata,

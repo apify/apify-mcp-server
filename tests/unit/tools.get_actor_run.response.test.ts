@@ -135,7 +135,6 @@ describe('get-actor-run default response', () => {
             'Item structure ([] marks an array): { crawl: { httpStatusCode }, metadata: { url }, markdown }',
         );
         expect(content[1].text).toContain('Selectable fields: crawl, metadata, markdown.');
-        expect(content[1].text).not.toContain('Pass dot paths');
         expect(content[1].text).not.toContain('```json');
 
         // Usage attribution `_meta` flows through end-to-end.
@@ -1431,7 +1430,7 @@ describe('array selection hints', () => {
         const hint = fieldsProjectionHint(['matrix/0/0']);
         expect(hint).toContain('matrix[][]');
         expect(hint).toContain('Selectable fields: matrix.');
-        expect(hint).not.toContain('matrix returns empty objects');
+        expect(hint).toContain('fields="matrix.0.0" for one indexed value');
     });
 });
 
@@ -1488,10 +1487,6 @@ describe('buildDatasetFieldSelection', () => {
             topLevelFields: ['metadata', 'markdown'],
             dottedOutput: 'flatKeys',
         });
-    });
-
-    it('returns nothing for empty metadata', () => {
-        expect(buildDatasetFieldSelection([])).toBeUndefined();
     });
 });
 

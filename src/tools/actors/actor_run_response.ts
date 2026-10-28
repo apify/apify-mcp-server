@@ -256,11 +256,10 @@ export function buildDatasetShape(fields: string[]): string {
 
 /**
  * Builds {@link DatasetFieldSelection} from the raw slash-separated, index-expanded `fields`
- * metadata. One example per array depth keeps the guidance short on array-heavy datasets, where
- * the raw list runs to hundreds of paths. Returns undefined when there is no metadata.
+ * metadata (non-empty). One example per array depth keeps the guidance short on array-heavy
+ * datasets, where the raw list runs to hundreds of paths.
  */
-export function buildDatasetFieldSelection(fields: string[]): DatasetFieldSelection | undefined {
-    if (fields.length === 0) return undefined;
+export function buildDatasetFieldSelection(fields: string[]): DatasetFieldSelection {
     const exampleByArrayDepth = new Map<number, string>();
     for (const field of fields) {
         const arrayDepth = field.split('/').filter((segment) => /^\d+$/.test(segment)).length;
@@ -271,15 +270,10 @@ export function buildDatasetFieldSelection(fields: string[]): DatasetFieldSelect
         .sort(([depthA], [depthB]) => depthA - depthB)
         .map(([, example]) => example);
     return {
-        topLevelFields: getTopLevelFields(fields),
+        topLevelFields: [...new Set(fields.map((field) => field.split('/')[0]))],
         ...(indexedFieldExamples.length > 0 ? { indexedFieldExamples } : {}),
         dottedOutput: 'flatKeys',
     };
-}
-
-/** Unique first segments of slash-separated field paths. */
-function getTopLevelFields(fields: string[]): string[] {
-    return [...new Set(fields.map((field) => field.split('/')[0]))];
 }
 
 export function toIsoString(value: Date | string | undefined | null): string | undefined {
@@ -312,7 +306,7 @@ function buildRunDataset(id: string, datasetMeta: Dataset | null, resolvedItemCo
         // "0 bytes" is misleading for a non-empty dataset). `cleanEmptyProperties` drops undefined.
         inflatedBytes: inflatedBytes && inflatedBytes > 0 ? inflatedBytes : undefined,
         fields: datasetMeta.fields ? normalizeDatasetFields(datasetMeta.fields) : undefined,
-        fieldSelection: datasetMeta.fields ? buildDatasetFieldSelection(datasetMeta.fields) : undefined,
+        fieldSelection: datasetMeta.fields?.length ? buildDatasetFieldSelection(datasetMeta.fields) : undefined,
     }) as RunDataset;
 }
 
@@ -617,11 +611,11 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
 
 export function fieldsProjectionHint(fields: string[] | undefined): string {
     if (!fields?.length) return '';
-    const topLevelFields = getTopLevelFields(fields);
-    const indexedField = fields.find((field) => /\/\d+\//.test(field));
-    const arrayHint = indexedField
-        ? ` Use fields="${indexedField.split('/')[0]}" for the whole top-level value, ` +
-          `or fields="${indexedField.replace(/\//g, '.')}" for one indexed value (zero-based). Include an index at each array level.`
+    const { topLevelFields, indexedFieldExamples } = buildDatasetFieldSelection(fields);
+    const indexedExample = indexedFieldExamples?.[0];
+    const arrayHint = indexedExample
+        ? ` Use fields="${indexedExample.split('.')[0]}" for the whole top-level value, ` +
+          `or fields="${indexedExample}" for one indexed value (zero-based). Include an index at each array level.`
         : '';
     return (
         `${arrayHint} Item structure ([] marks an array): ${buildDatasetShape(fields)}. Selectable fields: ${topLevelFields.join(', ')}. ` +

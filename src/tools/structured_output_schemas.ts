@@ -747,7 +747,7 @@ export const updateActorVersionToolOutputSchema = {
 const buildDatasetFieldSelectionSchema = () => ({
     type: 'object' as const,
     description:
-        'Supported `fields` selections for get-dataset-items. Present only when the dataset has field metadata.',
+        "Selections the `fields` parameter supports when fetching this dataset's items. Present only when the dataset has field metadata.",
     properties: {
         topLevelFields: {
             type: 'array' as const,

@@ -227,7 +227,6 @@ describe('get-dataset fields normalization', () => {
         );
         expect(structuredContent.nextStep).not.toContain('latestComments.id');
         expect(structuredContent.nextStep).toContain('Include an index at each array level');
-        expect(structuredContent.nextStep).not.toContain('Pass dot paths');
     });
 
     it('adds fieldSelection beside the collapsed fields and validates against the output schema', async () => {
