@@ -598,6 +598,7 @@ describe('the default apify/web-fetch tool', () => {
 
         expect(tool.description).toContain('Operations:\n```json\n{"operations":[{"method":"GET","path":"/"');
         expect(tool.description).toContain('"name":"wait"');
+        expect(tool.description).toContain('Example: {"query":{"url":"https://example.com","formats":"markdown"}}');
         expect(tool.description!.length).toBeLessThanOrEqual(CLIENT_DESCRIPTION_MAX_LENGTH);
     });
 
