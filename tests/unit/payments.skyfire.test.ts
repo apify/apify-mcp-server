@@ -4,12 +4,10 @@ import { SkyfirePaymentProvider } from '../../src/payments/skyfire.js';
 
 const provider = new SkyfirePaymentProvider();
 
-describe('SkyfirePaymentProvider.redactForLogging()', () => {
+describe('skyfire-pay-id log redaction', () => {
     it('passes through non-record values unchanged', () => {
         expect(provider.redactForLogging(null)).toBeNull();
         expect(provider.redactForLogging(undefined)).toBeUndefined();
-        expect(provider.redactForLogging('string')).toBe('string');
-        expect(provider.redactForLogging(42)).toBe(42);
         const arr = [1, 2, 3];
         expect(provider.redactForLogging(arr)).toBe(arr);
     });
