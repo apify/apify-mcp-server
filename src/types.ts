@@ -587,6 +587,8 @@ export type ActorExecutionParams = {
     taskMode?: boolean;
     /** Whether the session serves call-actor; without it, an Actor's tip gets the callability caveat. */
     hasCallActorTool?: boolean;
+    /** Names of all currently loaded tools; the FAILED run nextStep names the run log tool only when it is here. */
+    loadedToolNames: readonly string[];
 };
 
 /**

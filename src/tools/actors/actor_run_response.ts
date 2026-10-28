@@ -23,6 +23,7 @@ import { logHttpError } from '../../utils/logging.js';
 import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 import { cleanEmptyProperties } from '../../utils/schema_generation.js';
+import { RUN_LOG_LINES_MAX } from '../runs/get_actor_run_log.js';
 import { DEFAULT_DATASET_ITEMS_LIMIT } from '../storage/get_dataset_items.js';
 
 /** Reserved key-value store key some Actors use to advertise advisory guidance about the run. */
@@ -553,6 +554,26 @@ export function datasetSizeNextStepHint(inflatedBytes: number | undefined): stri
     return `${size} Fetching all may exceed context; ${NARROW_OUTPUT_HINT}.`;
 }
 
+/**
+ * The run log has the error details, and a run that fails before it writes a statusMessage has its
+ * cause only there, so the log tool is named whenever the session has it (see
+ * apify/apify-mcp-server#1698). Without the tool, the log is still stated as the source, so the text
+ * is never a dead end.
+ */
+function buildFailedNextStep(
+    runId: string,
+    statusMessage: string | null | undefined,
+    loadedToolNames: readonly string[],
+): string {
+    const statusPart = statusMessageLine(statusMessage)
+        ? 'Diagnose using the Actor status in the summary.'
+        : 'The run wrote no status message.';
+    const logPart = loadedToolNames.includes(HELPER_TOOLS.ACTOR_RUNS_LOG)
+        ? ` The run log has the error details; ${HELPER_TOOLS.ACTOR_RUNS_LOG} with runId ${runId} returns its last lines (lines takes up to ${RUN_LOG_LINES_MAX}).`
+        : ' The run log has the error details.';
+    return `${statusPart}${logPart} If the user wants another attempt, fix the cause before retrying.`;
+}
+
 function buildSucceededSummaryNextStep(
     runTimeSecs: number,
     statusMessage: string | null | undefined,
@@ -634,7 +655,8 @@ function buildTimedOutSummaryNextStep(
 }
 
 /**
- * Build {summary, nextStep} per status. Returns one primary action — never two.
+ * Build {summary, nextStep} per status. Returns one primary action, never two. For FAILED that
+ * action is the diagnosis, which can point at both the Actor status and the run log.
  *
  * Every observed terminal status — including FAILED, ABORTED and TIMED-OUT — is a successful
  * observation, so responses stay `isError: false` and the MCP task lands in `completed`. Task
@@ -643,11 +665,13 @@ function buildTimedOutSummaryNextStep(
  */
 export function buildStatusSummaryNextStep(params: {
     run: ActorRun;
+    /** Tools the session was served; the FAILED nextStep names the run log tool only when it is here. */
+    loadedToolNames: readonly string[];
     dataset?: RunDataset;
     keyValueStore?: RunKeyValueStore;
     datasetMetadataFetched?: boolean;
 }): { summary: string; nextStep: string } {
-    const { run, dataset, keyValueStore, datasetMetadataFetched = true } = params;
+    const { run, loadedToolNames, dataset, keyValueStore, datasetMetadataFetched = true } = params;
     const { id: runId, status, statusMessage } = run;
     // The platform usually populates stats.runTimeSecs on terminal runs, but not always (e.g.
     // ABORTED before stats flushed). Fall back to `elapsedSecs(run)` so summaries don't render
@@ -686,9 +710,7 @@ export function buildStatusSummaryNextStep(params: {
         case 'FAILED':
             return {
                 summary: `FAILED after ${runTimeSecs}s.${statusMessageLine(statusMessage)}`,
-                nextStep:
-                    'Diagnose using statusMessage and exitCode in this response. ' +
-                    'If the user wants another attempt, fix the cause before retrying.',
+                nextStep: buildFailedNextStep(runId, statusMessage, loadedToolNames),
             };
         case 'ABORTED':
             return {
@@ -811,7 +833,11 @@ async function waitForRunWithProgress(opts: {
  * builders below. Returns the full `RunResponse` with the computed (non-widget) `nextStep`;
  * `buildStartRunWidgetResponse` overrides `nextStep` on its own copy.
  */
-function buildStartRunSharedContent(actorName: string, actorRun: ActorRun): RunResponse {
+function buildStartRunSharedContent(
+    actorName: string,
+    actorRun: ActorRun,
+    loadedToolNames: readonly string[],
+): RunResponse {
     // Start path returns before any metadata fetch, so every entry — default and aliases — is id-only.
     const datasetIds = buildStorageAliasIds(actorRun.storageIds?.datasets, actorRun.defaultDatasetId ?? undefined);
     const kvIds = buildStorageAliasIds(
@@ -829,6 +855,7 @@ function buildStartRunSharedContent(actorName: string, actorRun: ActorRun): RunR
         run: actorRun,
         dataset: datasets?.default,
         keyValueStore: keyValueStores?.default,
+        loadedToolNames,
     });
 
     return {
@@ -854,11 +881,12 @@ function buildStartRunSharedContent(actorName: string, actorRun: ActorRun): RunR
 export function buildStartRunResponse(params: {
     actorName: string;
     actorRun: ActorRun;
+    loadedToolNames: readonly string[];
     linkContext?: ConsoleLinkContext;
 }): ToolResponse {
-    const { actorName, actorRun, linkContext } = params;
+    const { actorName, actorRun, loadedToolNames, linkContext } = params;
 
-    const structuredContent = buildStartRunSharedContent(actorName, actorRun);
+    const structuredContent = buildStartRunSharedContent(actorName, actorRun, loadedToolNames);
     const consoleLinks = applyConsoleLinks(structuredContent, linkContext);
 
     return respondOk(
@@ -875,10 +903,14 @@ export function buildStartRunResponse(params: {
  * nextStep is replaced with a no-poll message and widget _meta is included so the UI renders
  * automatically. Used only by `*-widget` tools.
  */
-export function buildStartRunWidgetResponse(params: { actorName: string; actorRun: ActorRun }): ToolResponse {
-    const { actorName, actorRun } = params;
+export function buildStartRunWidgetResponse(params: {
+    actorName: string;
+    actorRun: ActorRun;
+    loadedToolNames: readonly string[];
+}): ToolResponse {
+    const { actorName, actorRun, loadedToolNames } = params;
 
-    const base = buildStartRunSharedContent(actorName, actorRun);
+    const base = buildStartRunSharedContent(actorName, actorRun, loadedToolNames);
     const structuredContent = { ...base, nextStep: WIDGET_NO_POLL_NEXT_STEP };
 
     return respondOk(
@@ -913,12 +945,13 @@ export async function fetchActorRunData(params: {
     waitSecs?: number;
     actorName?: string;
     client: ApifyClient;
+    loadedToolNames: readonly string[];
     progressTracker?: ProgressTracker | null;
     abortSignal?: AbortSignal;
     mcpSessionId?: string;
     onAbort?: (runId: string, client: ApifyClient) => Promise<void>;
 }): Promise<{ error: ToolResponse } | { aborted: true } | { result: FetchActorRunResult }> {
-    const { runId, waitSecs, client, progressTracker, abortSignal, mcpSessionId, onAbort } = params;
+    const { runId, waitSecs, client, loadedToolNames, progressTracker, abortSignal, mcpSessionId, onAbort } = params;
 
     const waitResult = await waitForRunWithProgress({
         client,
@@ -972,6 +1005,7 @@ export async function fetchActorRunData(params: {
         run,
         dataset: datasets?.default,
         keyValueStore: keyValueStores?.default,
+        loadedToolNames,
     });
 
     const defaultKv = keyValueStores?.default;

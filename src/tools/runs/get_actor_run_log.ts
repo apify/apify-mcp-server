@@ -7,11 +7,14 @@ import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { getActorRunLogToolOutputSchema } from '../structured_output_schemas.js';
 
+/** Largest `lines` value; `lines: 0` returns the entire log. */
+export const RUN_LOG_LINES_MAX = 50;
+
 const GetRunLogArgs = z.object({
     runId: z.string().describe('The ID of the Actor run.'),
     lines: z
         .number()
-        .max(50)
+        .max(RUN_LOG_LINES_MAX)
         .describe('Output the last NUM lines, instead of the last 10. Pass 0 to return the entire log.')
         .default(10),
 });

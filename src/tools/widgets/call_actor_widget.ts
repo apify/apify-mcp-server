@@ -133,7 +133,11 @@ export const callActorWidget: ToolEntry = Object.freeze({
                 runId: actorRun.id,
                 mcpSessionId: toolArgs.mcpSessionId,
             });
-            const response = buildStartRunWidgetResponse({ actorName: baseActorName, actorRun });
+            const response = buildStartRunWidgetResponse({
+                actorName: baseActorName,
+                actorRun,
+                loadedToolNames: toolArgs.loadedToolNames,
+            });
             return {
                 ...response,
                 toolTelemetry: { actorId: resolvedActorId },

@@ -149,6 +149,7 @@ export const getActorRun: ToolEntry = Object.freeze({
                 runId: parsed.runId,
                 waitSecs: parsed.waitSecs,
                 client,
+                loadedToolNames,
                 progressTracker,
                 abortSignal: signal,
                 mcpSessionId,
