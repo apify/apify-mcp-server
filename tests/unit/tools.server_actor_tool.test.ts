@@ -76,6 +76,110 @@ const WEB_FETCH_SCHEMA = {
     },
 };
 
+/** apify/web-fetch's API schema as served on 2026-10-28: the request side the tool renders, texts as written. */
+const WEB_FETCH_LIVE_SCHEMA = {
+    openapi: '3.0.0',
+    paths: {
+        '/': {
+            get: {
+                summary: 'Fetch a URL',
+                description:
+                    'Fetches the resource at the URL and returns its content converted to requested formats plus ' +
+                    'metadata. Choose `POST` instead of query params to send a JSON request body.',
+                parameters: [
+                    {
+                        name: 'url',
+                        in: 'query',
+                        required: true,
+                        description:
+                            'The URL to fetch. Only `http://` and `https://` schemes are supported; others are ' +
+                            'rejected. Only `url` is required.',
+                        schema: { $ref: '#/components/schemas/FetchRequest/properties/url' },
+                        example: 'https://apify.com',
+                    },
+                    {
+                        name: 'formats',
+                        in: 'query',
+                        description:
+                            'Select one or more formats: `markdown`, `html`, `text`, `links`, `raw`. If omitted, ' +
+                            'defaults to `markdown` for HTML/PDF, `text` for text-based content, or `raw` for ' +
+                            'images, archives, and other binary content.',
+                        schema: { $ref: '#/components/schemas/FetchRequest/properties/formats' },
+                    },
+                    {
+                        name: 'unwrap',
+                        in: 'query',
+                        description: 'See the unwrap property.',
+                        schema: { $ref: '#/components/schemas/FetchRequest/properties/unwrap' },
+                    },
+                    {
+                        name: 'headers',
+                        in: 'query',
+                        description:
+                            'Extra HTTP headers to send with the request, as a JSON string. For example: ' +
+                            '`{"Accept-Language":"fr-FR"}`.',
+                        schema: { type: 'string' },
+                    },
+                    {
+                        name: 'wait',
+                        in: 'query',
+                        description:
+                            'Milliseconds to wait after the page loads, for content that shows up late. From 1 to ' +
+                            '60000. Setting it renders the page in a real browser, so content loaded by JavaScript ' +
+                            'is included. Rendered requests are slower.',
+                        schema: { $ref: '#/components/schemas/FetchRequest/properties/wait' },
+                    },
+                ],
+            },
+            post: {
+                summary: 'Fetch a URL',
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/FetchRequest' } } },
+                },
+            },
+        },
+    },
+    components: {
+        schemas: {
+            FetchRequest: {
+                type: 'object',
+                required: ['url'],
+                properties: {
+                    url: {
+                        type: 'string',
+                        format: 'uri-reference',
+                        description:
+                            'The URL to fetch. Only `http://` and `https://` schemes are supported; others are rejected.',
+                        example: 'https://apify.com',
+                    },
+                    formats: {
+                        type: 'array',
+                        description:
+                            "The Actor converts the fetched content to the requested format(s). A format that doesn't " +
+                            'apply to the content type returns `null`; if none of the requested formats apply, the ' +
+                            'request fails with `UNSUPPORTED_CONTENT_TYPE`. If omitted, defaults to `markdown` for ' +
+                            'HTML/PDF, `text` for text-based content, or `raw` for images, archives, and other binary ' +
+                            'content. Composes freely with `unwrap`.',
+                        items: { type: 'string', enum: ['markdown', 'html', 'text', 'links', 'raw'] },
+                    },
+                    unwrap: { type: 'boolean', description: 'Returns the first producible format as the body.' },
+                    headers: { type: 'object', additionalProperties: { type: 'string' } },
+                    wait: {
+                        type: 'integer',
+                        minimum: 1,
+                        maximum: 60000,
+                        description:
+                            'Milliseconds to wait after the page loads, for content that shows up late. From 1 to ' +
+                            '60000. Setting it renders the page in a real browser, so content loaded by JavaScript ' +
+                            'is included. Rendered requests are slower.',
+                    },
+                },
+            },
+        },
+    },
+};
+
 let actorCount = 0;
 
 /** Loads a standby Actor serving `schema` as Actor tools; each call is a new Actor, so the definition cache misses. */
@@ -366,6 +470,22 @@ describe('the default apify/web-fetch tool', () => {
 
         expect(result.isError).toBe(true);
         expect(textOf(result.content[0])).toContain('"unwrap" is not accepted by this tool');
+    });
+
+    it('carries GET / in full within the client description limit, with the live schema and Actor description', async () => {
+        const tool = await loadServerTool(WEB_FETCH_LIVE_SCHEMA, {
+            username,
+            name,
+            description:
+                'Download any web page by URL and convert it to clean Markdown, plain text, HTML, and other formats. ' +
+                'Automatically renders JavaScript and works around bot blocking. The Actor provides a real-time API ' +
+                'for quick response times.',
+            actorStandby: { isEnabled: true, tenancy: 'MULTI_TENANT' },
+        });
+
+        expect(tool.description).toContain('Operations:\n```json\n{"operations":[{"method":"GET","path":"/"');
+        expect(tool.description).toContain('"name":"wait"');
+        expect(tool.description.length).toBeLessThanOrEqual(CLIENT_DESCRIPTION_MAX_LENGTH);
     });
 
     it('keeps the read-only hint of the Actor', async () => {

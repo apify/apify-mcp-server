@@ -14,9 +14,9 @@ For detailed data from a specific platform (e.g. Amazon products with prices, In
  * no references to any specific client or its built-in tools, so the same text works
  * for every MCP client.
  */
-const WEB_FETCH_ADDITIONAL_DESC = `Use this tool to fetch a specific http(s) URL and return its complete content (one URL per call; http and https only).
+const WEB_FETCH_ADDITIONAL_DESC = `Use this tool to fetch a specific URL and return its complete content.
 It renders JavaScript and bypasses anti-bot protection, so it also retrieves pages where a plain HTTP fetch gets blocked, fails with an error such as 403 or 429, or returns incomplete content.
-The page comes back verbatim - full content, no summarization - as Markdown, plain text, HTML, the raw response body, or the list of links on the page.
+The page comes back verbatim, with no summarization.
 In query, formats is a comma-separated string, such as "markdown,links", and headers is a JSON object as a string, such as {"Accept-Language":"fr-FR"}.
 
 Examples of when to use:
