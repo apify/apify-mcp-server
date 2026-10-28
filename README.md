@@ -380,7 +380,7 @@ Follow-ups work too. "Show me the next 10 results from that run" makes the agent
 ## 💰 Pricing and limits
 
 - Connecting to the MCP server is free. Actor runs bill to your Apify account according to each Actor's pricing, which `fetch-actor-details` shows before a run. The [Apify free plan](https://apify.com/pricing) includes $5 of monthly platform usage.
-- To cap what a single run can cost, the agent can pass limits such as `maxItems`, `timeout`, `memory`, and `maxTotalChargeUsd` in the `callOptions` of `call-actor`.
+- To limit billing, pass `callOptions.maxTotalChargeUsd` for pay-per-event Actors or `callOptions.maxItems` for pay-per-result Actors; each is ignored for other pricing models. `timeout` limits runtime and `memory` limits memory allocation, not total cost. Use the Actor's input limits to bound work.
 - The hosted server accepts up to 30 requests per second per account.
 - For security, the server excludes [full-permission Actors](https://docs.apify.com/actors/running/permissions#full-permission-actors) from search and execution, because running one is a decision you should approve yourself. Rental Actors are also excluded from search.
 - Some tools work without an Apify account: `search-actors`, `fetch-actor-details`, `search-apify-docs`, `fetch-apify-docs`, `apify-api-search`, and `apify-api-details`. Select only those, for example `https://mcp.apify.com?tools=search-actors`, and the hosted server accepts the connection without a token.
