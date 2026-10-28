@@ -7,7 +7,6 @@ import {
     buildStartRunResponse,
     buildStartRunWidgetResponse,
     buildDatasetFieldSelection,
-    buildDatasetShape,
     buildStatusSummaryNextStep,
     collapseArrayIndices,
     fieldsProjectionHint,
@@ -131,10 +130,7 @@ describe('get-actor-run default response', () => {
         expect(content).toHaveLength(2);
         expect(JSON.parse(content[0].text)).toEqual(structuredContent);
         expect(content[1].text).toContain('dataset-xyz');
-        expect(content[1].text).toContain(
-            'Item structure ([] marks an array): { crawl: { httpStatusCode }, metadata: { url }, markdown }',
-        );
-        expect(content[1].text).toContain('Selectable fields: crawl, metadata, markdown.');
+        expect(content[1].text).toContain('Selectable fields: crawl, metadata, markdown');
         expect(content[1].text).not.toContain('```json');
 
         // Usage attribution `_meta` flows through end-to-end.
@@ -1128,9 +1124,12 @@ function makeRun(status: string, statusMessage?: string, runTimeSecs = 10) {
     } as Parameters<typeof buildStatusSummaryNextStep>[0]['run'];
 }
 
-const datasetWithItems: RunDataset = { id: 'ds-1', itemCount: 47, fields: ['metadata.url', 'markdown'] };
-const DATASET_FIELDS = ['metadata/url', 'markdown'];
-const DATASET_SHAPE = '{ metadata: { url }, markdown }';
+const datasetWithItems: RunDataset = {
+    id: 'ds-1',
+    itemCount: 47,
+    fields: ['metadata.url', 'markdown'],
+    fieldSelection: { topLevelFields: ['metadata', 'markdown'], dottedOutput: 'flatKeys' },
+};
 const datasetEmpty: RunDataset = { id: 'ds-1', itemCount: 0, fields: [] };
 const kvWithRecords: RunKeyValueStore = { id: 'kv-1', keys: ['result-a', 'result-b'], keyCount: 2 };
 
@@ -1147,13 +1146,11 @@ describe('buildStatusTemplate', () => {
         const t = buildStatusSummaryNextStep({
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
-            datasetFields: DATASET_FIELDS,
         });
         expect(t.summary).toContain('47 items; 2 fields available');
         expect(t.nextStep).toContain('get-dataset-items');
         expect(t.nextStep).toContain('datasetId=ds-1');
-        expect(t.nextStep).toContain(DATASET_SHAPE);
-        expect(t.nextStep).toContain('Selectable fields: metadata, markdown.');
+        expect(t.nextStep).toContain('Selectable fields: metadata, markdown');
     });
 
     it('SUCCEEDED dataset nextStep uses DEFAULT_DATASET_ITEMS_LIMIT as example limit', () => {
@@ -1190,7 +1187,7 @@ describe('buildStatusTemplate', () => {
         const dataset: RunDataset = { id: 'ds-1', itemCount: 5, fields: [] };
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
         expect(t.nextStep).toContain('get-dataset-items');
-        expect(t.nextStep).not.toContain('Item structure');
+        expect(t.nextStep).not.toContain('Selectable fields');
         expect(t.nextStep).not.toContain('—');
     });
 
@@ -1314,14 +1311,12 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).toContain('partial output (47 items written)');
     });
 
-    it('TIMED-OUT with a dataset shape names the item structure and selectable fields', () => {
+    it('TIMED-OUT with field metadata names the selectable fields', () => {
         const t = buildStatusSummaryNextStep({
             run: makeRun('TIMED-OUT'),
             dataset: datasetWithItems,
-            datasetFields: DATASET_FIELDS,
         });
-        expect(t.nextStep).toContain(DATASET_SHAPE);
-        expect(t.nextStep).toContain('Selectable fields: metadata, markdown.');
+        expect(t.nextStep).toContain('Selectable fields: metadata, markdown');
     });
 
     it('TIMED-OUT with both dataset and KV records picks dataset for nextStep', () => {
@@ -1418,7 +1413,6 @@ describe('buildStatusTemplate', () => {
         const t = buildStatusSummaryNextStep({
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
-            datasetFields: DATASET_FIELDS,
         });
         expect(t.nextStep).toMatch(/\.$/);
         expect(t.nextStep).not.toMatch(/\.\.$/);
@@ -1426,11 +1420,20 @@ describe('buildStatusTemplate', () => {
 });
 
 describe('array selection hints', () => {
-    it('keeps a nested scalar array selectable as a whole', () => {
-        const hint = fieldsProjectionHint(['matrix/0/0']);
-        expect(hint).toContain('matrix[][]');
-        expect(hint).toContain('Selectable fields: matrix.');
-        expect(hint).toContain('fields="matrix.0.0" for one indexed value');
+    it('names the selectable field and the indexed example for a nested scalar array', () => {
+        const hint = fieldsProjectionHint({
+            topLevelFields: ['matrix'],
+            indexedFieldExamples: ['matrix.0.0'],
+            dottedOutput: 'flatKeys',
+        });
+        expect(hint).toContain('Selectable fields: matrix');
+        expect(hint).toContain('fields="matrix.0.0"');
+    });
+
+    it('omits the indexed sentence when no field is under an array', () => {
+        const hint = fieldsProjectionHint({ topLevelFields: ['metadata', 'markdown'], dottedOutput: 'flatKeys' });
+        expect(hint).toContain('Selectable fields: metadata, markdown');
+        expect(hint).not.toContain('index');
     });
 });
 
@@ -1487,27 +1490,6 @@ describe('buildDatasetFieldSelection', () => {
             topLevelFields: ['metadata', 'markdown'],
             dottedOutput: 'flatKeys',
         });
-    });
-});
-
-describe('buildDatasetShape marks arrays with []', () => {
-    it('nests objects and marks arrays of objects and of strings', () => {
-        expect(
-            buildDatasetShape([
-                'query',
-                'search/provider',
-                'results/0/url',
-                'results/0/emphasizedKeywords/0',
-                'results/1/title',
-                'results/1/siteLinks/0/url',
-            ]),
-        ).toBe(
-            '{ query, search: { provider }, results: { url, emphasizedKeywords[], title, siteLinks: { url }[] }[] }',
-        );
-    });
-
-    it('marks an array of arrays with one [] per level', () => {
-        expect(buildDatasetShape(['table/rows/0/0', 'table/rows/1/2'])).toBe('{ table: { rows[][] } }');
     });
 });
 

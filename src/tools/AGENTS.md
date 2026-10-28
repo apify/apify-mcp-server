@@ -51,13 +51,12 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     and wait-timeout modes: storage IDs plus a `summary` (past) / `nextStep` (one primary
     action) pair, never inline dataset items or KV bodies — except the reserved `TIP` key,
     inlined as `tip` on terminal RAG Web Browser runs only.
-    Dataset hints show the inferred item structure with array markers and separately list
-    selectable top-level fields. Dotted selections return flat keys and must end at a scalar; arrays
-    require explicit zero-based indices for individual values. An unindexed path does not select
-    across array elements.
-    Run dataset entries and `get-dataset` also carry `fieldSelection` (`buildDatasetFieldSelection`):
+    Run dataset entries and `get-dataset` carry `fieldSelection` (`buildDatasetFieldSelection`):
     the top-level names, one indexed example per array depth built from the raw index-expanded
-    metadata, and `dottedOutput: 'flatKeys'`. `fields` keeps its collapsed shape for compatibility.
+    metadata, and `dottedOutput: 'flatKeys'`; the narrative hint is rendered from it. Dotted
+    selections return flat keys and must end at a scalar; arrays require explicit zero-based indices
+    for individual values, and an unindexed path does not select across array elements. `fields`
+    keeps its collapsed shape for compatibility.
   - `runs/` — get/abort runs, run logs, run list.
   - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`.
   - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public

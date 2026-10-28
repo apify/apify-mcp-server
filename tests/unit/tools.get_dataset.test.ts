@@ -27,6 +27,9 @@ const MOCK_DATASET = {
     fields: ['title', 'url'],
 };
 
+// Raw API shape: slash-separated with array indices expanded.
+const ARRAY_FIELDS = ['latestComments/0/id', 'latestComments/1/owner/username', 'images/0', 'images/1'];
+
 function stubApifyClient(dataset: unknown): InternalToolArgs['apifyClient'] {
     return mockApifyClient({
         dataset: (_id: string) => ({ get: async () => dataset }),
@@ -52,7 +55,7 @@ describe('get-dataset', () => {
         expect(structuredContent.summary).toBe("Dataset 'my-dataset' has 42 items, 2 fields.");
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
         expect(structuredContent.nextStep).toContain('datasetId=ds-1');
-        expect(structuredContent.nextStep).toContain('Item structure ([] marks an array): { title, url }');
+        expect(structuredContent.nextStep).toContain('Selectable fields: title, url');
         // content[0] is the data-only JSON dump (no narrative); content[1] is the narrative.
         const { summary, nextStep, ...data } = structuredContent;
         expect(JSON.parse(content[0].text)).toEqual(data);
@@ -205,39 +208,27 @@ describe('get-dataset fields normalization', () => {
         ]);
     });
 
-    it('marks arrays in the nextStep item shape, which the collapsed fields list cannot', async () => {
+    it('names the selectable fields and an indexed example in the nextStep', async () => {
         const result = await (getDataset as HelperTool).call(
             stubToolCallContext(
                 { datasetId: 'ds-1' },
-                stubApifyClient({
-                    id: 'ds-1',
-                    itemCount: 1,
-                    fields: ['latestComments/0/id', 'latestComments/1/owner/username', 'images/0', 'images/1'],
-                }),
+                stubApifyClient({ id: 'ds-1', itemCount: 1, fields: ARRAY_FIELDS }),
             ),
         );
         const { structuredContent } = result as { structuredContent: { nextStep: string } };
-        expect(structuredContent.nextStep).toContain('{ latestComments: { id, owner: { username } }[], images[] }');
-        expect(structuredContent.nextStep).toContain('Selectable fields: latestComments, images.');
-        expect(structuredContent.nextStep).toContain('to keep whole objects and arrays');
-        expect(structuredContent.nextStep).toContain('fields="latestComments" for the whole top-level value');
-        expect(structuredContent.nextStep).toContain('fields="latestComments.0.id" for one indexed value');
+        expect(structuredContent.nextStep).toContain('Selectable fields: latestComments, images');
+        expect(structuredContent.nextStep).toContain('fields="latestComments.0.id"');
         expect(structuredContent.nextStep).toContain(
             'Dotted selections return flat keys and must end at a scalar value',
         );
         expect(structuredContent.nextStep).not.toContain('latestComments.id');
-        expect(structuredContent.nextStep).toContain('Include an index at each array level');
     });
 
     it('adds fieldSelection beside the collapsed fields and validates against the output schema', async () => {
         const result = await (getDataset as HelperTool).call(
             stubToolCallContext(
                 { datasetId: 'ds-1' },
-                stubApifyClient({
-                    id: 'ds-1',
-                    itemCount: 1,
-                    fields: ['latestComments/0/id', 'latestComments/1/owner/username', 'images/0', 'images/1'],
-                }),
+                stubApifyClient({ id: 'ds-1', itemCount: 1, fields: ARRAY_FIELDS }),
             ),
         );
         const { structuredContent } = result as {
