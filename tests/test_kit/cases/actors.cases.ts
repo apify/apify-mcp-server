@@ -1213,19 +1213,12 @@ export const actorsCases: Case[] = [
             expect(list.text).toContain(
                 `send-server-actor-request sends a request to one of them: {"actor":"${ACTOR_SERVER_ACTOR_TEST}"`,
             );
-            expect(list.text).toContain('- POST /add: Add two numbers (JSON body). Required: request body.');
-            for (const key of ['openapi', 'paths', 'components']) expect(list.text).toContain(`"${key}":`);
+            expect(list.text).toContain('"method":"POST","path":"/add","summary":"Add two numbers (JSON body)"');
+            for (const key of ['openapi', 'responses', 'components']) expect(list.text).not.toContain(`"${key}":`);
             const operation = await call(ACTOR_SERVER_ACTOR_TEST, { serverInterface: 'GET /add' });
             expect(operation.result.isError).not.toBe(true);
-            for (const part of ['"operation":', 'Components are omitted', '"$ref":"#/components/parameters/AsText"']) {
-                expect(operation.text).toContain(part);
-            }
-            expect(operation.text).toContain('"$ref":"#/components/responses/Add"');
-            const parameter = await call(ACTOR_SERVER_ACTOR_TEST, {
-                serverInterface: '#/components/parameters/AsText',
-            });
-            expect(parameter.result.isError).not.toBe(true);
-            expect(parameter.text).toContain('"name":"asText"');
+            expect(operation.text).toContain('"name":"asText"');
+            expect(operation.text).not.toContain('"$ref":');
             const unknown = await call(ACTOR_SERVER_ACTOR_TEST, { serverInterface: 'GET /nope' });
             expect(unknown.result.isError).toBe(true);
             expect(unknown.text).toMatch(

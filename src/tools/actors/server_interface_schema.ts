@@ -3,7 +3,15 @@ import type { Actor } from '../../types.js';
 import { ACTOR_TENANCY } from '../../types.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { resolveActorTenancy } from '../actor_tool_naming.js';
-import { API_METHODS, isRecord, resolveLocalRef } from '../api/apify_api_spec.js';
+import type { DereferenceContext } from '../api/apify_api_spec.js';
+import {
+    API_METHODS,
+    DereferenceBudgetError,
+    isRecord,
+    parseParameters,
+    parseRequestBody,
+    resolveLocalRef,
+} from '../api/apify_api_spec.js';
 
 type ServerOperation = { method: string; path: string; operation: Record<string, unknown> };
 
@@ -96,6 +104,51 @@ function formatOperationLine({ method, path, operation }: ServerOperation, schem
     return text;
 }
 
+/** One line per operation; over `maxBytes`, the lines that fit, then `… and N more`. */
+function formatOperationIndex(operations: ServerOperation[], schema: unknown, maxBytes: number): string {
+    const lines = operations.map((operation) => formatOperationLine(operation, schema));
+    const index = lines.join('\n');
+    if (Buffer.byteLength(index) <= maxBytes) return index;
+    // Room for the cut line with the largest count it can show.
+    let bytes = Buffer.byteLength(`… and ${lines.length} more`);
+    const kept: string[] = [];
+    for (const line of lines) {
+        bytes += Buffer.byteLength(line) + 1;
+        if (bytes > maxBytes) break;
+        kept.push(line);
+    }
+    return [...kept, `… and ${lines.length - kept.length} more`].join('\n');
+}
+
+/**
+ * One operation in the `get-apify-api-details` shape: local references inlined, examples kept, no responses.
+ * The summary and description are left out when the schema has none. Throws `DereferenceBudgetError` when the
+ * context's budget runs out.
+ */
+function buildServerOperationDetails({ method, path, operation }: ServerOperation, context: DereferenceContext) {
+    const requestBody = parseRequestBody(operation.requestBody, context);
+    return {
+        method,
+        path,
+        ...(typeof operation.summary === 'string' && { summary: operation.summary }),
+        ...(typeof operation.description === 'string' && { description: operation.description }),
+        parameters: parseParameters(Array.isArray(operation.parameters) ? operation.parameters : undefined, context),
+        ...(requestBody && { requestBody }),
+    };
+}
+
+/** `render` as fenced JSON; `undefined` when its references expand past `MAX_INLINE_BYTES`. */
+function formatWithinBudget(schema: unknown, render: (context: DereferenceContext) => unknown): string | undefined {
+    const budget = { remainingBytes: MAX_INLINE_BYTES };
+    try {
+        return wrapJsonText(render({ spec: schema, shouldKeepExamples: true, budget }));
+    } catch (error) {
+        // A deep untrusted schema or example can exhaust the stack in JSON.stringify.
+        if (error instanceof DereferenceBudgetError || error instanceof RangeError) return undefined;
+        throw error;
+    }
+}
+
 /** E.g. `3 documented operations: GET /add, POST /add, GET /empty`; over the naming limits, the count alone. */
 function formatOperationCount(operations: ServerOperation[]): string {
     const count = `${operations.length} documented operation${operations.length === 1 ? '' : 's'}`;
@@ -109,23 +162,25 @@ function formatDetailsCall(actorFullName: string, serverInterface: true | string
     return `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorFullName, output: { serverInterface } })}`;
 }
 
-function checkSize(text: string, actorFullName: string): { text: string } | { error: string } {
-    if (Buffer.byteLength(text) <= MAX_INLINE_BYTES) return { text };
+/** `undefined` text: the rendering ran out of its budget, so it would not fit. */
+function checkSize(text: string | undefined, actorFullName: string): { text: string } | { error: string } {
+    if (text !== undefined && Buffer.byteLength(text) <= MAX_INLINE_BYTES) return { text };
     return {
-        error: `Actor '${actorFullName}' server-interface output exceeds the ${MAX_INLINE_BYTES}-byte limit and was not returned. A smaller operation or schema node may fit.`,
+        error: `Actor '${actorFullName}' server-interface output exceeds the ${MAX_INLINE_BYTES}-byte limit and was not returned. A smaller operation may fit.`,
     };
 }
 
 /**
  * The server-interface text of `fetch-actor-details`, by `output.serverInterface`; none for an Actor without
- * Actor Standby unless asked for. References are not expanded or fetched, and the schema's `servers` are not used.
+ * Actor Standby unless asked for. Operations are rendered by `buildServerOperationDetails`, without the schema's
+ * responses, components and `servers`.
  * - `false`: one summary line with the tenancy and the operation count, naming the operations while few and short;
  *   none in a session without `send-server-actor-request`.
- * - `true`: the operation list, plus the creator-written schema as is when the text fits `MAX_INLINE_BYTES`.
- * - `"GET /search"`: one operation excerpt with inherited parameters and the root schema/security context.
- * - `"#/components/schemas/Search"`: the raw node at that local JSON pointer.
+ * - `true`: every operation in full when the text fits `MAX_INLINE_BYTES`; otherwise one line per operation
+ *   (`formatOperationLine`), cut at the limit with `… and N more`.
+ * - `"GET /search"`: that one operation in full.
  * The send-tool example becomes the Actor's base URL without the send tool or in agentic payment mode.
- * An unknown selection, or a selected text over the byte cap, is an error.
+ * An unknown selection, or one operation over the byte cap, is an error.
  */
 export function buildServerInterfaceText({
     actor,
@@ -173,23 +228,21 @@ export function buildServerInterfaceText({
         canSend
             ? `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends ${lead}: ${JSON.stringify({ actor: actorFullName, method, path })}\n`
             : '';
-    const guidance = `References are not expanded or fetched. ${formatDetailsCall(actorFullName, '#/components/schemas/Name')} returns the raw node at a local JSON pointer. The schema's servers are not used.\n`;
     if (serverInterface === true) {
-        const lines = operations.map((operation) => formatOperationLine(operation, schema)).join('\n');
+        const title = `# Server interface of ${actorFullName}\n${header}${send('a request to one of them', operations[0])}Operations (${operations.length}):\n`;
+        const details = formatWithinBudget(schema, (context) => ({
+            operations: operations.map((operation) => buildServerOperationDetails(operation, context)),
+        }));
+        const full = details && `${title}${details}`;
+        if (full && Buffer.byteLength(full) <= MAX_INLINE_BYTES) return { text: full };
         const { method, path } = operations[0];
-        const excerpt = `${formatDetailsCall(actorFullName, `${method} ${path}`)} returns one operation excerpt.\n`;
-        const list = `# Server interface of ${actorFullName}\n${header}Operations (${operations.length}):\n${lines}\n${send('a request to one of them', operations[0])}${excerpt}${guidance}`;
-        const full = `${list}Full API schema:\n${wrapJsonText(schema)}`;
-        if (Buffer.byteLength(full) <= MAX_INLINE_BYTES) return { text: full };
-        const omitted = `Full API schema omitted: exceeds the ${MAX_INLINE_BYTES}-byte limit. Operation excerpts and referenced nodes are available through the navigation above.`;
-        return checkSize(`${list}${omitted}`, actorFullName);
-    }
-    if (serverInterface.startsWith('#/')) {
-        const node = resolveLocalRef(schema, serverInterface);
-        if (node === undefined)
-            return { error: `Actor '${actorFullName}' has no schema node at "${serverInterface}".` };
-        const title = `# Server interface of ${actorFullName}: ${serverInterface}\n`;
-        return checkSize(`${title}${header}${guidance}${wrapJsonText(node)}`, actorFullName);
+        const next = `The operations in full exceed the ${MAX_INLINE_BYTES}-byte limit. ${formatDetailsCall(actorFullName, `${method} ${path}`)} returns one operation in full.`;
+        const index = formatOperationIndex(
+            operations,
+            schema,
+            MAX_INLINE_BYTES - Buffer.byteLength(`${title}\n${next}`),
+        );
+        return checkSize(`${title}${index}\n${next}`, actorFullName);
     }
 
     const match = /^\s*([A-Za-z]+)\s+(\S+)\s*$/.exec(serverInterface);
@@ -199,11 +252,7 @@ export function buildServerInterfaceText({
             error: `Actor '${actorFullName}' has no operation "${serverInterface}". ${formatOperationCount(operations)}. ${listsThem}`,
         };
     }
-    const { method, path, operation } = selected;
-    const summary = typeof operation.summary === 'string' ? `\n${operation.summary}` : '';
-    const { openapi, jsonSchemaDialect, security } = schema;
-    const detail = wrapJsonText({ openapi, jsonSchemaDialect, security, operation });
-    const title = `# Server interface of ${actorFullName}: ${method} ${path}${summary}\n`;
-    const note = `Operation excerpt. Components are omitted.\n${guidance}`;
-    return checkSize(`${title}${header}${send('this request', selected)}${note}${detail}`, actorFullName);
+    const details = formatWithinBudget(schema, (context) => buildServerOperationDetails(selected, context));
+    const title = `# Server interface of ${actorFullName}: ${selected.method} ${selected.path}\n`;
+    return checkSize(details && `${title}${header}${send('this request', selected)}${details}`, actorFullName);
 }
