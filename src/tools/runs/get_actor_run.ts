@@ -9,6 +9,7 @@ import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildUsageMeta, respondAborted, respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
+import { TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 import { ACTOR_TIP_CAVEAT } from '../actor_tool_naming.js';
 import {
     applyConsoleLinks,
@@ -94,8 +95,11 @@ export function buildGetActorRunResponse(
 export function buildGetActorRunWidgetResponse(params: FetchActorRunResult): ToolResponse {
     const { run, structuredContent } = params;
 
-    // Override nextStep so the model reading structuredContent (content[0]) also sees no-poll guidance.
-    const widgetContent = { ...structuredContent, nextStep: WIDGET_NO_POLL_NEXT_STEP };
+    // While the run is in progress, the no-poll text replaces a nextStep that names get-actor-run,
+    // which a session with only this widget does not have. An ended run keeps its own nextStep.
+    const widgetContent = TERMINAL_RUN_STATUSES.has(structuredContent.status)
+        ? structuredContent
+        : { ...structuredContent, nextStep: WIDGET_NO_POLL_NEXT_STEP };
     return respondOk(
         [
             JSON.stringify(widgetContent),
