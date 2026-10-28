@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - Log SSE replay stream conflict as a client fault ([#1723](https://github.com/apify/apify-mcp-server/pull/1723)) ([7d1dfe9](https://github.com/apify/apify-mcp-server/commit/7d1dfe98e8d58ae52856b8f53f8ccb3aef2e27fc)) by [@jirispilka](https://github.com/jirispilka)
 - Reject prototype names as payment provider ids ([#1718](https://github.com/apify/apify-mcp-server/pull/1718)) ([60d3d15](https://github.com/apify/apify-mcp-server/commit/60d3d1542f6a0f99db1cf3cb16fde185416ada41)) by [@jirispilka](https://github.com/jirispilka)
+- Count call-actor-widget and apify-api-write in canRunActor ([#1752](https://github.com/apify/apify-mcp-server/pull/1752)) ([6f81932](https://github.com/apify/apify-mcp-server/commit/6f819329a1743483637b297b30dd1a880bf2c4d1)) by [@jirispilka](https://github.com/jirispilka), closes [#1530](https://github.com/apify/apify-mcp-server/issues/1530)
 
 
 <!-- git-cliff-unreleased-end -->
