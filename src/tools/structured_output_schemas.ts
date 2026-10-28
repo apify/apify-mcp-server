@@ -763,7 +763,8 @@ const buildDatasetFieldSelectionSchema = () => ({
         dottedOutput: {
             type: 'string',
             enum: ['flatKeys'],
-            description: 'A dotted selection returns a flat key (e.g. "results.1.url"), not a nested object.',
+            description:
+                'A dotted selection returns a flat key (e.g. "results.1.url") and must end at a scalar value; a dotted path to a nested object or array returns nothing.',
         },
     },
     required: ['topLevelFields', 'dottedOutput'],

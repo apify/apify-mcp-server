@@ -122,7 +122,7 @@ export type DatasetFieldSelection = {
     topLevelFields: string[];
     /** Dotted paths with an index at every array level, one per array depth; absent when no field is under an array. */
     indexedFieldExamples?: string[];
-    /** Dotted selections return flat keys (`results.1.url`), not nested objects. */
+    /** Dotted selections return flat keys (`results.1.url`) and must end at a scalar; a dotted path to a nested object or array returns nothing. */
     dottedOutput: 'flatKeys';
 };
 
@@ -625,7 +625,7 @@ export function fieldsProjectionHint(fields: string[] | undefined): string {
         : '';
     return (
         `${arrayHint} Item structure ([] marks an array): ${buildDatasetShape(fields)}. Selectable fields: ${topLevelFields.join(', ')}. ` +
-        'Pass top-level names via fields="..." to keep whole objects and arrays. Dotted selections return flat keys.'
+        'Pass top-level names via fields="..." to keep whole objects and arrays. Dotted selections return flat keys and must end at a scalar value.'
     );
 }
 

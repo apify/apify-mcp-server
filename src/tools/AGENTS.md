@@ -52,7 +52,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     action) pair, never inline dataset items or KV bodies — except the reserved `TIP` key,
     inlined as `tip` on terminal RAG Web Browser runs only.
     Dataset hints show the inferred item structure with array markers and separately list
-    selectable top-level fields. Dotted selections return flat keys; arrays require explicit
+    selectable top-level fields. Dotted selections return flat keys and must end at a scalar; arrays require explicit
     zero-based indices for individual values. An unindexed path does not select across array elements.
     Run dataset entries and `get-dataset` also carry `fieldSelection` (`buildDatasetFieldSelection`):
     the top-level names, one indexed example per array depth built from the raw index-expanded
