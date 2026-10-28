@@ -131,16 +131,13 @@ function listParameterInputs(operation: Record<string, unknown>, schema: unknown
     return inputs;
 }
 
-/** The request body with the media type `parseRequestBody` picks; `undefined` when the operation takes none. */
-function getRequestBody(
-    operation: Record<string, unknown>,
-    schema: unknown,
-): { isRequired: boolean; schema: unknown } | undefined {
+/** The JSON request body with the media type `parseRequestBody` picks; `undefined` when the operation takes none. */
+function getRequestBody(operation: Record<string, unknown>, schema: unknown): { schema: unknown } | undefined {
     const requestBody = resolveRef(operation.requestBody, schema);
     if (!isRecord(requestBody) || !isRecord(requestBody.content)) return undefined;
     const { content } = requestBody;
     const media = content['application/json'] ?? content[Object.keys(content).find(isJsonMediaType) ?? '*/*'];
-    return isRecord(media) ? { isRequired: requestBody.required === true, schema: media.schema } : undefined;
+    return isRecord(media) ? { schema: media.schema } : undefined;
 }
 
 /** The top-level properties of a body schema; `undefined` when it lists none. */
@@ -168,17 +165,19 @@ function formatInputs(inputs: OperationInput[]): string {
 
 /**
  * E.g. `- GET /search [q:string required, limit:integer]: Search the web.`, or
- * `- POST / {url:string required, formats:array}: Fetch a URL.` for a JSON body. A body schema that lists no
- * properties reads `{request body}`.
+ * `- POST / {url:string required, formats:array}: Fetch a URL.` for a JSON body. Any other body, such as a JSON
+ * schema that lists no properties or a form, reads `{request body}`, with `required` when it is.
  */
 function formatOperationLine({ method, path, operation }: ServerOperation, schema: unknown): string {
     let text = `- ${method} ${path}`;
     const parameters = listParameterInputs(operation, schema);
     if (parameters.length > 0) text += ` [${formatInputs(parameters)}]`;
-    const body = getRequestBody(operation, schema);
-    if (body) {
-        const bodyInputs = listBodyInputs(body.schema, schema);
-        text += bodyInputs ? ` {${formatInputs(bodyInputs)}}` : ` {request body${body.isRequired ? ' required' : ''}}`;
+    const requestBody = resolveRef(operation.requestBody, schema);
+    // An external or unresolved reference says nothing about the body.
+    if (isRecord(requestBody) && requestBody.$ref === undefined) {
+        const bodyInputs = listBodyInputs(getRequestBody(operation, schema)?.schema, schema);
+        const isRequired = requestBody.required === true;
+        text += bodyInputs ? ` {${formatInputs(bodyInputs)}}` : ` {request body${isRequired ? ' required' : ''}}`;
     }
     const { summary } = operation;
     if (typeof summary === 'string' && summary) text += `: ${summary}${/[.!?]$/.test(summary) ? '' : '.'}`;

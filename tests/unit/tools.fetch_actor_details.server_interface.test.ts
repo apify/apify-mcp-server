@@ -424,6 +424,14 @@ describe('the operation index, when the operations in full exceed the byte limit
         expect(indexLineOf({ post: { requestBody: body(false) } })).toBe('- POST /items/{id} {request body}');
     });
 
+    it('marks a required body the send tool cannot send as JSON, such as a form', () => {
+        const requestBody = { required: true, content: { 'application/x-www-form-urlencoded': {} } };
+
+        expect(indexLineOf({ post: { summary: 'Form only', requestBody } })).toBe(
+            '- POST /items/{id} {request body required}: Form only.',
+        );
+    });
+
     it('cuts the index at the byte limit and counts the operations left out', () => {
         const count = 1000;
         const paths = Object.fromEntries(
