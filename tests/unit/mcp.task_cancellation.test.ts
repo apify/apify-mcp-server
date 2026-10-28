@@ -4,7 +4,10 @@ import log from '@apify/log';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
 import * as telemetry from '../../src/telemetry.js';
-import type { ToolCallTelemetryProperties } from '../../src/types.js';
+import type { InternalToolArgs, ToolCallTelemetryProperties, ToolEntry, ToolInputSchema } from '../../src/types.js';
+import { TOOL_TYPE } from '../../src/types.js';
+import { compileSchema } from '../../src/utils/ajv.js';
+import { respondRaw } from '../../src/utils/mcp.js';
 import {
     getRequestHandler,
     getTaskStore,
@@ -131,5 +134,82 @@ describe('executeToolAndUpdateTask()', () => {
         // is abort-aware: the cancel watcher polls every 500 ms and flips it to ABORTED once it
         // ticks. Both outcomes are correct here, so pin the pair rather than one side of a race.
         expect([TOOL_STATUS.FAILED, TOOL_STATUS.ABORTED]).toContain(properties.tool_status);
+    });
+});
+
+/** A task tool that, once released, reports a status message through its progress tracker. */
+function makeStatusMessageTool(): {
+    tool: ToolEntry;
+    started: Promise<void>;
+    release: () => void;
+    reported: Promise<void>;
+} {
+    let markStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+        markStarted = resolve;
+    });
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => {
+        release = resolve;
+    });
+    let markReported!: () => void;
+    const reported = new Promise<void>((resolve) => {
+        markReported = resolve;
+    });
+    const tool: ToolEntry = {
+        type: TOOL_TYPE.INTERNAL,
+        name: 'test-status-message-tool',
+        description: 'reports a status message once released',
+        inputSchema: { type: 'object', properties: {} } as ToolInputSchema,
+        ajvValidate: compileSchema({ type: 'object', properties: {} }),
+        execution: { taskSupport: 'optional' },
+        call: async ({ progressTracker }: InternalToolArgs) => {
+            markStarted();
+            await released;
+            await progressTracker?.updateProgress('Crawling 1/10');
+            markReported();
+            return respondRaw({ content: [{ type: 'text', text: 'ok' }] });
+        },
+    };
+    return { tool, started, release, reported };
+}
+
+describe('task status message updates', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('does not log a status message rejected after tasks/cancel as a store failure', async () => {
+        await withServer(async (server) => {
+            const softFailSpy = vi.spyOn(log, 'softFail').mockImplementation(() => log);
+            const { tool, started, release, reported } = makeStatusMessageTool();
+            server.upsertTools([tool]);
+
+            const taskId = await startTask(server, tool.name);
+            await started;
+            await cancelTask(server, taskId);
+            release();
+            await reported;
+
+            expect(softFailSpy).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ taskId }));
+            expect((await getTaskStore(server).getTask(taskId, SESSION_ID))?.status).toBe('cancelled');
+        });
+    });
+
+    it('logs a store failure while writing a status message', async () => {
+        await withServer(async (server) => {
+            const softFailSpy = vi.spyOn(log, 'softFail').mockImplementation(() => log);
+            const { tool, started, release, reported } = makeStatusMessageTool();
+            server.upsertTools([tool]);
+
+            const taskId = await startTask(server, tool.name);
+            await started;
+            vi.spyOn(getTaskStore(server), 'updateTaskStatus').mockRejectedValueOnce(new Error('redis down'));
+            release();
+            await reported;
+
+            expect(softFailSpy).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ taskId, errMessage: 'redis down' }),
+            );
+        });
     });
 });
