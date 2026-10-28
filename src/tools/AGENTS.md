@@ -54,6 +54,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     Dataset hints show the inferred item structure with array markers and separately list
     selectable top-level fields. Dotted selections return flat keys; arrays require explicit
     zero-based indices for individual values. An unindexed path does not select across array elements.
+    Run dataset entries and `get-dataset` also carry `fieldSelection` (`buildDatasetFieldSelection`):
+    the top-level names, one indexed example per array depth built from the raw index-expanded
+    metadata, and `dottedOutput: 'flatKeys'`. `fields` keeps its collapsed shape for compatibility.
   - `runs/` — get/abort runs, run logs, run list.
   - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`.
   - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public

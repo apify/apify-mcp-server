@@ -75,11 +75,12 @@ describe('get-dataset', () => {
         const { content, structuredContent } = result as TextToolResult & {
             structuredContent: Record<string, unknown>;
         };
-        const { summary, nextStep, ...data } = structuredContent;
+        // `fieldSelection` is derived, not passed through; its shape has its own tests below.
+        const { summary, nextStep, fieldSelection, ...data } = structuredContent;
 
         expectSchemaConformingStructuredContent(result, datasetMetadataOutputSchema);
         expect(data).toEqual(metadata);
-        expect(JSON.parse(content[0].text)).toEqual(metadata);
+        expect(JSON.parse(content[0].text)).toEqual({ ...metadata, fieldSelection });
         expect(JSON.stringify(result)).not.toContain('urlSigningSecretKey');
         expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
     });
@@ -225,6 +226,38 @@ describe('get-dataset fields normalization', () => {
         expect(structuredContent.nextStep).not.toContain('latestComments.id');
         expect(structuredContent.nextStep).toContain('Include an index at each array level');
         expect(structuredContent.nextStep).not.toContain('Pass dot paths');
+    });
+
+    it('adds fieldSelection beside the collapsed fields and validates against the output schema', async () => {
+        const result = await (getDataset as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'ds-1' },
+                stubApifyClient({
+                    id: 'ds-1',
+                    itemCount: 1,
+                    fields: ['latestComments/0/id', 'latestComments/1/owner/username', 'images/0', 'images/1'],
+                }),
+            ),
+        );
+        const { structuredContent } = result as {
+            structuredContent: { fields: string[]; fieldSelection: unknown };
+        };
+        expectSchemaConformingStructuredContent(result, datasetMetadataOutputSchema);
+        expect(structuredContent.fields).toEqual(['latestComments.id', 'latestComments.owner.username', 'images']);
+        expect(structuredContent.fieldSelection).toEqual({
+            topLevelFields: ['latestComments', 'images'],
+            indexedFieldExamples: ['latestComments.0.id'],
+            dottedOutput: 'flatKeys',
+        });
+    });
+
+    it('omits fieldSelection when the API returns an empty field list', async () => {
+        const result = await (getDataset as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ id: 'ds-1', itemCount: 0, fields: [] })),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+        expect(structuredContent.fields).toEqual([]);
+        expect(structuredContent).not.toHaveProperty('fieldSelection');
     });
 
     it('preserves non-`fields` keys from the raw API response unchanged', async () => {

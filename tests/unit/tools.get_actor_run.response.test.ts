@@ -6,6 +6,7 @@ import { ACTOR_TIP_CAVEAT } from '../../src/tools/actor_tool_naming.js';
 import {
     buildStartRunResponse,
     buildStartRunWidgetResponse,
+    buildDatasetFieldSelection,
     buildDatasetShape,
     buildStatusSummaryNextStep,
     collapseArrayIndices,
@@ -15,10 +16,17 @@ import {
     type RunResponse,
 } from '../../src/tools/actors/actor_run_response.js';
 import { getActorRun } from '../../src/tools/runs/get_actor_run.js';
+import { actorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockApifyClient, mockUserInfo, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import {
+    expectSchemaConformingStructuredContent,
+    mockApifyClient,
+    mockUserInfo,
+    stubToolCallContext,
+    type TextToolResult,
+} from './helpers/tool_context.js';
 
 // Only Console UI token sessions reach the users/me lookup; the default 'test-token'
 // stub never triggers it.
@@ -1424,6 +1432,66 @@ describe('array selection hints', () => {
         expect(hint).toContain('matrix[][]');
         expect(hint).toContain('Selectable fields: matrix.');
         expect(hint).not.toContain('matrix returns empty objects');
+    });
+});
+
+describe('dataset field selection guidance on the run dataset entry', () => {
+    it('adds fieldSelection beside the collapsed fields and keeps every array index in the examples', async () => {
+        const run = mockSucceededRun();
+        const dataset = mockDataset({
+            fields: ['query', 'results/0/url', 'results/0/siteLinks/0/url', 'results/1/url', 'results/1/title'],
+        });
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, stubClient({ run, dataset })),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+
+        expectSchemaConformingStructuredContent(result, actorRunOutputSchema);
+        // The collapsed, index-stripped description stays as it was for existing consumers.
+        expect(structuredContent.storages.datasets?.default.fields).toEqual([
+            'query',
+            'results.url',
+            'results.siteLinks.url',
+            'results.title',
+        ]);
+        expect(structuredContent.storages.datasets?.default.fieldSelection).toEqual({
+            topLevelFields: ['query', 'results'],
+            indexedFieldExamples: ['results.0.url', 'results.0.siteLinks.0.url'],
+            dottedOutput: 'flatKeys',
+        });
+    });
+
+    it('omits fieldSelection when the dataset metadata carries no fields', async () => {
+        const run = mockSucceededRun();
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext(
+                { runId: 'run-1', waitSecs: 0 },
+                stubClient({ run, dataset: mockDataset({ fields: undefined }) }),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: RunResponse };
+        expect(structuredContent.storages.datasets?.default).not.toHaveProperty('fieldSelection');
+    });
+});
+
+describe('buildDatasetFieldSelection', () => {
+    it('keeps scalar arrays and arrays of arrays selectable as whole top-level values', () => {
+        expect(buildDatasetFieldSelection(['tags/0', 'tags/1', 'matrix/0/0', 'matrix/1/0'])).toEqual({
+            topLevelFields: ['tags', 'matrix'],
+            indexedFieldExamples: ['tags.0', 'matrix.0.0'],
+            dottedOutput: 'flatKeys',
+        });
+    });
+
+    it('lists no indexed examples when no field sits under an array', () => {
+        expect(buildDatasetFieldSelection(['metadata/url', 'metadata/title', 'markdown'])).toStrictEqual({
+            topLevelFields: ['metadata', 'markdown'],
+            dottedOutput: 'flatKeys',
+        });
+    });
+
+    it('returns nothing for empty metadata', () => {
+        expect(buildDatasetFieldSelection([])).toBeUndefined();
     });
 });
 

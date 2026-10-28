@@ -101,12 +101,29 @@ export type RunDataset = {
      * shape Apify returns for array-heavy datasets.
      */
     fields?: string[];
+    /** Which `fields` selections `get-dataset-items` supports for this dataset; absent without field metadata. */
+    fieldSelection?: DatasetFieldSelection;
     /**
      * JSON Schema fragment for each dataset row. Populated only by direct actor tools (where
      * the target Actor is known at tools/list time, so historical row shape can be looked up
      * via `actorStore`). Absent for `call-actor` / `get-actor-run` (dynamic target).
      */
     itemsSchema?: { type: 'object'; properties: Record<string, unknown> };
+};
+
+/**
+ * Selection guidance derived from the raw, index-expanded `fields` metadata. `fields` on the same
+ * entry collapses array indices (`results.url`), which is not a usable `fields="..."` selection
+ * (#1656): a path through an array needs an explicit index at every array level, and a dotted
+ * selection returns a flat key. The examples keep the indices so they can be passed as written.
+ */
+export type DatasetFieldSelection = {
+    /** Unique first path segments; each selects a whole top-level value, arrays and objects included. */
+    topLevelFields: string[];
+    /** Dotted paths with an index at every array level, one per array depth; absent when no field is under an array. */
+    indexedFieldExamples?: string[];
+    /** Dotted selections return flat keys (`results.1.url`), not nested objects. */
+    dottedOutput: 'flatKeys';
 };
 
 export type RunKeyValueStore = {
@@ -237,6 +254,34 @@ export function buildDatasetShape(fields: string[]): string {
     return renderShapeNode(root);
 }
 
+/**
+ * Builds {@link DatasetFieldSelection} from the raw slash-separated, index-expanded `fields`
+ * metadata. One example per array depth keeps the guidance short on array-heavy datasets, where
+ * the raw list runs to hundreds of paths. Returns undefined when there is no metadata.
+ */
+export function buildDatasetFieldSelection(fields: string[]): DatasetFieldSelection | undefined {
+    if (fields.length === 0) return undefined;
+    const exampleByArrayDepth = new Map<number, string>();
+    for (const field of fields) {
+        const arrayDepth = field.split('/').filter((segment) => /^\d+$/.test(segment)).length;
+        if (arrayDepth === 0 || exampleByArrayDepth.has(arrayDepth)) continue;
+        exampleByArrayDepth.set(arrayDepth, field.replace(/\//g, '.'));
+    }
+    const indexedFieldExamples = [...exampleByArrayDepth]
+        .sort(([depthA], [depthB]) => depthA - depthB)
+        .map(([, example]) => example);
+    return {
+        topLevelFields: getTopLevelFields(fields),
+        ...(indexedFieldExamples.length > 0 ? { indexedFieldExamples } : {}),
+        dottedOutput: 'flatKeys',
+    };
+}
+
+/** Unique first segments of slash-separated field paths. */
+function getTopLevelFields(fields: string[]): string[] {
+    return [...new Set(fields.map((field) => field.split('/')[0]))];
+}
+
 export function toIsoString(value: Date | string | undefined | null): string | undefined {
     if (!value) return undefined;
     return value instanceof Date ? value.toISOString() : value;
@@ -267,6 +312,7 @@ function buildRunDataset(id: string, datasetMeta: Dataset | null, resolvedItemCo
         // "0 bytes" is misleading for a non-empty dataset). `cleanEmptyProperties` drops undefined.
         inflatedBytes: inflatedBytes && inflatedBytes > 0 ? inflatedBytes : undefined,
         fields: datasetMeta.fields ? normalizeDatasetFields(datasetMeta.fields) : undefined,
+        fieldSelection: datasetMeta.fields ? buildDatasetFieldSelection(datasetMeta.fields) : undefined,
     }) as RunDataset;
 }
 
@@ -571,7 +617,7 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
 
 export function fieldsProjectionHint(fields: string[] | undefined): string {
     if (!fields?.length) return '';
-    const topLevelFields = [...new Set(fields.map((field) => field.split('/')[0]))];
+    const topLevelFields = getTopLevelFields(fields);
     const indexedField = fields.find((field) => /\/\d+\//.test(field));
     const arrayHint = indexedField
         ? ` Use fields="${indexedField.split('/')[0]}" for the whole top-level value, ` +
