@@ -843,6 +843,30 @@ describe('get-actor-run default response', () => {
         expect(content[1].text).toContain(`Use a different Actor.\n\`\`\`\n${ACTOR_TIP_CAVEAT}`);
     });
 
+    it('omits the callability caveat when call-actor-widget can run the recommended Actor', async () => {
+        const { client } = makeKvStoreClient({
+            displayedKeys: [{ key: 'TIP' }],
+            tipRecordValue: {
+                message: 'Use a different Actor.',
+                level: 'info',
+                recommendedActorId: 'shu8hvrXbJbY3Eb9W',
+            },
+        });
+
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client), {
+                loadedToolNames: [HELPER_TOOLS.ACTOR_CALL_WIDGET, HELPER_TOOLS.ACTOR_RUNS_GET],
+            }),
+        );
+        const { content, structuredContent } = result as {
+            content: { type: string; text: string }[];
+            structuredContent: RunResponse;
+        };
+
+        expect(structuredContent.tip).not.toHaveProperty('caveat');
+        expect(content[1].text).not.toContain(ACTOR_TIP_CAVEAT);
+    });
+
     it('renders the tip in a fenced code block in the text response', async () => {
         const { client } = makeKvStoreClient({
             displayedKeys: [{ key: 'TIP' }],

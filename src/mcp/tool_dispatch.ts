@@ -5,8 +5,9 @@ import dedent from 'dedent';
 import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
-import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../const.js';
+import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
+import { canRunActor } from '../tools/actor_tool_naming.js';
 import { actorExecutor } from '../tools/actors/actor_executor.js';
 import type { ActorStore, CallDiagnostics, ToolEntry, ToolStatus } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
@@ -90,6 +91,10 @@ export async function dispatchToolCall(params: {
     let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
     // Always populate actor fields so they're tracked on both success and failure paths.
     let callDiagnostics: CallDiagnostics = { ...buildActorFields(actorName, actorId) };
+    const loadedToolNames = Array.from(tools.keys());
+    const loadedActorIds = new Set(
+        Array.from(tools.values(), extractActorId).filter((id): id is string => id !== undefined),
+    );
 
     switch (tool.type) {
         case TOOL_TYPE.INTERNAL: {
@@ -107,10 +112,8 @@ export async function dispatchToolCall(params: {
                     apifyClient,
                     actorStore,
                     paymentProvider,
-                    loadedToolNames: Array.from(tools.keys()),
-                    loadedActorIds: new Set(
-                        Array.from(tools.values(), extractActorId).filter((id): id is string => id !== undefined),
-                    ),
+                    loadedToolNames,
+                    loadedActorIds,
                     progressTracker,
                     mcpSessionId,
                     taskMode,
@@ -260,7 +263,8 @@ export async function dispatchToolCall(params: {
                     mcpSessionId,
                     datasetItemsSchema: tool.datasetItemsSchema,
                     taskMode,
-                    hasCallActorTool: tools.has(HELPER_TOOLS.ACTOR_CALL),
+                    canRunTipActor: (recommendedActorId) =>
+                        canRunActor(recommendedActorId, loadedToolNames, loadedActorIds),
                 });
 
                 if (!executorResult) {
