@@ -13,7 +13,7 @@ import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
 import { getApifyAPIPublicBaseUrl } from '../apify_client.js';
-import { InvalidParamsError } from '../mcp/errors.js';
+import { InternalError, InvalidParamsError } from '../mcp/errors.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { SERVER_MODE } from '../types.js';
 import { readApiResource } from './api_resources.js';
@@ -105,19 +105,16 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             };
         }
 
-        if (getMode() === SERVER_MODE.APPS && uri.startsWith('ui://widget/')) {
-            const widget = getAvailableWidgets().get(uri);
-
-            if (!widget || !widget.exists) {
-                return {
-                    contents: [
-                        {
-                            uri,
-                            mimeType: 'text/plain',
-                            text: `Widget ${uri} is not available. ${!widget ? 'Not found in registry.' : `File not found at ${widget.jsPath}`}`,
-                        },
-                    ],
-                };
+        const widget =
+            getMode() === SERVER_MODE.APPS && uri.startsWith('ui://widget/')
+                ? getAvailableWidgets().get(uri)
+                : undefined;
+        if (widget) {
+            // A missing or unreadable bundle is a server build fault. No adapter logs a resource error, so the path
+            // is logged here and left out of the error the client gets.
+            if (!widget.exists) {
+                log.error('Widget file not found', { uri, jsPath: widget.jsPath });
+                throw new InternalError(`Widget ${uri} is not available.`, { uri });
             }
 
             try {
@@ -148,16 +145,12 @@ export function createResourceService(options: ResourceServiceOptions): Resource
                     contents: [widgetContent],
                 };
             } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                return {
-                    contents: [
-                        {
-                            uri,
-                            mimeType: 'text/plain',
-                            text: `Failed to load widget: ${errorMessage}`,
-                        },
-                    ],
-                };
+                log.error('Failed to load widget', {
+                    uri,
+                    jsPath: widget.jsPath,
+                    errMessage: error instanceof Error ? error.message : String(error),
+                });
+                throw new InternalError(`Failed to load widget ${uri}.`, { uri });
             }
         }
 

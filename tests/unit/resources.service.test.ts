@@ -169,32 +169,49 @@ describe('createResourceService()', () => {
             expect(firstContent(result).html).toContain('<script type="module">console.log("widget");</script>');
         });
 
-        it('returns a plain-text fallback for a widget URI not in the registry', async () => {
+        it('throws InvalidParams for a widget URI not in the registry', async () => {
             const service = createResourceService({
                 getMode: () => 'apps',
                 getAvailableWidgets: () => new Map(),
             });
+            const uri = 'ui://widget/search-actors-widget.html';
 
-            const result = await service.readResource('ui://widget/unknown.html');
+            const error = await service.readResource(uri).catch((e: unknown) => e);
 
-            expect(firstContent(result).text).toContain('Not found in registry.');
-            expect(firstContent(result).mimeType).toBe('text/plain');
+            expect(error).toBeInstanceOf(InvalidParamsError);
+            expect((error as InvalidParamsError).data).toEqual({ uri });
         });
 
-        it('returns a plain-text fallback when the widget file is missing on disk', async () => {
-            const widgets = new Map<string, AvailableWidget>([
-                [WIDGET_URIS.SEARCH_ACTORS, buildAvailableWidget(WIDGET_URIS.SEARCH_ACTORS, false)],
-            ]);
+        it('throws InternalError without the server path when the widget file is missing on disk', async () => {
+            const widget = buildAvailableWidget(WIDGET_URIS.SEARCH_ACTORS, false);
             const service = createResourceService({
                 getMode: () => 'apps',
-                getAvailableWidgets: () => widgets,
+                getAvailableWidgets: () => new Map([[WIDGET_URIS.SEARCH_ACTORS, widget]]),
             });
 
-            const result = await service.readResource(WIDGET_URIS.SEARCH_ACTORS);
+            const error = await service.readResource(WIDGET_URIS.SEARCH_ACTORS).catch((e: unknown) => e);
 
-            expect(firstContent(result).text).toContain('File not found at');
-            expect(firstContent(result).text).toContain(WIDGET_REGISTRY[WIDGET_URIS.SEARCH_ACTORS].jsFilename);
-            expect(firstContent(result).mimeType).toBe('text/plain');
+            expect(error).toBeInstanceOf(InternalError);
+            expect((error as InternalError).data).toEqual({ uri: WIDGET_URIS.SEARCH_ACTORS });
+            expect((error as InternalError).message).not.toContain(widget.jsPath);
+        });
+
+        it('throws InternalError without the server path when the widget file cannot be read', async () => {
+            const fs = await import('node:fs');
+            const widget = buildAvailableWidget(WIDGET_URIS.SEARCH_ACTORS, true);
+            vi.mocked(fs.readFileSync).mockImplementationOnce(() => {
+                throw new Error(`EACCES: permission denied, open '${widget.jsPath}'`);
+            });
+            const service = createResourceService({
+                getMode: () => 'apps',
+                getAvailableWidgets: () => new Map([[WIDGET_URIS.SEARCH_ACTORS, widget]]),
+            });
+
+            const error = await service.readResource(WIDGET_URIS.SEARCH_ACTORS).catch((e: unknown) => e);
+
+            expect(error).toBeInstanceOf(InternalError);
+            expect((error as InternalError).data).toEqual({ uri: WIDGET_URIS.SEARCH_ACTORS });
+            expect((error as InternalError).message).not.toContain(widget.jsPath);
         });
     });
 
