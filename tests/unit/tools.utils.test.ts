@@ -16,10 +16,18 @@ import {
     transformActorInputSchemaProperties,
 } from '../../src/tools/actor_input_schema.js';
 import { isActorBlockedUnderPaymentProvider } from '../../src/tools/actor_tool_naming.js';
+import { callActor } from '../../src/tools/actors/call_actor.js';
+import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
+import { sendServerActorRequest } from '../../src/tools/actors/send_server_actor_request.js';
 import type { ActorInputSchema, SchemaProperties, ToolBase, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { ajv } from '../../src/utils/ajv.js';
-import { extractActorName, getToolFullName, getToolPublicFieldOnly } from '../../src/utils/tools.js';
+import {
+    extractActorInterface,
+    extractActorName,
+    getToolFullName,
+    getToolPublicFieldOnly,
+} from '../../src/utils/tools.js';
 
 describe('fixedAjvCompile — untrusted schema size cap', () => {
     it('compiles a normal-sized schema', () => {
@@ -1065,6 +1073,19 @@ describe('extractActorName', () => {
     it('returns undefined for internal tools without actor arg', () => {
         const tool = { type: TOOL_TYPE.INTERNAL, name: 'store-search' } as unknown as ToolEntry;
         expect(extractActorName(tool)).toBeUndefined();
+    });
+});
+
+describe('the Actor interface a tool call goes through', () => {
+    it.each([
+        ['an Actor run tool', { type: TOOL_TYPE.ACTOR } as unknown as ToolEntry, {}, 'input'],
+        ['a proxied MCP tool', { type: TOOL_TYPE.ACTOR_MCP } as unknown as ToolEntry, {}, 'mcp'],
+        ['call-actor with an Actor', callActor, { actor: 'apify/rag-web-browser' }, 'input'],
+        ['call-actor with an MCP tool of an Actor', callActor, { actor: 'apify/example-mcp-server:add' }, 'mcp'],
+        ['send-server-actor-request', sendServerActorRequest, { actor: 'apify/web-fetch' }, 'server'],
+        ['a tool that calls no Actor', fetchActorDetails, { actor: 'apify/web-fetch' }, undefined],
+    ] as const)('is read for %s', (_label, tool, args, expected) => {
+        expect(extractActorInterface(tool, args)).toBe(expected);
     });
 });
 

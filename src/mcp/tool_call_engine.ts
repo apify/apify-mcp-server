@@ -37,7 +37,13 @@ import { getRequestOriginForClient, resolveStoreSearchTracking } from '../utils/
 import type { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { extractAjvErrorDetails, isMcpError } from '../utils/tool_status.js';
-import { buildActorFields, extractActorId, extractActorName, getToolFullName } from '../utils/tools.js';
+import {
+    buildActorFields,
+    extractActorId,
+    extractActorInterface,
+    extractActorName,
+    getToolFullName,
+} from '../utils/tools.js';
 import type { McpClientContext } from './client_context.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
 import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
@@ -247,6 +253,8 @@ export async function prepareToolCall(params: {
     const resolvedToolName = getToolFullName(tool);
     if (telemetryData) {
         telemetryData.tool_name = resolvedToolName;
+        const actorInterface = extractActorInterface(tool, args as Record<string, unknown> | undefined);
+        if (actorInterface) telemetryData.actor_interface = actorInterface;
     }
 
     const actorName = extractActorName(tool, args as Record<string, unknown>);

@@ -183,6 +183,9 @@ export type ActorInterfaces = {
     server: boolean;
 };
 
+/** One of an Actor's interfaces, e.g. the one a tool call goes through. */
+export type ActorInterfaceName = keyof ActorInterfaces;
+
 /**
  * Type for Actor-based tools - tools that wrap Apify Actors.
  * Type discriminator: {@link TOOL_TYPE.ACTOR}
@@ -253,6 +256,11 @@ export type HelperTool = ToolBase & {
      * arguments; it also sees undeclared keys, so build the copy as an allowlist.
      */
     redactArgs?: (args: Record<string, unknown>) => Record<string, unknown>;
+    /**
+     * The interface of the Actor in `args.actor` that the tool calls through, for telemetry; `extractActorInterface`
+     * reads an `actor:toolName` argument as `mcp`.
+     */
+    actorInterface?: ActorInterfaceName;
 };
 
 /**
@@ -437,6 +445,8 @@ export type ToolCallTelemetryProperties = {
     http_status?: number;
     /** Whose standby run `send-server-actor-request` reached. */
     actor_tenancy?: ActorTenancy;
+    /** The Actor interface the call went through; absent for a tool that calls no Actor. */
+    actor_interface?: ActorInterfaceName;
     actor_name?: string;
     actor_id?: string;
     /** Run the call touched. `run_status` is the run's own outcome, distinct from `tool_status`. */

@@ -1,4 +1,11 @@
-import type { CallDiagnostics, HelperTool, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
+import type {
+    ActorInterfaceName,
+    CallDiagnostics,
+    HelperTool,
+    ToolBase,
+    ToolEntry,
+    ToolInputSchema,
+} from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 import { fixZodSchemaRequired } from './ajv.js';
 
@@ -54,6 +61,18 @@ export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>
     const actorArg = args?.actor;
     if (typeof actorArg !== 'string') return undefined;
     return actorArg.split(':')[0]?.trim() || undefined;
+}
+
+/**
+ * The Actor interface a tool call goes through, for telemetry: an Actor tool's own, or the one an internal tool
+ * declares, where `call-actor`'s `actor:toolName` form reaches the MCP server. `undefined` for a tool that calls
+ * no Actor.
+ */
+export function extractActorInterface(tool: ToolEntry, args?: Record<string, unknown>): ActorInterfaceName | undefined {
+    if (tool.type === TOOL_TYPE.ACTOR) return 'input';
+    if (tool.type === TOOL_TYPE.ACTOR_MCP) return 'mcp';
+    if (tool.actorInterface !== 'input') return tool.actorInterface;
+    return typeof args?.actor === 'string' && args.actor.includes(':') ? 'mcp' : 'input';
 }
 
 type ToolPublicFieldOptions = {

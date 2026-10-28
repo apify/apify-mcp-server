@@ -507,6 +507,7 @@ export const sendServerActorRequest: ToolEntry = Object.freeze({
     ),
     // A third-party payment provider cannot pay for an Actor Server run, so such a session is rejected before the call.
     hasPaymentProviderStandbyCheck: true,
+    actorInterface: 'server',
     annotations: {
         title: 'Send Server Actor request',
         readOnlyHint: false,
