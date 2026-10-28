@@ -4,7 +4,6 @@ import { ZodError } from 'zod';
 import log from '@apify/log';
 
 import { SchemaTooLargeError } from '../errors.js';
-import { SKYFIRE_PAY_ID_KEY } from '../payments/const.js';
 import { isActorRunLimitError } from './apify_errors.js';
 
 /**
@@ -216,29 +215,4 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
 
     // No status code available - log as error
     log.error(message, { error: toPlainError(error), ...data });
-}
-
-const REDACTED_VALUE = '[REDACTED]';
-
-const isPlainRecord = (value: unknown): value is Record<string, unknown> => {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-};
-
-/**
- * Sanitizes tool call parameters by redacting the skyfire-pay-id.
- * Used for logging to avoid exposing the Skyfire payment token.
- *
- * @param params - The parameters object to sanitize
- * @returns A new object with skyfire-pay-id replaced with '[REDACTED]'
- */
-export function redactSkyfirePayId(params: unknown): unknown {
-    if (!isPlainRecord(params) || !(SKYFIRE_PAY_ID_KEY in params)) {
-        return params;
-    }
-
-    if (params[SKYFIRE_PAY_ID_KEY] === REDACTED_VALUE) {
-        return params;
-    }
-
-    return { ...params, [SKYFIRE_PAY_ID_KEY]: REDACTED_VALUE };
 }
