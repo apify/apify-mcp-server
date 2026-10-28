@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { HELPER_TOOLS, RAG_WEB_BROWSER } from '../../src/const.js';
+import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
 import { ACTOR_LOAD_ERROR_KIND } from '../../src/errors.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { getActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
@@ -15,7 +15,7 @@ import type { Actor, ServerActorToolInfo, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { mockActor, mockActorBuildClient, mockDefaultBuild } from './helpers/actor_build_client.js';
 import { makePaymentProvider } from './helpers/mcp_server.js';
-import { only } from './helpers/tool_context.js';
+import { only, stubToolCallContext, textOf, type TextToolResult } from './helpers/tool_context.js';
 
 /** Shaped like apify/server-actor-test: query parameters, a JSON body behind a reference, and a templated path. */
 const SCHEMA = {
@@ -48,6 +48,31 @@ const LONG_SCHEMA = {
     paths: {
         ...SCHEMA.paths,
         '/empty': { get: { summary: 'Return no content', description: 'a'.repeat(CLIENT_DESCRIPTION_MAX_LENGTH) } },
+    },
+};
+
+/** Shaped like apify/web-fetch: `GET /` with query parameters, among them `unwrap`, and `POST /` with a JSON body. */
+const WEB_FETCH_SCHEMA = {
+    paths: {
+        '/': {
+            get: {
+                summary: 'Fetch a URL',
+                parameters: [
+                    { name: 'url', in: 'query', required: true, schema: { type: 'string' } },
+                    { name: 'formats', in: 'query', schema: { type: 'array', items: { type: 'string' } } },
+                    { name: 'unwrap', in: 'query', schema: { type: 'boolean' } },
+                ],
+            },
+            post: {
+                summary: 'Fetch a URL',
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': { schema: { type: 'object', properties: { url: { type: 'string' } } } },
+                    },
+                },
+            },
+        },
     },
 };
 
@@ -288,5 +313,64 @@ describe('the operations in a Server Actor tool description', () => {
             hasRequestBody: true,
         });
         expect(buildServerActorToolInfo({ paths: {} }, 'apify/server-actor-test')).toBeUndefined();
+    });
+});
+
+describe('the default apify/web-fetch tool', () => {
+    const [username, name] = WEB_FETCH.split('/');
+    const loadWebFetchTool = async () =>
+        loadServerTool(WEB_FETCH_SCHEMA, {
+            username,
+            name,
+            actorStandby: { isEnabled: true, tenancy: 'MULTI_TENANT' },
+        });
+
+    it('takes only GET / with no body, both defaulted', async () => {
+        const tool = await loadWebFetchTool();
+        const args: Record<string, unknown> = { query: { url: 'https://example.com' } };
+
+        expect(tool.inputSchema.properties).toMatchObject({ method: { enum: ['GET'] }, path: { enum: ['/'] } });
+        expect(tool.inputSchema.properties).not.toHaveProperty('body');
+        expect(tool.ajvValidate(args)).toBe(true);
+        expect(args).toMatchObject({ method: 'GET', path: '/' });
+    });
+
+    it('describes only GET /, without unwrap', async () => {
+        const tool = await loadWebFetchTool();
+
+        expect(tool.description).toContain('{"operations":[{"method":"GET","path":"/"');
+        expect(tool.description).toContain('"name":"formats"');
+        expect(tool.description).not.toContain('"method":"POST"');
+        expect(tool.description).not.toContain('unwrap');
+    });
+
+    it('describes the query encodings and the URL scheme limit', async () => {
+        const tool = await loadWebFetchTool();
+
+        expect(tool.description).toContain('formats is a comma-separated string, such as "markdown,links"');
+        expect(tool.description).toContain('headers is a JSON object as a string, such as {"Accept-Language":"fr-FR"}');
+        expect(tool.description).toContain('a non-http(s) scheme such as ftp:');
+    });
+
+    it('rejects unwrap before sending the request', async () => {
+        const tool = await loadWebFetchTool();
+        if (tool.type !== TOOL_TYPE.ACTOR_SERVER) throw new Error('Expected a server tool');
+        const { apifyClient } = mockActorBuildClient({ actor: mockActor(), defaultBuild: mockDefaultBuild() });
+
+        const result = (await tool.call(
+            stubToolCallContext(
+                { method: 'GET', path: '/', query: { url: 'https://example.com', unwrap: true } },
+                apifyClient,
+            ),
+        )) as TextToolResult;
+
+        expect(result.isError).toBe(true);
+        expect(textOf(result.content[0])).toContain('"unwrap" is not accepted by this tool');
+    });
+
+    it('keeps the read-only hint of the Actor', async () => {
+        const tool = await loadWebFetchTool();
+
+        expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
     });
 });

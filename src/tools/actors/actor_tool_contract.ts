@@ -17,6 +17,7 @@ For detailed data from a specific platform (e.g. Amazon products with prices, In
 const WEB_FETCH_ADDITIONAL_DESC = `Use this tool to fetch a specific http(s) URL and return its complete content (one URL per call; http and https only).
 It renders JavaScript and bypasses anti-bot protection, so it also retrieves pages where a plain HTTP fetch gets blocked, fails with an error such as 403 or 429, or returns incomplete content.
 The page comes back verbatim - full content, no summarization - as Markdown, plain text, HTML, the raw response body, or the list of links on the page.
+In query, formats is a comma-separated string, such as "markdown,links", and headers is a JSON object as a string, such as {"Accept-Language":"fr-FR"}.
 
 Examples of when to use:
 - User provides a URL and wants its content, its data or links, or an answer that requires reading that page
@@ -24,16 +25,7 @@ Examples of when to use:
 - Verbatim page content is needed, e.g. for quoting, extraction, or archiving
 
 This tool does not search the web - it needs a URL. To find pages by query, use a web search tool instead.
-If the exact URL cannot be fetched (e.g. a non-http(s) scheme), say so rather than silently substituting a different URL.`;
-
-/**
- * Appended to the `url` parameter description of the `apify/web-fetch` tool. Lives on the
- * parameter because that is what an agent reads while writing the argument: agents
- * silently rewrote ftp:// URLs to https:// instead of telling the user the scheme is
- * unsupported.
- */
-const WEB_FETCH_URL_SCHEME_NOTE =
-    'http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.';
+If the exact URL cannot be fetched (e.g. a non-http(s) scheme such as ftp:), say so rather than silently substituting a different URL.`;
 
 /** Appended to the `apify/web-search` Actor tool description. */
 const WEB_SEARCH_ADDITIONAL_DESC = `Use this tool to search the web by query and get one page of organic results: title, URL, snippet and position (up to about 10 results; links and snippets only, no page content).
@@ -59,7 +51,6 @@ type ActorToolPolicyConfig = {
     directInput?: DirectActorPolicyConfig;
     /** Only these inputs are served; the others are hidden but still accepted and passed to the run. */
     exposedInputs?: readonly string[];
-    inputDescriptionSuffixes?: Readonly<Record<string, string>>;
     buildDescription?: (context: ToolDescriptionContext) => string;
 };
 
@@ -78,7 +69,6 @@ const ACTOR_TOOL_POLICIES: Readonly<Record<string, ActorToolPolicyConfig>> = {
         buildDescription: () => RAG_WEB_BROWSER_ADDITIONAL_DESC,
     },
     [WEB_FETCH]: {
-        inputDescriptionSuffixes: { url: WEB_FETCH_URL_SCHEME_NOTE },
         buildDescription: () => WEB_FETCH_ADDITIONAL_DESC,
     },
     [WEB_SEARCH]: {
