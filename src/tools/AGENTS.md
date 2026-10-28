@@ -21,7 +21,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   read by tool loading: a server tool if `server`, else MCP tools if `mcp`, else a run tool if `input`, else none
   (`SERVER_ACTOR_WITHOUT_MCP`). `getActorToolModeFromInterfaces` gives the `call-actor` route, which skips the
   server interface, so `call-actor` still starts runs of a Server Actor. Actors in `INPUT_INTERFACE_ACTORS`
-  (`../const.ts`: web-fetch, web-search, rag-web-browser) are served as run tools although they declare an MCP
+  (`../const.ts`: web-search, rag-web-browser) are served as run tools although they declare an MCP
   path or a server interface, unless their input schema is empty, in which case they get no tool.
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
   - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), delete
@@ -29,7 +29,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     (`getServerActorsAsTools`, type `actor-server`): `send-server-actor-request`'s execution and output with the
     Actor fixed, `method` narrowed to the documented ones, `path` a plain string (no enum: a schema can document
     thousands of paths), and the operations in the description; an Actor with a server interface and no
-    `webServerToolInfo` is reported as `load-failed`), the direct actor-tool executor (`actor_executor.ts`),
+    `webServerToolInfo` is reported as `load-failed`; the default `apify/web-fetch` tool is the one hardcoded
+    exception: only `GET /`, without `unwrap`, which its call refuses), the direct actor-tool executor
+    (`actor_executor.ts`),
     `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`, and resolves the build
     the server-interface fields — `webServerMcpPath`, `webServerSchema` — are read from when standby is on,
     `resolveServerInterfaceDefinition`, shared with `fetchActorDetails` in `../utils/actor_details.ts`; the input

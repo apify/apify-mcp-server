@@ -28,6 +28,7 @@ import { ACTOR_TENANCY, ACTOR_TOOL_MODE } from '../types.js';
  * Actors in `INPUT_INTERFACE_ACTORS` (`../const.ts`) are served through the input interface although they declare
  * other interfaces: their MCP path reads as absent, and their own tool never takes `SERVER`. With an empty input
  * schema (including a malformed one `pruneActorDefinition` drops) they get no tool, like any other server Actor.
+ * `apify/web-fetch` is not among them: its own tool is `SERVER`, limited to `GET /` (`buildServerActorToolInfo`).
  * An MCP-server Actor does not get `input` even with a non-empty input schema: Store data shows that
  * interface is unused on such Actors.
  * The input schema counts as empty when the definition has no `input`, `input.properties` is missing,
