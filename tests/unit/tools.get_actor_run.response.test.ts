@@ -14,17 +14,10 @@ import {
     type RunResponse,
 } from '../../src/tools/actors/actor_run_response.js';
 import { getActorRun } from '../../src/tools/runs/get_actor_run.js';
-import { actorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import {
-    expectSchemaConformingStructuredContent,
-    mockApifyClient,
-    mockUserInfo,
-    stubToolCallContext,
-    type TextToolResult,
-} from './helpers/tool_context.js';
+import { mockApifyClient, mockUserInfo, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 // Only Console UI token sessions reach the users/me lookup; the default 'test-token'
 // stub never triggers it.
@@ -129,7 +122,6 @@ describe('get-actor-run default response', () => {
         expect(content).toHaveLength(2);
         expect(JSON.parse(content[0].text)).toEqual(structuredContent);
         expect(content[1].text).toContain('dataset-xyz');
-        expect(content[1].text).not.toContain('Array paths in fields');
         expect(content[1].text).not.toContain('```json');
 
         // Usage attribution `_meta` flows through end-to-end.
@@ -1124,7 +1116,6 @@ function makeRun(status: string, statusMessage?: string, runTimeSecs = 10) {
 }
 
 const datasetWithItems: RunDataset = { id: 'ds-1', itemCount: 47, fields: ['metadata.url', 'markdown'] };
-const datasetWithArrays: RunDataset = { id: 'ds-1', itemCount: 47, fields: ['query', 'results.0.url'] };
 const datasetEmpty: RunDataset = { id: 'ds-1', itemCount: 0, fields: [] };
 const kvWithRecords: RunKeyValueStore = { id: 'kv-1', keys: ['result-a', 'result-b'], keyCount: 2 };
 
@@ -1145,12 +1136,8 @@ describe('buildStatusTemplate', () => {
         expect(t.summary).toContain('47 items; 2 fields available');
         expect(t.nextStep).toContain('get-dataset-items');
         expect(t.nextStep).toContain('datasetId=ds-1');
-        expect(t.nextStep).not.toContain('Array paths in fields');
-    });
-
-    it('SUCCEEDED with arrays adds the array selection sentence to nextStep', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset: datasetWithArrays });
-        expect(t.nextStep).toContain('An unindexed array path (results.url) returns nothing.');
+        expect(t.nextStep).toContain('Fields: metadata.url, markdown.');
+        expect(t.nextStep).toContain('returns nothing');
     });
 
     it('SUCCEEDED dataset nextStep uses DEFAULT_DATASET_ITEMS_LIMIT as example limit', () => {
@@ -1187,7 +1174,7 @@ describe('buildStatusTemplate', () => {
         const dataset: RunDataset = { id: 'ds-1', itemCount: 5, fields: [] };
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
         expect(t.nextStep).toContain('get-dataset-items');
-        expect(t.nextStep).not.toContain('Array paths in fields');
+        expect(t.nextStep).not.toContain('Fields:');
         expect(t.nextStep).not.toContain('—');
     });
 
@@ -1311,12 +1298,10 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).toContain('partial output (47 items written)');
     });
 
-    it('TIMED-OUT with arrays adds the array selection sentence to nextStep', () => {
-        const t = buildStatusSummaryNextStep({
-            run: makeRun('TIMED-OUT'),
-            dataset: datasetWithArrays,
-        });
-        expect(t.nextStep).toContain('An unindexed array path (results.url) returns nothing.');
+    it('TIMED-OUT with fields carries the same fields hint as SUCCEEDED', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('TIMED-OUT'), dataset: datasetWithItems });
+        expect(t.nextStep).toContain('Fields: metadata.url, markdown.');
+        expect(t.nextStep).toContain('returns nothing');
     });
 
     it('TIMED-OUT with both dataset and KV records picks dataset for nextStep', () => {
@@ -1409,68 +1394,39 @@ describe('buildStatusTemplate', () => {
     });
 
     it('SUCCEEDED with items ends nextStep with a single period after the fields hint', () => {
-        // The hint terminates the sentence, so the outer template must not append its own period.
+        // The fields-hint template already terminates the sentence, so the outer nextStep
+        // template must not append its own `.`.
         const t = buildStatusSummaryNextStep({
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
         });
-        expect(t.nextStep).toMatch(/\.$/);
+        expect(t.nextStep).toMatch(/for every element\.$/);
         expect(t.nextStep).not.toMatch(/\.\.$/);
     });
 });
 
-describe('array selection hints', () => {
-    it('derives the one-element, every-element and unindexed examples from the first indexed path', () => {
-        const hint = fieldsProjectionHint(['query', 'results.0.url', 'results.0.siteLinks.0.url']);
-        expect(hint).toContain('select one element (results.0.url)');
-        expect(hint).toContain('top-level name (results) for every element');
-        expect(hint).toContain('An unindexed array path (results.url) returns nothing.');
+describe('fieldsProjectionHint', () => {
+    it('lists the fields and says a path through an array is not selectable, without an indexed example', () => {
+        const hint = fieldsProjectionHint(['query', 'results.url']);
+        expect(hint).toContain('Fields: query, results.url.');
+        expect(hint).toContain('select the top-level name of the array for every element');
+        expect(hint).not.toMatch(/\.\d+(\.|\b)/);
     });
 
-    it('skips the unindexed example for a scalar array, whose top-level name is the only other path', () => {
-        const hint = fieldsProjectionHint(['tags.0', 'markdown']);
-        expect(hint).toContain('select one element (tags.0)');
-        expect(hint).not.toContain('returns nothing');
-    });
-
-    it('is empty without arrays', () => {
-        expect(fieldsProjectionHint(['metadata.url', 'markdown'])).toBe('');
-    });
-});
-
-describe('collapsed array indices on the run dataset entry', () => {
-    it('collapses every index to 0 so each listed path is a valid selection', async () => {
-        const run = mockSucceededRun();
-        const dataset = mockDataset({
-            fields: ['query', 'results/0/url', 'results/0/siteLinks/0/url', 'results/1/url', 'results/1/title'],
-        });
-        const result = await (getActorRun as HelperTool).call(
-            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, stubClient({ run, dataset })),
-        );
-        const { structuredContent, content } = result as {
-            structuredContent: RunResponse;
-            content: { text: string }[];
-        };
-
-        expectSchemaConformingStructuredContent(result, actorRunOutputSchema);
-        expect(structuredContent.storages.datasets?.default.fields).toEqual([
-            'query',
-            'results.0.url',
-            'results.0.siteLinks.0.url',
-            'results.0.title',
-        ]);
-        expect(content[1].text).toContain('An unindexed array path (results.url) returns nothing.');
+    it('is empty without fields', () => {
+        expect(fieldsProjectionHint([])).toBe('');
+        expect(fieldsProjectionHint(undefined)).toBe('');
     });
 });
 
 // -----------------------------------------------------------------------------
-// collapseArrayIndices (#894, #1656): the single boundary where Apify's index-expanded
+// collapseArrayIndices (#894): the single boundary where Apify's index-expanded
 // `dataset.fields` is normalized. `buildRunDataset` calls this once, so every
 // downstream consumer (structured `storages.datasets.default.fields` AND the
-// narrative summary/nextStep) sees a deduped list of valid selections.
+// narrative summary/nextStep) sees a flat deduped list.
 // -----------------------------------------------------------------------------
 describe('collapseArrayIndices', () => {
-    it('collapses numeric segments to 0 and dedupes paths sharing the same shape', () => {
+    it('strips numeric segments and dedupes paths sharing the same shape', () => {
         expect(
             collapseArrayIndices([
                 'latestComments.0.id',
@@ -1479,21 +1435,22 @@ describe('collapseArrayIndices', () => {
                 'latestComments.1.text',
                 'latestComments.2.owner.username',
             ]),
-        ).toEqual(['latestComments.0.id', 'latestComments.0.text', 'latestComments.0.owner.username']);
+        ).toEqual(['latestComments.id', 'latestComments.text', 'latestComments.owner.username']);
     });
 
     it('preserves non-array fields unchanged and preserves first-occurrence order', () => {
         expect(
             collapseArrayIndices(['metadata.url', 'entities.hashtags.0.text', 'entities.hashtags.1.text', 'markdown']),
-        ).toEqual(['metadata.url', 'entities.hashtags.0.text', 'markdown']);
+        ).toEqual(['metadata.url', 'entities.hashtags.text', 'markdown']);
     });
 
     it('returns [] for empty input', () => {
         expect(collapseArrayIndices([])).toEqual([]);
     });
 
-    it('keeps one path for pathological all-numeric keys', () => {
-        // Pure-numeric top-level keys are object keys, not array indices, but they collapse like one.
-        expect(collapseArrayIndices(['0', '1', '2'])).toEqual(['0']);
+    it('drops paths that collapse to empty (pathological all-numeric segments)', () => {
+        // Pure-numeric top-level keys are pathological (dataset fields are object keys, not
+        // array indices) but we still don't want them sneaking through as empty strings.
+        expect(collapseArrayIndices(['0', '1', '2'])).toEqual([]);
     });
 });

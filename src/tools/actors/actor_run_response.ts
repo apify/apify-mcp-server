@@ -95,9 +95,11 @@ export type RunDataset = {
      */
     inflatedBytes?: number;
     /**
-     * Dot-notation field paths with every array index collapsed to 0 and the list deduped, so
-     * `entities.hashtags.0.text`, `entities.hashtags.1.text`, ... become one `entities.hashtags.0.text`.
-     * Each path is a valid `fields` selection; another element is the same path with another index.
+     * Dot-notation field paths. Pure-numeric segments (array indices) are stripped and the
+     * list is deduped at build time, so callers receive a flat unique description of the item
+     * structure rather than the inflated `entities.hashtags.0.text`, `entities.hashtags.1.text`, ...
+     * shape Apify returns for array-heavy datasets. A path through an array is not a valid
+     * `fields` selection (#1656).
      */
     fields?: string[];
     /**
@@ -171,8 +173,9 @@ export type FetchActorRunResult = {
 /**
  * Apify expands array indices in dataset fields (e.g. `entities.hashtags.0.text`,
  * `entities.hashtags.1.text`, ... `entities.hashtags.14.text`), so deeply-nested or
- * array-heavy schemas balloon into hundreds of redundant paths. Collapse every index to 0 and
- * dedupe: the list stays short and each path is still a valid `fields` selection (#1656).
+ * array-heavy schemas balloon into hundreds of redundant paths. Strip pure-numeric
+ * segments and dedupe; the result describes the structure, and a path through an array is
+ * not a valid `fields` selection (#1656).
  *
  * Exported for direct unit testing of edge cases (empty input, all-numeric paths) —
  * production callers go through `normalizeDatasetFields`.
@@ -183,9 +186,9 @@ export function collapseArrayIndices(fields: string[]): string[] {
     for (const field of fields) {
         const collapsed = field
             .split('.')
-            .map((segment) => (/^\d+$/.test(segment) ? '0' : segment))
+            .filter((segment) => !/^\d+$/.test(segment))
             .join('.');
-        if (!seen.has(collapsed)) {
+        if (collapsed && !seen.has(collapsed)) {
             seen.add(collapsed);
             result.push(collapsed);
         }
@@ -536,23 +539,15 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
 }
 
 /**
- * Array guidance for the `fields` parameter, derived from the collapsed `fields` of a dataset
- * entry. Empty when the dataset has no arrays: plain dotted paths need no explanation. The
- * examples come from the first indexed path. Projection across array elements is an API gap
- * (apify/apify-core#31931); until then the whole array is the only way to get every element.
+ * `fields` collapses array indices, so a path through an array (`results.url`) describes the
+ * structure but returns `[{}]` when selected (#1656). Say so; projection across array elements
+ * is an API gap (apify/apify-core#31931) and the whole array is the only way to get every element.
  */
 export function fieldsProjectionHint(fields: string[] | undefined): string {
-    const indexedField = fields?.find((field) => /(^|\.)0(\.|$)/.test(field));
-    if (!indexedField) return '';
-    const topLevel = indexedField.split('.')[0];
-    const unindexed = indexedField
-        .split('.')
-        .filter((segment) => !/^\d+$/.test(segment))
-        .join('.');
-    const negative = unindexed === topLevel ? '' : ` An unindexed array path (${unindexed}) returns nothing.`;
+    if (!fields?.length) return '';
     return (
-        ` Array paths in fields carry index 0 and select one element (${indexedField});` +
-        ` select the top-level name (${topLevel}) for every element.${negative}`
+        ` Fields: ${fields.join(', ')}. A dotted path through an array is not selectable and returns nothing;` +
+        ' select the top-level name of the array for every element.'
     );
 }
 
@@ -585,7 +580,7 @@ function buildSucceededSummaryNextStep(
         const fields = dataset?.fields ?? [];
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. ${itemCount} ${itemCount === 1 ? 'item' : 'items'}; ${fields.length} fields available.${kv.summarySuffix}`,
-            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items (${itemCount} total).${datasetSizeNextStepHint(dataset?.inflatedBytes)}${fieldsProjectionHint(dataset?.fields)}`,
+            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items (${itemCount} total).${datasetSizeNextStepHint(dataset?.inflatedBytes)}${fieldsProjectionHint(fields)}`,
         };
     }
 
