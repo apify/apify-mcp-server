@@ -52,6 +52,13 @@ const sendServerActorRequestArgs = z.object({
 });
 type SendServerActorRequestArgs = z.infer<typeof sendServerActorRequestArgs>;
 
+/** Advertises explicit JSON types for `body` without letting AJV coerce it, as apify-api-write does. */
+function toAdvertisedInputSchema(args: z.ZodObject<z.ZodRawShape>): ToolInputSchema {
+    const { body } = args.shape;
+    const advertised = body ? args.extend({ body: (body as z.ZodType).meta(anyJsonValueSchema) }) : args;
+    return z.toJSONSchema(advertised) as ToolInputSchema;
+}
+
 /** The Actor and the request as sent: the fields every response about a sent request starts with. */
 type ServerActorRequest = {
     actorId: string;
@@ -450,6 +457,17 @@ export async function executeSendServerActorRequest(
     }
 }
 
+/** The logged arguments: the body can carry secrets, and an Actor Server can take a credential under any query name. */
+function redactServerActorRequestArgs({ actor, query, ...rest }: Record<string, unknown>) {
+    return {
+        actor,
+        ...redactApiCallArgs(rest),
+        ...(query !== undefined && {
+            query: isRecord(query) ? Object.fromEntries(Object.keys(query).map((name) => [name, REDACTED])) : REDACTED,
+        }),
+    };
+}
+
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
     const details = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
         ? ` ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface returns the documented operations with their parameters.`
@@ -481,10 +499,7 @@ export const sendServerActorRequest: ToolEntry = Object.freeze({
     title: 'Send Server Actor request',
     description: buildDescription(ALL_TOOLS_PRESENT),
     buildDescription,
-    // Advertise explicit JSON types without letting AJV coerce the body, as apify-api-write does.
-    inputSchema: z.toJSONSchema(
-        sendServerActorRequestArgs.extend({ body: sendServerActorRequestArgs.shape.body.meta(anyJsonValueSchema) }),
-    ) as ToolInputSchema,
+    inputSchema: toAdvertisedInputSchema(sendServerActorRequestArgs),
     outputSchema: serverActorRequestOutputSchema,
     // The shared validator coerces null and singleton arrays into scalar query values.
     ajvValidate: new Ajv({ coerceTypes: false, strict: false, removeAdditional: true }).compile(
@@ -500,13 +515,6 @@ export const sendServerActorRequest: ToolEntry = Object.freeze({
         idempotentHint: false,
         openWorldHint: true,
     },
-    // The body can carry secrets, and an Actor Server can take a credential under any query name.
-    redactArgs: ({ actor, query, ...rest }: Record<string, unknown>) => ({
-        actor,
-        ...redactApiCallArgs(rest),
-        ...(query !== undefined && {
-            query: isRecord(query) ? Object.fromEntries(Object.keys(query).map((name) => [name, REDACTED])) : REDACTED,
-        }),
-    }),
+    redactArgs: redactServerActorRequestArgs,
     call: async (toolArgs: InternalToolArgs) => executeSendServerActorRequest(toolArgs),
 } as const);
