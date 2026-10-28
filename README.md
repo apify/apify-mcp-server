@@ -267,6 +267,7 @@ Legend for the **Enabled by default** column:
 | `fetch-actor-details` | actors | Retrieve detailed information about a specific Actor, including its input schema, README (summary when available, full otherwise), pricing, Actor output schema, and a Server Actor's HTTP operations. | ✅ |
 | `call-actor` | actors | Call an Actor and get its run results. Use fetch-actor-details first to get the Actor's input schema. | ✅ |
 | `send-server-actor-request` | none (select by name: `tools=send-server-actor-request`) | Send one HTTP request to a Server Actor's API, the server interface its API schema documents, and return the response. |  |
+| `fetch-actor-mcp-tool-list` | actors | List an Actor's MCP tools with their schemas, annotations, and metadata. | ✅ |
 | `call-actor-mcp-tool` | actors | Call one tool on an Actor's MCP server and return its result. | ✅ |
 | `get-actor-run` | runs | Get detailed information about a specific Actor run. | ⚡ |
 | `get-dataset-items` | storage | Retrieve items from a dataset with support for filtering and pagination. | ⚡ |
@@ -432,6 +433,7 @@ The v2 configuration preserves backward compatibility with v1 usage. Notes:
 - `tools=get-actor-log` is retired: the tool was renamed to `get-actor-run-log`. The old selector is ignored and loads no tools. Use `tools=get-actor-run-log` (or the `runs` category) instead.
 - `tools=source` is retired: the category was renamed to `versions`. The old selector is ignored and loads no tools. Use `tools=versions` instead.
 - `call-actor` no longer calls an MCP server Actor's tools: the `"actorName:toolName"` form of `actor` is rejected, and the result with `runId: 'mcp-passthrough'` is gone. Call `call-actor-mcp-tool` with `actor`, `tool`, and `arguments`; it returns the remote tool's result. It is in the `actors` category, so a selection naming `call-actor` alone needs `call-actor-mcp-tool` added.
+- `fetch-actor-details` no longer lists an MCP server Actor's tools: `output.mcpTools` and the `mcpTools` field of `structuredContent` are removed, and details never connects to the Actor. Call `fetch-actor-mcp-tool-list` with `actor`; it returns the tool definitions in `structuredContent.tools`. It is in the `actors` category, so a selection naming `fetch-actor-details` alone needs `fetch-actor-mcp-tool-list` added. An `output.mcpTools` sent by an older client is ignored. If it was the only output option, details returns its default sections.
 
 Existing URLs and commands using `?actors=...` or `--actors` continue to work unchanged.
 

@@ -47,6 +47,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `mcp` interface, with the remote `CallToolResult` passed through except for internal telemetry;
     `runOnActorMcpServer` resolves the Actor and its MCP URL, connects under the caller's token and turns a failed
     connection, an abort or a remote error into a response),
+    `fetch_actor_mcp_tool_list.ts` (`fetch-actor-mcp-tool-list`: an uncached `tools/list` through
+    `runOnActorMcpServer` that follows `nextCursor` within one `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC` for all pages,
+    fails on a failed page and stops after `MAX_TOOL_LIST_PAGES`;
+    `fetch-actor-details` never connects to an MCP server),
     `actor_tool_contract.ts` (Actor-specific presentation policies plus direct-tool input restrictions
     and defaults, shared by schema generation, the call engine's denied-input check and execution;
     generic calls skip direct-only restrictions and defaults), and

@@ -350,7 +350,7 @@ describe('the tool description', () => {
 
         expect(withSend).toContain('one-line server interface summary');
         expect(withoutSend).not.toContain('server interface summary');
-        expect(withoutSend).toContain('mcpTools and serverInterface.\n');
+        expect(withoutSend).toContain('outputSchema and serverInterface.\n');
     });
 });
 

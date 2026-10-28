@@ -314,7 +314,6 @@ export const actorsCases: Case[] = [
                         metadata: false,
                         inputSchema: true,
                         readme: false,
-                        mcpTools: false,
                     },
                 },
             });
@@ -341,7 +340,6 @@ export const actorsCases: Case[] = [
                         metadata: false,
                         inputSchema: false,
                         readme: false,
-                        mcpTools: false,
                     },
                 },
             });
@@ -353,85 +351,32 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        name: 'should list MCP tools when output={ mcpTools: true } for MCP server Actor',
-        isDeploymentTest: false,
+        name: 'lists the MCP tools of an MCP server Actor with fetch-actor-mcp-tool-list',
+        isDeploymentTest: true,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
-                name: 'fetch-actor-details',
-                arguments: {
-                    actor: ACTOR_EXAMPLE_MCP_SERVER,
-                    output: {
-                        description: false,
-                        stats: false,
-                        pricing: false,
-                        rating: false,
-                        metadata: false,
-                        inputSchema: false,
-                        readme: false,
-                        mcpTools: true,
-                    },
-                },
+                name: 'fetch-actor-mcp-tool-list',
+                arguments: { actor: ACTOR_EXAMPLE_MCP_SERVER },
             });
 
-            const content = result.content as { text: string }[];
-            expect(content.some((item) => item.text.includes('Available MCP Tools'))).toBe(true);
-            expect(content.some((item) => item.text.includes('add'))).toBe(true);
+            expect(result.isError ?? false).toBe(false);
+            const { tools } = result.structuredContent as { tools: { name: string; inputSchema: unknown }[] };
+            expect(tools.find((tool) => tool.name === 'add')?.inputSchema).toBeDefined();
+            expect((result.content as { text: string }[]).some((item) => item.text.startsWith('add: '))).toBe(true);
+            validateStructuredOutputForTool(result, 'fetch-actor-mcp-tool-list', 'default');
         }),
     },
     {
-        name: 'should return graceful note when output={ mcpTools: true } for regular Actor',
+        name: 'rejects an Actor that is not an MCP server in fetch-actor-mcp-tool-list',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
-                name: 'fetch-actor-details',
-                arguments: {
-                    actor: ACTOR_NORMAL_MODE,
-                    output: {
-                        description: false,
-                        stats: false,
-                        pricing: false,
-                        rating: false,
-                        metadata: false,
-                        inputSchema: false,
-                        readme: false,
-                        mcpTools: true,
-                    },
-                },
+                name: 'fetch-actor-mcp-tool-list',
+                arguments: { actor: ACTOR_NORMAL_MODE },
             });
 
-            const content = result.content as { text: string }[];
-            expect(content.some((item) => item.text.includes('This Actor is not an MCP server'))).toBe(true);
-        }),
-    },
-    {
-        name: 'should return structured output for fetch-actor-details with selective output matching outputSchema',
-        isDeploymentTest: false,
-        run: withClient({ tools: ['actors'] }, async (client) => {
-            const toolName = 'fetch-actor-details';
-
-            // Test with output={ mcpTools: true } - should validate against schema even with selective fields
-            const result = await client.callTool({
-                name: toolName,
-                arguments: {
-                    actor: ACTOR_EXAMPLE_MCP_SERVER,
-                    output: {
-                        description: false,
-                        stats: false,
-                        pricing: false,
-                        rating: false,
-                        metadata: false,
-                        inputSchema: false,
-                        readme: false,
-                        mcpTools: true,
-                    },
-                },
-            });
-
-            const content = result.content as { text: string; isError?: boolean }[];
-            expect(content.length).toBeGreaterThan(0);
-
-            // This should validate successfully - structured output must match schema
-            validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
+            expect(result.isError).toBe(true);
+            expect((result.content as { text: string }[])[0].text).toContain('is not an MCP server');
         }),
     },
     {
@@ -453,7 +398,6 @@ export const actorsCases: Case[] = [
                         metadata: false,
                         inputSchema: false,
                         readme: true,
-                        mcpTools: false,
                     },
                 },
             });
@@ -481,7 +425,6 @@ export const actorsCases: Case[] = [
                         metadata: false,
                         inputSchema: false,
                         readme: false,
-                        mcpTools: false,
                     },
                 },
             });
@@ -512,7 +455,6 @@ export const actorsCases: Case[] = [
                         metadata: false,
                         inputSchema: false,
                         readme: true,
-                        mcpTools: false,
                     },
                 },
             });
@@ -566,10 +508,8 @@ export const actorsCases: Case[] = [
 
             const content = result.content as { text: string }[];
             // Should contain all default sections (description, stats, pricing, rating, metadata, readme, inputSchema)
-            // but NOT mcpTools (which defaults to false)
             expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
-            expect(content.some((item) => item.text.includes('Available MCP Tools'))).toBe(false);
         }),
     },
     {
@@ -588,7 +528,6 @@ export const actorsCases: Case[] = [
                         metadata: false,
                         inputSchema: true,
                         readme: true,
-                        mcpTools: false,
                     },
                 },
             });
@@ -628,7 +567,6 @@ export const actorsCases: Case[] = [
                         metadata: false,
                         inputSchema: false,
                         readme: false,
-                        mcpTools: false,
                     },
                 },
             });
@@ -660,7 +598,6 @@ export const actorsCases: Case[] = [
                         metadata: false,
                         inputSchema: false,
                         readme: false,
-                        mcpTools: false,
                     },
                 },
             });
@@ -693,7 +630,6 @@ export const actorsCases: Case[] = [
                         metadata: true,
                         inputSchema: false,
                         readme: false,
-                        mcpTools: false,
                     },
                 },
             });
@@ -724,7 +660,6 @@ export const actorsCases: Case[] = [
                         metadata: true,
                         inputSchema: false,
                         readme: false,
-                        mcpTools: false,
                     },
                 },
             });
@@ -861,7 +796,6 @@ export const actorsCases: Case[] = [
                             metadata: option.field === 'metadata',
                             inputSchema: option.field === 'inputSchema',
                             readme: option.field === 'readme',
-                            mcpTools: false,
                         },
                     },
                 });
@@ -896,7 +830,6 @@ export const actorsCases: Case[] = [
                         metadata: true,
                         inputSchema: false,
                         readme: false,
-                        mcpTools: false,
                     },
                 },
             });

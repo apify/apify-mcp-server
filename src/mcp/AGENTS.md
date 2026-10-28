@@ -36,7 +36,7 @@ Two MCP protocol revisions are served, each by its own adapter:
 - `client.ts` — `connectMCPClient(url, options)`: transport negotiation; both transports send the token and the
   session's request origin (`ApifyClient.requestOrigin`, `APIFY_AI` for the Apify AI client) on every request.
 - `remote_tool_call.ts` — `withRemoteMcpClient()`: connect-call-close round trip for
-  `tool_dispatch.ts` and `call_actor_mcp_tool.ts`'s remote tool calls.
+  `tool_dispatch.ts` and the MCP server Actor tools (`runOnActorMcpServer` in `call_actor_mcp_tool.ts`).
 - `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`, `getProxyMCPServerToolName(actorFullName, toolName)`.
 - `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`; `resolveOnStandbyOrigin()`:
   resolves a path against the Actor's `standbyUrl` (no `standbyUrl`, no URL) and flags a path that leaves that

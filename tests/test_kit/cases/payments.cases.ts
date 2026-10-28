@@ -174,7 +174,7 @@ export const paymentsCases: Case[] = [
         },
     },
     {
-        name: 'does not list send-server-actor-request or call-actor-mcp-tool in x402 or skyfire payment mode',
+        name: 'does not list send-server-actor-request or the Actor MCP tools in x402 or skyfire payment mode',
         isDeploymentTest: false,
         skipIf: skipOnStdio,
         run: async (ctx) => {
@@ -185,6 +185,7 @@ export const paymentsCases: Case[] = [
                     const names = tools.map((tool) => tool.name);
                     expect(names).not.toContain('send-server-actor-request');
                     expect(names).not.toContain('call-actor-mcp-tool');
+                    expect(names).not.toContain('fetch-actor-mcp-tool-list');
                 } finally {
                     await client.close();
                 }

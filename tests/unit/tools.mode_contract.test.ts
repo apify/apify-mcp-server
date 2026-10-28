@@ -75,6 +75,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
                 HELPER_TOOLS.STORE_SEARCH,
                 HELPER_TOOLS.ACTOR_GET_DETAILS,
                 HELPER_TOOLS.ACTOR_CALL,
+                HELPER_TOOLS.ACTOR_MCP_TOOL_LIST,
                 HELPER_TOOLS.ACTOR_MCP_TOOL_CALL,
             ];
             expect(toolNames(defaultCategories.actors)).toEqual(expected);
@@ -278,6 +279,20 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
 
             expect(description).toContain('do not construct a plausible-looking name');
             expect(description).not.toContain(HELPER_TOOLS.STORE_SEARCH);
+        });
+    });
+
+    describe('fetch-actor-details MCP tool guidance', () => {
+        it('names fetch-actor-mcp-tool-list only when that tool is served', () => {
+            const withList = getToolPublicFieldOnly(fetchActorDetails, {
+                presentTools: new Set([HELPER_TOOLS.ACTOR_GET_DETAILS, HELPER_TOOLS.ACTOR_MCP_TOOL_LIST]),
+            });
+            const withoutList = getToolPublicFieldOnly(fetchActorDetails, {
+                presentTools: new Set([HELPER_TOOLS.ACTOR_GET_DETAILS]),
+            });
+
+            expect(withList.description).toContain(`${HELPER_TOOLS.ACTOR_MCP_TOOL_LIST} lists its MCP tools`);
+            expect(withoutList.description).not.toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST);
         });
     });
 

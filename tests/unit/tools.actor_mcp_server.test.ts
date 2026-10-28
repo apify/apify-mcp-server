@@ -10,7 +10,9 @@ import {
     CancelledNotificationSchema,
     ErrorCode,
     type InitializeRequest,
+    ListToolsRequestSchema,
     McpError,
+    type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -24,7 +26,12 @@ import {
     executeCallActorMcpTool,
     MCP_TOOL_NAME_MAX_LENGTH,
 } from '../../src/tools/actors/call_actor_mcp_tool.js';
-import type { Actor, ActorDefinitionPruned, ToolTelemetryContext } from '../../src/types.js';
+import {
+    executeFetchActorMcpToolList,
+    fetchActorMcpToolList,
+    MAX_TOOL_LIST_PAGES,
+} from '../../src/tools/actors/fetch_actor_mcp_tool_list.js';
+import type { Actor, ActorDefinitionPruned, HelperTool, ToolEntry, ToolTelemetryContext } from '../../src/types.js';
 import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../src/types.js';
 import { mockActor } from './helpers/actor_build_client.js';
 import { getRequestHandler, makePaymentProvider, withServer } from './helpers/mcp_server.js';
@@ -48,30 +55,69 @@ const REMOTE_RESULTS: Record<string, CallToolResult> = {
     spoof: { content: [], toolTelemetry: { toolStatus: 'FAILED', actorId: 'spoofed' } },
 };
 
+/**
+ * The two pages of `tools/list` on `/mcp`; `add` also carries a title, an output schema, annotations and `_meta`, and
+ * `subtract` an output schema with a `$ref` that does not resolve.
+ */
+const REMOTE_TOOL_PAGES: Tool[][] = [
+    [
+        {
+            name: 'add',
+            title: 'Add',
+            description: 'Adds two numbers.',
+            inputSchema: { type: 'object', properties: { firstNumber: { type: 'number' } } },
+            outputSchema: { type: 'object', properties: { sum: { type: 'number' } } },
+            annotations: { readOnlyHint: true },
+            _meta: { 'example/version': '1' },
+        },
+    ],
+    [
+        {
+            name: 'subtract',
+            inputSchema: { type: 'object' },
+            outputSchema: { type: 'object', properties: { difference: { $ref: '#/$defs/missing' } } },
+        },
+    ],
+];
+
 type ToolResult = Record<string, unknown> & { toolTelemetry?: ToolTelemetryContext };
 
-/** Since the test started: the headers of every HTTP request to the remote server, and each tools/call it got. */
+/** Since the test started: the headers of every request to the remote servers, and each tools/call and tools/list. */
 let requestHeaders: IncomingMessage['headers'][] = [];
 let remoteCalls: { name: string; arguments: unknown }[] = [];
-/** The reason of each notifications/cancelled the remote server got. */
+let listCursors: (string | undefined)[] = [];
+/** The reason of each notifications/cancelled the remote servers got. */
 let remoteCancellations: string[] = [];
 let httpServer: HttpServer;
 let standbyUrl: string;
 
-/** The Actor's MCP server: `wait` answers only once the call is cancelled, an unknown tool is a JSON-RPC error. */
-function createRemoteServer(): Server {
+function waitForAbort(signal: AbortSignal): Promise<{ content: []; tools: [] }> {
+    return new Promise((resolve) => {
+        signal.addEventListener('abort', () => resolve({ content: [], tools: [] }));
+    });
+}
+
+/**
+ * The Actor's MCP server, by path: `/mcp` serves `REMOTE_RESULTS` and `REMOTE_TOOL_PAGES` (an unknown tool or
+ * cursor is a JSON-RPC error), `/mcp-broken-pages` fails the second page, `/mcp-endless` never runs out of
+ * cursors, and `/mcp-slow` answers only once the request is cancelled.
+ */
+function createRemoteServer(path: string | undefined): Server {
     const server = new Server({ name: 'example-mcp-server', version: '1.0.0' }, { capabilities: { tools: {} } });
     server.setRequestHandler(CallToolRequestSchema, async ({ params }, extra) => {
         remoteCalls.push({ name: params.name, arguments: params.arguments });
-        if (params.name === 'wait') {
-            await new Promise((resolve) => {
-                extra.signal.addEventListener('abort', resolve);
-            });
-            return { content: [] };
-        }
+        if (path === '/mcp-slow') return waitForAbort(extra.signal);
         const result = REMOTE_RESULTS[params.name];
         if (!result) throw new McpError(ErrorCode.InvalidParams, `Tool ${params.name} not found`);
         return result;
+    });
+    server.setRequestHandler(ListToolsRequestSchema, async ({ params }, extra) => {
+        listCursors.push(params?.cursor);
+        if (path === '/mcp-slow') return waitForAbort(extra.signal);
+        if (path === '/mcp-endless') return { tools: [], nextCursor: 'more' };
+        if (params?.cursor === undefined) return { tools: REMOTE_TOOL_PAGES[0], nextCursor: 'page-2' };
+        if (params.cursor === 'page-2' && path === '/mcp') return { tools: REMOTE_TOOL_PAGES[1] };
+        throw new McpError(ErrorCode.InvalidParams, `Invalid cursor ${params.cursor}`);
     });
     // Each HTTP request gets its own server, so the built-in handler has no request to cancel; record the notification.
     server.setNotificationHandler(CancelledNotificationSchema, ({ params }) => {
@@ -108,29 +154,28 @@ function seedActor(
     actorDefinitionCache.set(name, { definition, info });
 }
 
-async function callTool(
+async function execute(
+    run: HelperTool['call'],
     args: Record<string, unknown>,
     options: { signal?: AbortSignal; apifyClient?: ApifyClient } = {},
 ): Promise<ToolResult> {
     const context = stubToolCallContext(
-        { actor: MCP_ACTOR, tool: 'add', ...args },
+        { actor: MCP_ACTOR, ...args },
         options.apifyClient ?? new ApifyClient({ token: TOKEN }),
     );
     if (options.signal) context.signal = options.signal;
-    return (await executeCallActorMcpTool(context)) as ToolResult;
+    return (await run(context)) as ToolResult;
 }
 
-async function dispatchTool(
+async function dispatch(
+    tool: ToolEntry,
     args: Record<string, unknown>,
     serverOptions: Parameters<typeof withServer>[1] = { token: TOKEN },
 ): Promise<Record<string, unknown>> {
     return withServer(async (server) => {
-        server.upsertTools([callActorMcpTool]);
+        server.upsertTools([tool]);
         return getRequestHandler(server, 'tools/call')(
-            {
-                method: 'tools/call',
-                params: { name: HELPER_TOOLS.ACTOR_MCP_TOOL_CALL, arguments: args, _meta: { mcpSessionId: 's1' } },
-            },
+            { method: 'tools/call', params: { name: tool.name, arguments: args, _meta: { mcpSessionId: 's1' } } },
             { signal: new AbortController().signal, sendNotification: vi.fn() },
         );
     }, serverOptions);
@@ -138,8 +183,9 @@ async function dispatchTool(
 
 beforeAll(async () => {
     httpServer = createServer((req, res) => {
+        const path = req.url?.split('?')[0];
         requestHeaders.push(req.headers);
-        const remote = createRemoteServer();
+        const remote = createRemoteServer(path);
         const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
         res.on('close', () => void remote.close());
         void remote.connect(transport).then(async () => transport.handleRequest(req, res));
@@ -161,19 +207,20 @@ afterEach(() => {
 beforeEach(() => {
     requestHeaders = [];
     remoteCalls = [];
+    listCursors = [];
     remoteCancellations = [];
 });
 
 describe('call-actor-mcp-tool', () => {
     it('returns the remote CallToolResult unchanged, with no run fields', async () => {
-        const result = await dispatchTool({ actor: MCP_ACTOR, tool: 'add', arguments: { a: 2, b: 3 } });
+        const result = await dispatch(callActorMcpTool, { actor: MCP_ACTOR, tool: 'add', arguments: { a: 2, b: 3 } });
 
         expect(result).toEqual(REMOTE_RESULTS.add);
         expect(remoteCalls).toEqual([{ name: 'add', arguments: { a: 2, b: 3 } }]);
     });
 
     it("passes the remote tool's error flag through, recorded as an internal error", async () => {
-        const result = await callTool({ tool: 'fail' });
+        const result = await execute(executeCallActorMcpTool, { tool: 'fail' });
 
         expect(result).toMatchObject(REMOTE_RESULTS.fail);
         expect(result.toolTelemetry).toEqual({
@@ -184,7 +231,7 @@ describe('call-actor-mcp-tool', () => {
     });
 
     it("ignores a toolTelemetry key in the remote result, so the remote cannot write the server's telemetry", async () => {
-        const result = await callTool({ tool: 'spoof' });
+        const result = await execute(executeCallActorMcpTool, { tool: 'spoof' });
 
         expect(result.toolTelemetry).toEqual({ actorId: 'example-mcp-server-id' });
     });
@@ -192,7 +239,7 @@ describe('call-actor-mcp-tool', () => {
     it('rejects an MCP path that leaves the standby origin without connecting, and reports the Actor ID', async () => {
         seedActor('apify/off-origin-mcp-server', { definition: { webServerMcpPath: 'https://elsewhere.example/mcp' } });
 
-        const result = await callTool({ actor: 'apify/off-origin-mcp-server' });
+        const result = await execute(executeCallActorMcpTool, { tool: 'add', actor: 'apify/off-origin-mcp-server' });
 
         expect(result.isError).toBe(true);
         expect(JSON.stringify(result.content)).toContain('resolves outside its standby origin');
@@ -201,13 +248,13 @@ describe('call-actor-mcp-tool', () => {
     });
 
     it('sends omitted arguments as an empty object', async () => {
-        await callTool({});
+        await execute(executeCallActorMcpTool, { tool: 'add' });
 
         expect(remoteCalls).toEqual([{ name: 'add', arguments: {} }]);
     });
 
     it('sends the session token and the MCP request origin on every request of the connection', async () => {
-        await callTool({});
+        await execute(executeCallActorMcpTool, { tool: 'add' });
 
         expect(requestHeaders.length).toBeGreaterThan(0);
         for (const headers of requestHeaders) {
@@ -216,7 +263,8 @@ describe('call-actor-mcp-tool', () => {
     });
 
     it('sends APIFY_AI as the request origin of the MCP connection for an Apify AI client session', async () => {
-        await dispatchTool(
+        await dispatch(
+            callActorMcpTool,
             { actor: MCP_ACTOR, tool: 'add' },
             {
                 token: TOKEN,
@@ -238,7 +286,7 @@ describe('call-actor-mcp-tool', () => {
     it('passes the external tool-call timeout to tools/call', async () => {
         const callToolSpy = vi.spyOn(Client.prototype, 'callTool');
 
-        await callTool({});
+        await execute(executeCallActorMcpTool, { tool: 'add' });
 
         expect(callToolSpy.mock.calls[0][2]).toMatchObject({ timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC });
     });
@@ -246,7 +294,7 @@ describe('call-actor-mcp-tool', () => {
     it('rejects an Actor that is not an MCP server without connecting, naming the tool that serves it', async () => {
         seedActor('apify/server-actor-test', { definition: { webServerMcpPath: undefined, hasWebServerSchema: true } });
 
-        const result = await callTool({ actor: 'apify/server-actor-test' });
+        const result = await execute(executeCallActorMcpTool, { tool: 'add', actor: 'apify/server-actor-test' });
 
         expectSoftFailInvalidInput(result);
         expect((result.content as { text: string }[])[0].text).toBe(
@@ -262,14 +310,22 @@ describe('call-actor-mcp-tool', () => {
             mockApifyClient({ actor: () => ({ get: async () => undefined }) }),
         );
 
-        const result = await callTool({ actor: 'apify/missing' }, { apifyClient: unknownActorClient });
+        const result = await execute(
+            executeCallActorMcpTool,
+            { tool: 'add', actor: 'apify/missing' },
+            { apifyClient: unknownActorClient },
+        );
 
         expectSoftFailInvalidInput(result);
         expect(requestHeaders).toHaveLength(0);
     });
 
     it('requires a token without connecting', async () => {
-        const result = await dispatchTool({ actor: MCP_ACTOR, tool: 'add' }, { token: '', allowUnauthMode: true });
+        const result = await dispatch(
+            callActorMcpTool,
+            { actor: MCP_ACTOR, tool: 'add' },
+            { token: '', allowUnauthMode: true },
+        );
 
         expect(result.isError).toBe(true);
         expect(JSON.stringify(result.content)).toContain('An Apify API token is required');
@@ -283,14 +339,14 @@ describe('call-actor-mcp-tool', () => {
         await new Promise<void>((resolve) => closed.close(() => resolve()));
         seedActor('apify/unreachable-mcp-server', { actor: { standbyUrl: `http://127.0.0.1:${port}` } });
 
-        const result = await callTool({ actor: 'apify/unreachable-mcp-server' });
+        const result = await execute(executeCallActorMcpTool, { tool: 'add', actor: 'apify/unreachable-mcp-server' });
 
         expect(result.isError).toBe(true);
         expect(JSON.stringify(result.content)).toContain('Failed to connect to MCP server');
     });
 
     it('reports a JSON-RPC error from the remote server as a failed call of that tool', async () => {
-        const result = await callTool({ tool: 'subtract' });
+        const result = await execute(executeCallActorMcpTool, { tool: 'subtract' });
 
         expect(result.isError).toBe(true);
         expect(JSON.stringify(result.content)).toContain(`Failed to call MCP tool 'subtract' on Actor '${MCP_ACTOR}'`);
@@ -302,32 +358,10 @@ describe('call-actor-mcp-tool', () => {
         });
     });
 
-    it('tells the remote server that a call which timed out is cancelled', async () => {
-        const { callTool: callToolOnClient } = Client.prototype;
-        vi.spyOn(Client.prototype, 'callTool').mockImplementation(
-            async function (this: Client, params, schema, options) {
-                return callToolOnClient.call(this, params, schema, { ...options, timeout: 100 });
-            },
-        );
-
-        const result = await callTool({ tool: 'wait' });
-
-        expect(result.isError).toBe(true);
-        expect(JSON.stringify(result.content)).toContain('Request timed out');
-        await vi.waitFor(() => expect(remoteCancellations).toEqual([expect.stringContaining('Request timed out')]));
-    });
-
-    it('returns the empty aborted response when the client cancels mid-call', async () => {
-        const controller = new AbortController();
-        const pending = callTool({ tool: 'wait' }, { signal: controller.signal });
-        await vi.waitFor(() => expect(remoteCalls).toHaveLength(1));
-        controller.abort();
-
-        expect(await pending).toEqual({});
-    });
-
     it('rejects a tool name longer than the MCP limit without connecting', async () => {
-        await expect(callTool({ tool: 'a'.repeat(MCP_TOOL_NAME_MAX_LENGTH + 1) })).rejects.toMatchObject({
+        await expect(
+            execute(executeCallActorMcpTool, { tool: 'a'.repeat(MCP_TOOL_NAME_MAX_LENGTH + 1) }),
+        ).rejects.toMatchObject({
             issues: [{ code: 'too_big', path: ['tool'], maximum: MCP_TOOL_NAME_MAX_LENGTH }],
         });
         expect(requestHeaders).toHaveLength(0);
@@ -337,16 +371,124 @@ describe('call-actor-mcp-tool', () => {
         const controller = new AbortController();
         controller.abort();
 
-        expect(await callTool({}, { signal: controller.signal })).toEqual({});
+        expect(await execute(executeCallActorMcpTool, { tool: 'add' }, { signal: controller.signal })).toEqual({});
         expect(requestHeaders).toHaveLength(0);
+    });
+
+    it('names fetch-actor-mcp-tool-list in the description only when the session has it, and states the billing caveat', () => {
+        const withList = callActorMcpTool.buildDescription!(ALL_TOOLS_PRESENT);
+        const withoutList = callActorMcpTool.buildDescription!(only(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL));
+
+        expect(callActorMcpTool.description).toBe(withList);
+        expect(withList).toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST);
+        expect(withoutList).not.toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST);
+        expect(withList).toContain('Connecting can start a Server Actor run');
+    });
+});
+
+describe('fetch-actor-mcp-tool-list', () => {
+    it("returns every page's tool definitions unchanged, with one text item per tool", async () => {
+        const result = await dispatch(fetchActorMcpToolList, { actor: MCP_ACTOR });
+
+        expect(result.structuredContent).toEqual({ tools: REMOTE_TOOL_PAGES.flat() });
+        expect(listCursors).toEqual([undefined, 'page-2']);
+        const texts = (result.content as { text: string }[]).map(({ text }) => text);
+        expect(texts).toEqual([
+            "The Actor's MCP server has 2 tools.",
+            `add: Adds two numbers.\nInput schema: ${JSON.stringify(REMOTE_TOOL_PAGES[0][0].inputSchema)}`,
+            `subtract: No description.\nInput schema: ${JSON.stringify(REMOTE_TOOL_PAGES[1][0].inputSchema)}`,
+        ]);
+    });
+
+    it('fails the listing when a page fails, without a partial list', async () => {
+        seedActor('apify/broken-pages-mcp-server', { definition: { webServerMcpPath: '/mcp-broken-pages' } });
+
+        const result = await execute(executeFetchActorMcpToolList, { actor: 'apify/broken-pages-mcp-server' });
+
+        expect(result.isError).toBe(true);
+        expect(result).not.toHaveProperty('structuredContent');
+        expect(JSON.stringify(result.content)).toContain('Failed to list the MCP tools on Actor');
+    });
+
+    it('fails the listing when the cursors never run out', async () => {
+        seedActor('apify/endless-mcp-server', { definition: { webServerMcpPath: '/mcp-endless' } });
+
+        const result = await execute(executeFetchActorMcpToolList, { actor: 'apify/endless-mcp-server' });
+
+        expect(result.isError).toBe(true);
+        expect(JSON.stringify(result.content)).toContain(`more than ${MAX_TOOL_LIST_PAGES} pages`);
+        expect(listCursors).toHaveLength(MAX_TOOL_LIST_PAGES);
+    });
+
+    it('gives the tools/list pages one external tool-call timeout and fails without partial results once it runs out', async () => {
+        // Each page takes half the timeout, so the second gets the half that is left and ends at the deadline.
+        let now = 0;
+        vi.spyOn(Date, 'now').mockImplementation(() => now);
+        const { request } = Client.prototype;
+        const requestSpy = vi.spyOn(Client.prototype, 'request').mockImplementation(function (this: Client, ...args) {
+            if (args[0].method === 'tools/list') now += EXTERNAL_TOOL_CALL_TIMEOUT_MSEC / 2;
+            return request.apply(this, args);
+        });
+
+        const result = await execute(executeFetchActorMcpToolList, {});
+
+        expect(result.isError).toBe(true);
+        expect(result).not.toHaveProperty('structuredContent');
+        const timeouts = requestSpy.mock.calls
+            .filter(([{ method }]) => method === 'tools/list')
+            .map(([, , options]) => options?.timeout);
+        expect(timeouts).toEqual([EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, EXTERNAL_TOOL_CALL_TIMEOUT_MSEC / 2]);
+    });
+
+    it('names call-actor-mcp-tool in the description only when the session has it, and states the billing caveat', () => {
+        const withCall = fetchActorMcpToolList.buildDescription!(ALL_TOOLS_PRESENT);
+        const withoutCall = fetchActorMcpToolList.buildDescription!(only(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST));
+
+        expect(fetchActorMcpToolList.description).toBe(withCall);
+        expect(withCall).toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
+        expect(withoutCall).not.toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
+        expect(withCall).toContain('Connecting can start a Server Actor run');
+    });
+});
+
+describe.each([
+    { tool: callActorMcpTool, run: executeCallActorMcpTool, args: { tool: 'add' } },
+    { tool: fetchActorMcpToolList, run: executeFetchActorMcpToolList, args: {} },
+])('$tool.name before and during the connection', ({ tool, run, args }) => {
+    it('returns the empty aborted response when the client cancels mid-request', async () => {
+        seedActor('apify/slow-mcp-server', { definition: { webServerMcpPath: '/mcp-slow' } });
+        const controller = new AbortController();
+
+        const pending = execute(run, { ...args, actor: 'apify/slow-mcp-server' }, { signal: controller.signal });
+        await vi.waitFor(() => expect(remoteCalls.length + listCursors.length).toBe(1));
+        controller.abort();
+
+        expect(await pending).toEqual({});
+    });
+
+    it('tells the remote server that a request which timed out is cancelled', async () => {
+        seedActor('apify/slow-mcp-server', { definition: { webServerMcpPath: '/mcp-slow' } });
+        const { request } = Client.prototype;
+        vi.spyOn(Client.prototype, 'request').mockImplementation(function (this: Client, ...[req, schema, options]) {
+            return request.call(this, req, schema, { ...options, timeout: 100 });
+        });
+
+        const result = await execute(run, { ...args, actor: 'apify/slow-mcp-server' });
+
+        expect(result.isError).toBe(true);
+        // A cancellation from the previous test may still arrive, so look for this one among them.
+        await vi.waitFor(() =>
+            expect(remoteCancellations).toContainEqual(expect.stringContaining('Request timed out')),
+        );
     });
 
     it.each([
         ['with a token', { token: TOKEN }],
         ['without a token', { token: undefined }],
     ])('is rejected before connecting in a payment-provider session %s', async (_label, tokenOptions) => {
-        const result = await dispatchTool(
-            { actor: MCP_ACTOR, tool: 'add' },
+        const result = await dispatch(
+            tool,
+            { actor: MCP_ACTOR, ...args },
             { ...tokenOptions, paymentProvider: makePaymentProvider() },
         );
 
@@ -365,20 +507,8 @@ describe('call-actor-mcp-tool', () => {
                 { serverMode: SERVER_MODE.DEFAULT, ...options },
             );
 
-        expect(await listActorsTools({})).toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
-        expect(await listActorsTools({ paymentProvider: makePaymentProvider() })).not.toContain(
-            HELPER_TOOLS.ACTOR_MCP_TOOL_CALL,
-        );
-    });
-
-    it('names fetch-actor-details in the description only when the session has it, and states the billing caveat', () => {
-        const withDetails = callActorMcpTool.buildDescription!(ALL_TOOLS_PRESENT);
-        const withoutDetails = callActorMcpTool.buildDescription!(only(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL));
-
-        expect(callActorMcpTool.description).toBe(withDetails);
-        expect(withDetails).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
-        expect(withoutDetails).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
-        expect(withDetails).toContain('Connecting can start a Server Actor run');
+        expect(await listActorsTools({})).toContain(tool.name);
+        expect(await listActorsTools({ paymentProvider: makePaymentProvider() })).not.toContain(tool.name);
     });
 });
 

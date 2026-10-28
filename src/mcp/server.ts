@@ -371,7 +371,9 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         if (this.options.paymentProvider) {
             tools = tools.filter(
                 (tool) =>
-                    tool.name !== HELPER_TOOLS.ACTOR_SERVER_REQUEST && tool.name !== HELPER_TOOLS.ACTOR_MCP_TOOL_CALL,
+                    tool.name !== HELPER_TOOLS.ACTOR_SERVER_REQUEST &&
+                    tool.name !== HELPER_TOOLS.ACTOR_MCP_TOOL_CALL &&
+                    tool.name !== HELPER_TOOLS.ACTOR_MCP_TOOL_LIST,
             );
         }
         const served = this.isReportProblemServable(view, source.input)
