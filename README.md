@@ -31,6 +31,25 @@ Your agent searches Apify Store, checks an Actor's input and pricing, runs it, a
 
 <!-- TODO: add the new setup video here once it is published. The old 2025 Claude tutorial (BKu8H91uCTg) was removed as outdated. -->
 
+## Contents
+
+- [Quickstart](#-quickstart)
+- [Set up your client](#-set-up-your-client)
+- [Remote (hosted) or local MCP server](#remote-hosted-or-local-mcp-server)
+- [How an agent uses Apify Actors](#how-an-agent-uses-apify-actors)
+- [Tools, resources, and prompts](#%EF%B8%8F-tools-resources-and-prompts)
+- [Choose which tools load](#choose-which-tools-load)
+- [UI mode configuration](#ui-mode-configuration)
+- [Example prompts](#-example-prompts)
+- [Pricing and limits](#-pricing-and-limits)
+- [Telemetry](#-telemetry)
+- [Troubleshooting and limitations](#-troubleshooting-and-limitations)
+- [FAQ](#-faq)
+- [Development](#-development)
+- [Contributing](#-contributing)
+- [Privacy and license](#-privacy-and-license)
+- [Learn more](#-learn-more)
+
 ## 🚀 Quickstart
 
 1. Open the [MCP configurator](https://mcp.apify.com), pick your client, and choose the tools you want.
