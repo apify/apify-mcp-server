@@ -4,7 +4,7 @@ import { expect } from 'vitest';
 
 import { SKYFIRE_ENABLED_TOOLS } from '@apify/actors-mcp-server/internals/test-kit.js';
 
-import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE, skipOnStdio } from '../helpers.js';
+import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE, ACTOR_SERVER_ACTOR_TEST, skipOnStdio } from '../helpers.js';
 import type { Case } from '../types.js';
 
 /** Skyfire and x402 payment modes. */
@@ -174,20 +174,30 @@ export const paymentsCases: Case[] = [
         },
     },
     {
-        name: 'does not list send-server-actor-request or the Actor MCP tools in x402 or skyfire payment mode',
+        name: 'does not list or run send-server-actor-request, or list the Actor MCP tools, in x402 or skyfire payment mode',
         isDeploymentTest: false,
         skipIf: skipOnStdio,
         run: async (ctx) => {
+            // A default session, the actors category, and the tool named in tools=.
+            const selections = [undefined, ['actors'], ['send-server-actor-request']];
             for (const payment of ['x402', 'skyfire'] as const) {
-                const client = await ctx.createClientFn({ payment, tools: ['actors'] });
-                try {
-                    const { tools } = await client.listTools();
-                    const names = tools.map((tool) => tool.name);
-                    expect(names).not.toContain('send-server-actor-request');
-                    expect(names).not.toContain('call-actor-mcp-tool');
-                    expect(names).not.toContain('fetch-actor-mcp-tool-list');
-                } finally {
-                    await client.close();
+                for (const tools of selections) {
+                    const client = await ctx.createClientFn({ payment, tools });
+                    try {
+                        const names = (await client.listTools()).tools.map((tool) => tool.name);
+                        expect(names).not.toContain('send-server-actor-request');
+                        expect(names).not.toContain('call-actor-mcp-tool');
+                        expect(names).not.toContain('fetch-actor-mcp-tool-list');
+                        // An unknown tool is a protocol error, so no request reaches the Actor.
+                        await expect(
+                            client.callTool({
+                                name: 'send-server-actor-request',
+                                arguments: { actor: ACTOR_SERVER_ACTOR_TEST, method: 'GET', path: '/add' },
+                            }),
+                        ).rejects.toThrow('Tool "send-server-actor-request" was not found');
+                    } finally {
+                        await client.close();
+                    }
                 }
             }
         },
