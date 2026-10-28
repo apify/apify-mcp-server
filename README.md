@@ -335,7 +335,7 @@ https://mcp.apify.com?tools=apify/instagram-scraper
 
 ## UI mode configuration
 
-The `ui` parameter controls [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) widgets in tool responses. With UI mode on, tools such as `search-actors` return interactive widgets instead of plain text. By default (`auto`), the server turns widgets on when the client supports MCP Apps.
+The `ui` parameter controls the availability of [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) widget tools. With UI mode on, the server adds `search-actors-widget` and `fetch-actor-details-widget` when their base tools are loaded. The base tools still return standard responses; interactive widgets come from calling the separate `*-widget` tools. By default (`auto`), UI mode turns on when the client supports MCP Apps.
 
 | Value | Behavior |
 | :--- | :--- |
