@@ -867,8 +867,8 @@ describe('describing the tool', () => {
 });
 
 describe("a selected Server Actor's own tool", () => {
-    it('sends the request to its Actor through the same execution, filling a single method and path', async () => {
-        const received = recordRequests();
+    /** Calls the own tool of SERVER_ACTOR, which documents only POST /echo, through dispatch. */
+    async function callOwnTool(args: Record<string, unknown>) {
         const cached = actorDefinitionCache.get(SERVER_ACTOR)!;
         const webServerToolInfo: ServerActorToolInfo = {
             methods: ['POST'],
@@ -879,23 +879,37 @@ describe("a selected Server Actor's own tool", () => {
         const [tool] = getServerActorsAsTools([
             { definition: { ...cached.definition, webServerToolInfo }, actor: cached.info, webServerMcpPath: null },
         ]);
-
-        const result = await withServer(
+        return withServer(
             async (mcpServer) => {
                 mcpServer.upsertTools([tool]);
                 return getRequestHandler(mcpServer, 'tools/call')(
                     {
                         method: 'tools/call',
-                        params: { name: tool.name, arguments: { body: { a: 1 } }, _meta: { mcpSessionId: 's1' } },
+                        params: { name: tool.name, arguments: args, _meta: { mcpSessionId: 's1' } },
                     },
                     { signal: new AbortController().signal, sendNotification: vi.fn() },
                 );
             },
             { token: TOKEN },
         );
+    }
+
+    it('sends the request to its Actor through the same execution, filling a single method and path', async () => {
+        const received = recordRequests();
+
+        const result = await callOwnTool({ body: { a: 1 } });
 
         expect(received).toMatchObject([{ method: 'POST', url: '/echo', body: '{"a":1}' }]);
         expect(result.structuredContent).toMatchObject({ actorName: SERVER_ACTOR, interface: 'server', status: 200 });
+    });
+
+    it('ignores an actor argument and sends to its own Actor', async () => {
+        const received = recordRequests();
+
+        const result = await callOwnTool({ actor: 'apify/web-fetch', body: { a: 1 } });
+
+        expect(received).toHaveLength(1);
+        expect(result.structuredContent).toMatchObject({ actorName: SERVER_ACTOR });
     });
 });
 
