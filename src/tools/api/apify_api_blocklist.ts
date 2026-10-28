@@ -70,16 +70,17 @@ function extractQueryParamName(name: string): string {
 
 /**
  * A path's segments, matched fail-closed: without the leading slash and `v2/` prefix (`normalizeApiPath`), in
- * lowercase, each decoded, without empty segments (a trailing or doubled slash), without any leading `v2` segment
- * (a doubled or escaped prefix, as in `//v2/` or `%76%32/`), and with a legacy resource name read as the one the
- * spec lists (`API_RESOURCE_ALIASES`). Split before decoding, as the API's router does, so the escaped slash in
- * `apify%2Fhello-world` stays in its segment.
+ * lowercase, each decoded, without empty segments (a trailing or doubled slash), and with a legacy resource name
+ * read as the one the spec lists (`API_RESOURCE_ALIASES`). Split before decoding, as the API's router does, so the
+ * escaped slash in `apify%2Fhello-world` stays in its segment.
  */
 function splitRoutePath(path: string): string[] {
     const segments = normalizeApiPath(path)
         .split('/')
         .filter(Boolean)
         .map((segment) => decodeEscapes(segment).toLowerCase());
+    // A doubled or escaped prefix (`//v2/`, `%76%32/`) leaves a `v2` segment. The API answers 404 to it today;
+    // dropping it keeps the rules matching if a proxy in front ever merges slashes or decodes escapes.
     while (segments[0] === 'v2') segments.shift();
     segments[0] = API_RESOURCE_ALIASES.get(segments[0]) ?? segments[0];
     return segments;
