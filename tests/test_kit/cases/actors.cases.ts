@@ -1238,6 +1238,24 @@ export const actorsCases: Case[] = [
         }),
     },
     {
+        // isDeploymentTest: the default web-fetch tool, sent through its server interface.
+        name: 'fetches a page with the default web-fetch tool through GET /',
+        isDeploymentTest: true,
+        run: withClient({}, async (client) => {
+            const result = await client.callTool({
+                name: 'apify--web-fetch',
+                arguments: { query: { url: 'https://example.com', formats: 'markdown,links' } },
+            });
+
+            expect(result.isError).not.toBe(true);
+            const sc = (result as { structuredContent?: ServerActorRequestContent }).structuredContent;
+            expect(sc?.status).toBe(200);
+            expect(JSON.parse(sc!.body)).toEqual(
+                expect.objectContaining({ markdown: expect.any(String), links: expect.any(Array) }),
+            );
+        }),
+    },
+    {
         name: 'summarizes a Server Actor interface and navigates it with fetch-actor-details',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
