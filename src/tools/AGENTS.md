@@ -51,11 +51,11 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     and wait-timeout modes: storage IDs plus a `summary` (past) / `nextStep` (one primary
     action) pair, never inline dataset items or KV bodies — except the reserved `TIP` key,
     inlined as `tip` on terminal RAG Web Browser runs only. The dataset field hint
-    (`fieldsProjectionHint`, shared with `get-dataset`) renders the item shape from the raw
-    index-expanded metadata with `[]` marking arrays, lists the selectable top-level names, and
-    says a dotted path through an array returns nothing; the whole array is the only way to get
-    every element until apify/apify-core#31931. Never show an indexed example (`results.0.url`):
-    evals showed weak models copy it and report one element as the whole result.
+    (`fieldsProjectionHint`, shared with `get-dataset`) is rendered from the raw index-expanded
+    metadata, not the collapsed `fields`: the item shape with `[]` marking arrays, the top-level
+    names, and that a dotted path through an array returns nothing (apify/apify-core#31931).
+    Never show an indexed path (`results.0.url`): evals showed weak models copy it and report
+    one element as the whole result.
   - `runs/` — get/abort runs, run logs, run list.
   - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`.
   - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public

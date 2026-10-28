@@ -572,12 +572,10 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
 }
 
 /**
- * Dataset hint from the raw, index-expanded `fields` metadata: the item shape with `[]` marking
- * arrays, the top-level names (the selections that always work) and, when the data has them,
- * one dotted path through objects and one through an array. The second is named only to say it
- * returns nothing (#1656); projection across array elements is apify/apify-core#31931. Never
- * show an indexed path (`results.0.url`): evals showed weak models copy it and report one
- * element as the whole result.
+ * Only top-level names always work as a `fields` selection: the API's projection does not cross
+ * arrays, so a dotted path through one returns `[{}]` (#1656, apify/apify-core#31931), and the
+ * hint names such a path only to say so. Never show an indexed path (`results.0.url`): evals
+ * showed weak models copy it and report one element as the whole result.
  */
 export function fieldsProjectionHint(fields: string[] | undefined): string {
     if (!fields?.length) return '';
@@ -704,7 +702,7 @@ export function buildStatusSummaryNextStep(params: {
     dataset?: RunDataset;
     keyValueStore?: RunKeyValueStore;
     datasetMetadataFetched?: boolean;
-    /** Raw index-expanded field metadata of the default dataset, for the shape in the hint. */
+    /** Raw metadata with array indices; `dataset.fields` has them collapsed and the shape needs them. */
     datasetFields?: string[];
 }): { summary: string; nextStep: string } {
     const { run, dataset, keyValueStore, datasetMetadataFetched = true, datasetFields } = params;
@@ -1013,6 +1011,7 @@ export async function fetchActorRunData(params: {
     const datasetIds = buildStorageAliasIds(run.storageIds?.datasets, run.defaultDatasetId ?? undefined);
     const kvIds = buildStorageAliasIds(run.storageIds?.keyValueStores, run.defaultKeyValueStoreId ?? undefined);
 
+    // The entry keeps the collapsed list; the hint's shape needs the raw indices.
     let defaultDatasetFields: string[] | undefined;
     const [datasets, keyValueStores] = await Promise.all([
         buildStorageEntriesFromIds(datasetIds, async (id) => {

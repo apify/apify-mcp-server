@@ -1117,7 +1117,7 @@ function makeRun(status: string, statusMessage?: string, runTimeSecs = 10) {
 }
 
 const datasetWithItems: RunDataset = { id: 'ds-1', itemCount: 47, fields: ['metadata.url', 'markdown'] };
-// Raw index-expanded metadata as the API returns it, threaded separately for the shape in the hint.
+// Raw metadata with indices, as the API returns it; `datasetWithItems.fields` is the collapsed form.
 const DATASET_FIELDS = ['metadata/url', 'markdown'];
 const datasetEmpty: RunDataset = { id: 'ds-1', itemCount: 0, fields: [] };
 const kvWithRecords: RunKeyValueStore = { id: 'kv-1', keys: ['result-a', 'result-b'], keyCount: 2 };
