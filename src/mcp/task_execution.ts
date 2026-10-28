@@ -242,7 +242,10 @@ export async function executeToolAndUpdateTask(params: {
                 await taskStore.updateTaskStatus(taskId, 'working', message, mcpSessionId);
             } catch (error) {
                 // The store rejects cancelled → working when tasks/cancel lands first, and an expired task.
-                if (isTaskNotFoundError(error) || (await isTaskCancelled(taskId, mcpSessionId, taskStore))) {
+                if (
+                    isTaskNotFoundError(error) ||
+                    (await isTaskCancelled(taskId, mcpSessionId, taskStore).catch(() => false))
+                ) {
                     log.debug('[executeToolAndUpdateTask] Task is cancelled or expired, skipping status message', {
                         taskId,
                         mcpSessionId,

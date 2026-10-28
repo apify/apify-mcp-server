@@ -194,6 +194,25 @@ describe('task status message updates', () => {
         });
     });
 
+    it('does not log a status message rejected for an expired task as a store failure', async () => {
+        await withServer(async (server) => {
+            const softFailSpy = vi.spyOn(log, 'softFail').mockImplementation(() => log);
+            const { tool, started, release, reported } = makeStatusMessageTool();
+            server.upsertTools([tool]);
+
+            const taskId = await startTask(server, tool.name);
+            await started;
+            // What the store throws once the task's TTL has elapsed.
+            vi.spyOn(getTaskStore(server), 'updateTaskStatus').mockRejectedValueOnce(
+                new Error(`Task with ID ${taskId} not found`),
+            );
+            release();
+            await reported;
+
+            expect(softFailSpy).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ taskId }));
+        });
+    });
+
     it('logs a store failure while writing a status message', async () => {
         await withServer(async (server) => {
             const softFailSpy = vi.spyOn(log, 'softFail').mockImplementation(() => log);
@@ -210,6 +229,23 @@ describe('task status message updates', () => {
                 expect.any(String),
                 expect.objectContaining({ taskId, errMessage: 'redis down' }),
             );
+        });
+    });
+
+    it('logs a store failure when the cancellation re-check fails too', async () => {
+        await withServer(async (server) => {
+            const softFailSpy = vi.spyOn(log, 'softFail').mockImplementation(() => log);
+            const { tool, started, release, reported } = makeStatusMessageTool();
+            server.upsertTools([tool]);
+
+            const taskId = await startTask(server, tool.name);
+            await started;
+            vi.spyOn(getTaskStore(server), 'updateTaskStatus').mockRejectedValueOnce(new Error('redis down'));
+            vi.spyOn(getTaskStore(server), 'getTask').mockRejectedValueOnce(new Error('redis down'));
+            release();
+            await reported;
+
+            expect(softFailSpy).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ taskId }));
         });
     });
 });
