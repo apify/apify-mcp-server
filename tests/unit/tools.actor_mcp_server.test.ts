@@ -7,6 +7,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import {
     CallToolRequestSchema,
     type CallToolResult,
+    CancelledNotificationSchema,
     ErrorCode,
     type InitializeRequest,
     ListToolsRequestSchema,
@@ -20,7 +21,11 @@ import { APIFY_AI_CLIENT_NAME, FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } fro
 import { connectMCPClient } from '../../src/mcp/client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../src/mcp/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
-import { callActorMcpTool, executeCallActorMcpTool } from '../../src/tools/actors/call_actor_mcp_tool.js';
+import {
+    callActorMcpTool,
+    executeCallActorMcpTool,
+    MCP_TOOL_NAME_MAX_LENGTH,
+} from '../../src/tools/actors/call_actor_mcp_tool.js';
 import {
     executeFetchActorMcpToolList,
     fetchActorMcpToolList,
@@ -81,6 +86,8 @@ type ToolResult = Record<string, unknown> & { toolTelemetry?: ToolTelemetryConte
 let requestHeaders: IncomingMessage['headers'][] = [];
 let remoteCalls: { name: string; arguments: unknown }[] = [];
 let listCursors: (string | undefined)[] = [];
+/** The reason of each notifications/cancelled the remote servers got. */
+let remoteCancellations: string[] = [];
 let httpServer: HttpServer;
 let standbyUrl: string;
 
@@ -111,6 +118,10 @@ function createRemoteServer(path: string | undefined): Server {
         if (params?.cursor === undefined) return { tools: REMOTE_TOOL_PAGES[0], nextCursor: 'page-2' };
         if (params.cursor === 'page-2' && path === '/mcp') return { tools: REMOTE_TOOL_PAGES[1] };
         throw new McpError(ErrorCode.InvalidParams, `Invalid cursor ${params.cursor}`);
+    });
+    // Each HTTP request gets its own server, so the built-in handler has no request to cancel; record the notification.
+    server.setNotificationHandler(CancelledNotificationSchema, ({ params }) => {
+        remoteCancellations.push(String(params.reason));
     });
     return server;
 }
@@ -197,6 +208,7 @@ beforeEach(() => {
     requestHeaders = [];
     remoteCalls = [];
     listCursors = [];
+    remoteCancellations = [];
 });
 
 describe('call-actor-mcp-tool', () => {
@@ -338,10 +350,21 @@ describe('call-actor-mcp-tool', () => {
 
         expect(result.isError).toBe(true);
         expect(JSON.stringify(result.content)).toContain(`Failed to call MCP tool 'subtract' on Actor '${MCP_ACTOR}'`);
+        // The server answered, so it is not unavailable.
+        expect(JSON.stringify(result.content)).not.toContain('temporarily unavailable');
         expect(result.toolTelemetry).toMatchObject({
             toolStatus: TOOL_STATUS.SOFT_FAIL,
             failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
         });
+    });
+
+    it('rejects a tool name longer than the MCP limit without connecting', async () => {
+        await expect(
+            execute(executeCallActorMcpTool, { tool: 'a'.repeat(MCP_TOOL_NAME_MAX_LENGTH + 1) }),
+        ).rejects.toMatchObject({
+            issues: [{ code: 'too_big', path: ['tool'], maximum: MCP_TOOL_NAME_MAX_LENGTH }],
+        });
+        expect(requestHeaders).toHaveLength(0);
     });
 
     it('does not connect when the call is already cancelled', async () => {
@@ -441,6 +464,22 @@ describe.each([
         controller.abort();
 
         expect(await pending).toEqual({});
+    });
+
+    it('tells the remote server that a request which timed out is cancelled', async () => {
+        seedActor('apify/slow-mcp-server', { definition: { webServerMcpPath: '/mcp-slow' } });
+        const { request } = Client.prototype;
+        vi.spyOn(Client.prototype, 'request').mockImplementation(function (this: Client, ...[req, schema, options]) {
+            return request.call(this, req, schema, { ...options, timeout: 100 });
+        });
+
+        const result = await execute(run, { ...args, actor: 'apify/slow-mcp-server' });
+
+        expect(result.isError).toBe(true);
+        // A cancellation from the previous test may still arrive, so look for this one among them.
+        await vi.waitFor(() =>
+            expect(remoteCancellations).toContainEqual(expect.stringContaining('Request timed out')),
+        );
     });
 
     it.each([

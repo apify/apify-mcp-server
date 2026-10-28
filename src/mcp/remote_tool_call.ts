@@ -24,11 +24,10 @@ export async function withRemoteMcpClient<T>(
         if (!client) return { outcome: 'connect-failed' };
         return { outcome: 'success', value: await run(client) };
     } catch (error) {
-        if (signal.aborted) {
-            // Yield a macrotask so the SDK's fire-and-forget notifications/cancelled flushes before close() aborts it.
-            await new Promise((resolve) => setImmediate(resolve));
-            return { outcome: 'aborted' };
-        }
+        // Yield a macrotask so the SDK's fire-and-forget notifications/cancelled, sent on an abort or a timeout,
+        // flushes before close() aborts it.
+        await new Promise((resolve) => setImmediate(resolve));
+        if (signal.aborted) return { outcome: 'aborted' };
         return { outcome: 'error', error };
     } finally {
         if (client) await client.close();
