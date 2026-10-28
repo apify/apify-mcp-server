@@ -71,7 +71,12 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
 
     describe('per-mode tool lists', () => {
         it('has correct tools in actors category (both modes)', () => {
-            const expected = [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS, HELPER_TOOLS.ACTOR_CALL];
+            const expected = [
+                HELPER_TOOLS.STORE_SEARCH,
+                HELPER_TOOLS.ACTOR_GET_DETAILS,
+                HELPER_TOOLS.ACTOR_CALL,
+                HELPER_TOOLS.ACTOR_MCP_TOOL_CALL,
+            ];
             expect(toolNames(defaultCategories.actors)).toEqual(expected);
             expect(toolNames(appsCategories.actors)).toEqual(expected);
         });
@@ -613,10 +618,8 @@ describe('tool descriptions never name a tool absent from the session', () => {
                         }
                         for (const name of absent) {
                             // Boundary guard so `get-dataset` does not match inside `get-dataset-items`,
-                            // nor `call-actor` inside `call-actor-widget`. `:` is excluded too — it
-                            // marks a remote MCP-Actor tool ("apify/example-mcp-server:add"),
-                            // not a tool served from this session.
-                            if (new RegExp(`(?<![\\w-:])${name}(?![\\w-])`).test(line)) {
+                            // nor `call-actor` inside `call-actor-widget`.
+                            if (new RegExp(`(?<![\\w-])${name}(?![\\w-])`).test(line)) {
                                 violations.push(`${tool.name} names absent ${name}: ${line.trim()}`);
                             }
                         }

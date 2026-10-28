@@ -1,3 +1,4 @@
+import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ApifyApiError } from 'apify-client';
 
 import {
@@ -9,7 +10,7 @@ import {
 } from '../const.js';
 
 // Helpers that read or classify an error received from the Apify API by its `type`. Kept in one leaf
-// module (imports only const + apify-client) so logging, telemetry, payments, and the tool layer
+// module (imports only const and external packages) so logging, telemetry, payments, and the tool layer
 // can share them without import cycles.
 
 /** The API's machine-readable error type (e.g. `actor-task-name-not-unique`), if the error carries one. */
@@ -64,9 +65,23 @@ export const ACTOR_RUN_LIMIT_MESSAGE =
     'You have reached your account limit for concurrent Actor runs. ' +
     'Wait for running Actors to finish, or upgrade your plan at https://console.apify.com/billing/subscription.';
 
+/**
+ * True when the MCP server may not have answered: the connection closed, the request timed out, the network failed,
+ * or the transport got a 5xx. Node system errors carry a string code (ECONNRESET); fetch reports one as the cause
+ * of a TypeError; the SDK transports put the HTTP status in `code` (protocol error codes are negative).
+ */
+function isMcpServerUnavailableError(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) return false;
+    const { code, cause } = error as { code?: unknown; cause?: unknown };
+    if (code === ErrorCode.ConnectionClosed || code === ErrorCode.RequestTimeout) return true;
+    if (typeof code === 'number' && code >= 500) return true;
+    return typeof code === 'string' || (error instanceof TypeError && cause !== undefined);
+}
+
 /** User-facing detail appended to a failed remote MCP-server tool call message. */
 export function remoteMcpFailureDetail(error: unknown): string {
     if (isActorRunLimitError(error)) return ACTOR_RUN_LIMIT_MESSAGE;
     const message = error instanceof Error ? error.message : String(error);
+    if (!isMcpServerUnavailableError(error)) return `${message}.`;
     return `${message}. The MCP server may be temporarily unavailable.`;
 }

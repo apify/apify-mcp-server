@@ -138,7 +138,7 @@ export async function dispatchToolCall(params: {
 
             const outcome = await withRemoteMcpClient(
                 tool.serverUrl,
-                apifyToken,
+                { token: apifyToken, requestOrigin: apifyClient.requestOrigin },
                 mcpSessionId,
                 signal,
                 async (client) => {

@@ -5,7 +5,12 @@ import log from '@apify/log';
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { InvalidToolCall, PreparedCall } from '../../src/mcp/tool_call_engine.js';
-import { classifyToolCallError, executeSyncToolCall, prepareToolCall } from '../../src/mcp/tool_call_engine.js';
+import {
+    buildPreflightFailureOutcome,
+    classifyToolCallError,
+    executeSyncToolCall,
+    prepareToolCall,
+} from '../../src/mcp/tool_call_engine.js';
 import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
 import { sendServerActorRequest } from '../../src/tools/actors/send_server_actor_request.js';
 import {
@@ -17,7 +22,7 @@ import { getActorRunList } from '../../src/tools/runs/get_actor_run_list.js';
 import type { ToolCallTelemetryProperties, ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
-import { respondRaw } from '../../src/utils/mcp.js';
+import { respondRaw, respondUserError } from '../../src/utils/mcp.js';
 import { makePaymentRequiredError, makeRecorderTool, makeThrowingTool, withServer } from './helpers/mcp_server.js';
 
 /** An abort signal for direct engine tests, optionally already aborted. */
@@ -423,5 +428,25 @@ describe('classifyToolCallError()', () => {
         const texts = (outcome.result.content as { text: string }[]).map((c) => c.text);
         expect(texts).toHaveLength(2);
         expect(texts[1]).toBe(sentence);
+    });
+});
+
+describe('standby rejection outcome', () => {
+    it('keeps the internal telemetry off the wire and records its failure detail', () => {
+        const outcome = buildPreflightFailureOutcome(
+            respondUserError('Actor apify/example-mcp-server is not supported in agentic payment mode.', {
+                detail: 'standby-payment-not-supported',
+            }),
+            undefined,
+            'apify/example-mcp-server',
+            undefined,
+        );
+
+        expect(outcome.result).not.toHaveProperty('toolTelemetry');
+        expect(outcome.callDiagnostics).toEqual({
+            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+            failure_detail: 'standby-payment-not-supported',
+            actor_name: 'apify/example-mcp-server',
+        });
     });
 });

@@ -10,7 +10,7 @@ import type { PaymentHeaders } from './payments/types.js';
 const USER_AGENT_ORIGIN = 'Origin/mcp-server';
 
 // Request origin headers
-const REQUEST_ORIGIN_HEADER = 'X-Apify-Request-Origin';
+export const REQUEST_ORIGIN_HEADER = 'X-Apify-Request-Origin';
 
 /** Values sent in the X-Apify-Request-Origin header; expected to correspond to `META_ORIGINS` in `@apify/consts` on the backend. */
 export const REQUEST_ORIGIN = {
@@ -45,6 +45,11 @@ export function getApifyAPIPublicBaseUrl(): string {
 }
 
 export class ApifyClient extends _ApifyClient {
+    /**
+     * Sent in the X-Apify-Request-Origin header; connections to an Actor's MCP server send it too. Always set; optional
+     * so a plain apify-client `ApifyClient`, which public methods such as `loadToolsFromInput` accept, stays assignable.
+     */
+    readonly requestOrigin?: REQUEST_ORIGIN;
     /** Call tracking sent with Store searches. */
     storeSearchTracking?: { traceId?: string; useCase?: string };
 
@@ -77,6 +82,7 @@ export class ApifyClient extends _ApifyClient {
             userAgentSuffix: USER_AGENT_ORIGIN,
             requestInterceptors: [(config) => ({ ...config, headers: { ...config.headers, ...staticHeaders } })],
         });
+        this.requestOrigin = staticHeaders[REQUEST_ORIGIN_HEADER];
     }
 }
 

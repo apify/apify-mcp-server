@@ -1,3 +1,5 @@
+import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
@@ -59,9 +61,20 @@ describe('remoteMcpFailureDetail', () => {
         expect(detail).toContain('console.apify.com/billing/subscription');
     });
 
-    it('echoes the error with the generic availability hint otherwise', () => {
-        expect(remoteMcpFailureDetail(new Error('socket hang up'))).toBe(
-            'socket hang up. The MCP server may be temporarily unavailable.',
-        );
+    it.each([
+        ['the connection closed', new McpError(ErrorCode.ConnectionClosed, 'Connection closed')],
+        ['the request timed out', new McpError(ErrorCode.RequestTimeout, 'Request timed out')],
+        ['a socket failed', Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' })],
+        ['fetch failed', new TypeError('fetch failed', { cause: new Error('connect ECONNREFUSED 127.0.0.1:443') })],
+        ['the transport got a 5xx', new StreamableHTTPError(503, 'Error POSTing to endpoint: Service Unavailable')],
+    ])('adds the availability hint when %s', (_label, error) => {
+        expect(remoteMcpFailureDetail(error)).toBe(`${error.message}. The MCP server may be temporarily unavailable.`);
+    });
+
+    it.each([
+        ['a JSON-RPC error', new McpError(ErrorCode.InvalidParams, 'Tool subtract not found')],
+        ['a 4xx', new StreamableHTTPError(403, 'Error POSTing to endpoint: Forbidden')],
+    ])('echoes %s the server answered with, without the availability hint', (_label, error) => {
+        expect(remoteMcpFailureDetail(error)).toBe(`${error.message}.`);
     });
 });

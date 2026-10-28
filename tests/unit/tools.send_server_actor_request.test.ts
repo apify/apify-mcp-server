@@ -294,7 +294,7 @@ describe('sending the request', () => {
 
     it('sends to an Actor with both an API schema and an MCP path, even one that would not resolve', async () => {
         const received = recordRequests();
-        // `getActorToolResolutionCached` throws on this path; the HTTP interface does not depend on it.
+        // An MCP path off the standby origin fails only an MCP call; the HTTP interface does not depend on it.
         seedActor('apify/server-and-mcp', { definition: { webServerMcpPath: 'https://other.example/mcp' } });
 
         const result = await callTool({ actor: 'apify/server-and-mcp', path: '/echo' });
@@ -730,14 +730,21 @@ describe('rejecting a call before sending', () => {
         expect(received).toHaveLength(0);
     });
 
-    it('rejects an MCP-server Actor without an API schema, pointing at its MCP tools', async () => {
+    it('rejects an MCP-server Actor without an API schema, naming call-actor-mcp-tool only when the session has it', async () => {
         const received = recordRequests();
         seedActor('apify/mcp-only', { definition: { webServerMcpPath: '/mcp', hasWebServerSchema: false } });
 
-        const result = await callTool({ actor: 'apify/mcp-only', path: '/echo' });
+        const withMcpTool = await callTool({ actor: 'apify/mcp-only', path: '/echo' });
+        const withoutMcpTool = await callTool(
+            { actor: 'apify/mcp-only', path: '/echo' },
+            { loadedToolNames: [HELPER_TOOLS.ACTOR_SERVER_REQUEST, HELPER_TOOLS.ACTOR_CALL] },
+        );
 
-        expectSoftFailInvalidInput(result);
-        expect(result.content[0].text).toContain(`${HELPER_TOOLS.ACTOR_CALL} as "apify/mcp-only:toolName"`);
+        expectSoftFailInvalidInput(withMcpTool);
+        expect(withMcpTool.content[0].text).toContain(
+            `Its MCP tools can be called with ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL}.`,
+        );
+        expect(withoutMcpTool.content[0].text).not.toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
         expect(received).toHaveLength(0);
     });
 
