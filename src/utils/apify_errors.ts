@@ -66,13 +66,15 @@ export const ACTOR_RUN_LIMIT_MESSAGE =
     'Wait for running Actors to finish, or upgrade your plan at https://console.apify.com/billing/subscription.';
 
 /**
- * True when the MCP server may not have answered: the connection closed, the request timed out, or the network failed.
- * Node system errors carry a string code (ECONNRESET); fetch reports one as the cause of a TypeError.
+ * True when the MCP server may not have answered: the connection closed, the request timed out, the network failed,
+ * or the transport got a 5xx. Node system errors carry a string code (ECONNRESET); fetch reports one as the cause
+ * of a TypeError; the SDK transports put the HTTP status in `code` (protocol error codes are negative).
  */
 function isMcpServerUnavailableError(error: unknown): boolean {
     if (typeof error !== 'object' || error === null) return false;
     const { code, cause } = error as { code?: unknown; cause?: unknown };
     if (code === ErrorCode.ConnectionClosed || code === ErrorCode.RequestTimeout) return true;
+    if (typeof code === 'number' && code >= 500) return true;
     return typeof code === 'string' || (error instanceof TypeError && cause !== undefined);
 }
 
