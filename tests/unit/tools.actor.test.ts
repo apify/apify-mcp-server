@@ -176,6 +176,13 @@ describe('canRunActor()', () => {
         expect(canRunActor('actor-id-1', [HELPER_TOOLS.ACTOR_CALL], new Set())).toBe(true);
     });
 
+    it.each([HELPER_TOOLS.ACTOR_CALL_WIDGET, HELPER_TOOLS.API_WRITE])(
+        'returns true when only %s is loaded, regardless of the Actor',
+        (toolName) => {
+            expect(canRunActor('actor-id-1', [toolName], new Set())).toBe(true);
+        },
+    );
+
     it('returns true when call-actor is absent but the Actor ID is in loadedActorIds', () => {
         expect(canRunActor('actor-id-1', [], new Set(['actor-id-1']))).toBe(true);
     });
