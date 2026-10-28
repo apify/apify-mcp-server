@@ -9,13 +9,20 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ApifyClient } from '../../src/apify_client.js';
 import { FAILURE_CATEGORY, HELPER_TOOLS, MAX_INLINE_BYTES, TOOL_STATUS } from '../../src/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
+import { getServerActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import {
     executeSendServerActorRequest,
     RECOVERY_MAX_OPERATIONS,
     sendServerActorRequest,
 } from '../../src/tools/actors/send_server_actor_request.js';
 import { serverActorRequestOutputSchema } from '../../src/tools/structured_output_schemas.js';
-import type { Actor, ActorDefinitionPruned, HelperTool, ToolTelemetryContext } from '../../src/types.js';
+import type {
+    Actor,
+    ActorDefinitionPruned,
+    HelperTool,
+    ServerActorToolInfo,
+    ToolTelemetryContext,
+} from '../../src/types.js';
 import { ACTOR_TENANCY, SERVER_MODE } from '../../src/types.js';
 import { mockActor } from './helpers/actor_build_client.js';
 import { getRequestHandler, makePaymentProvider, withServer } from './helpers/mcp_server.js';
@@ -856,6 +863,39 @@ describe('describing the tool', () => {
             `${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface`,
         );
         expect(sendServerActorRequest.buildDescription!(only())).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+    });
+});
+
+describe("a selected Server Actor's own tool", () => {
+    it('sends the request to its Actor through the same execution, filling a single method and path', async () => {
+        const received = recordRequests();
+        const cached = actorDefinitionCache.get(SERVER_ACTOR)!;
+        const webServerToolInfo: ServerActorToolInfo = {
+            methods: ['POST'],
+            paths: ['/echo'],
+            hasRequestBody: true,
+            operations: '',
+        };
+        const [tool] = getServerActorsAsTools([
+            { definition: { ...cached.definition, webServerToolInfo }, actor: cached.info, webServerMcpPath: null },
+        ]);
+
+        const result = await withServer(
+            async (mcpServer) => {
+                mcpServer.upsertTools([tool]);
+                return getRequestHandler(mcpServer, 'tools/call')(
+                    {
+                        method: 'tools/call',
+                        params: { name: tool.name, arguments: { body: { a: 1 } }, _meta: { mcpSessionId: 's1' } },
+                    },
+                    { signal: new AbortController().signal, sendNotification: vi.fn() },
+                );
+            },
+            { token: TOKEN },
+        );
+
+        expect(received).toMatchObject([{ method: 'POST', url: '/echo', body: '{"a":1}' }]);
+        expect(result.structuredContent).toMatchObject({ actorName: SERVER_ACTOR, interface: 'server', status: 200 });
     });
 });
 

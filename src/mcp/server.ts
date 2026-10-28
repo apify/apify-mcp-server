@@ -435,7 +435,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      */
     public listActorToolNames(): string[] {
         return Array.from(this.tools.values())
-            .filter((tool) => tool.type === TOOL_TYPE.ACTOR)
+            .filter((tool) => tool.type === TOOL_TYPE.ACTOR || tool.type === TOOL_TYPE.ACTOR_SERVER)
             .map((tool) => tool.actorFullName);
     }
 

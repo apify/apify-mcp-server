@@ -1,5 +1,5 @@
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
-import type { Actor } from '../../types.js';
+import type { Actor, ServerActorToolInfo } from '../../types.js';
 import { ACTOR_TENANCY } from '../../types.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { resolveActorTenancy } from '../actor_tool_naming.js';
@@ -21,6 +21,9 @@ const MAX_ALIAS_HOPS = 16;
 
 const MAX_NAMED_OPERATIONS = 5;
 const MAX_NAMED_OPERATIONS_LENGTH = 300;
+
+/** Longest operations block in a selected Server Actor's tool description. */
+export const SERVER_TOOL_OPERATIONS_MAX_BYTES = 8 * 1024;
 
 /** Inputs an operation line names in each list; the rest are counted. */
 const MAX_LISTED_INPUTS = 5;
@@ -284,6 +287,35 @@ function checkSize(text: string | undefined, actorFullName: string): { text: str
     if (text !== undefined && Buffer.byteLength(text) <= MAX_INLINE_BYTES) return { text };
     return {
         error: `Actor '${actorFullName}' server-interface output exceeds the ${MAX_INLINE_BYTES}-byte limit and was not returned. A smaller operation may fit.`,
+    };
+}
+
+/**
+ * What a selected Server Actor's tool is built from; `undefined` for a schema with no operation. Its operations block
+ * is the `serverInterface: true` rendering when that fits `SERVER_TOOL_OPERATIONS_MAX_BYTES`, otherwise one line per
+ * operation (`formatOperationLine`), cut to fit with `… and N more`.
+ */
+export function buildServerActorToolInfo(schema: unknown, actorFullName: string): ServerActorToolInfo | undefined {
+    const operations = listServerOperations(schema);
+    if (operations.length === 0) return undefined;
+    const surface = {
+        methods: API_METHODS.filter((method) => operations.some((operation) => operation.method === method)),
+        paths: [...new Set(operations.map(({ path }) => path))],
+        hasRequestBody: operations.some(({ operation }) => getRequestBody(operation, schema) !== undefined),
+    };
+    const full = formatWithinBudget(
+        schema,
+        (context) => ({ operations: operations.map((operation) => buildServerOperationDetails(operation, context)) }),
+        SERVER_TOOL_OPERATIONS_MAX_BYTES,
+    );
+    if (full !== undefined && Buffer.byteLength(full) <= SERVER_TOOL_OPERATIONS_MAX_BYTES) {
+        return { ...surface, operations: full };
+    }
+    const { method, path } = operations[0];
+    return {
+        ...surface,
+        operations: formatOperationIndex(operations, schema, SERVER_TOOL_OPERATIONS_MAX_BYTES),
+        detailsHint: `${formatDetailsCall(actorFullName, `${method} ${path}`)} returns one operation in full.`,
     };
 }
 

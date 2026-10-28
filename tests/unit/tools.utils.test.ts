@@ -1080,6 +1080,7 @@ describe('the Actor interface a tool call goes through', () => {
     it.each([
         ['an Actor run tool', { type: TOOL_TYPE.ACTOR } as unknown as ToolEntry, {}, 'input'],
         ['a proxied MCP tool', { type: TOOL_TYPE.ACTOR_MCP } as unknown as ToolEntry, {}, 'mcp'],
+        ["a Server Actor's own tool", { type: TOOL_TYPE.ACTOR_SERVER } as unknown as ToolEntry, {}, 'server'],
         ['call-actor with an Actor', callActor, { actor: 'apify/rag-web-browser' }, 'input'],
         ['call-actor with an MCP tool of an Actor', callActor, { actor: 'apify/example-mcp-server:add' }, 'mcp'],
         ['send-server-actor-request', sendServerActorRequest, { actor: 'apify/web-fetch' }, 'server'],
