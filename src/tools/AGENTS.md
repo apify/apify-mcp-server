@@ -21,7 +21,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   read by tool loading: a server tool if `server`, else MCP tools if `mcp`, else a run tool if `input`, else none
   (`SERVER_ACTOR_WITHOUT_MCP`). `getActorToolModeFromInterfaces` gives the `call-actor` route, which skips the
   server interface, so `call-actor` still starts runs of a Server Actor. Actors in `INPUT_INTERFACE_ACTORS`
-  (`../const.ts`: web-fetch, web-search, rag-web-browser) are served as run tools although they declare an MCP
+  (`../const.ts`: web-search, rag-web-browser) are served as run tools although they declare an MCP
   path or a server interface, unless their input schema is empty, in which case they get no tool.
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
   - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), delete
@@ -30,7 +30,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     Actor fixed, `method` and `path` narrowed to the documented ones, and the operations in the description. The
     whole description stays within `CLIENT_DESCRIPTION_MAX_LENGTH` (4,096 characters, the Claude Code cut): the
     operations in full when it fits, else `formatOperationLine` lines cut to fit (`buildServerActorToolDescription`,
-    from what `buildServerActorToolInfo` renders once per definition)), the direct actor-tool executor
+    from what `buildServerActorToolInfo` renders once per definition); the default `apify/web-fetch` tool is the one
+    hardcoded exception: only `GET /`, without `unwrap`, which its call refuses), the direct actor-tool executor
     (`actor_executor.ts`),
     `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`, and resolves the build
     the server-interface fields — `webServerMcpPath`, `webServerSchema` — are read from when standby is on,

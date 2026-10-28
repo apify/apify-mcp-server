@@ -197,7 +197,7 @@ A typical task follows four steps:
 
 The server adds `get-dataset-items`, `get-key-value-store-record`, `get-actor-run`, and `abort-actor-run` whenever `call-actor` or an Actor tool is loaded, so the agent can always read results and check on long runs that outlast the wait.
 
-You can also expose a specific Actor as its own tool, for example `apify/web-search` or `apify/instagram-scraper`. The server builds the tool's parameters from the Actor's input schema, so the agent knows exactly what to pass.
+You can also expose a specific Actor as its own tool, for example `apify/web-search` or `apify/instagram-scraper`. The server builds the tool's parameters from the Actor's input schema, so the agent knows exactly what to pass. A Server Actor with an API schema, such as `apify/web-fetch`, gets a tool that sends one HTTP request to its API instead; for `apify/web-fetch` that is `GET /` only.
 
 **Actors that run their own MCP server.** Some Actors are MCP servers themselves. `fetch-actor-mcp-tool-list` lists their tools, and `call-actor-mcp-tool` calls one. When such an Actor is loaded as a tool source, its tools are exposed under names in the form `username--actor-name--tool-name`. Apify Store also lists MCP-related Actors from independent creators; those are separate products with their own READMEs and pricing.
 
