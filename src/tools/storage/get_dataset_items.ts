@@ -49,7 +49,8 @@ const getDatasetItemsArgs = z.object({
                 'Use dot notation for nested objects (e.g. "metadata.url") or explicit zero-based array indices ' +
                 '(e.g. "results.1.url"); the server auto-flattens parent prefixes and returns flat keys. ' +
                 'A dotted path must end at a scalar value; a dotted path to a nested object or array returns nothing. ' +
-                'Array child paths require an explicit index at each array level (e.g. "results.0.siteLinks.1.url"). ' +
+                'Array child paths require an explicit index at each array level (e.g. "results.0.siteLinks.1.url"); ' +
+                'an unindexed array path (e.g. "results.url") returns nothing. ' +
                 'To retrieve every array element, select the whole top-level field (e.g. "results").',
         ),
     omit: z.string().optional().describe('Comma-separated list of fields to exclude from results.'),

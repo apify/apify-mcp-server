@@ -8,12 +8,7 @@ import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { respondUserError } from '../../utils/mcp.js';
-import {
-    buildDatasetFieldSelection,
-    datasetSizeNextStepHint,
-    fieldsProjectionHint,
-    normalizeDatasetFields,
-} from '../actors/actor_run_response.js';
+import { datasetSizeNextStepHint, fieldsProjectionHint, normalizeDatasetFields } from '../actors/actor_run_response.js';
 import { datasetMetadataOutputSchema } from '../structured_output_schemas.js';
 import { DEFAULT_DATASET_ITEMS_LIMIT } from './get_dataset_items.js';
 import { buildStorageResponse, resolveSiblingNextStep } from './storage_helpers.js';
@@ -87,13 +82,8 @@ export const getDataset: ToolEntry = Object.freeze({
         // produces redundant slash-notation paths. Run the same
         // normalization `buildRunDataset` applies so this tool's `fields` matches
         // the structured `storages.datasets.default.fields` shape.
-        const fieldSelection = metadata.fields?.length ? buildDatasetFieldSelection(metadata.fields) : undefined;
         const normalized = metadata.fields
-            ? {
-                  ...metadata,
-                  fields: normalizeDatasetFields(metadata.fields),
-                  ...(fieldSelection && { fieldSelection }),
-              }
+            ? { ...metadata, fields: normalizeDatasetFields(metadata.fields) }
             : metadata;
         const fieldCount = Array.isArray(normalized.fields) ? normalized.fields.length : undefined;
         // `inflatedBytes` is undeclared on the apify-client `DatasetStats` type and absent from the GET
@@ -103,7 +93,7 @@ export const getDataset: ToolEntry = Object.freeze({
         const nextStep = resolveSiblingNextStep(
             HELPER_TOOLS.DATASET_GET_ITEMS,
             loadedToolNames,
-            `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}${fieldsProjectionHint(fieldSelection)}`,
+            `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}${fieldsProjectionHint(normalized.fields)}`,
         );
         return buildStorageResponse({
             structuredContent: normalized,

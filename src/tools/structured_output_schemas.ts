@@ -739,38 +739,6 @@ export const updateActorVersionToolOutputSchema = {
     required: ['revision', 'changed', 'changes'],
 };
 
-/**
- * `fields` collapses array indices, so it describes the item structure but is not a usable
- * `get-dataset-items` projection for paths through arrays (#1656). This object carries the
- * selections that work; a factory for the same `structuredClone` identity reason as the entry schemas below.
- */
-const buildDatasetFieldSelectionSchema = () => ({
-    type: 'object' as const,
-    description:
-        "Selections the `fields` parameter supports when fetching this dataset's items. Present only when the dataset has field metadata.",
-    properties: {
-        topLevelFields: {
-            type: 'array' as const,
-            items: { type: 'string' },
-            description: 'Top-level field names; each selects the whole value, arrays and nested objects included.',
-        },
-        indexedFieldExamples: {
-            type: 'array' as const,
-            items: { type: 'string' },
-            description:
-                'Dotted paths with a zero-based index at every array level (e.g. "results.0.siteLinks.0.url"), one per array depth; omitted when no field is under an array.',
-        },
-        dottedOutput: {
-            type: 'string',
-            enum: ['flatKeys'],
-            description:
-                'A dotted selection returns a flat key (e.g. "results.1.url") and must end at a scalar value; a dotted path to a nested object or array returns nothing.',
-        },
-    },
-    required: ['topLevelFields', 'dottedOutput'],
-    additionalProperties: false,
-});
-
 // Per-storage entry shapes. Factories (not shared constants) because `structuredClone` preserves
 // object identity: if `default` and `additionalProperties` referenced the same object, cloning
 // `actorRunOutputSchema` would keep them as the same object, and injecting `itemsSchema` into
@@ -795,9 +763,8 @@ const buildDatasetEntrySchema = () => ({
             type: 'array' as const,
             items: { type: 'string' },
             description:
-                'Dataset field paths in dot notation with array indices collapsed (e.g. ["metadata.url"]); describes the item structure. See fieldSelection for usable selections.',
+                'Dataset field paths in dot notation with array indices collapsed to 0 (e.g. ["metadata.url", "results.0.url"]); each is a valid fields selection.',
         },
-        fieldSelection: buildDatasetFieldSelectionSchema(),
     },
     required: ['id'],
 });
@@ -1080,9 +1047,8 @@ export const datasetMetadataOutputSchema = {
             type: 'array' as const,
             items: { type: 'string' },
             description:
-                'Field paths in dot notation with array indices collapsed (e.g. ["metadata.url"]); describes the item structure. See fieldSelection for usable selections.',
+                'Field paths in dot notation with array indices collapsed to 0 (e.g. ["metadata.url", "results.0.url"]); each is a valid fields selection.',
         },
-        fieldSelection: buildDatasetFieldSelectionSchema(),
         summary: summaryProperty,
         nextStep: nextStepProperty,
     },

@@ -55,7 +55,6 @@ describe('get-dataset', () => {
         expect(structuredContent.summary).toBe("Dataset 'my-dataset' has 42 items, 2 fields.");
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
         expect(structuredContent.nextStep).toContain('datasetId=ds-1');
-        expect(structuredContent.nextStep).toContain('Selectable fields: title, url');
         // content[0] is the data-only JSON dump (no narrative); content[1] is the narrative.
         const { summary, nextStep, ...data } = structuredContent;
         expect(JSON.parse(content[0].text)).toEqual(data);
@@ -78,12 +77,11 @@ describe('get-dataset', () => {
         const { content, structuredContent } = result as TextToolResult & {
             structuredContent: Record<string, unknown>;
         };
-        // `fieldSelection` is derived, not passed through; its shape has its own tests below.
-        const { summary, nextStep, fieldSelection, ...data } = structuredContent;
+        const { summary, nextStep, ...data } = structuredContent;
 
         expectSchemaConformingStructuredContent(result, datasetMetadataOutputSchema);
         expect(data).toEqual(metadata);
-        expect(JSON.parse(content[0].text)).toEqual({ ...metadata, fieldSelection });
+        expect(JSON.parse(content[0].text)).toEqual(metadata);
         expect(JSON.stringify(result)).not.toContain('urlSigningSecretKey');
         expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
     });
@@ -201,55 +199,39 @@ describe('get-dataset fields normalization', () => {
         );
         const { structuredContent } = result as { structuredContent: { fields: string[] } };
         expect(structuredContent.fields).toEqual([
-            'latestComments.id',
-            'latestComments.text',
-            'latestComments.owner.username',
-            'images',
+            'latestComments.0.id',
+            'latestComments.0.text',
+            'latestComments.0.owner.username',
+            'images.0',
         ]);
     });
 
-    it('names the selectable fields and an indexed example in the nextStep', async () => {
+    it('adds the array selection sentence to the nextStep and validates against the output schema', async () => {
         const result = await (getDataset as HelperTool).call(
             stubToolCallContext(
                 { datasetId: 'ds-1' },
                 stubApifyClient({ id: 'ds-1', itemCount: 1, fields: ARRAY_FIELDS }),
             ),
         );
-        const { structuredContent } = result as { structuredContent: { nextStep: string } };
-        expect(structuredContent.nextStep).toContain('Selectable fields: latestComments, images');
-        expect(structuredContent.nextStep).toContain('fields="latestComments.0.id"');
-        expect(structuredContent.nextStep).toContain(
-            'Dotted selections return flat keys and must end at a scalar value',
-        );
-        expect(structuredContent.nextStep).not.toContain('latestComments.id');
-    });
-
-    it('adds fieldSelection beside the collapsed fields and validates against the output schema', async () => {
-        const result = await (getDataset as HelperTool).call(
-            stubToolCallContext(
-                { datasetId: 'ds-1' },
-                stubApifyClient({ id: 'ds-1', itemCount: 1, fields: ARRAY_FIELDS }),
-            ),
-        );
-        const { structuredContent } = result as {
-            structuredContent: { fields: string[]; fieldSelection: unknown };
-        };
+        const { structuredContent } = result as { structuredContent: { fields: string[]; nextStep: string } };
         expectSchemaConformingStructuredContent(result, datasetMetadataOutputSchema);
-        expect(structuredContent.fields).toEqual(['latestComments.id', 'latestComments.owner.username', 'images']);
-        expect(structuredContent.fieldSelection).toEqual({
-            topLevelFields: ['latestComments', 'images'],
-            indexedFieldExamples: ['latestComments.0.id'],
-            dottedOutput: 'flatKeys',
-        });
+        expect(structuredContent.fields).toEqual([
+            'latestComments.0.id',
+            'latestComments.0.owner.username',
+            'images.0',
+        ]);
+        expect(structuredContent.nextStep).toContain('select one element (latestComments.0.id)');
+        expect(structuredContent.nextStep).toContain('top-level name (latestComments) for every element');
+        expect(structuredContent.nextStep).toContain('An unindexed array path (latestComments.id) returns nothing.');
     });
 
-    it('omits fieldSelection when the API returns an empty field list', async () => {
+    it('keeps the nextStep free of array guidance when the API returns an empty field list', async () => {
         const result = await (getDataset as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ id: 'ds-1', itemCount: 0, fields: [] })),
         );
-        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+        const { structuredContent } = result as { structuredContent: { fields: string[]; nextStep: string } };
         expect(structuredContent.fields).toEqual([]);
-        expect(structuredContent).not.toHaveProperty('fieldSelection');
+        expect(structuredContent.nextStep).not.toContain('Array paths in fields');
     });
 
     it('preserves non-`fields` keys from the raw API response unchanged', async () => {
@@ -271,7 +253,7 @@ describe('get-dataset fields normalization', () => {
             userId: 'u-1',
             itemCount: 3,
             stats: { storageBytes: 15557, readCount: 4, writeCount: 3 },
-            fields: ['a.b.c'],
+            fields: ['a.b.0.c'],
         });
     });
 

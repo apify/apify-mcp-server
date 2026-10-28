@@ -95,35 +95,17 @@ export type RunDataset = {
      */
     inflatedBytes?: number;
     /**
-     * Dot-notation field paths. Pure-numeric segments (array indices) are stripped and the
-     * list is deduped at build time, so callers receive a flat unique description of the structure
-     * rather than the inflated `entities.hashtags.0.text`, `entities.hashtags.1.text`, ...
-     * shape Apify returns for array-heavy datasets.
+     * Dot-notation field paths with every array index collapsed to 0 and the list deduped, so
+     * `entities.hashtags.0.text`, `entities.hashtags.1.text`, ... become one `entities.hashtags.0.text`.
+     * Each path is a valid `fields` selection; another element is the same path with another index.
      */
     fields?: string[];
-    /** Which `fields` selections `get-dataset-items` supports for this dataset; absent without field metadata. */
-    fieldSelection?: DatasetFieldSelection;
     /**
      * JSON Schema fragment for each dataset row. Populated only by direct actor tools (where
      * the target Actor is known at tools/list time, so historical row shape can be looked up
      * via `actorStore`). Absent for `call-actor` / `get-actor-run` (dynamic target).
      */
     itemsSchema?: { type: 'object'; properties: Record<string, unknown> };
-};
-
-/**
- * Selection guidance derived from the raw, index-expanded `fields` metadata. `fields` on the same
- * entry collapses array indices (`results.url`), which is not a usable `fields="..."` selection
- * (#1656): a path through an array needs an explicit index at every array level, and a dotted
- * selection returns a flat key. The examples keep the indices so they can be passed as written.
- */
-export type DatasetFieldSelection = {
-    /** Unique first path segments; each selects a whole top-level value, arrays and objects included. */
-    topLevelFields: string[];
-    /** Dotted paths with an index at every array level, one per array depth; absent when no field is under an array. */
-    indexedFieldExamples?: string[];
-    /** Dotted selections return flat keys (`results.1.url`) and must end at a scalar; a dotted path to a nested object or array returns nothing. */
-    dottedOutput: 'flatKeys';
 };
 
 export type RunKeyValueStore = {
@@ -189,8 +171,8 @@ export type FetchActorRunResult = {
 /**
  * Apify expands array indices in dataset fields (e.g. `entities.hashtags.0.text`,
  * `entities.hashtags.1.text`, ... `entities.hashtags.14.text`), so deeply-nested or
- * array-heavy schemas balloon into hundreds of redundant paths. Strip pure-numeric
- * segments and dedupe; these paths describe the structure, not necessarily valid `fields` selections.
+ * array-heavy schemas balloon into hundreds of redundant paths. Collapse every index to 0 and
+ * dedupe: the list stays short and each path is still a valid `fields` selection (#1656).
  *
  * Exported for direct unit testing of edge cases (empty input, all-numeric paths) —
  * production callers go through `normalizeDatasetFields`.
@@ -201,9 +183,9 @@ export function collapseArrayIndices(fields: string[]): string[] {
     for (const field of fields) {
         const collapsed = field
             .split('.')
-            .filter((segment) => !/^\d+$/.test(segment))
+            .map((segment) => (/^\d+$/.test(segment) ? '0' : segment))
             .join('.');
-        if (collapsed && !seen.has(collapsed)) {
+        if (!seen.has(collapsed)) {
             seen.add(collapsed);
             result.push(collapsed);
         }
@@ -219,28 +201,6 @@ export function collapseArrayIndices(fields: string[]): string[] {
  */
 export function normalizeDatasetFields(fields: string[]): string[] {
     return collapseArrayIndices(fields.map((f) => f.replace(/\//g, '.')));
-}
-
-/**
- * Builds {@link DatasetFieldSelection} from the raw slash-separated, index-expanded `fields`
- * metadata (non-empty). One example per array depth keeps the guidance short on array-heavy
- * datasets, where the raw list runs to hundreds of paths.
- */
-export function buildDatasetFieldSelection(fields: string[]): DatasetFieldSelection {
-    const exampleByArrayDepth = new Map<number, string>();
-    for (const field of fields) {
-        const arrayDepth = field.split('/').filter((segment) => /^\d+$/.test(segment)).length;
-        if (arrayDepth === 0 || exampleByArrayDepth.has(arrayDepth)) continue;
-        exampleByArrayDepth.set(arrayDepth, field.replace(/\//g, '.'));
-    }
-    const indexedFieldExamples = [...exampleByArrayDepth]
-        .sort(([depthA], [depthB]) => depthA - depthB)
-        .map(([, example]) => example);
-    return {
-        topLevelFields: [...new Set(fields.map((field) => field.split('/')[0]))],
-        ...(indexedFieldExamples.length > 0 ? { indexedFieldExamples } : {}),
-        dottedOutput: 'flatKeys',
-    };
 }
 
 export function toIsoString(value: Date | string | undefined | null): string | undefined {
@@ -273,7 +233,6 @@ function buildRunDataset(id: string, datasetMeta: Dataset | null, resolvedItemCo
         // "0 bytes" is misleading for a non-empty dataset). `cleanEmptyProperties` drops undefined.
         inflatedBytes: inflatedBytes && inflatedBytes > 0 ? inflatedBytes : undefined,
         fields: datasetMeta.fields ? normalizeDatasetFields(datasetMeta.fields) : undefined,
-        fieldSelection: datasetMeta.fields?.length ? buildDatasetFieldSelection(datasetMeta.fields) : undefined,
     }) as RunDataset;
 }
 
@@ -576,15 +535,24 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
     return { hasKv: true, kvId, keys, keyCountLabel, summarySuffix: ` Key-value store has ${keyCountLabel}.` };
 }
 
-export function fieldsProjectionHint(fieldSelection: DatasetFieldSelection | undefined): string {
-    if (!fieldSelection) return '';
-    const { topLevelFields, indexedFieldExamples } = fieldSelection;
-    const arrayHint = indexedFieldExamples
-        ? ` For one array element, include a zero-based index at each array level, for example fields="${indexedFieldExamples[0]}".`
-        : '';
+/**
+ * Array guidance for the `fields` parameter, derived from the collapsed `fields` of a dataset
+ * entry. Empty when the dataset has no arrays: plain dotted paths need no explanation. The
+ * examples come from the first indexed path. Projection across array elements is an API gap
+ * (apify/apify-core#31931); until then the whole array is the only way to get every element.
+ */
+export function fieldsProjectionHint(fields: string[] | undefined): string {
+    const indexedField = fields?.find((field) => /(^|\.)0(\.|$)/.test(field));
+    if (!indexedField) return '';
+    const topLevel = indexedField.split('.')[0];
+    const unindexed = indexedField
+        .split('.')
+        .filter((segment) => !/^\d+$/.test(segment))
+        .join('.');
+    const negative = unindexed === topLevel ? '' : ` An unindexed array path (${unindexed}) returns nothing.`;
     return (
-        ` Selectable fields: ${topLevelFields.join(', ')} (a top-level name returns the whole value, arrays and objects included).` +
-        `${arrayHint} Dotted selections return flat keys and must end at a scalar value.`
+        ` Array paths in fields carry index 0 and select one element (${indexedField});` +
+        ` select the top-level name (${topLevel}) for every element.${negative}`
     );
 }
 
@@ -617,7 +585,7 @@ function buildSucceededSummaryNextStep(
         const fields = dataset?.fields ?? [];
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. ${itemCount} ${itemCount === 1 ? 'item' : 'items'}; ${fields.length} fields available.${kv.summarySuffix}`,
-            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items (${itemCount} total).${datasetSizeNextStepHint(dataset?.inflatedBytes)}${fieldsProjectionHint(dataset?.fieldSelection)}`,
+            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items (${itemCount} total).${datasetSizeNextStepHint(dataset?.inflatedBytes)}${fieldsProjectionHint(dataset?.fields)}`,
         };
     }
 
@@ -638,7 +606,7 @@ function buildSucceededSummaryNextStep(
     if (itemCount === 0 && datasetId) {
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. Dataset item count reads 0 - counts can lag right after a run finishes.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
-            nextStep: `Fetch ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) before concluding the run produced no output.${fieldsProjectionHint(dataset?.fieldSelection)}`,
+            nextStep: `Fetch ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) before concluding the run produced no output.${fieldsProjectionHint(dataset?.fields)}`,
         };
     }
 
@@ -669,7 +637,7 @@ function buildTimedOutSummaryNextStep(
         const itemCount = dataset?.itemCount ?? 0;
         return {
             summary: `TIMED-OUT after ${runTimeSecs}s.${kv.summarySuffix}`,
-            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch any partial output (${itemCount} ${itemCount === 1 ? 'item' : 'items'} written).${fieldsProjectionHint(dataset?.fieldSelection)}`,
+            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch any partial output (${itemCount} ${itemCount === 1 ? 'item' : 'items'} written).${fieldsProjectionHint(dataset?.fields)}`,
         };
     }
 

@@ -51,12 +51,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     and wait-timeout modes: storage IDs plus a `summary` (past) / `nextStep` (one primary
     action) pair, never inline dataset items or KV bodies — except the reserved `TIP` key,
     inlined as `tip` on terminal RAG Web Browser runs only.
-    Run dataset entries and `get-dataset` carry `fieldSelection` (`buildDatasetFieldSelection`):
-    the top-level names, one indexed example per array depth built from the raw index-expanded
-    metadata, and `dottedOutput: 'flatKeys'`; the narrative hint is rendered from it. Dotted
-    selections return flat keys and must end at a scalar; arrays require explicit zero-based indices
-    for individual values, and an unindexed path does not select across array elements. `fields`
-    keeps its collapsed shape for compatibility.
+    Dataset `fields` collapse every array index to 0 (`results.0.url`), so each path is a valid
+    `get-dataset-items` selection. The hint (`fieldsProjectionHint`) adds one sentence when arrays
+    exist: an indexed path selects one element, the top-level name selects every element, and an
+    unindexed array path returns nothing (projection across elements is apify/apify-core#31931).
   - `runs/` — get/abort runs, run logs, run list.
   - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`.
   - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public
