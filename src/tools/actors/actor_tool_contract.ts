@@ -18,6 +18,7 @@ const WEB_FETCH_ADDITIONAL_DESC = `Use this tool to fetch a specific URL and ret
 It renders JavaScript and bypasses anti-bot protection, so it also retrieves pages where a plain HTTP fetch gets blocked, fails with an error such as 403 or 429, or returns incomplete content.
 The page comes back verbatim, with no summarization.
 In query, formats is a comma-separated string, such as "markdown,links", and headers is a JSON object as a string, such as {"Accept-Language":"fr-FR"}.
+Example: {"query":{"url":"https://example.com","formats":"markdown"}}
 
 Examples of when to use:
 - User provides a URL and wants its content, its data or links, or an answer that requires reading that page
