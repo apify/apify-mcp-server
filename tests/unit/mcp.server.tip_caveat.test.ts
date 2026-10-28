@@ -1,24 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
-import type { ActorExecutionParams, ToolEntry, ToolInputSchema } from '../../src/types.js';
-import { TOOL_TYPE } from '../../src/types.js';
-import { compileSchema } from '../../src/utils/ajv.js';
-import { getRequestHandler, withServer } from './helpers/mcp_server.js';
+import type { ActorExecutionParams } from '../../src/types.js';
+import { getRequestHandler, makeActorTool, withServer } from './helpers/mcp_server.js';
 
 const WEB_FETCH_ACTOR_ID = 'a6Sqhlnt4touIHTub';
-
-function makeActorTool(actorFullName: string, actorId: string): ToolEntry {
-    return {
-        type: TOOL_TYPE.ACTOR,
-        name: actorFullName.replace('/', '--'),
-        description: 'actor',
-        inputSchema: { type: 'object', properties: {} } as ToolInputSchema,
-        ajvValidate: compileSchema({ type: 'object', properties: {} }),
-        actorId,
-        actorFullName,
-    } as ToolEntry;
-}
 
 describe('tip caveat on a direct Actor tool response', () => {
     afterEach(() => vi.restoreAllMocks());
@@ -31,8 +17,16 @@ describe('tip caveat on a direct Actor tool response', () => {
                 return { content: [{ type: 'text', text: 'ok' }] };
             });
             server.upsertTools([
-                makeActorTool('apify/rag-web-browser', '3ox4R101TgZz67sLr'),
-                makeActorTool('apify/web-fetch', WEB_FETCH_ACTOR_ID),
+                makeActorTool({
+                    name: 'apify--rag-web-browser',
+                    actorFullName: 'apify/rag-web-browser',
+                    actorId: '3ox4R101TgZz67sLr',
+                }),
+                makeActorTool({
+                    name: 'apify--web-fetch',
+                    actorFullName: 'apify/web-fetch',
+                    actorId: WEB_FETCH_ACTOR_ID,
+                }),
             ]);
 
             await getRequestHandler(server, 'tools/call')(

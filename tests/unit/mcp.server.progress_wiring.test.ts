@@ -2,11 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
-import type { ToolEntry, ToolInputSchema } from '../../src/types.js';
-import { TOOL_TYPE } from '../../src/types.js';
-import { compileSchema } from '../../src/utils/ajv.js';
 import { ProgressTracker } from '../../src/utils/progress.js';
-import { getRequestHandler, makeRecorderTool, withServer } from './helpers/mcp_server.js';
+import { getRequestHandler, makeActorTool, makeRecorderTool, withServer } from './helpers/mcp_server.js';
 
 /**
  * Covers the request-metadata → `createProgressTracker` wiring in `tools/call`. The unit tests
@@ -25,19 +22,6 @@ async function runRecorder(toolName: string, meta: Record<string, unknown>) {
         );
         return received;
     });
-}
-
-/** A minimal ACTOR tool; its executor is spied so the test can read the progressTracker it receives. */
-function makeActorTool(): ToolEntry {
-    return {
-        type: TOOL_TYPE.ACTOR,
-        name: 'test-actor-tool',
-        description: 'actor',
-        inputSchema: { type: 'object', properties: {} } as ToolInputSchema,
-        ajvValidate: compileSchema({ type: 'object', properties: {} }),
-        actorId: 'test/actor',
-        actorFullName: 'test/actor',
-    } as ToolEntry;
 }
 
 describe('tools/call progressToken wiring', () => {

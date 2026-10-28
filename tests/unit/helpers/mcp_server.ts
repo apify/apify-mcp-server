@@ -252,6 +252,20 @@ export function makePermissionApprovalError(): ApifyApiError {
     );
 }
 
+/** A minimal ACTOR tool with an empty input schema; tests spy on `actorExecutor` to read what dispatch passes it. */
+export function makeActorTool(options: { name?: string; actorFullName?: string; actorId?: string } = {}): ToolEntry {
+    const { name = 'test-actor-tool', actorFullName = 'test/actor', actorId = 'test/actor' } = options;
+    return {
+        type: TOOL_TYPE.ACTOR,
+        name,
+        description: 'actor',
+        inputSchema: { type: 'object', properties: {} } as ToolInputSchema,
+        ajvValidate: compileSchema({ type: 'object', properties: {} }),
+        actorId,
+        actorFullName,
+    } as ToolEntry;
+}
+
 /**
  * A synthetic internal tool whose `call` throws `error` (default: a plain `Error('boom')`), so
  * dispatch falls through to the outer catch. An empty input schema validates against `{}`. Set
