@@ -1,6 +1,7 @@
 import type { ApifyClientOptions } from 'apify-client';
 import { ApifyClient as _ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig, AxiosResponse } from 'axios';
+import { isAxiosError } from 'axios';
 
 import { API_PUBLIC_BASE_URL, API_PUBLIC_BASE_URL_STAGING, MAX_INLINE_BYTES, STAGING_MCP_HOSTNAME } from './const.js';
 import type { PaymentHeaders } from './payments/types.js';
@@ -9,7 +10,7 @@ import type { PaymentHeaders } from './payments/types.js';
 const USER_AGENT_ORIGIN = 'Origin/mcp-server';
 
 // Request origin headers
-const REQUEST_ORIGIN_HEADER = 'X-Apify-Request-Origin';
+export const REQUEST_ORIGIN_HEADER = 'X-Apify-Request-Origin';
 
 /** Values sent in the X-Apify-Request-Origin header; expected to correspond to `META_ORIGINS` in `@apify/consts` on the backend. */
 export const REQUEST_ORIGIN = {
@@ -44,6 +45,11 @@ export function getApifyAPIPublicBaseUrl(): string {
 }
 
 export class ApifyClient extends _ApifyClient {
+    /**
+     * Sent in the X-Apify-Request-Origin header; connections to an Actor's MCP server send it too. Always set; optional
+     * so a plain apify-client `ApifyClient`, which public methods such as `loadToolsFromInput` accept, stays assignable.
+     */
+    readonly requestOrigin?: REQUEST_ORIGIN;
     /** Call tracking sent with Store searches. */
     storeSearchTracking?: { traceId?: string; useCase?: string };
 
@@ -76,20 +82,50 @@ export class ApifyClient extends _ApifyClient {
             userAgentSuffix: USER_AGENT_ORIGIN,
             requestInterceptors: [(config) => ({ ...config, headers: { ...config.headers, ...staticHeaders } })],
         });
+        this.requestOrigin = staticHeaders[REQUEST_ORIGIN_HEADER];
     }
 }
 
 /**
  * Sends one request, with no retries, through apify-client's axios instance, which adds the token and the
- * request-origin and payment headers. Check the URL with `isApifyApiUri` (`resources/api_resources.ts`)
- * first and the status after: a non-2xx response resolves. It skips `httpClient.call()`, which retries (a
- * write could apply twice, and a body over the size cap is downloaded again) and turns a streamed error
- * body into a junk message; that also skips its `HTTPS_PROXY` support and User-Agent. axios aborts a body
- * over `MAX_INLINE_BYTES` mid-stream (checked in axios 1.16.1), so it is never buffered whole.
+ * request-origin and payment headers. Check the URL first, with `isApifyApiUri` (`resources/api_resources.ts`)
+ * for the API or against the Actor's standby origin (`tools/actors/send_server_actor_request.ts`), and the
+ * status after: a non-2xx response resolves, and so does a 3xx with `maxRedirects: 0`. It skips
+ * `httpClient.call()`, which retries (a write could apply twice, and a body over the size cap is downloaded
+ * again) and turns a streamed error body into a junk message; that also skips its `HTTPS_PROXY` support and
+ * User-Agent. axios aborts a body over `MAX_INLINE_BYTES` mid-stream (checked in axios 1.16.1), so it is
+ * never buffered whole.
  */
 export async function sendApifyApiRequest(
     apifyClient: ApifyClient,
-    config: Pick<AxiosRequestConfig, 'url' | 'method' | 'params' | 'data' | 'headers' | 'responseType' | 'signal'>,
+    config: Pick<
+        AxiosRequestConfig,
+        'url' | 'method' | 'params' | 'data' | 'headers' | 'responseType' | 'signal' | 'maxRedirects'
+    >,
 ): Promise<AxiosResponse<unknown>> {
     return apifyClient.httpClient.axios.request<unknown>({ ...config, maxContentLength: MAX_INLINE_BYTES });
+}
+
+/** The mid-consumption abort axios raises when a body crosses `maxContentLength`. */
+export function isMaxContentLengthAbort(err: unknown): boolean {
+    return isAxiosError(err) && err.code === 'ERR_BAD_RESPONSE' && err.message.includes('maxContentLength');
+}
+
+/**
+ * Reads the body of a `responseType: 'stream'` response from `sendApifyApiRequest`; `undefined` when it passed
+ * `MAX_INLINE_BYTES`, where axios stopped reading. Any other failure mid-body propagates, so a partial body is
+ * never returned.
+ */
+export async function readBodyUnderCap(response: Pick<AxiosResponse<unknown>, 'data'>): Promise<Buffer | undefined> {
+    const chunks: Buffer[] = [];
+    try {
+        // Chunks are Buffers (`objectMode: false`).
+        for await (const chunk of response.data as AsyncIterable<Buffer | string>) {
+            chunks.push(Buffer.from(chunk));
+        }
+    } catch (err) {
+        if (isMaxContentLengthAbort(err)) return undefined;
+        throw err;
+    }
+    return Buffer.concat(chunks);
 }

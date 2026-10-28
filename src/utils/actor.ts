@@ -1,10 +1,9 @@
 import type { ApifyClient } from '../apify_client.js';
-import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
+import { getActorMCPServerPath } from '../mcp/actors.js';
 import { actorDefinitionCache } from '../state.js';
-import { resolveActorToolMode } from '../tools/actor_tool_naming.js';
+import { getActorToolModeFromInterfaces, resolveActorInterfaces } from '../tools/actor_tool_naming.js';
 import { getActorDefinition } from '../tools/actors/actor_definition.js';
 import type { ActorDefinitionWithInfo, ActorToolResolutionResult } from '../types.js';
-import { ACTOR_TOOL_MODE } from '../types.js';
 import { getUserInfoCached } from './userid_cache.js';
 
 /**
@@ -41,17 +40,25 @@ export async function getActorDefinitionCached(
     const cached = actorDefinitionCache.get(actorIdOrName);
     if (cached && (await callerMaySeeCachedActor(cached, apifyClient))) return cached;
     const fetched = await getActorDefinition(actorIdOrName, apifyClient);
-    if (fetched) actorDefinitionCache.set(actorIdOrName, fetched);
+    // Without a token, a Standby build named by an untagged build number can't be resolved (listing builds needs
+    // auth), so the definition comes back with no server interface. Caching it would hide the interface from later
+    // callers with a token. The definition can't tell that apart from a Standby Actor that declares no interface,
+    // so neither is cached for anonymous reads; they re-fetch every time (#1642).
+    const isUnresolvedAnonymousServer =
+        !apifyClient.token &&
+        fetched?.info.actorStandby?.isEnabled === true &&
+        !fetched.definition.webServerMcpPath &&
+        !fetched.definition.hasWebServerSchema;
+    if (fetched && !isUnresolvedAnonymousServer) actorDefinitionCache.set(actorIdOrName, fetched);
     return fetched;
 }
 
 /**
- * Resolve how an Actor is exposed as a tool at call time, by name. The only place `resolveActorToolMode`
- * is consulted outside the tool-loading factory, so `call-actor` routing and tool loading share one rule.
+ * Resolve how an Actor is exposed as a tool at call time, by name: its interface set and the tool slot derived
+ * from it, by the rule tool loading uses (`resolveActorInterfaces`).
  *
- * Returns `null` when there is no definition to classify (unknown Actor). The URL is a pure function of
- * the definition (`getActorMCPServerURL` does no I/O), so this rides the authorization-gated
- * `getActorDefinitionCached` instead of a separate cache that would leak a private Actor's URL across tenants.
+ * Returns `null` when there is no definition to classify (unknown Actor). It does not resolve the MCP server URL,
+ * so a bad `webServerMcpPath` fails only the MCP call that needs it (`runOnActorMcpServer`).
  */
 export async function getActorToolResolutionCached(
     actorIdOrName: string,
@@ -60,20 +67,14 @@ export async function getActorToolResolutionCached(
     const cached = await getActorDefinitionCached(actorIdOrName, apifyClient);
     if (!cached) return null;
 
-    const webServerMcpPath = getActorMCPServerPath(cached.definition);
-    const toolMode = resolveActorToolMode({
+    const interfaces = resolveActorInterfaces({
         definition: cached.definition,
         actor: cached.info,
-        webServerMcpPath,
+        webServerMcpPath: getActorMCPServerPath(cached.definition),
     });
-    const { actorFullName } = cached.definition;
-    // `resolveActorToolMode` returns MCP only when `webServerMcpPath` is set.
-    if (toolMode === ACTOR_TOOL_MODE.MCP) {
-        return {
-            toolMode,
-            mcpServerUrl: await getActorMCPServerURL(cached.definition.id, webServerMcpPath!),
-            actorFullName,
-        };
-    }
-    return { toolMode, actorFullName };
+    return {
+        toolMode: getActorToolModeFromInterfaces(interfaces),
+        actorFullName: cached.definition.actorFullName,
+        interfaces,
+    };
 }

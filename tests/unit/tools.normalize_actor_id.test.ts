@@ -55,4 +55,11 @@ describe('fixActorNameInput', () => {
         expect(fixActorNameInput('`apify / rag-web-browser`')).toBe('apify/rag-web-browser');
         expect(fixActorNameInput('"apify / rag-web-browser"')).toBe('apify/rag-web-browser');
     });
+
+    it('drops the :toolName suffix of the removed actorName:toolName form', () => {
+        expect(fixActorNameInput('apify/example-mcp-server:add')).toBe('apify/example-mcp-server');
+        expect(fixActorNameInput('https://apify.com/apify/rag-web-browser')).toBe(
+            'https://apify.com/apify/rag-web-browser',
+        );
+    });
 });

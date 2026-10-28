@@ -20,7 +20,6 @@ import {
     type ActorInfo,
     type ActorStore,
     type ActorTool,
-    type ApifyToken,
     type ToolDescriptionContext,
     type ToolEntry,
     type ToolInputSchema,
@@ -222,12 +221,13 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
 
 export async function getMCPServersAsTools(
     actorsInfo: ActorInfo[],
-    apifyToken: ApifyToken,
+    apifyClient: Pick<ApifyClient, 'token' | 'requestOrigin'>,
     mcpSessionId?: string,
 ): Promise<ToolEntry[]> {
+    const { token, requestOrigin } = apifyClient;
     // Payment-provider request with no Apify token: standby Actors aren't supported here, so
     // MCP servers — which are always standby Actors — are skipped since they'd fail anyway.
-    if (apifyToken === null || apifyToken === undefined) {
+    if (token === null || token === undefined) {
         return [];
     }
 
@@ -247,10 +247,7 @@ export async function getMCPServersAsTools(
         try {
             // getActorMCPServerURL rejects a webServerMcpPath that escapes the Actor's standby origin.
             // Resolve it inside the try so one Actor's bad path skips only that Actor, not the whole batch.
-            const mcpServerUrl = await getActorMCPServerURL(
-                actorInfo.definition.id, // Real ID of the Actor
-                actorInfo.webServerMcpPath,
-            );
+            const mcpServerUrl = await getActorMCPServerURL(actorInfo.actor, actorInfo.webServerMcpPath);
             log.debug('Retrieved MCP server URL for Actor', {
                 actorFullName: actorInfo.definition.actorFullName,
                 actorId,
@@ -258,7 +255,7 @@ export async function getMCPServersAsTools(
                 mcpSessionId,
             });
 
-            client = await connectMCPClient(mcpServerUrl, apifyToken, mcpSessionId);
+            client = await connectMCPClient(mcpServerUrl, { token, requestOrigin }, mcpSessionId);
             if (!client) {
                 // Skip this Actor, connectMCPClient will log the error
                 return [];
@@ -288,14 +285,20 @@ export async function getMCPServersAsTools(
 export function fixActorNameInputAndLog(actorName: string, extra?: Record<string, unknown>): string {
     const fixed = fixActorNameInput(actorName);
     if (fixed !== actorName) {
-        log.info('Actor name input required normalization before lookup (quotes, spacing, or slash padding)', {
-            actorNameInput: actorName,
-            actorNameFixed: fixed,
-            ...extra,
-        });
+        log.info(
+            'Actor name input required normalization before lookup (quotes, spacing, slash padding, or a tool name)',
+            {
+                actorNameInput: actorName,
+                actorNameFixed: fixed,
+                ...extra,
+            },
+        );
     }
     return fixed;
 }
+
+/** The `:toolName` of the removed `actorName:toolName` form; a URL's `scheme://` is not one. */
+export const MCP_TOOL_NAME_SUFFIX = /:[^/]*$/;
 
 /**
  * Fixes Actor name strings (`username/name`) before cache + Apify API lookup.
@@ -303,10 +306,11 @@ export function fixActorNameInputAndLog(actorName: string, extra?: Record<string
  * LLMs often wrap values in markdown quotes or smart quotes and insert spaces around `/`.
  * The Apify API treats those as distinct strings → avoidable 404 SOFT_FAIL. This only trims
  * and strips common wrappers / spacing noise; valid names pass through unchanged.
+ * It also drops the `:toolName` of the removed `actorName:toolName` form, since a name never contains a colon.
  */
 export function fixActorNameInput(actorName: string): string {
     const s = stripQuoteWrappers(actorName).replace(/\s*\/\s*/g, '/');
-    return s.replace(/\s+/g, ' ').trim();
+    return s.replace(/\s+/g, ' ').trim().replace(MCP_TOOL_NAME_SUFFIX, '');
 }
 
 /**
@@ -409,9 +413,9 @@ export async function getActorsAsTools(
         }
 
         const toolMode = resolveActorToolMode(actorInfo);
-        if (toolMode === ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP) {
-            const error = ActorLoadError.standbyWithoutMcpNotSupported(actorInfo.definition.actorFullName);
-            log.softFail('Skipping standby Actor with no MCP server and an empty input schema', {
+        if (toolMode === ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP) {
+            const error = ActorLoadError.serverActorWithoutMcpNotSupported(actorInfo.definition.actorFullName);
+            log.softFail('Skipping server Actor with no MCP server and an empty input schema', {
                 actorName: actorInfo.definition.actorFullName,
                 mcpSessionId,
                 actorLoadErrorKind: error.kind,
@@ -426,7 +430,7 @@ export async function getActorsAsTools(
 
     const [normalTools, mcpServerTools] = await Promise.all([
         getNormalActorsAsTools(normalActorsInfo, { mcpSessionId, actorStore, isDirectTool }),
-        getMCPServersAsTools(actorMCPServersInfo, apifyClient.token, mcpSessionId),
+        getMCPServersAsTools(actorMCPServersInfo, apifyClient, mcpSessionId),
     ]);
 
     return { tools: [...normalTools, ...mcpServerTools], errors };

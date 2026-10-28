@@ -229,6 +229,8 @@ export function extractToolTelemetry(
         ...(telemetry.failureCategory && { failure_category: telemetry.failureCategory }),
         ...(telemetry.failureHttpStatus !== undefined && { failure_http_status: telemetry.failureHttpStatus }),
         ...(telemetry.failureDetail && { failure_detail: telemetry.failureDetail }),
+        ...(telemetry.httpStatus !== undefined && { http_status: telemetry.httpStatus }),
+        ...(telemetry.actorTenancy && { actor_tenancy: telemetry.actorTenancy }),
         ...actorFields,
         ...telemetry.ajvErrorDetails,
     };

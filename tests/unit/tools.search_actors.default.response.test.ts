@@ -464,4 +464,12 @@ describe('buildDescription()', () => {
         expect(searchActors.description).toContain(carveOut);
         expect(renderDescription(HELPER_TOOLS.STORE_SEARCH)).toContain(carveOut);
     });
+
+    it('passes the use case to the Store search', async () => {
+        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+        await (searchActors as HelperTool).call(
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, useCase: 'compare prices' }, mockApifyClient()),
+        );
+        expect(searchAgentSafeActors).toHaveBeenCalledWith(expect.objectContaining({ useCase: 'compare prices' }));
+    });
 });

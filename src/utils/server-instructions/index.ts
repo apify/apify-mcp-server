@@ -91,7 +91,6 @@ export function getServerInstructions(
 - \`${HELPER_TOOLS.ACTOR_CALL}\`:
   - ${hasDetails ? `Use \`${HELPER_TOOLS.ACTOR_GET_DETAILS}\` first to obtain the Actor's input schema.` : `Check the Actor's input schema first.`}
   - Then call with proper input to execute the Actor.
-  - For MCP server Actors, use format "actorName:toolName" to call specific tools.
   - Supports a \`waitSecs\` parameter (default 30, max 45):
     - \`waitSecs: 0\`: fire-and-forget — starts the run and returns immediately with a runId.
     - \`waitSecs > 0\`: waits up to that many seconds for the run to complete, then returns its current status and storage IDs (never the output rows — fetch those with \`${HELPER_TOOLS.DATASET_GET_ITEMS}\`).

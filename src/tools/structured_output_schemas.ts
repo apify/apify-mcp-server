@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { TIP_MESSAGE_LIMIT } from '../const.js';
+import { ACTOR_TENANCY } from '../types.js';
 
 /**
  * Shared JSON schema definitions for structured output across tools.
@@ -141,7 +142,6 @@ export const statsSchema = {
     properties: {
         totalUsers: { type: 'number', description: 'Total users' },
         monthlyUsers: { type: 'number', description: 'Monthly active users' },
-        bookmarks: { type: 'number', description: 'Number of bookmarks' },
     },
 };
 
@@ -238,12 +238,27 @@ export const actorDetailsOutputSchema = {
         },
         inputSchema: { type: 'object' as const, description: 'Actor input schema.' },
         outputSchema: { type: 'object' as const, description: 'Output schema inferred from successful runs.' },
-        mcpTools: {
+        serverInterface: {
             type: 'string',
             description:
-                'Markdown listing of MCP tools exposed by the Actor (only present when `output.mcpTools` is requested).',
+                "The Actor's server interface. `output.serverInterface: true` returns the full API schema with " +
+                'guidance when it fits, or operation navigation otherwise. A "METHOD /path" string returns an ' +
+                'operation excerpt; "#/..." returns a raw local schema node.',
         },
     },
+};
+
+/** Schema for fetch-actor-mcp-tool-list output: the remote tool definitions as `tools/list` returned them. */
+export const actorMcpToolListOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        tools: {
+            type: 'array',
+            items: { type: 'object' },
+            description: "The tools on the Actor's MCP server, with their schemas, annotations and metadata.",
+        },
+    },
+    required: ['tools'],
 };
 
 /**
@@ -1239,4 +1254,54 @@ export const apifyApiCallOutputSchema = {
         },
     },
     required: ['method', 'path', 'statusCode', 'data'],
+};
+
+/** Schema for send-server-actor-request output: one HTTP exchange with an Actor's server. */
+export const serverActorRequestOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'Actor ID' },
+        actorName: { type: 'string', description: 'Actor full name (username/name)' },
+        interface: { type: 'string', enum: ['server'], description: 'The Actor interface used: its Actor Server' },
+        tenancy: {
+            type: 'string',
+            enum: Object.values(ACTOR_TENANCY),
+            description:
+                'single-tenant: a run of the Actor in your account served the request; multi-tenant: a run of the ' +
+                "Actor's owner did, charged per event",
+        },
+        method: { type: 'string', description: 'HTTP method sent' },
+        path: { type: 'string', description: 'Path sent, with its query' },
+        status: { type: 'integer', description: 'HTTP status received' },
+        contentType: { type: 'string', description: 'Content-Type of the response; absent when it had none' },
+        body: {
+            type: 'string',
+            description: 'Response body as text; empty when the response had none; absent when omitted',
+        },
+        bytes: {
+            type: 'integer',
+            description: 'Response body size in bytes, after decompression; absent when over the limit',
+        },
+        bodyOmitted: {
+            type: 'boolean',
+            const: true,
+            description: 'The response arrived, but its body was not returned',
+        },
+        reason: { type: 'string', description: 'Why the response body was omitted' },
+        location: { type: 'string', description: 'Location header of a redirect, which is not followed' },
+        summary: { type: 'string', description: 'Readable summary of the HTTP response' },
+        errorMessage: {
+            type: 'string',
+            description: 'The error string of a JSON {"error": ...} error body; other error bodies are only in body',
+        },
+        nextStep: {
+            type: 'string',
+            description: 'Where to look to correct the request, or why the Actor Server refused it',
+        },
+    },
+    required: ['actorId', 'actorName', 'interface', 'tenancy', 'method', 'path', 'status', 'summary'],
+    oneOf: [
+        { type: 'object', required: ['body', 'bytes'] },
+        { type: 'object', required: ['bodyOmitted', 'reason'] },
+    ],
 };

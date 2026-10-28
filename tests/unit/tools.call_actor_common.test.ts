@@ -1,4 +1,3 @@
-import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,14 +10,11 @@ import {
     TOOL_STATUS,
 } from '../../src/const.js';
 import { ActorLoadError } from '../../src/errors.js';
-import * as mcpClient from '../../src/mcp/client.js';
-import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../src/mcp/const.js';
 import {
     buildCallActorDescription,
     buildCallActorErrorResponse,
     callActorArgs,
     callOptionsSchema,
-    handleMcpToolCall,
     resolveAndValidateActor,
 } from '../../src/tools/actors/call_actor.js';
 import type { InternalToolArgs, ToolEntry } from '../../src/types.js';
@@ -56,6 +52,27 @@ describe('call_actor_common', () => {
         // reaches buildRunDataset, so the field-metadata promise must stay tied to waitSecs > 0.
         it('promises dataset field metadata only for a non-zero wait', () => {
             expect(buildCallActorDescription()).toContain('with waitSecs > 0 also reports dataset field metadata');
+        });
+
+        it('says MCP server Actors are not run here, naming call-actor-mcp-tool only when the session has it', () => {
+            const withMcpTool = buildCallActorDescription();
+            const withoutMcpTool = buildCallActorDescription(only(HELPER_TOOLS.ACTOR_GET_DETAILS));
+
+            expect(withMcpTool).toContain(`MCP server Actors are not run here; ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL}`);
+            expect(withoutMcpTool).toContain('MCP server Actors are not run here.');
+            expect(withoutMcpTool).not.toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
+        });
+
+        it('points Server Actor requests at send-server-actor-request only when the session has it', () => {
+            const withSend = buildCallActorDescription(
+                only(HELPER_TOOLS.ACTOR_SERVER_REQUEST, HELPER_TOOLS.ACTOR_GET_DETAILS),
+            );
+            const withoutSend = buildCallActorDescription(only(HELPER_TOOLS.ACTOR_GET_DETAILS));
+
+            expect(withSend).toContain(`For one or a few results, ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}`);
+            expect(withSend).toContain(`${HELPER_TOOLS.ACTOR_GET_DETAILS} with output={ serverInterface: true }`);
+            expect(withoutSend).not.toContain('For Server Actors');
+            expect(withoutSend).not.toMatch(/\n{3}/);
         });
 
         // call-actor-widget is not auto-paired — gate strictly on its own presence, not on
@@ -550,116 +567,6 @@ describe('call_actor_common', () => {
                 failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
                 actorId: 'actor-id-rag',
             });
-        });
-    });
-
-    describe('handleMcpToolCall()', () => {
-        beforeEach(() => {
-            vi.restoreAllMocks();
-        });
-
-        it('forwards signal and timeout into client.callTool options', async () => {
-            const callTool = vi.fn().mockResolvedValue({
-                content: [{ type: 'text', text: 'remote ok' }],
-                isError: false,
-            });
-            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue({
-                callTool,
-                close: vi.fn().mockResolvedValue(undefined),
-            } as unknown as Client);
-
-            const controller = new AbortController();
-            const result = await handleMcpToolCall({
-                baseActorName: 'apify/mcp-demo',
-                mcpToolName: 'search',
-                input: { q: 'x' },
-                mcpServerUrl: 'https://example.invalid/mcp',
-                apifyToken: 'token',
-                signal: controller.signal,
-            });
-
-            expect(result?.isError).not.toBe(true);
-            expect(callTool).toHaveBeenCalledTimes(1);
-            const options = callTool.mock.calls[0][2] as { signal?: AbortSignal; timeout?: number };
-            expect(options.signal).toBe(controller.signal);
-            expect(options.timeout).toBe(EXTERNAL_TOOL_CALL_TIMEOUT_MSEC);
-        });
-
-        it('returns aborted when the signal is already aborted before the remote call', async () => {
-            const connectSpy = vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(null);
-            const controller = new AbortController();
-            controller.abort();
-
-            const result = await handleMcpToolCall({
-                baseActorName: 'apify/mcp-demo',
-                mcpToolName: 'search',
-                input: { q: 'x' },
-                mcpServerUrl: 'https://example.invalid/mcp',
-                apifyToken: 'token',
-                signal: controller.signal,
-            });
-
-            expect(result).toEqual({});
-            expect(connectSpy).not.toHaveBeenCalled();
-        });
-
-        it('returns a server error when the connection fails', async () => {
-            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(null);
-
-            const result = await handleMcpToolCall({
-                baseActorName: 'apify/mcp-demo',
-                mcpToolName: 'search',
-                input: { q: 'x' },
-                mcpServerUrl: 'https://example.invalid/mcp',
-                apifyToken: 'token',
-                signal: new AbortController().signal,
-            });
-
-            expect(result?.isError).toBe(true);
-            const allText = ((result as TextToolResult).content ?? []).map(textOf).join('\n');
-            expect(allText).toContain('Failed to connect to MCP server');
-        });
-
-        it('returns a server error when the remote call rejects without an abort', async () => {
-            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue({
-                callTool: vi.fn().mockRejectedValue(new Error('remote boom')),
-                close: vi.fn().mockResolvedValue(undefined),
-            } as unknown as Client);
-
-            const result = await handleMcpToolCall({
-                baseActorName: 'apify/mcp-demo',
-                mcpToolName: 'search',
-                input: { q: 'x' },
-                mcpServerUrl: 'https://example.invalid/mcp',
-                apifyToken: 'token',
-                signal: new AbortController().signal,
-            });
-
-            expect(result?.isError).toBe(true);
-            const allText = ((result as TextToolResult).content ?? []).map(textOf).join('\n');
-            expect(allText).toContain("Failed to call MCP tool 'search' on Actor 'apify/mcp-demo'");
-        });
-
-        it('returns aborted when the remote call rejects after the signal aborts', async () => {
-            const controller = new AbortController();
-            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue({
-                callTool: vi.fn().mockImplementation(async () => {
-                    controller.abort();
-                    throw new Error('aborted');
-                }),
-                close: vi.fn().mockResolvedValue(undefined),
-            } as unknown as Client);
-
-            const result = await handleMcpToolCall({
-                baseActorName: 'apify/mcp-demo',
-                mcpToolName: 'search',
-                input: { q: 'x' },
-                mcpServerUrl: 'https://example.invalid/mcp',
-                apifyToken: 'token',
-                signal: controller.signal,
-            });
-
-            expect(result).toEqual({});
         });
     });
 });

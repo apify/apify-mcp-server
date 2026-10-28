@@ -61,6 +61,8 @@ const MCP_CLIENT_FAULT_MESSAGES: ReadonlySet<string> = new Set([
     'Parse error: Invalid JSON',
     'Parse error: Invalid JSON-RPC message',
     'Conflict: Only one SSE stream is allowed per session',
+    // A client resumed with Last-Event-ID while its previous stream for that ID is still open (409).
+    'Conflict: Stream already has an active connection',
     'Not connected',
 ]);
 

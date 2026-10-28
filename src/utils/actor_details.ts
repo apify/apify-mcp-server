@@ -2,10 +2,8 @@ import type { Build } from 'apify-client';
 
 import type { ApifyClient } from '../apify_client.js';
 import { CODE_RUNTIME_ACTOR_NAME } from '../const.js';
-import { ActorLoadError } from '../errors.js';
-import { connectMCPClient } from '../mcp/client.js';
-import type { PaymentProvider } from '../payments/types.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/actor_input_schema.js';
+import { resolveServerInterfaceDefinition } from '../tools/actors/actor_definition.js';
 import type {
     Actor,
     ActorCardOptions,
@@ -14,8 +12,6 @@ import type {
     ActorStoreList,
     StructuredActorCard,
 } from '../types.js';
-import { ACTOR_TOOL_MODE } from '../types.js';
-import { getActorToolResolutionCached } from './actor.js';
 import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from './actor_card.js';
 import { searchActorsByKeywords } from './actor_search.js';
 import { getHttpStatusCode, logHttpError } from './logging.js';
@@ -76,12 +72,13 @@ export function resolveReadmeContent(details: {
 // Keep the type here since it is a self-contained module
 export type ActorDetailsResult = {
     actorInfo: Actor;
-    buildInfo: Build;
     actorCard: string;
     actorCardStructured: StructuredActorCard;
     inputSchema: ActorInputSchema;
     readme: string;
     readmeSummary?: string;
+    /** API schema of the build standby serves (`resolveServerInterfaceDefinition`); absent when unresolved. */
+    webServerSchema?: unknown;
 };
 
 type FetchActorDetailsOptions = {
@@ -113,6 +110,7 @@ export async function fetchActorDetails(
                       }).catch(() => []),
             ]);
         if (!actorInfo || !buildInfo || !buildInfo.actorDefinition) return null;
+        const serverDefinition = await resolveServerInterfaceDefinition(actorInfo, buildInfo, apifyClient);
 
         const storeActor = storeActors?.find((item) => item.id === actorInfo.id);
         const pictureUrl =
@@ -133,12 +131,12 @@ export async function fetchActorDetails(
         const actorCardStructured = formatActorToStructuredCard(actorInfoWithPicture, cardOptions);
         return {
             actorInfo: actorInfoWithPicture,
-            buildInfo,
             actorCard,
             actorCardStructured,
             inputSchema,
             readme: buildInfo.actorDefinition.readme || 'No README provided.',
             readmeSummary: actorInfo.readmeSummary,
+            webServerSchema: serverDefinition?.webServerSchema,
         };
     } catch (error) {
         // 404/400 is a genuine "Actor doesn't exist" — same treatment as the not-found check
@@ -169,71 +167,6 @@ export function buildActorDetailsForWidget(details: ActorDetailsResult, userTier
             inputSchema: details.inputSchema,
         },
     };
-}
-
-/**
- * Gets MCP tools information for an Actor.
- * Returns a message about available tools, error, or that the Actor is not an MCP server.
- */
-export async function getMcpToolsMessage(
-    actorName: string,
-    apifyClient: ApifyClient,
-    apifyToken: string,
-    paymentProvider?: PaymentProvider,
-    mcpSessionId?: string,
-): Promise<string> {
-    const resolution = await getActorToolResolutionCached(actorName, apifyClient);
-
-    // Same canonical wording call-actor rejects with, so an agent gets one consistent reason
-    // for this Actor regardless of which tool it asked.
-    if (resolution?.toolMode === ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP) {
-        return ActorLoadError.standbyWithoutMcpNotSupported(resolution.actorFullName).message;
-    }
-
-    // Early return: not an MCP server
-    if (resolution?.toolMode !== ACTOR_TOOL_MODE.MCP) {
-        return `Note: This Actor is not an MCP server and does not expose MCP tools.`;
-    }
-
-    // Early return: Payment provider restriction
-    if (paymentProvider) {
-        return `This Actor is an MCP server and cannot be accessed using a third-party payment provider.`;
-    }
-
-    // Connect and list tools
-    const client = await connectMCPClient(resolution.mcpServerUrl, apifyToken, mcpSessionId);
-    if (!client) {
-        return `Failed to connect to MCP server for Actor '${actorName}'.`;
-    }
-
-    try {
-        const toolsResponse = await client.listTools();
-        const mcpToolsInfo = toolsResponse.tools
-            .map((tool) =>
-                [
-                    `**${tool.name}**`,
-                    tool.description || 'No description',
-                    'Input schema:',
-                    '```json',
-                    JSON.stringify(tool.inputSchema),
-                    '```',
-                ].join('\n'),
-            )
-            .join('\n\n');
-
-        return [
-            '# Available MCP Tools',
-            `This Actor is an MCP server with ${toolsResponse.tools.length} tools.`,
-            `To call a tool, use: "${actorName}:{toolName}"`,
-            '',
-            mcpToolsInfo,
-        ].join('\n');
-    } catch (error) {
-        logHttpError(error, `Failed to list MCP tools for Actor '${actorName}'`, { actorName });
-        return `Failed to retrieve MCP tools for Actor '${actorName}'. The MCP server may be temporarily unavailable.`;
-    } finally {
-        await client.close();
-    }
 }
 
 /**

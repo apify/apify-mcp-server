@@ -56,6 +56,9 @@ export const HELPER_TOOLS = {
     ACTOR_CALL: 'call-actor',
     ACTOR_CREATE: 'create-actor',
     ACTOR_CALL_WIDGET: 'call-actor-widget',
+    ACTOR_MCP_TOOL_CALL: 'call-actor-mcp-tool',
+    ACTOR_MCP_TOOL_LIST: 'fetch-actor-mcp-tool-list',
+    ACTOR_SERVER_REQUEST: 'send-server-actor-request',
     ACTOR_DELETE: 'delete-actor',
     ACTOR_GET_DETAILS: 'fetch-actor-details',
     ACTOR_GET_DETAILS_WIDGET: 'fetch-actor-details-widget',
@@ -114,15 +117,10 @@ export const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Client-name substrings (lowercased, matched against `clientInfo.name`) that `report-problem` is
- * hidden from: Anthropic surfaces (Claude.ai / Claude Desktop / Claude Code /
- * `local-agent-mode-apify`) pending the directory review. Applied in the compose step — once per
- * connection on the 2025 path, per request on the 2026-07-28 one. Stateless `client-info` is
- * optional; a request declaring no client name matches no blocked substring and is served the tool
- * by policy. Substring matching covers new client builds without a maintained allowlist;
- * over-matching only hides an optional tool. Bypassed by explicit `?tools=report-problem`/`dev`.
+ * Anthropic client-name substrings (lowercased): not offered `report-problem` or the search tools' `useCase` input.
+ * `local-agent-mode` is Claude Desktop's local agent mode, named `local-agent-mode-<server name>`. A request with no name matches none.
  */
-export const REPORT_PROBLEM_BLOCKED_CLIENTS: string[] = ['claude', 'anthropic', 'local-agent-mode-apify'];
+export const ANTHROPIC_CLIENT_NAMES: string[] = ['claude', 'anthropic', 'local-agent-mode'];
 
 /**
  * `clientInfo.name` sent by the Apify AI agent service (apify/apify-ai-agent) during the MCP
@@ -257,7 +255,7 @@ export const CONSOLE_BASE_URL_STAGING = 'https://console-securitybyobscurity.api
 export const API_PUBLIC_BASE_URL = 'https://api.apify.com';
 /** Apify API origin on the staging cluster, selected when running on the staging MCP host. */
 export const API_PUBLIC_BASE_URL_STAGING = 'https://api-securitybyobscurity.apify.com';
-/** Staging MCP host; mirrors the check in `getActorMCPServerURL` to pick staging vs production origins. */
+/** Staging MCP host; `getApifyAPIPublicBaseUrl` and `getConsoleBaseUrl` pick the staging origins when running on it. */
 export const STAGING_MCP_HOSTNAME = 'mcp-securitybyobscurity.apify.com';
 export const APIFY_FAVICON_URL = `${APIFY_STORE_URL}/favicon.ico`;
 export const APIFY_LOGO_URL = `${APIFY_STORE_URL}/apple-icon.png`;

@@ -475,3 +475,16 @@ describe('createExpressApp() era routing', () => {
         });
     });
 });
+
+describe('dev server request log', () => {
+    it('logs the method of an incoming request, never its body', async () => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => log);
+        const { body, headers } = statelessRequest('tools/list', { secret: 'secret-keywords' });
+        await withDevServer(async (post) => {
+            await post(DEV_URL, body, { ...headers, authorization: 'Bearer dev-token' });
+        });
+        const logged = JSON.stringify(info.mock.calls);
+        expect(logged).toContain('tools/list');
+        expect(logged).not.toContain('secret-keywords');
+    });
+});
