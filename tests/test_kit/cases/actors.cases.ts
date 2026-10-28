@@ -1204,9 +1204,11 @@ export const actorsCases: Case[] = [
             const properties = (tool?.inputSchema.properties ?? {}) as Record<string, { enum?: string[] }>;
             expect(Object.keys(properties)).toEqual(['method', 'path', 'query', 'body']);
             expect(properties.method.enum).toEqual(expect.arrayContaining(['GET', 'POST']));
+            // The full rendering is over 4,096 characters, so the description lists one line per operation.
             expect(tool?.description).toContain(
-                '"method":"POST","path":"/add","summary":"Add two numbers (JSON body)"',
+                '- POST /add [asText:boolean] {firstNumber:integer required, secondNumber:integer required}: Add two numbers (JSON body).',
             );
+            expect(tool?.description?.length).toBeLessThanOrEqual(4096);
             // The session has no fetch-actor-details, so the description names none.
             expect(tool?.description).not.toContain('fetch-actor-details');
 
