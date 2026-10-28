@@ -104,20 +104,33 @@ function formatOperationLine({ method, path, operation }: ServerOperation, schem
     return text;
 }
 
+/**
+ * The first lines of `count` operation lines within `maxSize`, as `sizeOf` measures it; when not all fit, the lines
+ * that do, then `… and N more`. The cut line is kept even when no line fits.
+ */
+function cutOperationLines(
+    lines: readonly string[],
+    count: number,
+    maxSize: number,
+    sizeOf: (text: string) => number,
+): string {
+    const index = lines.join('\n');
+    if (lines.length === count && sizeOf(index) <= maxSize) return index;
+    // Room for the cut line with the largest count it can show.
+    let size = sizeOf(`… and ${count} more`);
+    const kept: string[] = [];
+    for (const line of lines) {
+        size += sizeOf(line) + 1;
+        if (size > maxSize) break;
+        kept.push(line);
+    }
+    return [...kept, `… and ${count - kept.length} more`].join('\n');
+}
+
 /** One line per operation; over `maxBytes`, the lines that fit, then `… and N more`. */
 function formatOperationIndex(operations: ServerOperation[], schema: unknown, maxBytes: number): string {
     const lines = operations.map((operation) => formatOperationLine(operation, schema));
-    const index = lines.join('\n');
-    if (Buffer.byteLength(index) <= maxBytes) return index;
-    // Room for the cut line with the largest count it can show.
-    let bytes = Buffer.byteLength(`… and ${lines.length} more`);
-    const kept: string[] = [];
-    for (const line of lines) {
-        bytes += Buffer.byteLength(line) + 1;
-        if (bytes > maxBytes) break;
-        kept.push(line);
-    }
-    return [...kept, `… and ${lines.length - kept.length} more`].join('\n');
+    return cutOperationLines(lines, lines.length, maxBytes, Buffer.byteLength);
 }
 
 /** A request body with no JSON media type: whether it is required and its media types, with no schema. */
