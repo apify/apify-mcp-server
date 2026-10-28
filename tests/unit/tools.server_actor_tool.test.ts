@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { HELPER_TOOLS } from '../../src/const.js';
+import { HELPER_TOOLS, RAG_WEB_BROWSER } from '../../src/const.js';
 import { ACTOR_LOAD_ERROR_KIND } from '../../src/errors.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { getActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
@@ -55,7 +55,12 @@ let actorCount = 0;
 /** Loads a standby Actor serving `schema` as Actor tools; each call is a new Actor, so the definition cache misses. */
 async function loadTools(
     schema: unknown,
-    options: { actor?: Partial<Actor>; isDirectTool?: boolean; hasPaymentProvider?: boolean } = {},
+    options: {
+        actor?: Partial<Actor>;
+        webServerMcpPath?: string;
+        isDirectTool?: boolean;
+        hasPaymentProvider?: boolean;
+    } = {},
 ) {
     actorCount += 1;
     const actor = mockActor({
@@ -67,7 +72,7 @@ async function loadTools(
     });
     const { apifyClient } = mockActorBuildClient({
         actor,
-        defaultBuild: mockDefaultBuild({ webServerMcpPath: undefined, webServerSchema: schema }),
+        defaultBuild: mockDefaultBuild({ webServerMcpPath: options.webServerMcpPath, webServerSchema: schema }),
     });
     return getActorsAsTools([`${actor.username}/${actor.name}`], apifyClient, {
         isDirectTool: options.isDirectTool,
@@ -115,6 +120,19 @@ describe('serving a selected Server Actor through its server interface', () => {
         expect(tool.annotations).toMatchObject({ readOnlyHint: isReadOnly, destructiveHint: !isReadOnly });
     });
 
+    it('takes the slot of an Actor that also has an MCP server', async () => {
+        const { tools } = await loadTools(SCHEMA, { webServerMcpPath: '/mcp' });
+
+        expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR_SERVER]);
+    });
+
+    it('leaves an Actor served through its input interface a run tool', async () => {
+        const [username, name] = RAG_WEB_BROWSER.split('/');
+        const { tools } = await loadTools(SCHEMA, { actor: { username, name } });
+
+        expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR]);
+    });
+
     it('is not served in a payment-provider session', async () => {
         const { tools, errors } = await loadTools(SCHEMA, { hasPaymentProvider: true });
 
@@ -148,6 +166,13 @@ describe('the input schema of a Server Actor tool', () => {
         expect(inputSchema.properties).toMatchObject({ method: { default: 'POST' }, path: { default: '/' } });
         expect(ajvValidate(args)).toBe(true);
         expect(args).toEqual({ method: 'POST', path: '/' });
+    });
+
+    it('rejects a method or a path outside the documented ones', () => {
+        const { ajvValidate } = schemasOf({ methods: ['GET', 'POST'], paths: ['/add', '/empty'] });
+
+        expect(ajvValidate({ method: 'DELETE', path: '/add' })).toBe(false);
+        expect(ajvValidate({ method: 'GET', path: '/admin' })).toBe(false);
     });
 
     it('takes a templated path as a string that lists the paths, with no default', () => {
