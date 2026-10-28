@@ -786,6 +786,22 @@ describe('rejecting a call before sending', () => {
             HELPER_TOOLS.ACTOR_SERVER_REQUEST,
         );
     });
+
+    it.each(['x402', 'skyfire'] as const)('is not listed in a default %s session', async (providerId) => {
+        const listDefaultTools = async (options: Parameters<typeof withServer>[1]) =>
+            withServer(
+                async (server) => {
+                    await server.loadToolsFromInput({}, mockApifyClient());
+                    return server.listToolNames();
+                },
+                { serverMode: SERVER_MODE.DEFAULT, ...options },
+            );
+
+        expect(await listDefaultTools({})).toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
+        expect(await listDefaultTools({ paymentProvider: makePaymentProvider(providerId) })).not.toContain(
+            HELPER_TOOLS.ACTOR_SERVER_REQUEST,
+        );
+    });
 });
 
 describe('reporting an incomplete response', () => {
