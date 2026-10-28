@@ -273,7 +273,10 @@ describe('serving a selected Server Actor through its server interface', () => {
 
 describe('the input schema of a Server Actor tool', () => {
     const schemasOf = (info: Partial<ServerActorToolInfo>) =>
-        buildServerActorToolSchemas({ methods: ['GET'], paths: ['/'], hasRequestBody: false, ...info });
+        buildServerActorToolSchemas(
+            { methods: ['GET'], paths: ['/'], hasRequestBody: false, ...info },
+            'apify/server-actor-test',
+        );
 
     it('narrows the method and the path to the documented ones and requires them', () => {
         const { inputSchema } = schemasOf({
@@ -317,6 +320,17 @@ describe('the input schema of a Server Actor tool', () => {
 
     it('leaves the body out when no operation takes one', () => {
         expect(schemasOf({ hasRequestBody: false }).inputSchema.properties).not.toHaveProperty('body');
+    });
+
+    it('takes the query as an optional record of scalars, with no named fields', () => {
+        const { inputSchema } = schemasOf({});
+
+        expect(inputSchema.properties?.query).not.toHaveProperty('properties');
+        expect(inputSchema.properties?.query).toMatchObject({
+            type: 'object',
+            additionalProperties: expect.anything(),
+        });
+        expect(inputSchema.required).not.toContain('query');
     });
 });
 
@@ -448,6 +462,24 @@ describe('the default apify/web-fetch tool', () => {
         expect(tool.description).not.toContain('"name":"unwrap"');
     });
 
+    it('requires the query and its url', async () => {
+        const tool = await loadWebFetchTool();
+
+        expect(tool.inputSchema.required).toContain('query');
+        expect(tool.inputSchema.properties?.query).toMatchObject({ required: ['url'] });
+        expect(tool.ajvValidate({ query: 'https://example.com' })).toBe(false);
+        expect(tool.ajvValidate({ query: { formats: 'markdown' } })).toBe(false);
+    });
+
+    it('takes formats and headers as strings, as the query encodes them', async () => {
+        const tool = await loadWebFetchTool();
+        const query = tool.inputSchema.properties?.query as { properties?: Record<string, unknown> };
+
+        expect(query.properties).toMatchObject({ formats: { type: 'string' }, headers: { type: 'string' } });
+        expect(tool.ajvValidate({ query: { url: 'https://example.com', formats: ['markdown', 'links'] } })).toBe(false);
+        expect(tool.ajvValidate.errors?.[0]).toMatchObject({ instancePath: '/query/formats', keyword: 'type' });
+    });
+
     it('describes the query encodings and the URL scheme limit', async () => {
         const tool = await loadWebFetchTool();
 
@@ -472,13 +504,11 @@ describe('the default apify/web-fetch tool', () => {
             defaultBuild: mockDefaultBuild({ webServerMcpPath: undefined, webServerSchema: WEB_FETCH_SCHEMA }),
         });
         const apifyClient = mockApifyClient({ ...buildClient, httpClient: { axios: { request } } });
+        const args = { query: { url: 'https://example.com', unwrap: true } };
 
-        const result = (await tool.call(
-            stubToolCallContext(
-                { method: 'GET', path: '/', query: { url: 'https://example.com', unwrap: true } },
-                apifyClient,
-            ),
-        )) as TextToolResult;
+        // Validation keeps unwrap, so the tool refuses it instead of the validator dropping it.
+        expect(tool.ajvValidate(args)).toBe(true);
+        const result = (await tool.call(stubToolCallContext(args, apifyClient))) as TextToolResult;
 
         expect(result.isError).toBe(true);
         expect(textOf(result.content[0])).toContain('"unwrap" is not accepted by this tool');

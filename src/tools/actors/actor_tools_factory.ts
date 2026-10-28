@@ -278,7 +278,7 @@ Operations:
             actorFullName,
             description: buildDescription(ALL_TOOLS_PRESENT),
             buildDescription,
-            ...buildServerActorToolSchemas(toolInfo),
+            ...buildServerActorToolSchemas(toolInfo, actorFullName),
             outputSchema: serverActorRequestOutputSchema,
             icons: definition.pictureUrl ? [{ src: definition.pictureUrl, mimeType: 'image/png' }] : undefined,
             annotations: {
