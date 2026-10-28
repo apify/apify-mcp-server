@@ -392,9 +392,9 @@ for (let i = 0; i < 3000; i++) chainSchemas[`C${i}`] = { $ref: `#/components/sch
 // 5000 levels of inline nesting, no references.
 let deepSchema: unknown = { type: 'string' };
 for (let i = 0; i < 5000; i++) deepSchema = { type: 'array', items: deepSchema };
-// 20000 levels, deeper than JSON.stringify can serialize.
+// 60000 levels: deeper than JSON.stringify can serialize on Node.js 24, and over the byte limit on Node.js 26, which can.
 let deepValue: unknown = 'leaf';
-for (let i = 0; i < 20000; i++) deepValue = { a: deepValue };
+for (let i = 0; i < 60000; i++) deepValue = { a: deepValue };
 
 // Without a bound, rendering would not finish or would overflow the stack.
 describe.each([
