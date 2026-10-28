@@ -621,6 +621,7 @@ export const callActor: ToolEntry = Object.freeze({
     ajvValidate: callActorAjvValidate,
     paymentRequired: true,
     hasPaymentProviderStandbyCheck: true,
+    actorInterface: 'input',
     annotations: {
         title: 'Call Actor',
         readOnlyHint: false,
