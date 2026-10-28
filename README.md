@@ -231,6 +231,7 @@ Legend for the **Enabled by default** column:
 | `call-actor` | actors | Run an Actor and return its run status and storage IDs. Use `fetch-actor-details` first to get the input schema. | ✅ |
 | `fetch-actor-mcp-tool-list` | actors | List the tools of an Actor that runs an MCP server, with their schemas, annotations, and metadata. | ✅ |
 | `call-actor-mcp-tool` | actors | Call one tool on an Actor's MCP server and return its result. | ✅ |
+| `send-server-actor-request` | actors | Send one HTTP request to a Server Actor's API, as documented by its API schema, and return the response. | ✅ |
 | `get-actor-run` | runs | Get details about an Actor run. | ⚡ |
 | `get-dataset-items` | storage | Read items from a dataset, with filtering and pagination. | ⚡ |
 | `get-key-value-store-record` | storage | Get the value stored under a key in a key-value store. | ⚡ |
@@ -241,7 +242,6 @@ Legend for the **Enabled by default** column:
 | [`apify--web-fetch`](https://apify.com/apify/web-fetch) | Actor (see [Choose which tools load](#choose-which-tools-load)) | Fetch a URL and return its content as Markdown, text, HTML, or other formats. | ✅ |
 | `report-problem` | dev | Report a problem with an Apify tool or Actor to the Apify team. | ✅¹ |
 | `get-actor-list` | none (select by name: `tools=get-actor-list`) | List the Actors you own and those shared with you, including private ones. | |
-| `send-server-actor-request` | none (select by name: `tools=send-server-actor-request`) | Send one HTTP request to a Server Actor's API, as documented by its API schema, and return the response. | |
 | `delete-actor` | none (select by name: `tools=delete-actor`) | Delete an Actor from your account permanently. Public Actors must be unpublished first. | |
 | `get-actor-run-list` | runs | List Actor runs, filtered by Actor and status. | |
 | `get-actor-run-log` | runs | Read the log of an Actor run. | |
