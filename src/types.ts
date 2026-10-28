@@ -137,7 +137,8 @@ export type ToolBase = z.infer<typeof ToolSchema> & {
     paymentRequired?: boolean;
     /**
      * Whether a third-party payment-provider session is rejected before the call when the Actor named in
-     * `args.actor` has Actor Standby enabled; see `checkPaymentProviderStandbyConflict`.
+     * `args.actor`, or the fixed Actor of an {@link ActorServerTool}, has Actor Standby enabled; see
+     * `checkPaymentProviderStandbyConflict`.
      */
     hasPaymentProviderStandbyCheck?: boolean;
     /**

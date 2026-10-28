@@ -868,7 +868,7 @@ describe('describing the tool', () => {
 
 describe("a selected Server Actor's own tool", () => {
     /** Calls the own tool of SERVER_ACTOR, which documents only POST /echo, through dispatch. */
-    async function callOwnTool(args: Record<string, unknown>) {
+    async function callOwnTool(args: Record<string, unknown>, options: Parameters<typeof withServer>[1] = {}) {
         const cached = actorDefinitionCache.get(SERVER_ACTOR)!;
         const webServerToolInfo: ServerActorToolInfo = {
             methods: ['POST'],
@@ -890,9 +890,20 @@ describe("a selected Server Actor's own tool", () => {
                     { signal: new AbortController().signal, sendNotification: vi.fn() },
                 );
             },
-            { token: TOKEN },
+            { token: TOKEN, ...options },
         );
     }
+
+    it('rejects a payment-provider session before any request, even when the tool was listed', async () => {
+        const received = recordRequests();
+
+        // Upserted directly, as a loader without the provider or the pre-initialize path of auto mode does.
+        const result = await callOwnTool({ body: { a: 1 } }, { paymentProvider: makePaymentProvider() });
+
+        expect(result.isError).toBe(true);
+        expect((result.content as { text: string }[])[0].text).toContain('is not supported in agentic payment mode');
+        expect(received).toHaveLength(0);
+    });
 
     it('sends the request to its Actor through the same execution, filling a single method and path', async () => {
         const received = recordRequests();

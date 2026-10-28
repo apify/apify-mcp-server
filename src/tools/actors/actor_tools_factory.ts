@@ -279,6 +279,9 @@ ${toolInfo.operations}${detailsHint}`;
                 openWorldHint: true,
             },
             redactArgs: redactServerActorRequestArgs,
+            // Composition drops the tool in a payment-provider session, but a tool upserted before composition
+            // (auto mode before initialize, `processParamsGetTools`) is still rejected here before any request.
+            hasPaymentProviderStandbyCheck: true,
             call: async (toolArgs) =>
                 executeSendServerActorRequest({ ...toolArgs, args: { ...toolArgs.args, actor: actorFullName } }),
         });

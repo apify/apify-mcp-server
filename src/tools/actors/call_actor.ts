@@ -351,7 +351,8 @@ export async function checkPaymentProviderStandbyConflict(params: {
 }): Promise<Record<string, unknown> | null> {
     const { tool, args, paymentProvider, apifyToken, mcpSessionId } = params;
     if (!paymentProvider || !tool.hasPaymentProviderStandbyCheck) return null;
-    const actorName = args.actor;
+    // A Server Actor's own tool takes no `actor` argument: its Actor is fixed.
+    const actorName = tool.type === TOOL_TYPE.ACTOR_SERVER ? tool.actorFullName : args.actor;
     if (typeof actorName !== 'string' || !actorName) return null;
 
     const normalizedActorName = fixActorNameInputAndLog(actorName, { mcpSessionId });
