@@ -880,7 +880,9 @@ describe("a selected Server Actor's own tool", () => {
             methods: ['POST'],
             paths: ['/echo'],
             hasRequestBody: true,
-            operations: '',
+            operationLines: [],
+            operationCount: 1,
+            detailsHint: '',
         };
         const [tool] = getServerActorsAsTools([
             { definition: { ...cached.definition, webServerToolInfo }, actor: cached.info, webServerMcpPath: null },

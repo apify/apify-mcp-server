@@ -62,7 +62,11 @@ type SendServerActorRequestArgs = z.infer<typeof sendServerActorRequestArgs>;
  * and `path` narrowed to the documented ones, each with a default when there is one, and `body` only when an
  * operation takes one. A templated path cannot be an enum, so then `path` is a string that lists the paths.
  */
-export function buildServerActorToolSchemas({ methods, paths, hasRequestBody }: ServerActorToolInfo) {
+export function buildServerActorToolSchemas({
+    methods,
+    paths,
+    hasRequestBody,
+}: Pick<ServerActorToolInfo, 'methods' | 'paths' | 'hasRequestBody'>) {
     const method = z.enum(methods).describe('HTTP method of the operation.');
     const isTemplated = paths.some((path) => /\{[^}]*\}/.test(path));
     const path = isTemplated

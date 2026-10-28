@@ -6,8 +6,9 @@ import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { getActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import { buildServerActorToolSchemas } from '../../src/tools/actors/send_server_actor_request.js';
 import {
+    buildServerActorToolDescription,
     buildServerActorToolInfo,
-    SERVER_TOOL_OPERATIONS_MAX_BYTES,
+    CLIENT_DESCRIPTION_MAX_LENGTH,
 } from '../../src/tools/actors/server_interface_schema.js';
 import { serverActorRequestOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { Actor, ServerActorToolInfo, ToolEntry } from '../../src/types.js';
@@ -41,12 +42,12 @@ const SCHEMA = {
     },
 };
 
-/** SCHEMA with a description on GET /empty long enough that the operations in full exceed the description budget. */
+/** SCHEMA with a description on GET /empty long enough that the operations in full exceed the description limit. */
 const LONG_SCHEMA = {
     ...SCHEMA,
     paths: {
         ...SCHEMA.paths,
-        '/empty': { get: { summary: 'Return no content', description: 'a'.repeat(SERVER_TOOL_OPERATIONS_MAX_BYTES) } },
+        '/empty': { get: { summary: 'Return no content', description: 'a'.repeat(CLIENT_DESCRIPTION_MAX_LENGTH) } },
     },
 };
 
@@ -143,7 +144,7 @@ describe('serving a selected Server Actor through its server interface', () => {
 
 describe('the input schema of a Server Actor tool', () => {
     const schemasOf = (info: Partial<ServerActorToolInfo>) =>
-        buildServerActorToolSchemas({ methods: ['GET'], paths: ['/'], hasRequestBody: false, operations: '', ...info });
+        buildServerActorToolSchemas({ methods: ['GET'], paths: ['/'], hasRequestBody: false, ...info });
 
     it('narrows the method and the path to the documented ones and requires them', () => {
         const { inputSchema } = schemasOf({
@@ -190,6 +191,49 @@ describe('the input schema of a Server Actor tool', () => {
     });
 });
 
+describe('the length of a Server Actor tool description', () => {
+    const HEAD = 'Operations:\n';
+    const HINT = 'fetch-actor-details returns one operation in full.';
+    const LINES = ['- GET /a: A.', '- GET /b: B.', '- GET /c: C.'];
+    const infoWith = (fullLength: number, overrides: Partial<ServerActorToolInfo> = {}): ServerActorToolInfo => ({
+        methods: ['GET'],
+        paths: ['/a', '/b', '/c'],
+        hasRequestBody: false,
+        fullOperations: 'f'.repeat(fullLength),
+        operationLines: LINES,
+        operationCount: LINES.length,
+        detailsHint: HINT,
+        ...overrides,
+    });
+
+    it('carries every operation in full when the whole description is at the limit', () => {
+        const info = infoWith(CLIENT_DESCRIPTION_MAX_LENGTH - HEAD.length);
+
+        expect(buildServerActorToolDescription(HEAD, info, HINT)).toBe(`${HEAD}${info.fullOperations}`);
+    });
+
+    it('lists one line per operation, then the hint, when the full description would be one character over', () => {
+        const info = infoWith(CLIENT_DESCRIPTION_MAX_LENGTH - HEAD.length + 1);
+
+        expect(buildServerActorToolDescription(HEAD, info, HINT)).toBe(`${HEAD}${LINES.join('\n')}\n${HINT}`);
+    });
+
+    it('cuts the lines at the limit and counts the operations left out', () => {
+        const head = 'h'.repeat(CLIENT_DESCRIPTION_MAX_LENGTH - HINT.length - 30);
+
+        const description = buildServerActorToolDescription(head, infoWith(CLIENT_DESCRIPTION_MAX_LENGTH), HINT);
+
+        expect(description).toBe(`${head}- GET /a: A.\n… and 2 more\n${HINT}`);
+        expect(description.length).toBeLessThanOrEqual(CLIENT_DESCRIPTION_MAX_LENGTH);
+    });
+
+    it('keeps the count of all operations when the fixed text alone exceeds the limit', () => {
+        const head = 'h'.repeat(CLIENT_DESCRIPTION_MAX_LENGTH);
+
+        expect(buildServerActorToolDescription(head, infoWith(1), undefined)).toBe(`${head}… and 3 more`);
+    });
+});
+
 describe('the operations in a Server Actor tool description', () => {
     it('are the operations in full when they fit, with no lookup to point at', async () => {
         const tool = await loadServerTool(SCHEMA);
@@ -215,15 +259,16 @@ describe('the operations in a Server Actor tool description', () => {
         expect(tool.buildDescription?.(only()).endsWith(lines)).toBe(true);
     });
 
-    it('cut the lines at the budget and count the operations left out', () => {
+    it('keep only what can fit the description limit', () => {
         const count = 1000;
         const paths = Object.fromEntries(Array.from({ length: count }, (_, i) => [`/path-${i}`, { get: {} }]));
 
-        const { operations } = infoOf({ paths });
+        const info = infoOf({ paths });
 
-        const lines = operations.split('\n').filter((line) => line.startsWith('- GET /'));
-        expect(operations.endsWith(`\n… and ${count - lines.length} more`)).toBe(true);
-        expect(Buffer.byteLength(operations)).toBeLessThanOrEqual(SERVER_TOOL_OPERATIONS_MAX_BYTES);
+        expect(info.fullOperations).toBeUndefined();
+        expect(info.operationCount).toBe(count);
+        expect(info.operationLines.join('\n').length).toBeLessThanOrEqual(CLIENT_DESCRIPTION_MAX_LENGTH);
+        expect(info.operationLines.length).toBeLessThan(count);
     });
 
     it('come with the documented methods and paths, and whether an operation takes a body', () => {
