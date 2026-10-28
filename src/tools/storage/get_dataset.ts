@@ -78,11 +78,10 @@ export const getDataset: ToolEntry = Object.freeze({
         const { schema, urlSigningSecretKey, ...metadata } = dataset as typeof dataset & { schema?: unknown };
         // Apify returns `fields` slash-separated AND with array indices expanded
         // (e.g. `latestComments/0/owner/username`). For a real Instagram-scraper
-        // dataset this inflates ~78 schema fields into 528 paths (~85% bloat) and
-        // produces slash-notation paths that aren't directly usable as projection
-        // hints for `get-dataset-items` (which expects dot-notation). Run the same
-        // normalization `buildRunDataset` applies so this tool's `fields` matches
-        // the structured `storages.datasets.default.fields` shape.
+        // dataset this inflates ~78 schema fields into 528 paths (~85% bloat). The hint
+        // renders the raw list as an item shape; for `fields`, run the same normalization
+        // `buildRunDataset` applies so it matches the structured
+        // `storages.datasets.default.fields` shape.
         const normalized = metadata.fields
             ? { ...metadata, fields: normalizeDatasetFields(metadata.fields) }
             : metadata;
@@ -94,7 +93,7 @@ export const getDataset: ToolEntry = Object.freeze({
         const nextStep = resolveSiblingNextStep(
             HELPER_TOOLS.DATASET_GET_ITEMS,
             loadedToolNames,
-            `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}${fieldsProjectionHint(normalized.fields)}`,
+            `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}${fieldsProjectionHint(metadata.fields)}`,
         );
         return buildStorageResponse({
             structuredContent: normalized,

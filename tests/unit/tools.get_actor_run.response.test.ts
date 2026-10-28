@@ -6,6 +6,7 @@ import { ACTOR_TIP_CAVEAT } from '../../src/tools/actor_tool_naming.js';
 import {
     buildStartRunResponse,
     buildStartRunWidgetResponse,
+    buildDatasetShape,
     buildStatusSummaryNextStep,
     collapseArrayIndices,
     fieldsProjectionHint,
@@ -1116,6 +1117,8 @@ function makeRun(status: string, statusMessage?: string, runTimeSecs = 10) {
 }
 
 const datasetWithItems: RunDataset = { id: 'ds-1', itemCount: 47, fields: ['metadata.url', 'markdown'] };
+// Raw index-expanded metadata as the API returns it, threaded separately for the shape in the hint.
+const DATASET_FIELDS = ['metadata/url', 'markdown'];
 const datasetEmpty: RunDataset = { id: 'ds-1', itemCount: 0, fields: [] };
 const kvWithRecords: RunKeyValueStore = { id: 'kv-1', keys: ['result-a', 'result-b'], keyCount: 2 };
 
@@ -1132,12 +1135,13 @@ describe('buildStatusTemplate', () => {
         const t = buildStatusSummaryNextStep({
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
+            datasetFields: DATASET_FIELDS,
         });
         expect(t.summary).toContain('47 items; 2 fields available');
         expect(t.nextStep).toContain('get-dataset-items');
         expect(t.nextStep).toContain('datasetId=ds-1');
-        expect(t.nextStep).toContain('Fields: metadata.url, markdown.');
-        expect(t.nextStep).toContain('returns nothing');
+        expect(t.nextStep).toContain('Item structure ([] marks an array): { metadata: { url }, markdown }.');
+        expect(t.nextStep).toContain('Selectable fields: metadata, markdown;');
     });
 
     it('SUCCEEDED dataset nextStep uses DEFAULT_DATASET_ITEMS_LIMIT as example limit', () => {
@@ -1174,7 +1178,7 @@ describe('buildStatusTemplate', () => {
         const dataset: RunDataset = { id: 'ds-1', itemCount: 5, fields: [] };
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
         expect(t.nextStep).toContain('get-dataset-items');
-        expect(t.nextStep).not.toContain('Fields:');
+        expect(t.nextStep).not.toContain('Item structure');
         expect(t.nextStep).not.toContain('—');
     });
 
@@ -1298,10 +1302,13 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).toContain('partial output (47 items written)');
     });
 
-    it('TIMED-OUT with fields carries the same fields hint as SUCCEEDED', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('TIMED-OUT'), dataset: datasetWithItems });
-        expect(t.nextStep).toContain('Fields: metadata.url, markdown.');
-        expect(t.nextStep).toContain('returns nothing');
+    it('TIMED-OUT with fields carries the same shape hint as SUCCEEDED', () => {
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('TIMED-OUT'),
+            dataset: datasetWithItems,
+            datasetFields: DATASET_FIELDS,
+        });
+        expect(t.nextStep).toContain('Item structure ([] marks an array): { metadata: { url }, markdown }.');
     });
 
     it('TIMED-OUT with both dataset and KV records picks dataset for nextStep', () => {
@@ -1399,23 +1406,65 @@ describe('buildStatusTemplate', () => {
         const t = buildStatusSummaryNextStep({
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
+            datasetFields: DATASET_FIELDS,
         });
-        expect(t.nextStep).toMatch(/for every element\.$/);
+        expect(t.nextStep).toMatch(/\.$/);
         expect(t.nextStep).not.toMatch(/\.\.$/);
     });
 });
 
 describe('fieldsProjectionHint', () => {
-    it('lists the fields and says a path through an array is not selectable, without an indexed example', () => {
-        const hint = fieldsProjectionHint(['query', 'results.url']);
-        expect(hint).toContain('Fields: query, results.url.');
-        expect(hint).toContain('select the top-level name of the array for every element');
+    it('shows the shape, the top-level names, one object path and one array path that returns nothing', () => {
+        const hint = fieldsProjectionHint(['query', 'search/provider', 'results/0/url', 'results/0/siteLinks/0/url']);
+        expect(hint).toContain(
+            'Item structure ([] marks an array): { query, search: { provider }, results: { url, siteLinks: { url }[] }[] }.',
+        );
+        expect(hint).toContain('Selectable fields: query, search, results;');
+        expect(hint).toContain('Dotted paths work through objects (search.provider).');
+        expect(hint).toContain('A dotted path through an array (results.url) returns nothing.');
+        // Never an indexed path: weak models copy it and report one element as the whole result.
         expect(hint).not.toMatch(/\.\d+(\.|\b)/);
+    });
+
+    it('omits the object and array sentences when the data has no such path', () => {
+        const hint = fieldsProjectionHint(['markdown', 'tags/0']);
+        expect(hint).toContain('Item structure ([] marks an array): { markdown, tags[] }.');
+        expect(hint).not.toContain('Dotted paths work');
+        expect(hint).not.toContain('returns nothing');
     });
 
     it('is empty without fields', () => {
         expect(fieldsProjectionHint([])).toBe('');
         expect(fieldsProjectionHint(undefined)).toBe('');
+    });
+});
+
+describe('buildDatasetShape marks arrays with []', () => {
+    it('nests objects and marks arrays of objects and of strings', () => {
+        expect(buildDatasetShape(['query', 'results/0/url', 'results/0/emphasizedKeywords/0', 'results/1/title'])).toBe(
+            '{ query, results: { url, emphasizedKeywords[], title }[] }',
+        );
+    });
+
+    it('marks an array of arrays with one [] per level', () => {
+        expect(buildDatasetShape(['table/rows/0/0', 'table/rows/1/2'])).toBe('{ table: { rows[][] } }');
+    });
+});
+
+describe('run response threads the raw field metadata into the hint', () => {
+    it('renders the shape from the index-expanded fields while fields stays collapsed', async () => {
+        const run = mockSucceededRun();
+        const dataset = mockDataset({ fields: ['query', 'results/0/url', 'results/1/url'] });
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, stubClient({ run, dataset })),
+        );
+        const { structuredContent, content } = result as {
+            structuredContent: RunResponse;
+            content: { text: string }[];
+        };
+        expect(structuredContent.storages.datasets?.default.fields).toEqual(['query', 'results.url']);
+        expect(content[1].text).toContain('Item structure ([] marks an array): { query, results: { url }[] }.');
+        expect(content[1].text).toContain('A dotted path through an array (results.url) returns nothing.');
     });
 });
 
