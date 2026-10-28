@@ -133,6 +133,7 @@ const BASE_TELEMETRY_KEYS = [
     'tool_response_file_bytes',
     'tool_response_structured_content_bytes',
     'tool_status',
+    'trace_id',
     'transport_type',
 ];
 
@@ -214,13 +215,13 @@ function expectFailureClassTelemetry(
 }
 
 /** Drives a task-mode call, waits for terminal status, and reads back the stored task + result. */
-async function runTaskAndReadBack(server: ActorsMcpServer, tool: ToolEntry) {
+async function runTaskAndReadBack(server: ActorsMcpServer, tool: ToolEntry, meta?: Record<string, unknown>) {
     server.upsertTools([tool]);
     const handler = getRequestHandler(server, 'tools/call');
     const res = (await handler(
         {
             method: 'tools/call',
-            params: { name: tool.name, arguments: {}, _meta: { mcpSessionId: 's1' }, task: { ttl: 60_000 } },
+            params: { name: tool.name, arguments: {}, _meta: { mcpSessionId: 's1', ...meta }, task: { ttl: 60_000 } },
         },
         { signal: { aborted: false }, sendNotification: vi.fn() },
     )) as { task: { taskId: string } };
@@ -676,6 +677,25 @@ describe('executeToolAndUpdateTask()', () => {
         expectClientContextTelemetry(trackSpy.mock.calls[0][2]);
     });
 
+    it('takes the task-call trace_id from the Apify AI thread id', async () => {
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        const apifyAi = { ...INITIALIZE_REQUEST.params, clientInfo: { name: 'apify-ai', version: '1' } };
+        await withServer(
+            async (server) => {
+                const { tool } = makeRecorderTool('task-trace-tool', { taskSupport: 'optional' });
+                await runTaskAndReadBack(server, tool, { 'com.apify/traceId': 'thread-1' });
+                await vi.waitFor(() => expect(trackSpy).toHaveBeenCalled());
+            },
+            {
+                token: undefined,
+                telemetry: { enabled: true },
+                allowUnauthMode: true,
+                initializeRequestData: { ...INITIALIZE_REQUEST, params: apifyAi },
+            },
+        );
+        expect(trackSpy.mock.calls[0][2]).toMatchObject({ mcp_session_id: 's1', trace_id: 'thread-1' });
+    });
+
     it('dispatches an ACTOR_MCP tool run as a task and surfaces a connect failure as a completed error result', async () => {
         // #1063 CLOSED: executeToolAndUpdateTask now dispatches ACTOR_MCP through the shared switch.
         // Stub connectMCPClient to return null — deterministic, no real network attempt — so the
@@ -1103,7 +1123,10 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                     .spyOn(callActor, 'checkPaymentProviderStandbyConflict')
                     .mockResolvedValue(standbyResult);
                 const notifySpy = vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
+                const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
+                    hasPaymentProviderStandbyCheck: true,
+                    taskSupport: 'optional',
+                });
                 const res = await callTask(server, tool, { actor: 'apify/some-actor' });
 
                 expect(res.task.status).toBe('completed');
@@ -1129,6 +1152,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 // paymentRequired + missing skyfire-pay-id would also yield paymentRequiredResult.
                 const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
                     paymentRequired: true,
+                    hasPaymentProviderStandbyCheck: true,
                     taskSupport: 'optional',
                 });
                 const res = await callTask(server, tool, { actor: 'apify/some-actor' });
@@ -1172,7 +1196,10 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
                 vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockResolvedValue(standbyResult);
                 vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
+                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
+                    hasPaymentProviderStandbyCheck: true,
+                    taskSupport: 'optional',
+                });
                 await callTask(server, tool, { actor: 'apify/some-actor' });
             },
             {
@@ -1198,7 +1225,10 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
                 vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockResolvedValue(standbyResult);
                 vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
+                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
+                    hasPaymentProviderStandbyCheck: true,
+                    taskSupport: 'optional',
+                });
                 server.upsertTools([tool]);
                 const handler = getRequestHandler(server, 'tools/call');
 
@@ -1310,7 +1340,9 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockRejectedValue(
                     Object.assign(new Error('server error'), { statusCode: 500 }),
                 );
-                const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL);
+                const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
+                    hasPaymentProviderStandbyCheck: true,
+                });
                 server.upsertTools([tool]);
                 const handler = getRequestHandler(server, 'tools/call');
                 const result = await handler(
@@ -1389,7 +1421,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockRejectedValue(
                     Object.assign(new Error('server error'), { statusCode: 500 }),
                 );
-                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL);
+                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { hasPaymentProviderStandbyCheck: true });
                 server.upsertTools([tool]);
                 const handler = getRequestHandler(server, 'tools/call');
                 await handler(

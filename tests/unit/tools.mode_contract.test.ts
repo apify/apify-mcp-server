@@ -15,6 +15,7 @@ import {
     type HelperToolName,
     RAG_WEB_BROWSER,
     WEB_FETCH,
+    WEB_SEARCH,
 } from '../../src/const.js';
 import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
@@ -37,6 +38,7 @@ function buildFixtureActorInfo(actorFullName: string): ActorInfo {
             readme: '',
             description: 'Test actor for description-gating coverage.',
             defaultRunOptions: { memoryMbytes: 1024, timeoutSecs: 300, build: 'latest' },
+            hasWebServerSchema: false,
             input: {
                 type: 'object',
                 title: 'Test Input',
@@ -52,9 +54,10 @@ function buildFixtureActorInfo(actorFullName: string): ActorInfo {
 // Real getNormalActorsAsTools output, not a hand-written stand-in — exercises the gated description.
 const [actorToolStub] = await getNormalActorsAsTools([buildFixtureActorInfo('apify/test-actor')]);
 // Real dedicated Actor tools that other descriptions refer to.
-const [ragToolStub, webFetchToolStub] = await getNormalActorsAsTools([
+const [ragToolStub, webFetchToolStub, webSearchToolStub] = await getNormalActorsAsTools([
     buildFixtureActorInfo(RAG_WEB_BROWSER),
     buildFixtureActorInfo(WEB_FETCH),
+    buildFixtureActorInfo(WEB_SEARCH),
 ]);
 
 /** Helper to extract tool names from a category. */
@@ -571,6 +574,17 @@ describe('tool descriptions never name a tool absent from the session', () => {
             input: { tools: [RAG_WEB_BROWSER, WEB_FETCH] },
             actorTools: [ragToolStub, webFetchToolStub],
         },
+        { label: 'Web Search only', input: { tools: [WEB_SEARCH] }, actorTools: [webSearchToolStub] },
+        {
+            label: 'Web Search and Web Fetch',
+            input: { tools: [WEB_SEARCH, WEB_FETCH] },
+            actorTools: [webSearchToolStub, webFetchToolStub],
+        },
+        {
+            label: 'all three dedicated Actors',
+            input: { tools: [RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH] },
+            actorTools: [ragToolStub, webFetchToolStub, webSearchToolStub],
+        },
     ];
     // A dedicated Actor is named by its tool name, or by its full name in a tool reference
     // ("use apify/rag-web-browser", "prefer the dedicated apify/web-fetch tool"); a full name given as
@@ -578,6 +592,7 @@ describe('tool descriptions never name a tool absent from the session', () => {
     const DEDICATED_ACTORS = [
         { name: ragToolStub.name, actorFullName: RAG_WEB_BROWSER },
         { name: webFetchToolStub.name, actorFullName: WEB_FETCH },
+        { name: webSearchToolStub.name, actorFullName: WEB_SEARCH },
     ];
 
     for (const mode of SERVER_MODES) {

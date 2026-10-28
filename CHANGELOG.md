@@ -2,6 +2,52 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.19.6 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Log SSE replay stream conflict as a client fault ([#1723](https://github.com/apify/apify-mcp-server/pull/1723)) ([7d1dfe9](https://github.com/apify/apify-mcp-server/commit/7d1dfe98e8d58ae52856b8f53f8ccb3aef2e27fc)) by [@jirispilka](https://github.com/jirispilka)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.19.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.5) (2026-10-27)
+
+### 🚀 Features
+
+- Let search-actors take a use case, except for Claude clients ([#1715](https://github.com/apify/apify-mcp-server/pull/1715)) ([464b957](https://github.com/apify/apify-mcp-server/commit/464b957b4e017011dc056b8f18e5da894d45a8a1)) by [@MQ37](https://github.com/MQ37), closes [#272](https://github.com/apify/apify-mcp-server/issues/272)
+
+
+## [0.19.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.4) (2026-10-27)
+
+### 🚀 Features
+
+- Serve apify&#x2F;web-search as a run-based Actor tool ([#1654](https://github.com/apify/apify-mcp-server/pull/1654)) ([09fab11](https://github.com/apify/apify-mcp-server/commit/09fab118b124e6ca5ec21b5cd14cce5e685051be)) by [@jirispilka](https://github.com/jirispilka), closes [#1619](https://github.com/apify/apify-mcp-server/issues/1619), [#1651](https://github.com/apify/apify-mcp-server/issues/1651)
+- Send trace id and use case with Apify Store searches ([#1650](https://github.com/apify/apify-mcp-server/pull/1650)) ([826e128](https://github.com/apify/apify-mcp-server/commit/826e128e5506760cb9d22f254dec7cddfceb1486)) by [@MQ37](https://github.com/MQ37), closes [#1362](https://github.com/apify/apify-mcp-server/issues/1362), [#272](https://github.com/apify/apify-mcp-server/issues/272), [#1553](https://github.com/apify/apify-mcp-server/issues/1553)
+- Resolve server-interface fields from the server-interface build ([#1677](https://github.com/apify/apify-mcp-server/pull/1677)) ([6d69185](https://github.com/apify/apify-mcp-server/commit/6d691858b3b450762335fb651f0212b62eb660e3)) by [@jirispilka](https://github.com/jirispilka), closes [#1620](https://github.com/apify/apify-mcp-server/issues/1620), [#1642](https://github.com/apify/apify-mcp-server/issues/1642)
+- Add send-server-actor-request ([#1681](https://github.com/apify/apify-mcp-server/pull/1681)) ([935cfb0](https://github.com/apify/apify-mcp-server/commit/935cfb07082412474cc6164915474fe95b334318)) by [@jirispilka](https://github.com/jirispilka), closes [#1620](https://github.com/apify/apify-mcp-server/issues/1620), [#1623](https://github.com/apify/apify-mcp-server/issues/1623)
+- Add a server-interface section to fetch-actor-details ([#1682](https://github.com/apify/apify-mcp-server/pull/1682)) ([19489b4](https://github.com/apify/apify-mcp-server/commit/19489b4c15cc3a35c3f79c1dcbe018deb0b276d5)) by [@jirispilka](https://github.com/jirispilka), closes [#1620](https://github.com/apify/apify-mcp-server/issues/1620), [#1645](https://github.com/apify/apify-mcp-server/issues/1645)
+- List documented operations on a rejected Actor Server request ([#1696](https://github.com/apify/apify-mcp-server/pull/1696)) ([88adc14](https://github.com/apify/apify-mcp-server/commit/88adc144c6019cd412ba7ef3119582ccea0d5a09)) by [@jirispilka](https://github.com/jirispilka), closes [#1620](https://github.com/apify/apify-mcp-server/issues/1620)
+- Serve send-server-actor-request only when requested ([#1703](https://github.com/apify/apify-mcp-server/pull/1703)) ([753391a](https://github.com/apify/apify-mcp-server/commit/753391a59c93174b3dc80aa532c75b6d637350bf)) by [@jirispilka](https://github.com/jirispilka), closes [#1620](https://github.com/apify/apify-mcp-server/issues/1620)
+
+### 🐛 Bug Fixes
+
+- Close feature gaps after the Store search backend switch ([#1713](https://github.com/apify/apify-mcp-server/pull/1713)) ([790724d](https://github.com/apify/apify-mcp-server/commit/790724de58cb3a06ff784b900b49b5b3704d4473)) by [@jirispilka](https://github.com/jirispilka), closes [#1673](https://github.com/apify/apify-mcp-server/issues/1673)
+
+
+## [0.19.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.3) (2026-10-21)
+
+
+## [0.19.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.2) (2026-10-21)
+
+
+## [0.19.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.2) (2026-10-21)
+
+### 🚀 Features
+
+- Search the Store with the new backend ([#1662](https://github.com/apify/apify-mcp-server/pull/1662)) ([b326ace](https://github.com/apify/apify-mcp-server/commit/b326acecb714ee94eb96e311c5a4d61194e99e9d)) by [@jmikitova](https://github.com/jmikitova)
+
+
 ## [0.19.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.1) (2026-10-20)
 
 ### 🚀 Features

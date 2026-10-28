@@ -7,6 +7,7 @@ import {
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
     FAILURE_CATEGORY,
     HELPER_TOOLS,
+    RAG_WEB_BROWSER,
     TOOL_STATUS,
 } from '../../src/const.js';
 import { ActorLoadError } from '../../src/errors.js';
@@ -43,10 +44,30 @@ describe('call_actor_common', () => {
             expect(description).not.toContain('always runs asynchronously');
         });
 
+        it('prefers dedicated tools without promoting a web tool example', () => {
+            const description = buildCallActorDescription();
+
+            expect(description).toContain('Always use dedicated tools when available');
+            expect(description).not.toContain('apify--rag-web-browser');
+            expect(description).not.toContain(RAG_WEB_BROWSER);
+        });
+
         // The waitSecs: 0 path (buildStartRunSharedContent) returns id-only storages and never
         // reaches buildRunDataset, so the field-metadata promise must stay tied to waitSecs > 0.
         it('promises dataset field metadata only for a non-zero wait', () => {
             expect(buildCallActorDescription()).toContain('with waitSecs > 0 also reports dataset field metadata');
+        });
+
+        it('points Server Actor requests at send-server-actor-request only when the session has it', () => {
+            const withSend = buildCallActorDescription(
+                only(HELPER_TOOLS.ACTOR_SERVER_REQUEST, HELPER_TOOLS.ACTOR_GET_DETAILS),
+            );
+            const withoutSend = buildCallActorDescription(only(HELPER_TOOLS.ACTOR_GET_DETAILS));
+
+            expect(withSend).toContain(`For one or a few results, ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}`);
+            expect(withSend).toContain(`${HELPER_TOOLS.ACTOR_GET_DETAILS} with output={ serverInterface: true }`);
+            expect(withoutSend).not.toContain('For Server Actors');
+            expect(withoutSend).not.toMatch(/\n{3}/);
         });
 
         // call-actor-widget is not auto-paired — gate strictly on its own presence, not on

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
-import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
 import { callActorPreExecute, executeCallActor } from '../../src/tools/actors/call_actor.js';
 import type { ActorDefinitionWithInfo } from '../../src/types.js';
@@ -40,7 +40,13 @@ const RUN_ONLY_ID = 'zXyW9876';
 
 function seedActor(
     name: string,
-    opts: { webServerMcpPath?: string; isStandbyEnabled?: boolean; input?: unknown; cacheKey?: string },
+    opts: {
+        webServerMcpPath?: string;
+        isStandbyEnabled?: boolean;
+        hasWebServerSchema?: boolean;
+        input?: unknown;
+        cacheKey?: string;
+    },
 ): void {
     const id = name.replace('/', '-');
     actorDefinitionCache.set(opts.cacheKey ?? name, {
@@ -50,13 +56,17 @@ function seedActor(
             description: 'test Actor',
             defaultRunOptions: { memoryMbytes: 1024 },
             ...(opts.webServerMcpPath && { webServerMcpPath: opts.webServerMcpPath }),
+            hasWebServerSchema: opts.hasWebServerSchema,
             ...(opts.input !== undefined && { input: opts.input }),
         },
         info: {
             id,
             isPublic: true,
             userId: 'owner',
-            ...(opts.isStandbyEnabled && { actorStandby: { isEnabled: true } }),
+            ...(opts.isStandbyEnabled && {
+                actorStandby: { isEnabled: true },
+                standbyUrl: `https://${id}.apify.actor`,
+            }),
         },
     } as unknown as ActorDefinitionWithInfo);
 }
@@ -97,6 +107,8 @@ beforeEach(() => {
     seedActor(RUN_ONLY, { input: NON_EMPTY_INPUT });
     seedActor(RUN_ONLY_STALE_PATH, { webServerMcpPath: '/mcp', input: NON_EMPTY_INPUT });
     seedActor(STANDBY_MCP, { webServerMcpPath: '/mcp', isStandbyEnabled: true, input: NON_EMPTY_INPUT });
+    seedActor(WEB_SEARCH, { webServerMcpPath: '/mcp', isStandbyEnabled: true, input: NON_EMPTY_INPUT });
+    seedActor(WEB_FETCH, { webServerMcpPath: '/mcp', isStandbyEnabled: true, input: NON_EMPTY_INPUT });
     seedActor(STANDBY_INPUT, { isStandbyEnabled: true, input: NON_EMPTY_INPUT });
     seedActor(STANDBY_EMPTY, { isStandbyEnabled: true });
     seedActor(STANDBY_EMPTY, { isStandbyEnabled: true, cacheKey: STANDBY_EMPTY_ID });
@@ -109,6 +121,8 @@ describe('Actor run/standby mode decision table', () => {
         ['a run-only Actor', RUN_ONLY, ['acme--run-only']],
         ['a run-only Actor carrying a leftover webServerMcpPath', RUN_ONLY_STALE_PATH, ['acme--run-only-stale-path']],
         ['a standby Actor exposing an MCP server (proxied tools only)', STANDBY_MCP, ['acme--standby-mcp--add']],
+        ['an input-interface Actor carrying an MCP path', WEB_SEARCH, ['apify--web-search']],
+        ['Web Fetch with its MCP endpoint enabled', WEB_FETCH, ['apify--web-fetch']],
         ['a standby Actor with no MCP server but a non-empty input schema', STANDBY_INPUT, ['acme--standby-input']],
         ['a standby Actor with no MCP server and an empty input schema', STANDBY_EMPTY, []],
     ])('tools/list surface for %s', async (_label, actor, expected) => {
@@ -116,11 +130,14 @@ describe('Actor run/standby mode decision table', () => {
     });
 
     describe('call-actor routing', () => {
-        it('runs a run-only Actor with a leftover webServerMcpPath instead of demanding a tool name', async () => {
-            const result = await preExecute(RUN_ONLY_STALE_PATH);
+        it.each([RUN_ONLY_STALE_PATH, WEB_FETCH])(
+            'runs %s through its input schema despite its MCP path',
+            async (actor) => {
+                const result = await preExecute(actor);
 
-            expect('earlyResponse' in result).toBe(false);
-        });
+                expect('earlyResponse' in result).toBe(false);
+            },
+        );
 
         it('answers "is not an MCP server" for the actor:tool shape on a run-only Actor with a leftover path', async () => {
             const result = await preExecute(`${RUN_ONLY_STALE_PATH}:add`);
@@ -170,16 +187,42 @@ describe('Actor run/standby mode decision table', () => {
             expect('earlyResponse' in result).toBe(true);
         });
 
-        it('answers the canonical standby-without-MCP message for both call shapes on the unsupported cell', async () => {
+        it('answers the canonical server-Actor-without-MCP message for both call shapes on the unsupported cell', async () => {
             const bare = await callActor(STANDBY_EMPTY);
             const withToolName = await preExecute(`${STANDBY_EMPTY}:add`);
 
             const withToolNameText = earlyText(withToolName);
 
             expect(firstText(bare)).toBe(withToolNameText);
-            expect(withToolNameText).toContain('standby mode without an MCP server');
+            expect(withToolNameText).toContain('has no MCP tools or input interface');
+            expect(withToolNameText).not.toContain('not supported yet');
+            expect(withToolNameText).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
             expect(bare.isError).toBe(true);
             expect(earlyResponseOf(withToolName).isError).toBe(true);
+        });
+
+        it.each([true, false])('names the HTTP request tool only when loaded: %s', async (hasRequestTool) => {
+            seedActor(STANDBY_EMPTY, { isStandbyEnabled: true, hasWebServerSchema: true });
+            const client = new ApifyClient({ token: 'test-token' });
+            const options = {
+                loadedToolNames: hasRequestTool ? [HELPER_TOOLS.ACTOR_SERVER_REQUEST] : [],
+            };
+            const bare = await executeCallActor(
+                stubToolCallContext({ actor: STANDBY_EMPTY, input: {} }, client, options),
+            );
+            const withToolName = await callActorPreExecute(
+                stubToolCallContext({ actor: `${STANDBY_EMPTY}:add`, input: {} }, client, options),
+                { route: HELPER_TOOLS.ACTOR_CALL },
+            );
+
+            const text = firstText(bare);
+            expect(text).toBe(earlyText(withToolName));
+            expect(text.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)).toBe(hasRequestTool);
+            expect(text).toContain('has no MCP tools or input interface');
+            expect(bare.toolTelemetry).toMatchObject({
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+            });
         });
 
         it('answers with the canonical Actor name for both call shapes when addressed by Actor ID', async () => {

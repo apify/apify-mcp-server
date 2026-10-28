@@ -7,11 +7,13 @@ import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { InvalidToolCall, PreparedCall } from '../../src/mcp/tool_call_engine.js';
 import { classifyToolCallError, executeSyncToolCall, prepareToolCall } from '../../src/mcp/tool_call_engine.js';
 import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
+import { sendServerActorRequest } from '../../src/tools/actors/send_server_actor_request.js';
 import {
     REPORT_PROBLEM_INVALID_INPUT_NUDGE,
     REPORT_PROBLEM_NUDGE,
     reportProblem,
 } from '../../src/tools/dev/report_problem.js';
+import { getActorRunList } from '../../src/tools/runs/get_actor_run_list.js';
 import type { ToolCallTelemetryProperties, ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
@@ -47,6 +49,7 @@ describe('prepareToolCall()', () => {
 
     it('returns InvalidToolCall with AUTH category when no token is provided', async () => {
         await withServer(async (server) => {
+            const telemetryData = {} as ToolCallTelemetryProperties;
             const result = await prepareToolCall({
                 ...prepareFields(server),
                 apifyToken: '',
@@ -56,7 +59,7 @@ describe('prepareToolCall()', () => {
                 requestHeaders: undefined,
                 isTaskRequest: false,
                 mcpSessionId: 's1',
-                telemetryData: null,
+                telemetryData,
                 clientContext: undefined,
             });
             expect('message' in result).toBe(true);
@@ -64,11 +67,13 @@ describe('prepareToolCall()', () => {
             expect(invalid.toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
             expect(invalid.callDiagnostics.failure_category).toBe(FAILURE_CATEGORY.AUTH);
             expect(invalid.message).toContain('Apify API token is required');
+            expect(telemetryData.trace_id).toBe('s1');
         });
     });
 
     it('returns InvalidToolCall for an unknown tool name', async () => {
         await withServer(async (server) => {
+            const telemetryData = {} as ToolCallTelemetryProperties;
             const result = await prepareToolCall({
                 ...prepareFields(server),
                 apifyToken: 'fake-token',
@@ -78,13 +83,14 @@ describe('prepareToolCall()', () => {
                 requestHeaders: undefined,
                 isTaskRequest: false,
                 mcpSessionId: 's1',
-                telemetryData: null,
+                telemetryData,
                 clientContext: undefined,
             });
             expect('message' in result).toBe(true);
             const invalid = result as InvalidToolCall;
             expect(invalid.callDiagnostics.failure_category).toBe(FAILURE_CATEGORY.INVALID_INPUT);
             expect(invalid.message).toContain('was not found');
+            expect(telemetryData.trace_id).toBe('s1');
         });
     });
 
@@ -136,6 +142,39 @@ describe('prepareToolCall()', () => {
         });
     });
 
+    it('carries the trace id on the client and in telemetry only when telemetry is on', async () => {
+        await withServer(async (server) => {
+            const { tool } = makeRecorderTool('recorder-tool');
+            server.upsertTools([tool]);
+            const call = (telemetryData: ToolCallTelemetryProperties | null) =>
+                prepareToolCall({
+                    ...prepareFields(server),
+                    apifyToken: 'fake-token',
+                    name: 'recorder-tool',
+                    args: {},
+                    meta: { 'com.apify/traceId': 'thread-1', 'com.apify/useCase': 'find a scraper' },
+                    requestHeaders: undefined,
+                    isTaskRequest: false,
+                    mcpSessionId: 's1',
+                    telemetryData,
+                    clientContext: {
+                        protocolVersion: '2025-06-18',
+                        clientInfo: { name: 'apify-ai', version: '1' },
+                        capabilities: {},
+                    },
+                }) as Promise<PreparedCall>;
+
+            const telemetryData = { tool_name: 'recorder-tool' } as unknown as ToolCallTelemetryProperties;
+            const tracked = await call(telemetryData);
+            expect(tracked.apifyClient.storeSearchTracking).toEqual({ traceId: 'thread-1' });
+            expect(telemetryData.trace_id).toBe('thread-1');
+            expect(JSON.stringify(telemetryData)).not.toContain('find a scraper');
+
+            const untracked = await call(null);
+            expect(untracked.apifyClient.storeSearchTracking).toBeUndefined();
+        });
+    });
+
     describe('argument failure hint', () => {
         const STRICT_SCHEMA = {
             type: 'object',
@@ -179,17 +218,24 @@ describe('prepareToolCall()', () => {
             return (result as InvalidToolCall).message;
         }
 
+        it('points a non-Actor tool with missing arguments at its tools/list schema, not fetch-actor-details', async () => {
+            const message = await failureMessage(makeStrictTool(TOOL_TYPE.INTERNAL), true, undefined);
+
+            expect(message).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+            expect(message).toContain('tools/list');
+        });
+
+        it('gives a non-Actor tool with invalid arguments no schema pointer', async () => {
+            const message = await failureMessage(makeStrictTool(TOOL_TYPE.INTERNAL), true, { query: '' });
+
+            expect(message).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+            expect(message).not.toContain('tools/list');
+        });
+
         describe.each([
             ['invalid', { query: '' }],
             ['missing', undefined],
         ])('%s arguments', (_label, args) => {
-            it('points a non-Actor tool at its tools/list schema, not fetch-actor-details', async () => {
-                const message = await failureMessage(makeStrictTool(TOOL_TYPE.INTERNAL), true, args);
-
-                expect(message).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
-                expect(message).toContain('tools/list');
-            });
-
             it('points an Actor tool at fetch-actor-details when the session serves it', async () => {
                 const message = await failureMessage(makeStrictTool(TOOL_TYPE.ACTOR), true, args);
 
@@ -202,6 +248,82 @@ describe('prepareToolCall()', () => {
                 expect(message).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
                 expect(message).toContain('tools/list');
             });
+        });
+    });
+
+    describe('argument failure names what was received and what the parameter takes', () => {
+        const SCHEMA = {
+            type: 'object',
+            properties: {
+                path: { type: 'string', description: 'The path on the Actor Server, starting with /.' },
+                query: { type: 'object', description: 'Query parameters, by name, for example {"limit": 10}.' },
+                tags: { type: 'array', items: { type: 'string', description: 'One tag, such as "news".' } },
+            },
+            required: ['path'],
+        };
+        const tool: ToolEntry = {
+            type: TOOL_TYPE.INTERNAL,
+            name: 'send-server-actor-request',
+            description: 'sends one request',
+            inputSchema: SCHEMA as ToolInputSchema,
+            ajvValidate: compileSchema(SCHEMA),
+            call: async () => respondRaw({ content: [] }),
+        };
+
+        async function failureMessage(args: Record<string, unknown>, selectedTool: ToolEntry = tool): Promise<string> {
+            const result = await prepareToolCall({
+                tools: new Map([[selectedTool.name, selectedTool]]),
+                apifyToken: 'fake-token',
+                name: selectedTool.name,
+                args,
+                meta: undefined,
+                requestHeaders: undefined,
+                isTaskRequest: false,
+                mcpSessionId: 's1',
+                telemetryData: null,
+                clientContext: undefined,
+            });
+            return (result as InvalidToolCall).message;
+        }
+
+        it('lists the allowed values for an invalid enum', async () => {
+            const message = await failureMessage({ status: 'SUCCESS' }, getActorRunList);
+
+            expect(message).toContain('/status: must be equal to one of the allowed values');
+            expect(message).toContain('"SUCCEEDED"');
+            expect(message).toContain('"FAILED"');
+        });
+
+        it('uses the parent description for an invalid query value', async () => {
+            const message = await failureMessage(
+                { actor: 'apify/web-search', method: 'GET', path: '/', query: { limit: {} } },
+                sendServerActorRequest,
+            );
+
+            expect(message).toContain('/query/limit: must be string, got object');
+            expect(message).toContain('Parameter /query: Query parameters, by name');
+        });
+
+        it('reports the received type and the description for a wrong type', async () => {
+            const message = await failureMessage({ path: '/', query: '{"ai"}' });
+
+            expect(message).toContain('/query: must be object, got string');
+            expect(message).toContain('Parameter /query: Query parameters, by name');
+        });
+
+        it('reports the description of a missing required parameter', async () => {
+            const message = await failureMessage({ query: {} });
+
+            expect(message).toContain("must have required property 'path'");
+            expect(message).toContain('Parameter /path: The path on the Actor Server');
+        });
+
+        it('reports the description of an array item', async () => {
+            // An object, since the shared validator coerces a number to a string.
+            const message = await failureMessage({ path: '/', tags: [{}] });
+
+            expect(message).toContain('/tags/0: must be string, got object');
+            expect(message).toContain('Parameter /tags/0: One tag');
         });
     });
 });

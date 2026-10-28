@@ -10,6 +10,7 @@
 import type { ApifyClient } from '../apify_client.js';
 import type { PaymentProvider } from '../payments/types.js';
 import type { ActorStoreList } from '../types.js';
+import { sanitizeUseCase } from './mcp_clients.js';
 
 export type SearchActorsByKeywordsOptions = {
     search: string;
@@ -20,6 +21,8 @@ export type SearchActorsByKeywordsOptions = {
     allowsAgenticUsers?: boolean;
     /** API rejects values above `MAX_LIMIT_WITH_INPUT_SCHEMA` (apify-core cap). */
     includeInputSchema?: boolean;
+    /** Sent as `_traceId` and `_useCase`. */
+    tracking?: ApifyClient['storeSearchTracking'];
 };
 
 export type SearchAgentSafeActorsOptions = {
@@ -28,32 +31,40 @@ export type SearchAgentSafeActorsOptions = {
     limit: number;
     offset: number;
     paymentProvider?: PaymentProvider;
+    /** Why the user is searching, as the model wrote it; sent as `_useCase` after {@link sanitizeUseCase}. */
+    useCase?: string;
 };
 
 export async function searchActorsByKeywords(options: SearchActorsByKeywordsOptions): Promise<ActorStoreList[]> {
-    const { search, apifyClient, limit, offset, allowsAgenticUsers, includeInputSchema } = options;
+    const { search, apifyClient, limit, offset, allowsAgenticUsers, includeInputSchema, tracking } = options;
     const storeClient = apifyClient.store();
+    storeClient.params = { ...storeClient.params, _useNewStoreBackend: true };
     if (allowsAgenticUsers !== undefined) storeClient.params = { ...storeClient.params, allowsAgenticUsers };
     if (includeInputSchema !== undefined) storeClient.params = { ...storeClient.params, includeInputSchema };
+    const { traceId, useCase } = tracking ?? {};
+    if (traceId) storeClient.params = { ...storeClient.params, _traceId: traceId };
+    if (useCase) storeClient.params = { ...storeClient.params, _useCase: useCase };
 
     const results = await storeClient.list({ search, limit, offset });
     return results.items as ActorStoreList[];
 }
 
 /**
- * Preset around `searchActorsByKeywords` for the agent-facing search tool:
- * always sets `includeInputSchema=true` and forwards `allowsAgenticUsers`
- * when a `paymentProvider` is in play. The public arg schema caps `limit`
- * at apify-core's hard cap (`MAX_LIMIT_WITH_INPUT_SCHEMA`).
+ * Store search used by the `search-actors` tools (plain and widget).
+ * Always requests input schemas, so `limit` must stay within `MAX_LIMIT_WITH_INPUT_SCHEMA` (the tool's arg schema enforces it).
+ * With a payment provider, returns only Actors that allow agentic users.
  */
 export async function searchAgentSafeActors(options: SearchAgentSafeActorsOptions): Promise<ActorStoreList[]> {
-    const { keywords, apifyClient, limit, offset, paymentProvider } = options;
+    const { keywords, apifyClient, limit, offset, paymentProvider, useCase } = options;
 
     return searchActorsByKeywords({
-        search: keywords,
+        // The Store returns no Actors for keywords without letters or digits (" ", "%", "..."),
+        // so send them as empty keywords.
+        search: /[\p{L}\p{N}]/u.test(keywords) ? keywords : '',
         apifyClient,
         limit,
         offset,
+        tracking: { ...apifyClient.storeSearchTracking, useCase: sanitizeUseCase(useCase) },
         allowsAgenticUsers: paymentProvider ? true : undefined,
         includeInputSchema: true,
     });

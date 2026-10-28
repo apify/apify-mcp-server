@@ -20,6 +20,8 @@ import { classifyFailureCategory, getToolStatusFromError } from './tool_status.j
 
 /** MCP `_meta` key for Apify Actor run information. Namespaced per MCP spec. */
 export const APIFY_ACTOR_RUN_META_KEY = 'com.apify/ActorRun';
+/** `_meta` key Apify AI sets on `tools/call`: the chat thread id. */
+export const APIFY_TRACE_ID_META_KEY = 'com.apify/traceId';
 
 /**
  * Injects the MCP session ID into request parameters.

@@ -116,6 +116,21 @@ export const registrationCases: Case[] = [
             expect(names).not.toContain('report-problem');
         }),
     },
+    ...[
+        { clientName: 'cursor', served: true },
+        { clientName: 'claude-ai', served: false },
+    ].map(
+        ({ clientName, served }): Case => ({
+            name: `${served ? 'adds' : 'omits'} the search-actors useCase for the ${clientName} client`,
+            isDeploymentTest: true,
+            run: withClient({ tools: ['search-actors'], clientName, telemetry: { enabled: true } }, async (client) => {
+                const { tools } = await client.listTools();
+                const search = tools.find((tool) => tool.name === 'search-actors');
+                expect(search).toBeDefined();
+                expect('useCase' in (search?.inputSchema.properties ?? {})).toBe(served);
+            }),
+        }),
+    ),
     {
         // Pinned ?tools= wins for call-actor even with report-problem auto-inject live.
         // No ?ui=: apps mode comes from the client's own UI-capability advertisement (serverMode 'auto'), not a URL override.

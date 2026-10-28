@@ -29,7 +29,11 @@ import type {
     ToolEntry,
 } from '../types.js';
 import { SERVER_MODE, TOOL_TYPE } from '../types.js';
-import { getRequestOriginForClient, isReportProblemBlockedForClient } from '../utils/mcp_clients.js';
+import {
+    getRequestOriginForClient,
+    isReportProblemBlockedForClient,
+    isStoreUseCaseServable,
+} from '../utils/mcp_clients.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
 import {
@@ -38,6 +42,7 @@ import {
     isReportProblemExplicitlySelected,
     resolveToolNamesFromInput,
     toolNamesToInput,
+    withoutUseCaseField,
 } from '../utils/tools_loader.js';
 import { buildMcpClientContext, isUiSupportedByClient } from './client_context.js';
 import type { McpClientContext } from './client_context.js';
@@ -355,16 +360,22 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * Compose one source's tool list against `view`: resolve mode-specific tools, then drop
-     * report-problem unless servable for that view ({@link isReportProblemServable}). Load paths
-     * and the initialize flush pass the instance's own {@link servingContext};
-     * {@link createRequestSnapshot} passes a view derived from one stateless request.
-     * An explicit opt-in in `source.input` applies to every request reusing this retained source.
+     * One source's tool list for `view`: the mode's tools, minus report-problem and the search tools'
+     * `useCase` input where `view`'s client is not served them. Load paths and the initialize flush
+     * pass {@link servingContext}; {@link createRequestSnapshot} passes a per-request view. An explicit
+     * report-problem opt-in in `source.input` applies to every request reusing the source.
      */
     private composeToolsForClient(source: ToolSource, view: ServingContext): ToolEntry[] {
-        const tools = getToolsForServerMode(source.input, source.actorTools, view.serverMode);
-        if (this.isReportProblemServable(view, source.input)) return tools;
-        return tools.filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT);
+        let tools = getToolsForServerMode(source.input, source.actorTools, view.serverMode);
+        // A payment provider cannot pay for an Actor Server run, so every call would be rejected.
+        if (this.options.paymentProvider) {
+            tools = tools.filter((tool) => tool.name !== HELPER_TOOLS.ACTOR_SERVER_REQUEST);
+        }
+        const served = this.isReportProblemServable(view, source.input)
+            ? tools
+            : tools.filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT);
+        if (this.telemetryEnabled && isStoreUseCaseServable(view.clientContext)) return served;
+        return served.map(withoutUseCaseField);
     }
 
     /**

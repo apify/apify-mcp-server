@@ -4,7 +4,12 @@
  stays minimal for its actual consumer (see src/AGENTS.md).
 */
 
-import { HELPER_TOOLS, MAX_LIMIT_WITH_INPUT_SCHEMA, SERVER_MODE_AUTO_DETECTION_ENABLED } from './const.js';
+import {
+    HELPER_TOOLS,
+    MAX_INLINE_BYTES,
+    MAX_LIMIT_WITH_INPUT_SCHEMA,
+    SERVER_MODE_AUTO_DETECTION_ENABLED,
+} from './const.js';
 import { SKYFIRE_ENABLED_TOOLS } from './payments/const.js';
 import { RESOURCE_MIME_TYPE } from './resources/widgets.js';
 import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG } from './tools/actors/call_actor.js';
@@ -17,6 +22,7 @@ import { AUTO_INJECTED_TOOLS } from './utils/tools_loader.js';
 
 export {
     HELPER_TOOLS,
+    MAX_INLINE_BYTES,
     MAX_LIMIT_WITH_INPUT_SCHEMA,
     SERVER_MODE_AUTO_DETECTION_ENABLED,
     SKYFIRE_ENABLED_TOOLS,

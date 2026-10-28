@@ -19,6 +19,8 @@ const stubApifyClient = mockApifyClient({
     }),
 });
 
+const TRACKING = { traceId: 'thread-1', useCase: 'find a scraper' };
+
 const baseStoreActor: ActorStoreList = {
     id: 'id-default',
     name: 'actor-default',
@@ -66,6 +68,18 @@ describe('searchActorsByKeywords', () => {
         expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: 5, offset: 0 });
     });
 
+    it('forwards the `tracking` option as `_traceId` and `_useCase`', async () => {
+        listMock.mockResolvedValueOnce({ items: [] });
+        await searchActorsByKeywords({ search: 'foo', apifyClient: stubApifyClient, limit: 5, tracking: TRACKING });
+        expect(paramsHolder.params).toMatchObject({ _traceId: 'thread-1', _useCase: 'find a scraper' });
+    });
+
+    it('always sets `_useNewStoreBackend`', async () => {
+        listMock.mockResolvedValueOnce({ items: [] });
+        await searchActorsByKeywords({ search: 'foo', apifyClient: stubApifyClient, limit: 5 });
+        expect(paramsHolder.params).toMatchObject({ _useNewStoreBackend: true });
+    });
+
     it('omits both flags when not provided', async () => {
         listMock.mockResolvedValueOnce({ items: [] });
         await searchActorsByKeywords({ search: 'foo', apifyClient: stubApifyClient, limit: 5 });
@@ -93,6 +107,12 @@ describe('searchAgentSafeActors', () => {
         expect(result).toHaveLength(3);
     });
 
+    it('sends keywords without letters or digits as empty keywords', async () => {
+        listMock.mockResolvedValueOnce({ items: [] });
+        await searchAgentSafeActors({ keywords: ' ... ', apifyClient: stubApifyClient, limit: 5, offset: 0 });
+        expect(listMock).toHaveBeenCalledWith({ search: '', limit: 5, offset: 0 });
+    });
+
     it('forwards allowsAgenticUsers when paymentProvider is set', async () => {
         listMock.mockResolvedValueOnce({ items: [makeActor()] });
         await searchAgentSafeActors({
@@ -104,5 +124,28 @@ describe('searchAgentSafeActors', () => {
             paymentProvider: {} as never,
         });
         expect(paramsHolder.params).toMatchObject({ allowsAgenticUsers: true, includeInputSchema: true });
+    });
+
+    it('forwards the trace id of the client and the use case of the call, sanitized', async () => {
+        listMock.mockResolvedValueOnce({ items: [] });
+        const apifyClient = mockApifyClient({ store: stubApifyClient.store, storeSearchTracking: TRACKING });
+        await searchAgentSafeActors({
+            keywords: 'foo',
+            apifyClient,
+            limit: 5,
+            offset: 0,
+            useCase: ' compare prices for apify_api_SECRET123 ',
+        });
+        expect(paramsHolder.params).toMatchObject({
+            _traceId: 'thread-1',
+            _useCase: 'compare prices for apify_api_***',
+        });
+    });
+
+    it('sends no use case when the call has none', async () => {
+        listMock.mockResolvedValueOnce({ items: [] });
+        const apifyClient = mockApifyClient({ store: stubApifyClient.store, storeSearchTracking: TRACKING });
+        await searchAgentSafeActors({ keywords: 'foo', apifyClient, limit: 5, offset: 0 });
+        expect(paramsHolder.params).not.toHaveProperty('_useCase');
     });
 });

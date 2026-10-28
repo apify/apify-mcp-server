@@ -22,6 +22,11 @@ Sentry.init({
     dsn: 'https://916ec26e2f0abda151403acb5d8370c7@o272833.ingest.us.sentry.io/4510662589808640',
     release: getPackageVersion() ?? undefined,
     enabled: !isTelemetryDisabled,
+    // The query string Sentry records for HTTP requests carries the Store search `_useCase`.
+    beforeBreadcrumb: (breadcrumb) => {
+        if (breadcrumb.data) delete breadcrumb.data['http.query'];
+        return breadcrumb;
+    },
 });
 
 // Start a Sentry session for this CLI invocation so crash-free rate metrics work.

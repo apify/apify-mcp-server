@@ -450,13 +450,12 @@ describe('buildDescription()', () => {
         expect(searchActors.description).not.toContain(getActorCallabilityCaveat());
     });
 
-    // Regression: #1532 — the description named apify/rag-web-browser when the session did not serve it.
-    it('names apify/rag-web-browser only when its tool is served', () => {
-        const ragClause = '— use apify/rag-web-browser instead.';
-        expect(renderDescription(HELPER_TOOLS.STORE_SEARCH, actorNameToToolName(RAG_WEB_BROWSER))).toContain(ragClause);
-        const withoutRag = renderDescription(HELPER_TOOLS.STORE_SEARCH);
-        expect(withoutRag).toContain('This tool discovers Actors; it does not retrieve their output.');
-        expect(withoutRag).not.toContain('rag-web-browser');
+    it('describes Store discovery without referring to a web tool', () => {
+        const description = renderDescription(HELPER_TOOLS.STORE_SEARCH, actorNameToToolName(RAG_WEB_BROWSER));
+
+        expect(description).toBe(renderDescription(HELPER_TOOLS.STORE_SEARCH));
+        expect(description).toContain('discovers Actors; it does not retrieve their output');
+        expect(description).not.toContain(RAG_WEB_BROWSER);
     });
 
     // Regression: #1532 — "prefer searching the Store first" sent named-Actor questions to search (evals: typo-actor-name 7/10 → 2/10).
@@ -464,5 +463,13 @@ describe('buildDescription()', () => {
         const carveOut = 'When the user names a specific Actor, look up that Actor directly instead of searching.';
         expect(searchActors.description).toContain(carveOut);
         expect(renderDescription(HELPER_TOOLS.STORE_SEARCH)).toContain(carveOut);
+    });
+
+    it('passes the use case to the Store search', async () => {
+        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+        await (searchActors as HelperTool).call(
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, useCase: 'compare prices' }, mockApifyClient()),
+        );
+        expect(searchAgentSafeActors).toHaveBeenCalledWith(expect.objectContaining({ useCase: 'compare prices' }));
     });
 });
