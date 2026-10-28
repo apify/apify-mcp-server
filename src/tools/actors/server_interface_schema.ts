@@ -44,7 +44,7 @@ export type ServerOperationInputs = {
 const MAX_ALIAS_HOPS = 16;
 
 /** Follows local parameter or request-body aliases, without expanding nested schemas. */
-function resolveRef(node: unknown, spec: unknown): unknown {
+export function resolveRef(node: unknown, spec: unknown): unknown {
     const seen = new Set<string>();
     let resolved = node;
     while (isRecord(resolved) && typeof resolved.$ref === 'string' && resolved.$ref.startsWith('#/')) {

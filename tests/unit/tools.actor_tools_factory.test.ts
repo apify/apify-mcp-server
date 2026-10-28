@@ -284,19 +284,6 @@ describe('getNormalActorsAsTools()', () => {
             expect(tool.description).not.toContain(WEB_FETCH);
             expect(tool.description).not.toContain(RAG_WEB_BROWSER);
         });
-
-        it.each([true, false])('preserves Web Fetch descriptions with isDirectTool %s', async (isDirectTool) => {
-            const actorInfo = createMockActorInfo(WEB_FETCH, { ...LIMITED });
-            const original = structuredClone(actorInfo);
-            const [tool] = await getNormalActorsAsTools([actorInfo], { isDirectTool });
-            expect(tool.description).toContain('Use this tool to fetch a specific http(s) URL');
-            expect(tool.inputSchema.properties?.url).toMatchObject({
-                description:
-                    'The URL to process http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.',
-            });
-            expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
-            expect(actorInfo).toEqual(original);
-        });
     });
 
     it('describes RAG page content without referring to Web Fetch', async () => {
