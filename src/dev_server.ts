@@ -227,8 +227,7 @@ async function serveStatelessRequest(req: Request, res: Response, taskStore: InM
                 },
             },
             {
-                // The adapter answers its own failures with a 500 and does not rethrow, so the route's catch
-                // never sees them. A safety net: the dev server has no real path that reaches it.
+                // The adapter answers a throw with its own 500 and never rethrows, so the route's catch can't log it.
                 onerror: (error) =>
                     log.exception(toPlainError(error), 'Error in request', {
                         logMessage: 'Error handling MCP request',
