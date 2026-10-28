@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
 import { ACTOR_LOAD_ERROR_KIND } from '../../src/errors.js';
@@ -15,7 +15,7 @@ import type { Actor, ServerActorToolInfo, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { mockActor, mockActorBuildClient, mockDefaultBuild } from './helpers/actor_build_client.js';
 import { makePaymentProvider } from './helpers/mcp_server.js';
-import { only, stubToolCallContext, textOf, type TextToolResult } from './helpers/tool_context.js';
+import { mockApifyClient, only, stubToolCallContext, textOf, type TextToolResult } from './helpers/tool_context.js';
 
 /** Shaped like apify/server-actor-test: query parameters, a JSON body behind a reference, and a templated path. */
 const SCHEMA = {
@@ -439,13 +439,13 @@ describe('the default apify/web-fetch tool', () => {
         expect(args).toMatchObject({ method: 'GET', path: '/' });
     });
 
-    it('describes only GET /, without unwrap', async () => {
+    it('renders only the GET / operation, without the unwrap parameter', async () => {
         const tool = await loadWebFetchTool();
 
         expect(tool.description).toContain('{"operations":[{"method":"GET","path":"/"');
         expect(tool.description).toContain('"name":"formats"');
         expect(tool.description).not.toContain('"method":"POST"');
-        expect(tool.description).not.toContain('unwrap');
+        expect(tool.description).not.toContain('"name":"unwrap"');
     });
 
     it('describes the query encodings and the URL scheme limit', async () => {
@@ -459,7 +459,19 @@ describe('the default apify/web-fetch tool', () => {
     it('rejects unwrap before sending the request', async () => {
         const tool = await loadWebFetchTool();
         if (tool.type !== TOOL_TYPE.ACTOR_SERVER) throw new Error('Expected a server tool');
-        const { apifyClient } = mockActorBuildClient({ actor: mockActor(), defaultBuild: mockDefaultBuild() });
+        // The web-fetch Actor itself, so the call would reach its server without the refusal. Every request to the
+        // Actor Server goes through `httpClient.axios.request`.
+        const request = vi.fn();
+        const { apifyClient: buildClient } = mockActorBuildClient({
+            actor: mockActor({
+                username,
+                name,
+                actorStandby: { isEnabled: true, tenancy: 'MULTI_TENANT' },
+                standbyUrl: 'https://apify--web-fetch.apify.actor',
+            }),
+            defaultBuild: mockDefaultBuild({ webServerMcpPath: undefined, webServerSchema: WEB_FETCH_SCHEMA }),
+        });
+        const apifyClient = mockApifyClient({ ...buildClient, httpClient: { axios: { request } } });
 
         const result = (await tool.call(
             stubToolCallContext(
@@ -470,6 +482,7 @@ describe('the default apify/web-fetch tool', () => {
 
         expect(result.isError).toBe(true);
         expect(textOf(result.content[0])).toContain('"unwrap" is not accepted by this tool');
+        expect(request).not.toHaveBeenCalled();
     });
 
     it('carries GET / in full within the client description limit, with the live schema and Actor description', async () => {
@@ -485,7 +498,7 @@ describe('the default apify/web-fetch tool', () => {
 
         expect(tool.description).toContain('Operations:\n```json\n{"operations":[{"method":"GET","path":"/"');
         expect(tool.description).toContain('"name":"wait"');
-        expect(tool.description.length).toBeLessThanOrEqual(CLIENT_DESCRIPTION_MAX_LENGTH);
+        expect(tool.description!.length).toBeLessThanOrEqual(CLIENT_DESCRIPTION_MAX_LENGTH);
     });
 
     it('keeps the read-only hint of the Actor', async () => {
