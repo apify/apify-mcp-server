@@ -1,20 +1,27 @@
 /**
  * The server-interface section of `fetch-actor-details`, built as the `structuredContent` object first and the
- * text from it (a header plus the object as fenced JSON), so the two cannot drift.
+ * text from it (a header plus the object as fenced JSON), so the two cannot drift. Also the operations of a
+ * selected Server Actor's own tool description (`buildServerActorToolInfo`).
  */
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
-import type { Actor, ActorTenancy } from '../../types.js';
+import type { Actor, ActorTenancy, ServerActorToolInfo } from '../../types.js';
 import { ACTOR_TENANCY } from '../../types.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { resolveActorTenancy } from '../actor_tool_naming.js';
 import type { DereferenceContext } from '../api/apify_api_spec.js';
-import { DereferenceBudgetError } from '../api/apify_api_spec.js';
-import type { ServerOperation, ServerOperationDetails, ServerOperationIndexEntry } from './server_interface_schema.js';
+import { API_METHODS, DereferenceBudgetError } from '../api/apify_api_spec.js';
+import type {
+    OperationInput,
+    ServerOperation,
+    ServerOperationDetails,
+    ServerOperationIndexEntry,
+} from './server_interface_schema.js';
 import {
     buildServerOperationDetails,
     buildServerOperationIndex,
     findServerOperation,
     formatOperationName,
+    listOperationInputs,
     listServerOperations,
 } from './server_interface_schema.js';
 
@@ -37,6 +44,15 @@ export type ServerInterfaceSection = { serverInterface?: ServerInterfaceDetails;
 
 const MAX_NAMED_OPERATIONS = 5;
 const MAX_NAMED_OPERATIONS_LENGTH = 300;
+
+/**
+ * Longest tool description a client keeps whole: Claude Code keeps the first 4,096 characters of a tool loaded
+ * upfront (https://code.claude.com/docs/en/mcp.md, "Scale with MCP tool search").
+ */
+export const CLIENT_DESCRIPTION_MAX_LENGTH = 4096;
+
+/** Inputs an operation line names in each list; the rest are counted. */
+const MAX_LISTED_INPUTS = 5;
 
 function formatOperationCount(operations: ServerOperation[]): string {
     const count = `${operations.length} documented operation${operations.length === 1 ? '' : 's'}`;
@@ -251,4 +267,102 @@ export function buildServerInterfaceDetails({
         };
     }
     return buildOperationSection(context, operation);
+}
+
+/** E.g. `q:string required, limit:integer`: required inputs first, then the others, up to `MAX_LISTED_INPUTS`. */
+function formatInputs(inputs: OperationInput[]): string {
+    const ordered = [...inputs.filter((input) => input.isRequired), ...inputs.filter((input) => !input.isRequired)];
+    const listed = ordered
+        .slice(0, MAX_LISTED_INPUTS)
+        .map(({ name, type, isRequired }) => `${name}${type ? `:${type}` : ''}${isRequired ? ' required' : ''}`);
+    const rest = ordered.length - listed.length;
+    return [...listed, ...(rest > 0 ? [`+${rest} more`] : [])].join(', ');
+}
+
+/**
+ * E.g. `- GET /search [q:string required, limit:integer]: Search the web.`, or
+ * `- POST / {url:string required, formats:array}: Fetch a URL.` for a JSON body. Any other body, such as a JSON
+ * schema that lists no properties or a form, reads `{request body}`, with `required` when it is.
+ */
+function formatOperationLine(serverOperation: ServerOperation, schema: unknown): string {
+    const { method, path, operation } = serverOperation;
+    const { parameters, requestBody } = listOperationInputs(serverOperation, schema);
+    let text = `- ${method} ${path}`;
+    if (parameters.length > 0) text += ` [${formatInputs(parameters)}]`;
+    if (requestBody) {
+        text += requestBody.properties
+            ? ` {${formatInputs(requestBody.properties)}}`
+            : ` {request body${requestBody.isRequired ? ' required' : ''}}`;
+    }
+    const { summary } = operation;
+    if (typeof summary === 'string' && summary) text += `: ${summary}${/[.!?]$/.test(summary) ? '' : '.'}`;
+    return text;
+}
+
+/**
+ * The first lines of `count` operation lines within `maxLength`; when not all fit, the lines that do, then
+ * `… and N more`. The cut line is kept even when no line fits.
+ */
+function cutOperationLines(lines: readonly string[], count: number, maxLength: number): string {
+    const index = lines.join('\n');
+    if (lines.length === count && index.length <= maxLength) return index;
+    // Room for the cut line with the largest count it can show.
+    let length = `… and ${count} more`.length;
+    const kept: string[] = [];
+    for (const line of lines) {
+        length += line.length + 1;
+        if (length > maxLength) break;
+        kept.push(line);
+    }
+    return [...kept, `… and ${count - kept.length} more`].join('\n');
+}
+
+/**
+ * What a selected Server Actor's tool is built from; `undefined` for a schema with no operation. Only what can fit
+ * `CLIENT_DESCRIPTION_MAX_LENGTH` is kept: the `serverInterface: true` rendering, and the first operation lines
+ * (`formatOperationLine`).
+ */
+export function buildServerActorToolInfo(schema: unknown, actorFullName: string): ServerActorToolInfo | undefined {
+    const operations = listServerOperations(schema);
+    if (operations.length === 0) return undefined;
+    // A character takes at most 4 UTF-8 bytes, and the reference budget counts bytes.
+    const full = formatDereferencedJson(
+        schema,
+        (context) => ({ operations: operations.map((operation) => buildServerOperationDetails(operation, context)) }),
+        CLIENT_DESCRIPTION_MAX_LENGTH * 4,
+    )?.json;
+    const operationLines: string[] = [];
+    let length = 0;
+    for (const operation of operations) {
+        const line = formatOperationLine(operation, schema);
+        length += line.length + 1;
+        if (length > CLIENT_DESCRIPTION_MAX_LENGTH) break;
+        operationLines.push(line);
+    }
+    return {
+        methods: API_METHODS.filter((apiMethod) => operations.some((operation) => operation.method === apiMethod)),
+        paths: [...new Set(operations.map((operation) => operation.path))],
+        hasRequestBody: operations.some((operation) => listOperationInputs(operation, schema).requestBody?.isJson),
+        ...(full !== undefined && full.length <= CLIENT_DESCRIPTION_MAX_LENGTH && { fullOperations: full }),
+        operationLines,
+        operationCount: operations.length,
+        detailsHint: `${formatDetailsCall(actorFullName, formatOperationName(operations[0]))} returns one operation in full.`,
+    };
+}
+
+/**
+ * A selected Server Actor's tool description, `head` followed by its operations, within
+ * `CLIENT_DESCRIPTION_MAX_LENGTH`: every operation in full when the whole description fits, otherwise one line per
+ * operation, cut with `… and N more`, then `detailsHint`.
+ */
+export function buildServerActorToolDescription(
+    head: string,
+    { fullOperations, operationLines, operationCount }: ServerActorToolInfo,
+    detailsHint: string | undefined,
+): string {
+    const full = fullOperations && `${head}${fullOperations}`;
+    if (full && full.length <= CLIENT_DESCRIPTION_MAX_LENGTH) return full;
+    const tail = detailsHint ? `\n${detailsHint}` : '';
+    const room = CLIENT_DESCRIPTION_MAX_LENGTH - head.length - tail.length;
+    return `${head}${cutOperationLines(operationLines, operationCount, room)}${tail}`;
 }
