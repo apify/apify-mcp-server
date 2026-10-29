@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.20.1 - **not yet released**
+
+### 🚀 Features
+
+- Return rendered operations from fetch-actor-details ([#1737](https://github.com/apify/apify-mcp-server/pull/1737)) ([718f02f](https://github.com/apify/apify-mcp-server/commit/718f02ffbc774a195c2cb607a73334f78d996eac)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#1620](https://github.com/apify/apify-mcp-server/issues/1620), [#1736](https://github.com/apify/apify-mcp-server/issues/1736)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.20.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.20.0) (2026-10-29)
 
 ### 🚀 Features
