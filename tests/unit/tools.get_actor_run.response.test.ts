@@ -843,7 +843,16 @@ describe('get-actor-run default response', () => {
         expect(content[1].text).toContain(`Use a different Actor.\n\`\`\`\n${ACTOR_TIP_CAVEAT}`);
     });
 
-    it('omits the callability caveat when call-actor-widget can run the recommended Actor', async () => {
+    it.each([
+        {
+            loaded: 'call-actor-widget',
+            context: { loadedToolNames: [HELPER_TOOLS.ACTOR_CALL_WIDGET, HELPER_TOOLS.ACTOR_RUNS_GET] },
+        },
+        {
+            loaded: "the recommended Actor's own tool",
+            context: { loadedToolNames: [HELPER_TOOLS.ACTOR_RUNS_GET], loadedActorIds: ['shu8hvrXbJbY3Eb9W'] },
+        },
+    ])('omits the callability caveat when $loaded is loaded', async ({ context }) => {
         const { client } = makeKvStoreClient({
             displayedKeys: [{ key: 'TIP' }],
             tipRecordValue: {
@@ -854,9 +863,7 @@ describe('get-actor-run default response', () => {
         });
 
         const result = await (getActorRun as HelperTool).call(
-            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client), {
-                loadedToolNames: [HELPER_TOOLS.ACTOR_CALL_WIDGET, HELPER_TOOLS.ACTOR_RUNS_GET],
-            }),
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client), context),
         );
         const { content, structuredContent } = result as {
             content: { type: string; text: string }[];
@@ -865,27 +872,6 @@ describe('get-actor-run default response', () => {
 
         expect(structuredContent.tip).not.toHaveProperty('caveat');
         expect(content[1].text).not.toContain(ACTOR_TIP_CAVEAT);
-    });
-
-    it("omits the callability caveat when the recommended Actor's own tool is loaded", async () => {
-        const { client } = makeKvStoreClient({
-            displayedKeys: [{ key: 'TIP' }],
-            tipRecordValue: {
-                message: 'Use a different Actor.',
-                level: 'info',
-                recommendedActorId: 'shu8hvrXbJbY3Eb9W',
-            },
-        });
-
-        const result = await (getActorRun as HelperTool).call(
-            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, makeRunClient(client), {
-                loadedToolNames: [HELPER_TOOLS.ACTOR_RUNS_GET],
-                loadedActorIds: ['shu8hvrXbJbY3Eb9W'],
-            }),
-        );
-        const { structuredContent } = result as { structuredContent: RunResponse };
-
-        expect(structuredContent.tip).not.toHaveProperty('caveat');
     });
 
     it('renders the tip in a fenced code block in the text response', async () => {
