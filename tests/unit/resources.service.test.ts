@@ -169,6 +169,20 @@ describe('createResourceService()', () => {
             expect(firstContent(result).html).toContain('<script type="module">console.log("widget");</script>');
         });
 
+        it('throws InternalError without the server path when the widget file is missing on disk', async () => {
+            const widget = buildAvailableWidget(WIDGET_URIS.SEARCH_ACTORS, false);
+            const service = createResourceService({
+                getMode: () => 'apps',
+                getAvailableWidgets: () => new Map([[WIDGET_URIS.SEARCH_ACTORS, widget]]),
+            });
+
+            const error = await service.readResource(WIDGET_URIS.SEARCH_ACTORS).catch((e: unknown) => e);
+
+            expect(error).toBeInstanceOf(InternalError);
+            expect((error as InternalError).data).toEqual({ uri: WIDGET_URIS.SEARCH_ACTORS });
+            expect((error as InternalError).message).not.toContain(widget.jsPath);
+        });
+
         it('throws InternalError without the server path when the widget file cannot be read', async () => {
             const fs = await import('node:fs');
             const widget = buildAvailableWidget(WIDGET_URIS.SEARCH_ACTORS, true);
