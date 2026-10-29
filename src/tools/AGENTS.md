@@ -118,9 +118,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).
   - `searchActorsBaseArgsSchema` has an optional `useCase` (Store search context). `withoutUseCaseField` in `utils/tools_loader.ts` removes it from the served schema; `ActorsMcpServer.composeToolsForClient` applies that for clients `isStoreUseCaseServable` does not allow. The call passes it to `searchAgentSafeActors`, which sanitizes it.
-- `../utils/apify_resource_id.ts` holds the helpers that resolve an Actor, task, or schedule given by ID or
-  name, where a name alone means one of the caller's own. The task, schedule, and versions tools use them,
-  and so do `build-actor` and the `actorId` filter of `get-actor-build-list` and `get-actor-run-list`.
+- `../utils/apify_resource_id.ts` holds the helpers that resolve an Actor, task, schedule, or storage given by
+  ID or name, where a name alone means one of the caller's own. The task, schedule, and versions tools use them,
+  and so do `build-actor` and the `actorId` filter of `get-actor-build-list` and `get-actor-run-list`. The
+  dataset and key-value store tools reach them through `fetchStorageByIdOrName` in `storage/storage_helpers.ts`.
 
 ## Rules when editing here
 

@@ -1,4 +1,5 @@
 import { HELPER_TOOLS, HTTP_NOT_FOUND, MAX_INLINE_BYTES } from '../../const.js';
+import { getResourceByIdOrName, isAmbiguousResourceId } from '../../utils/apify_resource_id.js';
 import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
@@ -22,6 +23,51 @@ export async function catchNotFound<T>(promise: Promise<T>): Promise<T | null> {
         }
         throw err;
     }
+}
+
+/**
+ * Runs `fetch` against a storage given by ID, name, or `username~name`, where a name alone means one of
+ * the caller's own (see `getResourceByIdOrName`), and reads a 404 as a miss. Returns the result with the
+ * API-safe id it was found under, or `undefined` when there is no such storage.
+ */
+export async function fetchStorageByIdOrName<T>(
+    idOrName: string,
+    fetch: (safeId: string) => Promise<T | undefined>,
+): Promise<{ result: T; safeId: string } | undefined> {
+    return getResourceByIdOrName(idOrName, async (safeId) => {
+        const result = (await catchNotFound(fetch(safeId))) ?? undefined;
+        return result === undefined ? undefined : { result, safeId };
+    });
+}
+
+/**
+ * The storage's ID, for URLs that do not resolve a name: Console pages, and public record links, which
+ * an anonymous `~name` cannot reach. A hit under an ID-shaped safe id was an ID; any other is read back
+ * once through `get`.
+ */
+export async function resolveStorageId(
+    safeId: string,
+    get: (safeId: string) => Promise<{ id: string } | undefined>,
+): Promise<string> {
+    if (isAmbiguousResourceId(safeId)) return safeId;
+    return (await get(safeId))?.id ?? safeId;
+}
+
+const STORAGE_ARG = {
+    dataset: { noun: 'Dataset', arg: 'datasetId', plural: 'datasets' },
+    keyValueStore: { noun: 'Key-value store', arg: 'keyValueStoreId', plural: 'key-value stores' },
+} as const;
+
+/** The `describe()` text of a storage id argument. */
+export function storageIdArgDescription(kind: keyof typeof STORAGE_ARG): string {
+    const { noun, plural } = STORAGE_ARG[kind];
+    return `${noun} ID, name (resolved against your own ${plural}), or full name as username~name.`;
+}
+
+/** The not-found error for a storage id argument, naming the forms it takes. */
+export function storageNotFoundText(kind: keyof typeof STORAGE_ARG, idOrName: string): string {
+    const { noun, arg, plural } = STORAGE_ARG[kind];
+    return `${noun} '${idOrName}' not found. The ${arg} argument takes an ID, a name (resolved against your own ${plural}), or a full name as username~name.`;
 }
 
 function suggestTool(toolName: string, loadedToolNames: readonly string[]): string | undefined {
