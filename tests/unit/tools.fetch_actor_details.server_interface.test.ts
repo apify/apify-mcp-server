@@ -12,8 +12,9 @@ const STANDBY_URL = 'https://server-actor-test.apify.actor';
 const DETAILS = `${HELPER_TOOLS.ACTOR_GET_DETAILS} with {"actor":"${ACTOR_FULL_NAME}","output":`;
 const SUMMARY = 'Server interface: enabled, single-tenant, 3 documented operations: GET /add, POST /add, GET /empty.';
 const LISTS_THEM = `${DETAILS}{"serverInterface":true}} lists them.`;
+const SIZE_ERROR = `Actor '${ACTOR_FULL_NAME}' server-interface output exceeds the ${MAX_INLINE_BYTES}-byte limit and was not returned. A smaller operation may fit.`;
 
-/** The fixture's schema shapes: parameter, request body and response references, like apify/web-fetch's `FetchRequest`. */
+/** The fixture's schema shapes: parameter, request body and response references. */
 const SCHEMA: Record<string, unknown> = {
     openapi: '3.0.0',
     info: { title: 'Server Actor test', version: '1' },
@@ -45,12 +46,104 @@ const SCHEMA: Record<string, unknown> = {
     components: {
         schemas: {
             AddRequest: { type: 'object', properties: { firstNumber: { type: 'integer' } }, required: ['firstNumber'] },
-            'Forbidden/~': false,
         },
         parameters: { AsText: { name: 'asText', in: 'query', required: false, schema: { type: 'boolean' } } },
         responses: { Add: { description: 'The sum.' } },
     },
 };
+
+const WEB_FETCH = 'apify/web-fetch';
+
+/** Shaped like apify/web-fetch's schema: query parameters that reference properties of the body schema, and examples. */
+const WEB_FETCH_SCHEMA: Record<string, unknown> = {
+    openapi: '3.0.0',
+    info: { title: 'Web Fetch API', version: '0.1' },
+    servers: [{ url: 'https://web-fetch.apify.actor' }],
+    paths: {
+        '/': {
+            get: {
+                summary: 'Fetch a URL',
+                description: 'Fetches the resource at the URL.',
+                'x-codegen-name': 'fetchGet',
+                parameters: [
+                    {
+                        name: 'url',
+                        in: 'query',
+                        required: true,
+                        schema: { $ref: '#/components/schemas/FetchRequest/properties/url' },
+                        example: 'https://apify.com',
+                    },
+                    {
+                        name: 'formats',
+                        in: 'query',
+                        schema: { $ref: '#/components/schemas/FetchRequest/properties/formats' },
+                    },
+                    // The send tool sends no headers.
+                    { name: 'X-Trace', in: 'header', schema: { type: 'string' } },
+                ],
+                responses: { '200': { $ref: '#/components/responses/FetchSuccess' } },
+            },
+            post: {
+                summary: 'Fetch a URL',
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: { $ref: '#/components/schemas/FetchRequest' },
+                            example: { url: 'https://apify.com', formats: ['markdown'] },
+                            examples: { html: { value: { url: 'https://apify.com', formats: ['html'] } } },
+                        },
+                    },
+                },
+                responses: { '200': { $ref: '#/components/responses/FetchSuccess' } },
+            },
+        },
+    },
+    components: {
+        schemas: {
+            FetchRequest: {
+                type: 'object',
+                required: ['url'],
+                properties: {
+                    url: { type: 'string', format: 'uri-reference', example: 'https://apify.com' },
+                    formats: { type: 'array', items: { $ref: '#/components/schemas/Format' }, 'x-order': 2 },
+                },
+            },
+            Format: { type: 'string', enum: ['markdown', 'html'] },
+        },
+        responses: { FetchSuccess: { description: 'The fetched content.' } },
+    },
+};
+
+const URL_SCHEMA = { type: 'string', format: 'uri-reference', example: 'https://apify.com' };
+const FORMATS_SCHEMA = { type: 'array', items: { type: 'string', enum: ['markdown', 'html'] } };
+
+/** WEB_FETCH_SCHEMA in the get-apify-api-details shape: references inlined, examples kept, no responses or extensions. */
+const WEB_FETCH_OPERATIONS = [
+    {
+        method: 'GET',
+        path: '/',
+        summary: 'Fetch a URL',
+        description: 'Fetches the resource at the URL.',
+        parameters: [
+            { name: 'url', in: 'query', isRequired: true, schema: URL_SCHEMA, example: 'https://apify.com' },
+            { name: 'formats', in: 'query', isRequired: false, schema: FORMATS_SCHEMA },
+        ],
+    },
+    {
+        // The schema gives no description, so the operation has none.
+        method: 'POST',
+        path: '/',
+        summary: 'Fetch a URL',
+        parameters: [],
+        requestBody: {
+            isRequired: true,
+            schema: { type: 'object', required: ['url'], properties: { url: URL_SCHEMA, formats: FORMATS_SCHEMA } },
+            example: { url: 'https://apify.com', formats: ['markdown'] },
+            examples: { html: { value: { url: 'https://apify.com', formats: ['html'] } } },
+        },
+    },
+];
 
 function serverActor(overrides: Partial<Actor> = {}): Pick<Actor, 'actorStandby' | 'standbyUrl'> {
     return {
@@ -60,7 +153,17 @@ function serverActor(overrides: Partial<Actor> = {}): Pick<Actor, 'actorStandby'
     };
 }
 
+const MULTI_TENANT_ACTOR = serverActor({
+    actorStandby: { isEnabled: true, tenancy: 'MULTI_TENANT', idleTimeoutSecs: 300 },
+});
+
 const required = (name: string) => ({ name, in: 'query', required: true });
+
+/** SCHEMA with a description on GET /empty, which the operations in full carry and the index does not. */
+function withDescriptionOnEmpty(description: string): Record<string, unknown> {
+    const paths = SCHEMA.paths as Record<string, unknown>;
+    return { ...SCHEMA, paths: { ...paths, '/empty': { get: { summary: 'Return no content', description } } } };
+}
 
 function build(params: Partial<Parameters<typeof buildServerInterfaceText>[0]> = {}) {
     return buildServerInterfaceText({
@@ -82,6 +185,7 @@ function textOfBuild(params: Partial<Parameters<typeof buildServerInterfaceText>
 
 /** Parses the fenced JSON block a text ends with. */
 function parseJsonBlock(text: string) {
+    expect(text.endsWith('\n```')).toBe(true);
     return JSON.parse(text.slice(text.indexOf('```json\n') + '```json\n'.length, text.lastIndexOf('\n```')));
 }
 
@@ -121,23 +225,100 @@ describe('summarizing a server interface in one line', () => {
     });
 });
 
-describe('the operation list', () => {
-    it('lists each operation with its summary and required inputs, the calls to use, and the full schema', () => {
-        const text = textOfBuild();
+describe('the operations in full', () => {
+    it('returns the header, the call to send, and every operation in the get-apify-api-details shape', () => {
+        const text = textOfBuild({ actor: MULTI_TENANT_ACTOR, actorFullName: WEB_FETCH, schema: WEB_FETCH_SCHEMA });
 
         expect(text.slice(0, text.indexOf('```json'))).toBe(
+            `# Server interface of ${WEB_FETCH}\n` +
+                'multi-tenant: requests are charged per event and start no run in your account.\n' +
+                `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends a request to one of them: {"actor":"${WEB_FETCH}","method":"GET","path":"/"}\n` +
+                'Operations (2):\n',
+        );
+        expect(parseJsonBlock(text)).toEqual({ operations: WEB_FETCH_OPERATIONS });
+    });
+
+    it('merges path-level parameters, an operation parameter replacing the one with the same name', () => {
+        const schema = {
+            paths: {
+                '/search': {
+                    parameters: [
+                        { $ref: '#/components/parameters/Query' },
+                        { name: 'limit', in: 'query', schema: { type: 'integer' } },
+                    ],
+                    get: { parameters: [{ name: 'q', in: 'query', description: 'Search terms.' }] },
+                },
+            },
+            components: { parameters: { Query: required('q') } },
+        };
+
+        expect(parseJsonBlock(textOfBuild({ schema })).operations[0].parameters).toEqual([
+            { name: 'q', in: 'query', isRequired: false, description: 'Search terms.' },
+            { name: 'limit', in: 'query', isRequired: false, schema: { type: 'integer' } },
+        ]);
+    });
+
+    const formBody = { required: true, content: { 'multipart/form-data': { schema: { type: 'object' } } } };
+    // The index says the body is required, so the full rendering must show it, though it has no JSON schema.
+    it.each([
+        ['inline', formBody, {}],
+        ['through a reference', { $ref: '#/components/requestBodies/Upload' }, { Upload: formBody }],
+    ])('shows the content types of a request body that is not JSON, %s', (_label, requestBody, requestBodies) => {
+        const schema = { paths: { '/upload': { post: { requestBody } } }, components: { requestBodies } };
+
+        expect(parseJsonBlock(textOfBuild({ schema })).operations[0].requestBody).toEqual({
+            isRequired: true,
+            contentTypes: ['multipart/form-data'],
+        });
+    });
+
+    it('says requests are not supported, without the send tool or run cost, in agentic payment mode', () => {
+        const text = textOfBuild({ hasPaymentProvider: true });
+
+        expect(text).toContain('Requests to a server interface are not supported in agentic payment mode.\n');
+        expect(text).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
+        expect(text).not.toContain('starts a run');
+    });
+
+    it("gives the Actor's standby URL as the base URL instead of the send tool when the session lacks it", () => {
+        const text = textOfBuild({ loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS] });
+
+        expect(text).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
+        expect(text).toContain(`Base URL: ${STANDBY_URL}`);
+        expect(text).not.toContain('example-server-actor');
+    });
+
+    // At the limit the operations fit in full; one byte over, the text is the index.
+    it.each([0, 1])('counts the whole text against the byte limit, %i byte over', (over) => {
+        const fullBytes = Buffer.byteLength(textOfBuild({ schema: withDescriptionOnEmpty('') }));
+
+        const text = textOfBuild({ schema: withDescriptionOnEmpty('a'.repeat(MAX_INLINE_BYTES - fullBytes + over)) });
+
+        expect(text.includes('```json')).toBe(over === 0);
+        expect(text.includes('- POST /add')).toBe(over === 1);
+    });
+
+    it('counts UTF-8 bytes, not characters, against the byte limit', () => {
+        const text = textOfBuild({ schema: withDescriptionOnEmpty('漢'.repeat(Math.ceil(MAX_INLINE_BYTES / 3))) });
+
+        expect(text).not.toContain('```json');
+        expect(text).toContain('- POST /add');
+    });
+});
+
+describe('the operation index, when the operations in full exceed the byte limit', () => {
+    it('lists each operation with its summary and required inputs, and the call that returns one in full', () => {
+        expect(textOfBuild({ schema: withDescriptionOnEmpty('a'.repeat(MAX_INLINE_BYTES)) })).toBe(
             `# Server interface of ${ACTOR_FULL_NAME}\n` +
                 'single-tenant: the first request starts a run in your account, kept for its idle timeout of 300 s.\n' +
+                `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends a request to one of them: {"actor":"${ACTOR_FULL_NAME}","method":"GET","path":"/add"}\n` +
                 'Operations (3):\n' +
                 '- GET /add: Add two numbers (query). Required: firstNumber.\n' +
                 '- POST /add: Add two numbers (JSON body). Required: request body.\n' +
                 '- GET /empty: Return no content\n' +
-                `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends a request to one of them: {"actor":"${ACTOR_FULL_NAME}","method":"GET","path":"/add"}\n` +
-                `${DETAILS}{"serverInterface":"GET /add"}} returns one operation excerpt.\n` +
-                `References are not expanded or fetched. ${DETAILS}{"serverInterface":"#/components/schemas/Name"}} returns the raw node at a local JSON pointer. The schema's servers are not used.\n` +
-                'Full API schema:\n',
+                `The operations in full exceed the ${MAX_INLINE_BYTES}-byte limit. ` +
+                `${DETAILS}{"serverInterface":"GET /add"}} returns one operation in full.`,
         );
-        expect(parseJsonBlock(text)).toEqual(SCHEMA);
     });
 
     const chain: Record<string, unknown> = { P100: required('deep') };
@@ -179,142 +360,117 @@ describe('the operation list', () => {
             ' Required: q.\n',
         ],
     ])('%s', (_label, get, parameters, line) => {
+        const description = 'a'.repeat(MAX_INLINE_BYTES);
         const schema = {
-            paths: { '/search': { parameters: [{ $ref: '#/components/parameters/Alias' }], get } },
+            paths: {
+                '/search': { parameters: [{ $ref: '#/components/parameters/Alias' }], get: { ...get, description } },
+            },
             components: { parameters },
         };
 
         expect(textOfBuild({ schema })).toContain(`- GET /search${line}`);
     });
 
-    it('says requests are not supported, without the send tool or run cost, in agentic payment mode', () => {
-        const text = textOfBuild({ hasPaymentProvider: true });
-
-        expect(text).toContain('Requests to a server interface are not supported in agentic payment mode.\n');
-        expect(text).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
-        expect(text).not.toContain('starts a run');
-    });
-
-    it("gives the Actor's standby URL as the base URL instead of the send tool when the session lacks it", () => {
-        const text = textOfBuild({ loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS] });
-
-        expect(text).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
-        expect(text).toContain(`Base URL: ${STANDBY_URL}`);
-        expect(text.slice(0, text.indexOf('```json'))).not.toContain('example-server-actor');
-    });
-
-    it('explains the cost of a multi-tenant Actor', () => {
-        const actor = serverActor({ actorStandby: { isEnabled: true, tenancy: 'MULTI_TENANT', idleTimeoutSecs: 300 } });
-
-        expect(textOfBuild({ actor })).toContain(
-            'multi-tenant: requests are charged per event and start no run in your account.',
+    it('cuts the index at the byte limit and counts the operations left out', () => {
+        const count = 1000;
+        const paths = Object.fromEntries(
+            Array.from({ length: count }, (_, i) => [`/${String(i).padStart(4, '0')}${'a'.repeat(300)}`, { get: {} }]),
         );
+
+        const text = textOfBuild({ schema: { paths } });
+
+        const lines = text.split('\n').filter((line) => line.startsWith('- GET /'));
+        expect(text).toContain(`${lines.at(-1)}\n… and ${count - lines.length} more\n`);
+        expect(text.endsWith('returns one operation in full.')).toBe(true);
+        // No room is left for one more line.
+        expect(Buffer.byteLength(text)).toBeLessThanOrEqual(MAX_INLINE_BYTES);
+        expect(Buffer.byteLength(text) + Buffer.byteLength(`${lines[0]}\n`)).toBeGreaterThan(MAX_INLINE_BYTES);
+    });
+});
+
+/** A schema whose POST /nested body has the JSON media type object `media`, with `schemas` as its components. */
+function nestedBodySchema(media: Record<string, unknown>, schemas: Record<string, unknown> = {}) {
+    const requestBody = { required: true, content: { 'application/json': media } };
+    return { paths: { '/nested': { post: { summary: 'Nest', requestBody } } }, components: { schemas } };
+}
+
+// Each level references the next ten times: 10^30 nodes in full.
+const exponentialSchemas: Record<string, unknown> = { L30: { type: 'string' } };
+for (let level = 0; level < 30; level++) {
+    const properties = Array.from({ length: 10 }, (_, i) => [`p${i}`, { $ref: `#/components/schemas/L${level + 1}` }]);
+    exponentialSchemas[`L${level}`] = { type: 'object', properties: Object.fromEntries(properties) };
+}
+// 3000 distinct references, each to the next.
+const chainSchemas: Record<string, unknown> = { C3000: { type: 'string' } };
+for (let i = 0; i < 3000; i++) chainSchemas[`C${i}`] = { $ref: `#/components/schemas/C${i + 1}` };
+// 5000 levels of inline nesting, no references.
+let deepSchema: unknown = { type: 'string' };
+for (let i = 0; i < 5000; i++) deepSchema = { type: 'array', items: deepSchema };
+// 60000 levels: deeper than JSON.stringify can serialize on Node.js 24, and over the byte limit on Node.js 26, which can.
+let deepValue: unknown = 'leaf';
+for (let i = 0; i < 60000; i++) deepValue = { a: deepValue };
+
+// Without a bound, rendering would not finish or would overflow the stack.
+describe.each([
+    [
+        'references that expand exponentially',
+        nestedBodySchema({ schema: { $ref: '#/components/schemas/L0' } }, exponentialSchemas),
+    ],
+    ['a long reference chain', nestedBodySchema({ schema: { $ref: '#/components/schemas/C0' } }, chainSchemas)],
+    ['deep inline nesting', nestedBodySchema({ schema: deepSchema })],
+    [
+        'a reference to deep inline nesting',
+        nestedBodySchema({ schema: { $ref: '#/components/schemas/Deep' } }, { Deep: deepValue }),
+    ],
+    ['a deeply nested example', nestedBodySchema({ schema: { type: 'object' }, example: deepValue })],
+])('a schema with %s', (_label, schema) => {
+    it('falls back to the index for all operations', () => {
+        expect(textOfBuild({ schema })).toContain(
+            '- POST /nested: Nest. Required: request body.\nThe operations in full',
+        );
+    });
+
+    it('is a size error for one operation', () => {
+        expect(build({ schema, serverInterface: 'POST /nested' })).toEqual({ error: SIZE_ERROR });
     });
 });
 
 describe('one operation', () => {
-    it('returns the selected operation, of any method case, with raw references and navigation', () => {
-        const text = textOfBuild({ serverInterface: 'get /add' });
+    it('returns the selected operation, of any method case, in full', () => {
+        const text = textOfBuild({
+            actor: MULTI_TENANT_ACTOR,
+            actorFullName: WEB_FETCH,
+            schema: WEB_FETCH_SCHEMA,
+            serverInterface: 'post /',
+        });
 
-        expect(text).toContain(`# Server interface of ${ACTOR_FULL_NAME}: GET /add\nAdd two numbers (query)`);
-        expect(text).toContain(
-            `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends this request: ` +
-                `{"actor":"${ACTOR_FULL_NAME}","method":"GET","path":"/add"}`,
+        expect(text.slice(0, text.indexOf('```json'))).toBe(
+            `# Server interface of ${WEB_FETCH}: POST /\n` +
+                'multi-tenant: requests are charged per event and start no run in your account.\n' +
+                `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends this request: {"actor":"${WEB_FETCH}","method":"POST","path":"/"}\n`,
         );
-        expect(text).toContain('Components are omitted');
-        expect(text).toContain('"serverInterface":"#/components/schemas/Name"');
-        expect(parseJsonBlock(text)).toEqual({
-            openapi: '3.0.0',
-            operation: (SCHEMA.paths as Record<string, Record<string, unknown>>)['/add'].get,
+        expect(parseJsonBlock(text)).toEqual(WEB_FETCH_OPERATIONS[1]);
+    });
+
+    it('returns an operation when all operations together exceed the byte limit', () => {
+        const text = textOfBuild({
+            schema: withDescriptionOnEmpty('a'.repeat(MAX_INLINE_BYTES)),
+            serverInterface: 'POST /add',
         });
-    });
 
-    it('keeps an operation navigable when unrelated schema detail is too large', () => {
-        const schema = { ...SCHEMA, description: 'a'.repeat(MAX_INLINE_BYTES) };
-
-        const text = textOfBuild({ schema, serverInterface: 'POST /add' });
-
-        expect(parseJsonBlock(text).operation.requestBody.content['application/json'].schema).toEqual({
-            $ref: '#/components/schemas/AddRequest',
-        });
-        expect(text).not.toContain('a'.repeat(100));
-    });
-
-    it('preserves inherited parameters and security context in an operation excerpt', () => {
-        const schema = {
-            openapi: '3.1.0',
-            jsonSchemaDialect: 'https://json-schema.org/draft/2020-12/schema',
-            security: [{ ActorKey: [] }],
-            paths: { '/search': { parameters: [required('q')], get: {} } },
-        };
-
-        expect(parseJsonBlock(textOfBuild({ schema, serverInterface: 'GET /search' }))).toEqual({
-            ...schema,
-            paths: undefined,
-            operation: { parameters: [required('q')] },
-        });
-    });
-});
-
-describe('the full schema', () => {
-    it('leaves reference siblings, examples, and extensions unchanged', () => {
-        const schema = {
-            ...SCHEMA,
-            components: {
-                schemas: {
-                    Text: { $ref: '#/components/schemas/Node', maxLength: 10, examples: ['Apify'], 'x-name': 'Text' },
-                    Node: { $ref: '#/components/schemas/Node' },
-                    External: { $ref: 'https://example.com/schema.json' },
-                },
-            },
-        };
-        const original = structuredClone(schema);
-
-        expect(parseJsonBlock(textOfBuild({ schema }))).toEqual(original);
-        expect(schema).toEqual(original);
-    });
-
-    // At the limit the full schema fits; one byte over, guidance included, it is left out.
-    it.each([0, 1])('counts the whole text against the byte limit, %i byte over', (over) => {
-        const schema = { ...SCHEMA, description: '' };
-        schema.description = 'a'.repeat(MAX_INLINE_BYTES - Buffer.byteLength(textOfBuild({ schema })) + over);
-
-        const text = textOfBuild({ schema });
-
-        expect(text.includes(JSON.stringify(schema))).toBe(over === 0);
-        expect(text.includes(`Full API schema omitted: exceeds the ${MAX_INLINE_BYTES}-byte limit`)).toBe(over === 1);
-    });
-
-    it('falls back to operation navigation when the full schema exceeds the UTF-8 byte cap', () => {
-        const text = textOfBuild({ schema: { ...SCHEMA, description: '漢'.repeat(Math.ceil(MAX_INLINE_BYTES / 3)) } });
-
-        expect(text).toContain('Full API schema omitted');
-        expect(text).toContain('- POST /add');
-        expect(text).not.toContain('```json');
-        expect(Buffer.byteLength(text)).toBeLessThanOrEqual(MAX_INLINE_BYTES);
-    });
-
-    it.each([
-        [
-            '#/components/schemas/AddRequest',
+        expect(parseJsonBlock(text).requestBody.schema).toEqual(
             (SCHEMA.components as Record<string, Record<string, unknown>>).schemas.AddRequest,
-        ],
-        ['#/components/schemas/Forbidden~1~0', false],
-    ])('returns the raw node at %j', (serverInterface, node) => {
-        expect(parseJsonBlock(textOfBuild({ serverInterface }))).toEqual(node);
+        );
     });
 });
 
 describe('a selection that cannot be returned', () => {
-    // `constructor` is inherited by every object; only the schema's own keys are nodes.
+    const unknown = `3 documented operations: GET /add, POST /add, GET /empty. ${LISTS_THEM}`;
     it.each([
-        [
-            'GET /nope',
-            `has no operation "GET /nope". 3 documented operations: GET /add, POST /add, GET /empty. ${LISTS_THEM}`,
-        ],
-        ['add', `has no operation "add". 3 documented operations: GET /add, POST /add, GET /empty. ${LISTS_THEM}`],
-        ['#/components/schemas/Missing', 'has no schema node at "#/components/schemas/Missing".'],
-        ['#/components/schemas/constructor', 'has no schema node at "#/components/schemas/constructor".'],
+        ['GET /nope', `has no operation "GET /nope". ${unknown}`],
+        ['add', `has no operation "add". ${unknown}`],
+        // The JSON pointer form is gone: a pointer is an unknown operation.
+        ['#/components/schemas/AddRequest', `has no operation "#/components/schemas/AddRequest". ${unknown}`],
     ])('is an error for %j', (serverInterface, error) => {
         expect(build({ serverInterface })).toEqual({ error: `Actor '${ACTOR_FULL_NAME}' ${error}` });
     });
@@ -327,20 +483,11 @@ describe('a selection that cannot be returned', () => {
         });
     });
 
-    it.each([true, 'GET /search', '#/components/schemas/Huge'])(
-        'is a size error, no partial JSON, for %j',
-        (serverInterface) => {
-            const huge = 'a'.repeat(MAX_INLINE_BYTES);
-            const schema = {
-                paths: { '/search': { get: { summary: huge } } },
-                components: { schemas: { Huge: { huge } } },
-            };
+    it('is a size error, no partial JSON, for one operation over the byte limit', () => {
+        const schema = { paths: { '/search': { get: { summary: 'a'.repeat(MAX_INLINE_BYTES) } } } };
 
-            expect(build({ schema, serverInterface })).toEqual({
-                error: `Actor '${ACTOR_FULL_NAME}' server-interface output exceeds the ${MAX_INLINE_BYTES}-byte limit and was not returned. A smaller operation or schema node may fit.`,
-            });
-        },
-    );
+        expect(build({ schema, serverInterface: 'GET /search' })).toEqual({ error: SIZE_ERROR });
+    });
 });
 
 describe('the tool description', () => {

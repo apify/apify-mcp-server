@@ -452,7 +452,7 @@ export async function executeSendServerActorRequest(
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
     const details = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
-        ? ` ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface lists the documented operations.`
+        ? ` ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface returns the documented operations with their parameters.`
         : '';
     return dedent`
         Send one HTTP request to an Actor Server: the HTTP API of a Server Actor, documented in its API schema (OpenAPI) and README.${details}
