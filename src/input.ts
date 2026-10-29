@@ -20,34 +20,18 @@ export function normalizeList(value: string | unknown[] | undefined): string[] |
 }
 
 /**
- * Normalize user-provided input into a canonical `Input`.
- *
- * Responsibilities:
- * - Coerce `actors`, `tools` from string/array into trimmed arrays ('' → []).
- * - Merge `actors` into `tools` so selection lives in one place.
- *
- * Semantics passed to the loader:
- * - `undefined` → use defaults; `[]` → explicitly none.
+ * Canonicalize `actors` and `tools` into trimmed arrays and merge `actors` into `tools`, so the
+ * loader reads one selector list. `undefined` keeps the defaults, `[]` means explicitly none.
  */
 export function processInput(originalInput: Partial<Input>): Input {
-    // Normalize actors (strings and arrays) to a clean array or undefined
     const actors = normalizeList(originalInput.actors);
-
-    // Normalize tools (strings/arrays) to a clean array or undefined
     let tools = normalizeList(originalInput.tools);
 
-    // Merge actors into tools. If tools undefined → tools = actors, then remove actors;
-    // otherwise append actors to tools.
-    // NOTE (future): Actor names contain '/', unlike internal tool names or categories. We could use that to differentiate between the two.
+    // Actor names contain '/', unlike categories and internal tool names, so the loader can tell them apart.
     if (Array.isArray(actors) && actors.length > 0) {
-        if (tools === undefined) {
-            tools = [...actors];
-        } else {
-            tools = [...tools, ...actors];
-        }
+        tools = tools === undefined ? [...actors] : [...tools, ...actors];
     }
 
-    // Return a new object with all properties explicitly defined
     return {
         ...originalInput,
         actors: Array.isArray(actors) && actors.length > 0 ? undefined : actors,

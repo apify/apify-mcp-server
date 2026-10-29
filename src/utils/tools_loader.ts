@@ -58,19 +58,15 @@ const ALL_INTERNAL_TOOL_NAMES: Set<string> = (() => {
 
 type NormalizedInput = {
     /**
-     * Cleaned tool selectors (trimmed, non-empty, without `RETIRED_SELECTOR_NAMES`). `undefined` when
-     * `input.tools` was not provided at all. Use `selectors?.length === 0` to detect an explicitly-empty
-     * list; an all-retired list collapses to `[]` too, and both phases treat it the same way.
+     * Trimmed, non-empty selectors with `RETIRED_SELECTOR_NAMES` dropped. `undefined` when `input.tools`
+     * was not given; `[]` when it was empty or held only retired names, which both phases treat alike.
      */
     selectors: string[] | undefined;
     /** `true` when `input.actors` was explicitly empty (`[]` or `''`). */
     actorsExplicitlyEmpty: boolean;
 };
 
-/**
- * Normalize the raw {@link Input} into cleaned selectors + the explicit-empty flag.
- * Shared by both loader phases so semantics stay consistent.
- */
+/** Shared by both loader phases so they read `input.tools` and `input.actors` the same way. */
 function normalizeInput(input: Input): NormalizedInput {
     const raw = input.tools;
     const selectors =
@@ -99,18 +95,9 @@ export function isReportProblemExplicitlySelected(input: Input): boolean {
 }
 
 /**
- * Resolve the list of Actor names (`username/name`) to fetch from the input.
- *
- * **Mode-agnostic** — the result does NOT depend on `SERVER_MODE`. An Actor tool
- * is identified by name, and the same Actor entry is reused across modes; only
- * the *internal* tool variants around it differ by mode.
- *
- * Selectors classified as "actor names" (retired selectors are already dropped by `normalizeInput`):
- *   - NOT a category name (from `CATEGORY_NAME_SET`)
- *   - NOT the name of an internal tool in any mode (from `ALL_INTERNAL_TOOL_NAMES`)
- *
- * If no selectors / no explicit actors: the defaults apply (or empty when
- * `actors` was explicitly set to empty).
+ * Resolve the Actor names (`username/name`) to fetch. A selector is an Actor name when it is neither
+ * a category nor an internal tool of any mode, so the result does not depend on `SERVER_MODE`.
+ * Without selectors and explicit actors the defaults apply, or nothing when `actors` was set empty.
  */
 export function resolveActorsToLoad(input: Input): string[] {
     const { selectors, actorsExplicitlyEmpty } = normalizeInput(input);
