@@ -108,11 +108,6 @@ export function createResourceService(options: ResourceServiceOptions): Resource
         const widget = getMode() === SERVER_MODE.APPS ? getAvailableWidgets().get(uri) : undefined;
         if (widget) {
             // No adapter logs resource errors, so the path is logged here and kept out of the error.
-            if (!widget.exists) {
-                log.error('Widget file not found', { uri, jsPath: widget.jsPath });
-                throw new InternalError(`Widget ${uri} is not available.`, { uri });
-            }
-
             try {
                 log.debug('Reading widget file', { uri, jsPath: widget.jsPath });
                 const widgetJs = readFileSync(widget.jsPath, 'utf-8');
