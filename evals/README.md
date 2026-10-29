@@ -128,7 +128,7 @@ dataset and a key-value store record that the user names the way they would, by 
 API reads a bare value as an ID, so the tools resolve it as `~name`; before that, every first call failed
 with "not found" and the zero-tool-error gate fails the item on it. Two permanent read-only fixtures,
 the dataset `eval-storage-products` (three items) and the key-value store `eval-storage-settings` (a
-`CONFIG` record), are created by `pnpm run evals:mcp-agent:fixtures` if missing; no case writes, so
+`CONFIG` record), are seeded by `pnpm run evals:mcp-agent:fixtures` when their content is missing; no case writes, so
 nothing is reset or swept. The not-found case asks for a dataset that does not exist.
 
 The web-fetch family (`merge/web-fetch/*`, 11 items: 8 proper + 3 with `expectedErrors`) covers the

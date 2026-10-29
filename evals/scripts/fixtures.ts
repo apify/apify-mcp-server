@@ -6,7 +6,7 @@
  * Deletes the schedules and tasks a run left behind (delete rule in `sweep.ts`), then resets the
  * two permanent read-only task and schedule fixtures, creating them if missing. Schedules go before
  * tasks and the task fixture before the schedule fixture, because the fixture schedule runs the
- * fixture task. Last, creates the named dataset and key-value store fixtures if missing.
+ * fixture task. Last, seeds the named dataset and key-value store fixtures if their content is missing.
  *
  * Usage: pnpm run evals:mcp-agent:fixtures [--run-id <id>] [--dry-run]
  */
@@ -34,7 +34,7 @@ const FIXTURE_SCHEDULE = {
 
 /**
  * Permanent read-only fixtures for the `merge/storage/*` cases, which address them by bare name.
- * The storage tools only read, so no case can change them and they are created once, never reset.
+ * The storage tools only read, so no case can change them and they are seeded once, never reset.
  */
 const FIXTURE_DATASET_NAME = 'eval-storage-products';
 const FIXTURE_DATASET_ITEMS = [
@@ -142,14 +142,15 @@ async function main() {
         console.log(`🌱 ${DRY}Created fixture schedule "${FIXTURE_SCHEDULE_NAME}"${created ? ` (${created.id})` : ''}`);
     }
 
-    if (!(await client.dataset(`~${FIXTURE_DATASET_NAME}`).get())) {
+    // Check the content, not the storage: a seed that failed after the create is repaired on the next run.
+    if (!(await client.dataset(`~${FIXTURE_DATASET_NAME}`).get())?.itemCount) {
         if (!IS_DRY_RUN) {
             const dataset = await client.datasets().getOrCreate(FIXTURE_DATASET_NAME);
             await client.dataset(dataset.id).pushItems(FIXTURE_DATASET_ITEMS);
         }
         console.log(`🌱 ${DRY}Created fixture dataset "${FIXTURE_DATASET_NAME}"`);
     }
-    if (!(await client.keyValueStore(`~${FIXTURE_KEY_VALUE_STORE_NAME}`).get())) {
+    if (!(await client.keyValueStore(`~${FIXTURE_KEY_VALUE_STORE_NAME}`).recordExists(FIXTURE_RECORD.key))) {
         if (!IS_DRY_RUN) {
             const store = await client.keyValueStores().getOrCreate(FIXTURE_KEY_VALUE_STORE_NAME);
             await client.keyValueStore(store.id).setRecord(FIXTURE_RECORD);
