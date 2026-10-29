@@ -441,6 +441,24 @@ describe('get-key-value-store-record with a bare store name', () => {
         expect(kvStoreSpy).toHaveBeenCalledWith('~eval-ai-store');
     });
 
+    it('reports a missing record, not a missing store, when the named store exists', async () => {
+        const kvStoreSpy = vi.fn().mockImplementation((id: string) => ({
+            getRecord: async () => undefined,
+            get: async () => (id === '~eval-ai-store' ? STORE_BY_NAME : undefined),
+        }));
+
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'eval-ai-store', recordKey: 'MISSING' },
+                mockApifyClient({ keyValueStore: kvStoreSpy }),
+            ),
+        );
+        const { content } = result as TextToolResult;
+
+        expectSoftFailInvalidInput(result);
+        expect(content[0].text).toContain("Record 'MISSING' not found in key-value store 'eval-ai-store'");
+    });
+
     it('links Console to the store ID', async () => {
         vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
 
