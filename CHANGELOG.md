@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
 
 - Return rendered operations from fetch-actor-details ([#1737](https://github.com/apify/apify-mcp-server/pull/1737)) ([718f02f](https://github.com/apify/apify-mcp-server/commit/718f02ffbc774a195c2cb607a73334f78d996eac)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#1620](https://github.com/apify/apify-mcp-server/issues/1620), [#1736](https://github.com/apify/apify-mcp-server/issues/1736)
 
+### 🐛 Bug Fixes
+
+- Give fetch-actor-details-widget its own status text ([#1755](https://github.com/apify/apify-mcp-server/pull/1755)) ([ac7af70](https://github.com/apify/apify-mcp-server/commit/ac7af70e2fd7ca8184cd20ec9d1758e8e4f65133)) by [@jirispilka](https://github.com/jirispilka), closes [#1729](https://github.com/apify/apify-mcp-server/issues/1729)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.20.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.20.0) (2026-10-29)
