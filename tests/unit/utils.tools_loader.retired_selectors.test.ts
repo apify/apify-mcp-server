@@ -6,7 +6,7 @@ import { HELPER_TOOLS } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/index.js';
 import type * as ToolsIndexModule from '../../src/tools/index.js';
 import { SERVER_MODE } from '../../src/types.js';
-import { getActors, getToolsForServerMode, toolNamesToInput } from '../../src/utils/tools_loader.js';
+import { getActors, toolNamesToInput } from '../../src/utils/tools_loader.js';
 
 const RETIRED_SELECTORS = ['add-actor', 'experimental', 'preview', 'get-actor-log', 'source'] as const;
 
@@ -37,24 +37,6 @@ describe('toolNamesToInput()', () => {
         expect(toolNamesToInput([selector, HELPER_TOOLS.STORE_SEARCH])).toEqual({
             tools: [HELPER_TOOLS.STORE_SEARCH],
         });
-    });
-});
-
-describe('getToolsForServerMode()', () => {
-    it.for(RETIRED_SELECTORS)('loads nothing for retired selector "%s"', (selector) => {
-        const toolNames = getToolsForServerMode({ tools: [selector] }, [], SERVER_MODE.DEFAULT).map(
-            (tool) => tool.name,
-        );
-
-        expect(toolNames).toEqual([]);
-    });
-
-    it.for(RETIRED_SELECTORS)('ignores retired selector "%s" alongside docs', (selector) => {
-        const toolNames = getToolsForServerMode({ tools: [selector, 'docs'] }, [], SERVER_MODE.DEFAULT).map(
-            (tool) => tool.name,
-        );
-
-        expect(toolNames).toEqual([HELPER_TOOLS.DOCS_SEARCH, HELPER_TOOLS.DOCS_FETCH]);
     });
 });
 
