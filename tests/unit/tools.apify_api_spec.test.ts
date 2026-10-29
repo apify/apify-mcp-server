@@ -198,12 +198,16 @@ describe('the budget of a creator schema', () => {
     // 5000 levels of inline nesting, no references.
     let deep: unknown = { type: 'string' };
     for (let i = 0; i < 5000; i++) deep = { type: 'array', items: deep };
+    // 60000 levels behind one reference, deeper than JSON.stringify can measure on some Node versions.
+    let tooDeep: unknown = 'leaf';
+    for (let i = 0; i < 60000; i++) tooDeep = { a: tooDeep };
 
     // Without the budget, the first would not finish and the others could overflow the stack.
     it.each([
         ['references that expand exponentially', { $ref: '#/components/schemas/L0' }, exponential],
         ['a long reference chain', { $ref: '#/components/schemas/C0' }, chain],
         ['deep inline nesting', deep, {}],
+        ['a reference to a node nested too deep to measure', { $ref: '#/components/schemas/Deep' }, { Deep: tooDeep }],
     ])('stops %s with DereferenceBudgetError', (_label, schema, schemas) => {
         const spec = { components: { schemas } };
 

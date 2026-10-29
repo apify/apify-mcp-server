@@ -158,7 +158,13 @@ function dereference(
 function chargeExpansion(target: unknown, context: DereferenceContext): void {
     if (!context.budget) return;
     // Shared references can expand exponentially, so each expansion costs the size of its target.
-    context.budget.remainingBytes -= Buffer.byteLength(JSON.stringify(target));
+    try {
+        context.budget.remainingBytes -= Buffer.byteLength(JSON.stringify(target));
+    } catch (error) {
+        // A target nested too deep for JSON.stringify is too large to render.
+        if (error instanceof RangeError) throw new DereferenceBudgetError();
+        throw error;
+    }
     if (context.budget.remainingBytes < 0) throw new DereferenceBudgetError();
 }
 
