@@ -238,8 +238,6 @@ export const appsCases: Case[] = [
                 _meta?: { ui?: { resourceUri?: string } };
             };
 
-            // A missing widget JS file fails the read with an InternalError, so a result here is the
-            // widget the build served.
             expect(contents.mimeType).toBe(RESOURCE_MIME_TYPE);
             expect(contents.text).toContain('<!DOCTYPE html>');
             expect(contents._meta?.ui?.resourceUri).toBe(uri);

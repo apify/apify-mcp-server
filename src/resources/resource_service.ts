@@ -107,8 +107,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
 
         const widget = getMode() === SERVER_MODE.APPS ? getAvailableWidgets().get(uri) : undefined;
         if (widget) {
-            // A missing or unreadable bundle is a server build fault. No adapter logs a resource error, so the path
-            // is logged here and left out of the error the client gets.
+            // Log server paths here, not in client errors.
             if (!widget.exists) {
                 log.error('Widget file not found', { uri, jsPath: widget.jsPath });
                 throw new InternalError(`Widget ${uri} is not available.`, { uri });
