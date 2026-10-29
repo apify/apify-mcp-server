@@ -258,6 +258,20 @@ describe('the operations in full', () => {
         ]);
     });
 
+    const formBody = { required: true, content: { 'multipart/form-data': { schema: { type: 'object' } } } };
+    // The index says the body is required, so the full rendering must show it, though it has no JSON schema.
+    it.each([
+        ['inline', formBody, {}],
+        ['through a reference', { $ref: '#/components/requestBodies/Upload' }, { Upload: formBody }],
+    ])('shows the content types of a request body that is not JSON, %s', (_label, requestBody, requestBodies) => {
+        const schema = { paths: { '/upload': { post: { requestBody } } }, components: { requestBodies } };
+
+        expect(parseJsonBlock(textOfBuild({ schema })).operations[0].requestBody).toEqual({
+            isRequired: true,
+            contentTypes: ['multipart/form-data'],
+        });
+    });
+
     it('says requests are not supported, without the send tool or run cost, in agentic payment mode', () => {
         const text = textOfBuild({ hasPaymentProvider: true });
 

@@ -120,13 +120,24 @@ function formatOperationIndex(operations: ServerOperation[], schema: unknown, ma
     return [...kept, `… and ${lines.length - kept.length} more`].join('\n');
 }
 
+/** A request body with no JSON media type: whether it is required and its media types, with no schema. */
+function buildOtherRequestBody(rawRequestBody: unknown, schema: unknown) {
+    const requestBody = resolveRef(rawRequestBody, schema);
+    if (!isRecord(requestBody) || !isRecord(requestBody.content)) return undefined;
+    const contentTypes = Object.keys(requestBody.content);
+    if (contentTypes.length === 0) return undefined;
+    return { isRequired: requestBody.required === true, contentTypes };
+}
+
 /**
  * One operation in the `get-apify-api-details` shape: local references inlined, examples kept, no responses.
  * The summary and description are left out when the schema has none. Throws `DereferenceBudgetError` when the
  * context's budget runs out.
+ * A request body that is not JSON shows its content types instead of a schema.
  */
 function buildServerOperationDetails({ method, path, operation }: ServerOperation, context: DereferenceContext) {
-    const requestBody = parseRequestBody(operation.requestBody, context);
+    const requestBody =
+        parseRequestBody(operation.requestBody, context) ?? buildOtherRequestBody(operation.requestBody, context.spec);
     return {
         method,
         path,
