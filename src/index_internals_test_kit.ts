@@ -12,7 +12,6 @@ import {
 } from './const.js';
 import { SKYFIRE_ENABLED_TOOLS } from './payments/const.js';
 import { RESOURCE_MIME_TYPE } from './resources/widgets.js';
-import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG } from './tools/actors/call_actor.js';
 import { toolCategoriesEnabledByDefault } from './tools/index.js';
 import { UNCATEGORIZED_TOOLS } from './tools/registry.js';
 import { actorRunOutputSchema } from './tools/structured_output_schemas.js';
@@ -27,7 +26,6 @@ export {
     SERVER_MODE_AUTO_DETECTION_ENABLED,
     SKYFIRE_ENABLED_TOOLS,
     RESOURCE_MIME_TYPE,
-    CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
     toolCategoriesEnabledByDefault,
     UNCATEGORIZED_TOOLS,
     actorRunOutputSchema,

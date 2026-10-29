@@ -20,9 +20,16 @@ import {
     getDeniedDirectActorInputs,
     getDirectActorPolicy,
 } from '../tools/actors/actor_tool_contract.js';
-import { checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
+import { buildLegacyMcpSyntaxRejection, checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
 import { withReportProblemNudge } from '../tools/dev/report_problem.js';
-import type { ActorStore, CallDiagnostics, ToolCallTelemetryProperties, ToolEntry, ToolStatus } from '../types.js';
+import type {
+    ActorStore,
+    CallDiagnostics,
+    ToolCallTelemetryProperties,
+    ToolEntry,
+    ToolStatus,
+    ToolTelemetryContext,
+} from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 import { logHttpError } from '../utils/logging.js';
 import { respondOk } from '../utils/mcp.js';
@@ -134,7 +141,10 @@ export type PreparedCallError = ToolCallOutcome & {
     decodedArgs: Record<string, unknown>;
 };
 
-/** Builds the pre-flight result; standby rejection takes precedence over 402. */
+/**
+ * Builds the pre-flight result; standby rejection takes precedence over 402. The rejection skipped dispatch, which
+ * strips `toolTelemetry` from a tool response, so it is stripped here and its failure detail recorded.
+ */
 export function buildPreflightFailureOutcome(
     standbyRejection: Record<string, unknown> | null,
     paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined,
@@ -145,14 +155,16 @@ export function buildPreflightFailureOutcome(
     callDiagnostics: CallDiagnostics;
     result: Record<string, unknown> | ReturnType<typeof buildPaymentRequiredResponse>;
 } {
+    const { toolTelemetry, ...rejection } = (standbyRejection ?? {}) as { toolTelemetry?: ToolTelemetryContext };
     return {
         toolStatus: TOOL_STATUS.SOFT_FAIL,
         callDiagnostics: {
             failure_category: FAILURE_CATEGORY.INVALID_INPUT,
             ...(standbyRejection ? {} : { failure_http_status: 402 }),
+            ...(toolTelemetry?.failureDetail && { failure_detail: toolTelemetry.failureDetail }),
             ...buildActorFields(actorName, actorId),
         },
-        result: (standbyRejection ?? paymentRequiredResult)!,
+        result: standbyRejection ? rejection : paymentRequiredResult!,
     };
 }
 
@@ -349,21 +361,15 @@ export async function prepareToolCall(params: {
             };
         }
 
-        // Standby Actors need a specific rejection instead of a generic 402 in both modes; the tool declares the check.
-        const actorArg = (toolArgs as { actor?: unknown } | undefined)?.actor;
-
         const standbyRejection =
-            paymentProvider &&
-            tool.hasPaymentProviderStandbyCheck &&
-            typeof actorArg === 'string' &&
-            actorArg.length > 0
-                ? await checkPaymentProviderStandbyConflict({
-                      actorName: actorArg,
-                      paymentProvider,
-                      apifyToken,
-                      mcpSessionId: params.mcpSessionId,
-                  })
-                : null;
+            buildLegacyMcpSyntaxRejection(tool.name, toolArgs.actor, Array.from(tools.keys())) ??
+            (await checkPaymentProviderStandbyConflict({
+                tool,
+                args: toolArgs,
+                paymentProvider,
+                apifyToken,
+                mcpSessionId: params.mcpSessionId,
+            }));
 
         return {
             tool,

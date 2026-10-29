@@ -5,7 +5,7 @@ import { callActorWidget } from '../../src/tools/widgets/call_actor_widget.js';
 import type { HelperTool, ToolEntry } from '../../src/types.js';
 import { ACTOR_TOOL_MODE, TOOL_TYPE } from '../../src/types.js';
 import { getActorToolResolutionCached } from '../../src/utils/actor.js';
-import { mockApifyClient, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import { mockApifyClient, stubToolCallContext } from './helpers/tool_context.js';
 
 /**
  * Apps / UI mode: call-actor-widget starts the run and renders an interactive UI element
@@ -163,22 +163,5 @@ describe('call-actor-widget response', () => {
         const tool = callActorWidget as HelperTool;
         const ok = tool.ajvValidate({ actor: 'apify/rag-web-browser', input: { query: 'test' } });
         expect(ok).toBe(true);
-    });
-
-    it('rejects MCP "actor:toolName" syntax and points at call-actor', async () => {
-        const startSpy = vi.fn();
-        const apifyClient = stubApifyClient(startSpy);
-
-        const result = await (callActorWidget as HelperTool).call(
-            stubToolCallContext({ actor: 'apify/example-mcp-server:add', input: { query: 'test' } }, apifyClient),
-        );
-
-        const { content, isError } = result as TextToolResult;
-        expect(isError).toBe(true);
-        expect(startSpy).not.toHaveBeenCalled();
-        const joined = content.map((c) => c.text).join(' ');
-        expect(joined).toContain('call-actor-widget');
-        expect(joined).toContain('call-actor');
-        expect(joined).toContain('actorName:toolName');
     });
 });

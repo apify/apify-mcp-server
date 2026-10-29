@@ -50,9 +50,7 @@ export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>
     if (tool.type === TOOL_TYPE.ACTOR) return tool.actorFullName;
     if (tool.type === TOOL_TYPE.ACTOR_MCP) return tool.actorId;
 
-    // For call-actor, the actor name is in `args.actor`.
-    // The format can be "username/name" or "username/name:toolName" (MCP server Actors).
-    // Strip the optional `:toolName` suffix to get the base actor name.
+    // A legacy "username/name:toolName" value is logged by its Actor name.
     const actorArg = args?.actor;
     if (typeof actorArg !== 'string') return undefined;
     return actorArg.split(':')[0]?.trim() || undefined;

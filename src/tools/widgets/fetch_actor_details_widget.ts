@@ -61,6 +61,8 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
     ajvValidate: compileSchema(z.toJSONSchema(fetchActorDetailsWidgetArgsSchema)),
     _meta: {
         ...widgetConfig?.meta,
+        'openai/toolInvocation/invoking': 'Fetching Actor details...',
+        'openai/toolInvocation/invoked': 'Actor details loaded',
     },
     annotations: {
         title: 'Fetch Actor details (widget)',
@@ -111,6 +113,8 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
             // Response-level meta; only returned in apps mode (this handler is apps-only).
             meta: {
                 ...widgetConfig?.meta,
+                'openai/toolInvocation/invoking': 'Fetching Actor details...',
+                'openai/toolInvocation/invoked': 'Actor details loaded',
                 'openai/widgetDescription': `Actor details for ${actorName} from Apify Store`,
             },
         });

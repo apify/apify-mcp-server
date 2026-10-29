@@ -322,15 +322,14 @@ export type ActorInfo = {
 /**
  * How an Actor is exposed as a tool, resolved once from its definition: the interface set
  * (`resolveActorInterfaces`) and the tool slot derived from it (`resolveActorToolMode`).
- * `mcpServerUrl` is present exactly when `toolMode` is {@link ACTOR_TOOL_MODE.MCP}, so callers
- * connect without a cast and an un-narrowed read is a compile error.
  * `actorFullName` is the platform-canonical `username/name`, not whatever identifier the caller used —
  * messages built from it read the same whether the Actor was addressed by ID or by name.
  */
-export type ActorToolResolutionResult = { actorFullName: string; interfaces: ActorInterfaces } & (
-    | { toolMode: typeof ACTOR_TOOL_MODE.MCP; mcpServerUrl: string }
-    | { toolMode: typeof ACTOR_TOOL_MODE.RUN | typeof ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP }
-);
+export type ActorToolResolutionResult = {
+    actorFullName: string;
+    interfaces: ActorInterfaces;
+    toolMode: ACTOR_TOOL_MODE;
+};
 
 export type ActorStoreList = ActorStoreListOutdated & {
     actorReviewCount?: number;

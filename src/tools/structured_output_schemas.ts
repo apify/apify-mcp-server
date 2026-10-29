@@ -238,19 +238,27 @@ export const actorDetailsOutputSchema = {
         },
         inputSchema: { type: 'object' as const, description: 'Actor input schema.' },
         outputSchema: { type: 'object' as const, description: 'Output schema inferred from successful runs.' },
-        mcpTools: {
-            type: 'string',
-            description:
-                'Markdown listing of MCP tools exposed by the Actor (only present when `output.mcpTools` is requested).',
-        },
         serverInterface: {
             type: 'string',
             description:
-                "The Actor's server interface. `output.serverInterface: true` returns the full API schema with " +
-                'guidance when it fits, or operation navigation otherwise. A "METHOD /path" string returns an ' +
-                'operation excerpt; "#/..." returns a raw local schema node.',
+                "The Actor's server interface. `output.serverInterface: true` returns every operation with its " +
+                'parameters and request body schema when they fit, or one line per operation otherwise. ' +
+                'A "METHOD /path" string returns that one operation in full.',
         },
     },
+};
+
+/** Schema for fetch-actor-mcp-tool-list output: the remote tool definitions as `tools/list` returned them. */
+export const actorMcpToolListOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        tools: {
+            type: 'array',
+            items: { type: 'object' },
+            description: "The tools on the Actor's MCP server, with their schemas, annotations and metadata.",
+        },
+    },
+    required: ['tools'],
 };
 
 /**

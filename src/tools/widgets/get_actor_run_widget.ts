@@ -48,6 +48,8 @@ export const getActorRunWidget: ToolEntry = Object.freeze({
     paymentRequired: true,
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
+        'openai/toolInvocation/invoking': 'Checking Actor run...',
+        'openai/toolInvocation/invoked': 'Actor run status loaded',
     },
     annotations: {
         title: 'Get Actor run (widget)',

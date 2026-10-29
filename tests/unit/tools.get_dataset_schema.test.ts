@@ -203,3 +203,15 @@ describe('get-dataset-schema nextStep gating', () => {
         expectSchemaConformingStructuredContent(result, datasetSchemaOutputSchema);
     });
 });
+
+describe('get-dataset-schema with a bare dataset name', () => {
+    it("reads the name as one of the caller's own datasets", async () => {
+        const datasetSpy = vi.fn().mockReturnValue({ listItems: async () => ({ items: MOCK_ITEMS, total: 2 }) });
+
+        await (getDatasetSchema as HelperTool).call(
+            stubToolCallContext({ datasetId: 'eval-ai-items' }, mockApifyClient({ dataset: datasetSpy })),
+        );
+
+        expect(datasetSpy).toHaveBeenCalledWith('~eval-ai-items');
+    });
+});

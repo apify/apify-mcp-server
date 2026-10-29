@@ -123,6 +123,14 @@ The deterministic platform facts the judge used to score here live in
 `tests/test_kit/cases/schedules.cases.ts` instead, asserted against the live API. Those cases name their
 schedules `test-sched-*`; the sweep only ever touches `eval-*`.
 
+The storage family (`merge/storage/*`, 3 items: 2 proper + 1 with `expectedErrors`) covers reading a
+dataset and a key-value store record that the user names the way they would, by bare name (#1628). The
+API reads a bare value as an ID, so the tools resolve it as `~name`; before that, every first call failed
+with "not found" and the zero-tool-error gate fails the item on it. Two permanent read-only fixtures,
+the dataset `eval-storage-products` (three items) and the key-value store `eval-storage-settings` (a
+`CONFIG` record), are seeded by `pnpm run evals:mcp-agent:fixtures` when their content is missing; no case writes, so
+nothing is reset or swept. The not-found case asks for a dataset that does not exist.
+
 The web-fetch family (`merge/web-fetch/*`, 11 items: 8 proper + 3 with `expectedErrors`) covers the
 `apify/web-fetch` default Actor tool: fetching, output formats, HTTP status reporting, tool
 selection among the defaults, and multi-fetch chains. They create no named account state, so

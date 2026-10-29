@@ -3,14 +3,35 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.19.6 - **not yet released**
+## 0.20.1 - **not yet released**
+
+### 🚀 Features
+
+- Return rendered operations from fetch-actor-details ([#1737](https://github.com/apify/apify-mcp-server/pull/1737)) ([718f02f](https://github.com/apify/apify-mcp-server/commit/718f02ffbc774a195c2cb607a73334f78d996eac)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#1620](https://github.com/apify/apify-mcp-server/issues/1620), [#1736](https://github.com/apify/apify-mcp-server/issues/1736)
+
+### 🐛 Bug Fixes
+
+- Give fetch-actor-details-widget its own status text ([#1755](https://github.com/apify/apify-mcp-server/pull/1755)) ([ac7af70](https://github.com/apify/apify-mcp-server/commit/ac7af70e2fd7ca8184cd20ec9d1758e8e4f65133)) by [@jirispilka](https://github.com/jirispilka), closes [#1729](https://github.com/apify/apify-mcp-server/issues/1729)
+- Give get-actor-run-widget its own status text ([#1756](https://github.com/apify/apify-mcp-server/pull/1756)) ([2af064a](https://github.com/apify/apify-mcp-server/commit/2af064a775ee8be5a6e6f22e7968d923e2ddd889)) by [@jirispilka](https://github.com/jirispilka), closes [#1742](https://github.com/apify/apify-mcp-server/issues/1742)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.20.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.20.0) (2026-10-29)
+
+### 🚀 Features
+
+- [**breaking**] Split MCP calls out of call-actor ([#1685](https://github.com/apify/apify-mcp-server/pull/1685)) ([910c297](https://github.com/apify/apify-mcp-server/commit/910c297173dcf05443e643b91041db78696de8ba)) by [@jirispilka](https://github.com/jirispilka), closes [#1620](https://github.com/apify/apify-mcp-server/issues/1620), [#1624](https://github.com/apify/apify-mcp-server/issues/1624)
+- [**breaking**] Add fetch-actor-mcp-tool-list ([#1686](https://github.com/apify/apify-mcp-server/pull/1686)) ([691acaa](https://github.com/apify/apify-mcp-server/commit/691acaafd9855d87cdd2e2dccb1c4bd4e4c4a06e)) by [@jirispilka](https://github.com/jirispilka), closes [#1620](https://github.com/apify/apify-mcp-server/issues/1620), [#1644](https://github.com/apify/apify-mcp-server/issues/1644)
 
 ### 🐛 Bug Fixes
 
 - Log SSE replay stream conflict as a client fault ([#1723](https://github.com/apify/apify-mcp-server/pull/1723)) ([7d1dfe9](https://github.com/apify/apify-mcp-server/commit/7d1dfe98e8d58ae52856b8f53f8ccb3aef2e27fc)) by [@jirispilka](https://github.com/jirispilka)
+- Reject prototype names as payment provider ids ([#1718](https://github.com/apify/apify-mcp-server/pull/1718)) ([60d3d15](https://github.com/apify/apify-mcp-server/commit/60d3d1542f6a0f99db1cf3cb16fde185416ada41)) by [@jirispilka](https://github.com/jirispilka)
+- Count call-actor-widget and apify-api-write in canRunActor ([#1752](https://github.com/apify/apify-mcp-server/pull/1752)) ([6f81932](https://github.com/apify/apify-mcp-server/commit/6f819329a1743483637b297b30dd1a880bf2c4d1)) by [@jirispilka](https://github.com/jirispilka), closes [#1530](https://github.com/apify/apify-mcp-server/issues/1530)
+- Resolve a bare storage name in dataset and key-value store tools ([#1661](https://github.com/apify/apify-mcp-server/pull/1661)) ([6f4e6a9](https://github.com/apify/apify-mcp-server/commit/6f4e6a948fd561f0999c40bcbff00bded4626618)) by [@vojtechj-apify](https://github.com/vojtechj-apify), closes [#1628](https://github.com/apify/apify-mcp-server/issues/1628)
+- Route 2025-era requests over 4 MiB to the stateful path ([#1744](https://github.com/apify/apify-mcp-server/pull/1744)) ([41c896e](https://github.com/apify/apify-mcp-server/commit/41c896e58fb0fafc8d2bc604d07bb0041890c1fc)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#1743](https://github.com/apify/apify-mcp-server/issues/1743)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.19.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.19.5) (2026-10-27)
 
 ### 🚀 Features

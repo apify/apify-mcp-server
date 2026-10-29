@@ -33,9 +33,12 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     can call in the publisher's schema; `webServerOperations` caches each operation with its required inputs, which
     the send tool lists after a 400/404/405/422),
     `server_interface_schema.ts` (the server-interface text of `fetch-actor-details`: by default one summary line,
-    served only with `send-server-actor-request`; `output.serverInterface: true` lists the operations, with the API
-    schema as written while it fits `MAX_INLINE_BYTES`; `"METHOD /path"` returns one operation excerpt and `"#/..."`
-    the raw node at a local JSON pointer; references are not expanded or fetched),
+    served only with `send-server-actor-request`; `output.serverInterface: true` returns every operation in the
+    `get-apify-api-details` shape (`buildServerOperationDetails`, through the API tools' `dereference`: local
+    references inlined, examples kept, no responses, components or `servers`) while the text fits
+    `MAX_INLINE_BYTES`, else one line per operation (`formatOperationLine`), cut with `… and N more`;
+    `"METHOD /path"` returns that one operation; reference expansion has a byte budget, as a creator schema can
+    expand exponentially),
     `send_server_actor_request.ts` (`send-server-actor-request`: one HTTP request to a Server Actor's API, gated on
     the `server` interface and sent through `sendApifyApiRequest` with raw response
     bytes, no redirects, the `MAX_INLINE_BYTES` cap after decompression and the `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`
@@ -43,6 +46,14 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     validated without coercion; text uses the declared charset, UTF-8 by default, and rejects unsupported
     charsets while keeping the HTTP status; refused bodies retain structured request/status metadata with
     `bodyOmitted` and `reason`, and `bytes` only when the full size is known; session tokens are masked after decoding too),
+    `call_actor_mcp_tool.ts` (`call-actor-mcp-tool`: one `tools/call` on an MCP server Actor's server, gated on the
+    `mcp` interface, with the remote `CallToolResult` passed through except for internal telemetry;
+    `runOnActorMcpServer` resolves the Actor and its MCP URL, connects under the caller's token and turns a failed
+    connection, an abort or a remote error into a response),
+    `fetch_actor_mcp_tool_list.ts` (`fetch-actor-mcp-tool-list`: an uncached `tools/list` through
+    `runOnActorMcpServer` that follows `nextCursor` within one `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC` for all pages,
+    fails on a failed page and stops after `MAX_TOOL_LIST_PAGES`;
+    `fetch-actor-details` never connects to an MCP server),
     `actor_tool_contract.ts` (Actor-specific presentation policies plus direct-tool input restrictions
     and defaults, shared by schema generation, the call engine's denied-input check and execution;
     generic calls skip direct-only restrictions and defaults), and
@@ -110,9 +121,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).
   - `searchActorsBaseArgsSchema` has an optional `useCase` (Store search context). `withoutUseCaseField` in `utils/tools_loader.ts` removes it from the served schema; `ActorsMcpServer.composeToolsForClient` applies that for clients `isStoreUseCaseServable` does not allow. The call passes it to `searchAgentSafeActors`, which sanitizes it.
-- `../utils/apify_resource_id.ts` holds the helpers that resolve an Actor, task, or schedule given by ID or
-  name, where a name alone means one of the caller's own. The task, schedule, and versions tools use them,
-  and so do `build-actor` and the `actorId` filter of `get-actor-build-list` and `get-actor-run-list`.
+- `../utils/apify_resource_id.ts` holds the helpers that resolve an Actor, task, schedule, or storage given by
+  ID or name, where a name alone means one of the caller's own. The task, schedule, and versions tools use them,
+  and so do `build-actor` and the `actorId` filter of `get-actor-build-list` and `get-actor-run-list`. The
+  dataset and key-value store tools reach them through `fetchStorageByIdOrName` in `storage/storage_helpers.ts`.
 
 ## Rules when editing here
 
