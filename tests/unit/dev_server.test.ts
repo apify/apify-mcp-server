@@ -173,7 +173,10 @@ function statelessRequest(
     params: Record<string, unknown> = {},
     meta: Record<string, unknown> = {},
 ): { body: unknown; headers: Record<string, string> } {
-    const headers: Record<string, string> = { 'mcp-method': method };
+    const headers: Record<string, string> = {
+        'mcp-method': method,
+        'mcp-protocol-version': STATELESS_PROTOCOL_VERSION,
+    };
     if (typeof params.name === 'string') headers['mcp-name'] = params.name;
     return {
         body: { jsonrpc: '2.0', id: 1, method, params: { ...params, _meta: { ...ENVELOPE, ...meta } } },
