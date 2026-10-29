@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Give fetch-actor-details-widget its own status text ([#1755](https://github.com/apify/apify-mcp-server/pull/1755)) ([ac7af70](https://github.com/apify/apify-mcp-server/commit/ac7af70e2fd7ca8184cd20ec9d1758e8e4f65133)) by [@jirispilka](https://github.com/jirispilka), closes [#1729](https://github.com/apify/apify-mcp-server/issues/1729)
+- Give get-actor-run-widget its own status text ([#1756](https://github.com/apify/apify-mcp-server/pull/1756)) ([2af064a](https://github.com/apify/apify-mcp-server/commit/2af064a775ee8be5a6e6f22e7968d923e2ddd889)) by [@jirispilka](https://github.com/jirispilka), closes [#1742](https://github.com/apify/apify-mcp-server/issues/1742)
 
 
 <!-- git-cliff-unreleased-end -->
