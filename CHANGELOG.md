@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Give fetch-actor-details-widget its own status text ([#1755](https://github.com/apify/apify-mcp-server/pull/1755)) ([ac7af70](https://github.com/apify/apify-mcp-server/commit/ac7af70e2fd7ca8184cd20ec9d1758e8e4f65133)) by [@jirispilka](https://github.com/jirispilka), closes [#1729](https://github.com/apify/apify-mcp-server/issues/1729)
 - Give get-actor-run-widget its own status text ([#1756](https://github.com/apify/apify-mcp-server/pull/1756)) ([2af064a](https://github.com/apify/apify-mcp-server/commit/2af064a775ee8be5a6e6f22e7968d923e2ddd889)) by [@jirispilka](https://github.com/jirispilka), closes [#1742](https://github.com/apify/apify-mcp-server/issues/1742)
 - Tell a cancel race from a store failure in task status messages ([#1757](https://github.com/apify/apify-mcp-server/pull/1757)) ([30df90b](https://github.com/apify/apify-mcp-server/commit/30df90b911ff9c0176086daa7f8af7a6c5184639)) by [@jirispilka](https://github.com/jirispilka), closes [#645](https://github.com/apify/apify-mcp-server/issues/645)
+- Decide the tip caveat from the tip&#x27;s recommended Actor ([#1753](https://github.com/apify/apify-mcp-server/pull/1753)) ([cae776e](https://github.com/apify/apify-mcp-server/commit/cae776ede7c92aa4bf860dfce0079eb6aac9fd1f)) by [@jirispilka](https://github.com/jirispilka), closes [#1741](https://github.com/apify/apify-mcp-server/issues/1741)
 
 
 <!-- git-cliff-unreleased-end -->
