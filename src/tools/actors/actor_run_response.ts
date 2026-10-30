@@ -95,11 +95,8 @@ export type RunDataset = {
      */
     inflatedBytes?: number;
     /**
-     * Dot-notation field paths. Pure-numeric segments (array indices) are stripped and the
-     * list is deduped at build time, so callers receive a flat unique description of the item
-     * structure rather than the inflated `entities.hashtags.0.text`, `entities.hashtags.1.text`, ...
-     * shape Apify returns for array-heavy datasets. A path through an array is not a valid
-     * `fields` selection (#1656).
+     * Dot-notation field paths with array indices collapsed (see `collapseArrayIndices`).
+     * Describes the item structure; a path through an array is not a valid `fields` selection (#1656).
      */
     fields?: string[];
     /**
@@ -215,7 +212,7 @@ function renderShapeNode(node: ShapeNode): string {
     return `{ ${keys.join(', ')} }${'[]'.repeat(node.arrayDepth)}`;
 }
 
-/** Renders raw slash-separated dataset fields as an item shape, preserving array depth. */
+/** E.g. `['results/0/url', 'query']` → `{ results: { url }[], query }`. */
 export function buildDatasetShape(fields: string[]): string {
     const root: ShapeNode = { arrayDepth: 0, children: new Map() };
     for (const field of fields) {
@@ -573,9 +570,9 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
 
 /**
  * Only top-level names always work as a `fields` selection: the API's projection does not cross
- * arrays, so a dotted path through one returns `[{}]` (#1656, apify/apify-core#31931), and the
- * hint names such a path only to say so. Never show an indexed path (`results.0.url`): evals
- * showed weak models copy it and report one element as the whole result.
+ * arrays, so a dotted path through one returns `[{}]`. Never show
+ * an indexed path (`results.0.url`): evals showed weak models copy it and report one element as
+ * the whole result.
  */
 export function fieldsProjectionHint(fields: string[] | undefined): string {
     if (!fields?.length) return '';
@@ -702,7 +699,7 @@ export function buildStatusSummaryNextStep(params: {
     dataset?: RunDataset;
     keyValueStore?: RunKeyValueStore;
     datasetMetadataFetched?: boolean;
-    /** Raw metadata with array indices; `dataset.fields` has them collapsed and the shape needs them. */
+    /** Raw fields with array indices, which the shape needs; `dataset.fields` has them collapsed. */
     datasetFields?: string[];
 }): { summary: string; nextStep: string } {
     const { run, dataset, keyValueStore, datasetMetadataFetched = true, datasetFields } = params;
@@ -1011,7 +1008,6 @@ export async function fetchActorRunData(params: {
     const datasetIds = buildStorageAliasIds(run.storageIds?.datasets, run.defaultDatasetId ?? undefined);
     const kvIds = buildStorageAliasIds(run.storageIds?.keyValueStores, run.defaultKeyValueStoreId ?? undefined);
 
-    // The entry keeps the collapsed list; the hint's shape needs the raw indices.
     let defaultDatasetFields: string[] | undefined;
     const [datasets, keyValueStores] = await Promise.all([
         buildStorageEntriesFromIds(datasetIds, async (id) => {

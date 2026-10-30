@@ -1422,7 +1422,6 @@ describe('fieldsProjectionHint', () => {
         expect(hint).toContain('Selectable fields: query, search, results;');
         expect(hint).toContain('Dotted paths work through objects (search.provider).');
         expect(hint).toContain('A dotted path through an array (results.url) returns nothing.');
-        // Never an indexed path: weak models copy it and report one element as the whole result.
         expect(hint).not.toMatch(/\.\d+(\.|\b)/);
     });
 
