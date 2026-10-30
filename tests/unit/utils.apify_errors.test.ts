@@ -17,7 +17,8 @@ function apifyApiError(type: string, status = 402): ApifyApiError {
 }
 
 describe('isActorRunLimitError', () => {
-    it('matches by `type` field (direct run) or message substring (wrapped MCP error), not unrelated errors', () => {
+    it('matches by `type` field (direct run or Standby) or message substring (wrapped MCP error), not unrelated errors', () => {
+        expect(isActorRunLimitError(apifyApiError('concurrent-runs-limit-exceeded'))).toBe(true);
         expect(isActorRunLimitError({ type: 'cannot-start-actor-runs', message: 'Cannot start new Actor runs.' })).toBe(
             true,
         );
@@ -25,15 +26,16 @@ describe('isActorRunLimitError', () => {
             true,
         );
         expect(isActorRunLimitError(new Error('socket hang up'))).toBe(false);
-        expect(isActorRunLimitError({ type: 'memory-limit-exceeded' })).toBe(false);
+        expect(isActorRunLimitError(new Error('concurrent-runs-limit-exceeded'))).toBe(false);
+        expect(isActorRunLimitError(apifyApiError('actor-memory-limit-exceeded'))).toBe(false);
     });
 });
 
 describe('isMemoryQuotaError', () => {
     it('matches only the memory-limit ApifyApiError type', () => {
-        expect(isMemoryQuotaError(apifyApiError('memory-limit-exceeded'))).toBe(true);
+        expect(isMemoryQuotaError(apifyApiError('actor-memory-limit-exceeded'))).toBe(true);
         expect(isMemoryQuotaError(apifyApiError('cannot-start-actor-runs'))).toBe(false);
-        expect(isMemoryQuotaError(new Error('memory-limit-exceeded'))).toBe(false);
+        expect(isMemoryQuotaError(new Error('actor-memory-limit-exceeded'))).toBe(false);
     });
 });
 

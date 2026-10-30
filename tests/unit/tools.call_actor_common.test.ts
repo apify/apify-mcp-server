@@ -267,7 +267,7 @@ describe('call_actor_common', () => {
                 {
                     data: {
                         error: {
-                            type: APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
+                            type: 'actor-memory-limit-exceeded',
                             message:
                                 'By launching this job you will exceed the memory limit of 8192MB for all your Actor runs and builds.',
                         },
@@ -307,14 +307,13 @@ describe('call_actor_common', () => {
             );
         });
 
-        it('returns the concurrent-run-limit billing hint for cannot-start-actor-runs errors', () => {
+        it('returns the concurrent-run-limit billing hint for concurrent-runs-limit-exceeded errors', () => {
             const error = new ApifyApiError(
                 {
                     data: {
                         error: {
-                            type: 'cannot-start-actor-runs',
-                            message:
-                                'Cannot start new Actor runs. Underlying error: By launching this job you will exceed your limit of 25 concurrent Actor runs.',
+                            type: 'concurrent-runs-limit-exceeded',
+                            message: 'By launching this job you will exceed your limit of 25 concurrent Actor runs.',
                         },
                     },
                     status: 402,
