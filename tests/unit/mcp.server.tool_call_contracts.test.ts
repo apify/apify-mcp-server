@@ -815,6 +815,24 @@ describe('ACTOR_MCP remote-McpError containment (sync tools/call catch)', () => 
         });
     });
 
+    it('names the Actor by its full name in the failure text', async () => {
+        await withServer(async (server) => {
+            silenceLogs();
+            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(
+                stubRejectingClient(new McpError(ErrorCode.InternalError, 'remote boom')),
+            );
+            const tool = {
+                ...makeActorMcpTool(),
+                actorId: 'Iei3c51WbI7eKwgSg',
+                actorFullName: 'apify/example-mcp-server',
+            } as ToolEntry;
+            const result = await runSync(server, tool);
+            const { text } = (result.content as { text: string }[])[0];
+            expect(text).toContain("on Actor 'apify/example-mcp-server'");
+            expect(text).not.toContain('Iei3c51WbI7eKwgSg');
+        });
+    });
+
     it('contains a remote 402-coded McpError as a soft-fail result, never a thrown payment error', async () => {
         // A remote McpError with code 402 would classify as PAYMENT if it reached buildToolCallErrorResult
         // (getHttpStatusCode falls through to `.code`). The inner catch keeps it a soft-fail execution
