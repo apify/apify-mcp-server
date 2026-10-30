@@ -73,9 +73,9 @@
     "tools": {
       "type": "string",
       "title": "Enabled tools",
-      "description": "Comma-separated list of tool categories or Actors, e.g. \"actors,docs,apify/rag-web-browser\". For details, see https://mcp.apify.com",
+      "description": "Comma-separated list of tool categories or Actors, e.g. \"actors,docs,apify/web-search\". For details, see https://mcp.apify.com",
       "required": false,
-      "default": "actors,docs,apify/rag-web-browser,apify/web-fetch"
+      "default": "actors,docs,apify/web-search,apify/web-fetch"
     }
   },
   "compatibility": {

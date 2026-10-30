@@ -76,11 +76,7 @@ export const reportProblemArgsSchema = z.object({
         .min(1)
         .max(2000)
         .describe('What happened: the problem you hit. Required. Keep it to a few sentences (max 2000 characters).'),
-    actorId: z
-        .string()
-        .max(200)
-        .optional()
-        .describe('Optional. The Actor this problem is about, e.g. apify/rag-web-browser.'),
+    actorId: z.string().max(200).optional().describe('Optional. The Actor this problem is about, as "username/name".'),
     actorRunId: z.string().max(200).optional().describe('Optional. The Actor run this problem is about.'),
     relatedTools: z
         .string()

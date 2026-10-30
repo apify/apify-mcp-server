@@ -203,7 +203,7 @@ You can also expose a specific Actor as its own tool, for example `apify/web-sea
 
 ## 🛠️ Tools, resources, and prompts
 
-Any [Actor](https://apify.com/store) can be a tool, and agents discover new ones as they work. By default, the server loads the `actors` and `docs` categories, two Actor tools ([RAG Web Browser](https://apify.com/apify/rag-web-browser) and [Web Fetch](https://apify.com/apify/web-fetch)), and `report-problem`. Everything else is opt-in by category or by tool name.
+Any [Actor](https://apify.com/store) can be a tool, and agents discover new ones as they work. By default, the server loads the `actors` and `docs` categories, two Actor tools ([Web Search](https://apify.com/apify/web-search) and [Web Fetch](https://apify.com/apify/web-fetch)), and `report-problem`. Everything else is opt-in by category or by tool name.
 
 ### Helper tools
 
@@ -237,9 +237,10 @@ Legend for the **Enabled by default** column:
 | `abort-actor-run` | runs | Abort a running Actor run, optionally gracefully. | ⚡ |
 | `search-apify-docs` | docs | Search the Apify and Crawlee documentation for relevant pages. | ✅ |
 | `fetch-apify-docs` | docs | Fetch the full content of a documentation page by its URL. | ✅ |
-| [`apify--rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see [Choose which tools load](#choose-which-tools-load)) | Search the web and return the content of the top results. | ✅ |
+| [`apify--web-search`](https://apify.com/apify/web-search) | Actor (see [Choose which tools load](#choose-which-tools-load)) | Search the web and return one page of results: titles, URLs, and snippets. | ✅ |
 | [`apify--web-fetch`](https://apify.com/apify/web-fetch) | Actor (see [Choose which tools load](#choose-which-tools-load)) | Fetch a URL and return its content as Markdown, text, HTML, or other formats. | ✅ |
 | `report-problem` | dev | Report a problem with an Apify tool or Actor to the Apify team. | ✅¹ |
+| [`apify--rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see [Choose which tools load](#choose-which-tools-load)) | Search the web and return the content of the top results. | |
 | `get-actor-list` | none (select by name: `tools=get-actor-list`) | List the Actors you own and those shared with you, including private ones. | |
 | `send-server-actor-request` | none (select by name: `tools=send-server-actor-request`) | Send one HTTP request to a Server Actor's API, as documented by its API schema, and return the response. | |
 | `delete-actor` | none (select by name: `tools=delete-actor`) | Delete an Actor from your account permanently. Public Actors must be unpublished first. | |
@@ -311,6 +312,7 @@ https://mcp.apify.com?tools=apify/instagram-scraper
 <details>
 <summary><b>Backward compatibility with older configurations</b></summary>
 
+- `apify/web-search` replaced `apify/rag-web-browser` in the default tools. To keep `apify--rag-web-browser`, add `apify/rag-web-browser` to your `tools` list, or set `tools=actors,docs,apify/rag-web-browser,apify/web-fetch` for the previous default categories and Actors.
 - The `actors` URL parameter and `--actors` flag still work. They're merged into `tools`, so `?actors=apify/web-fetch` equals `?tools=apify/web-fetch`.
 - `enableAddingActors`, `enable-adding-actors`, and `enableActorAutoLoading` were removed and are ignored. Dynamic Actor calls come from `call-actor`, which the default `actors` category includes.
 - The selectors `add-actor`, `experimental`, and `preview` are retired and load nothing. Use `call-actor` or the `actors` category.

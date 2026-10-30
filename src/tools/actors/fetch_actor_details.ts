@@ -104,10 +104,7 @@ export function resolveOutputOptions(output?: z.infer<typeof actorDetailsOutputO
  * `src/tools/widgets/fetch_actor_details_widget.ts`.
  */
 export const fetchActorDetailsToolArgsSchema = z.object({
-    actor: z
-        .string()
-        .min(1)
-        .describe(`Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".`),
+    actor: z.string().min(1).describe(`Actor ID or full name in the format "username/name".`),
     output: actorDetailsOutputOptionsSchema
         .optional()
         .describe('Specify which information to include in the response to save tokens.'),
@@ -117,7 +114,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
     const mcpToolList = hasTool(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST)
         ? `\nIt does not connect to an MCP server Actor; ${HELPER_TOOLS.ACTOR_MCP_TOOL_LIST} lists its MCP tools.`
         : '';
-    return dedent`Get detailed information about an Actor by its ID or full name (format: "username/name", e.g., "apify/rag-web-browser").
+    return dedent`Get detailed information about an Actor by its ID or full name (format: "username/name").
 
 Requires the exact ID or full name — do not construct a plausible-looking name and call this tool with it.${
         hasTool(HELPER_TOOLS.STORE_SEARCH)
