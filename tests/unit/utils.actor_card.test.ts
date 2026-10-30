@@ -350,7 +350,7 @@ describe('formatActorToStructuredCard', () => {
 
             // Should include pricing
             expect(result.pricing).toBeDefined();
-            expect(result.pricing.model).toBe('PER_ACTOR_RUN');
+            expect(result.pricing?.model).toBe('PER_ACTOR_RUN');
 
             // Should include stats
             expect(result.stats).toBeDefined();
@@ -363,8 +363,8 @@ describe('formatActorToStructuredCard', () => {
             expect(result.rating?.count).toBe(14);
 
             // Should include metadata (developer, categories, dates, deprecation)
-            expect(result.developer.username).toBe('apify');
-            expect(result.developer.isOfficialApify).toBe(true);
+            expect(result.developer?.username).toBe('apify');
+            expect(result.developer?.isOfficialApify).toBe(true);
             expect(result.categories).toEqual(['AI', 'Open Source']);
             expect(result.modifiedAt).toBe('2025-11-27T09:32:06.582Z');
             expect(result.isDeprecated).toBe(false);
@@ -391,10 +391,9 @@ describe('formatActorToStructuredCard', () => {
             expect(result.url).toBe('https://apify.com/apify/rag-web-browser');
             expect(result.fullName).toBe('apify/rag-web-browser');
 
-            // Should have empty/default values for description section
-            expect(result.developer.username).toBe('');
-            expect(result.description).toBe('');
-            expect(result.categories).toEqual([]);
+            expect(result).not.toHaveProperty('developer');
+            expect(result).not.toHaveProperty('description');
+            expect(result).not.toHaveProperty('categories');
         });
 
         it('includes only description text when includeDescription is true', () => {
@@ -407,8 +406,9 @@ describe('formatActorToStructuredCard', () => {
             });
 
             expect(result.description).toContain('Web browser for OpenAI Assistants');
-            expect(result.developer.username).toBe(''); // Default value, not filled
-            expect(result.categories).toEqual([]); // Default value, not filled
+            expect(result).not.toHaveProperty('developer');
+            expect(result).not.toHaveProperty('categories');
+            expect(result).not.toHaveProperty('pricing');
             expect(result.stats).toBeUndefined();
         });
     });
@@ -454,7 +454,7 @@ describe('formatActorToStructuredCard', () => {
     });
 
     describe('granular options - includePricing', () => {
-        it('includes default pricing when includePricing is false', () => {
+        it('omits pricing when includePricing is false', () => {
             const result = formatActorToStructuredCard(mockActor, {
                 includeDescription: false,
                 includeStats: false,
@@ -463,8 +463,7 @@ describe('formatActorToStructuredCard', () => {
                 includeMetadata: false,
             });
 
-            // Should have default pricing
-            expect(result.pricing.model).toBe('FREE');
+            expect(result).not.toHaveProperty('pricing');
         });
 
         it('includes actual pricing when includePricing is true', () => {
@@ -476,7 +475,8 @@ describe('formatActorToStructuredCard', () => {
                 includeMetadata: false,
             });
 
-            expect(result.pricing.model).toBe('PER_ACTOR_RUN');
+            expect(result.pricing?.model).toBe('PER_ACTOR_RUN');
+            expect(result).not.toHaveProperty('developer');
         });
     });
 
@@ -516,8 +516,10 @@ describe('formatActorToStructuredCard', () => {
                 includeMetadata: false,
             });
 
-            expect(result.modifiedAt).toBeUndefined();
-            expect(result.isDeprecated).toBe(false); // Default value
+            expect(result).not.toHaveProperty('developer');
+            expect(result).not.toHaveProperty('categories');
+            expect(result).not.toHaveProperty('modifiedAt');
+            expect(result).not.toHaveProperty('isDeprecated');
         });
 
         it('includes metadata (developer, categories, dates, deprecation) when includeMetadata is true', () => {
@@ -529,11 +531,12 @@ describe('formatActorToStructuredCard', () => {
                 includeMetadata: true,
             });
 
-            expect(result.developer.username).toBe('apify');
-            expect(result.developer.isOfficialApify).toBe(true);
+            expect(result.developer?.username).toBe('apify');
+            expect(result.developer?.isOfficialApify).toBe(true);
             expect(result.categories).toEqual(['AI', 'Open Source']);
             expect(result.modifiedAt).toBe('2025-11-27T09:32:06.582Z');
             expect(result.isDeprecated).toBe(true);
+            expect(result).not.toHaveProperty('pricing');
         });
     });
 
@@ -548,9 +551,9 @@ describe('formatActorToStructuredCard', () => {
             });
 
             expect(result.description).toContain('Web browser for OpenAI Assistants');
-            expect(result.pricing.model).toBe('PER_ACTOR_RUN');
-            expect(result.developer.username).toBe(''); // Not included (metadata is false)
-            expect(result.categories).toEqual([]); // Not included (metadata is false)
+            expect(result.pricing?.model).toBe('PER_ACTOR_RUN');
+            expect(result).not.toHaveProperty('developer');
+            expect(result).not.toHaveProperty('categories');
             expect(result.stats).toBeUndefined();
             expect(result.rating).toBeUndefined();
             expect(result.modifiedAt).toBeUndefined();
@@ -567,7 +570,7 @@ describe('formatActorToStructuredCard', () => {
 
             expect(result.stats).toBeDefined();
             expect(result.rating).toBeDefined();
-            expect(result.developer.username).toBe('');
+            expect(result).not.toHaveProperty('developer');
             expect(result.modifiedAt).toBeUndefined();
         });
     });

@@ -227,7 +227,7 @@ Legend for the **Enabled by default** column:
 | Tool name | Category | Description | Enabled by default |
 | :--- | :--- | :--- | :---: |
 | `search-actors` | actors | Search for Actors in Apify Store. | ✅ |
-| `fetch-actor-details` | actors | Get an Actor's input schema, README (summary when available, full otherwise), pricing, and a Server Actor's HTTP operations. The output schema is opt-in. | ✅ |
+| `fetch-actor-details` | actors | Get an Actor's input schema, README (summary when available, full otherwise), pricing, and a Server Actor's HTTP operations. The output schema is opt-in. With an `output` selection, `structuredContent.actorInfo` leaves out the sections it does not request. | ✅ |
 | `call-actor` | actors | Run an Actor and return its run status and storage IDs. Use `fetch-actor-details` first to get the input schema. | ✅ |
 | `fetch-actor-mcp-tool-list` | actors | List the tools of an Actor that runs an MCP server, with their schemas, annotations, and metadata. | ✅ |
 | `call-actor-mcp-tool` | actors | Call one tool on an Actor's MCP server and return its result. | ✅ |
