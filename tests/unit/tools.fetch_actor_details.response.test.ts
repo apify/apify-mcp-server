@@ -162,10 +162,7 @@ describe('buildFetchActorDetailsResult()', () => {
         expect(content.at(-1)?.text).toBe(VERBATIM_LINKS_NUDGE);
     });
 
-    // The direct buildActorNotFoundResponse() tests below cannot see whether this function
-    // forwards the session's tool names, so a hardcoded [] here would go unnoticed.
     it('returns only the requested sections in structuredContent.actorInfo', async () => {
-        // Paid, official and deprecated, so a placeholder (FREE, unofficial, active) cannot pass for real data.
         const paidDeprecatedActor = {
             id: 'actor-id-1',
             name: 'example-mcp-server',
@@ -200,6 +197,8 @@ describe('buildFetchActorDetailsResult()', () => {
         }
     });
 
+    // The direct buildActorNotFoundResponse() tests below cannot see whether this function
+    // forwards the session's tool names, so a hardcoded [] here would go unnoticed.
     it('forwards the session tool names to the not-found response', async () => {
         vi.mocked(fetchActorDetails).mockResolvedValue(null as unknown as ActorDetailsResult);
 

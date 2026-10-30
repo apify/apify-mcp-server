@@ -451,22 +451,6 @@ describe('formatActorToStructuredCard', () => {
 
             expect(result.stats).not.toHaveProperty('bookmarks');
         });
-
-        // A paid, official, deprecated Actor: placeholders (FREE, unofficial, active) would read as real values.
-        it('omits every unrequested section from a stats-only card', () => {
-            const result = formatActorToStructuredCard(mockDeprecatedActor, {
-                includeDescription: false,
-                includeStats: true,
-                includePricing: false,
-                includeRating: false,
-                includeMetadata: false,
-            });
-
-            expect(result.stats).toBeDefined();
-            for (const section of ['pricing', 'developer', 'categories', 'modifiedAt', 'isDeprecated', 'description']) {
-                expect(result).not.toHaveProperty(section);
-            }
-        });
     });
 
     describe('granular options - includePricing', () => {
