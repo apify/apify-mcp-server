@@ -94,10 +94,7 @@ export type RunDataset = {
      * GET response does not return it (only the dataset-list endpoint does), so it is normally absent.
      */
     inflatedBytes?: number;
-    /**
-     * Dot-notation field paths with array indices collapsed. A path through an array is not a
-     * valid `fields` selection.
-     */
+    /** Dot-notation paths that work as a `fields` selection; a field holding an array appears by its top-level name. */
     fields?: string[];
     /**
      * JSON Schema fragment for each dataset row. Populated only by direct actor tools (where
@@ -168,38 +165,33 @@ export type FetchActorRunResult = {
 // -----------------------------------------------------------------------------
 
 /**
- * Apify expands array indices in dataset fields (e.g. `entities.hashtags.0.text`,
- * `entities.hashtags.1.text`, ... `entities.hashtags.14.text`), so deeply-nested or
- * array-heavy schemas balloon into hundreds of redundant paths. The collapsed paths describe
- * the structure only: one through an array is not a valid `fields` selection.
+ * Apify expands array indices in dataset fields (`entities.hashtags.0.text`, ...
+ * `entities.hashtags.14.text`), so array-heavy schemas balloon into hundreds of paths. A path to
+ * or through an array also selects nothing: `get-dataset-items` flattens a dotted path's
+ * top-level field and the API's flatten recurses into arrays, so no such key exists. Only the
+ * top-level name selects an array, and listing nothing else keeps agents from copying a dead path.
  *
  * Exported for direct unit testing of edge cases (empty input, all-numeric paths) —
  * production callers go through `normalizeDatasetFields`.
  */
-export function collapseArrayIndices(fields: string[]): string[] {
-    const seen = new Set<string>();
-    const result: string[] = [];
-    for (const field of fields) {
-        const collapsed = field
-            .split('.')
-            .filter((segment) => !/^\d+$/.test(segment))
-            .join('.');
-        if (collapsed && !seen.has(collapsed)) {
-            seen.add(collapsed);
-            result.push(collapsed);
-        }
-    }
-    return result;
+export function collapseArrayPaths(fields: string[]): string[] {
+    const collapsed = fields.map((field) => {
+        const segments = field.split('.');
+        const indexAt = segments.findIndex((segment) => /^\d+$/.test(segment));
+        if (indexAt === -1) return field;
+        return indexAt > 0 ? segments[0] : '';
+    });
+    return [...new Set(collapsed.filter(Boolean))];
 }
 
 /**
  * Canonical normalization for an Apify-returned `dataset.fields` array: translate
- * slash-notation to dot-notation AND collapse expanded array indices. Used at every
+ * slash-notation to dot-notation and collapse array paths. Used at every
  * MCP tool boundary that surfaces dataset field metadata (`buildRunDataset` for
  * `call-actor` / `get-actor-run`, and `get-dataset` for the raw API passthrough).
  */
 export function normalizeDatasetFields(fields: string[]): string[] {
-    return collapseArrayIndices(fields.map((f) => f.replace(/\//g, '.')));
+    return collapseArrayPaths(fields.map((f) => f.replace(/\//g, '.')));
 }
 
 export function toIsoString(value: Date | string | undefined | null): string | undefined {
@@ -535,37 +527,20 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
 }
 
 /**
- * Examples only: structured output already carries the field list. The API's projection does
- * not cross arrays, so a dotted path into one returns `[{}]`, and the collapsed `fields` do not
- * show which paths cross one; hence the list of arrays. Never show an indexed path
- * (`results.0.url`): evals showed weak models copy it and report one element as the whole result.
+ * Structured output already carries the field list. The array rule uses placeholder names: agents
+ * copy the dataset's own paths (`results.url`) or bare inner names (`url`) into `fields` and get
+ * nothing. Never show an indexed path (`results.0.url`): evals showed weak models copy it and
+ * report one element as the whole result.
  */
 export function fieldsProjectionHint(fields: string[] | undefined): string {
     if (!fields?.length) return '';
-    const isIndex = (segment: string) => /^\d+$/.test(segment);
-    const toDotted = (field: string) =>
-        field
-            .split('/')
-            .filter((segment) => !isIndex(segment))
-            .join('.');
-    // Outermost array with named fields inside: `metadata/jsonLd/0/@graph/0/url` → `metadata.jsonLd`.
-    const objectArrays = new Set<string>();
-    let arrayChildField: string | undefined;
-    for (const field of fields) {
-        const segments = field.split('/');
-        const indexAt = segments.findIndex(isIndex);
-        if (indexAt > 0 && segments.slice(indexAt).some((segment) => !isIndex(segment))) {
-            objectArrays.add(segments.slice(0, indexAt).join('.'));
-            arrayChildField ??= field;
-        }
-    }
-    const objectField = fields.find((field) => field.includes('/') && !field.split('/').some(isIndex));
-    const topLevelExample = (arrayChildField ?? objectField ?? fields[0]).split('/')[0];
-    const objectClause = objectField ? ` A dotted path works through objects (e.g. ${toDotted(objectField)}).` : '';
-    const arrayClause = arrayChildField
-        ? ` A dotted path into an array returns nothing (e.g. ${toDotted(arrayChildField)}); arrays of objects: ${[...objectArrays].join(', ')}.`
-        : '';
-    return ` Select with fields="...": a top-level name (e.g. ${topLevelExample}) returns the whole value, arrays included.${objectClause}${arrayClause}`;
+    const listClause = ' Each listed field path works in fields="...".';
+    const hasArray = fields.some((field) => field.split('/').some((segment) => /^\d+$/.test(segment)));
+    if (!hasArray) return listClause;
+    return (
+        `${listClause} Arrays come whole under their top-level field: for items shaped { a, b: [{ c }] },` +
+        ' fields="b" returns every element of b, while fields="b.c" and fields="c" return nothing.'
+    );
 }
 
 /**

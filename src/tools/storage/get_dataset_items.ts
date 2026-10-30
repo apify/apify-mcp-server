@@ -47,7 +47,7 @@ const getDatasetItemsArgs = z.object({
             'Comma-separated list of fields to include in results. ' +
                 'Fields in output are sorted as specified. ' +
                 'Use dot notation for nested objects (e.g. "metadata.url"); the server auto-flattens parent prefixes and returns flat keys. ' +
-                'A dotted path through an array (e.g. "results.url") returns nothing: select the whole top-level field (e.g. "results") for every element.',
+                'A dotted path to or through an array (e.g. "results.url") returns nothing: select its top-level field (e.g. "results") for every element.',
         ),
     omit: z.string().optional().describe('Comma-separated list of fields to exclude from results.'),
     desc: z.boolean().optional().describe('If true, results are returned in reverse order (newest to oldest).'),
