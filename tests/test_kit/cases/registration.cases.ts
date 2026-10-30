@@ -77,13 +77,13 @@ const CLAUDE_CONNECTOR_CLIENT_OPTIONS: SuiteClientOptions = {
 /** Tool/Actor selection, categories, env loading, auto-inject, server mode. */
 export const registrationCases: Case[] = [
     {
-        name: 'matches spec default: actors,docs,apify/rag-web-browser,apify/web-fetch when no params provided',
+        name: 'matches spec default: actors,docs,apify/web-search,apify/web-fetch when no params provided',
         isDeploymentTest: true,
         run: withClient({ telemetry: { enabled: false } }, async (client) => {
             const tools = await client.listTools();
             const names = getToolNames(tools);
 
-            // Equivalent to tools=actors,docs,apify/rag-web-browser,apify/web-fetch (no widgets outside apps).
+            // Equivalent to tools=actors,docs,apify/web-search,apify/web-fetch (no widgets outside apps).
             const expectedActorsTools = [
                 'fetch-actor-details',
                 'search-actors',
@@ -92,10 +92,7 @@ export const registrationCases: Case[] = [
                 'call-actor-mcp-tool',
             ];
             const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
-            const expectedActors = [
-                actorNameToToolName('apify/rag-web-browser'),
-                actorNameToToolName('apify/web-fetch'),
-            ];
+            const expectedActors = [actorNameToToolName('apify/web-search'), actorNameToToolName('apify/web-fetch')];
             const expectedTotal = expectedActorsTools.concat(expectedDocsTools, expectedActors);
             expect(names).toHaveLength(expectedTotal.length + AUTO_INJECTED_TOOL_NAMES.length);
 

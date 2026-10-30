@@ -137,7 +137,7 @@ export const WEB_SEARCH = 'apify/web-search';
  */
 export const INPUT_INTERFACE_ACTORS: ReadonlySet<string> = new Set([WEB_SEARCH, WEB_FETCH]);
 export const defaults = {
-    actors: [RAG_WEB_BROWSER, WEB_FETCH],
+    actors: [WEB_SEARCH, WEB_FETCH],
 };
 
 /** API rejects `includeInputSchema=true` above this; mirrors apify-core `MAX_LIMIT_WITH_INPUT_SCHEMA`. */
