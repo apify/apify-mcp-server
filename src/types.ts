@@ -450,7 +450,12 @@ export type ToolCallTelemetryProperties = {
     validation_missing_property?: string;
     validation_additional_property?: string;
     validation_error_count?: number;
+    /** How a passing local Actor input check changed the input; absent when it changed nothing or failed. */
+    validation_input_change?: ValidationInputChange;
 };
+
+/** AJV coerces types and drops undeclared keys of the input in place while checking it. */
+export type ValidationInputChange = 'coerced' | 'removed' | 'coerced_and_removed';
 
 /**
  * Segment 'MCP Reported Problem' event payload: the `report-problem` submission plus the same
@@ -496,6 +501,7 @@ export type ToolTelemetryContext = {
     actorTenancy?: ActorTenancy;
     actorId?: string;
     ajvErrorDetails?: AjvErrorDetails;
+    validationInputChange?: ValidationInputChange;
 };
 
 export type CallDiagnostics = Pick<
@@ -517,6 +523,7 @@ export type CallDiagnostics = Pick<
     | 'validation_missing_property'
     | 'validation_additional_property'
     | 'validation_error_count'
+    | 'validation_input_change'
 >;
 
 /**

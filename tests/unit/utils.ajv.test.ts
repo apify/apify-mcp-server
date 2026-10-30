@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ajv, compileSchema, fixZodSchemaRequired } from '../../src/utils/ajv.js';
+import { ajv, compileSchema, fixZodSchemaRequired, getValidationInputChange } from '../../src/utils/ajv.js';
 
 describe('compileSchema', () => {
     it('validates declared properties normally', () => {
@@ -163,5 +163,54 @@ describe('ajv instance — Actor input schemas', () => {
         const data: Record<string, unknown> = { url: 'https://example.com', dynamicField: 'kept' };
         expect(validate(data)).toBe(true);
         expect(data).toEqual({ url: 'https://example.com', dynamicField: 'kept' });
+    });
+});
+
+describe('getValidationInputChange — what a passing check changed', () => {
+    const validate = compileSchema({
+        type: 'object',
+        properties: {
+            maxResults: { type: 'integer' },
+            searchQueries: { type: 'array', items: { type: 'string' } },
+            startUrls: {
+                type: 'array',
+                items: { type: 'object', properties: { url: { type: 'string' } }, additionalProperties: false },
+            },
+            proxy: {
+                type: 'object',
+                properties: { useApifyProxy: { type: 'boolean' } },
+                additionalProperties: false,
+            },
+        },
+        additionalProperties: false,
+    });
+
+    function validateAndCompare(input: Record<string, unknown>) {
+        const snapshot = structuredClone(input);
+        expect(validate(input)).toBe(true);
+        return getValidationInputChange(snapshot, input);
+    }
+
+    it('reports nothing for an input the check left unchanged', () => {
+        expect(validateAndCompare({ maxResults: 5, searchQueries: ['apify'] })).toBeUndefined();
+    });
+
+    it('reports a numeric string turned into a number as coerced', () => {
+        expect(validateAndCompare({ maxResults: '5' })).toBe('coerced');
+    });
+
+    // The scalar is wrapped in a new array; no key disappears, so it must not read as a removal.
+    it('reports a scalar wrapped into an array as coerced, not removed', () => {
+        expect(validateAndCompare({ searchQueries: 'apify' })).toBe('coerced');
+    });
+
+    it('reports a key dropped from an object inside an array as removed', () => {
+        expect(validateAndCompare({ startUrls: [{ url: 'https://apify.com', label: 'home' }] })).toBe('removed');
+    });
+
+    it('reports a coercion and a removal in the same nested object as coerced_and_removed', () => {
+        expect(validateAndCompare({ proxy: { useApifyProxy: 'true', groups: ['RESIDENTIAL'] } })).toBe(
+            'coerced_and_removed',
+        );
     });
 });

@@ -19,6 +19,7 @@ import type {
     ToolCallTelemetryProperties,
     ToolEntry,
     ToolStatus,
+    ValidationInputChange,
 } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 import { logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
@@ -116,6 +117,7 @@ export async function executeToolAndUpdateTask(params: {
     userId: string | null;
     telemetryEnv: TelemetryEnv;
     sendNotification: (notification: ServerNotification) => Promise<void>;
+    validationInputChange?: ValidationInputChange;
 }): Promise<void> {
     const {
         taskId,
@@ -137,6 +139,7 @@ export async function executeToolAndUpdateTask(params: {
         userId,
         telemetryEnv,
         sendNotification,
+        validationInputChange,
     } = params;
     const emitLog = async (msg: { level: string; data?: unknown }) =>
         server.sendLoggingMessage(msg as Parameters<typeof server.sendLoggingMessage>[0]);
@@ -160,7 +163,10 @@ export async function executeToolAndUpdateTask(params: {
             taskId,
             telemetryData,
             userId,
-            callDiagnostics: diagnostics,
+            callDiagnostics: {
+                ...diagnostics,
+                ...(validationInputChange && { validation_input_change: validationInputChange }),
+            },
             args: toolArgs,
             result,
             telemetryEnv,
