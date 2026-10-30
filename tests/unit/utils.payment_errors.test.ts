@@ -72,7 +72,7 @@ describe('isX402PaymentRequiredError()', () => {
         );
         const runLimitError = Object.assign(new Error('Cannot start new Actor runs.'), {
             statusCode: 402,
-            type: 'cannot-start-actor-runs',
+            type: 'concurrent-runs-limit-exceeded',
         });
         expect(isX402PaymentRequiredError(runLimitError)).toBe(false);
     });

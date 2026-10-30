@@ -10,6 +10,7 @@ import {
 } from '../../src/const.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from '../../src/mcp/tool_call_error_mapper.js';
 import type { CallDiagnostics } from '../../src/types.js';
+import { ACTOR_RUN_LIMIT_MESSAGE } from '../../src/utils/apify_errors.js';
 import { getToolCallErrorUserText } from '../../src/utils/mcp.js';
 import {
     makePaymentRequiredError,
@@ -155,6 +156,27 @@ describe('buildToolCallErrorResult()', () => {
             'all publication requirements on publish. The error message names the requirement that is not met.',
         );
         expect('userText' in result && result.userText).not.toMatch(/retry/i);
+    });
+
+    it('maps a concurrent-run limit 402 to the run-limit message, not a payment request', () => {
+        const error = Object.assign(new Error('You will exceed your limit of 25 concurrent Actor runs.'), {
+            statusCode: 402,
+            type: 'concurrent-runs-limit-exceeded',
+        });
+        const result = buildToolCallErrorResult(error, {
+            toolName: TOOL_NAME,
+            actorName: ACTOR_NAME,
+            actorId: ACTOR_ID,
+            isAborted: false,
+        });
+
+        expect(result.kind).toBe(TOOL_CALL_ERROR_KIND.EXECUTION);
+        expect(result.toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
+        expect(result.callDiagnostics).toMatchObject({
+            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+            failure_http_status: 402,
+        });
+        expect('userText' in result && result.userText).toContain(ACTOR_RUN_LIMIT_MESSAGE);
     });
 
     it('returns ABORTED toolStatus for an aborted execution error', () => {
