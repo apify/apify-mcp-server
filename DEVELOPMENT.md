@@ -204,11 +204,11 @@ This is a real execution decision, not a visibility flag: internal's `isDeployme
 **Tests in this repo** cover the package's MCP and library surface. They live in `tests/test_kit/cases/*.cases.ts` (registered through `tests/integration/suite.ts`) and `tests/unit/`:
 
 - MCP protocol — `initialize` handshake, request/response shapes for `tools/*`, `prompts/*`, `resources/*`, `tasks/*`, notification delivery, JSON-RPC error codes.
-- Package logic — tool loader and selectors, widget metadata shape, structured output schemas, prompt registry, built-in tools, `call-actor` `RunResponse` shape, `SkyfirePaymentProvider`, client-name capability detection, `?ui=` server-mode parsing.
+- Package logic — tool loader and selectors, widget metadata shape, structured output schemas, prompt registry, built-in tools, `call-actor` `RunResponse` shape, client-name capability detection, `?ui=` server-mode parsing.
 
 **Tests not in this repo** — anything that only makes sense with the hosted stack:
 
-- IAM auth gate (401, unauth user toolset filter, `?payment=skyfire` bypass), rate limiter, `RedisEventStore` replay via `Last-Event-ID`, user-aware rental Actor filter, non-MCP HTTP routes (`/`, OAuth metadata, server card).
+- IAM auth gate (401, unauth user toolset filter), rate limiter, `RedisEventStore` replay via `Last-Event-ID`, user-aware rental Actor filter, non-MCP HTTP routes (`/`, OAuth metadata, server card).
 - Multi-node coordination — cross-node session continuity and cancellation, failover through the Caddy load balancer.
 
 Those live in `apify-mcp-server-internal`, together with a small **contract smoke suite** that re-asserts our package's behavior survives the hosted server's extra code (auth, rate limiter, Caddy, response handlers). We don't maintain that suite — internal does — but we should know it exists.

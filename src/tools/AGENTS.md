@@ -136,7 +136,6 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 - A tool whose arguments carry secrets sets `redactArgs` on its entry (`HelperTool` in `../types.ts`).
   It runs before AJV validation, so it must accept any shape, must not mutate the arguments, and must
   be an allowlist: the logged copy keeps the undeclared keys AJV strips only from the tool's copy.
-  `cloneToolEntry` keeps it on the copies the providers decorate.
 - Descriptions, result text, annotations and the tool set follow [TOOL_GUIDELINES.md](../../TOOL_GUIDELINES.md); the gating mechanics below implement its "name only what the session has" rule.
 
 **Storage tool description skeleton** (`storage/`, all 8 tools): lead sentence stating what the tool
