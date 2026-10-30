@@ -147,8 +147,7 @@ The web-selection family (`merge/web-selection/*`, 9 items: 7 proper + 2 with `e
 the clash between the default web tools: web search by query (`apify/web-search`) vs
 single-URL verbatim fetch (`apify/web-fetch`) vs Actor discovery (`search-actors`) vs a
 specialized Actor for structured platform data, plus coexistence with a client's built-in,
-summarizing fetch. `rag-blocked` loads `apify/rag-web-browser` through `metadata.tools`, so the opt-in
-tool stays covered. Also stateless — no fixtures script.
+summarizing fetch. Also stateless — no fixtures script.
 Known residual (2026-08-21): on `merge/web-fetch/unsupported-protocol`,
 claude-haiku-4-5 reproducibly rewrites the ftp:// URL to https:// without telling the user,
 despite the scheme note in both the tool description and the `url` parameter — a model-level

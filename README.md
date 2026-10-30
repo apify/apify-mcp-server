@@ -312,7 +312,7 @@ https://mcp.apify.com?tools=apify/instagram-scraper
 <details>
 <summary><b>Backward compatibility with older configurations</b></summary>
 
-- `apify/web-search` replaced `apify/rag-web-browser` in the default tools. To keep `apify--rag-web-browser`, add `apify/rag-web-browser` to your `tools` list, or set `tools=actors,docs,apify/rag-web-browser,apify/web-fetch` for the previous default set.
+- `apify/web-search` replaced `apify/rag-web-browser` in the default tools. To keep `apify--rag-web-browser`, add `apify/rag-web-browser` to your `tools` list, or set `tools=actors,docs,apify/rag-web-browser,apify/web-fetch` for the previous default categories and Actors.
 - The `actors` URL parameter and `--actors` flag still work. They're merged into `tools`, so `?actors=apify/web-fetch` equals `?tools=apify/web-fetch`.
 - `enableAddingActors`, `enable-adding-actors`, and `enableActorAutoLoading` were removed and are ignored. Dynamic Actor calls come from `call-actor`, which the default `actors` category includes.
 - The selectors `add-actor`, `experimental`, and `preview` are retired and load nothing. Use `call-actor` or the `actors` category.
