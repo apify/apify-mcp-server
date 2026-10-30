@@ -5,7 +5,14 @@ import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { readBodyUnderCap, sendApifyApiRequest } from '../../apify_client.js';
-import { FAILURE_CATEGORY, HELPER_TOOLS, HTTP_FORBIDDEN, HTTP_UNAUTHORIZED, MAX_INLINE_BYTES } from '../../const.js';
+import {
+    FAILURE_CATEGORY,
+    HELPER_TOOLS,
+    HTTP_FORBIDDEN,
+    HTTP_UNAUTHORIZED,
+    MAX_INLINE_BYTES,
+    WEB_FETCH,
+} from '../../const.js';
 import { getActorMCPServerPath, resolveOnStandbyOrigin } from '../../mcp/actors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import { isTextualMimeType, maskSessionToken, parseCharset, REDACTED } from '../../resources/api_resources.js';
@@ -61,15 +68,30 @@ function toAdvertisedInputSchema(args: z.ZodObject<z.ZodRawShape>): ToolInputSch
 }
 
 /**
+ * The `GET /` query of the default `apify/web-fetch` tool (#1647). A free record let agents write `query` as a bare
+ * URL; named fields show that `url` goes inside it. `formats` and `headers` are strings, as the query encodes them.
+ * Other keys stay allowed as scalars, as in the generic record: `additionalProperties: false` would make AJV's
+ * `removeAdditional` drop `unwrap` silently instead of letting the tool refuse it.
+ */
+const webFetchQuery = z
+    .object({
+        url: z.string().describe('The URL to fetch.'),
+        formats: z.string().optional().describe('Comma-separated, e.g. "markdown,links".'),
+        headers: z.string().optional().describe('A JSON object as a string.'),
+        wait: z.number().int().min(1).max(60000).optional().describe('Milliseconds to wait after the page loads.'),
+    })
+    .catchall(z.union([z.string(), z.number(), z.boolean()]))
+    .describe('Query parameters of GET /.');
+
+/**
  * The input schema and validator of a selected Server Actor's tool: this tool's arguments without `actor`, `method`
  * and `path` narrowed to the documented ones, each with a default when there is one, and `body` only when an
  * operation takes one. A templated path cannot be an enum, so then `path` is a string that lists the paths.
  */
-export function buildServerActorToolSchemas({
-    methods,
-    paths,
-    hasRequestBody,
-}: Pick<ServerActorToolInfo, 'methods' | 'paths' | 'hasRequestBody'>) {
+export function buildServerActorToolSchemas(
+    { methods, paths, hasRequestBody }: Pick<ServerActorToolInfo, 'methods' | 'paths' | 'hasRequestBody'>,
+    actorFullName: string,
+) {
     const method = z.enum(methods).describe('HTTP method of the operation.');
     const isTemplated = paths.some((path) => /\{[^}]*\}/.test(path));
     const path = isTemplated
@@ -81,7 +103,7 @@ export function buildServerActorToolSchemas({
     const args = z.object({
         method: methods.length === 1 ? method.default(methods[0]) : method,
         path: paths.length === 1 && !isTemplated ? path.default(paths[0]) : path,
-        query: sendServerActorRequestArgs.shape.query,
+        query: actorFullName === WEB_FETCH ? webFetchQuery : sendServerActorRequestArgs.shape.query,
         ...(hasRequestBody && { body: sendServerActorRequestArgs.shape.body }),
     });
     return {

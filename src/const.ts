@@ -136,7 +136,7 @@ export const WEB_SEARCH = 'apify/web-search';
  * interface. Hand-wired for selected Apify Actors so the served tool does not change when the Actor's other
  * interfaces do. `apify/rag-web-browser` is a default tool with a server interface.
  */
-export const INPUT_INTERFACE_ACTORS: ReadonlySet<string> = new Set([WEB_SEARCH, WEB_FETCH, RAG_WEB_BROWSER]);
+export const INPUT_INTERFACE_ACTORS: ReadonlySet<string> = new Set([WEB_SEARCH, RAG_WEB_BROWSER]);
 export const defaults = {
     actors: [RAG_WEB_BROWSER, WEB_FETCH],
 };

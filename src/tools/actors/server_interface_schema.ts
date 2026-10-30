@@ -1,4 +1,4 @@
-import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES, WEB_FETCH } from '../../const.js';
 import type { Actor, ServerActorToolInfo } from '../../types.js';
 import { ACTOR_TENANCY } from '../../types.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
@@ -293,12 +293,34 @@ function checkSize(text: string | undefined, actorFullName: string): { text: str
 }
 
 /**
+ * The default `apify/web-fetch` tool takes only `GET /`, without `unwrap` (#1647): `unwrap` replaces the JSON response
+ * with the content alone, which can be binary. `getServerActorsAsTools` refuses a call that sends it.
+ */
+export const WEB_FETCH_REFUSED_QUERY_PARAMETER = 'unwrap';
+
+function listWebFetchToolOperations(operations: ServerOperation[], schema: unknown): ServerOperation[] {
+    return operations
+        .filter(({ method, path }) => method === 'GET' && path === '/')
+        .map(({ operation, ...rest }) => ({
+            ...rest,
+            operation: {
+                ...operation,
+                parameters: (Array.isArray(operation.parameters) ? operation.parameters : []).filter((parameter) => {
+                    const resolved = resolveRef(parameter, schema);
+                    return !isRecord(resolved) || resolved.name !== WEB_FETCH_REFUSED_QUERY_PARAMETER;
+                }),
+            },
+        }));
+}
+
+/**
  * What a selected Server Actor's tool is built from; `undefined` for a schema with no operation. Only what can fit
  * `CLIENT_DESCRIPTION_MAX_LENGTH` is kept: the `serverInterface: true` rendering, and the first operation lines
  * (`formatOperationLine`).
  */
 export function buildServerActorToolInfo(schema: unknown, actorFullName: string): ServerActorToolInfo | undefined {
-    const operations = listServerOperations(schema);
+    const listed = listServerOperations(schema);
+    const operations = actorFullName === WEB_FETCH ? listWebFetchToolOperations(listed, schema) : listed;
     if (operations.length === 0) return undefined;
     // A character takes at most 4 UTF-8 bytes, and the reference budget counts bytes.
     const full = formatWithinBudget(

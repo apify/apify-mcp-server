@@ -197,7 +197,7 @@ A typical task follows four steps:
 
 The server adds `get-dataset-items`, `get-key-value-store-record`, `get-actor-run`, and `abort-actor-run` whenever `call-actor` or an Actor tool is loaded, so the agent can always read results and check on long runs that outlast the wait.
 
-You can also expose a specific Actor as its own tool, for example `apify/web-search` or `apify/instagram-scraper`. The server builds the tool's parameters from the Actor's input schema, so the agent knows exactly what to pass.
+You can also expose a specific Actor as its own tool, for example `apify/web-search` or `apify/instagram-scraper`. The server builds the tool's parameters from the Actor's input schema, so the agent knows exactly what to pass. A Server Actor with an API schema, such as `apify/web-fetch`, gets a tool that sends one HTTP request to its API instead (`apify/rag-web-browser` and `apify/web-search` stay run tools); for `apify/web-fetch` that is `GET /` only.
 
 **Actors that run their own MCP server.** Some Actors are MCP servers themselves. `fetch-actor-mcp-tool-list` lists their tools, and `call-actor-mcp-tool` calls one. When such an Actor is loaded as a tool source, its tools are exposed under names in the form `username--actor-name--tool-name`. Apify Store also lists MCP-related Actors from independent creators; those are separate products with their own READMEs and pricing.
 
@@ -317,7 +317,8 @@ https://mcp.apify.com?tools=apify/instagram-scraper
 - `get-actor-log` was renamed to `get-actor-run-log`, and the `source` category to `versions`. The old names load nothing.
 - `call-actor` no longer calls tools on MCP server Actors: the `actorName:toolName` form is rejected. Use `call-actor-mcp-tool` with `actor`, `tool`, and `arguments`. A selection that names `call-actor` alone needs `call-actor-mcp-tool` added.
 - `fetch-actor-details` no longer lists an MCP server Actor's tools, and `output.mcpTools` is ignored. Use `fetch-actor-mcp-tool-list`, which returns the definitions in `structuredContent.tools`. A selection that names `fetch-actor-details` alone needs `fetch-actor-mcp-tool-list` added.
-- A selected Actor with an API schema (a Server Actor) gets a tool that sends one HTTP request to its API, with `method`, `path`, and `query` arguments, instead of a tool that starts a run. If the Actor is also an MCP server, the selection no longer loads its MCP tools: use `call-actor-mcp-tool`. `call-actor` still starts runs of the Actor. `apify/rag-web-browser`, `apify/web-search`, and `apify/web-fetch` keep their run tools.
+- A selected Actor with an API schema (a Server Actor) gets a tool that sends one HTTP request to its API, with `method`, `path`, and `query` arguments, instead of a tool that starts a run. If the Actor is also an MCP server, the selection no longer loads its MCP tools: use `call-actor-mcp-tool`. `call-actor` still starts runs of the Actor. `apify/rag-web-browser` and `apify/web-search` keep their run tools.
+- `apify--web-fetch` sends `GET /` to the Web Fetch Actor's API instead of starting a run, and returns the HTTP response. Its arguments moved into `query`, for example `{"query": {"url": "https://example.com", "formats": "markdown,links"}}`. `formats` is a comma-separated string, and `headers` is a JSON object as a string.
 
 </details>
 

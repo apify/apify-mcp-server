@@ -10,6 +10,7 @@ import {
     MAX_INLINE_BYTES,
     OFFICIAL_ACTORS_WITH_SIDE_EFFECTS,
     OFFICIAL_APIFY_USERNAMES,
+    WEB_FETCH,
 } from '../../const.js';
 import { ActorLoadError } from '../../errors.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
@@ -32,6 +33,7 @@ import { getActorDefinitionCached } from '../../utils/actor.js';
 import { ajv } from '../../utils/ajv.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { logHttpError } from '../../utils/logging.js';
+import { respondUserError } from '../../utils/mcp.js';
 import { buildActorInputSchema, fixedAjvCompile } from '../actor_input_schema.js';
 import {
     actorNameToToolName,
@@ -40,6 +42,7 @@ import {
     resolveActorInterfaces,
     resolveActorToolMode,
 } from '../actor_tool_naming.js';
+import { isRecord } from '../api/apify_api_spec.js';
 import {
     buildEnrichedDirectActorOutputSchema,
     actorRunOutputSchema,
@@ -52,7 +55,11 @@ import {
     executeSendServerActorRequest,
     redactServerActorRequestArgs,
 } from './send_server_actor_request.js';
-import { buildServerActorToolDescription, formatServerRequestCost } from './server_interface_schema.js';
+import {
+    buildServerActorToolDescription,
+    formatServerRequestCost,
+    WEB_FETCH_REFUSED_QUERY_PARAMETER,
+} from './server_interface_schema.js';
 
 /**
  * MCP-only opt-in injected next to the Actor's own input fields. Same contract as `call-actor`'s
@@ -239,7 +246,7 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
 /**
  * Builds the own tool of each Actor served through its server interface: `send-server-actor-request` with the Actor
  * fixed, its documented operations in the description and its methods and paths in the input schema.
- * `readOnlyHint` is the Actor's, as for a run tool.
+ * `readOnlyHint` and the policy text (`getActorToolPolicy`) are the Actor's, as for a run tool.
  */
 export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
     const tools: ToolEntry[] = [];
@@ -250,12 +257,14 @@ export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
         const { actorFullName } = definition;
         const isReadOnly = isReadOnlyActor(actorInfo);
         // Names fetch-actor-details only when the session has it, and only when the operations are not in full.
-        const buildDescription = ({ hasTool }: ToolDescriptionContext): string => {
+        const buildDescription = (context: ToolDescriptionContext): string => {
+            const { hasTool } = context;
+            const policyDescription = getActorToolPolicy(actorFullName)?.buildDescription?.(context);
             const head = `This tool sends one HTTP request to the server interface of the Actor "${actorFullName}" and returns the response.
 Actor description: ${definition.description}
 ${formatServerRequestCost(actor)}
 The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text; other content types, and bodies over ${MAX_INLINE_BYTES} bytes, are not returned.
-
+${policyDescription ? `\n${policyDescription}\n` : ''}
 Operations:
 `;
             const detailsHint = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? toolInfo.detailsHint : undefined;
@@ -269,7 +278,7 @@ Operations:
             actorFullName,
             description: buildDescription(ALL_TOOLS_PRESENT),
             buildDescription,
-            ...buildServerActorToolSchemas(toolInfo),
+            ...buildServerActorToolSchemas(toolInfo, actorFullName),
             outputSchema: serverActorRequestOutputSchema,
             icons: definition.pictureUrl ? [{ src: definition.pictureUrl, mimeType: 'image/png' }] : undefined,
             annotations: {
@@ -283,8 +292,16 @@ Operations:
             // before initialize, `processParamsGetTools`) is rejected by the call engine, through this flag, before
             // any request.
             hasPaymentProviderStandbyCheck: true,
-            call: async (toolArgs) =>
-                executeSendServerActorRequest({ ...toolArgs, args: { ...toolArgs.args, actor: actorFullName } }),
+            call: async (toolArgs) => {
+                const { query } = toolArgs.args;
+                if (actorFullName === WEB_FETCH && isRecord(query) && WEB_FETCH_REFUSED_QUERY_PARAMETER in query) {
+                    return respondUserError(
+                        `"${WEB_FETCH_REFUSED_QUERY_PARAMETER}" is not accepted by this tool. The response is a JSON ` +
+                            'object with a field for each requested format.',
+                    );
+                }
+                return executeSendServerActorRequest({ ...toolArgs, args: { ...toolArgs.args, actor: actorFullName } });
+            },
         });
     }
     return tools;
