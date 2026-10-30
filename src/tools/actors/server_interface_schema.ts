@@ -104,20 +104,33 @@ function formatOperationLine({ method, path, operation }: ServerOperation, schem
     return text;
 }
 
+/**
+ * The first lines of `count` operation lines within `maxSize`, as `sizeOf` measures it; when not all fit, the lines
+ * that do, then `… and N more`. The cut line is kept even when no line fits.
+ */
+function cutOperationLines(
+    lines: readonly string[],
+    count: number,
+    maxSize: number,
+    sizeOf: (text: string) => number,
+): string {
+    const index = lines.join('\n');
+    if (lines.length === count && sizeOf(index) <= maxSize) return index;
+    // Room for the cut line with the largest count it can show.
+    let size = sizeOf(`… and ${count} more`);
+    const kept: string[] = [];
+    for (const line of lines) {
+        size += sizeOf(line) + 1;
+        if (size > maxSize) break;
+        kept.push(line);
+    }
+    return [...kept, `… and ${count - kept.length} more`].join('\n');
+}
+
 /** One line per operation; over `maxBytes`, the lines that fit, then `… and N more`. */
 function formatOperationIndex(operations: ServerOperation[], schema: unknown, maxBytes: number): string {
     const lines = operations.map((operation) => formatOperationLine(operation, schema));
-    const index = lines.join('\n');
-    if (Buffer.byteLength(index) <= maxBytes) return index;
-    // Room for the cut line with the largest count it can show.
-    let bytes = Buffer.byteLength(`… and ${lines.length} more`);
-    const kept: string[] = [];
-    for (const line of lines) {
-        bytes += Buffer.byteLength(line) + 1;
-        if (bytes > maxBytes) break;
-        kept.push(line);
-    }
-    return [...kept, `… and ${lines.length - kept.length} more`].join('\n');
+    return cutOperationLines(lines, lines.length, maxBytes, Buffer.byteLength);
 }
 
 /** A request body with no JSON media type: whether it is required and its media types, with no schema. */
@@ -148,9 +161,13 @@ function buildServerOperationDetails({ method, path, operation }: ServerOperatio
     };
 }
 
-/** `render` as fenced JSON; `undefined` when its references expand past `MAX_INLINE_BYTES`. */
-function formatWithinBudget(schema: unknown, render: (context: DereferenceContext) => unknown): string | undefined {
-    const budget = { remainingBytes: MAX_INLINE_BYTES };
+/** `render` as fenced JSON; `undefined` when its references expand past `maxBytes`. */
+function formatWithinBudget(
+    schema: unknown,
+    render: (context: DereferenceContext) => unknown,
+    maxBytes = MAX_INLINE_BYTES,
+): string | undefined {
+    const budget = { remainingBytes: maxBytes };
     try {
         return wrapJsonText(render({ spec: schema, shouldKeepExamples: true, budget }));
     } catch (error) {
@@ -171,6 +188,17 @@ function formatOperationCount(operations: ServerOperation[]): string {
 /** E.g. `fetch-actor-details with {"actor":"apify/search","output":{"serverInterface":true}}` */
 function formatDetailsCall(actorFullName: string, serverInterface: true | string): string {
     return `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorFullName, output: { serverInterface } })}`;
+}
+
+/** What a request to the Actor's server interface costs, by tenancy. */
+export function formatServerRequestCost(actor: Pick<Actor, 'actorStandby'>): string {
+    const tenancy = resolveActorTenancy(actor);
+    if (tenancy === ACTOR_TENANCY.MULTI_TENANT) {
+        return `${tenancy}: requests are charged per event and start no run in your account.`;
+    }
+    const idleTimeoutSecs = actor.actorStandby?.idleTimeoutSecs;
+    const idleTimeout = idleTimeoutSecs === undefined ? 'its idle timeout' : `its idle timeout of ${idleTimeoutSecs} s`;
+    return `${tenancy}: the first request starts a run in your account, kept for ${idleTimeout}.`;
 }
 
 /** `undefined` text: the rendering ran out of its budget, so it would not fit. */
@@ -225,14 +253,10 @@ export function buildServerInterfaceText({
     }
 
     const canSend = !hasPaymentProvider && loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
-    const idleTimeoutSecs = actor.actorStandby?.idleTimeoutSecs;
-    const idleTimeout = idleTimeoutSecs === undefined ? 'its idle timeout' : `its idle timeout of ${idleTimeoutSecs} s`;
-    // What a request costs, by tenancy; a payment provider cannot pay for one.
+    // A payment provider cannot pay for a request.
     const notice = hasPaymentProvider
         ? 'Requests to a server interface are not supported in agentic payment mode.'
-        : tenancy === ACTOR_TENANCY.MULTI_TENANT
-          ? `${tenancy}: requests are charged per event and start no run in your account.`
-          : `${tenancy}: the first request starts a run in your account, kept for ${idleTimeout}.`;
+        : formatServerRequestCost(actor);
     // The send tool adds the host itself; without it, the base URL is how the user reaches the API.
     const header = `${notice}\n${canSend ? '' : `Base URL: ${actor.standbyUrl ?? 'not configured'}\n`}`;
     const send = (lead: string, { method, path }: ServerOperation) =>
