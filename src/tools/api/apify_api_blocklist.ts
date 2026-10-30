@@ -79,6 +79,9 @@ function splitRoutePath(path: string): string[] {
         .split('/')
         .filter(Boolean)
         .map((segment) => decodeEscapes(segment).toLowerCase());
+    // A doubled or escaped prefix (`//v2/`, `%76%32/`) leaves a `v2` segment. The API answers 404 to it today;
+    // dropping it keeps the rules matching if a proxy in front ever merges slashes or decodes escapes.
+    while (segments[0] === 'v2') segments.shift();
     segments[0] = API_RESOURCE_ALIASES.get(segments[0]) ?? segments[0];
     return segments;
 }
