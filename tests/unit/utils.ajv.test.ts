@@ -199,7 +199,6 @@ describe('getValidationInputChange — what a passing check changed', () => {
         expect(validateAndCompare({ maxResults: '5' })).toBe('coerced');
     });
 
-    // The scalar is wrapped in a new array; no key disappears, so it must not read as a removal.
     it('reports a scalar wrapped into an array as coerced, not removed', () => {
         expect(validateAndCompare({ searchQueries: 'apify' })).toBe('coerced');
     });

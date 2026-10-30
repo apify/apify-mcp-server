@@ -454,7 +454,6 @@ export type ToolCallTelemetryProperties = {
     validation_input_change?: ValidationInputChange;
 };
 
-/** AJV coerces types and drops undeclared keys of the input in place while checking it. */
 export type ValidationInputChange = 'coerced' | 'removed' | 'coerced_and_removed';
 
 /**

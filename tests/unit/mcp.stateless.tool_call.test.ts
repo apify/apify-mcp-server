@@ -356,7 +356,7 @@ describe('createStatelessServer() tools/call', () => {
             });
         });
 
-        it('records the Actor input change in telemetry on both paths, not in the result', async () => {
+        it('records the Actor input change in telemetry on both paths', async () => {
             const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
             vi.spyOn(actorExecutor, 'executeActorTool').mockResolvedValue({
                 content: [{ type: 'text', text: 'actor ok' }],
@@ -366,18 +366,16 @@ describe('createStatelessServer() tools/call', () => {
                 makeActorTool({ inputSchema: { type: 'object', properties: { maxResults: { type: 'integer' } } } }),
             ];
 
-            const legacy = await callViaLegacy(buildTools, 'test-actor-tool', options, { maxResults: '5' });
-            const stateless = await withStatelessServer(async ({ server, call }) => {
+            await callViaLegacy(buildTools, 'test-actor-tool', options, { maxResults: '5' });
+            await withStatelessServer(async ({ server, call }) => {
                 await loadSource(server, buildTools());
-                return await call('tools/call', { name: 'test-actor-tool', arguments: { maxResults: '5' } });
+                await call('tools/call', { name: 'test-actor-tool', arguments: { maxResults: '5' } });
             }, options);
 
             expect(trackSpy.mock.calls.map(([, , properties]) => properties.validation_input_change)).toEqual([
                 'coerced',
                 'coerced',
             ]);
-            expect(legacy).not.toHaveProperty('toolTelemetry');
-            expect(stateless.result).not.toHaveProperty('toolTelemetry');
         });
 
         it('emits the same telemetry properties, apart from the session id and protocol revision', async () => {

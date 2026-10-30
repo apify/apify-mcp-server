@@ -90,13 +90,13 @@ function findInputChanges(before: unknown, after: unknown): { isCoerced: boolean
     const changes = { isCoerced: false, isRemoved: false };
     if (typeof before !== 'object' || before === null) return changes;
     // Arrays walk by index: AJV never drops an item, so only nested values can change.
-    const afterEntries = after as Record<string, unknown>;
+    const afterRecord = after as Record<string, unknown>;
     for (const [key, value] of Object.entries(before)) {
-        if (!Object.hasOwn(afterEntries, key)) {
+        if (!Object.hasOwn(afterRecord, key)) {
             changes.isRemoved = true;
             continue;
         }
-        const nested = findInputChanges(value, afterEntries[key]);
+        const nested = findInputChanges(value, afterRecord[key]);
         changes.isCoerced ||= nested.isCoerced;
         changes.isRemoved ||= nested.isRemoved;
     }

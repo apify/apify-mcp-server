@@ -222,6 +222,24 @@ describe('direct tool call', () => {
         expect(result.validationInputChange).toBeUndefined();
     });
 
+    it("ignores a change to call-actor's own arguments", async () => {
+        const result = await prepareToolCall({
+            tools: new Map([[HELPER_TOOLS.ACTOR_CALL, callActor]]),
+            apifyToken: 'test-token',
+            name: HELPER_TOOLS.ACTOR_CALL,
+            args: { actor: ACTOR_FULL_NAME, input: { url: 'https://example.com' }, callOptions: { memory: '1024' } },
+            meta: undefined,
+            requestHeaders: undefined,
+            isTaskRequest: false,
+            mcpSessionId: 'test-session',
+            telemetryData: null,
+            clientContext: undefined,
+        });
+        if (!('tool' in result)) throw new Error('Valid input failed validation');
+        expect(result.toolArgs.callOptions).toEqual({ memory: 1024 });
+        expect(result.validationInputChange).toBeUndefined();
+    });
+
     it('points other validation errors at the tool schema instead of the original Actor schema', async () => {
         const result = await prepareDirectToolCall({});
         if (!('message' in result)) throw new Error('Invalid input passed validation');
