@@ -13,7 +13,7 @@
 <!-- For a small fix, "Before: … / Now: …" is enough. Don't list files — the diff shows that. Explain the approach only when it's non-obvious; otherwise it's noise. -->
 
 ## Notes for reviewers (human-written)
-<!-- Your own words — two sentences beat none. Where should review look hardest? What are you unsure about? If AI wrote parts you don't fully follow, say which — the reviewer must not be the first human to read them. Any impact on apify-mcp-server-internal (internals.js exports, _meta, structuredContent, clientInfo, ?ui=/?payment=)? -->
+<!-- Your own words — two sentences beat none. Where should review look hardest? What are you unsure about? If AI wrote parts you don't fully follow, say which — the reviewer must not be the first human to read them. Any impact on apify-mcp-server-internal (internals.js exports, _meta, structuredContent, clientInfo, ?ui=)? -->
 
 ## Proof it works
 <!-- Not "unit tests pass" — CI shows that. An end-to-end MCP probe (mcpc transcript), a screenshot, or a link to an Actor run on the Apify platform. "Works on my machine" / "the AI said it works" is not proof. -->

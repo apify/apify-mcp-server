@@ -1,7 +1,7 @@
 <!-- agents-scope: src/mcp -->
 # src/mcp — MCP protocol core (the npm-published surface)
 
-↑ [src/](../AGENTS.md) · sideways: [`../payments/AGENTS.md`](../payments/AGENTS.md)
+↑ [src/](../AGENTS.md)
 
 The cross-file invariant: this directory is the published `@apify/actors-mcp-server`
 surface — **generic types only**. No Apify-internal infrastructure (Redis, Mongo,
@@ -20,7 +20,7 @@ Two MCP protocol revisions are served, each by its own adapter:
 ## Files
 
 - `server.ts` — `ActorsMcpServer`, the shared facade for tools, server mode, services,
-  widgets, payments, and telemetry. It constructs and delegates v1 work to `LegacyMcpServer`,
+  widgets, and telemetry. It constructs and delegates v1 work to `LegacyMcpServer`,
   and hands the stateless adapter a per-request snapshot via `createRequestSnapshot`.
 - `legacy_server.ts` — package-private v1 SDK adapter for handlers, Tasks, errors,
   notifications, logging, and transport lifecycle. It reads shared state through
@@ -107,4 +107,3 @@ Dev server and manual MCP-client (mcpc) testing: see
 ## See also
 
 - [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) — naming / coding standards (do not duplicate).
-- [`../payments/AGENTS.md`](../payments/AGENTS.md) — `CallToolRequest` resolves payment context.

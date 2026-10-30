@@ -133,6 +133,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 - **Reference tool names via the `HELPER_TOOLS` `as const` object**, never hardcoded strings
   (exception: the integration suite, `tests/integration/` and the shared `tests/test_kit/` cases and helpers, which hardcode them so a renamed tool fails).
 - Keep a new tool mode-agnostic unless it is genuinely a widget variant.
+- A tool whose arguments carry secrets sets `redactArgs` on its entry (`HelperTool` in `../types.ts`).
+  It runs before AJV validation, so it must accept any shape, must not mutate the arguments, and must
+  be an allowlist: the logged copy keeps the undeclared keys AJV strips only from the tool's copy.
 - Descriptions, result text, annotations and the tool set follow [TOOL_GUIDELINES.md](../../TOOL_GUIDELINES.md); the gating mechanics below implement its "name only what the session has" rule.
 
 **Storage tool description skeleton** (`storage/`, all 8 tools): lead sentence stating what the tool
