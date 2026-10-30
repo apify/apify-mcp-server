@@ -5,7 +5,7 @@ import { z } from 'zod';
 import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
-import { getApifyAPIBaseUrl } from '../apify_client.js';
+import { getApifyAPIBaseUrl, sendApifyApiRequest } from '../apify_client.js';
 import type { ActorStoreList } from '../types.js';
 
 // Read once at import, so the tool schema and the routing always agree.
@@ -126,8 +126,7 @@ export async function searchActorsViaUnstableEndpoint(
     options: UnstableStoreSearchOptions,
 ): Promise<UnstableStoreSearchPage> {
     const { apifyClient, ...query } = options;
-    // Carries the token, origin and payment headers, and resolves non-2xx responses instead of throwing.
-    const response = await apifyClient.httpClient.axios.request({
+    const response = await sendApifyApiRequest(apifyClient, {
         url: buildUnstableStoreSearchUrl(query).toString(),
         method: 'GET',
     });
