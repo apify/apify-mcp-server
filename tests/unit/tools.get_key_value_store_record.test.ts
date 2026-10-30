@@ -66,7 +66,7 @@ describe('get-key-value-store-record', () => {
         };
 
         expect(isError).not.toBe(true);
-        expect(structuredContent).toMatchObject({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', ...MOCK_RECORD });
+        expect(structuredContent).toMatchObject({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', ...MOCK_RECORD, found: true });
         // {"query":"hello"} serializes to 17 bytes.
         expect(structuredContent.summary).toBe("Read 'INPUT' (contentType=application/json, 17 bytes).");
         // Reading a record is terminal — no nextStep, and content[1] is the summary alone.
@@ -91,7 +91,7 @@ describe('get-key-value-store-record', () => {
         };
 
         expect(isError).not.toBe(true);
-        expect(structuredContent).toMatchObject({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', ...record });
+        expect(structuredContent).toMatchObject({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', ...record, found: true });
         // 'hello world\nsecond line' is 23 ASCII bytes.
         expect(structuredContent.summary).toBe("Read 'note.txt' (contentType=text/plain; charset=utf-8, 23 bytes).");
     });
@@ -107,7 +107,12 @@ describe('get-key-value-store-record', () => {
         );
         expectSchemaConformingStructuredContent(result, keyValueStoreRecordOutputSchema);
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
-        expect(structuredContent).toMatchObject({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', key: 'OUTPUT', value: '' });
+        expect(structuredContent).toMatchObject({
+            keyValueStoreId: 'KvsWkzbQMuFYuam3Y',
+            key: 'OUTPUT',
+            value: '',
+            found: true,
+        });
     });
 
     it('returns an image content block for a binary image record', async () => {
@@ -249,17 +254,23 @@ describe('get-key-value-store-record', () => {
         });
     });
 
-    it('returns isError "record not found" when getRecord is undefined but the store exists', async () => {
+    it('returns a normal found: false result when the key is missing from an existing store', async () => {
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
-                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'MISSING' },
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'CHECKPOINT' },
                 stubApifyClient({ record: undefined, store: MOCK_STORE }),
             ),
         );
-        const { content } = result as TextToolResult;
 
-        expectSoftFailInvalidInput(result);
-        expect(content[0].text).toContain("Record 'MISSING' not found in key-value store 'KvsWkzbQMuFYuam3Y'");
+        expect(result.isError).not.toBe(true);
+        expect(result.toolTelemetry).toBeUndefined();
+        expectSchemaConformingStructuredContent(result, keyValueStoreRecordOutputSchema);
+        expect(result.structuredContent).toEqual({
+            keyValueStoreId: 'KvsWkzbQMuFYuam3Y',
+            key: 'CHECKPOINT',
+            found: false,
+            summary: "No record 'CHECKPOINT' in key-value store 'KvsWkzbQMuFYuam3Y'. Keys are case-sensitive.",
+        });
     });
 
     it('returns isError "store not found" when both getRecord and store get are undefined', async () => {
@@ -315,6 +326,7 @@ describe('get-key-value-store-record', () => {
                     keyValueStoreId: 'KvsWkzbQMuFYuam3Y',
                     key: recordKey,
                     contentType,
+                    found: true,
                 });
             });
         }
@@ -327,14 +339,14 @@ describe('get-key-value-store-record', () => {
     describe('official SDK client round-trip (pedantic output-schema validation)', () => {
         const tool = getKeyValueStoreRecord as HelperTool;
 
-        async function connectClientForRecord(record: unknown): Promise<Client> {
+        async function connectClientForRecord(record: unknown, store?: unknown): Promise<Client> {
             const server = new Server({ name: 'test-server', version: '0.0.0' }, { capabilities: { tools: {} } });
             server.setRequestHandler(ListToolsRequestSchema, async () => ({
                 tools: [{ name: tool.name, inputSchema: tool.inputSchema, outputSchema: tool.outputSchema }],
             }));
             server.setRequestHandler(CallToolRequestSchema, async (req) => {
                 const result = (await tool.call(
-                    stubToolCallContext(req.params.arguments ?? {}, stubApifyClient({ record })),
+                    stubToolCallContext(req.params.arguments ?? {}, stubApifyClient({ record, store })),
                 )) as CallToolResult;
                 // Mirror the real server, which strips internal telemetry before sending the result.
                 return {
@@ -369,6 +381,18 @@ describe('get-key-value-store-record', () => {
                 key: 'screenshot.png',
             });
             expect((result.content as { type: string }[])[0].type).toBe('image');
+            await client.close();
+        });
+
+        it('accepts a found: false result for a missing key', async () => {
+            const client = await connectClientForRecord(undefined, MOCK_STORE);
+            const result = await client.callTool({
+                name: tool.name,
+                arguments: { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'CHECKPOINT' },
+            });
+
+            expect(result.isError).not.toBe(true);
+            expect(result.structuredContent).toMatchObject({ key: 'CHECKPOINT', found: false });
             await client.close();
         });
 
@@ -453,10 +477,9 @@ describe('get-key-value-store-record with a bare store name', () => {
                 mockApifyClient({ keyValueStore: kvStoreSpy }),
             ),
         );
-        const { content } = result as TextToolResult;
 
-        expectSoftFailInvalidInput(result);
-        expect(content[0].text).toContain("Record 'MISSING' not found in key-value store 'eval-ai-store'");
+        expect(result.isError).not.toBe(true);
+        expect(result.structuredContent).toMatchObject({ keyValueStoreId: 'eval-ai-store', found: false });
     });
 
     it('links Console to the store ID', async () => {
