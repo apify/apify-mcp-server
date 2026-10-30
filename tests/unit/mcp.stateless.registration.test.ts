@@ -5,7 +5,10 @@ import { listStatelessHandlerMethods, STATELESS_PROTOCOL_VERSION, withStatelessS
 
 const STREAM_END_TIMEOUT_MILLIS = 1_000;
 
-/** Reads the body to its end, or cancels the read and returns `undefined` if the stream is still open after `timeoutMillis`. */
+/**
+ * Reads the body to its end, or cancels the read and returns `undefined` if the stream is still open
+ * after `timeoutMillis`.
+ */
 async function readBodyToEnd(response: Response, timeoutMillis: number): Promise<string | undefined> {
     const reader = response.body!.getReader();
     let isTimedOut = false;
@@ -89,10 +92,8 @@ describe('createStatelessServer()', () => {
                 .split('\n')
                 .filter((line) => line.startsWith('data: '))
                 .map((line) => JSON.parse(line.slice('data: '.length)));
-            expect(acknowledgement).toMatchObject({
-                method: 'notifications/subscriptions/acknowledged',
-                params: { notifications: {} },
-            });
+            expect(acknowledgement).toMatchObject({ method: 'notifications/subscriptions/acknowledged' });
+            expect(acknowledgement).toHaveProperty('params.notifications', {});
             expect(completion).toMatchObject({ id: requestId, result: { resultType: 'complete' } });
         });
     });
