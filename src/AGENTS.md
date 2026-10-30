@@ -29,7 +29,6 @@ directory you're editing.
 
 - [`mcp/AGENTS.md`](mcp/AGENTS.md) — MCP protocol core (the published surface).
 - [`tools/AGENTS.md`](tools/AGENTS.md) — MCP tool implementations.
-- [`payments/AGENTS.md`](payments/AGENTS.md) — Skyfire / x402 payment providers.
 - [`resources/AGENTS.md`](resources/AGENTS.md) — MCP resources + widget registry.
 - [`web/AGENTS.md`](web/AGENTS.md) — widget UI (separate build) + design system.
 - `utils/` — broad helper grab-bag, no single concept (no child doc; grep it).

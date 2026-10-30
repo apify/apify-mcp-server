@@ -215,7 +215,7 @@ Those live in `apify-mcp-server-internal`, together with a small **contract smok
 
 #### When your change affects the hosted server
 
-The hosted server wraps this package with auth, rate limiter, Caddy, and response handlers. Any of that can change, drop, or delay something we produce; our tests don't see that wrapping. So if you change something the hosted server consumes — `internals.js` exports, `_meta` shape, `structuredContent`, anything that depends on `clientInfo`, `?ui=` / `?payment=` parsing, the timing of notifications — flag it in the PR. Internal's contract suite likely needs a matching test.
+The hosted server wraps this package with auth, rate limiter, Caddy, and response handlers. Any of that can change, drop, or delay something we produce; our tests don't see that wrapping. So if you change something the hosted server consumes — `internals.js` exports, `_meta` shape, `structuredContent`, anything that depends on `clientInfo`, `?ui=` parsing, the timing of notifications — flag it in the PR. Internal's contract suite likely needs a matching test.
 
 #### Don't delete a public test thinking internal covers it
 
