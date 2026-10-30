@@ -233,7 +233,7 @@ Legend for the **Enabled by default** column:
 | `call-actor-mcp-tool` | actors | Call one tool on an Actor's MCP server and return its result. | ✅ |
 | `get-actor-run` | runs | Get details about an Actor run. | ⚡ |
 | `get-dataset-items` | storage | Read items from a dataset, with filtering and pagination. | ⚡ |
-| `get-key-value-store-record` | storage | Get the value stored under a key in a key-value store. Every result has a `found` field; a missing key returns `found: false`, not an error. | ⚡ |
+| `get-key-value-store-record` | storage | Get the value stored under a key in a key-value store. Non-error results have a `found` field; a missing key returns `found: false`, not an error. | ⚡ |
 | `abort-actor-run` | runs | Abort a running Actor run, optionally gracefully. | ⚡ |
 | `search-apify-docs` | docs | Search the Apify and Crawlee documentation for relevant pages. | ✅ |
 | `fetch-apify-docs` | docs | Fetch the full content of a documentation page by its URL. | ✅ |

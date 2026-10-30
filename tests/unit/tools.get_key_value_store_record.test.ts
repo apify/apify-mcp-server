@@ -98,7 +98,7 @@ describe('get-key-value-store-record', () => {
 
     it('returns an empty value in schema-conforming structuredContent for an empty record', async () => {
         // apify-client maps an empty record body to `undefined` (e.g. an Actor that writes an empty OUTPUT);
-        // the value must still be present so the output schema's required `value` is satisfied.
+        // the value must still be present, since only a missing record omits it.
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
                 { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'OUTPUT' },
@@ -257,7 +257,7 @@ describe('get-key-value-store-record', () => {
     it('returns a normal found: false result when the key is missing from an existing store', async () => {
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
-                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'CHECKPOINT' },
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'MISSING' },
                 stubApifyClient({ record: undefined, store: MOCK_STORE }),
             ),
         );
@@ -267,9 +267,9 @@ describe('get-key-value-store-record', () => {
         expectSchemaConformingStructuredContent(result, keyValueStoreRecordOutputSchema);
         expect(result.structuredContent).toEqual({
             keyValueStoreId: 'KvsWkzbQMuFYuam3Y',
-            key: 'CHECKPOINT',
+            key: 'MISSING',
             found: false,
-            summary: "No record 'CHECKPOINT' in key-value store 'KvsWkzbQMuFYuam3Y'. Keys are case-sensitive.",
+            summary: "No record 'MISSING' in key-value store 'KvsWkzbQMuFYuam3Y'. Keys are case-sensitive.",
         });
     });
 
