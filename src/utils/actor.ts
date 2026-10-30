@@ -54,8 +54,9 @@ export async function getActorDefinitionCached(
 }
 
 /**
- * Resolve how an Actor is exposed as a tool at call time, by name: its interface set and the tool slot derived
- * from it, by the rule tool loading uses (`resolveActorInterfaces`).
+ * Resolve how `call-actor` reaches an Actor at call time, by name: its interface set and the `call-actor` route
+ * derived from it. The only place outside the tool-loading factory that resolves them (`resolveActorInterfaces`), so
+ * `call-actor` routing and tool loading share one interface rule.
  *
  * Returns `null` when there is no definition to classify (unknown Actor). It does not resolve the MCP server URL,
  * so a bad `webServerMcpPath` fails only the MCP call that needs it (`runOnActorMcpServer`).

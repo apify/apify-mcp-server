@@ -3,10 +3,13 @@ import { ApifyClient } from 'apify-client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ActorsMcpServer } from '../../src/mcp/server.js';
-import type { Input } from '../../src/types.js';
+import { getServerActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
+import type { ActorDefinitionPruned, Input } from '../../src/types.js';
 import { SERVER_MODE } from '../../src/types.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
 import { getActors } from '../../src/utils/tools_loader.js';
+import { mockActor } from './helpers/actor_build_client.js';
+import { makePaymentProvider } from './helpers/mcp_server.js';
 
 // Stub getActors so a load runs without a network fetch to the Apify platform.
 vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
@@ -38,12 +41,13 @@ afterEach(async () => {
     }
 });
 
-function makeServer(): ActorsMcpServer {
+function makeServer(options: Partial<ConstructorParameters<typeof ActorsMcpServer>[0]> = {}): ActorsMcpServer {
     const server = new ActorsMcpServer({
         taskStore: new InMemoryTaskStore(),
         setupSigintHandler: false,
         serverMode: SERVER_MODE.DEFAULT,
         telemetry: { enabled: false },
+        ...options,
     });
     servers.push(server);
     return server;
@@ -91,6 +95,26 @@ describe('registerFetchedActorTools()', () => {
         await load(server, { actors: ['apify/rag-web-browser'] });
 
         expect(pendingToolKeys(server)).toHaveLength(1);
+    });
+});
+
+describe('composing tools in a payment-provider session', () => {
+    it("drops a Server Actor's own tool that a loader without the provider fetched", async () => {
+        // `processParamsGetTools` and other loaders fetch without the provider, so the list-time filter is not enough.
+        const definition = {
+            id: 'server-actor-id',
+            actorFullName: 'apify/server-actor-test',
+            webServerToolInfo: { methods: ['GET'], paths: ['/add'], operationLines: [], operationCount: 1 },
+        } as unknown as ActorDefinitionPruned;
+        const actor = mockActor({ actorStandby: { isEnabled: true } });
+        vi.mocked(getActors).mockResolvedValueOnce(
+            getServerActorsAsTools([{ definition, actor, webServerMcpPath: null }]),
+        );
+        const server = makeServer({ paymentProvider: makePaymentProvider() });
+
+        await load(server, { actors: ['apify/server-actor-test'] });
+
+        expect(server.listToolNames()).not.toContain('apify--server-actor-test');
     });
 });
 

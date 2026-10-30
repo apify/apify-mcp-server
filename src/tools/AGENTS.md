@@ -17,14 +17,21 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 - `utils.ts` — shared tool helpers (schema property shaping, AJV compile).
 - `actor_tool_naming.ts` — Actor tool names and `resolveActorInterfaces`, the one rule for which interfaces an
   Actor has: `input` (a run tool through its input schema), `mcp` (its MCP server) and `server` (its HTTP API,
-  `hasWebServerSchema`). `resolveActorToolMode` derives the tool slot from the set — MCP tools if `mcp`, else a
-  run tool if `input`, else none (`SERVER_ACTOR_WITHOUT_MCP`) — and tool loading and `call-actor` routing both
-  read it. Actors in `INPUT_INTERFACE_ACTORS` (`../const.ts`) read as having no MCP interface, so they are
-  served as run tools although they declare `webServerMcpPath`, unless their input schema is empty, in which
-  case they get no tool.
+  `hasWebServerSchema`). Two routes derive from the set. `resolveActorToolMode` gives a selected Actor's own tool,
+  read by tool loading: a server tool if `server`, else MCP tools if `mcp`, else a run tool if `input`, else none
+  (`SERVER_ACTOR_WITHOUT_MCP`). `getActorToolModeFromInterfaces` gives the `call-actor` route, which skips the
+  server interface, so `call-actor` still starts runs of a Server Actor. Actors in `INPUT_INTERFACE_ACTORS`
+  (`../const.ts`: web-fetch, web-search, rag-web-browser) are served as run tools although they declare an MCP
+  path or a server interface, unless their input schema is empty, in which case they get no tool.
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
   - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), delete
-    (`delete_actor.ts`), the actor-tools factory, the direct actor-tool executor (`actor_executor.ts`),
+    (`delete_actor.ts`), the actor-tools factory (run tools, proxied MCP tools, and a Server Actor's own tool
+    (`getServerActorsAsTools`, type `actor-server`): `send-server-actor-request`'s execution and output with the
+    Actor fixed, `method` and `path` narrowed to the documented ones, and the operations in the description. The
+    whole description stays within `CLIENT_DESCRIPTION_MAX_LENGTH` (4,096 characters, the Claude Code cut): the
+    operations in full when it fits, else `formatOperationLine` lines cut to fit (`buildServerActorToolDescription`,
+    from what `buildServerActorToolInfo` renders once per definition)), the direct actor-tool executor
+    (`actor_executor.ts`),
     `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`, and resolves the build
     the server-interface fields — `webServerMcpPath`, `webServerSchema` — are read from when standby is on,
     `resolveServerInterfaceDefinition`, shared with `fetchActorDetails` in `../utils/actor_details.ts`; the input
@@ -35,7 +42,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     served only with `send-server-actor-request`; `output.serverInterface: true` returns every operation in the
     `get-apify-api-details` shape (`buildServerOperationDetails`, through the API tools' `dereference`: local
     references inlined, examples kept, no responses, components or `servers`) while the text fits
-    `MAX_INLINE_BYTES`, else one line per operation (`formatOperationLine`), cut with `… and N more`;
+    `MAX_INLINE_BYTES`, else one line per operation with up to five parameters and five top-level JSON body
+    properties, required first (`formatOperationLine`), cut with `… and N more`;
     `"METHOD /path"` returns that one operation; reference expansion has a byte budget, as a creator schema can
     expand exponentially),
     `send_server_actor_request.ts` (`send-server-actor-request`: one HTTP request to a Server Actor's API, gated on

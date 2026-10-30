@@ -1,5 +1,5 @@
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
-import type { Actor } from '../../types.js';
+import type { Actor, ServerActorToolInfo } from '../../types.js';
 import { ACTOR_TENANCY } from '../../types.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { resolveActorTenancy } from '../actor_tool_naming.js';
@@ -7,6 +7,7 @@ import type { DereferenceContext } from '../api/apify_api_spec.js';
 import {
     API_METHODS,
     DereferenceBudgetError,
+    isJsonMediaType,
     isRecord,
     parseParameters,
     parseRequestBody,
@@ -20,6 +21,18 @@ const MAX_ALIAS_HOPS = 16;
 
 const MAX_NAMED_OPERATIONS = 5;
 const MAX_NAMED_OPERATIONS_LENGTH = 300;
+
+/**
+ * Longest tool description a client keeps whole: Claude Code keeps the first 4,096 characters of a tool loaded
+ * upfront (https://code.claude.com/docs/en/mcp.md, "Scale with MCP tool search").
+ */
+export const CLIENT_DESCRIPTION_MAX_LENGTH = 4096;
+
+/** Inputs an operation line names in each list; the rest are counted. */
+const MAX_LISTED_INPUTS = 5;
+
+/** A parameter or a top-level body property, as an operation line names it. */
+type OperationInput = { name: string; type?: string; isRequired: boolean };
 
 /** Follows local parameter or request-body aliases, without expanding nested schemas. */
 function resolveRef(node: unknown, spec: unknown): unknown {
@@ -92,15 +105,85 @@ export function listDocumentedOperations(schema: unknown): string[] {
     });
 }
 
-/** E.g. `- GET /search: Search the web. Required: q, request body.` */
-function formatOperationLine({ method, path, operation }: ServerOperation, schema: unknown): string {
-    const required = listRequiredInputs(operation, schema);
-    let text = `- ${method} ${path}`;
-    if (typeof operation.summary === 'string') {
-        text += `: ${operation.summary}`;
-        if (required.length > 0 && !/[.!?]$/.test(operation.summary)) text += '.';
+/** Follows one local reference: an operation line reads a type without expanding schemas. */
+function resolveOneRef(node: unknown, schema: unknown): unknown {
+    return isRecord(node) && typeof node.$ref === 'string' ? resolveLocalRef(schema, node.$ref) : node;
+}
+
+/** E.g. `string`, or `string|null` for a list of types; `undefined` when the schema names no type. */
+function getTypeName(node: unknown, schema: unknown): string | undefined {
+    const resolved = resolveOneRef(node, schema);
+    if (!isRecord(resolved)) return undefined;
+    const types = [resolved.type].flat().filter((type): type is string => typeof type === 'string');
+    return types.length > 0 ? types.join('|') : undefined;
+}
+
+/** Path and query parameters, read as `parseParameters` reads them: a path parameter is required. */
+function listParameterInputs(operation: Record<string, unknown>, schema: unknown): OperationInput[] {
+    const inputs: OperationInput[] = [];
+    for (const parameter of Array.isArray(operation.parameters) ? operation.parameters : []) {
+        const resolved = resolveRef(parameter, schema);
+        if (!isRecord(resolved) || typeof resolved.name !== 'string') continue;
+        if (resolved.in !== 'path' && resolved.in !== 'query') continue;
+        inputs.push({
+            name: resolved.name,
+            type: getTypeName(resolved.schema, schema),
+            isRequired: resolved.in === 'path' || resolved.required === true,
+        });
     }
-    if (required.length > 0) text += ` Required: ${required.join(', ')}.`;
+    return inputs;
+}
+
+/** The JSON request body with the media type `parseRequestBody` picks; `undefined` when the operation takes none. */
+function getRequestBody(operation: Record<string, unknown>, schema: unknown): { schema: unknown } | undefined {
+    const requestBody = resolveRef(operation.requestBody, schema);
+    if (!isRecord(requestBody) || !isRecord(requestBody.content)) return undefined;
+    const { content } = requestBody;
+    const media = content['application/json'] ?? content[Object.keys(content).find(isJsonMediaType) ?? '*/*'];
+    return isRecord(media) ? { schema: media.schema } : undefined;
+}
+
+/** The top-level properties of a body schema; `undefined` when it lists none. */
+function listBodyInputs(bodySchema: unknown, schema: unknown): OperationInput[] | undefined {
+    const resolved = resolveOneRef(bodySchema, schema);
+    if (!isRecord(resolved) || !isRecord(resolved.properties)) return undefined;
+    const required = Array.isArray(resolved.required) ? resolved.required : [];
+    const inputs = Object.entries(resolved.properties).map(([name, property]) => ({
+        name,
+        type: getTypeName(property, schema),
+        isRequired: required.includes(name),
+    }));
+    return inputs.length > 0 ? inputs : undefined;
+}
+
+/** E.g. `q:string required, limit:integer`: required inputs first, then the others, up to `MAX_LISTED_INPUTS`. */
+function formatInputs(inputs: OperationInput[]): string {
+    const ordered = [...inputs.filter((input) => input.isRequired), ...inputs.filter((input) => !input.isRequired)];
+    const listed = ordered
+        .slice(0, MAX_LISTED_INPUTS)
+        .map(({ name, type, isRequired }) => `${name}${type ? `:${type}` : ''}${isRequired ? ' required' : ''}`);
+    const rest = ordered.length - listed.length;
+    return [...listed, ...(rest > 0 ? [`+${rest} more`] : [])].join(', ');
+}
+
+/**
+ * E.g. `- GET /search [q:string required, limit:integer]: Search the web.`, or
+ * `- POST / {url:string required, formats:array}: Fetch a URL.` for a JSON body. Any other body, such as a JSON
+ * schema that lists no properties or a form, reads `{request body}`, with `required` when it is.
+ */
+function formatOperationLine({ method, path, operation }: ServerOperation, schema: unknown): string {
+    let text = `- ${method} ${path}`;
+    const parameters = listParameterInputs(operation, schema);
+    if (parameters.length > 0) text += ` [${formatInputs(parameters)}]`;
+    const requestBody = resolveRef(operation.requestBody, schema);
+    // An external or unresolved reference says nothing about the body.
+    if (isRecord(requestBody) && requestBody.$ref === undefined) {
+        const bodyInputs = listBodyInputs(getRequestBody(operation, schema)?.schema, schema);
+        const isRequired = requestBody.required === true;
+        text += bodyInputs ? ` {${formatInputs(bodyInputs)}}` : ` {request body${isRequired ? ' required' : ''}}`;
+    }
+    const { summary } = operation;
+    if (typeof summary === 'string' && summary) text += `: ${summary}${/[.!?]$/.test(summary) ? '' : '.'}`;
     return text;
 }
 
@@ -207,6 +290,57 @@ function checkSize(text: string | undefined, actorFullName: string): { text: str
     return {
         error: `Actor '${actorFullName}' server-interface output exceeds the ${MAX_INLINE_BYTES}-byte limit and was not returned. A smaller operation may fit.`,
     };
+}
+
+/**
+ * What a selected Server Actor's tool is built from; `undefined` for a schema with no operation. Only what can fit
+ * `CLIENT_DESCRIPTION_MAX_LENGTH` is kept: the `serverInterface: true` rendering, and the first operation lines
+ * (`formatOperationLine`).
+ */
+export function buildServerActorToolInfo(schema: unknown, actorFullName: string): ServerActorToolInfo | undefined {
+    const operations = listServerOperations(schema);
+    if (operations.length === 0) return undefined;
+    // A character takes at most 4 UTF-8 bytes, and the reference budget counts bytes.
+    const full = formatWithinBudget(
+        schema,
+        (context) => ({ operations: operations.map((operation) => buildServerOperationDetails(operation, context)) }),
+        CLIENT_DESCRIPTION_MAX_LENGTH * 4,
+    );
+    const operationLines: string[] = [];
+    let length = 0;
+    for (const operation of operations) {
+        const line = formatOperationLine(operation, schema);
+        length += line.length + 1;
+        if (length > CLIENT_DESCRIPTION_MAX_LENGTH) break;
+        operationLines.push(line);
+    }
+    const { method, path } = operations[0];
+    return {
+        methods: API_METHODS.filter((apiMethod) => operations.some((operation) => operation.method === apiMethod)),
+        paths: [...new Set(operations.map((operation) => operation.path))],
+        hasRequestBody: operations.some(({ operation }) => getRequestBody(operation, schema) !== undefined),
+        ...(full !== undefined && full.length <= CLIENT_DESCRIPTION_MAX_LENGTH && { fullOperations: full }),
+        operationLines,
+        operationCount: operations.length,
+        detailsHint: `${formatDetailsCall(actorFullName, `${method} ${path}`)} returns one operation in full.`,
+    };
+}
+
+/**
+ * A selected Server Actor's tool description, `head` followed by its operations, within
+ * `CLIENT_DESCRIPTION_MAX_LENGTH`: every operation in full when the whole description fits, otherwise one line per
+ * operation, cut with `… and N more`, then `detailsHint`.
+ */
+export function buildServerActorToolDescription(
+    head: string,
+    { fullOperations, operationLines, operationCount }: ServerActorToolInfo,
+    detailsHint: string | undefined,
+): string {
+    const full = fullOperations && `${head}${fullOperations}`;
+    if (full && full.length <= CLIENT_DESCRIPTION_MAX_LENGTH) return full;
+    const tail = detailsHint ? `\n${detailsHint}` : '';
+    const room = CLIENT_DESCRIPTION_MAX_LENGTH - head.length - tail.length;
+    return `${head}${cutOperationLines(operationLines, operationCount, room, (text) => text.length)}${tail}`;
 }
 
 /**

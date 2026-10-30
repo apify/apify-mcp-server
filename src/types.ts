@@ -15,6 +15,7 @@ import type z from 'zod';
 import type { ApifyClient } from './apify_client.js';
 import type { FAILURE_CATEGORY, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
 import type { PaymentProvider, PaymentProviderId } from './payments/types.js';
+import type { ApiMethod } from './tools/api/apify_api_spec.js';
 import type { CATEGORY_NAMES } from './tools/registry.js';
 import type { ToolResponse } from './utils/mcp.js';
 import type { PricingTier, StructuredPricingInfo } from './utils/pricing_info.js';
@@ -84,7 +85,25 @@ export type ActorDefinitionPruned = Pick<
     hasWebServerSchema: boolean;
     /** The schema's operations with their required inputs, e.g. `GET / (required: query)`, for request recovery text. */
     webServerOperations?: string[];
+    /** What the Actor's own tool is built from when it is served through its server interface. */
+    webServerToolInfo?: ServerActorToolInfo;
     pictureUrl?: string; // Optional, URL to the Actor's icon/picture
+};
+
+/** A selected Server Actor's tool, as `buildServerActorToolInfo` renders it from the API schema. */
+export type ServerActorToolInfo = {
+    /** The documented methods and paths, for the tool's input schema. */
+    methods: ApiMethod[];
+    paths: string[];
+    /** Whether an operation takes a JSON request body. */
+    hasRequestBody: boolean;
+    /** Every operation in full; absent when it alone exceeds the description limit. */
+    fullOperations?: string;
+    /** One line per operation, the first ones that can fit the description limit. */
+    operationLines: string[];
+    operationCount: number;
+    /** How `fetch-actor-details` returns one operation in full, for a description that lists lines. */
+    detailsHint: string;
 };
 
 /**
@@ -121,7 +140,8 @@ export type ToolBase = z.infer<typeof ToolSchema> & {
     paymentRequired?: boolean;
     /**
      * Whether a third-party payment-provider session is rejected before the call when the Actor named in
-     * `args.actor` has Actor Standby enabled; see `checkPaymentProviderStandbyConflict`.
+     * `args.actor`, or the fixed Actor of an {@link ActorServerTool}, has Actor Standby enabled; see
+     * `checkPaymentProviderStandbyConflict`.
      */
     hasPaymentProviderStandbyCheck?: boolean;
     /**
@@ -148,6 +168,7 @@ export const TOOL_TYPE = {
     INTERNAL: 'internal',
     ACTOR: 'actor',
     ACTOR_MCP: 'actor-mcp',
+    ACTOR_SERVER: 'actor-server',
 } as const;
 
 /**
@@ -159,6 +180,7 @@ export type TOOL_TYPE = (typeof TOOL_TYPE)[keyof typeof TOOL_TYPE];
 export const ACTOR_TOOL_MODE = {
     RUN: 'RUN',
     MCP: 'MCP',
+    SERVER: 'SERVER',
     SERVER_ACTOR_WITHOUT_MCP: 'SERVER_ACTOR_WITHOUT_MCP',
 } as const;
 export type ACTOR_TOOL_MODE = (typeof ACTOR_TOOL_MODE)[keyof typeof ACTOR_TOOL_MODE];
@@ -182,6 +204,9 @@ export type ActorInterfaces = {
     /** The HTTP API described by `webServerSchema`. */
     server: boolean;
 };
+
+/** One of an Actor's interfaces, e.g. the one a tool call goes through. */
+export type ActorInterfaceName = keyof ActorInterfaces;
 
 /**
  * Type for Actor-based tools - tools that wrap Apify Actors.
@@ -253,6 +278,11 @@ export type HelperTool = ToolBase & {
      * arguments; it also sees undeclared keys, so build the copy as an allowlist.
      */
     redactArgs?: (args: Record<string, unknown>) => Record<string, unknown>;
+    /**
+     * The interface of the Actor in `args.actor` that the tool calls through, for telemetry; `extractActorInterface`
+     * reads an `actor:toolName` argument as `mcp`.
+     */
+    actorInterface?: ActorInterfaceName;
 };
 
 /**
@@ -271,14 +301,32 @@ export type ActorMcpTool = ToolBase & {
 };
 
 /**
+ * A selected Server Actor's own tool: one HTTP request to the Actor's server interface, sent as
+ * `send-server-actor-request` sends it, with the Actor fixed.
+ * Type discriminator: {@link TOOL_TYPE.ACTOR_SERVER}
+ */
+export type ActorServerTool = ToolBase & {
+    type: typeof TOOL_TYPE.ACTOR_SERVER;
+    /** Stable Apify Actor ID */
+    actorId: string;
+    /** Full name of the Apify Actor (username/name) */
+    actorFullName: string;
+    /** As {@link HelperTool.call}. */
+    call: (toolArgs: InternalToolArgs) => Promise<ToolResponse>;
+    /** As {@link HelperTool.redactArgs}. */
+    redactArgs?: (args: Record<string, unknown>) => Record<string, unknown>;
+};
+
+/**
  * Discriminated union of all tool types.
  *
  * This is a discriminated union that ensures type safety:
  * - When type is 'internal', tool is guaranteed to be HelperTool
  * - When type is 'actor', tool is guaranteed to be ActorTool
  * - When type is 'actor-mcp', tool is guaranteed to be ActorMcpTool
+ * - When type is 'actor-server', tool is guaranteed to be ActorServerTool
  */
-export type ToolEntry = HelperTool | ActorTool | ActorMcpTool;
+export type ToolEntry = HelperTool | ActorTool | ActorMcpTool | ActorServerTool;
 
 export type ToolCategory = (typeof CATEGORY_NAMES)[number];
 /**
@@ -320,8 +368,9 @@ export type ActorInfo = {
 };
 
 /**
- * How an Actor is exposed as a tool, resolved once from its definition: the interface set
- * (`resolveActorInterfaces`) and the tool slot derived from it (`resolveActorToolMode`).
+ * How `call-actor` reaches an Actor, resolved once from its definition: the interface set
+ * (`resolveActorInterfaces`) and the `call-actor` route derived from it (`getActorToolModeFromInterfaces`),
+ * which never takes the server interface. The Actor's own tool is `resolveActorToolMode`'s.
  * `actorFullName` is the platform-canonical `username/name`, not whatever identifier the caller used —
  * messages built from it read the same whether the Actor was addressed by ID or by name.
  */
@@ -437,6 +486,8 @@ export type ToolCallTelemetryProperties = {
     http_status?: number;
     /** Whose standby run `send-server-actor-request` reached. */
     actor_tenancy?: ActorTenancy;
+    /** The Actor interface the call went through; absent for a tool that calls no Actor. */
+    actor_interface?: ActorInterfaceName;
     actor_name?: string;
     actor_id?: string;
     /** Run the call touched. `run_status` is the run's own outcome, distinct from `tool_status`. */

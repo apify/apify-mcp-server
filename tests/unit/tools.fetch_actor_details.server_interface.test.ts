@@ -307,15 +307,15 @@ describe('the operations in full', () => {
 });
 
 describe('the operation index, when the operations in full exceed the byte limit', () => {
-    it('lists each operation with its summary and required inputs, and the call that returns one in full', () => {
+    it('lists each operation with its inputs and summary, and the call that returns one in full', () => {
         expect(textOfBuild({ schema: withDescriptionOnEmpty('a'.repeat(MAX_INLINE_BYTES)) })).toBe(
             `# Server interface of ${ACTOR_FULL_NAME}\n` +
                 'single-tenant: the first request starts a run in your account, kept for its idle timeout of 300 s.\n' +
                 `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends a request to one of them: {"actor":"${ACTOR_FULL_NAME}","method":"GET","path":"/add"}\n` +
                 'Operations (3):\n' +
-                '- GET /add: Add two numbers (query). Required: firstNumber.\n' +
-                '- POST /add: Add two numbers (JSON body). Required: request body.\n' +
-                '- GET /empty: Return no content\n' +
+                '- GET /add [firstNumber:integer required, asText:boolean]: Add two numbers (query).\n' +
+                '- POST /add {firstNumber:integer required}: Add two numbers (JSON body).\n' +
+                '- GET /empty: Return no content.\n' +
                 `The operations in full exceed the ${MAX_INLINE_BYTES}-byte limit. ` +
                 `${DETAILS}{"serverInterface":"GET /add"}} returns one operation in full.`,
         );
@@ -329,19 +329,19 @@ describe('the operation index, when the operations in full exceed the byte limit
             'keeps one period after a summary that ends with one',
             { summary: 'Hi.', parameters: [required('q')] },
             {},
-            ': Hi. Required: q.',
+            ' [q required]: Hi.\n',
         ],
         [
             'reads required inputs through an alias chain and escaped pointer segments',
             {},
             { Alias: { $ref: '#/components/parameters/Search~1query~0' }, 'Search/query~': required('q') },
-            ' Required: q.',
+            ' [q required]\n',
         ],
         [
             'replaces an aliased path-level parameter by its operation-level override',
             { summary: 'Search', parameters: [{ name: 'q', in: 'query' }] },
             { Alias: { $ref: '#/components/parameters/Search' }, Search: required('q') },
-            ': Search\n',
+            ' [q]: Search.\n',
         ],
         [
             'skips circular, missing and external aliases, and a chain over the hop cap',
@@ -357,7 +357,7 @@ describe('the operation index, when the operations in full exceed the byte limit
                 Loop: { $ref: '#/components/parameters/Loop' },
                 ...chain,
             },
-            ' Required: q.\n',
+            ' [q required]\n',
         ],
     ])('%s', (_label, get, parameters, line) => {
         const description = 'a'.repeat(MAX_INLINE_BYTES);
@@ -369,6 +369,67 @@ describe('the operation index, when the operations in full exceed the byte limit
         };
 
         expect(textOfBuild({ schema })).toContain(`- GET /search${line}`);
+    });
+
+    /** The index line of the one path item `pathItem`, with a description long enough to force the index. */
+    const indexLineOf = (pathItem: Record<string, unknown>, components: Record<string, unknown> = {}) => {
+        const description = 'a'.repeat(MAX_INLINE_BYTES);
+        const operations = Object.fromEntries(
+            Object.entries(pathItem).map(([method, operation]) => [method, { ...(operation as object), description }]),
+        );
+        const text = textOfBuild({ schema: { paths: { '/items/{id}': operations }, components } });
+        return text.split('\n').find((line) => line.startsWith('- '));
+    };
+
+    it('lists required parameters first, then the others in schema order, up to five, then counts the rest', () => {
+        const optional = (name: string) => ({ name, in: 'query', schema: { type: ['string', 'null'] } });
+        const parameters = [
+            optional('a'),
+            { name: 'trace', in: 'header', required: true },
+            { name: 'id', in: 'path', schema: { $ref: '#/components/schemas/Id' } },
+            optional('b'),
+            { ...required('q'), schema: { type: 'string' } },
+            optional('c'),
+            optional('d'),
+        ];
+
+        // A header parameter is never sent, and a path parameter is always required.
+        expect(indexLineOf({ get: { parameters } }, { schemas: { Id: { type: 'integer' } } })).toBe(
+            '- GET /items/{id} [id:integer required, q:string required, a:string|null, b:string|null, c:string|null, +1 more]',
+        );
+    });
+
+    it('lists the top-level properties of a JSON body the same way, without expanding nested objects', () => {
+        const properties = Object.fromEntries(
+            ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map((name) => [name, { $ref: '#/components/schemas/Nested' }]),
+        );
+        const requestBody = { content: { 'application/json': { schema: { $ref: '#/components/schemas/Body' } } } };
+        const schemas = {
+            Body: { type: 'object', required: ['p6'], properties },
+            Nested: { type: 'object', properties: { deep: { type: 'string' } } },
+        };
+
+        expect(indexLineOf({ put: { summary: 'Update', requestBody } }, { schemas })).toBe(
+            '- PUT /items/{id} {p6:object required, p1:object, p2:object, p3:object, p4:object, +1 more}: Update.',
+        );
+    });
+
+    it('marks a JSON body whose schema lists no properties, and whether it is required', () => {
+        const body = (isRequired: boolean) => ({
+            required: isRequired,
+            content: { 'text/plain': {}, 'application/vnd.api+json': { schema: { type: 'array' } } },
+        });
+
+        expect(indexLineOf({ post: { requestBody: body(true) } })).toBe('- POST /items/{id} {request body required}');
+        expect(indexLineOf({ post: { requestBody: body(false) } })).toBe('- POST /items/{id} {request body}');
+    });
+
+    it('marks a required body the send tool cannot send as JSON, such as a form', () => {
+        const requestBody = { required: true, content: { 'application/x-www-form-urlencoded': {} } };
+
+        expect(indexLineOf({ post: { summary: 'Form only', requestBody } })).toBe(
+            '- POST /items/{id} {request body required}: Form only.',
+        );
     });
 
     it('cuts the index at the byte limit and counts the operations left out', () => {
@@ -425,9 +486,7 @@ describe.each([
     ['a deeply nested example', nestedBodySchema({ schema: { type: 'object' }, example: deepValue })],
 ])('a schema with %s', (_label, schema) => {
     it('falls back to the index for all operations', () => {
-        expect(textOfBuild({ schema })).toContain(
-            '- POST /nested: Nest. Required: request body.\nThe operations in full',
-        );
+        expect(textOfBuild({ schema })).toMatch(/\n- POST \/nested \{[^\n]+\}: Nest\.\nThe operations in full/);
     });
 
     it('is a size error for one operation', () => {

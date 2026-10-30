@@ -373,7 +373,8 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
                 (tool) =>
                     tool.name !== HELPER_TOOLS.ACTOR_SERVER_REQUEST &&
                     tool.name !== HELPER_TOOLS.ACTOR_MCP_TOOL_CALL &&
-                    tool.name !== HELPER_TOOLS.ACTOR_MCP_TOOL_LIST,
+                    tool.name !== HELPER_TOOLS.ACTOR_MCP_TOOL_LIST &&
+                    tool.type !== TOOL_TYPE.ACTOR_SERVER,
             );
         }
         const served = this.isReportProblemServable(view, source.input)
@@ -435,7 +436,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      */
     public listActorToolNames(): string[] {
         return Array.from(this.tools.values())
-            .filter((tool) => tool.type === TOOL_TYPE.ACTOR)
+            .filter((tool) => tool.type === TOOL_TYPE.ACTOR || tool.type === TOOL_TYPE.ACTOR_SERVER)
             .map((tool) => tool.actorFullName);
     }
 

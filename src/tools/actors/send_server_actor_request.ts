@@ -14,6 +14,7 @@ import type {
     ActorInterfaces,
     ActorTenancy,
     InternalToolArgs,
+    ServerActorToolInfo,
     ToolDescriptionContext,
     ToolEntry,
     ToolInputSchema,
@@ -57,6 +58,39 @@ function toAdvertisedInputSchema(args: z.ZodObject<z.ZodRawShape>): ToolInputSch
     const { body } = args.shape;
     const advertised = body ? args.extend({ body: (body as z.ZodType).meta(anyJsonValueSchema) }) : args;
     return z.toJSONSchema(advertised) as ToolInputSchema;
+}
+
+/**
+ * The input schema and validator of a selected Server Actor's tool: this tool's arguments without `actor`, `method`
+ * and `path` narrowed to the documented ones, each with a default when there is one, and `body` only when an
+ * operation takes one. A templated path cannot be an enum, so then `path` is a string that lists the paths.
+ */
+export function buildServerActorToolSchemas({
+    methods,
+    paths,
+    hasRequestBody,
+}: Pick<ServerActorToolInfo, 'methods' | 'paths' | 'hasRequestBody'>) {
+    const method = z.enum(methods).describe('HTTP method of the operation.');
+    const isTemplated = paths.some((path) => /\{[^}]*\}/.test(path));
+    const path = isTemplated
+        ? z
+              .string()
+              .min(1)
+              .describe(`The path of an operation: ${paths.join(', ')}. Replace each {name} with its value.`)
+        : z.enum(paths).describe('The path of an operation.');
+    const args = z.object({
+        method: methods.length === 1 ? method.default(methods[0]) : method,
+        path: paths.length === 1 && !isTemplated ? path.default(paths[0]) : path,
+        query: sendServerActorRequestArgs.shape.query,
+        ...(hasRequestBody && { body: sendServerActorRequestArgs.shape.body }),
+    });
+    return {
+        inputSchema: toAdvertisedInputSchema(args),
+        // `useDefaults` fills a defaulted method or path before the request is built from the arguments.
+        ajvValidate: new Ajv({ coerceTypes: false, strict: false, removeAdditional: true, useDefaults: true }).compile(
+            fixZodSchemaRequired(z.toJSONSchema(args)),
+        ),
+    };
 }
 
 /** The Actor and the request as sent: the fields every response about a sent request starts with. */
@@ -458,7 +492,7 @@ export async function executeSendServerActorRequest(
 }
 
 /** The logged arguments: the body can carry secrets, and an Actor Server can take a credential under any query name. */
-function redactServerActorRequestArgs({ actor, query, ...rest }: Record<string, unknown>) {
+export function redactServerActorRequestArgs({ actor, query, ...rest }: Record<string, unknown>) {
     return {
         actor,
         ...redactApiCallArgs(rest),
@@ -507,6 +541,7 @@ export const sendServerActorRequest: ToolEntry = Object.freeze({
     ),
     // A third-party payment provider cannot pay for an Actor Server run, so such a session is rejected before the call.
     hasPaymentProviderStandbyCheck: true,
+    actorInterface: 'server',
     annotations: {
         title: 'Send Server Actor request',
         readOnlyHint: false,

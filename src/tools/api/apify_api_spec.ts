@@ -183,7 +183,7 @@ function resolveExamplesMap(examples: Record<string, unknown>, context: Derefere
 }
 
 /** `application/json`, also with parameters such as `; charset=utf-8`, or a `+json` type such as `application/vnd.api+json`. */
-function isJsonMediaType(mediaType: string): boolean {
+export function isJsonMediaType(mediaType: string): boolean {
     const base = mediaType.split(';')[0].trim().toLowerCase();
     return base === 'application/json' || base.endsWith('+json');
 }

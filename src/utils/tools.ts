@@ -1,4 +1,11 @@
-import type { CallDiagnostics, HelperTool, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
+import type {
+    ActorInterfaceName,
+    CallDiagnostics,
+    HelperTool,
+    ToolBase,
+    ToolEntry,
+    ToolInputSchema,
+} from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 import { fixZodSchemaRequired } from './ajv.js';
 
@@ -10,6 +17,7 @@ import { fixZodSchemaRequired } from './ajv.js';
 export function getToolFullName(tool: ToolEntry): string {
     switch (tool.type) {
         case TOOL_TYPE.ACTOR:
+        case TOOL_TYPE.ACTOR_SERVER:
             return tool.actorFullName;
         case TOOL_TYPE.INTERNAL:
         case TOOL_TYPE.ACTOR_MCP:
@@ -21,11 +29,11 @@ export function getToolFullName(tool: ToolEntry): string {
 
 /**
  * Extract stable Actor ID for telemetry.
- * Available for actor and actor-mcp tools; undefined for internal tools.
+ * Available for Actor, Actor-MCP and Actor-server tools; undefined for internal tools.
  */
 export function extractActorId(tool: ToolEntry): string | undefined {
-    if (tool.type === TOOL_TYPE.ACTOR || tool.type === TOOL_TYPE.ACTOR_MCP) return tool.actorId;
-    return undefined;
+    if (tool.type === TOOL_TYPE.INTERNAL) return undefined;
+    return tool.actorId;
 }
 
 /**
@@ -47,13 +55,26 @@ export function buildActorFields(
  * Returns undefined for other internal tools or when the arg is missing/invalid.
  */
 export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>): string | undefined {
-    if (tool.type === TOOL_TYPE.ACTOR) return tool.actorFullName;
+    if (tool.type === TOOL_TYPE.ACTOR || tool.type === TOOL_TYPE.ACTOR_SERVER) return tool.actorFullName;
     if (tool.type === TOOL_TYPE.ACTOR_MCP) return tool.actorId;
 
     // A legacy "username/name:toolName" value is logged by its Actor name.
     const actorArg = args?.actor;
     if (typeof actorArg !== 'string') return undefined;
     return actorArg.split(':')[0]?.trim() || undefined;
+}
+
+/**
+ * The Actor interface a tool call goes through, for telemetry: an Actor tool's own, or the one an internal tool
+ * declares, where `call-actor`'s `actor:toolName` form reaches the MCP server. `undefined` for a tool that calls
+ * no Actor.
+ */
+export function extractActorInterface(tool: ToolEntry, args?: Record<string, unknown>): ActorInterfaceName | undefined {
+    if (tool.type === TOOL_TYPE.ACTOR) return 'input';
+    if (tool.type === TOOL_TYPE.ACTOR_MCP) return 'mcp';
+    if (tool.type === TOOL_TYPE.ACTOR_SERVER) return 'server';
+    if (tool.actorInterface !== 'input') return tool.actorInterface;
+    return typeof args?.actor === 'string' && args.actor.includes(':') ? 'mcp' : 'input';
 }
 
 type ToolPublicFieldOptions = {
