@@ -313,8 +313,7 @@ describe('call_actor_common', () => {
                     data: {
                         error: {
                             type: 'concurrent-runs-limit-exceeded',
-                            message:
-                                'Cannot start new Actor runs. Underlying error: By launching this job you will exceed your limit of 25 concurrent Actor runs.',
+                            message: 'By launching this job you will exceed your limit of 25 concurrent Actor runs.',
                         },
                     },
                     status: 402,
