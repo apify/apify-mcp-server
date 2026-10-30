@@ -77,6 +77,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
                 HELPER_TOOLS.ACTOR_CALL,
                 HELPER_TOOLS.ACTOR_MCP_TOOL_LIST,
                 HELPER_TOOLS.ACTOR_MCP_TOOL_CALL,
+                HELPER_TOOLS.ACTOR_SERVER_REQUEST,
             ];
             expect(toolNames(defaultCategories.actors)).toEqual(expected);
             expect(toolNames(appsCategories.actors)).toEqual(expected);

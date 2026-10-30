@@ -35,6 +35,7 @@ const EXPECTED_TOOL_NAMES = [
     'abort-actor-run',
     'fetch-actor-mcp-tool-list',
     'call-actor-mcp-tool',
+    'send-server-actor-request',
     'search-apify-docs',
     'fetch-apify-docs',
 ];
