@@ -95,8 +95,8 @@ export type RunDataset = {
      */
     inflatedBytes?: number;
     /**
-     * Dot-notation field paths with array indices collapsed (see `collapseArrayIndices`).
-     * Describes the item structure; a path through an array is not a valid `fields` selection (#1656).
+     * Dot-notation field paths with array indices collapsed. A path through an array is not a
+     * valid `fields` selection.
      */
     fields?: string[];
     /**
@@ -170,9 +170,8 @@ export type FetchActorRunResult = {
 /**
  * Apify expands array indices in dataset fields (e.g. `entities.hashtags.0.text`,
  * `entities.hashtags.1.text`, ... `entities.hashtags.14.text`), so deeply-nested or
- * array-heavy schemas balloon into hundreds of redundant paths. Strip pure-numeric
- * segments and dedupe; the result describes the structure, and a path through an array is
- * not a valid `fields` selection (#1656).
+ * array-heavy schemas balloon into hundreds of redundant paths. The collapsed paths describe
+ * the structure only: one through an array is not a valid `fields` selection.
  *
  * Exported for direct unit testing of edge cases (empty input, all-numeric paths) —
  * production callers go through `normalizeDatasetFields`.
@@ -201,39 +200,6 @@ export function collapseArrayIndices(fields: string[]): string[] {
  */
 export function normalizeDatasetFields(fields: string[]): string[] {
     return collapseArrayIndices(fields.map((f) => f.replace(/\//g, '.')));
-}
-
-type ShapeNode = { arrayDepth: number; children: Map<string, ShapeNode> };
-
-function renderShapeNode(node: ShapeNode): string {
-    const keys = [...node.children].map(([key, child]) =>
-        child.children.size > 0 ? `${key}: ${renderShapeNode(child)}` : `${key}${'[]'.repeat(child.arrayDepth)}`,
-    );
-    return `{ ${keys.join(', ')} }${'[]'.repeat(node.arrayDepth)}`;
-}
-
-/** E.g. `['results/0/url', 'query']` → `{ results: { url }[], query }`. */
-export function buildDatasetShape(fields: string[]): string {
-    const root: ShapeNode = { arrayDepth: 0, children: new Map() };
-    for (const field of fields) {
-        let node = root;
-        let indexRun = 0;
-        for (const segment of field.split('/')) {
-            if (/^\d+$/.test(segment)) {
-                indexRun += 1;
-                node.arrayDepth = Math.max(node.arrayDepth, indexRun);
-                continue;
-            }
-            indexRun = 0;
-            let child = node.children.get(segment);
-            if (!child) {
-                child = { arrayDepth: 0, children: new Map() };
-                node.children.set(segment, child);
-            }
-            node = child;
-        }
-    }
-    return renderShapeNode(root);
 }
 
 export function toIsoString(value: Date | string | undefined | null): string | undefined {
@@ -569,28 +535,37 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
 }
 
 /**
- * Only top-level names always work as a `fields` selection: the API's projection does not cross
- * arrays, so a dotted path through one returns `[{}]`. Never show
- * an indexed path (`results.0.url`): evals showed weak models copy it and report one element as
- * the whole result.
+ * Examples only: structured output already carries the field list. The API's projection does
+ * not cross arrays, so a dotted path into one returns `[{}]`, and the collapsed `fields` do not
+ * show which paths cross one; hence the list of arrays. Never show an indexed path
+ * (`results.0.url`): evals showed weak models copy it and report one element as the whole result.
  */
 export function fieldsProjectionHint(fields: string[] | undefined): string {
     if (!fields?.length) return '';
     const isIndex = (segment: string) => /^\d+$/.test(segment);
-    const topLevelFields = [...new Set(fields.map((field) => field.split('/')[0]))];
-    const objectPath = fields.find((field) => field.includes('/') && !field.split('/').some(isIndex));
-    const arrayChildPath = fields.find((field) => /\/\d+\/[^\d]/.test(field));
-    const objectClause = objectPath ? ` Dotted paths work through objects (${objectPath.replace(/\//g, '.')}).` : '';
-    const arrayClause = arrayChildPath
-        ? ` A dotted path through an array (${arrayChildPath
-              .split('/')
-              .filter((segment) => !isIndex(segment))
-              .join('.')}) returns nothing.`
+    const toDotted = (field: string) =>
+        field
+            .split('/')
+            .filter((segment) => !isIndex(segment))
+            .join('.');
+    // Outermost array with named fields inside: `metadata/jsonLd/0/@graph/0/url` → `metadata.jsonLd`.
+    const objectArrays = new Set<string>();
+    let arrayChildField: string | undefined;
+    for (const field of fields) {
+        const segments = field.split('/');
+        const indexAt = segments.findIndex(isIndex);
+        if (indexAt > 0 && segments.slice(indexAt).some((segment) => !isIndex(segment))) {
+            objectArrays.add(segments.slice(0, indexAt).join('.'));
+            arrayChildField ??= field;
+        }
+    }
+    const objectField = fields.find((field) => field.includes('/') && !field.split('/').some(isIndex));
+    const topLevelExample = (arrayChildField ?? objectField ?? fields[0]).split('/')[0];
+    const objectClause = objectField ? ` A dotted path works through objects (e.g. ${toDotted(objectField)}).` : '';
+    const arrayClause = arrayChildField
+        ? ` A dotted path into an array returns nothing (e.g. ${toDotted(arrayChildField)}); arrays of objects: ${[...objectArrays].join(', ')}.`
         : '';
-    return (
-        ` Item structure ([] marks an array): ${buildDatasetShape(fields)}. Selectable fields: ${topLevelFields.join(', ')};` +
-        ` a top-level name returns the whole value, arrays included.${objectClause}${arrayClause}`
-    );
+    return ` Select with fields="...": a top-level name (e.g. ${topLevelExample}) returns the whole value, arrays included.${objectClause}${arrayClause}`;
 }
 
 /**
@@ -699,7 +674,7 @@ export function buildStatusSummaryNextStep(params: {
     dataset?: RunDataset;
     keyValueStore?: RunKeyValueStore;
     datasetMetadataFetched?: boolean;
-    /** Raw fields with array indices, which the shape needs; `dataset.fields` has them collapsed. */
+    /** Raw metadata `fields`: the hint needs the array indices that `dataset.fields` drops. */
     datasetFields?: string[];
 }): { summary: string; nextStep: string } {
     const { run, dataset, keyValueStore, datasetMetadataFetched = true, datasetFields } = params;

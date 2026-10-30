@@ -52,7 +52,7 @@ describe('get-dataset', () => {
         expect(structuredContent.summary).toBe("Dataset 'my-dataset' has 42 items, 2 fields.");
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
         expect(structuredContent.nextStep).toContain('datasetId=ds-1');
-        expect(structuredContent.nextStep).toContain('Item structure ([] marks an array): { title, url }.');
+        expect(structuredContent.nextStep).toContain('Select with fields="...": a top-level name (e.g. title)');
         // content[0] is the data-only JSON dump (no narrative); content[1] is the narrative.
         const { summary, nextStep, ...data } = structuredContent;
         expect(JSON.parse(content[0].text)).toEqual(data);
@@ -202,13 +202,7 @@ describe('get-dataset fields normalization', () => {
             'latestComments.owner.username',
             'images',
         ]);
-        // The hint takes the raw index-expanded list, not the collapsed one: arrays keep their [] marker.
-        expect(structuredContent.nextStep).toContain(
-            'Item structure ([] marks an array): { latestComments: { id, text, owner: { username } }[], images[] }.',
-        );
-        expect(structuredContent.nextStep).toContain(
-            'A dotted path through an array (latestComments.id) returns nothing.',
-        );
+        expect(structuredContent.nextStep).toContain('arrays of objects: latestComments.');
     });
 
     it('preserves non-`fields` keys from the raw API response unchanged', async () => {
