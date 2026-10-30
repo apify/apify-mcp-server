@@ -23,7 +23,7 @@
 # reason as above.
 server:
     # --- Not applicable: the scenario drives the reference fixture server's own tools, resources,
-    # prompts or headers by name, which this server does not and will not expose. ---
+    # prompts or headers by name, which this server does not expose; it serves no prompts yet. ---
 
     # Needs fixture tool `test_simple_text`.
     - tools-call-simple-text
@@ -47,7 +47,7 @@ server:
     - resources-read-binary
     # Needs fixture resource template `test://template/{id}/data`.
     - resources-templates-read
-    # Needs fixture prompt `test_simple_prompt`; this server serves no prompts.
+    # Needs fixture prompt `test_simple_prompt`; this server serves no prompts yet.
     - prompts-get-simple
     # Needs fixture prompt `test_prompt_with_arguments`.
     - prompts-get-with-args

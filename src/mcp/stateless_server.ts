@@ -127,6 +127,8 @@ class StatelessMcpServer {
 
     constructor(host: StatelessMcpServerHost, requestUrl?: string) {
         this.host = host;
+        // The SDK refuses to register prompt handlers without the capability, so both share this gate.
+        const hasPrompts = host.promptService.listPrompts().prompts.length > 0;
         this.server = new Server(getServerInfo(), {
             capabilities: {
                 // Deliberately no `tasks` (tasks/* → method-not-found), no `logging` (deprecated by SEP-2577), no
@@ -136,13 +138,13 @@ class StatelessMcpServer {
                 // host does not. Refusing the method outright is a follow-up.
                 tools: {},
                 resources: {},
-                prompts: {},
+                ...(hasPrompts && { prompts: {} }),
             },
             instructions: this.host.getStatelessServerInstructions(requestUrl),
         });
         this.setupToolHandlers();
         this.setupResourceHandlers();
-        this.setupPromptHandlers();
+        if (hasPrompts) this.setupPromptHandlers();
     }
 
     /** Snapshot for this request, resolved from the identity the request itself declared. */

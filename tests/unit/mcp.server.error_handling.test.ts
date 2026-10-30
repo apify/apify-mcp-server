@@ -8,7 +8,13 @@ import log from '@apify/log';
 import { TOOL_STATUS } from '../../src/const.js';
 import { getDefaultTools } from '../../src/tools/index.js';
 import { getToolCallErrorUserText } from '../../src/utils/mcp.js';
-import { getLegacyServer, getRequestHandler, makeThrowingTool, withServer } from './helpers/mcp_server.js';
+import {
+    getLegacyServer,
+    getRequestHandler,
+    makeThrowingTool,
+    withServer,
+    withTestPrompt,
+} from './helpers/mcp_server.js';
 
 /**
  * Covers the `server.onerror` wiring in `setupErrorHandling()`: client faults softFail with a
@@ -134,18 +140,20 @@ describe('resources/read and prompts/get error boundary', () => {
     });
 
     it('surfaces a prompts/get failure for an unknown name as McpError(InvalidParams)', async () => {
-        await withServer(async (server) => {
-            const handler = getRequestHandler(server, 'prompts/get');
+        await withTestPrompt(async () => {
+            await withServer(async (server) => {
+                const handler = getRequestHandler(server, 'prompts/get');
 
-            const error = await handler(
-                { method: 'prompts/get', params: { name: 'nonexistent' } },
-                { signal: { aborted: false }, sendNotification: vi.fn() },
-            ).catch((e: unknown) => e);
+                const error = await handler(
+                    { method: 'prompts/get', params: { name: 'nonexistent' } },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                ).catch((e: unknown) => e);
 
-            expect(error).toBeInstanceOf(McpError);
-            expect((error as McpError).code).toBe(ErrorCode.InvalidParams);
-            expect((error as McpError).message).toContain('nonexistent');
-            expect((error as McpError).message).toContain('Available prompts:');
+                expect(error).toBeInstanceOf(McpError);
+                expect((error as McpError).code).toBe(ErrorCode.InvalidParams);
+                expect((error as McpError).message).toContain('nonexistent');
+                expect((error as McpError).message).toContain('Available prompts:');
+            });
         });
     });
 });

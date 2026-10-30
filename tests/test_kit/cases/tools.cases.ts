@@ -1,7 +1,11 @@
 import type { Client as ClientV2, ProgressNotification } from '@modelcontextprotocol/client';
 import type { Client as ClientV1 } from '@modelcontextprotocol/sdk/client/index.js';
 import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { ErrorCode, LoggingMessageNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+    ErrorCode,
+    ListPromptsResultSchema,
+    LoggingMessageNotificationSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 import { expect, vi } from 'vitest';
 
 import { APIFY_ACTOR_RUN_META_KEY } from '@apify/actors-mcp-server/internals/test-kit.js';
@@ -164,11 +168,13 @@ export const toolsCases: Case[] = [
         }),
     },
     {
-        name: 'should list all prompts',
+        name: 'answers prompts/list with method not found while the server serves no prompts',
         isDeploymentTest: false,
         run: withClient(undefined, async (client) => {
-            const prompts = await client.listPrompts();
-            expect(prompts.prompts.length).toBe(0);
+            // A raw request: the v2 client answers listPrompts() with [] itself when no prompts are declared.
+            await expect(
+                (client as ClientV1).request({ method: 'prompts/list', params: {} }, ListPromptsResultSchema),
+            ).rejects.toMatchObject({ code: ErrorCode.MethodNotFound });
         }),
     },
     {
@@ -265,7 +271,7 @@ export const toolsCases: Case[] = [
             // #1232: `tools` must stay `{}` (no listChanged).
             expect(capabilities?.tools).toEqual({});
             expect(capabilities?.resources).toEqual({});
-            expect(capabilities?.prompts).toEqual({});
+            expect(capabilities).not.toHaveProperty('prompts');
         }),
     },
     {
@@ -315,14 +321,11 @@ export const toolsCases: Case[] = [
         }),
     },
     {
-        name: 'rejects prompts/get with an unknown prompt name',
+        name: 'answers prompts/get with method not found while the server serves no prompts',
         isDeploymentTest: false,
         run: withClient(undefined, async (client) => {
-            // Wording differs from the tool path above ("not found", no "was"), so pin the whole
-            // phrase rather than a substring that looks shared but is not.
             await expect(client.getPrompt({ name: 'no-such-prompt' })).rejects.toMatchObject({
-                code: ErrorCode.InvalidParams,
-                message: expect.stringContaining('Prompt no-such-prompt not found'),
+                code: ErrorCode.MethodNotFound,
             });
         }),
     },
