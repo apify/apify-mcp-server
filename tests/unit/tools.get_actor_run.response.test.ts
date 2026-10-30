@@ -7,7 +7,8 @@ import {
     buildStartRunResponse,
     buildStartRunWidgetResponse,
     buildStatusSummaryNextStep,
-    collapseArrayIndices,
+    collapseArrayPaths,
+    fieldsProjectionHint,
     type RunDataset,
     type RunKeyValueStore,
     type RunResponse,
@@ -1146,6 +1147,7 @@ function makeRun(status: string, statusMessage?: string, runTimeSecs = 10) {
 }
 
 const datasetWithItems: RunDataset = { id: 'ds-1', itemCount: 47, fields: ['metadata.url', 'markdown'] };
+const DATASET_FIELDS = ['metadata/url', 'markdown'];
 const datasetEmpty: RunDataset = { id: 'ds-1', itemCount: 0, fields: [] };
 const kvWithRecords: RunKeyValueStore = { id: 'kv-1', keys: ['result-a', 'result-b'], keyCount: 2 };
 
@@ -1162,11 +1164,12 @@ describe('buildStatusTemplate', () => {
         const t = buildStatusSummaryNextStep({
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
+            datasetFields: DATASET_FIELDS,
         });
         expect(t.summary).toContain('47 items; 2 fields available');
         expect(t.nextStep).toContain('get-dataset-items');
         expect(t.nextStep).toContain('datasetId=ds-1');
-        expect(t.nextStep).toContain('metadata.url, markdown');
+        expect(t.nextStep).toContain('Each listed field path works in fields="..."');
     });
 
     it('SUCCEEDED dataset nextStep uses DEFAULT_DATASET_ITEMS_LIMIT as example limit', () => {
@@ -1203,7 +1206,7 @@ describe('buildStatusTemplate', () => {
         const dataset: RunDataset = { id: 'ds-1', itemCount: 5, fields: [] };
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
         expect(t.nextStep).toContain('get-dataset-items');
-        expect(t.nextStep).not.toContain('Available fields');
+        expect(t.nextStep).not.toContain('fields="..."');
         expect(t.nextStep).not.toContain('—');
     });
 
@@ -1327,6 +1330,15 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).toContain('partial output (47 items written)');
     });
 
+    it('TIMED-OUT with fields carries the same fields hint as SUCCEEDED', () => {
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('TIMED-OUT'),
+            dataset: datasetWithItems,
+            datasetFields: DATASET_FIELDS,
+        });
+        expect(t.nextStep).toContain('Each listed field path works in fields="..."');
+    });
+
     it('TIMED-OUT with both dataset and KV records picks dataset for nextStep', () => {
         const t = buildStatusSummaryNextStep({
             run: makeRun('TIMED-OUT'),
@@ -1417,49 +1429,86 @@ describe('buildStatusTemplate', () => {
     });
 
     it('SUCCEEDED with items ends nextStep with a single period after the fields hint', () => {
-        // Pinned to prevent the `to project..` regression: the fields-hint template already
-        // terminates the sentence, so the outer nextStep template must not append its own `.`.
+        // The fields-hint template already terminates the sentence, so the outer nextStep
+        // template must not append its own `.`.
         const t = buildStatusSummaryNextStep({
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
+            datasetFields: DATASET_FIELDS,
         });
-        expect(t.nextStep).toMatch(/to project\.$/);
+        expect(t.nextStep).toMatch(/\.$/);
         expect(t.nextStep).not.toMatch(/\.\.$/);
     });
 });
 
-// -----------------------------------------------------------------------------
-// collapseArrayIndices (#894): the single boundary where Apify's index-expanded
-// `dataset.fields` is normalized. `buildRunDataset` calls this once, so every
-// downstream consumer (structured `storages.datasets.default.fields` AND the
-// narrative summary/nextStep) sees a flat deduped list.
-// -----------------------------------------------------------------------------
-describe('collapseArrayIndices', () => {
-    it('strips numeric segments and dedupes paths sharing the same shape', () => {
-        expect(
-            collapseArrayIndices([
-                'latestComments.0.id',
-                'latestComments.0.text',
-                'latestComments.1.id',
-                'latestComments.1.text',
-                'latestComments.2.owner.username',
-            ]),
-        ).toEqual(['latestComments.id', 'latestComments.text', 'latestComments.owner.username']);
+describe('fieldsProjectionHint', () => {
+    it('states the array rule with placeholder names when a field holds an array', () => {
+        const hint = fieldsProjectionHint(['query', 'search/provider', 'results/0/url', 'results/0/siteLinks/0/url']);
+        expect(hint).toContain('fields="b" returns every element of b');
+        // Neither the dataset's own names nor an indexed path: agents copy both.
+        expect(hint).not.toMatch(/query|search|results|url/);
+        expect(hint).not.toMatch(/\.\d+(\.|\b)/);
     });
 
-    it('preserves non-array fields unchanged and preserves first-occurrence order', () => {
+    it('omits the array rule when no field holds an array', () => {
+        const hint = fieldsProjectionHint(['markdown', 'metadata/url']);
+        expect(hint).toContain('Each listed field path works in fields="..."');
+        expect(hint).not.toContain('Arrays');
+    });
+
+    it('is empty without fields', () => {
+        expect(fieldsProjectionHint([])).toBe('');
+        expect(fieldsProjectionHint(undefined)).toBe('');
+    });
+});
+
+describe('run response threads the raw field metadata into the hint', () => {
+    it('detects arrays from the index-expanded fields while fields lists only the top-level name', async () => {
+        const run = mockSucceededRun();
+        const dataset = mockDataset({ fields: ['query', 'results/0/url', 'results/1/url'] });
+        const result = await (getActorRun as HelperTool).call(
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, stubClient({ run, dataset })),
+        );
+        const { structuredContent, content } = result as {
+            structuredContent: RunResponse;
+            content: { text: string }[];
+        };
+        expect(structuredContent.storages.datasets?.default.fields).toEqual(['query', 'results']);
+        expect(content[1].text).toContain('Arrays come whole under their top-level field');
+    });
+});
+
+// -----------------------------------------------------------------------------
+// collapseArrayPaths: the single boundary where Apify's index-expanded
+// `dataset.fields` becomes the list of working `fields` selections.
+// -----------------------------------------------------------------------------
+describe('collapseArrayPaths', () => {
+    it('collapses a path to or through an array to its top-level name and dedupes', () => {
         expect(
-            collapseArrayIndices(['metadata.url', 'entities.hashtags.0.text', 'entities.hashtags.1.text', 'markdown']),
-        ).toEqual(['metadata.url', 'entities.hashtags.text', 'markdown']);
+            collapseArrayPaths([
+                'latestComments.0.id',
+                'latestComments.1.text',
+                'latestComments.2.owner.username',
+                'metadata.headers.set-cookie.0',
+            ]),
+        ).toEqual(['latestComments', 'metadata']);
+    });
+
+    it('keeps object paths unchanged and preserves first-occurrence order', () => {
+        expect(collapseArrayPaths(['metadata.url', 'entities.hashtags.0.text', 'markdown'])).toEqual([
+            'metadata.url',
+            'entities',
+            'markdown',
+        ]);
     });
 
     it('returns [] for empty input', () => {
-        expect(collapseArrayIndices([])).toEqual([]);
+        expect(collapseArrayPaths([])).toEqual([]);
     });
 
     it('drops paths that collapse to empty (pathological all-numeric segments)', () => {
         // Pure-numeric top-level keys are pathological (dataset fields are object keys, not
         // array indices) but we still don't want them sneaking through as empty strings.
-        expect(collapseArrayIndices(['0', '1', '2'])).toEqual([]);
+        expect(collapseArrayPaths(['0', '1', '2'])).toEqual([]);
     });
 });

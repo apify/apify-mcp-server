@@ -61,7 +61,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     the one canonical run shape `call-actor` and `get-actor-run` share across sync, task
     and wait-timeout modes: storage IDs plus a `summary` (past) / `nextStep` (one primary
     action) pair, never inline dataset items or KV bodies — except the reserved `TIP` key,
-    inlined as `tip` on terminal RAG Web Browser runs only.
+    inlined as `tip` on terminal RAG Web Browser runs only. The dataset field hint
+    (`fieldsProjectionHint`, shared with `get-dataset`) takes the raw index-expanded metadata,
+    not the collapsed `fields`; its docstring has the rules.
   - `runs/` — get/abort runs, run logs, run list.
   - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`.
   - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public

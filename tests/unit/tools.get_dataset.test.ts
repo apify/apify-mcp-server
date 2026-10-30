@@ -52,6 +52,7 @@ describe('get-dataset', () => {
         expect(structuredContent.summary).toBe("Dataset 'my-dataset' has 42 items, 2 fields.");
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
         expect(structuredContent.nextStep).toContain('datasetId=ds-1');
+        expect(structuredContent.nextStep).toContain('Each listed field path works in fields="..."');
         // content[0] is the data-only JSON dump (no narrative); content[1] is the narrative.
         const { summary, nextStep, ...data } = structuredContent;
         expect(JSON.parse(content[0].text)).toEqual(data);
@@ -153,9 +154,8 @@ describe('get-dataset', () => {
 /**
  * The Apify `/v2/datasets/{id}` endpoint returns `fields` slash-separated with
  * array indices expanded (e.g. `latestComments/0/owner/username`). The tool
- * normalizes to dot-notation and collapses pure-numeric segments so consumers
- * can feed the list straight into `get-dataset-items` as a `fields="..."`
- * projection. See PR #904 / issue #894.
+ * normalizes it so every listed path works as a `get-dataset-items` `fields="..."`
+ * selection.
  */
 describe('get-dataset fields normalization', () => {
     it('translates slash-notation to dot-notation', async () => {
@@ -173,7 +173,7 @@ describe('get-dataset fields normalization', () => {
         expect(structuredContent.fields).toEqual(['crawl.httpStatusCode', 'metadata.url', 'markdown']);
     });
 
-    it('collapses array-index segments and dedupes', async () => {
+    it('collapses array paths to their top-level name and dedupes', async () => {
         // Real-world shape from `apify/instagram-scraper`: Apify expands every array index,
         // bloating ~30 schema fields into hundreds of paths.
         const result = await (getDataset as HelperTool).call(
@@ -195,13 +195,9 @@ describe('get-dataset fields normalization', () => {
                 }),
             ),
         );
-        const { structuredContent } = result as { structuredContent: { fields: string[] } };
-        expect(structuredContent.fields).toEqual([
-            'latestComments.id',
-            'latestComments.text',
-            'latestComments.owner.username',
-            'images',
-        ]);
+        const { structuredContent } = result as { structuredContent: { fields: string[]; nextStep: string } };
+        expect(structuredContent.fields).toEqual(['latestComments', 'images']);
+        expect(structuredContent.nextStep).toContain('Arrays come whole under their top-level field');
     });
 
     it('preserves non-`fields` keys from the raw API response unchanged', async () => {
@@ -223,7 +219,7 @@ describe('get-dataset fields normalization', () => {
             userId: 'u-1',
             itemCount: 3,
             stats: { storageBytes: 15557, readCount: 4, writeCount: 3 },
-            fields: ['a.b.c'],
+            fields: ['a'],
         });
     });
 
