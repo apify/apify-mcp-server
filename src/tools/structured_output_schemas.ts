@@ -1152,6 +1152,7 @@ export const keyValueStoreRecordOutputSchema = {
     properties: {
         keyValueStoreId: { type: 'string', description: 'Key-value store ID' },
         key: { type: 'string', description: 'Record key' },
+        found: { type: 'boolean', description: 'Whether the store has a record under the key' },
         value: {
             ...anyJsonValueSchema,
             description: 'The stored value (JSON, text, or binary)',
@@ -1159,7 +1160,7 @@ export const keyValueStoreRecordOutputSchema = {
         contentType: { type: 'string', description: 'MIME type of the stored value' },
         summary: summaryProperty,
     },
-    required: ['keyValueStoreId', 'key', 'value', 'summary'],
+    required: ['keyValueStoreId', 'key', 'found', 'summary'],
 };
 
 /**

@@ -308,6 +308,24 @@ export const storageCases: Case[] = [
         }),
     },
     {
+        name: "returns found: false for a key missing from the run's default KV store via get-key-value-store-record",
+        isDeploymentTest: false,
+        run: withNormalModeRun({ tools: ['storage'] }, async (client, { defaultKvId }) => {
+            const result = await client.callTool({
+                name: 'get-key-value-store-record',
+                arguments: { keyValueStoreId: defaultKvId, recordKey: 'CHECKPOINT' },
+            });
+            expect(result.isError).not.toBe(true);
+            expect(result.structuredContent).toEqual({
+                keyValueStoreId: defaultKvId,
+                key: 'CHECKPOINT',
+                found: false,
+                summary: expect.stringContaining('Keys are case-sensitive'),
+            });
+            validateStructuredOutputForTool(result, 'get-key-value-store-record', 'default');
+        }),
+    },
+    {
         name: 'returns dataset metadata via get-dataset',
         isDeploymentTest: false,
         run: withNormalModeRun({ tools: ['storage'] }, async (client, { datasetId }) => {
