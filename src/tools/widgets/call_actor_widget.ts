@@ -28,9 +28,7 @@ import { actorRunOutputSchema, anyJsonObjectSchema } from '../structured_output_
  */
 const callActorWidgetArgsSchema = z
     .object({
-        actor: z
-            .string()
-            .describe('The name of the Actor to call. Format: "username/name" (e.g., "apify/rag-web-browser").'),
+        actor: z.string().describe('The name of the Actor to call. Format: "username/name".'),
         input: anyJsonObjectSchema.describe('The input JSON to pass to the Actor. Required.'),
         callOptions: callOptionsSchema
             .optional()
@@ -60,7 +58,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         Render an interactive UI element (widget) that displays live Actor run progress for the user.
 
         Use this tool ONLY when the user explicitly wants to see run progress visually
-        (e.g., "run apify/rag-web-browser and show progress", "start this Actor with a progress view").
+        (e.g., "run username/name and show progress", "start this Actor with a progress view").
         The response renders as an interactive widget that automatically tracks run status until
         completion — do NOT poll the run status after this.${hasTool(HELPER_TOOLS.DATASET_GET_ITEMS) ? ` Use ${HELPER_TOOLS.DATASET_GET_ITEMS} to fetch output once the widget reports completion.` : ''}
         ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `\nFor silent starts where no UI is needed (e.g., "start this in the background"), use ${HELPER_TOOLS.ACTOR_CALL} instead — same run, no widget.\n` : ''}

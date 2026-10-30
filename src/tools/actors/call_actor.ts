@@ -189,7 +189,7 @@ function respondActorNotFound(actorName: string, loadedToolNames: readonly strin
     return respondUserError(
         dedent`
             Actor '${actorName}' was not found.
-            Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
+            Please verify Actor ID or name format ("username/name") and ensure that the Actor exists.
         ` + recovery,
         { httpStatus: 404, detail: `Actor '${actorName}' was not found` },
     );
@@ -299,11 +299,7 @@ export const callOptionsSchema = z.object({
 
 /** Zod schema for call-actor arguments — shared between default and apps variants. */
 export const callActorArgs = z.object({
-    actor: z
-        .string()
-        .describe(
-            'The Actor to call: its ID, or its name in the "username/name" form (e.g., "apify/rag-web-browser").',
-        ),
+    actor: z.string().describe('The Actor to call: its ID, or its name in the "username/name" form.'),
     input: anyJsonObjectSchema.describe('The input JSON to pass to the Actor. Required.'),
     waitSecs: z
         .number()
