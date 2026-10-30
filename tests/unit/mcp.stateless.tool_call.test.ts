@@ -22,6 +22,7 @@ import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
 import { getActors } from '../../src/utils/tools_loader.js';
 import {
     getRequestHandler,
+    makeActorTool,
     makeArgsRecorderTool,
     makePaymentRequiredError,
     makeThrowingTool,
@@ -54,18 +55,6 @@ vi.mock('../../src/apify_client.js', async (importOriginal) => {
 });
 
 const getActorsMock = vi.mocked(getActors);
-
-function makeActorTool(): ToolEntry {
-    return {
-        type: TOOL_TYPE.ACTOR,
-        name: 'test-actor-tool',
-        description: 'actor',
-        inputSchema: { type: 'object', properties: {} } as ToolInputSchema,
-        ajvValidate: compileSchema({ type: 'object', properties: {} }),
-        actorId: 'test/actor',
-        actorFullName: 'test/actor',
-    } as ToolEntry;
-}
 
 function makeActorMcpTool(): ToolEntry {
     return {

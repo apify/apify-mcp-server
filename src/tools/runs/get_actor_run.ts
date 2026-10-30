@@ -9,7 +9,7 @@ import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildUsageMeta, respondAborted, respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
-import { ACTOR_TIP_CAVEAT } from '../actor_tool_naming.js';
+import { ACTOR_TIP_CAVEAT, canRunActor } from '../actor_tool_naming.js';
 import {
     applyConsoleLinks,
     type FetchActorRunResult,
@@ -63,13 +63,16 @@ export function buildGetActorRunError(runId: string, error: unknown): ToolRespon
 /**
  * Build the success response. `content[0]` is the JSON-stringified `structuredContent`
  * mirror (per MCP spec); `content[1]` carries an LLM-readable narrative of `summary` + `nextStep`.
- * Without `hasCallActorTool`, `tip.caveat` says the session cannot run the recommended Actor; it is also printed after the tip.
+ * When `canRunTipActor` returns false for the tip's recommended Actor, `tip.caveat` says the session cannot run it; it is also printed after the tip.
  */
 export function buildGetActorRunResponse(
-    params: FetchActorRunResult & { linkContext?: ConsoleLinkContext; hasCallActorTool?: boolean },
+    params: FetchActorRunResult & {
+        linkContext?: ConsoleLinkContext;
+        canRunTipActor?: (recommendedActorId: string) => boolean;
+    },
 ): ToolResponse {
-    const { run, structuredContent, linkContext, hasCallActorTool = true } = params;
-    if (structuredContent.tip && !hasCallActorTool) {
+    const { run, structuredContent, linkContext, canRunTipActor = () => true } = params;
+    if (structuredContent.tip && !canRunTipActor(structuredContent.tip.recommendedActorId ?? '')) {
         structuredContent.tip = { ...structuredContent.tip, caveat: ACTOR_TIP_CAVEAT };
     }
     const { tip } = structuredContent;
@@ -143,6 +146,7 @@ export const getActorRun: ToolEntry = Object.freeze({
             mcpSessionId,
             signal,
             loadedToolNames,
+            loadedActorIds,
         } = toolArgs;
         const parsed = getActorRunArgs.parse(args);
 
@@ -164,7 +168,8 @@ export const getActorRun: ToolEntry = Object.freeze({
             return buildGetActorRunResponse({
                 ...fetchResult.result,
                 linkContext: await getConsoleLinkContext(apifyToken, client),
-                hasCallActorTool: loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL),
+                canRunTipActor: (recommendedActorId) =>
+                    canRunActor(recommendedActorId, loadedToolNames, loadedActorIds),
             });
         } catch (error) {
             logHttpError(error, 'Failed to get Actor run', { runId: parsed.runId });
