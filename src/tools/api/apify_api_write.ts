@@ -1,10 +1,11 @@
+import Ajv from 'ajv';
 import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
-import { compileSchema } from '../../utils/ajv.js';
+import { fixZodSchemaRequired } from '../../utils/ajv.js';
 import { respondUserError } from '../../utils/mcp.js';
 import { anyJsonValueSchema, apifyApiCallOutputSchema } from '../structured_output_schemas.js';
 import { isEndpointBlocked } from './apify_api_blocklist.js';
@@ -113,7 +114,10 @@ export const apifyApiWrite: ToolEntry = Object.freeze({
         apifyApiWriteArgs.extend({ body: apifyApiWriteArgs.shape.body.meta(anyJsonValueSchema) }),
     ) as ToolInputSchema,
     outputSchema: apifyApiCallOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(apifyApiWriteArgs)),
+    // The shared validator coerces null and singleton arrays into scalar query values.
+    ajvValidate: new Ajv({ coerceTypes: false, strict: false, removeAdditional: true }).compile(
+        fixZodSchemaRequired(z.toJSONSchema(apifyApiWriteArgs)),
+    ),
     annotations: {
         title: 'Write Apify API',
         readOnlyHint: false,
