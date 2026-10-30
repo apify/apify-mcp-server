@@ -38,7 +38,7 @@ The cross-file invariant no single file shows you:
   hand-injecting the schema field elsewhere — both `skyfire.ts` and `x402.ts` gate on that
   flag. `SKYFIRE_ENABLED_TOOLS` (`const.ts`) is the expected-list the Skyfire integration test
   asserts against; keep it in sync with the `paymentRequired` tools or that test fails.
-- `skyfire-pay-id` is injected only at the top level, so `redactSkyfirePayId` redacts top-level only; if you ever nest a payment field, make the redactor recursive or it leaks.
+- `skyfire-pay-id` is injected only at the top level, so `SkyfirePaymentProvider.redactForLogging` redacts top-level only; if you ever nest a payment field, make the redactor recursive or it leaks.
 - A tool whose arguments carry secrets sets `redactArgs` on its entry (`HelperTool` in `../types.ts`)
   instead of adding a case here. It runs before AJV validation, so it must accept any shape, must
   not mutate the arguments, and must be an allowlist: the logged copy keeps the undeclared keys AJV

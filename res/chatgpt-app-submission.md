@@ -69,7 +69,7 @@ their base tool.
 - [x] No unnecessary PII in tool responses — tools return public resource IDs (runId, datasetId), not internal/private data
 - [x] No session/trace/request IDs leaked — `mcpSessionId` is logging-only, never in tool responses
 - [x] API tokens never exposed in responses — used internally only
-- [x] Skyfire tokens redacted in logs (`redactSkyfirePayId`, `src/utils/logging.ts`)
+- [x] Skyfire tokens redacted in logs (`SkyfirePaymentProvider.redactForLogging`, `src/payments/skyfire.ts`)
 - [ ] Verify privacy policy explicitly covers all data categories returned by tools (run metadata, dataset items, Actor details)
 
 ## Widgets
