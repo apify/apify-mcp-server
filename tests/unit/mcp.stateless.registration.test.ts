@@ -102,4 +102,17 @@ describe('createStatelessServer()', () => {
             expect(response.result?.capabilities).toEqual(SERVED_CAPABILITIES);
         });
     });
+
+    // The adapter passes no `cacheHints`, so the SDK fills its defaults. The conformance `caching`
+    // scenario is excluded because it also requires prompts/list, so nothing else checks these hints.
+    describe('caching hints', () => {
+        for (const method of ['tools/list', 'resources/list', 'resources/templates/list']) {
+            it(`returns the default ttlMs and cacheScope on ${method}`, async () => {
+                await withStatelessServer(async ({ call }) => {
+                    const response = await call(method);
+                    expect(response.result).toMatchObject({ ttlMs: 0, cacheScope: 'private' });
+                });
+            });
+        }
+    });
 });
