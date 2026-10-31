@@ -179,8 +179,8 @@ export const DOCS_SOURCES = [
         indexName: 'crawlee',
         typeFilter: 'lvl1', // Filter to page-level results only (Docusaurus lvl1)
         facetFilters: ['language:en'],
-        // Searched at the latest released version, resolved at runtime (`resolveLatestDocsVersion`);
-        // blog posts and other unversioned pages carry `docusaurus_tag:default`.
+        // Searched at the latest released version, resolved at runtime; blog posts and other unversioned
+        // pages carry `docusaurus_tag:default`.
         isVersioned: true,
         unversionedTag: 'docusaurus_tag:default',
         description:

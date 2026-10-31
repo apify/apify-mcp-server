@@ -46,8 +46,6 @@ type AlgoliaResult = {
     facets?: Record<string, Record<string, number>>;
 };
 
-type DocsSource = (typeof DOCS_SOURCES)[number];
-
 /** Orders dotted numeric versions by their components, so `3.18` sorts after `3.9`. */
 function compareVersions(a: string, b: string): number {
     const aParts = a.split('.').map(Number);
@@ -66,7 +64,7 @@ function compareVersions(a: string, b: string): number {
  */
 async function resolveLatestDocsVersion(
     client: ReturnType<typeof algoliasearch>,
-    indexConfig: DocsSource,
+    indexConfig: (typeof DOCS_SOURCES)[number],
 ): Promise<string | undefined> {
     const cachedVersion = docsVersionCache.get(indexConfig.id);
     if (cachedVersion) return cachedVersion;
@@ -107,7 +105,7 @@ async function resolveLatestDocsVersion(
  * @returns {object} Algolia search request object with index name, query, and conditional filters
  */
 function prepareAlgoliaRequest(
-    indexConfig: DocsSource,
+    indexConfig: (typeof DOCS_SOURCES)[number],
     query: string,
     version: string | undefined,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

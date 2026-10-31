@@ -56,7 +56,6 @@ describe('searchDocsBySource()', () => {
             return { search, warning: vi.spyOn(log, 'warning').mockImplementation(() => undefined) };
         }
 
-        /** Answers the `version` facet query with `versions` and every search with no hits. */
         function stubVersionFacet(versions: string[]) {
             searchMock.mockImplementation(async ({ requests }: { requests: { facets?: string[] }[] }) =>
                 requests[0].facets
@@ -141,9 +140,12 @@ describe('searchDocsBySource()', () => {
             await search('crawlee-js', 'crawler');
             expect(getFacetQueries()).toHaveLength(1);
 
+            await search('crawlee-py', 'request queue');
+            expect(getFacetQueries()).toHaveLength(2);
+
             vi.setSystemTime(new Date('2026-10-30T12:00:00Z').getTime() + DAY_MILLIS + 1);
             await search('crawlee-js', 'proxy');
-            expect(getFacetQueries()).toHaveLength(2);
+            expect(getFacetQueries()).toHaveLength(3);
         });
     });
 
