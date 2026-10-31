@@ -98,10 +98,8 @@ describe('createStatelessServer()', () => {
     it('answers server/discover from the SDK, which owns that method', async () => {
         await withStatelessServer(async ({ call }) => {
             const response = await call('server/discover');
-            expect(response.result).toMatchObject({
-                supportedVersions: [STATELESS_PROTOCOL_VERSION],
-                capabilities: SERVED_CAPABILITIES,
-            });
+            expect(response.result).toMatchObject({ supportedVersions: [STATELESS_PROTOCOL_VERSION] });
+            expect(response.result?.capabilities).toEqual(SERVED_CAPABILITIES);
         });
     });
 });

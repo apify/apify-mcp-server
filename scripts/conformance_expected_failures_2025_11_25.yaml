@@ -52,7 +52,7 @@ server:
     - resources-read-binary
     # Needs fixture resource template `test://template/{id}/data`.
     - resources-templates-read
-    # Needs fixture prompt `test_simple_prompt`; this server serves no prompts yet.
+    # Needs fixture prompt `test_simple_prompt`; this server serves no prompts.
     - prompts-get-simple
     # Needs fixture prompt `test_prompt_with_arguments`.
     - prompts-get-with-args
