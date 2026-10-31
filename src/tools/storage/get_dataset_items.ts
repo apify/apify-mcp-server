@@ -6,7 +6,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/console_link.js';
-import { parseCommaSeparatedList, stripQuoteWrappers } from '../../utils/generic.js';
+import { parseCommaSeparatedList } from '../../utils/generic.js';
 import { respondUserError } from '../../utils/mcp.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
 import {
@@ -14,6 +14,7 @@ import {
     buildStorageResponse,
     fetchStorageByIdOrName,
     resolveStorageId,
+    resolveStorageTarget,
     storageIdArgDescription,
     storageNotFoundText,
 } from './storage_helpers.js';
@@ -33,7 +34,16 @@ export function extractDotPrefixes(fields: string[]): string[] {
 }
 
 const getDatasetItemsArgs = z.object({
-    datasetId: z.string().min(1).describe(storageIdArgDescription('dataset')),
+    datasetId: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(`${storageIdArgDescription('dataset')} Provide exactly one of datasetId or runId.`),
+    runId: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("Actor run ID; reads the run's default dataset. Provide exactly one of runId or datasetId."),
     clean: z
         .boolean()
         .optional()
@@ -106,7 +116,12 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             parsed.flatten !== undefined ? parseCommaSeparatedList(parsed.flatten) : extractDotPrefixes(fields);
 
         const effectiveLimit = parsed.limit ?? DEFAULT_DATASET_ITEMS_LIMIT;
-        const datasetId = stripQuoteWrappers(parsed.datasetId);
+        const target = await resolveStorageTarget(client, 'dataset', {
+            storageId: parsed.datasetId,
+            runId: parsed.runId,
+        });
+        if ('error' in target) return respondUserError(target.error);
+        const datasetId = target.storageId;
         const found = await fetchStorageByIdOrName(datasetId, async (safeId) =>
             client.dataset(safeId).listItems({
                 clean: parsed.clean,

@@ -268,3 +268,68 @@ describe('get-dataset-items with a bare dataset name', () => {
         expect(structuredContent.apifyConsoleUrl).toBe('https://console.apify.com/storage/datasets/WkzbQMuFYuamGv3YF');
     });
 });
+
+describe('get-dataset-items with a runId', () => {
+    function stubRunClient(run: unknown) {
+        const listItems = vi.fn().mockResolvedValue({ items: MOCK_ITEMS, total: 1 });
+        const dataset = vi.fn().mockReturnValue({ listItems });
+        const getRun = vi.fn().mockResolvedValue(run);
+        return { client: mockApifyClient({ run: () => ({ get: getRun }), dataset }), dataset, getRun };
+    }
+
+    it("reads the run's default dataset and returns its ID", async () => {
+        const { client, dataset } = stubRunClient({ id: 'GZXcXAOgwCrKn8vCn', defaultDatasetId: 'yDyna1VW4FXLtXdnS' });
+
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext({ runId: 'GZXcXAOgwCrKn8vCn' }, client),
+        );
+
+        expect(dataset).toHaveBeenCalledWith('yDyna1VW4FXLtXdnS');
+        expectSchemaConformingStructuredContent(result, datasetItemsOutputSchema);
+        expect((result as { structuredContent: { datasetId: string } }).structuredContent.datasetId).toBe(
+            'yDyna1VW4FXLtXdnS',
+        );
+    });
+
+    it('returns a user error naming the run when it does not exist, without a dataset request', async () => {
+        const { client, dataset } = stubRunClient(undefined);
+
+        const result = await (getDatasetItems as HelperTool).call(stubToolCallContext({ runId: 'RunMissing' }, client));
+
+        expectSoftFailInvalidInput(result);
+        expect((result as TextToolResult).content[0].text).toContain('RunMissing');
+        expect(dataset).not.toHaveBeenCalled();
+    });
+
+    it('returns a user error when the run has no default dataset, without a dataset request', async () => {
+        const { client, dataset } = stubRunClient({ id: 'GZXcXAOgwCrKn8vCn' });
+
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext({ runId: 'GZXcXAOgwCrKn8vCn' }, client),
+        );
+
+        expectSoftFailInvalidInput(result);
+        expect((result as TextToolResult).content[0].text).toContain('GZXcXAOgwCrKn8vCn');
+        expect(dataset).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['both identifiers', { runId: 'GZXcXAOgwCrKn8vCn', datasetId: 'yDyna1VW4FXLtXdnS' }],
+        ['neither identifier', {}],
+    ])('returns a user error without any API request for %s', async (_label, args) => {
+        const { client, dataset, getRun } = stubRunClient({
+            id: 'GZXcXAOgwCrKn8vCn',
+            defaultDatasetId: 'yDyna1VW4FXLtXdnS',
+        });
+        const validatedArgs = structuredClone(args);
+        // The shared validation path passes both shapes through unchanged; the tool body refuses them.
+        expect((getDatasetItems as HelperTool).ajvValidate(validatedArgs)).toBe(true);
+        expect(validatedArgs).toEqual(args);
+
+        const result = await (getDatasetItems as HelperTool).call(stubToolCallContext(validatedArgs, client));
+
+        expectSoftFailInvalidInput(result);
+        expect(getRun).not.toHaveBeenCalled();
+        expect(dataset).not.toHaveBeenCalled();
+    });
+});

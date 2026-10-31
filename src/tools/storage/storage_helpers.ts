@@ -1,7 +1,8 @@
+import type { ApifyClient } from '../../apify_client.js';
 import { HELPER_TOOLS, HTTP_NOT_FOUND, MAX_INLINE_BYTES } from '../../const.js';
 import { getResourceByIdOrName, isAmbiguousResourceId } from '../../utils/apify_resource_id.js';
 import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
-import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
+import { QUOTE_WRAPPER_CHARS, stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
 import { respondOk } from '../../utils/mcp.js';
 
@@ -54,8 +55,13 @@ export async function resolveStorageId(
 }
 
 const STORAGE_ARG = {
-    dataset: { noun: 'Dataset', arg: 'datasetId', plural: 'datasets' },
-    keyValueStore: { noun: 'Key-value store', arg: 'keyValueStoreId', plural: 'key-value stores' },
+    dataset: { noun: 'Dataset', arg: 'datasetId', plural: 'datasets', runField: 'defaultDatasetId' },
+    keyValueStore: {
+        noun: 'Key-value store',
+        arg: 'keyValueStoreId',
+        plural: 'key-value stores',
+        runField: 'defaultKeyValueStoreId',
+    },
 } as const;
 
 /** The `describe()` text of a storage id argument. */
@@ -68,6 +74,29 @@ export function storageIdArgDescription(kind: keyof typeof STORAGE_ARG): string 
 export function storageNotFoundText(kind: keyof typeof STORAGE_ARG, idOrName: string): string {
     const { noun, arg, plural } = STORAGE_ARG[kind];
     return `${noun} '${idOrName}' not found. The ${arg} argument takes an ID, a name (resolved against your own ${plural}), or a full name as username~name.`;
+}
+
+/**
+ * The storage a read targets: the given storage ID or name, or the default storage of the given run.
+ * Exactly one of the two must be given. A run without that default storage is an error, not a name lookup.
+ */
+export async function resolveStorageTarget(
+    client: ApifyClient,
+    kind: keyof typeof STORAGE_ARG,
+    { storageId, runId }: { storageId: string | undefined; runId: string | undefined },
+): Promise<{ storageId: string } | { error: string }> {
+    const { noun, arg, runField } = STORAGE_ARG[kind];
+    const exactlyOneText = `Provide exactly one of ${arg} or runId.`;
+    if (runId === undefined) {
+        return storageId === undefined ? { error: exactlyOneText } : { storageId: stripQuoteWrappers(storageId) };
+    }
+    if (storageId !== undefined) return { error: exactlyOneText };
+    const safeRunId = stripQuoteWrappers(runId);
+    const run = await client.run(safeRunId).get();
+    if (!run) return { error: `Actor run '${safeRunId}' not found.` };
+    const defaultStorageId = run[runField];
+    if (!defaultStorageId) return { error: `Actor run '${safeRunId}' has no default ${noun.toLowerCase()}.` };
+    return { storageId: defaultStorageId };
 }
 
 function suggestTool(toolName: string, loadedToolNames: readonly string[]): string | undefined {

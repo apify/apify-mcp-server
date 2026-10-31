@@ -80,12 +80,15 @@ function getApiOrigin(ctx: CaseCtx): string {
 /** Dataset/KV read tools. */
 export const storageCases: Case[] = [
     {
-        name: 'rejects get-key-value-store-record when required keyValueStoreId is missing',
+        name: 'rejects get-key-value-store-record without keyValueStoreId or runId',
         isDeploymentTest: false,
         run: withClient({ tools: ['storage'] }, async (client) => {
-            await expect(
-                client.callTool({ name: 'get-key-value-store-record', arguments: { recordKey: 'INPUT' } }),
-            ).rejects.toThrow(/must have required property 'keyValueStoreId'/);
+            const result = await client.callTool({
+                name: 'get-key-value-store-record',
+                arguments: { recordKey: 'INPUT' },
+            });
+            expect(result.isError).toBe(true);
+            expect((result.content as { text: string }[])[0].text).toContain('keyValueStoreId or runId');
         }),
     },
     {
@@ -305,6 +308,37 @@ export const storageCases: Case[] = [
                 .structuredContent;
             expect(kvSc?.summary).toContain("Read 'INPUT'");
             expect(kvSc).not.toHaveProperty('nextStep');
+        }),
+    },
+    {
+        name: 'reads the same items by runId as by datasetId via get-dataset-items',
+        isDeploymentTest: false,
+        run: withNormalModeRun({ tools: ['storage'] }, async (client, { runId, datasetId }) => {
+            const byRun = await client.callTool({ name: 'get-dataset-items', arguments: { runId } });
+            const byDataset = await client.callTool({ name: 'get-dataset-items', arguments: { datasetId } });
+            expect(byRun.isError).not.toBe(true);
+            const byRunSc = byRun.structuredContent as { datasetId: string; items: unknown[] };
+            expect(byRunSc.datasetId).toBe(datasetId);
+            expect(byRunSc.items).toEqual((byDataset.structuredContent as { items: unknown[] }).items);
+            validateStructuredOutputForTool(byRun, 'get-dataset-items', 'default');
+        }),
+    },
+    {
+        name: 'reads the same record by runId as by keyValueStoreId via get-key-value-store-record',
+        isDeploymentTest: false,
+        run: withNormalModeRun({ tools: ['storage'] }, async (client, { runId, defaultKvId }) => {
+            const byRun = await client.callTool({
+                name: 'get-key-value-store-record',
+                arguments: { runId, recordKey: 'INPUT' },
+            });
+            const byStore = await client.callTool({
+                name: 'get-key-value-store-record',
+                arguments: { keyValueStoreId: defaultKvId, recordKey: 'INPUT' },
+            });
+            expect(byRun.isError).not.toBe(true);
+            const byRunSc = byRun.structuredContent as { keyValueStoreId: string; value: unknown };
+            expect(byRunSc.keyValueStoreId).toBe(defaultKvId);
+            expect(byRunSc.value).toEqual((byStore.structuredContent as { value: unknown }).value);
         }),
     },
     {
