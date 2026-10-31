@@ -295,7 +295,7 @@ export async function executeToolAndUpdateTask(params: {
         callDiagnostics = dispatchResult.callDiagnostics;
 
         // Check if task was cancelled before storing result
-        if (await skipIfTaskCancelled(', skipping result storage', toolStatus)) return;
+        if (await skipIfTaskCancelled(', skipping result storage', toolStatus, callDiagnostics)) return;
 
         // On a failed result, nudge the agent to report the blocker via report-problem (mirrors the
         // synchronous CallTool path, which task-mode calls like call-actor bypass).
