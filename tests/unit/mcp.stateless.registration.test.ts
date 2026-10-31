@@ -1,7 +1,12 @@
 import { Server } from '@modelcontextprotocol/server';
 import { describe, expect, it } from 'vitest';
 
-import { listStatelessHandlerMethods, STATELESS_PROTOCOL_VERSION, withStatelessServer } from './helpers/mcp_server.js';
+import {
+    listStatelessHandlerMethods,
+    STATELESS_PROTOCOL_VERSION,
+    withStatelessServer,
+    withTestPrompt,
+} from './helpers/mcp_server.js';
 
 /**
  * Pins what the stateless (2026-07-28) adapter registers and advertises. The v2 SDK is a pinned beta,
@@ -9,22 +14,14 @@ import { listStatelessHandlerMethods, STATELESS_PROTOCOL_VERSION, withStatelessS
  * keys, or the capability gates.
  */
 describe('createStatelessServer()', () => {
-    const SERVED_CAPABILITIES = { tools: {}, resources: {}, prompts: {} };
-    const SERVED_METHODS = [
-        'tools/list',
-        'tools/call',
-        'resources/list',
-        'resources/templates/list',
-        'resources/read',
-        'prompts/list',
-        'prompts/get',
-    ];
+    const SERVED_CAPABILITIES = { tools: {}, resources: {} };
+    const SERVED_METHODS = ['tools/list', 'tools/call', 'resources/list', 'resources/templates/list', 'resources/read'];
 
     it('registers exactly the methods it serves and nothing beyond the SDK own handlers', async () => {
         await withStatelessServer(async ({ buildServer }) => {
             // Diffing against a bare `Server` built with the same capabilities separates our
             // registrations from the SDK's own (`server/discover`, `logging/setLevel`, …), so this
-            // asserts both "all seven are wired" and "we added nothing else".
+            // asserts both "all five are wired" and "we added nothing else".
             const sdkOwnMethods = listStatelessHandlerMethods(
                 new Server({ name: 'baseline', version: '0.0.0' }, { capabilities: SERVED_CAPABILITIES }),
             );
@@ -52,10 +49,36 @@ describe('createStatelessServer()', () => {
         });
     });
 
-    it('advertises tools, resources and prompts only — no tasks, logging or tools.listChanged', async () => {
+    it('advertises tools and resources only — no prompts, tasks, logging or tools.listChanged', async () => {
         await withStatelessServer(async ({ buildServer }) => {
             expect(buildServer().getCapabilities()).toEqual(SERVED_CAPABILITIES);
         });
+    });
+
+    it('advertises prompts and registers both prompt handlers when the host has a prompt', async () => {
+        await withTestPrompt(async () => {
+            await withStatelessServer(async ({ buildServer }) => {
+                const server = buildServer();
+                expect(server.getCapabilities()).toEqual({ ...SERVED_CAPABILITIES, prompts: {} });
+                expect(listStatelessHandlerMethods(server)).toEqual(
+                    expect.arrayContaining(['prompts/list', 'prompts/get']),
+                );
+            });
+        });
+    });
+
+    describe('prompts/* without prompts', () => {
+        for (const [method, params] of [
+            ['prompts/list', {}],
+            ['prompts/get', { name: 'greet' }],
+        ] as const) {
+            it(`answers ${method} with method not found`, async () => {
+                await withStatelessServer(async ({ call }) => {
+                    const response = await call(method, params);
+                    expect(response.error?.code).toBe(-32601);
+                });
+            });
+        }
     });
 
     describe('tasks/*', () => {
@@ -75,10 +98,21 @@ describe('createStatelessServer()', () => {
     it('answers server/discover from the SDK, which owns that method', async () => {
         await withStatelessServer(async ({ call }) => {
             const response = await call('server/discover');
-            expect(response.result).toMatchObject({
-                supportedVersions: [STATELESS_PROTOCOL_VERSION],
-                capabilities: SERVED_CAPABILITIES,
-            });
+            expect(response.result).toMatchObject({ supportedVersions: [STATELESS_PROTOCOL_VERSION] });
+            expect(response.result?.capabilities).toEqual(SERVED_CAPABILITIES);
         });
+    });
+
+    // The adapter passes no `cacheHints`, so the SDK fills its defaults. The conformance `caching`
+    // scenario is excluded because it also requires prompts/list, so nothing else checks these hints.
+    describe('caching hints', () => {
+        for (const method of ['tools/list', 'resources/list', 'resources/templates/list']) {
+            it(`returns the default ttlMs and cacheScope on ${method}`, async () => {
+                await withStatelessServer(async ({ call }) => {
+                    const response = await call(method);
+                    expect(response.result).toMatchObject({ ttlMs: 0, cacheScope: 'private' });
+                });
+            });
+        }
     });
 });

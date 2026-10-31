@@ -282,7 +282,7 @@ Every tool carries a `title`, a `readOnlyHint`, and an `openWorldHint`. `readOnl
 
 ### Prompts and resources
 
-No prompts are registered yet, so `prompts/list` returns an empty list. `resources/read` accepts any Apify API GET URL (`https://api.apify.com/v2/...`) and returns the response body using the session's Apify token, inlined up to 256 KB. Your data isn't enumerated in `resources/list`; `resources/templates/list` lists the common shapes with their paging parameters.
+The server does not serve prompts yet. `resources/read` accepts any Apify API GET URL (`https://api.apify.com/v2/...`) and returns the response body using the session's Apify token, inlined up to 256 KB. Your data isn't enumerated in `resources/list`; `resources/templates/list` lists the common shapes with their paging parameters.
 
 ## Choose which tools load
 

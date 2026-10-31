@@ -27,8 +27,9 @@ Two MCP protocol revisions are served, each by its own adapter:
   `LegacyMcpServerHost`.
 - `stateless_server.ts` — `createStatelessServer(host, requestUrl?)`: the 2026-07-28 (v2 SDK) adapter,
   one `Server` per request, reading shared state through `StatelessMcpServerHost`. Serves
-  `tools/*`, `resources/*` and `prompts/*`; registers no Tasks (the SDK answers
-  method-not-found) and declares no `logging`.
+  `tools/*`, `resources/*` and, only when the host's prompt service has a prompt, `prompts/*`
+  (both adapters gate the capability and the handlers together); registers no Tasks (the SDK
+  answers method-not-found) and declares no `logging`.
 - `client_context.ts` — protocol-neutral client identity and capabilities.
 - `errors.ts` — protocol-neutral domain errors mapped by each protocol adapter.
 - `tool_call_engine.ts` — shared `tools/call` orchestration. `prepareToolCall()` handles

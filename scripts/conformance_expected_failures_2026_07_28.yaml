@@ -23,7 +23,7 @@
 # reason as above.
 server:
     # --- Not applicable: the scenario drives the reference fixture server's own tools, resources,
-    # prompts or headers by name, which this server does not and will not expose. ---
+    # prompts or headers by name, which this server does not expose; it serves no prompts yet. ---
 
     # Needs fixture tool `test_simple_text`.
     - tools-call-simple-text
@@ -90,6 +90,14 @@ server:
     # The stateless adapter registers no `completion/complete` handler and declares no completions
     # capability, so the scenario's request is method-not-found.
     - completion-complete
+    # The server serves no prompts and declares no prompts capability, so `prompts/list` is
+    # method-not-found.
+    - prompts-list
+    # 1 of 6 checks fails: the scenario sends `prompts/list` without checking capabilities, and
+    # that is method-not-found here (see above); still so in runner 0.2.0-alpha.12. The runner
+    # excludes whole scenarios only, so the hints on the other list methods are pinned by
+    # `tests/unit/mcp.stateless.registration.test.ts` instead.
+    - caching
 
     # --- Behavior of our pinned SDK (`@modelcontextprotocol/server` 2.0.0-beta.5). No upstream
     # issue exists for either behavior below; filing them is a follow-up, not a blocker. ---

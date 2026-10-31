@@ -119,6 +119,8 @@ export class LegacyMcpServer {
         } else {
             throw new Error('Task store must be provided for non-stdio transport types');
         }
+        // The SDK refuses to register prompt handlers without the capability, so both share this gate.
+        const hasPrompts = host.promptService.listPrompts().prompts.length > 0;
 
         this.server = new Server(getServerInfo(), {
             capabilities: {
@@ -135,7 +137,7 @@ export class LegacyMcpServer {
                 },
                 // Declared but unused — some clients (e.g. Claude Desktop) fail without it.
                 resources: {},
-                prompts: {},
+                ...(hasPrompts && { prompts: {} }),
                 logging: {},
             },
             // Placeholder overwritten below once the real tool set is known; matches the pre-gating default (all but report-problem).
@@ -146,7 +148,7 @@ export class LegacyMcpServer {
         this.setupErrorHandling(setupSigintHandler);
         this.setupLoggingHandlers();
         this.setupToolHandlers();
-        this.setupPromptHandlers();
+        if (hasPrompts) this.setupPromptHandlers();
         // Handle resource requests so clients like Claude Desktop don't fail.
         this.setupResourceHandlers();
         this.setupTaskHandlers();
