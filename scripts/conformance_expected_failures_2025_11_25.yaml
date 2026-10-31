@@ -66,6 +66,8 @@ server:
     # No `completion/complete` handler and no completions capability, so the request is
     # method-not-found.
     - completion-complete
+    # No prompts and no prompts capability, so `prompts/list` is method-not-found.
+    - prompts-list
     # No `resources/subscribe` handler and the declared `resources` capability sets no `subscribe`,
     # so the request is method-not-found.
     - resources-subscribe

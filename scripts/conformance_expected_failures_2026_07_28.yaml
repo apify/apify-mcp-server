@@ -90,6 +90,9 @@ server:
     # The stateless adapter registers no `completion/complete` handler and declares no completions
     # capability, so the scenario's request is method-not-found.
     - completion-complete
+    # The server serves no prompts and declares no prompts capability, so `prompts/list` is
+    # method-not-found.
+    - prompts-list
 
     # --- Behavior of our pinned SDK (`@modelcontextprotocol/server` 2.0.0-beta.5). No upstream
     # issue exists for either behavior below; filing them is a follow-up, not a blocker. ---
