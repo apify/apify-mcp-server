@@ -493,3 +493,75 @@ describe('get-key-value-store-record with a bare store name', () => {
         );
     });
 });
+
+describe('get-key-value-store-record with a runId', () => {
+    function stubRunClient(run: unknown) {
+        const keyValueStore = vi
+            .fn()
+            .mockReturnValue({ getRecord: async () => MOCK_RECORD, get: async () => MOCK_STORE });
+        const runClient = vi.fn().mockReturnValue({ get: async () => run });
+        return { client: mockApifyClient({ run: runClient, keyValueStore }), keyValueStore, runClient };
+    }
+
+    it("reads the record from the run's default key-value store and returns its ID", async () => {
+        const { client, keyValueStore, runClient } = stubRunClient({
+            id: 'GZXcXAOgwCrKn8vCn',
+            defaultKeyValueStoreId: 'rj4lbrrZhIXa4Dq5L',
+        });
+
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext({ runId: 'GZXcXAOgwCrKn8vCn', recordKey: 'INPUT' }, client),
+        );
+
+        expect(runClient).toHaveBeenCalledWith('GZXcXAOgwCrKn8vCn');
+        expect(keyValueStore).toHaveBeenCalledWith('rj4lbrrZhIXa4Dq5L');
+        expectSchemaConformingStructuredContent(result, keyValueStoreRecordOutputSchema);
+        expect((result as { structuredContent: { keyValueStoreId: string } }).structuredContent.keyValueStoreId).toBe(
+            'rj4lbrrZhIXa4Dq5L',
+        );
+    });
+
+    it('returns a user error naming the run when it does not exist, without a store request', async () => {
+        const { client, keyValueStore } = stubRunClient(undefined);
+
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext({ runId: 'RunMissing', recordKey: 'INPUT' }, client),
+        );
+
+        expectSoftFailInvalidInput(result);
+        expect((result as TextToolResult).content[0].text).toContain('RunMissing');
+        expect(keyValueStore).not.toHaveBeenCalled();
+    });
+
+    it('returns a user error when the run has no default key-value store, without a store request', async () => {
+        const { client, keyValueStore } = stubRunClient({ id: 'GZXcXAOgwCrKn8vCn' });
+
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext({ runId: 'GZXcXAOgwCrKn8vCn', recordKey: 'INPUT' }, client),
+        );
+
+        expectSoftFailInvalidInput(result);
+        expect((result as TextToolResult).content[0].text).toContain('GZXcXAOgwCrKn8vCn');
+        expect(keyValueStore).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['both identifiers', { runId: 'GZXcXAOgwCrKn8vCn', keyValueStoreId: 'rj4lbrrZhIXa4Dq5L', recordKey: 'INPUT' }],
+        ['neither identifier', { recordKey: 'INPUT' }],
+    ])('returns a user error without any API request for %s', async (_label, args) => {
+        const { client, keyValueStore, runClient } = stubRunClient({
+            id: 'GZXcXAOgwCrKn8vCn',
+            defaultKeyValueStoreId: 'rj4lbrrZhIXa4Dq5L',
+        });
+        const validatedArgs = structuredClone(args);
+        // Not a schema rule: a z.union would let AJV strip one identifier before the body sees both.
+        expect((getKeyValueStoreRecord as HelperTool).ajvValidate(validatedArgs)).toBe(true);
+        expect(validatedArgs).toEqual(args);
+
+        const result = await (getKeyValueStoreRecord as HelperTool).call(stubToolCallContext(validatedArgs, client));
+
+        expectSoftFailInvalidInput(result);
+        expect(runClient).not.toHaveBeenCalled();
+        expect(keyValueStore).not.toHaveBeenCalled();
+    });
+});

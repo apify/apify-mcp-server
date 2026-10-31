@@ -232,8 +232,8 @@ Legend for the **Enabled by default** column:
 | `fetch-actor-mcp-tool-list` | actors | List the tools of an Actor that runs an MCP server, with their schemas, annotations, and metadata. | ✅ |
 | `call-actor-mcp-tool` | actors | Call one tool on an Actor's MCP server and return its result. | ✅ |
 | `get-actor-run` | runs | Get details about an Actor run. | ⚡ |
-| `get-dataset-items` | storage | Read items from a dataset, with filtering and pagination. | ⚡ |
-| `get-key-value-store-record` | storage | Get the value stored under a key in a key-value store. | ⚡ |
+| `get-dataset-items` | storage | Read items from a dataset, with filtering and pagination. Takes a dataset ID or name, or a `runId` to read that run's default dataset. | ⚡ |
+| `get-key-value-store-record` | storage | Get the value stored under a key in a key-value store. Takes a store ID or name, or a `runId` to read from that run's default store. | ⚡ |
 | `abort-actor-run` | runs | Abort a running Actor run, optionally gracefully. | ⚡ |
 | `search-apify-docs` | docs | Search the Apify and Crawlee documentation for relevant pages. | ✅ |
 | `fetch-apify-docs` | docs | Fetch the full content of a documentation page by its URL. | ✅ |
