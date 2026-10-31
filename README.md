@@ -235,7 +235,7 @@ Legend for the **Enabled by default** column:
 | `get-dataset-items` | storage | Read items from a dataset, with filtering and pagination. | ⚡ |
 | `get-key-value-store-record` | storage | Get the value stored under a key in a key-value store. | ⚡ |
 | `abort-actor-run` | runs | Abort a running Actor run, optionally gracefully. | ⚡ |
-| `search-apify-docs` | docs | Search the Apify and Crawlee documentation for relevant pages. | ✅ |
+| `search-apify-docs` | docs | Search the Apify and Crawlee documentation for relevant pages. Crawlee docs are searched at their latest released version, looked up once a day; if that lookup fails, the search runs across all Crawlee versions. | ✅ |
 | `fetch-apify-docs` | docs | Fetch the full content of a documentation page by its URL. | ✅ |
 | [`apify--rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see [Choose which tools load](#choose-which-tools-load)) | Search the web and return the content of the top results. | ✅ |
 | [`apify--web-fetch`](https://apify.com/apify/web-fetch) | Actor (see [Choose which tools load](#choose-which-tools-load)) | Fetch a URL and return its content as Markdown, text, HTML, or other formats. | ✅ |

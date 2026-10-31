@@ -7,6 +7,8 @@ const ACTOR_CACHE_TTL_SECS = 30 * 60; // 30 minutes
 const APIFY_DOCS_CACHE_MAX_SIZE = 500;
 const APIFY_DOCS_CACHE_TTL_SECS = 60 * 60; // 1 hour
 const APIFY_API_OPERATIONS_CACHE_TTL_SECS = 24 * 60 * 60; // 1 day
+const DOCS_VERSION_CACHE_MAX_SIZE = 10;
+const DOCS_VERSION_CACHE_TTL_SECS = 24 * 60 * 60; // 1 day
 
 export const actorDefinitionCache = new TTLLRUCache<ActorDefinitionWithInfo>(
     ACTOR_CACHE_MAX_SIZE,
@@ -16,6 +18,8 @@ export const searchApifyDocsCache = new TTLLRUCache<ApifyDocsSearchResult[]>(
     APIFY_DOCS_CACHE_MAX_SIZE,
     APIFY_DOCS_CACHE_TTL_SECS,
 );
+/** The latest released version of each versioned docs source, keyed by source ID. */
+export const docsVersionCache = new TTLLRUCache<string>(DOCS_VERSION_CACHE_MAX_SIZE, DOCS_VERSION_CACHE_TTL_SECS);
 /** Stores processed Markdown content */
 export const fetchApifyDocsCache = new TTLLRUCache<string>(APIFY_DOCS_CACHE_MAX_SIZE, APIFY_DOCS_CACHE_TTL_SECS);
 /** The Apify API operation index built from the published OpenAPI spec; one entry, keyed by the spec URL. */

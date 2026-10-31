@@ -10,7 +10,7 @@ import { algoliasearch } from 'algoliasearch';
 import log from '@apify/log';
 
 import { DOCS_SNIPPET_HIGHLIGHT_TAG, DOCS_SNIPPET_MAX_WORDS, DOCS_SOURCES } from '../const.js';
-import { searchApifyDocsCache } from '../state.js';
+import { docsVersionCache, searchApifyDocsCache } from '../state.js';
 import type { ApifyDocsSearchResult } from '../types.js';
 
 /**
@@ -43,18 +43,73 @@ type AlgoliaResultHit = {
  */
 type AlgoliaResult = {
     hits?: AlgoliaResultHit[];
+    facets?: Record<string, Record<string, number>>;
 };
+
+type DocsSource = (typeof DOCS_SOURCES)[number];
+
+/** Orders dotted numeric versions by their components, so `3.18` sorts after `3.9`. */
+function compareVersions(a: string, b: string): number {
+    const aParts = a.split('.').map(Number);
+    const bParts = b.split('.').map(Number);
+    for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+        const difference = (aParts[i] ?? 0) - (bParts[i] ?? 0);
+        if (difference !== 0) return difference;
+    }
+    return 0;
+}
+
+/**
+ * The highest numeric version in the index's `version` facet, cached per source for a day. `current`
+ * is the unreleased next version. Returns `undefined` with a warning when the lookup fails or finds no
+ * numeric version; that is not cached, so a later search retries.
+ */
+async function resolveLatestDocsVersion(
+    client: ReturnType<typeof algoliasearch>,
+    indexConfig: DocsSource,
+): Promise<string | undefined> {
+    const cachedVersion = docsVersionCache.get(indexConfig.id);
+    if (cachedVersion) return cachedVersion;
+    try {
+        const response = await client.search({
+            requests: [
+                {
+                    indexName: indexConfig.indexName,
+                    query: '',
+                    facets: ['version'],
+                    hitsPerPage: 0,
+                    maxValuesPerFacet: 100,
+                },
+            ],
+        });
+        const [result] = response.results as unknown as AlgoliaResult[];
+        const releases = Object.keys(result?.facets?.version ?? {}).filter((version) => /^\d+(\.\d+)*$/.test(version));
+        const latestVersion = releases.sort(compareVersions).at(-1);
+        if (latestVersion) {
+            docsVersionCache.set(indexConfig.id, latestVersion);
+            return latestVersion;
+        }
+        log.warning(`[Algolia] No released version found for "${indexConfig.id}"; searching all versions`);
+    } catch (error) {
+        log.warning(`[Algolia] Version lookup failed for "${indexConfig.id}"; searching all versions`, {
+            errMessage: error instanceof Error ? error.message : String(error),
+        });
+    }
+    return undefined;
+}
 
 /**
  * Builds an Algolia search request with conditional filters based on documentation source configuration.
  *
  * @param {object} indexConfig - The documentation source configuration from DOCS_SOURCES
  * @param {string} query - The search query string
+ * @param {string} version - The released version a versioned source is searched at; no version tag without it
  * @returns {object} Algolia search request object with index name, query, and conditional filters
  */
 function prepareAlgoliaRequest(
-    indexConfig: (typeof DOCS_SOURCES)[number],
+    indexConfig: DocsSource,
     query: string,
+    version: string | undefined,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): any {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,7 +134,10 @@ function prepareAlgoliaRequest(
     }
 
     if ('facetFilters' in indexConfig && indexConfig.facetFilters) {
-        searchRequest.facetFilters = indexConfig.facetFilters;
+        const unversionedTags = 'unversionedTag' in indexConfig ? [indexConfig.unversionedTag] : [];
+        searchRequest.facetFilters = version
+            ? [...indexConfig.facetFilters, [...unversionedTags, `docusaurus_tag:docs-default-${version}`]]
+            : indexConfig.facetFilters;
     }
 
     // Return a bounded, match-centered snippet of `content` rather than the full indexed attribute
@@ -149,7 +207,8 @@ export async function searchDocsBySource(docSource: string, query: string): Prom
 
     const client = getAlgoliaClient(indexConfig.appId, indexConfig.apiKey);
 
-    const searchRequest = prepareAlgoliaRequest(indexConfig, query);
+    const version = 'isVersioned' in indexConfig ? await resolveLatestDocsVersion(client, indexConfig) : undefined;
+    const searchRequest = prepareAlgoliaRequest(indexConfig, query, version);
     const response = await client.search({
         requests: [searchRequest],
     });
