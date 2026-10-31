@@ -499,12 +499,12 @@ describe('get-key-value-store-record with a runId', () => {
         const keyValueStore = vi
             .fn()
             .mockReturnValue({ getRecord: async () => MOCK_RECORD, get: async () => MOCK_STORE });
-        const getRun = vi.fn().mockResolvedValue(run);
-        return { client: mockApifyClient({ run: () => ({ get: getRun }), keyValueStore }), keyValueStore, getRun };
+        const runClient = vi.fn().mockReturnValue({ get: async () => run });
+        return { client: mockApifyClient({ run: runClient, keyValueStore }), keyValueStore, runClient };
     }
 
     it("reads the record from the run's default key-value store and returns its ID", async () => {
-        const { client, keyValueStore } = stubRunClient({
+        const { client, keyValueStore, runClient } = stubRunClient({
             id: 'GZXcXAOgwCrKn8vCn',
             defaultKeyValueStoreId: 'rj4lbrrZhIXa4Dq5L',
         });
@@ -513,6 +513,7 @@ describe('get-key-value-store-record with a runId', () => {
             stubToolCallContext({ runId: 'GZXcXAOgwCrKn8vCn', recordKey: 'INPUT' }, client),
         );
 
+        expect(runClient).toHaveBeenCalledWith('GZXcXAOgwCrKn8vCn');
         expect(keyValueStore).toHaveBeenCalledWith('rj4lbrrZhIXa4Dq5L');
         expectSchemaConformingStructuredContent(result, keyValueStoreRecordOutputSchema);
         expect((result as { structuredContent: { keyValueStoreId: string } }).structuredContent.keyValueStoreId).toBe(
@@ -548,19 +549,19 @@ describe('get-key-value-store-record with a runId', () => {
         ['both identifiers', { runId: 'GZXcXAOgwCrKn8vCn', keyValueStoreId: 'rj4lbrrZhIXa4Dq5L', recordKey: 'INPUT' }],
         ['neither identifier', { recordKey: 'INPUT' }],
     ])('returns a user error without any API request for %s', async (_label, args) => {
-        const { client, keyValueStore, getRun } = stubRunClient({
+        const { client, keyValueStore, runClient } = stubRunClient({
             id: 'GZXcXAOgwCrKn8vCn',
             defaultKeyValueStoreId: 'rj4lbrrZhIXa4Dq5L',
         });
         const validatedArgs = structuredClone(args);
-        // The shared validation path passes both shapes through unchanged; the tool body refuses them.
+        // Not a schema rule: a z.union would let AJV strip one identifier before the body sees both.
         expect((getKeyValueStoreRecord as HelperTool).ajvValidate(validatedArgs)).toBe(true);
         expect(validatedArgs).toEqual(args);
 
         const result = await (getKeyValueStoreRecord as HelperTool).call(stubToolCallContext(validatedArgs, client));
 
         expectSoftFailInvalidInput(result);
-        expect(getRun).not.toHaveBeenCalled();
+        expect(runClient).not.toHaveBeenCalled();
         expect(keyValueStore).not.toHaveBeenCalled();
     });
 });

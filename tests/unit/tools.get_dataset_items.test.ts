@@ -273,17 +273,21 @@ describe('get-dataset-items with a runId', () => {
     function stubRunClient(run: unknown) {
         const listItems = vi.fn().mockResolvedValue({ items: MOCK_ITEMS, total: 1 });
         const dataset = vi.fn().mockReturnValue({ listItems });
-        const getRun = vi.fn().mockResolvedValue(run);
-        return { client: mockApifyClient({ run: () => ({ get: getRun }), dataset }), dataset, getRun };
+        const runClient = vi.fn().mockReturnValue({ get: async () => run });
+        return { client: mockApifyClient({ run: runClient, dataset }), dataset, runClient };
     }
 
     it("reads the run's default dataset and returns its ID", async () => {
-        const { client, dataset } = stubRunClient({ id: 'GZXcXAOgwCrKn8vCn', defaultDatasetId: 'yDyna1VW4FXLtXdnS' });
+        const { client, dataset, runClient } = stubRunClient({
+            id: 'GZXcXAOgwCrKn8vCn',
+            defaultDatasetId: 'yDyna1VW4FXLtXdnS',
+        });
 
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext({ runId: 'GZXcXAOgwCrKn8vCn' }, client),
         );
 
+        expect(runClient).toHaveBeenCalledWith('GZXcXAOgwCrKn8vCn');
         expect(dataset).toHaveBeenCalledWith('yDyna1VW4FXLtXdnS');
         expectSchemaConformingStructuredContent(result, datasetItemsOutputSchema);
         expect((result as { structuredContent: { datasetId: string } }).structuredContent.datasetId).toBe(
@@ -317,19 +321,19 @@ describe('get-dataset-items with a runId', () => {
         ['both identifiers', { runId: 'GZXcXAOgwCrKn8vCn', datasetId: 'yDyna1VW4FXLtXdnS' }],
         ['neither identifier', {}],
     ])('returns a user error without any API request for %s', async (_label, args) => {
-        const { client, dataset, getRun } = stubRunClient({
+        const { client, dataset, runClient } = stubRunClient({
             id: 'GZXcXAOgwCrKn8vCn',
             defaultDatasetId: 'yDyna1VW4FXLtXdnS',
         });
         const validatedArgs = structuredClone(args);
-        // The shared validation path passes both shapes through unchanged; the tool body refuses them.
+        // Not a schema rule: a z.union would let AJV strip one identifier before the body sees both.
         expect((getDatasetItems as HelperTool).ajvValidate(validatedArgs)).toBe(true);
         expect(validatedArgs).toEqual(args);
 
         const result = await (getDatasetItems as HelperTool).call(stubToolCallContext(validatedArgs, client));
 
         expectSoftFailInvalidInput(result);
-        expect(getRun).not.toHaveBeenCalled();
+        expect(runClient).not.toHaveBeenCalled();
         expect(dataset).not.toHaveBeenCalled();
     });
 });
