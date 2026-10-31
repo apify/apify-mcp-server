@@ -172,9 +172,10 @@ export const toolsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient(undefined, async (client) => {
             // A raw request: the v2 client answers listPrompts() with [] itself when no prompts are declared.
+            // On 2026-07-28 the -32601 arrives in the body of an HTTP error, not as a JSON-RPC error code.
             await expect(
                 (client as ClientV1).request({ method: 'prompts/list', params: {} }, ListPromptsResultSchema),
-            ).rejects.toMatchObject({ code: ErrorCode.MethodNotFound });
+            ).rejects.toThrow(/-32601/);
         }),
     },
     {
@@ -324,9 +325,7 @@ export const toolsCases: Case[] = [
         name: 'answers prompts/get with method not found while the server serves no prompts',
         isDeploymentTest: false,
         run: withClient(undefined, async (client) => {
-            await expect(client.getPrompt({ name: 'no-such-prompt' })).rejects.toMatchObject({
-                code: ErrorCode.MethodNotFound,
-            });
+            await expect(client.getPrompt({ name: 'no-such-prompt' })).rejects.toThrow(/-32601/);
         }),
     },
     {
