@@ -29,8 +29,10 @@ import type {
     ToolEntry,
     ToolStatus,
     ToolTelemetryContext,
+    ValidationInputChange,
 } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
+import { getValidationInputChange } from '../utils/ajv.js';
 import { logHttpError } from '../utils/logging.js';
 import { respondOk } from '../utils/mcp.js';
 import { getRequestOriginForClient, resolveStoreSearchTracking } from '../utils/mcp_clients.js';
@@ -126,6 +128,8 @@ export type PreparedCall = {
     paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined;
     // The shell uses this decoded copy for telemetry.
     decodedArgs: Record<string, unknown>;
+    // What the passing input check changed in an Actor tool's input; the shell adds it to telemetry.
+    validationInputChange: ValidationInputChange | undefined;
 };
 
 /** Result of the synchronous dispatch tail, including the exact wire payload. */
@@ -318,6 +322,9 @@ export async function prepareToolCall(params: {
                 decodedArgs,
             };
         }
+        // The MCP-only `waitSecs` is left out of the snapshot, so a change to it is not counted.
+        const { waitSecs, ...actorInput } = toolArgs;
+        const actorInputSnapshot = tool.type === TOOL_TYPE.ACTOR ? structuredClone(actorInput) : undefined;
         if (!tool.ajvValidate(toolArgs)) {
             const errors = tool.ajvValidate.errors || [];
             const ajvErrorDetails = extractAjvErrorDetails(errors);
@@ -381,6 +388,7 @@ export async function prepareToolCall(params: {
             standbyRejection,
             paymentRequiredResult,
             decodedArgs,
+            validationInputChange: actorInputSnapshot && getValidationInputChange(actorInputSnapshot, toolArgs),
         };
     } catch (error) {
         // Keep protocol errors as JSON-RPC errors; classify other failures with actor context.

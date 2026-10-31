@@ -356,6 +356,28 @@ describe('createStatelessServer() tools/call', () => {
             });
         });
 
+        it('records the Actor input change in telemetry on both paths', async () => {
+            const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+            vi.spyOn(actorExecutor, 'executeActorTool').mockResolvedValue({
+                content: [{ type: 'text', text: 'actor ok' }],
+            } as never);
+            const options = { token: undefined, allowUnauthMode: true, telemetry: { enabled: true } };
+            const buildTools = () => [
+                makeActorTool({ inputSchema: { type: 'object', properties: { maxResults: { type: 'integer' } } } }),
+            ];
+
+            await callViaLegacy(buildTools, 'test-actor-tool', options, { maxResults: '5' });
+            await withStatelessServer(async ({ server, call }) => {
+                await loadSource(server, buildTools());
+                await call('tools/call', { name: 'test-actor-tool', arguments: { maxResults: '5' } });
+            }, options);
+
+            expect(trackSpy.mock.calls.map(([, , properties]) => properties.validation_input_change)).toEqual([
+                'coerced',
+                'coerced',
+            ]);
+        });
+
         it('emits the same telemetry properties, apart from the session id and protocol revision', async () => {
             const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
             const options = { token: undefined, allowUnauthMode: true, telemetry: { enabled: true } };

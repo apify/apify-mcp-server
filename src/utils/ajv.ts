@@ -1,6 +1,8 @@
 import type { ValidateFunction } from 'ajv';
 import Ajv from 'ajv';
 
+import type { ValidationInputChange } from '../types.js';
+
 export const ajv = new Ajv({ coerceTypes: 'array', strict: false, removeAdditional: true });
 
 // `pattern`/`patternProperties` compile a RegExp from untrusted Actor / proxied-MCP input schemas;
@@ -63,4 +65,40 @@ export function fixZodSchemaRequired(schema: Record<string, unknown>): Record<st
  */
 export function compileSchema(schema: Record<string, unknown>): ValidateFunction {
     return ajv.compile(fixZodSchemaRequired(schema));
+}
+
+/**
+ * What a passing check changed in an input, comparing a snapshot taken before the check with the input
+ * after it: `coerced` when a value changed JSON type (including scalar-to-array and back), `removed` when
+ * a key was dropped from an object, at any depth. `undefined` when nothing changed.
+ */
+export function getValidationInputChange(before: unknown, after: unknown): ValidationInputChange | undefined {
+    const { isCoerced, isRemoved } = findInputChanges(before, after);
+    if (isCoerced && isRemoved) return 'coerced_and_removed';
+    if (isCoerced) return 'coerced';
+    if (isRemoved) return 'removed';
+    return undefined;
+}
+
+function getJsonType(value: unknown): string {
+    if (value === null) return 'null';
+    return Array.isArray(value) ? 'array' : typeof value;
+}
+
+function findInputChanges(before: unknown, after: unknown): { isCoerced: boolean; isRemoved: boolean } {
+    if (getJsonType(before) !== getJsonType(after)) return { isCoerced: true, isRemoved: false };
+    const changes = { isCoerced: false, isRemoved: false };
+    if (typeof before !== 'object' || before === null) return changes;
+    // Arrays walk by index: AJV never drops an item, so only nested values can change.
+    const afterRecord = after as Record<string, unknown>;
+    for (const [key, value] of Object.entries(before)) {
+        if (!Object.hasOwn(afterRecord, key)) {
+            changes.isRemoved = true;
+            continue;
+        }
+        const nested = findInputChanges(value, afterRecord[key]);
+        changes.isCoerced ||= nested.isCoerced;
+        changes.isRemoved ||= nested.isRemoved;
+    }
+    return changes;
 }

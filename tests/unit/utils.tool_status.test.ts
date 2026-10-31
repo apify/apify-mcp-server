@@ -274,6 +274,18 @@ describe('extractToolTelemetry', () => {
         expect(toolStatus).toBe(TOOL_STATUS.SUCCEEDED);
         expect(callDiagnostics).toEqual({});
     });
+
+    it('maps the Actor input change to validation_input_change and strips it from the response', () => {
+        const res: Record<string, unknown> = {
+            content: 'ok',
+            toolTelemetry: { actorId: 'abc123', validationInputChange: 'coerced' },
+        };
+
+        const { callDiagnostics } = extractToolTelemetry(res, 'apify/web-scraper', undefined);
+
+        expect(callDiagnostics.validation_input_change).toBe('coerced');
+        expect(res).toEqual({ content: 'ok' });
+    });
 });
 
 describe('applyToolTelemetry', () => {

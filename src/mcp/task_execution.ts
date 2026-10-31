@@ -19,6 +19,7 @@ import type {
     ToolCallTelemetryProperties,
     ToolEntry,
     ToolStatus,
+    ValidationInputChange,
 } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 import { logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
@@ -116,6 +117,7 @@ export async function executeToolAndUpdateTask(params: {
     userId: string | null;
     telemetryEnv: TelemetryEnv;
     sendNotification: (notification: ServerNotification) => Promise<void>;
+    validationInputChange?: ValidationInputChange;
 }): Promise<void> {
     const {
         taskId,
@@ -137,6 +139,7 @@ export async function executeToolAndUpdateTask(params: {
         userId,
         telemetryEnv,
         sendNotification,
+        validationInputChange,
     } = params;
     const emitLog = async (msg: { level: string; data?: unknown }) =>
         server.sendLoggingMessage(msg as Parameters<typeof server.sendLoggingMessage>[0]);
@@ -160,7 +163,10 @@ export async function executeToolAndUpdateTask(params: {
             taskId,
             telemetryData,
             userId,
-            callDiagnostics: diagnostics,
+            callDiagnostics: {
+                ...diagnostics,
+                ...(validationInputChange && { validation_input_change: validationInputChange }),
+            },
             args: toolArgs,
             result,
             telemetryEnv,
@@ -289,7 +295,7 @@ export async function executeToolAndUpdateTask(params: {
         callDiagnostics = dispatchResult.callDiagnostics;
 
         // Check if task was cancelled before storing result
-        if (await skipIfTaskCancelled(', skipping result storage', toolStatus)) return;
+        if (await skipIfTaskCancelled(', skipping result storage', toolStatus, callDiagnostics)) return;
 
         // On a failed result, nudge the agent to report the blocker via report-problem (mirrors the
         // synchronous CallTool path, which task-mode calls like call-actor bypass).
