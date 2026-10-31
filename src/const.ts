@@ -178,7 +178,11 @@ export const DOCS_SOURCES = [
         apiKey: '267679200b833c2ca1255ab276731869',
         indexName: 'crawlee',
         typeFilter: 'lvl1', // Filter to page-level results only (Docusaurus lvl1)
-        facetFilters: ['language:en', ['docusaurus_tag:default', 'docusaurus_tag:docs-default-3.15']],
+        facetFilters: ['language:en'],
+        // Searched at the latest released version, resolved at runtime; blog posts and other unversioned
+        // pages carry `docusaurus_tag:default`.
+        isVersioned: true,
+        unversionedTag: 'docusaurus_tag:default',
         description:
             'Crawlee is a web scraping library for JavaScript. ' +
             'It handles blocking, crawling, proxies, and browsers for you.',
@@ -190,7 +194,8 @@ export const DOCS_SOURCES = [
         apiKey: '878493fcd7001e3c179b6db6796a999b',
         indexName: 'crawlee_python',
         typeFilter: 'lvl1', // Filter to page-level results only (Docusaurus lvl1)
-        facetFilters: ['language:en', ['docusaurus_tag:docs-default-current']],
+        facetFilters: ['language:en'],
+        isVersioned: true,
         description:
             'Crawlee is a web scraping library for Python. ' +
             'It handles blocking, crawling, proxies, and browsers for you.',
