@@ -18,15 +18,9 @@ import {
 import { isActorBlockedUnderPaymentProvider } from '../../src/tools/actor_tool_naming.js';
 import type { ActorInputSchema, SchemaProperties, ToolBase, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
-import { ajv } from '../../src/utils/ajv.js';
 import { extractActorName, getToolFullName, getToolPublicFieldOnly } from '../../src/utils/tools.js';
 
 describe('compileUntrustedSchema', () => {
-    it('compiles a normal-sized schema', () => {
-        const validate = compileUntrustedSchema({ type: 'object', properties: { url: { type: 'string' } } });
-        expect(validate({ url: 'https://example.com' })).toBe(true);
-    });
-
     it('keeps the shared instance configuration: strips unknown properties and ignores `pattern`', () => {
         const validate = compileUntrustedSchema({
             type: 'object',
@@ -45,11 +39,14 @@ describe('compileUntrustedSchema', () => {
         expect(compileUntrustedSchema({ ...schema(), required: [] })).not.toBe(first);
     });
 
-    it('registers nothing on the shared instance', () => {
-        const before = Object.keys(ajv.schemas).length;
-        compileUntrustedSchema({ $id: 'https://example.com/untrusted.json', type: 'object', properties: {} });
-        expect(Object.keys(ajv.schemas).length).toBe(before);
-        expect(ajv.getSchema('https://example.com/untrusted.json')).toBeUndefined();
+    it('generates identical validator source for equivalent rules on separate cache misses', () => {
+        const schema = { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] };
+        const first = compileUntrustedSchema({ ...schema, description: 'First Actor input' });
+        const second = compileUntrustedSchema({ ...schema, description: 'Second Actor input' });
+
+        expect(second).not.toBe(first);
+        // V8 retains distinct generated source; a reused Ajv changes its scope names on every compile.
+        expect(second.toString()).toBe(first.toString());
     });
 
     it('throws SchemaTooLargeError on an oversized schema before AJV codegen runs (DoS guard)', () => {
