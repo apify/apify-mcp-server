@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Return rendered operations from fetch-actor-details ([#1737](https://github.com/apify/apify-mcp-server/pull/1737)) ([718f02f](https://github.com/apify/apify-mcp-server/commit/718f02ffbc774a195c2cb607a73334f78d996eac)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#1620](https://github.com/apify/apify-mcp-server/issues/1620), [#1736](https://github.com/apify/apify-mcp-server/issues/1736)
+- Structure the server interface of fetch-actor-details ([#1784](https://github.com/apify/apify-mcp-server/pull/1784)) ([e126a7f](https://github.com/apify/apify-mcp-server/commit/e126a7f711e8c6511405abece58c84933ac6d69d)) by [@jirispilka](https://github.com/jirispilka)
 
 ### 🐛 Bug Fixes
 
@@ -17,6 +18,7 @@ All notable changes to this project will be documented in this file.
 - Decide the tip caveat from the tip&#x27;s recommended Actor ([#1753](https://github.com/apify/apify-mcp-server/pull/1753)) ([cae776e](https://github.com/apify/apify-mcp-server/commit/cae776ede7c92aa4bf860dfce0079eb6aac9fd1f)) by [@jirispilka](https://github.com/jirispilka), closes [#1741](https://github.com/apify/apify-mcp-server/issues/1741)
 - Share one keep-alive agent across Apify clients ([#1785](https://github.com/apify/apify-mcp-server/pull/1785)) ([1676473](https://github.com/apify/apify-mcp-server/commit/167647311ffdb40a92c7f3da44555354a67a5694)) by [@jirispilka](https://github.com/jirispilka)
 - Log the Actor full name as actor_name for proxied MCP tools ([#1722](https://github.com/apify/apify-mcp-server/pull/1722)) ([3c17c83](https://github.com/apify/apify-mcp-server/commit/3c17c8368efbcef7f7c3b5a6d918928758a08e20)) by [@jirispilka](https://github.com/jirispilka), closes [#1622](https://github.com/apify/apify-mcp-server/issues/1622)
+- Fail reading an unknown or broken ui:&#x2F;&#x2F; widget resource ([#1754](https://github.com/apify/apify-mcp-server/pull/1754)) ([1d9b95c](https://github.com/apify/apify-mcp-server/commit/1d9b95cff1eaac266caf3434690f9591c413e18e)) by [@jirispilka](https://github.com/jirispilka), closes [#1730](https://github.com/apify/apify-mcp-server/issues/1730)
 
 
 <!-- git-cliff-unreleased-end -->
