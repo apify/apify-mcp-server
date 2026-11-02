@@ -219,35 +219,6 @@ export const actorInfoSchema = {
     required: ['url', 'id', 'fullName', 'developer', 'description', 'categories', 'isDeprecated'],
 };
 
-/**
- * Schema for Actor details output (fetch-actor-details tool)
- * All fields are optional since the tool supports selective output via the 'output' parameter
- *
- * NOTE on `readme`: This field contains the abridged README summary when the Actor has one,
- * falling back to the full README otherwise. The field is named `readme` (not `readmeSummary`)
- * to stay consistent with the widget UI contract. Most Actors should have a summary defined,
- * so the full README fallback is only expected in niche cases.
- */
-export const actorDetailsOutputSchema = {
-    type: 'object' as const,
-    properties: {
-        actorInfo: actorInfoSchema,
-        readme: {
-            type: 'string',
-            description: 'Actor README summary when available, otherwise the full README documentation.',
-        },
-        inputSchema: { type: 'object' as const, description: 'Actor input schema.' },
-        outputSchema: { type: 'object' as const, description: 'Output schema inferred from successful runs.' },
-        serverInterface: {
-            type: 'string',
-            description:
-                "The Actor's server interface. `output.serverInterface: true` returns every operation with its " +
-                'parameters and request body schema when they fit, or one line per operation otherwise. ' +
-                'A "METHOD /path" string returns that one operation in full.',
-        },
-    },
-};
-
 /** Schema for fetch-actor-mcp-tool-list output: the remote tool definitions as `tools/list` returned them. */
 export const actorMcpToolListOutputSchema = {
     type: 'object' as const,
@@ -1234,6 +1205,122 @@ export const apifyApiDetailsOutputSchema = {
         },
     },
     required: ['operations'],
+};
+
+const creatorExamplesSchema = {
+    example: { ...anyJsonValueSchema, description: 'An example value' },
+    examples: { type: 'object', description: 'Named example values, as the API schema gives them' },
+};
+
+/** The apify-api-details operation shape with the creator's examples kept and a body that is not JSON allowed. */
+const serverOperationDetailsSchema = {
+    type: 'object' as const,
+    properties: {
+        ...apiOperationDetailsSchema.properties,
+        parameters: {
+            ...apiOperationDetailsSchema.properties.parameters,
+            items: {
+                ...apiOperationDetailsSchema.properties.parameters.items,
+                properties: {
+                    ...apiOperationDetailsSchema.properties.parameters.items.properties,
+                    ...creatorExamplesSchema,
+                },
+            },
+        },
+        requestBody: {
+            type: 'object' as const,
+            properties: {
+                isRequired: { type: 'boolean', description: 'Whether the body is required' },
+                schema: {
+                    type: 'object',
+                    description: 'JSON schema of the body, sent as JSON; absent for a body that is not JSON',
+                },
+                ...creatorExamplesSchema,
+                contentTypes: {
+                    type: 'array' as const,
+                    items: { type: 'string' },
+                    description: 'Media types of a body that is not JSON, which cannot be sent as JSON',
+                },
+            },
+            required: ['isRequired'],
+            description: 'Only when the operation takes a body',
+        },
+    },
+    required: ['method', 'path', 'parameters'],
+};
+
+const serverInterfaceDetailsSchema = {
+    type: 'object' as const,
+    properties: {
+        tenancy: {
+            type: 'string',
+            enum: Object.values(ACTOR_TENANCY),
+            description:
+                'single-tenant: the first request starts a run in your account; multi-tenant: requests are charged ' +
+                'per event and start no run in your account',
+        },
+        idleTimeoutSecs: {
+            type: 'integer',
+            description: 'Single-tenant: how long the run the first request starts stays up without requests',
+        },
+        baseUrl: { type: 'string', description: "Where the Actor's server answers; only when no tool sends to it" },
+        operationCount: { type: 'integer', description: 'All documented operations, whatever `operations` holds' },
+        operations: {
+            type: 'array' as const,
+            items: serverOperationDetailsSchema,
+            description:
+                'With `output.serverInterface: true`, every operation in full when they fit the inline limit; with ' +
+                '"METHOD /path", that one operation. Absent in the default summary',
+        },
+        operationIndex: {
+            type: 'array' as const,
+            items: {
+                type: 'object' as const,
+                properties: {
+                    method: { type: 'string', description: 'HTTP method' },
+                    path: { type: 'string', description: 'Path template; each {name} is a path parameter' },
+                    summary: { type: 'string', description: 'What the operation does' },
+                    requiredInputs: {
+                        type: 'array' as const,
+                        items: { type: 'string' },
+                        description: 'Required parameter names, and "request body" when the body is required',
+                    },
+                },
+                required: ['method', 'path', 'requiredInputs'],
+            },
+            description:
+                'One entry per operation when the operations in full exceed the inline limit; "METHOD /path" then ' +
+                'returns one in full',
+        },
+        omittedOperationCount: {
+            type: 'integer',
+            description: 'Operations left out of `operationIndex` when it exceeds the inline limit itself',
+        },
+    },
+    required: ['tenancy', 'operationCount'],
+};
+
+/**
+ * Schema for Actor details output (fetch-actor-details tool)
+ * All fields are optional since the tool supports selective output via the 'output' parameter
+ *
+ * NOTE on `readme`: This field contains the abridged README summary when the Actor has one,
+ * falling back to the full README otherwise. The field is named `readme` (not `readmeSummary`)
+ * to stay consistent with the widget UI contract. Most Actors should have a summary defined,
+ * so the full README fallback is only expected in niche cases.
+ */
+export const actorDetailsOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorInfo: actorInfoSchema,
+        readme: {
+            type: 'string',
+            description: 'Actor README summary when available, otherwise the full README documentation.',
+        },
+        inputSchema: { type: 'object' as const, description: 'Actor input schema.' },
+        outputSchema: { type: 'object' as const, description: 'Output schema inferred from successful runs.' },
+        serverInterface: serverInterfaceDetailsSchema,
+    },
 };
 
 /**
