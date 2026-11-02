@@ -1,12 +1,8 @@
 import type { AxiosRequestConfig } from 'axios';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ProxyAgent } from 'proxy-agent';
+import { describe, expect, it } from 'vitest';
 
-import { ApifyClient, FREE_SOCKET_TIMEOUT_MILLIS, sharedAgents } from '../../src/apify_client.js';
-
-afterEach(() => {
-    vi.unstubAllEnvs();
-    vi.resetModules();
-});
+import { ApifyClient } from '../../src/apify_client.js';
 
 /** Captures the final request config of one call instead of sending it, through the real interceptor chain. */
 async function captureRequestConfig(client: ApifyClient): Promise<AxiosRequestConfig> {
@@ -27,24 +23,15 @@ async function captureRequestConfig(client: ApifyClient): Promise<AxiosRequestCo
 }
 
 describe('every client sends through one keep-alive pool', () => {
-    it('two instances share the same agents, with free sockets closed after the idle timeout', async () => {
+    it('uses one proxy-aware agent across clients and protocols with keep-alive and a 15 s timeout', async () => {
         const first = await captureRequestConfig(new ApifyClient({ token: 'token-a' }));
         const second = await captureRequestConfig(new ApifyClient({ token: 'token-b' }));
 
-        expect(first.httpsAgent).toBe(sharedAgents!.httpsAgent);
+        expect(first.httpsAgent).toBeInstanceOf(ProxyAgent);
+        expect(first.httpAgent).toBe(first.httpsAgent);
         expect(second.httpsAgent).toBe(first.httpsAgent);
         expect(second.httpAgent).toBe(first.httpAgent);
-        expect(first.httpsAgent.options).toMatchObject({ keepAlive: true, timeout: FREE_SOCKET_TIMEOUT_MILLIS });
-    });
-
-    it('leaves apify-client its own proxy-aware agent when a proxy is configured', async () => {
-        vi.stubEnv('HTTPS_PROXY', 'http://proxy.internal:3128');
-        const proxied = await import('../../src/apify_client.js');
-        const client = new proxied.ApifyClient({ token: 'token-a' });
-
-        const config = await captureRequestConfig(client);
-
-        expect(proxied.sharedAgents).toBeUndefined();
-        expect(config.httpsAgent).toBe(client.httpClient.httpsAgent);
+        // apify-client's own agent keeps free sockets for the whole 360 s request timeout.
+        expect((first.httpsAgent as ProxyAgent).connectOpts).toMatchObject({ keepAlive: true, timeout: 15_000 });
     });
 });

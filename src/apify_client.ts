@@ -1,10 +1,8 @@
-import http from 'node:http';
-import https from 'node:https';
-
 import type { ApifyClientOptions } from 'apify-client';
 import { ApifyClient as _ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { isAxiosError } from 'axios';
+import { ProxyAgent } from 'proxy-agent';
 
 import { API_PUBLIC_BASE_URL, API_PUBLIC_BASE_URL_STAGING, MAX_INLINE_BYTES, STAGING_MCP_HOSTNAME } from './const.js';
 import type { PaymentHeaders } from './payments/types.js';
@@ -28,18 +26,13 @@ export type REQUEST_ORIGIN = (typeof REQUEST_ORIGIN)[keyof typeof REQUEST_ORIGIN
  * and per tool call accumulates idle TLS sockets for minutes after each call. An in-flight request
  * is unaffected: axios sets `config.timeout` on the active socket, and the agent timeout applies once it is free.
  */
-export const FREE_SOCKET_TIMEOUT_MILLIS = 15_000;
-
-const PROXY_ENV_VARS = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'ALL_PROXY', 'all_proxy'];
-const agentOptions = { keepAlive: true, timeout: FREE_SOCKET_TIMEOUT_MILLIS, scheduling: 'lifo' as const };
+const FREE_SOCKET_TIMEOUT_MILLIS = 15_000;
 
 /**
  * One keep-alive pool for every client in the process, so sockets are reused across instances and closed
- * when idle. `undefined` behind a proxy: there apify-client's own `ProxyAgent` has to do the tunnelling.
+ * when idle. A `ProxyAgent`, like apify-client's own, so `HTTPS_PROXY` and `NO_PROXY` keep working.
  */
-export const sharedAgents = PROXY_ENV_VARS.some((name) => process.env[name])
-    ? undefined
-    : { httpAgent: new http.Agent(agentOptions), httpsAgent: new https.Agent(agentOptions) };
+const sharedAgent = new ProxyAgent({ keepAlive: true, timeout: FREE_SOCKET_TIMEOUT_MILLIS, scheduling: 'lifo' });
 
 type ExtendedApifyClientOptions = Omit<ApifyClientOptions, 'token'> & {
     token?: string | null | undefined;
@@ -104,7 +97,12 @@ export class ApifyClient extends _ApifyClient {
             userAgentSuffix: USER_AGENT_ORIGIN,
             // Per-request agents win over the instance defaults apify-client sets on first use.
             requestInterceptors: [
-                (config) => ({ ...config, ...sharedAgents, headers: { ...config.headers, ...staticHeaders } }),
+                (config) => ({
+                    ...config,
+                    httpAgent: sharedAgent,
+                    httpsAgent: sharedAgent,
+                    headers: { ...config.headers, ...staticHeaders },
+                }),
             ],
         });
         this.requestOrigin = staticHeaders[REQUEST_ORIGIN_HEADER];
@@ -117,9 +115,8 @@ export class ApifyClient extends _ApifyClient {
  * for the API or against the Actor's standby origin (`tools/actors/send_server_actor_request.ts`), and the
  * status after: a non-2xx response resolves, and so does a 3xx with `maxRedirects: 0`. It skips
  * `httpClient.call()`, which retries (a write could apply twice, and a body over the size cap is downloaded
- * again) and turns a streamed error body into a junk message; that also skips its `HTTPS_PROXY` support and
- * User-Agent. axios aborts a body over `MAX_INLINE_BYTES` mid-stream (checked in axios 1.16.1), so it is
- * never buffered whole.
+ * again) and turns a streamed error body into a junk message; that also skips its User-Agent. axios aborts a
+ * body over `MAX_INLINE_BYTES` mid-stream (checked in axios 1.16.1), so it is never buffered whole.
  */
 export async function sendApifyApiRequest(
     apifyClient: ApifyClient,

@@ -22,8 +22,8 @@ directory you're editing.
   envelope) traffic to the stateless adapter, everything else to the stateful flow.
 - `input.ts` — input processing (`processInput`, used by `stdio.ts` and the HTTP URL-param parser in `mcp/utils.ts`).
 - `apify_client.ts` — the Apify API client wrapper; use it rather than calling the
-  API directly. Every instance sends through one process-wide keep-alive agent
-  (`sharedAgents`), so constructing a client per request costs no sockets. `state.ts` — TTL caches. `const.ts`, `errors.ts`,
+  API directly. Every instance sends through one process-wide keep-alive `ProxyAgent`
+  (`sharedAgent`), so constructing a client per request costs no sockets. `state.ts` — TTL caches. `const.ts`, `errors.ts`,
   `types.ts`, `telemetry.ts`, `instrument.ts`, `server_card.ts` — shared spine.
 
 ## Subdirectories
