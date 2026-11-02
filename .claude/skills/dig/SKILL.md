@@ -125,7 +125,7 @@ Use the repo's `feature_spec.yml` template. Only the **Problem** and **Proposed 
 ```
 
 **Style** (Explore explanations and Spec issues):
-- Plain language, no fluff — see `CLAUDE.md § Communication style`
+- Plain language, no fluff — see `AGENTS.md § Communication style`
 - Skip any section that would be empty or generic
 - 10-30 lines, not 100
 - Concrete steps > prose
