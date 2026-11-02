@@ -113,7 +113,7 @@ The same command works for `claude-code`, `vscode`, `codex`, `kiro`, and `antigr
 <details>
 <summary><b>VS Code and GitHub Copilot</b></summary>
 
-[Add Apify to VS Code](https://insiders.vscode.dev/redirect/mcp/install?name=apify&config=%7B%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fmcp.apify.com%2F%3Fclient%3Dvscode%22%7D), run `apify mcp install vscode`, or add `https://mcp.apify.com` as an HTTP server in your MCP configuration:
+Use the one-click install link from the [configurator](https://mcp.apify.com), run `apify mcp install vscode`, or add `https://mcp.apify.com` as an HTTP server in your MCP configuration:
 
 ```json
 {
