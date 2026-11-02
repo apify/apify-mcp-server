@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - Tell a cancel race from a store failure in task status messages ([#1757](https://github.com/apify/apify-mcp-server/pull/1757)) ([30df90b](https://github.com/apify/apify-mcp-server/commit/30df90b911ff9c0176086daa7f8af7a6c5184639)) by [@jirispilka](https://github.com/jirispilka), closes [#645](https://github.com/apify/apify-mcp-server/issues/645)
 - Decide the tip caveat from the tip&#x27;s recommended Actor ([#1753](https://github.com/apify/apify-mcp-server/pull/1753)) ([cae776e](https://github.com/apify/apify-mcp-server/commit/cae776ede7c92aa4bf860dfce0079eb6aac9fd1f)) by [@jirispilka](https://github.com/jirispilka), closes [#1741](https://github.com/apify/apify-mcp-server/issues/1741)
 - Share one keep-alive agent across Apify clients ([#1785](https://github.com/apify/apify-mcp-server/pull/1785)) ([1676473](https://github.com/apify/apify-mcp-server/commit/167647311ffdb40a92c7f3da44555354a67a5694)) by [@jirispilka](https://github.com/jirispilka)
+- Log the Actor full name as actor_name for proxied MCP tools ([#1722](https://github.com/apify/apify-mcp-server/pull/1722)) ([3c17c83](https://github.com/apify/apify-mcp-server/commit/3c17c8368efbcef7f7c3b5a6d918928758a08e20)) by [@jirispilka](https://github.com/jirispilka), closes [#1622](https://github.com/apify/apify-mcp-server/issues/1622)
 
 
 <!-- git-cliff-unreleased-end -->
