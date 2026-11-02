@@ -95,7 +95,7 @@ The ChatGPT desktop app uses local MCP configuration shared with Codex instead: 
 <details>
 <summary><b>Cursor</b></summary>
 
-Use the one-click install link from the [configurator](https://mcp.apify.com), or let the [Apify CLI](https://docs.apify.com/cli) write the configuration, including your API token:
+[Add Apify to Cursor](https://cursor.com/install-mcp?name=apify&config=eyJ0eXBlIjoiaHR0cCIsInVybCI6Imh0dHBzOi8vbWNwLmFwaWZ5LmNvbS8%2FY2xpZW50PWN1cnNvciJ9), or let the [Apify CLI](https://docs.apify.com/cli) write the configuration, including your API token:
 
 ```bash
 apify mcp install cursor
@@ -108,7 +108,7 @@ The same command works for `claude-code`, `vscode`, `codex`, `kiro`, and `antigr
 <details>
 <summary><b>VS Code and GitHub Copilot</b></summary>
 
-Use the one-click install link from the [configurator](https://mcp.apify.com), run `apify mcp install vscode`, or add `https://mcp.apify.com` as an HTTP server in your MCP configuration:
+[Add Apify to VS Code](https://insiders.vscode.dev/redirect/mcp/install?name=apify&config=%7B%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fmcp.apify.com%2F%3Fclient%3Dvscode%22%7D), run `apify mcp install vscode`, or add `https://mcp.apify.com` as an HTTP server in your MCP configuration:
 
 ```json
 {
@@ -126,7 +126,9 @@ Use the one-click install link from the [configurator](https://mcp.apify.com), r
 <details>
 <summary><b>Claude</b></summary>
 
-Apify is available as a Claude connector. Open **Settings** > **Connectors**, find **Apify** in the connector directory, and connect it. You can also select **Add custom connector**, name it `Apify`, and enter `https://mcp.apify.com` as the remote MCP server URL. Sign in with Apify when prompted. The same connector works on Claude.ai and in Claude Desktop. See the [Claude guide](https://docs.apify.com/integrations/claude-desktop).
+[Add Apify to Claude](https://claude.ai/new?modal=add-custom-connector&connectorName=Apify&connectorUrl=https%3A%2F%2Fmcp.apify.com%2F%3Fclient%3Dclaude#customize/connectors): the link opens the custom connector dialog with the name and URL filled in. Sign in with Apify when prompted.
+
+To set it up by hand, open **Settings** > **Connectors** and either find **Apify** in the connector directory, or select **Add custom connector**, name it `Apify`, and enter `https://mcp.apify.com` as the remote MCP server URL. The same connector works on Claude.ai and in Claude Desktop. See the [Claude guide](https://docs.apify.com/integrations/claude-desktop).
 
 </details>
 
