@@ -85,7 +85,7 @@ Claude Code opens the Apify sign-in page the first time it uses the server. To i
     - **Icon**: upload the [Apify icon](docs/apify-logo-chatgpt.png).
     - **Name**: `Apify`
     - **Description**: `Extract data from any website with thousands of scrapers, crawlers, and automations on Apify Store`
-    - **Connection**: **Server URL**, `https://mcp.apify.com`
+    - **Connection**: **Server URL**, the URL with your settings from the [configurator](https://mcp.apify.com), for example with [`?tools=`](#choose-which-tools-load). Without custom settings, use `https://mcp.apify.com`.
     - **Authentication**: **OAuth**
 3. Check **I understand and want to continue**, then select **Create as a plugin**.
 4. Sign in with Apify, review the tools, and install the plugin. No API token is needed.
