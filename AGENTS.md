@@ -23,8 +23,6 @@ TypeScript, ES modules. Runs in two modes: **stdio** (local CLI clients, `stdio.
 
 Conventional Commits for all three. Branch: `type/short-desc` (e.g. `fix/connection-timeout`). Commit/PR title: `type: Description` (e.g. `fix: Handle connection errors`). Types: `feat`, `fix`, `chore`, `refactor`, `docs`, `test`. Append `!` for breaking changes. PR title ≤70 chars.
 
-PR descriptions: concise. Fill the [template](./.github/pull_request_template.md) sections with a few short lines each — no file lists, no restating the diff. Keep the title and description current when later commits change the PR's scope.
-
 Use `git mv` (not `mv` + `rm`) when renaming files so git records a rename rather than delete+create.
 
 Working on several branches at once: one worktree per branch, run git as `git -C <worktree>`, and never run git commands for two worktrees in parallel. Before pushing, fetch the branch; if someone else pushed, merge or reapply on top. Never rebase, amend or force-push a branch someone else pushed to.
