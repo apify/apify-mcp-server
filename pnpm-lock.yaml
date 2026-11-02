@@ -259,6 +259,9 @@ importers:
       express:
         specifier: ^4.21.2
         version: 4.22.2
+      proxy-agent:
+        specifier: ^6.5.0
+        version: 6.5.0
       yargs:
         specifier: ^17.7.2
         version: 17.7.2
