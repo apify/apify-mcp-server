@@ -1,3 +1,6 @@
+import http from 'node:http';
+import https from 'node:https';
+
 import type { ApifyClientOptions } from 'apify-client';
 import { ApifyClient as _ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig, AxiosResponse } from 'axios';
@@ -18,6 +21,25 @@ export const REQUEST_ORIGIN = {
     APIFY_AI: 'APIFY_AI',
 } as const;
 export type REQUEST_ORIGIN = (typeof REQUEST_ORIGIN)[keyof typeof REQUEST_ORIGIN];
+
+/**
+ * How long an idle keep-alive socket stays open. apify-client builds a private agent per `ApifyClient` and
+ * keeps a free socket for the whole request timeout (360 s), so a server that constructs a client per session
+ * and per tool call accumulates idle TLS sockets for minutes after each call. An in-flight request
+ * is unaffected: axios sets `config.timeout` on the active socket, and the agent timeout applies once it is free.
+ */
+export const FREE_SOCKET_TIMEOUT_MILLIS = 15_000;
+
+const PROXY_ENV_VARS = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'ALL_PROXY', 'all_proxy'];
+const agentOptions = { keepAlive: true, timeout: FREE_SOCKET_TIMEOUT_MILLIS, scheduling: 'lifo' as const };
+
+/**
+ * One keep-alive pool for every client in the process, so sockets are reused across instances and closed
+ * when idle. `undefined` behind a proxy: there apify-client's own `ProxyAgent` has to do the tunnelling.
+ */
+export const sharedAgents = PROXY_ENV_VARS.some((name) => process.env[name])
+    ? undefined
+    : { httpAgent: new http.Agent(agentOptions), httpsAgent: new https.Agent(agentOptions) };
 
 type ExtendedApifyClientOptions = Omit<ApifyClientOptions, 'token'> & {
     token?: string | null | undefined;
@@ -80,7 +102,10 @@ export class ApifyClient extends _ApifyClient {
             // Signed storage links (`getRecordPublicUrl`) are handed to clients, so they take the client-facing origin.
             publicBaseUrl: clientOptions.publicBaseUrl ?? getApifyAPIPublicBaseUrl(),
             userAgentSuffix: USER_AGENT_ORIGIN,
-            requestInterceptors: [(config) => ({ ...config, headers: { ...config.headers, ...staticHeaders } })],
+            // Per-request agents win over the instance defaults apify-client sets on first use.
+            requestInterceptors: [
+                (config) => ({ ...config, ...sharedAgents, headers: { ...config.headers, ...staticHeaders } }),
+            ],
         });
         this.requestOrigin = staticHeaders[REQUEST_ORIGIN_HEADER];
     }
