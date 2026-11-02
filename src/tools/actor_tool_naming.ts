@@ -107,10 +107,10 @@ export function getToolSchemaID(actorName: string): string {
 
 /**
  * `?client=claude` is the Claude connector URL; the only client whose add-a-server flow has a name.
- * Also matches prefixed tags such as `apify-web-hero-claude`, but not `claude-code`.
+ * Matches any tag containing `claude` (e.g. `apify-web-hero-claude`), except `claude-code`, which has no connector.
  */
 export function isClaudeClient(clientParam?: string): boolean {
-    return clientParam === 'claude' || !!clientParam?.endsWith('-claude');
+    return !!clientParam?.includes('claude') && !clientParam.includes('claude-code');
 }
 
 /** How to get an Actor this session cannot run. Tool results use the neutral wording; descriptions and instructions see `clientParam`. */

@@ -198,8 +198,10 @@ describe('getOwnServerRemedy()', () => {
         }
     });
 
-    it('names the Claude custom connector for a prefixed ?client= tag ending in claude', () => {
-        expect(getOwnServerRemedy('apify-web-hero-claude')).toContain('add it to Claude as a custom connector.');
+    it('names the Claude custom connector for any ?client= tag containing claude except claude-code', () => {
+        for (const clientParam of ['apify-web-hero-claude', 'claude-desktop', 'apify-claude-ai']) {
+            expect(getOwnServerRemedy(clientParam)).toContain('add it to Claude as a custom connector.');
+        }
     });
 });
 
