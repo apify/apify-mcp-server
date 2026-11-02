@@ -264,8 +264,10 @@ export type ActorMcpTool = ToolBase & {
     type: typeof TOOL_TYPE.ACTOR_MCP;
     /** Origin MCP server tool name is needed for the tool call */
     originToolName: string;
-    /** ID of the Actorized MCP server - for example, apify/example-mcp-server */
+    /** ID of the Actorized MCP server */
     actorId: string;
+    /** Full name of the Actorized MCP server - for example, apify/example-mcp-server */
+    actorFullName: string;
     /** Connection URL of the Actorized MCP server */
     serverUrl: string;
 };
