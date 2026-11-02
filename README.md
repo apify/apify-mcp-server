@@ -80,9 +80,14 @@ Claude Code opens the Apify sign-in page the first time it uses the server. To i
 <details>
 <summary><b>ChatGPT</b></summary>
 
-1. Open [ChatGPT Plugins](https://chatgpt.com/plugins), select **+**, then **Add custom MCP server**.
-2. Name it `Apify`, enter `https://mcp.apify.com` as the server URL, and choose **OAuth** authentication.
-3. Review the risk warning, select **I understand and want to continue**, then **Create as a plugin**.
+1. Open [ChatGPT Plugins](https://chatgpt.com/plugins), select **Add** in the top-right corner, then **Add custom MCP server**.
+2. Fill in the form:
+    - **Icon**: upload the [Apify icon](docs/apify-logo-chatgpt.png).
+    - **Name**: `Apify`
+    - **Description**: `Extract data from any website with thousands of scrapers, crawlers, and automations on Apify Store`
+    - **Connection**: **Server URL**, `https://mcp.apify.com`
+    - **Authentication**: **OAuth**
+3. Check **I understand and want to continue**, then select **Create as a plugin**.
 4. Sign in with Apify, review the tools, and install the plugin. No API token is needed.
 5. Start a new conversation, type `@`, and select **Apify**.
 
