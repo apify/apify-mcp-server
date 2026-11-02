@@ -5,7 +5,13 @@ import log from '@apify/log';
 
 import { HELPER_TOOLS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
-import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
+import type {
+    InternalToolArgs,
+    ToolDescriptionContext,
+    ToolEntry,
+    ToolInputSchema,
+    ValidationInputChange,
+} from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { extractActorId } from '../../utils/tools.js';
@@ -15,6 +21,7 @@ import {
     callActorPreExecute,
     callOptionsSchema,
     resolveAndValidateActor,
+    withValidationInputChange,
 } from '../actors/call_actor.js';
 import { actorRunOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
 
@@ -100,6 +107,7 @@ export const callActorWidget: ToolEntry = Object.freeze({
 
         let resolvedActorId: string | undefined;
         let resolvedInputSchema: ToolInputSchema | undefined;
+        let validationInputChange: ValidationInputChange | undefined;
         try {
             const resolution = await resolveAndValidateActor({
                 actorName,
@@ -112,6 +120,7 @@ export const callActorWidget: ToolEntry = Object.freeze({
 
             resolvedActorId = extractActorId(resolution.actor);
             resolvedInputSchema = resolution.actor.inputSchema;
+            validationInputChange = resolution.validationInputChange;
             const { apifyClient } = toolArgs;
 
             const actorClient = apifyClient.actor(actorName);
@@ -124,10 +133,10 @@ export const callActorWidget: ToolEntry = Object.freeze({
             const response = buildStartRunWidgetResponse({ actorName, actorRun });
             return {
                 ...response,
-                toolTelemetry: { actorId: resolvedActorId },
+                toolTelemetry: { actorId: resolvedActorId, validationInputChange },
             };
         } catch (error) {
-            return buildCallActorErrorResponse({
+            const response = buildCallActorErrorResponse({
                 actorName,
                 error,
                 actorId: resolvedActorId,
@@ -135,6 +144,7 @@ export const callActorWidget: ToolEntry = Object.freeze({
                 loadedToolNames: toolArgs.loadedToolNames,
                 inputSchema: resolvedInputSchema,
             });
+            return withValidationInputChange(response, validationInputChange);
         }
     },
 } as const);

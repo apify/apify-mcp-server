@@ -233,6 +233,7 @@ export function extractToolTelemetry(
         ...(telemetry.actorTenancy && { actor_tenancy: telemetry.actorTenancy }),
         ...actorFields,
         ...telemetry.ajvErrorDetails,
+        ...(telemetry.validationInputChange && { validation_input_change: telemetry.validationInputChange }),
     };
 
     return { toolStatus, callDiagnostics };

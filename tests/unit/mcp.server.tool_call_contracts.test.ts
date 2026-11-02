@@ -12,6 +12,7 @@ import type { McpClientContext } from '../../src/mcp/client_context.js';
 import { getMCPServerTools } from '../../src/mcp/proxy.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import * as telemetry from '../../src/telemetry.js';
+import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import * as callActor from '../../src/tools/actors/call_actor.js';
 import {
     REPORT_PROBLEM_INVALID_INPUT_NUDGE,
@@ -32,6 +33,7 @@ import {
     makePaymentRequiredError,
     makePermissionApprovalError,
     makePaymentProvider,
+    makeActorTool,
     makeRecorderTool,
     makeThrowingTool,
     PERMISSION_HTTP_STATUS,
@@ -675,6 +677,39 @@ describe('executeToolAndUpdateTask()', () => {
 
         expect(trackSpy.mock.calls).toHaveLength(1);
         expectClientContextTelemetry(trackSpy.mock.calls[0][2]);
+    });
+
+    it('keeps the Actor input change in task-call telemetry', async () => {
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        vi.spyOn(actorExecutor, 'executeActorTool').mockResolvedValue({
+            content: [{ type: 'text', text: 'actor ok' }],
+        });
+        await withServer(
+            async (server) => {
+                const tool = {
+                    ...makeActorTool({
+                        inputSchema: { type: 'object', properties: { maxResults: { type: 'integer' } } },
+                    }),
+                    execution: { taskSupport: 'optional' },
+                } as ToolEntry;
+                server.upsertTools([tool]);
+                await getRequestHandler(server, 'tools/call')(
+                    {
+                        method: 'tools/call',
+                        params: {
+                            name: tool.name,
+                            arguments: { maxResults: '5' },
+                            _meta: { mcpSessionId: 's1' },
+                            task: { ttl: 60_000 },
+                        },
+                    },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                );
+                await vi.waitFor(() => expect(trackSpy).toHaveBeenCalled());
+            },
+            { token: undefined, telemetry: { enabled: true }, allowUnauthMode: true },
+        );
+        expect(trackSpy.mock.calls[0][2]).toMatchObject({ validation_input_change: 'coerced' });
     });
 
     it('takes the task-call trace_id from the Apify AI thread id', async () => {

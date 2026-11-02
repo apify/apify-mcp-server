@@ -38,6 +38,7 @@ import type {
     TelemetryEnv,
     ToolEntry,
     ToolStatus,
+    ValidationInputChange,
 } from '../types.js';
 import { isMcpError } from '../utils/tool_status.js';
 import { getToolFullName, getToolPublicFieldOnly } from '../utils/tools.js';
@@ -186,6 +187,7 @@ class StatelessMcpServer {
             const startTime = Date.now();
             let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
             let callDiagnostics: CallDiagnostics = {};
+            let validationInputChange: ValidationInputChange | undefined;
             let resolvedToolName = name;
             let toolResult: unknown = null;
             let actorName: string | undefined;
@@ -260,6 +262,7 @@ class StatelessMcpServer {
                 const { tool } = prepared;
                 actorName = prepared.actorName;
                 actorId = prepared.actorId;
+                validationInputChange = prepared.validationInputChange;
                 resolvedToolName = getToolFullName(tool);
                 // Telemetry uses the decoded arguments.
                 args = prepared.decodedArgs;
@@ -303,7 +306,10 @@ class StatelessMcpServer {
                     startTime,
                     telemetryData,
                     userId,
-                    callDiagnostics,
+                    callDiagnostics: {
+                        ...callDiagnostics,
+                        ...(validationInputChange && { validation_input_change: validationInputChange }),
+                    },
                     args,
                     result: toolResult,
                     telemetryEnv: this.host.telemetryEnv,

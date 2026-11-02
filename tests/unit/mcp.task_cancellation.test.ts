@@ -4,7 +4,13 @@ import log from '@apify/log';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
 import * as telemetry from '../../src/telemetry.js';
-import type { InternalToolArgs, ToolCallTelemetryProperties, ToolEntry, ToolInputSchema } from '../../src/types.js';
+import type {
+    InternalToolArgs,
+    ToolCallTelemetryProperties,
+    ToolEntry,
+    ToolInputSchema,
+    ToolTelemetryContext,
+} from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
 import { respondRaw } from '../../src/utils/mcp.js';
@@ -68,12 +74,26 @@ describe('executeToolAndUpdateTask()', () => {
      * Hence the wait on either spy, so a missing guard fails on the store assertion instead of
      * timing out.
      */
-    async function runCancelledTask(outcome?: { error: unknown }): Promise<ToolCallTelemetryProperties> {
+    async function runCancelledTask(
+        outcome?: { error: unknown },
+        toolTelemetry?: ToolTelemetryContext,
+    ): Promise<ToolCallTelemetryProperties> {
         const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
         await withServer(
             async (server) => {
                 silenceLogs();
-                const { tool, started, release } = makeBlockingTool();
+                const { tool: blockingTool, started, release } = makeBlockingTool();
+                const tool = toolTelemetry
+                    ? ({
+                          ...blockingTool,
+                          call: async (toolArgs: InternalToolArgs) => ({
+                              ...(await (blockingTool as { call: (args: InternalToolArgs) => Promise<object> }).call(
+                                  toolArgs,
+                              )),
+                              toolTelemetry,
+                          }),
+                      } as ToolEntry)
+                    : blockingTool;
                 server.upsertTools([tool]);
                 const storeSpy = vi.spyOn(getTaskStore(server), 'storeTaskResult');
 
@@ -110,6 +130,13 @@ describe('executeToolAndUpdateTask()', () => {
         // Not ABORTED: this guard forwards the dispatch's own status, unlike the 402 and
         // permission-approval guards, which pass ABORTED explicitly.
         expect(properties.tool_status).toBe(TOOL_STATUS.SUCCEEDED);
+    });
+
+    it('keeps the diagnostics the tool reported when it succeeds after the task was cancelled', async () => {
+        // call-actor reports the change a passing input check made on its response.
+        const properties = await runCancelledTask(undefined, { validationInputChange: 'coerced' });
+
+        expect(properties.validation_input_change).toBe('coerced');
     });
 
     it('stores no result when a 402 lands after the task was cancelled', async () => {
