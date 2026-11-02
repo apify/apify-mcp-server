@@ -193,9 +193,13 @@ describe('canRunActor()', () => {
 describe('getOwnServerRemedy()', () => {
     it('names the Claude custom connector only for ?client=claude', () => {
         expect(getOwnServerRemedy('claude')).toContain('add it to Claude as a custom connector.');
-        for (const clientParam of [undefined, 'cursor', 'claude-code']) {
+        for (const clientParam of [undefined, 'cursor', 'claude-code', 'apify-web-hero-claude-code']) {
             expect(getOwnServerRemedy(clientParam)).toContain('add it to your agent.');
         }
+    });
+
+    it('names the Claude custom connector for a prefixed ?client= tag ending in claude', () => {
+        expect(getOwnServerRemedy('apify-web-hero-claude')).toContain('add it to Claude as a custom connector.');
     });
 });
 

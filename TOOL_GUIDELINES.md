@@ -34,7 +34,7 @@ sentence can block a listing. Every configuration of this server must pass them.
 - When no general Actor-running tool is loaded, discovery responses say the Actor cannot be run in
   this configuration. The only remedy to offer is "create your own Apify MCP server configuration at
   https://mcp.apify.com and add it to your agent" (`getOwnServerRemedy`). Tool descriptions and
-  instructions say "add it to Claude as a custom connector" for `?client=claude`; tool results keep
+  instructions say "add it to Claude as a custom connector" for `?client=claude` (or a tag ending in `-claude`); tool results keep
   the neutral wording. No `?tools=` instructions and no Actor page links in served text.
 
 ## Never return a secret
