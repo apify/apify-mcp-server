@@ -51,7 +51,42 @@ async function getAnnotations(actorInfo: ActorInfo) {
 const LIMITED = { actorPermissionLevel: 'LIMITED_PERMISSIONS' };
 
 describe('getNormalActorsAsTools()', () => {
-    // Regression: #1513 — the validator required a property the platform fills from its default.
+    describe('input schema and validator are shared across sessions', () => {
+        it('shares one input schema and validator between builds of the same Actor', async () => {
+            // Each session's build starts from its own clone of the definition, as getActorsAsTools hands them out.
+            const [first] = await getNormalActorsAsTools([createMockActorInfo('apify/shared-schema-copies')]);
+            const [second] = await getNormalActorsAsTools([createMockActorInfo('apify/shared-schema-copies')]);
+
+            expect(second.inputSchema).toBe(first.inputSchema);
+            expect(second.ajvValidate).toBe(first.ajvValidate);
+        });
+
+        it('keeps the schema shared when permissions change, and still reflects them in the read-only annotation', async () => {
+            const [limited] = await getNormalActorsAsTools([
+                createMockActorInfo('apify/shared-schema-permissions', LIMITED),
+            ]);
+            const [unrestricted] = await getNormalActorsAsTools([
+                createMockActorInfo('apify/shared-schema-permissions', { actorPermissionLevel: 'FULL_PERMISSIONS' }),
+            ]);
+
+            expect(unrestricted.inputSchema).toBe(limited.inputSchema);
+            expect(limited.annotations?.readOnlyHint).toBe(true);
+            expect(unrestricted.annotations?.readOnlyHint).toBe(false);
+        });
+
+        it('does not share across different input schemas of the same Actor', async () => {
+            const [first] = await getNormalActorsAsTools([createMockActorInfo('apify/shared-schema-versions')]);
+            const [second] = await getNormalActorsAsTools([
+                createMockActorInfo('apify/shared-schema-versions', {
+                    inputProperties: { depth: { type: 'integer' } },
+                }),
+            ]);
+
+            expect(second.inputSchema).not.toBe(first.inputSchema);
+            expect(second.ajvValidate).not.toBe(first.ajvValidate);
+        });
+    });
+
     describe('input validation', () => {
         const actorInfo = createMockActorInfo('apify/screenshot-url', {
             inputProperties: {

@@ -152,6 +152,9 @@ export async function getNormalActorsAsTools(
             waitSecs: WAIT_SECS_INPUT_PROPERTY,
         };
 
+        // The closure below must capture only the note, not `contract`: that would keep the
+        // per-call copy of the input schema alive for the session's lifetime.
+        const contractDescription = contract.description;
         // Names call-actor only when the session actually has it.
         const buildDescription = (context: ToolDescriptionContext): string => {
             const { hasTool } = context;
@@ -159,7 +162,7 @@ export async function getNormalActorsAsTools(
 ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this specific Actor.\n` : ''}Actor description: ${actorDescription}`;
             const policyDescription = getActorToolPolicy(actorFullName)?.buildDescription?.(context);
             if (policyDescription) description += `\n\n${policyDescription}`;
-            if (contract.description) description += `\n\n${contract.description}`;
+            if (contractDescription) description += `\n\n${contractDescription}`;
             return description;
         };
 
@@ -191,7 +194,8 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
             actorFullName: definition.actorFullName,
             description: buildDescription(ALL_TOOLS_PRESENT),
             buildDescription,
-            inputSchema: inputSchema as ToolInputSchema,
+            // The cached validator already holds this schema; point at it so sessions share one copy.
+            inputSchema: ajvValidate.schema as ToolInputSchema,
             // Canonical RunResponse shape — same as call-actor and get-actor-run.
             outputSchema: actorRunOutputSchema,
             ajvValidate,
