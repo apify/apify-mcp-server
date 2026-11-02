@@ -133,7 +133,7 @@ Use the one-click install link from the [configurator](https://mcp.apify.com), r
 
 [Add Apify to Claude](https://claude.ai/new?modal=add-custom-connector&connectorName=Apify&connectorUrl=https%3A%2F%2Fmcp.apify.com%2F%3Fclient%3Dclaude#customize/connectors): the link opens the custom connector dialog with the name and URL filled in. Sign in with Apify when prompted.
 
-To set it up by hand, open **Settings** > **Connectors** and either find **Apify** in the connector directory, or select **Add custom connector**, name it `Apify`, and enter `https://mcp.apify.com` as the remote MCP server URL. The same connector works on Claude.ai and in Claude Desktop. See the [Claude guide](https://docs.apify.com/integrations/claude-desktop).
+To set it up by hand, open **Settings** > **Connectors**, select **Add custom connector**, name it `Apify`, and enter `https://mcp.apify.com` as the remote MCP server URL. The same connector works on Claude.ai and in Claude Desktop. See the [Claude guide](https://docs.apify.com/integrations/claude-desktop).
 
 </details>
 
