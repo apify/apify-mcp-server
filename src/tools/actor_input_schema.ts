@@ -1,10 +1,13 @@
+import { createHash } from 'node:crypto';
+
 import type { ValidateFunction } from 'ajv';
-import type Ajv from 'ajv';
+
+import { LruCache } from '@apify/datastructures';
 
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../const.js';
 import { SchemaTooLargeError } from '../errors.js';
 import type { ActorInputSchema, SchemaProperties } from '../types.js';
-import { fixZodSchemaRequired } from '../utils/ajv.js';
+import { createAjv, fixZodSchemaRequired } from '../utils/ajv.js';
 import {
     addGlobsProperties,
     addKeyValueProperties,
@@ -24,27 +27,32 @@ type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 // is intentionally uncapped.
 export const MAX_UNTRUSTED_SCHEMA_BYTES = 262_144;
 
-// source https://github.com/ajv-validator/ajv/issues/1413#issuecomment-867064234
-export function fixedAjvCompile(ajvInstance: Ajv, schema: object): ValidateFunction<unknown> {
-    // Skip AJV codegen (synchronous, would freeze the event loop) on an oversized untrusted schema.
-    // Throws SchemaTooLargeError, which callers log as a soft fail (not a server error).
-    if (Buffer.byteLength(JSON.stringify(schema)) > MAX_UNTRUSTED_SCHEMA_BYTES) {
+const UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE = 1000;
+const untrustedValidatorCache = new LruCache<ValidateFunction<unknown>>({
+    maxLength: UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE,
+});
+
+/**
+ * Compiles an Actor or proxied-MCP input schema, one validator per schema content.
+ *
+ * Each miss compiles on a fresh Ajv instance, never on the shared one. Ajv compiles through `new Function`, and V8
+ * keeps every distinct source it has compiled that way, past full GCs. A shared instance numbers its scope names
+ * with a counter that never resets, so the same schema produced different source each time and every compile
+ * stayed resident. On a fresh instance identical schemas compile to identical source. Same as apify-core#27900.
+ */
+export function compileUntrustedSchema(schema: object): ValidateFunction<unknown> {
+    const serialized = JSON.stringify(schema);
+    // Ajv codegen is synchronous; an oversized untrusted schema would freeze the event loop.
+    if (Buffer.byteLength(serialized) > MAX_UNTRUSTED_SCHEMA_BYTES) {
         throw new SchemaTooLargeError(MAX_UNTRUSTED_SCHEMA_BYTES);
     }
-    const validate = ajvInstance.compile(schema);
-    ajvInstance.removeSchema(schema);
 
-    // Force reset values that aren't reset with removeSchema
-    /* eslint-disable no-underscore-dangle */
-    /* eslint-disable @typescript-eslint/no-explicit-any */
-    (ajvInstance.scope as any)._values.schema!.delete(schema);
-    (ajvInstance.scope as any)._values.validate!.delete(validate);
-    const schemaIdx = (ajvInstance.scope as any)._scope.schema.indexOf(schema);
-    const validateIdx = (ajvInstance.scope as any)._scope.validate.indexOf(validate);
-    if (schemaIdx !== -1) (ajvInstance.scope as any)._scope.schema.splice(schemaIdx, 1);
-    if (validateIdx !== -1) (ajvInstance.scope as any)._scope.validate.splice(validateIdx, 1);
-    /* eslint-enable @typescript-eslint/no-explicit-any */
-    /* eslint-enable no-underscore-dangle */
+    const cacheKey = createHash('sha256').update(serialized).digest('base64');
+    const cached = untrustedValidatorCache.get(cacheKey);
+    if (cached) return cached;
+
+    const validate = createAjv().compile(schema);
+    untrustedValidatorCache.add(cacheKey, validate);
     return validate;
 }
 

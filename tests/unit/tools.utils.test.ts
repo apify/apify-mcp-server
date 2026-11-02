@@ -7,7 +7,7 @@ import {
     buildApifySpecificProperties,
     decodeDotPropertyNames,
     encodeDotPropertyNames,
-    fixedAjvCompile,
+    compileUntrustedSchema,
     inferArrayItemsTypeIfMissing,
     inferArrayItemType,
     MAX_UNTRUSTED_SCHEMA_BYTES,
@@ -21,10 +21,35 @@ import { TOOL_TYPE } from '../../src/types.js';
 import { ajv } from '../../src/utils/ajv.js';
 import { extractActorName, getToolFullName, getToolPublicFieldOnly } from '../../src/utils/tools.js';
 
-describe('fixedAjvCompile — untrusted schema size cap', () => {
+describe('compileUntrustedSchema', () => {
     it('compiles a normal-sized schema', () => {
-        const validate = fixedAjvCompile(ajv, { type: 'object', properties: { url: { type: 'string' } } });
+        const validate = compileUntrustedSchema({ type: 'object', properties: { url: { type: 'string' } } });
         expect(validate({ url: 'https://example.com' })).toBe(true);
+    });
+
+    it('keeps the shared instance configuration: strips unknown properties and ignores `pattern`', () => {
+        const validate = compileUntrustedSchema({
+            type: 'object',
+            properties: { url: { type: 'string', pattern: '^(a+)+$' } },
+            additionalProperties: false,
+        });
+        const input = { url: 'https://example.com', extra: 1 };
+        expect(validate(input)).toBe(true);
+        expect(input).toEqual({ url: 'https://example.com' });
+    });
+
+    it('returns one validator for schemas with the same content and separate ones otherwise', () => {
+        const schema = () => ({ type: 'object', properties: { url: { type: 'string' } }, required: ['url'] });
+        const first = compileUntrustedSchema(schema());
+        expect(compileUntrustedSchema(schema())).toBe(first);
+        expect(compileUntrustedSchema({ ...schema(), required: [] })).not.toBe(first);
+    });
+
+    it('registers nothing on the shared instance', () => {
+        const before = Object.keys(ajv.schemas).length;
+        compileUntrustedSchema({ $id: 'https://example.com/untrusted.json', type: 'object', properties: {} });
+        expect(Object.keys(ajv.schemas).length).toBe(before);
+        expect(ajv.getSchema('https://example.com/untrusted.json')).toBeUndefined();
     });
 
     it('throws SchemaTooLargeError on an oversized schema before AJV codegen runs (DoS guard)', () => {
@@ -32,7 +57,7 @@ describe('fixedAjvCompile — untrusted schema size cap', () => {
         for (let i = 0; i < 16000; i++) properties[`p${i}`] = { type: 'string' };
         const huge = { type: 'object', properties };
         expect(JSON.stringify(huge).length).toBeGreaterThan(MAX_UNTRUSTED_SCHEMA_BYTES);
-        expect(() => fixedAjvCompile(ajv, huge)).toThrow(SchemaTooLargeError);
+        expect(() => compileUntrustedSchema(huge)).toThrow(SchemaTooLargeError);
     });
 });
 
@@ -1179,7 +1204,7 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
                 description: '',
                 inputSchema,
             } as ToolBase);
-            const validate = fixedAjvCompile(ajv, inputSchema);
+            const validate = compileUntrustedSchema(inputSchema);
 
             expect(inputSchema.required).toEqual(['query']);
             expect((pub.inputSchema as { required?: string[] }).required).toEqual(['query']);
@@ -1225,7 +1250,7 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
         expect(displayProperties.categoryFilterWords.description).toContain('kept-0');
 
         // A value that a partial enum would have cut is now accepted; only `type` is enforced.
-        const validate = fixedAjvCompile(ajv, inputSchema);
+        const validate = compileUntrustedSchema(inputSchema);
         expect(validate({ categoryFilterWords: [droppedValue] })).toBe(true);
     });
 });

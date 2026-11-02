@@ -1,20 +1,26 @@
 import type { ValidateFunction } from 'ajv';
 import Ajv from 'ajv';
 
-export const ajv = new Ajv({ coerceTypes: 'array', strict: false, removeAdditional: true });
+/** Ajv with the server's validation policy. Shared for our own schemas; `compileUntrustedSchema` takes a fresh one. */
+export function createAjv(): Ajv {
+    const instance = new Ajv({ coerceTypes: 'array', strict: false, removeAdditional: true });
 
-// `pattern`/`patternProperties` compile a RegExp from untrusted Actor / proxied-MCP input schemas;
-// a catastrophic-backtracking pattern freezes the single-threaded event loop (ReDoS). `format` is
-// inert today (ajv-formats is not registered) but would arm the same vector if it ever were. This
-// layer only sanitizes LLM args — the Actor re-validates its real input on the run — so dropping
-// regex enforcement removes the DoS surface with no loss of protection. Consequence for `src/`
-// schemas: a `.regex()` on a Zod field is NOT enforced here. It still reaches `tools/list` and still
-// fires in a tool body's `parse()`, where it throws a raw ZodError at the client instead of a
-// readable error — so rely on the API's own validation rather than adding one. `taskNameSchema`
-// (`tools/tasks/task_helpers.ts`) still carries one and predates this note.
-ajv.removeKeyword('pattern');
-ajv.removeKeyword('patternProperties');
-ajv.removeKeyword('format');
+    // `pattern`/`patternProperties` compile a RegExp from untrusted Actor / proxied-MCP input schemas;
+    // a catastrophic-backtracking pattern freezes the single-threaded event loop (ReDoS). `format` is
+    // inert today (ajv-formats is not registered) but would arm the same vector if it ever were. This
+    // layer only sanitizes LLM args — the Actor re-validates its real input on the run — so dropping
+    // regex enforcement removes the DoS surface with no loss of protection. Consequence for `src/`
+    // schemas: a `.regex()` on a Zod field is NOT enforced here. It still reaches `tools/list` and still
+    // fires in a tool body's `parse()`, where it throws a raw ZodError at the client instead of a
+    // readable error — so rely on the API's own validation rather than adding one. `taskNameSchema`
+    // (`tools/tasks/task_helpers.ts`) still carries one and predates this note.
+    instance.removeKeyword('pattern');
+    instance.removeKeyword('patternProperties');
+    instance.removeKeyword('format');
+    return instance;
+}
+
+export const ajv = createAjv();
 
 /**
  * Removes the `$schema` property and drops fields with real `default` values from `required`.

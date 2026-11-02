@@ -28,10 +28,9 @@ import {
     TOOL_TYPE,
 } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
-import { ajv } from '../../utils/ajv.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { logHttpError } from '../../utils/logging.js';
-import { buildActorInputSchema, fixedAjvCompile } from '../actor_input_schema.js';
+import { buildActorInputSchema, compileUntrustedSchema } from '../actor_input_schema.js';
 import { actorNameToToolName, isActorBlockedUnderPaymentProvider, resolveActorToolMode } from '../actor_tool_naming.js';
 import { buildEnrichedDirectActorOutputSchema, actorRunOutputSchema } from '../structured_output_schemas.js';
 import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from './actor_run_response.js';
@@ -174,7 +173,7 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
             // Unknown properties are silently stripped by AJV's removeAdditional option.
             // Dynamic Actor input fields are part of the Actor's own inputSchema, so they
             // are declared properties and won't be stripped.
-            ajvValidate = fixedAjvCompile(ajv, inputSchema);
+            ajvValidate = compileUntrustedSchema(inputSchema);
         } catch (e) {
             // SchemaTooLargeError logs as a soft fail; a genuine AJV compile error stays an error.
             logHttpError(e, 'Failed to compile schema', {
