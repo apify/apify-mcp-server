@@ -311,7 +311,7 @@ function cutOperationLines(lines: readonly string[], count: number, maxLength: n
     const index = lines.join('\n');
     if (lines.length === count && index.length <= maxLength) return index;
     // Room for the cut line with the largest count it can show.
-    let length = `… and ${count} more`.length;
+    let { length } = `… and ${count} more`;
     const kept: string[] = [];
     for (const line of lines) {
         length += line.length + 1;
