@@ -49,8 +49,11 @@ function formatDetailsCall(actorFullName: string, serverInterface: true | string
     return `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorFullName, output: { serverInterface } })}`;
 }
 
-/** `undefined` when the references expand past `maxExpansionBytes`. */
-function renderWithinBudget<T>(
+/**
+ * `render`, and it as fenced JSON; `undefined` when the inlined `$ref` targets exceed `maxExpansionBytes`. The
+ * caller checks the output size.
+ */
+function formatDereferencedJson<T>(
     schema: unknown,
     render: (context: DereferenceContext) => T,
     maxExpansionBytes = MAX_INLINE_BYTES,
@@ -155,7 +158,7 @@ function buildOperationsSection(
     operations: ServerOperation[],
 ): ServerInterfaceSection | { error: string } {
     const header = formatHeader(`# Server interface of ${actorFullName}`, 'a request to one of them', operations[0]);
-    const full = renderWithinBudget(schema, (context) => ({
+    const full = formatDereferencedJson(schema, (context) => ({
         ...facts,
         operations: operations.map((operation) => buildServerOperationDetails(operation, context)),
     }));
@@ -181,7 +184,7 @@ function buildOperationSection(
         'this request',
         operation,
     );
-    const one = renderWithinBudget(schema, (context) => ({
+    const one = formatDereferencedJson(schema, (context) => ({
         ...facts,
         operations: [buildServerOperationDetails(operation, context)],
     }));
