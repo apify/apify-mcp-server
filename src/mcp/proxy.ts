@@ -70,7 +70,7 @@ export async function getMCPServerTools(
             name: getProxyMCPServerToolName(actorFullName, tool.name, shouldCapUsername),
             description: tool.description || '',
             inputSchema: tool.inputSchema,
-            ajvValidate: compileUntrustedSchema(tool.inputSchema),
+            ajvValidate: compileUntrustedSchema(tool.inputSchema).validate,
             annotations: tool.annotations,
         }),
     );

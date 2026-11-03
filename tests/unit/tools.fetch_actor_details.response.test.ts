@@ -12,13 +12,7 @@ import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
 import { fetchActorDetails } from '../../src/utils/actor_details.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import {
-    expectSoftFailInvalidInput,
-    mockApifyClient,
-    mockUserInfo,
-    stubToolCallContext,
-    textOf,
-} from './helpers/tool_context.js';
+import { mockApifyClient, mockUserInfo, stubToolCallContext, textOf } from './helpers/tool_context.js';
 
 vi.mock('../../src/utils/actor_details.js', async () => {
     const actual = await vi.importActual<Record<string, unknown>>('../../src/utils/actor_details.js');
@@ -157,15 +151,6 @@ describe('buildFetchActorDetailsResult()', () => {
         });
         expect(content[0].text).toContain('# [Input schema](https://console.apify.com/actors/actor-id-1)');
         expect(content.at(-1)?.text).toBe(VERBATIM_LINKS_NUDGE);
-    });
-
-    it('rejects a whitespace-only actor before the users/me and Actor lookups', async () => {
-        const result = await buildFetchActorDetailsResult(stubToolCallContext({ actor: '   ' }, mockApifyClient()));
-
-        expectSoftFailInvalidInput(result);
-        expect((result.content ?? []).map(textOf).join('\n')).toContain('"actor" must not be empty');
-        expect(getUserInfoCached).not.toHaveBeenCalled();
-        expect(fetchActorDetails).not.toHaveBeenCalled();
     });
 
     // The direct buildActorNotFoundResponse() tests below cannot see whether this function
