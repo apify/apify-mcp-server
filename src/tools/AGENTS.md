@@ -28,11 +28,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     (`delete_actor.ts`), the actor-tools factory (run tools, proxied MCP tools, and a Server Actor's own tool
     (`getServerActorsAsTools`, type `actor-server`): `send-server-actor-request`'s execution and output with the
     Actor fixed, `method` narrowed to the documented ones, `path` a plain string (no enum: a schema can document
-    thousands of paths), and the operations in the description. The
-    whole description stays within `CLIENT_DESCRIPTION_MAX_LENGTH` (4,096 characters, the Claude Code cut): the
-    operations in full when it fits, else `formatOperationLine` lines cut to fit (`buildServerActorToolDescription`,
-    from what `buildServerActorToolInfo` renders once per definition)), the direct actor-tool executor
-    (`actor_executor.ts`),
+    thousands of paths), and the operations in the description; an Actor with a server interface and no
+    `webServerToolInfo` is reported as `load-failed`), the direct actor-tool executor (`actor_executor.ts`),
     `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`, and resolves the build
     the server-interface fields — `webServerMcpPath`, `webServerSchema` — are read from when standby is on,
     `resolveServerInterfaceDefinition`, shared with `fetchActorDetails` in `../utils/actor_details.ts`; the input
@@ -44,7 +41,11 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `server_interface_details.ts` (the server-interface section of `fetch-actor-details`: the
     `structuredContent.serverInterface` object, and the text derived from it; the summary is served only with
     `send-server-actor-request`, and the operations in full give way to `operationIndex` over `MAX_INLINE_BYTES`,
-    with a byte budget on reference expansion since a creator schema can expand exponentially),
+    with a byte budget on reference expansion since a creator schema can expand exponentially; also a selected
+    Server Actor's tool description, within `CLIENT_DESCRIPTION_MAX_LENGTH` (4,096 characters, the Claude Code cut):
+    the operations in full when it fits, else `formatOperationLine` lines, cut with `… and N more` and a pointer to
+    `serverInterface: true` (`buildServerActorToolDescription`, from what `buildServerActorToolInfo` renders once
+    per definition); `server_interface_schema.ts` reads each operation's inputs for it, `listOperationInputs`),
     `send_server_actor_request.ts` (`send-server-actor-request`: one HTTP request to a Server Actor's API, gated on
     the `server` interface and sent through `sendApifyApiRequest` with raw response
     bytes, no redirects, the `MAX_INLINE_BYTES` cap after decompression and the `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`
