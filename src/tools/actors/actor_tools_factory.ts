@@ -248,7 +248,7 @@ export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
         const toolInfo = definition.webServerToolInfo;
         // `getActorsAsTools` reports an Actor without it.
         if (!toolInfo) continue;
-        const { actorFullName } = definition;
+        const { actorFullName, description } = definition;
         const isReadOnly = isReadOnlyActor(actorInfo);
         const costNotice = formatTenancyBilling({
             tenancy: resolveActorTenancy(actor),
@@ -257,7 +257,7 @@ export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
         // Names fetch-actor-details only when the session has it, and only when the operations are not in full.
         const buildDescription = ({ hasTool }: ToolDescriptionContext): string => {
             const head = `This tool sends one HTTP request to the server interface of the Actor "${actorFullName}" and returns the response.
-${hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_SERVER_REQUEST}" if user requests this specific Actor.\n` : ''}Actor description: ${definition.description}
+${hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_SERVER_REQUEST}" if user requests this specific Actor.\n` : ''}Actor description: ${description}
 ${costNotice}
 The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text; other content types, and bodies over ${MAX_INLINE_BYTES} bytes, are not returned.
 

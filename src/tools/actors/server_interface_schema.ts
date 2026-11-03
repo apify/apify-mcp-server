@@ -5,10 +5,10 @@
 import type { ApiMethod, ApiOperation, ApiParameter, DereferenceContext } from '../api/apify_api_spec.js';
 import {
     API_METHODS,
-    isJsonMediaType,
     isRecord,
     parseParameters,
     parseRequestBody,
+    pickJsonMedia,
     resolveLocalRef,
 } from '../api/apify_api_spec.js';
 
@@ -152,14 +152,9 @@ export function buildServerOperationDetails(
     };
 }
 
-/** Follows one local reference: an input reads a type without expanding schemas. */
-function resolveOneRef(node: unknown, schema: unknown): unknown {
-    return isRecord(node) && typeof node.$ref === 'string' ? resolveLocalRef(schema, node.$ref) : node;
-}
-
 /** E.g. `string`, or `string|null` for a list of types; `undefined` when the schema names no type. */
 function getTypeName(node: unknown, schema: unknown): string | undefined {
-    const resolved = resolveOneRef(node, schema);
+    const resolved = resolveRef(node, schema);
     if (!isRecord(resolved)) return undefined;
     const types = [resolved.type].flat().filter((type): type is string => typeof type === 'string');
     return types.length > 0 ? types.join('|') : undefined;
@@ -183,13 +178,13 @@ function listParameterInputs(operation: Record<string, unknown>, schema: unknown
 
 /** The schema of the JSON media type `parseRequestBody` picks; `undefined` when there is none. */
 function getJsonMediaSchema(content: Record<string, unknown>): { schema: unknown } | undefined {
-    const media = content['application/json'] ?? content[Object.keys(content).find(isJsonMediaType) ?? '*/*'];
+    const media = pickJsonMedia(content);
     return isRecord(media) ? { schema: media.schema } : undefined;
 }
 
 /** The top-level properties of a body schema; `undefined` when it lists none. */
 function listBodyInputs(bodySchema: unknown, schema: unknown): OperationInput[] | undefined {
-    const resolved = resolveOneRef(bodySchema, schema);
+    const resolved = resolveRef(bodySchema, schema);
     if (!isRecord(resolved) || !isRecord(resolved.properties)) return undefined;
     const required = Array.isArray(resolved.required) ? resolved.required : [];
     const inputs = Object.entries(resolved.properties).map(([name, property]) => ({

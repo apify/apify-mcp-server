@@ -55,9 +55,7 @@ export function buildActorFields(
  * Returns undefined for other internal tools or when the arg is missing/invalid.
  */
 export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>): string | undefined {
-    if (tool.type === TOOL_TYPE.ACTOR || tool.type === TOOL_TYPE.ACTOR_MCP || tool.type === TOOL_TYPE.ACTOR_SERVER) {
-        return tool.actorFullName;
-    }
+    if (tool.type !== TOOL_TYPE.INTERNAL) return tool.actorFullName;
 
     // A legacy "username/name:toolName" value is logged by its Actor name.
     const actorArg = args?.actor;

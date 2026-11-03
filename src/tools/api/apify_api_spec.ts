@@ -189,9 +189,14 @@ function resolveExamplesMap(examples: Record<string, unknown>, context: Derefere
 }
 
 /** `application/json`, also with parameters such as `; charset=utf-8`, or a `+json` type such as `application/vnd.api+json`. */
-export function isJsonMediaType(mediaType: string): boolean {
+function isJsonMediaType(mediaType: string): boolean {
     const base = mediaType.split(';')[0].trim().toLowerCase();
     return base === 'application/json' || base.endsWith('+json');
+}
+
+/** The JSON media type every body is sent as, else the wildcard type the key-value store record operations declare. */
+export function pickJsonMedia<T>(content: Record<string, T>): T | undefined {
+    return content['application/json'] ?? content[Object.keys(content).find(isJsonMediaType) ?? '*/*'];
 }
 
 /** Lowercase words of a text, splitting camelCase, snake_case, kebab-case, and paths. */
@@ -229,8 +234,7 @@ export function parseRequestBody(rawRequestBody: unknown, context: DereferenceCo
     const parsed = openApiRequestBodyValidator.safeParse(dereference(rawRequestBody, context));
     if (!parsed.success) return undefined;
     const { content, required } = parsed.data;
-    // Every body is sent as JSON; the key-value store record operations declare `*/*`.
-    const media = content['application/json'] ?? content[Object.keys(content).find(isJsonMediaType) ?? '*/*'];
+    const media = pickJsonMedia(content);
     if (!media) return undefined;
     const { schema, example, examples } = media;
     return {

@@ -15,6 +15,7 @@ import type {
     ServerOperation,
     ServerOperationDetails,
     ServerOperationIndexEntry,
+    ServerOperationInputs,
 } from './server_interface_schema.js';
 import {
     buildServerOperationDetails,
@@ -50,6 +51,9 @@ const MAX_NAMED_OPERATIONS_LENGTH = 300;
  * upfront (https://code.claude.com/docs/en/mcp.md, "Scale with MCP tool search").
  */
 export const CLIENT_DESCRIPTION_MAX_LENGTH = 4096;
+
+/** A character takes at most 4 UTF-8 bytes, and the reference budget counts bytes. */
+const CLIENT_DESCRIPTION_MAX_BYTES = CLIENT_DESCRIPTION_MAX_LENGTH * 4;
 
 /** Inputs an operation line names in each list; the rest are counted. */
 const MAX_LISTED_INPUTS = 5;
@@ -285,9 +289,10 @@ function formatInputs(inputs: OperationInput[]): string {
  * properties reads `{request body}`, with `required` when it is. A body the tool cannot send, such as a form, reads
  * `{application/x-www-form-urlencoded body: not supported}`.
  */
-function formatOperationLine(serverOperation: ServerOperation, schema: unknown): string {
-    const { method, path, operation } = serverOperation;
-    const { parameters, requestBody } = listOperationInputs(serverOperation, schema);
+function formatOperationLine(
+    { method, path, operation }: ServerOperation,
+    { parameters, requestBody }: ServerOperationInputs,
+): string {
     let text = `- ${method} ${path}`;
     if (parameters.length > 0) text += ` [${formatInputs(parameters)}]`;
     if (requestBody?.properties) {
@@ -329,23 +334,29 @@ function cutOperationLines(lines: readonly string[], count: number, maxLength: n
 export function buildServerActorToolInfo(schema: unknown, actorFullName: string): ServerActorToolInfo | undefined {
     const operations = listServerOperations(schema);
     if (operations.length === 0) return undefined;
-    // A character takes at most 4 UTF-8 bytes, and the reference budget counts bytes.
-    const full = formatDereferencedJson(
-        schema,
-        (context) => ({ operations: operations.map((operation) => buildServerOperationDetails(operation, context)) }),
-        CLIENT_DESCRIPTION_MAX_LENGTH * 4,
-    )?.json;
+    const inputs = operations.map((operation) => listOperationInputs(operation, schema));
     const operationLines: string[] = [];
     let length = 0;
-    for (const operation of operations) {
-        const line = formatOperationLine(operation, schema);
+    for (const [index, operation] of operations.entries()) {
+        const line = formatOperationLine(operation, inputs[index]);
         length += line.length + 1;
         if (length > CLIENT_DESCRIPTION_MAX_LENGTH) break;
         operationLines.push(line);
     }
+    // The full rendering is longer than the lines, so it cannot fit when they do not.
+    const full =
+        operationLines.length === operations.length
+            ? formatDereferencedJson(
+                  schema,
+                  (context) => ({
+                      operations: operations.map((operation) => buildServerOperationDetails(operation, context)),
+                  }),
+                  CLIENT_DESCRIPTION_MAX_BYTES,
+              )?.json
+            : undefined;
     return {
         methods: API_METHODS.filter((apiMethod) => operations.some((operation) => operation.method === apiMethod)),
-        hasRequestBody: operations.some((operation) => listOperationInputs(operation, schema).requestBody?.isJson),
+        hasRequestBody: inputs.some((operationInputs) => operationInputs.requestBody?.isJson),
         ...(full !== undefined && full.length <= CLIENT_DESCRIPTION_MAX_LENGTH && { fullOperations: full }),
         operationLines,
         operationCount: operations.length,

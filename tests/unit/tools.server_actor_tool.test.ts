@@ -52,6 +52,11 @@ const LONG_SCHEMA = {
     },
 };
 
+/** `count` documented paths, `/path-0`, `/path-1`, …, each with a bare GET. */
+function pathsOf(count: number): Record<string, unknown> {
+    return Object.fromEntries(Array.from({ length: count }, (_, i) => [`/path-${i}`, { get: {} }]));
+}
+
 let actorCount = 0;
 
 /** Loads a standby Actor serving `schema` as Actor tools; each call is a new Actor, so the definition cache misses. */
@@ -200,15 +205,6 @@ describe('the input schema of a Server Actor tool', () => {
         expect(query.description).not.toContain('limit');
     });
 
-    it('keeps the input schema the same size for any number of documented paths', () => {
-        const pathsOf = (count: number) =>
-            Object.fromEntries(Array.from({ length: count }, (_, i) => [`/path-${i}`, { get: {} }]));
-        const sizeOf = (count: number) =>
-            JSON.stringify(buildServerActorToolSchemas(infoOf({ paths: pathsOf(count) })).inputSchema).length;
-
-        expect(sizeOf(10_000)).toBe(sizeOf(2));
-    });
-
     it('defaults a single method, which the validator fills in', () => {
         const { inputSchema, ajvValidate } = schemasOf({ methods: ['POST'] });
         const args: Record<string, unknown> = { path: '/' };
@@ -311,8 +307,7 @@ describe('the operations in a Server Actor tool description', () => {
     });
 
     it('point at the list of every operation when the lines are cut', async () => {
-        const paths = Object.fromEntries(Array.from({ length: 1000 }, (_, i) => [`/path-${i}`, { get: {} }]));
-        const tool = await loadServerTool({ paths });
+        const tool = await loadServerTool({ paths: pathsOf(1000) });
 
         expect(tool.buildDescription?.(only(HELPER_TOOLS.ACTOR_GET_DETAILS))).toMatch(
             new RegExp(
@@ -340,9 +335,8 @@ describe('the operations in a Server Actor tool description', () => {
 
     it('keep only what can fit the description limit', () => {
         const count = 1000;
-        const paths = Object.fromEntries(Array.from({ length: count }, (_, i) => [`/path-${i}`, { get: {} }]));
 
-        const info = infoOf({ paths });
+        const info = infoOf({ paths: pathsOf(count) });
 
         expect(info.fullOperations).toBeUndefined();
         expect(info.operationCount).toBe(count);

@@ -308,17 +308,14 @@ export type ActorMcpTool = ToolBase & {
  * `send-server-actor-request` sends it, with the Actor fixed.
  * Type discriminator: {@link TOOL_TYPE.ACTOR_SERVER}
  */
-export type ActorServerTool = ToolBase & {
-    type: typeof TOOL_TYPE.ACTOR_SERVER;
-    /** Stable Apify Actor ID */
-    actorId: string;
-    /** Full name of the Apify Actor (username/name) */
-    actorFullName: string;
-    /** As {@link HelperTool.call}. */
-    call: (toolArgs: InternalToolArgs) => Promise<ToolResponse>;
-    /** As {@link HelperTool.redactArgs}. */
-    redactArgs?: (args: Record<string, unknown>) => Record<string, unknown>;
-};
+export type ActorServerTool = ToolBase &
+    Pick<HelperTool, 'call' | 'redactArgs'> & {
+        type: typeof TOOL_TYPE.ACTOR_SERVER;
+        /** Stable Apify Actor ID */
+        actorId: string;
+        /** Full name of the Apify Actor (username/name) */
+        actorFullName: string;
+    };
 
 /**
  * Discriminated union of all tool types.
