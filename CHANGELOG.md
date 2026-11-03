@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.20.1 - **not yet released**
+## [0.20.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.20.1) (2026-11-03)
 
 ### 🚀 Features
 
@@ -21,7 +20,6 @@ All notable changes to this project will be documented in this file.
 - Fail reading an unknown or broken ui:&#x2F;&#x2F; widget resource ([#1754](https://github.com/apify/apify-mcp-server/pull/1754)) ([1d9b95c](https://github.com/apify/apify-mcp-server/commit/1d9b95cff1eaac266caf3434690f9591c413e18e)) by [@jirispilka](https://github.com/jirispilka), closes [#1730](https://github.com/apify/apify-mcp-server/issues/1730)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.20.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.20.0) (2026-10-29)
 
 ### 🚀 Features
