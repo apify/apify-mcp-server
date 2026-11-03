@@ -8,21 +8,26 @@ import type { Actor, ActorInfo, ActorInterfaces, ActorTenancy, ToolDescriptionCo
 import { ACTOR_TENANCY, ACTOR_TOOL_MODE } from '../types.js';
 
 /**
- * The single rule for which interfaces an Actor has. Tool loading and `call-actor` routing both read the
- * tool slot `resolveActorToolMode` derives from it, so the two can never disagree.
+ * The single rule for which interfaces an Actor has. Two routes are derived from it: the Actor's own tool
+ * (`resolveActorToolMode`, read by tool loading) and `call-actor` (`getActorToolModeFromInterfaces`, read through
+ * `getActorToolResolutionCached`). The own tool takes the server interface first, then the MCP server, then the
+ * input interface; `call-actor` never takes the server interface, so it still starts runs of such an Actor.
  *
- * | server | MCP path | input schema | HTTP schema | `input` | `mcp` | `server` | tool slot                  |
- * |--------|----------|--------------|-------------|---------|-------|----------|----------------------------|
- * | off    | any      | any          | any         | true    | false | false    | `RUN`                      |
- * | on     | present  | any          | no / yes    | false   | true  | no / yes | `MCP`                      |
- * | on     | absent   | non-empty    | no / yes    | true    | false | no / yes | `RUN`                      |
- * | on     | absent   | empty        | no / yes    | false   | false | no / yes | `SERVER_ACTOR_WITHOUT_MCP` |
+ * | server | MCP path | input schema | HTTP schema | `input` | `mcp` | `server` | own tool                   | `call-actor`               |
+ * |--------|----------|--------------|-------------|---------|-------|----------|----------------------------|----------------------------|
+ * | off    | any      | any          | any         | true    | false | false    | `RUN`                      | `RUN`                      |
+ * | on     | present  | any          | yes         | false   | true  | true     | `SERVER`                   | `MCP`                      |
+ * | on     | present  | any          | no          | false   | true  | false    | `MCP`                      | `MCP`                      |
+ * | on     | absent   | non-empty    | yes         | true    | false | true     | `SERVER`                   | `RUN`                      |
+ * | on     | absent   | non-empty    | no          | true    | false | false    | `RUN`                      | `RUN`                      |
+ * | on     | absent   | empty        | yes         | false   | false | true     | `SERVER`                   | `SERVER_ACTOR_WITHOUT_MCP` |
+ * | on     | absent   | empty        | no          | false   | false | false    | `SERVER_ACTOR_WITHOUT_MCP` | `SERVER_ACTOR_WITHOUT_MCP` |
  *
  * "server" is the Actor's `actorStandby.isEnabled` (the API field is named standby). "MCP path" is
- * `webServerMcpPath`, read as absent for Actors in `INPUT_INTERFACE_ACTORS` (`../const.ts`), which are served
- * through the input interface although they declare it, unless their input schema is empty (including a
- * malformed one `pruneActorDefinition` drops); then they get no tool, like any other server Actor.
- * "HTTP schema" is `definition.hasWebServerSchema`.
+ * `webServerMcpPath`. "HTTP schema" is `definition.hasWebServerSchema`.
+ * Actors in `INPUT_INTERFACE_ACTORS` (`../const.ts`) are served through the input interface although they declare
+ * other interfaces: their MCP path reads as absent, and their own tool never takes `SERVER`. With an empty input
+ * schema (including a malformed one `pruneActorDefinition` drops) they get no tool, like any other server Actor.
  * An MCP-server Actor does not get `input` even with a non-empty input schema: Store data shows that
  * interface is unused on such Actors.
  * The input schema counts as empty when the definition has no `input`, `input.properties` is missing,
@@ -37,13 +42,20 @@ export function resolveActorInterfaces({ actor, definition, webServerMcpPath }: 
     return { input: hasInputProperties && !mcp, mcp, server: definition.hasWebServerSchema };
 }
 
-/** The tool slot column of the table on {@link resolveActorInterfaces}: MCP tools, else a run tool, else none. */
+/** The own-tool column of the table on {@link resolveActorInterfaces}. */
 export function resolveActorToolMode(actorInfo: ActorInfo): ACTOR_TOOL_MODE {
-    return getActorToolModeFromInterfaces(resolveActorInterfaces(actorInfo));
+    const interfaces = resolveActorInterfaces(actorInfo);
+    if (interfaces.server && !INPUT_INTERFACE_ACTORS.has(actorInfo.definition.actorFullName)) {
+        return ACTOR_TOOL_MODE.SERVER;
+    }
+    return getActorToolModeFromInterfaces(interfaces);
 }
 
-/** {@link resolveActorToolMode} for an interface set the caller already resolved. */
-export function getActorToolModeFromInterfaces({ input, mcp }: ActorInterfaces): ACTOR_TOOL_MODE {
+/** The `call-actor` column of the table on {@link resolveActorInterfaces}: MCP tools, else a run, else none. */
+export function getActorToolModeFromInterfaces({
+    input,
+    mcp,
+}: ActorInterfaces): Exclude<ACTOR_TOOL_MODE, typeof ACTOR_TOOL_MODE.SERVER> {
     if (mcp) return ACTOR_TOOL_MODE.MCP;
     if (input) return ACTOR_TOOL_MODE.RUN;
     return ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP;

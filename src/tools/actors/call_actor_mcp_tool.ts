@@ -180,6 +180,7 @@ export const callActorMcpTool: ToolEntry = Object.freeze({
     ajvValidate: compileSchema(z.toJSONSchema(callActorMcpToolArgs)),
     // A third-party payment provider cannot pay for a Server Actor run, so such a session is rejected before the call.
     hasPaymentProviderStandbyCheck: true,
+    actorInterface: 'mcp',
     annotations: {
         title: 'Call Actor MCP tool',
         readOnlyHint: false,

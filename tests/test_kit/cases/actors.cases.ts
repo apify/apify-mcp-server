@@ -1195,6 +1195,49 @@ export const actorsCases: Case[] = [
         }),
     },
     {
+        name: 'serves a selected Server Actor as one tool that sends a request to its server interface',
+        isDeploymentTest: false,
+        run: withClient({ tools: [ACTOR_SERVER_ACTOR_TEST] }, async (client) => {
+            const toolName = actorNameToToolName(ACTOR_SERVER_ACTOR_TEST);
+            const { tools } = await client.listTools();
+            const tool = tools.find((entry) => entry.name === toolName);
+            const properties = (tool?.inputSchema.properties ?? {}) as Record<string, { enum?: string[] }>;
+            expect(Object.keys(properties)).toEqual(['method', 'path', 'query', 'body']);
+            expect(properties.method.enum).toEqual(expect.arrayContaining(['GET', 'POST']));
+            // The full rendering is over 4,096 characters, so the description lists one line per operation.
+            expect(tool?.description).toContain(
+                '- POST /add [asText:boolean] {firstNumber:integer required, secondNumber:integer required}: Add two numbers (JSON body).',
+            );
+            expect(tool?.description?.length).toBeLessThanOrEqual(4096);
+            // The session has no fetch-actor-details, so the description names none.
+            expect(tool?.description).not.toContain('fetch-actor-details');
+
+            const result = await client.callTool({
+                name: toolName,
+                arguments: { method: 'GET', path: '/add', query: { firstNumber: 2, secondNumber: 3 } },
+            });
+
+            expect(result.isError).not.toBe(true);
+            validateStructuredOutput(result, tool?.outputSchema, toolName);
+            const sc = (result as { structuredContent?: ServerActorRequestContent }).structuredContent;
+            expect(sc).toMatchObject({ status: 200, interface: 'server', method: 'GET' });
+            expect(JSON.parse(sc!.body)).toMatchObject({ sum: 5 });
+        }),
+    },
+    {
+        name: 'runs a selected Server Actor from its input with call-actor',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['actors', ACTOR_SERVER_ACTOR_TEST] }, async (client) => {
+            const result = await client.callTool({
+                name: 'call-actor',
+                arguments: { actor: ACTOR_SERVER_ACTOR_TEST, input: { firstNumber: 2, secondNumber: 3 } },
+            });
+
+            expect(result.isError).not.toBe(true);
+            expect((result as { structuredContent?: { runId?: string } }).structuredContent?.runId).toBeTruthy();
+        }),
+    },
+    {
         name: 'summarizes a Server Actor interface and navigates it with fetch-actor-details',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {

@@ -43,7 +43,8 @@ Two MCP protocol revisions are served, each by its own adapter:
   origin, for `getActorMCPServerURL()` and `send-server-actor-request`.
 - `utils.ts` — `processParamsGetTools()`: turns `?actors=` URL params into tools.
 - `tool_call_error_mapper.ts` — shared tool-call error classification.
-- `tool_dispatch.ts` — neutral dispatch for internal, Actor MCP, and Actor tools.
+- `tool_dispatch.ts` — neutral dispatch for internal, Actor MCP, Actor, and Actor server tools (the last run their
+  `call`, as internal tools do).
 - `tool_call_telemetry.ts` — shared tool-call telemetry preparation and logging.
 - `task_execution.ts` — legacy long-running task execution and status notifications. `tasks/cancel`
   reaches the Actor run through `createTaskCancellationWatcher` (`utils.ts`), which polls the
