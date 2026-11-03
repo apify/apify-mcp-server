@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.20.2 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Compile untrusted schemas on a fresh Ajv instance and cache validators by content ([#1786](https://github.com/apify/apify-mcp-server/pull/1786)) ([ce708a0](https://github.com/apify/apify-mcp-server/commit/ce708a01f3f0b9cef322f8a01274f37bf8e41757)) by [@jirispilka](https://github.com/jirispilka), closes [#905](https://github.com/apify/apify-mcp-server/issues/905)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.20.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.20.1) (2026-11-03)
 
 ### 🚀 Features
