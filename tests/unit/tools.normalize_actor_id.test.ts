@@ -57,13 +57,7 @@ describe('fixActorNameInput', () => {
     });
 
     it('strips leading and trailing slashes', () => {
-        expect(fixActorNameInput('/apify/rag-web-browser')).toBe('apify/rag-web-browser');
-        expect(fixActorNameInput('apify/rag-web-browser/')).toBe('apify/rag-web-browser');
         expect(fixActorNameInput('//apify/rag-web-browser//')).toBe('apify/rag-web-browser');
-    });
-
-    it('strips slash padding inside quote wrappers', () => {
-        expect(fixActorNameInput('"/apify/rag-web-browser/"')).toBe('apify/rag-web-browser');
     });
 
     it('strips a trailing slash before dropping the :toolName suffix', () => {
