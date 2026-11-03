@@ -521,18 +521,11 @@ describe('the default apify/web-fetch tool', () => {
         const args: Record<string, unknown> = { query: { url: 'https://example.com' } };
 
         expect(tool.inputSchema.properties).toMatchObject({ method: { enum: ['GET'] }, path: { default: '/' } });
+        // The description lists no operation to point the path at.
+        expect(JSON.stringify(tool.inputSchema)).not.toContain('listed in the description');
         expect(tool.inputSchema.properties).not.toHaveProperty('body');
         expect(tool.ajvValidate(args)).toBe(true);
         expect(args).toMatchObject({ method: 'GET', path: '/' });
-    });
-
-    it('renders only the GET / operation, without the unwrap parameter', async () => {
-        const tool = await loadWebFetchTool();
-
-        expect(tool.description).toContain('{"operations":[{"method":"GET","path":"/"');
-        expect(tool.description).toContain('"name":"formats"');
-        expect(tool.description).not.toContain('"method":"POST"');
-        expect(tool.description).not.toContain('"name":"unwrap"');
     });
 
     it('requires the query and its url', async () => {
@@ -619,21 +612,20 @@ describe('the default apify/web-fetch tool', () => {
         expect(nextStep).not.toContain('POST /');
     });
 
-    it('carries GET / in full within the client description limit, with the live schema and Actor description', async () => {
+    // The live schema offers POST, composes formats with unwrap and types formats as an array; the tool takes none
+    // of these, and its own text and input schema already cover every field.
+    it('lists no operation from the Actor API schema', async () => {
         const tool = await loadServerTool(WEB_FETCH_LIVE_SCHEMA, {
             username,
             name,
-            description:
-                'Download any web page by URL and convert it to clean Markdown, plain text, HTML, and other formats. ' +
-                'Automatically renders JavaScript and works around bot blocking. The Actor provides a real-time API ' +
-                'for quick response times.',
             actorStandby: { isEnabled: true, tenancy: 'MULTI_TENANT' },
         });
 
-        expect(tool.description).toContain('Operations:\n```json\n{"operations":[{"method":"GET","path":"/"');
-        expect(tool.description).toContain('"name":"wait"');
         expect(tool.description).toContain('Example: {"query":{"url":"https://example.com","formats":"markdown"}}');
-        expect(tool.description!.length).toBeLessThanOrEqual(CLIENT_DESCRIPTION_MAX_LENGTH);
+        expect(tool.description).not.toContain('Operations:');
+        expect(tool.description).not.toContain('POST');
+        expect(tool.description).not.toContain('unwrap');
+        expect(tool.description).not.toContain('array');
     });
 
     it('keeps the read-only hint of the Actor', async () => {

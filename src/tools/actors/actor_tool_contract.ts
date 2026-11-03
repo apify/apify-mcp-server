@@ -1,5 +1,8 @@
+import { z } from 'zod';
+
 import { RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../const.js';
 import type { ActorInputSchema, ToolDescriptionContext } from '../../types.js';
+import type { ApiMethod } from '../api/apify_api_spec.js';
 
 const RAG_WEB_BROWSER_ADDITIONAL_DESC = `Use this tool for generic web content: it searches the web by query and returns the text of the top results.
 This tool scrapes the data itself - it does NOT just find tools.
@@ -47,9 +50,42 @@ type DirectActorPolicyConfig = {
     deniedInputsReason?: string;
 };
 
+/**
+ * The `GET /` query of the default `apify/web-fetch` tool (#1647). A free record let agents write `query` as a bare
+ * URL; named fields show that `url` goes inside it. `formats` and `headers` are strings, as the query encodes them.
+ * Other keys stay allowed as scalars, as in the generic record: `additionalProperties: false` would make AJV's
+ * `removeAdditional` drop `unwrap` silently instead of letting the tool refuse it.
+ */
+const webFetchQuery = z
+    .object({
+        url: z.string().describe('The URL to fetch.'),
+        formats: z.string().optional().describe('Comma-separated, e.g. "markdown,links".'),
+        headers: z.string().optional().describe('A JSON object as a string.'),
+        wait: z.number().int().min(1).max(60000).optional().describe('Milliseconds to wait after the page loads.'),
+    })
+    .catchall(z.union([z.string(), z.number(), z.boolean()]))
+    .describe('Query parameters of GET /.');
+
+/**
+ * A Server Actor tool that sends one operation of the Actor API schema. Its description lists no operation from the
+ * schema, whose text can contradict the tool, so `buildDescription` covers every input.
+ */
+type ServerOperationPolicyConfig = {
+    method: ApiMethod;
+    path: string;
+    /** The tool's `query`, in place of the generic record of scalars. */
+    query: z.ZodType;
+    /** Refused by the tool when sent, in the query or in the query string of the path, before the request. */
+    refusedQueryParameter: string;
+    /** Why, after `"<name>" is not accepted by this tool.` */
+    refusedQueryParameterReason: string;
+};
+
 type ActorToolPolicyConfig = {
     /** Direct tools only; `call-actor` and the widgets keep the Actor's own contract. */
     directInput?: DirectActorPolicyConfig;
+    /** Server Actor tools only. */
+    serverOperation?: ServerOperationPolicyConfig;
     /** Only these inputs are served; the others are hidden but still accepted and passed to the run. */
     exposedInputs?: readonly string[];
     buildDescription?: (context: ToolDescriptionContext) => string;
@@ -70,6 +106,14 @@ const ACTOR_TOOL_POLICIES: Readonly<Record<string, ActorToolPolicyConfig>> = {
         buildDescription: () => RAG_WEB_BROWSER_ADDITIONAL_DESC,
     },
     [WEB_FETCH]: {
+        // `unwrap` replaces the JSON response with the content alone, which can be binary (#1647).
+        serverOperation: {
+            method: 'GET',
+            path: '/',
+            query: webFetchQuery,
+            refusedQueryParameter: 'unwrap',
+            refusedQueryParameterReason: 'The response is a JSON object with a field for each requested format.',
+        },
         buildDescription: () => WEB_FETCH_ADDITIONAL_DESC,
     },
     [WEB_SEARCH]: {

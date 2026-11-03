@@ -10,7 +10,6 @@ import {
     MAX_INLINE_BYTES,
     OFFICIAL_ACTORS_WITH_SIDE_EFFECTS,
     OFFICIAL_APIFY_USERNAMES,
-    WEB_FETCH,
 } from '../../const.js';
 import { ActorLoadError } from '../../errors.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
@@ -55,11 +54,7 @@ import {
     executeSendServerActorRequest,
     redactServerActorRequestArgs,
 } from './send_server_actor_request.js';
-import {
-    buildServerActorToolDescription,
-    formatTenancyBilling,
-    WEB_FETCH_REFUSED_QUERY_PARAMETER,
-} from './server_interface_details.js';
+import { buildServerActorToolDescription, formatTenancyBilling } from './server_interface_details.js';
 
 /**
  * MCP-only opt-in injected next to the Actor's own input fields. Same contract as `call-actor`'s
@@ -262,17 +257,21 @@ export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
             tenancy: resolveActorTenancy(actor),
             idleTimeoutSecs: actor.actorStandby?.idleTimeoutSecs,
         });
+        const policy = getActorToolPolicy(actorFullName);
         const buildDescription = (context: ToolDescriptionContext): string => {
             const { hasTool } = context;
-            const policyDescription = getActorToolPolicy(actorFullName)?.buildDescription?.(context);
+            const policyDescription = policy?.buildDescription?.(context);
             const head = `This tool sends one HTTP request to the server interface of the Actor "${actorFullName}" and returns the response.
 ${hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_SERVER_REQUEST}" if user requests this specific Actor.\n` : ''}Actor description: ${definition.description}
 ${billing}
 The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text; other content types, and bodies over ${MAX_INLINE_BYTES} bytes, are not returned.
-${policyDescription ? `\n${policyDescription}\n` : ''}
-Operations:
-`;
-            return buildServerActorToolDescription(head, toolInfo, hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS));
+${policyDescription ? `\n${policyDescription}\n` : ''}`;
+            if (policy?.serverOperation) return head.trimEnd();
+            return buildServerActorToolDescription(
+                `${head}\nOperations:\n`,
+                toolInfo,
+                hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS),
+            );
         };
         tools.push({
             type: TOOL_TYPE.ACTOR_SERVER,
@@ -296,20 +295,20 @@ Operations:
             // (auto mode before initialize, `processParamsGetTools`) is still rejected here before any request.
             hasPaymentProviderStandbyCheck: true,
             call: async (toolArgs) => {
-                const { path, query } = toolArgs.args;
-                // `path` is a plain string, and a query string written into it is sent too. The base only parses it.
-                const pathQuery =
-                    typeof path === 'string' && URL.canParse(path, 'http://localhost')
-                        ? new URL(path, 'http://localhost').searchParams
-                        : undefined;
-                const isUnwrapSent =
-                    (isRecord(query) && WEB_FETCH_REFUSED_QUERY_PARAMETER in query) ||
-                    pathQuery?.has(WEB_FETCH_REFUSED_QUERY_PARAMETER) === true;
-                if (actorFullName === WEB_FETCH && isUnwrapSent) {
-                    return respondUserError(
-                        `"${WEB_FETCH_REFUSED_QUERY_PARAMETER}" is not accepted by this tool. The response is a JSON ` +
-                            'object with a field for each requested format.',
-                    );
+                const serverOperation = policy?.serverOperation;
+                if (serverOperation) {
+                    const { path, query } = toolArgs.args;
+                    const name = serverOperation.refusedQueryParameter;
+                    // `path` is a plain string, and a query string written into it is sent too. The base only parses it.
+                    const pathQuery =
+                        typeof path === 'string' && URL.canParse(path, 'http://localhost')
+                            ? new URL(path, 'http://localhost').searchParams
+                            : undefined;
+                    if ((isRecord(query) && name in query) || pathQuery?.has(name) === true) {
+                        return respondUserError(
+                            `"${name}" is not accepted by this tool. ${serverOperation.refusedQueryParameterReason}`,
+                        );
+                    }
                 }
                 return executeSendServerActorRequest(
                     { ...toolArgs, args: { ...toolArgs.args, actor: actorFullName } },

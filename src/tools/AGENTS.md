@@ -29,8 +29,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     (`getServerActorsAsTools`, type `actor-server`): `send-server-actor-request`'s execution and output with the
     Actor fixed, `method` narrowed to the documented ones, `path` a plain string (no enum: a schema can document
     thousands of paths), and the operations in the description; an Actor with a server interface and no
-    `webServerToolInfo` is reported as `load-failed`; the default `apify/web-fetch` tool is the one hardcoded
-    exception: only `GET /`, without `unwrap`, which its call refuses), the direct actor-tool executor
+    `webServerToolInfo` is reported as `load-failed`; a `serverOperation` policy (`actor_tool_contract.ts`, the
+    default `apify/web-fetch` tool) fixes the one operation, its query schema and a refused query parameter, and its
+    description lists no operation from the schema), the direct actor-tool executor
     (`actor_executor.ts`),
     `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`, and resolves the build
     the server-interface fields — `webServerMcpPath`, `webServerSchema` — are read from when standby is on,
@@ -66,7 +67,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `fetch-actor-details` never connects to an MCP server),
     `actor_tool_contract.ts` (Actor-specific presentation policies plus direct-tool input restrictions
     and defaults, shared by schema generation, the call engine's denied-input check and execution;
-    generic calls skip direct-only restrictions and defaults), and
+    generic calls skip direct-only restrictions and defaults; a Server Actor tool's fixed operation), and
     `actor_run_response.ts` —
     the one canonical run shape `call-actor` and `get-actor-run` share across sync, task
     and wait-timeout modes: storage IDs plus a `summary` (past) / `nextStep` (one primary
