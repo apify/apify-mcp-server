@@ -882,6 +882,7 @@ describe("a selected Server Actor's own tool", () => {
             hasRequestBody: true,
             operationLines: [],
             operationCount: 1,
+            documentedOperations: ['POST /echo'],
             detailsHint: '',
             listHint: '',
         };

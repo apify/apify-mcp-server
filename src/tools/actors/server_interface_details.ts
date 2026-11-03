@@ -21,6 +21,7 @@ import {
     buildServerOperationIndex,
     findServerOperation,
     formatOperationName,
+    listDocumentedOperations,
     listOperationInputs,
     listServerOperations,
     resolveRef,
@@ -375,6 +376,7 @@ export function buildServerActorToolInfo(schema: unknown, actorFullName: string)
         ...(full !== undefined && full.length <= CLIENT_DESCRIPTION_MAX_LENGTH && { fullOperations: full }),
         operationLines,
         operationCount: operations.length,
+        documentedOperations: listDocumentedOperations(schema, operations),
         detailsHint: `${formatDetailsCall(actorFullName, formatOperationName(operations[0]))} returns one operation in full.`,
         listHint: `${formatDetailsCall(actorFullName, true)} lists every operation.`,
     };

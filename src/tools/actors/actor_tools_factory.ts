@@ -311,7 +311,10 @@ Operations:
                             'object with a field for each requested format.',
                     );
                 }
-                return executeSendServerActorRequest({ ...toolArgs, args: { ...toolArgs.args, actor: actorFullName } });
+                return executeSendServerActorRequest(
+                    { ...toolArgs, args: { ...toolArgs.args, actor: actorFullName } },
+                    { operations: toolInfo.documentedOperations },
+                );
             },
         });
     }

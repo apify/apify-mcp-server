@@ -432,10 +432,16 @@ function buildIncompleteResponse(
     );
 }
 
-/** `timeoutMillis` shortens the deadline in local tests; production keeps `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`. */
+/**
+ * `timeoutMillis` shortens the deadline in local tests; production keeps `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`.
+ * `operations` replaces the definition's `webServerOperations` in the recovery text, for a tool that serves fewer.
+ */
 export async function executeSendServerActorRequest(
     toolArgs: InternalToolArgs,
-    { timeoutMillis = EXTERNAL_TOOL_CALL_TIMEOUT_MSEC }: { timeoutMillis?: number } = {},
+    {
+        timeoutMillis = EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
+        operations,
+    }: { timeoutMillis?: number; operations?: readonly string[] } = {},
 ): Promise<ToolResponse> {
     const { apifyToken, apifyClient, mcpSessionId, loadedToolNames, signal } = toolArgs;
     const args = sendServerActorRequestArgs.parse(toolArgs.args);
@@ -502,7 +508,7 @@ export async function executeSendServerActorRequest(
             buildResponse(request, response, {
                 apifyToken,
                 loadedToolNames,
-                operations: definition.webServerOperations,
+                operations: operations ?? definition.webServerOperations,
             }),
             response.status,
         );

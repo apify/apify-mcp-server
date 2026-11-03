@@ -103,6 +103,8 @@ export type ServerActorToolInfo = {
     /** One line per operation, the first ones that can fit the description limit. */
     operationLines: string[];
     operationCount: number;
+    /** The tool's operations with their required inputs, as `webServerOperations` lists them, for request recovery text. */
+    documentedOperations: string[];
     /** How `fetch-actor-details` returns one operation in full, for a description that lists every line. */
     detailsHint: string;
     /** How `fetch-actor-details` lists every operation, for a description that cuts the lines. */

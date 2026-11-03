@@ -120,8 +120,11 @@ export function buildServerOperationIndex(operations: ServerOperation[], schema:
     }));
 }
 
-export function listDocumentedOperations(schema: unknown): string[] {
-    return buildServerOperationIndex(listServerOperations(schema), schema).map((entry) => {
+export function listDocumentedOperations(
+    schema: unknown,
+    operations: ServerOperation[] = listServerOperations(schema),
+): string[] {
+    return buildServerOperationIndex(operations, schema).map((entry) => {
         const name = formatOperationName(entry);
         return entry.requiredInputs.length > 0 ? `${name} (required: ${entry.requiredInputs.join(', ')})` : name;
     });

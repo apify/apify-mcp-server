@@ -1,3 +1,5 @@
+import { Readable } from 'node:stream';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
@@ -381,6 +383,7 @@ describe('the length of a Server Actor tool description', () => {
         hasRequestBody: false,
         fullOperations: 'f'.repeat(fullLength),
         operationLines: LINES,
+        documentedOperations: [],
         operationCount: LINES.length,
         detailsHint: HINT,
         listHint: LIST_HINT,
@@ -586,6 +589,34 @@ describe('the default apify/web-fetch tool', () => {
         expect(result.isError).toBe(true);
         expect(textOf(result.content[0])).toContain('"unwrap" is not accepted by this tool');
         expect(request).not.toHaveBeenCalled();
+    });
+
+    // The schema also documents POST /, which this tool cannot send.
+    it('lists only GET / in the recovery text of a rejected request', async () => {
+        const tool = await loadWebFetchTool();
+        if (tool.type !== TOOL_TYPE.ACTOR_SERVER) throw new Error('Expected a server tool');
+        const request = vi.fn().mockResolvedValue({
+            status: 400,
+            headers: { 'content-type': 'application/json' },
+            data: Readable.from([Buffer.from('{"error":"url: Required"}')]),
+        });
+        const { apifyClient: buildClient } = mockActorBuildClient({
+            actor: mockActor({
+                username,
+                name,
+                actorStandby: { isEnabled: true, tenancy: 'MULTI_TENANT' },
+                standbyUrl: 'https://apify--web-fetch.apify.actor',
+            }),
+            defaultBuild: mockDefaultBuild({ webServerMcpPath: undefined, webServerSchema: WEB_FETCH_SCHEMA }),
+        });
+        const apifyClient = mockApifyClient({ ...buildClient, httpClient: { axios: { request } } });
+        const args = { method: 'GET', path: '/', query: { url: 'https://example.com' } };
+
+        const result = (await tool.call(stubToolCallContext(args, apifyClient))) as TextToolResult;
+        const { nextStep } = result.structuredContent as { nextStep: string };
+
+        expect(nextStep).toContain('Documented operations: GET / (required: url).');
+        expect(nextStep).not.toContain('POST /');
     });
 
     it('carries GET / in full within the client description limit, with the live schema and Actor description', async () => {
