@@ -205,6 +205,7 @@ describe('the input schema of a Server Actor tool', () => {
 describe('the length of a Server Actor tool description', () => {
     const HEAD = 'Operations:\n';
     const HINT = 'fetch-actor-details returns one operation in full.';
+    const LIST_HINT = 'fetch-actor-details lists every operation.';
     const LINES = ['- GET /a: A.', '- GET /b: B.', '- GET /c: C.'];
     const infoWith = (fullLength: number, overrides: Partial<ServerActorToolInfo> = {}): ServerActorToolInfo => ({
         methods: ['GET'],
@@ -213,44 +214,45 @@ describe('the length of a Server Actor tool description', () => {
         operationLines: LINES,
         operationCount: LINES.length,
         detailsHint: HINT,
+        listHint: LIST_HINT,
         ...overrides,
     });
 
     it('carries every operation in full when the whole description is at the limit', () => {
         const info = infoWith(CLIENT_DESCRIPTION_MAX_LENGTH - HEAD.length);
 
-        expect(buildServerActorToolDescription(HEAD, info, HINT)).toBe(`${HEAD}${info.fullOperations}`);
+        expect(buildServerActorToolDescription(HEAD, info, true)).toBe(`${HEAD}${info.fullOperations}`);
     });
 
-    it('lists one line per operation, then the hint, when the full description would be one character over', () => {
+    it('lists one line per operation, then how to get one in full, when the full description would be one character over', () => {
         const info = infoWith(CLIENT_DESCRIPTION_MAX_LENGTH - HEAD.length + 1);
 
-        expect(buildServerActorToolDescription(HEAD, info, HINT)).toBe(`${HEAD}${LINES.join('\n')}\n${HINT}`);
+        expect(buildServerActorToolDescription(HEAD, info, true)).toBe(`${HEAD}${LINES.join('\n')}\n${HINT}`);
     });
 
-    it('cuts the lines at the limit and counts the operations left out', () => {
+    it('cuts the lines at the limit, counts the operations left out and points at the list of them all', () => {
         const kept = `${LINES[0]}\n… and 2 more`;
         // Room for exactly one line, its newline and the cut line.
-        const head = 'h'.repeat(CLIENT_DESCRIPTION_MAX_LENGTH - kept.length - `\n${HINT}`.length);
+        const head = 'h'.repeat(CLIENT_DESCRIPTION_MAX_LENGTH - kept.length - `\n${LIST_HINT}`.length);
 
-        const description = buildServerActorToolDescription(head, infoWith(CLIENT_DESCRIPTION_MAX_LENGTH), HINT);
+        const description = buildServerActorToolDescription(head, infoWith(CLIENT_DESCRIPTION_MAX_LENGTH), true);
 
-        expect(description).toBe(`${head}${kept}\n${HINT}`);
+        expect(description).toBe(`${head}${kept}\n${LIST_HINT}`);
         expect(description.length).toBe(CLIENT_DESCRIPTION_MAX_LENGTH);
     });
 
     it('leaves out a line that is one character over the limit, its newline included', () => {
-        const head = 'h'.repeat(CLIENT_DESCRIPTION_MAX_LENGTH - `${LINES[0]}\n… and 2 more\n${HINT}`.length + 1);
+        const head = 'h'.repeat(CLIENT_DESCRIPTION_MAX_LENGTH - `${LINES[0]}\n… and 2 more\n${LIST_HINT}`.length + 1);
 
-        const description = buildServerActorToolDescription(head, infoWith(CLIENT_DESCRIPTION_MAX_LENGTH), HINT);
+        const description = buildServerActorToolDescription(head, infoWith(CLIENT_DESCRIPTION_MAX_LENGTH), true);
 
-        expect(description).toBe(`${head}… and 3 more\n${HINT}`);
+        expect(description).toBe(`${head}… and 3 more\n${LIST_HINT}`);
     });
 
     it('keeps the count of all operations when the fixed text alone exceeds the limit', () => {
         const head = 'h'.repeat(CLIENT_DESCRIPTION_MAX_LENGTH);
 
-        expect(buildServerActorToolDescription(head, infoWith(1), undefined)).toBe(`${head}… and 3 more`);
+        expect(buildServerActorToolDescription(head, infoWith(1), false)).toBe(`${head}… and 3 more`);
     });
 });
 
@@ -277,6 +279,15 @@ describe('the operations in a Server Actor tool description', () => {
             `${lines}\n${HELPER_TOOLS.ACTOR_GET_DETAILS} with {"actor":"acme/server-actor-${actorCount}","output":{"serverInterface":"GET /add"}} returns one operation in full.`,
         );
         expect(tool.buildDescription?.(only()).endsWith(lines)).toBe(true);
+    });
+
+    it('point at the list of every operation when the lines are cut', async () => {
+        const paths = Object.fromEntries(Array.from({ length: 1000 }, (_, i) => [`/path-${i}`, { get: {} }]));
+        const tool = await loadServerTool({ paths });
+
+        expect(tool.buildDescription?.(only(HELPER_TOOLS.ACTOR_GET_DETAILS))).toMatch(
+            new RegExp(`… and \\d+ more\n${HELPER_TOOLS.ACTOR_GET_DETAILS} with .*"serverInterface":true}} lists every operation\\.$`),
+        );
     });
 
     // The tool has no body argument for it, and it sends only JSON.

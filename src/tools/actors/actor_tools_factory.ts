@@ -262,8 +262,7 @@ The request is sent once, with no retries and without following redirects. A JSO
 
 Operations:
 `;
-            const detailsHint = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? toolInfo.detailsHint : undefined;
-            return buildServerActorToolDescription(head, toolInfo, detailsHint);
+            return buildServerActorToolDescription(head, toolInfo, hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS));
         };
         tools.push({
             type: TOOL_TYPE.ACTOR_SERVER,

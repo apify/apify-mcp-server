@@ -353,22 +353,26 @@ export function buildServerActorToolInfo(schema: unknown, actorFullName: string)
         operationLines,
         operationCount: operations.length,
         detailsHint: `${formatDetailsCall(actorFullName, formatOperationName(operations[0]))} returns one operation in full.`,
+        listHint: `${formatDetailsCall(actorFullName, true)} lists every operation.`,
     };
 }
 
 /**
  * A selected Server Actor's tool description, `head` followed by its operations, within
  * `CLIENT_DESCRIPTION_MAX_LENGTH`: every operation in full when the whole description fits, otherwise one line per
- * operation, cut with `… and N more`, then `detailsHint`.
+ * operation, then `detailsHint`; when not every line fits, the lines that do, `… and N more`, then `listHint`. The
+ * hints name `fetch-actor-details`, so they need `hasDetailsTool`.
  */
 export function buildServerActorToolDescription(
     head: string,
-    { fullOperations, operationLines, operationCount }: ServerActorToolInfo,
-    detailsHint: string | undefined,
+    { fullOperations, operationLines, operationCount, detailsHint, listHint }: ServerActorToolInfo,
+    hasDetailsTool: boolean,
 ): string {
     const full = fullOperations && `${head}${fullOperations}`;
     if (full && full.length <= CLIENT_DESCRIPTION_MAX_LENGTH) return full;
-    const tail = detailsHint ? `\n${detailsHint}` : '';
+    const lines = `${head}${operationLines.join('\n')}${hasDetailsTool ? `\n${detailsHint}` : ''}`;
+    if (operationLines.length === operationCount && lines.length <= CLIENT_DESCRIPTION_MAX_LENGTH) return lines;
+    const tail = hasDetailsTool ? `\n${listHint}` : '';
     const room = CLIENT_DESCRIPTION_MAX_LENGTH - head.length - tail.length;
     return `${head}${cutOperationLines(operationLines, operationCount, room)}${tail}`;
 }

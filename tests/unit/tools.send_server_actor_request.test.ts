@@ -883,6 +883,7 @@ describe("a selected Server Actor's own tool", () => {
             operationLines: [],
             operationCount: 1,
             detailsHint: '',
+            listHint: '',
         };
         const [tool] = getServerActorsAsTools([
             { definition: { ...cached.definition, webServerToolInfo }, actor: cached.info, webServerMcpPath: null },
