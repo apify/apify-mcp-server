@@ -9,7 +9,7 @@ import {
     buildServerActorToolDescription,
     buildServerActorToolInfo,
     CLIENT_DESCRIPTION_MAX_LENGTH,
-} from '../../src/tools/actors/server_interface_schema.js';
+} from '../../src/tools/actors/server_interface_details.js';
 import { serverActorRequestOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { Actor, ServerActorToolInfo, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
