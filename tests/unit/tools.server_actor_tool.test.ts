@@ -281,6 +281,14 @@ describe('the operations in a Server Actor tool description', () => {
         expect(tool.buildDescription?.(only()).endsWith(lines)).toBe(true);
     });
 
+    it('prefer this tool over send-server-actor-request only when the session has it', async () => {
+        const tool = await loadServerTool(SCHEMA);
+        const instead = `Use this tool instead of the "${HELPER_TOOLS.ACTOR_SERVER_REQUEST}"`;
+
+        expect(tool.buildDescription?.(only(HELPER_TOOLS.ACTOR_SERVER_REQUEST))).toContain(instead);
+        expect(tool.buildDescription?.(only())).not.toContain(instead);
+    });
+
     it('point at the list of every operation when the lines are cut', async () => {
         const paths = Object.fromEntries(Array.from({ length: 1000 }, (_, i) => [`/path-${i}`, { get: {} }]));
         const tool = await loadServerTool({ paths });
