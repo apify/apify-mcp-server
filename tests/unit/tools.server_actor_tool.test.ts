@@ -558,7 +558,11 @@ describe('the default apify/web-fetch tool', () => {
         expect(tool.description).toContain('a non-http(s) scheme such as ftp:');
     });
 
-    it('rejects unwrap before sending the request', async () => {
+    // `path` is a plain string, so a query string written into it reaches the Actor too.
+    it.each([
+        ['in the query', { query: { url: 'https://example.com', unwrap: true } }],
+        ['in the query string of the path', { path: '/?unwrap=true', query: { url: 'https://example.com' } }],
+    ])('rejects unwrap %s before sending the request', async (_where, args) => {
         const tool = await loadWebFetchTool();
         if (tool.type !== TOOL_TYPE.ACTOR_SERVER) throw new Error('Expected a server tool');
         // The web-fetch Actor itself, so the call would reach its server without the refusal. Every request to the
@@ -574,7 +578,6 @@ describe('the default apify/web-fetch tool', () => {
             defaultBuild: mockDefaultBuild({ webServerMcpPath: undefined, webServerSchema: WEB_FETCH_SCHEMA }),
         });
         const apifyClient = mockApifyClient({ ...buildClient, httpClient: { axios: { request } } });
-        const args = { query: { url: 'https://example.com', unwrap: true } };
 
         // Validation keeps unwrap, so the tool refuses it instead of the validator dropping it.
         expect(tool.ajvValidate(args)).toBe(true);

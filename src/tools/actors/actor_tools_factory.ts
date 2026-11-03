@@ -296,8 +296,16 @@ Operations:
             // (auto mode before initialize, `processParamsGetTools`) is still rejected here before any request.
             hasPaymentProviderStandbyCheck: true,
             call: async (toolArgs) => {
-                const { query } = toolArgs.args;
-                if (actorFullName === WEB_FETCH && isRecord(query) && WEB_FETCH_REFUSED_QUERY_PARAMETER in query) {
+                const { path, query } = toolArgs.args;
+                // `path` is a plain string, and a query string written into it is sent too. The base only parses it.
+                const pathQuery =
+                    typeof path === 'string' && URL.canParse(path, 'http://localhost')
+                        ? new URL(path, 'http://localhost').searchParams
+                        : undefined;
+                const isUnwrapSent =
+                    (isRecord(query) && WEB_FETCH_REFUSED_QUERY_PARAMETER in query) ||
+                    pathQuery?.has(WEB_FETCH_REFUSED_QUERY_PARAMETER) === true;
+                if (actorFullName === WEB_FETCH && isUnwrapSent) {
                     return respondUserError(
                         `"${WEB_FETCH_REFUSED_QUERY_PARAMETER}" is not accepted by this tool. The response is a JSON ` +
                             'object with a field for each requested format.',
