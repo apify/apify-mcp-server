@@ -165,31 +165,44 @@ export function buildStorageListSummaryNextStep(params: {
 /**
  * Pagination-aware {summary, nextStep}: when more items remain, point at the next page;
  * otherwise point at get-dataset for the field list (structure lives there, not in a heavy schema dump).
+ * An offset past the last item and a `fields` projection that returns only empty items are described instead.
  */
 export function buildDatasetItemsSummaryNextStep(params: {
     datasetId: string;
     itemCount: number;
     totalItemCount: number;
     offset: number;
+    fields: readonly string[];
+    hasOnlyEmptyItems: boolean;
     /** Active loaded tool set; gates the terminal get-dataset reference (see #1007). */
     loadedToolNames: readonly string[];
 }): { summary: string; nextStep: string } {
-    const { datasetId, itemCount, totalItemCount, offset, loadedToolNames } = params;
-    if (offset + itemCount < totalItemCount) {
+    const { datasetId, itemCount, totalItemCount, offset, fields, hasOnlyEmptyItems, loadedToolNames } = params;
+    if (totalItemCount > 0 && offset >= totalItemCount) {
         return {
-            summary: `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}).`,
-            nextStep: `Call ${HELPER_TOOLS.DATASET_GET_ITEMS} again with offset=${offset + itemCount} to fetch the next page.`,
+            summary:
+                `Offset ${offset} is past the last item: the dataset has ${totalItemCount} ` +
+                `${totalItemCount === 1 ? 'item' : 'items'} (offsets 0 to ${totalItemCount - 1}).`,
+            nextStep: `${HELPER_TOOLS.DATASET_GET_ITEMS} with offset=0 returns the first page.`,
         };
     }
-    const summary =
-        offset === 0 && itemCount === totalItemCount
-            ? `Fetched all ${itemCount} items.`
-            : `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}); no more pages.`;
-    return {
-        summary,
-        nextStep: suggestTool(HELPER_TOOLS.DATASET_GET, loadedToolNames)
+    let summary = `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}).`;
+    let nextStep = `Call ${HELPER_TOOLS.DATASET_GET_ITEMS} again with offset=${offset + itemCount} to fetch the next page.`;
+    if (offset + itemCount >= totalItemCount) {
+        summary =
+            offset === 0 && itemCount === totalItemCount
+                ? `Fetched all ${itemCount} items.`
+                : `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}); no more pages.`;
+        nextStep = suggestTool(HELPER_TOOLS.DATASET_GET, loadedToolNames)
             ? `Use ${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} to see the field list if you need the data structure.`
-            : `No more pages. Inspect the returned items directly.`,
+            : `No more pages. Inspect the returned items directly.`;
+    }
+    if (fields.length === 0 || itemCount === 0 || !hasOnlyEmptyItems) return { summary, nextStep };
+    return {
+        summary: `${summary} None of them has the requested fields (${fields.join(', ')}).`,
+        nextStep: suggestTool(HELPER_TOOLS.DATASET_GET, loadedToolNames)
+            ? `${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} lists the dataset's fields.`
+            : 'An item read without `fields` shows its field names.',
     };
 }
 

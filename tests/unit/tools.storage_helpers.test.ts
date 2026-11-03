@@ -21,6 +21,8 @@ describe('buildDatasetItemsSummaryNextStep()', () => {
             itemCount: 5,
             totalItemCount: 5,
             offset: 0,
+            fields: [],
+            hasOnlyEmptyItems: false,
             loadedToolNames: [HELPER_TOOLS.DATASET_GET],
         });
         expect(t.nextStep).toContain(HELPER_TOOLS.DATASET_GET);
@@ -33,6 +35,8 @@ describe('buildDatasetItemsSummaryNextStep()', () => {
             itemCount: 5,
             totalItemCount: 5,
             offset: 0,
+            fields: [],
+            hasOnlyEmptyItems: false,
             loadedToolNames: [],
         });
         expect(t.nextStep).not.toContain(HELPER_TOOLS.DATASET_GET);
@@ -45,6 +49,8 @@ describe('buildDatasetItemsSummaryNextStep()', () => {
             itemCount: 20,
             totalItemCount: 100,
             offset: 0,
+            fields: [],
+            hasOnlyEmptyItems: false,
             loadedToolNames: [HELPER_TOOLS.DATASET_GET],
         });
         const unloaded = buildDatasetItemsSummaryNextStep({
@@ -52,11 +58,91 @@ describe('buildDatasetItemsSummaryNextStep()', () => {
             itemCount: 20,
             totalItemCount: 100,
             offset: 0,
+            fields: [],
+            hasOnlyEmptyItems: false,
             loadedToolNames: [],
         });
         expect(loaded.nextStep).toBe(unloaded.nextStep);
         expect(loaded.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
         expect(loaded.nextStep).toContain('offset=20');
+    });
+});
+
+function summarizeDatasetItems(overrides: Partial<Parameters<typeof buildDatasetItemsSummaryNextStep>[0]>) {
+    return buildDatasetItemsSummaryNextStep({
+        datasetId: 'ds-1',
+        itemCount: 3,
+        totalItemCount: 3,
+        offset: 0,
+        fields: [],
+        hasOnlyEmptyItems: false,
+        loadedToolNames: [HELPER_TOOLS.DATASET_GET],
+        ...overrides,
+    });
+}
+
+describe('dataset items requested past the last item', () => {
+    it.each([3, 100])('describes offset %i of a 3-item dataset as past the last item', (offset) => {
+        expect(summarizeDatasetItems({ offset, itemCount: 0 })).toEqual({
+            summary: `Offset ${offset} is past the last item: the dataset has 3 items (offsets 0 to 2).`,
+            nextStep: `${HELPER_TOOLS.DATASET_GET_ITEMS} with offset=0 returns the first page.`,
+        });
+    });
+
+    it('counts a one-item dataset in the singular', () => {
+        const { summary } = summarizeDatasetItems({ offset: 5, itemCount: 0, totalItemCount: 1 });
+
+        expect(summary).toContain('the dataset has 1 item (');
+    });
+
+    it('keeps the text for an empty dataset', () => {
+        const { summary } = summarizeDatasetItems({
+            itemCount: 0,
+            totalItemCount: 0,
+            fields: ['price'],
+            hasOnlyEmptyItems: true,
+        });
+
+        expect(summary).toBe('Fetched all 0 items.');
+    });
+});
+
+describe('a field projection that matches nothing in the returned items', () => {
+    const EMPTY_PROJECTION = { fields: ['price', 'rating'], hasOnlyEmptyItems: true };
+
+    it('says so on the last page and points at the field list', () => {
+        expect(summarizeDatasetItems(EMPTY_PROJECTION)).toEqual({
+            summary: 'Fetched all 3 items. None of them has the requested fields (price, rating).',
+            nextStep: `${HELPER_TOOLS.DATASET_GET} with datasetId=ds-1 lists the dataset's fields.`,
+        });
+    });
+
+    it('says so on a page with more pages after it, instead of the next-page hint', () => {
+        const { summary, nextStep } = summarizeDatasetItems({
+            ...EMPTY_PROJECTION,
+            itemCount: 20,
+            totalItemCount: 100,
+        });
+
+        expect(summary).toBe(
+            'Fetched 20 of 100 items (offset=0). None of them has the requested fields (price, rating).',
+        );
+        expect(nextStep).toContain(HELPER_TOOLS.DATASET_GET);
+        expect(nextStep).not.toContain('offset=20');
+    });
+
+    it('names no tool for the field list when the session lacks get-dataset', () => {
+        const { nextStep } = summarizeDatasetItems({ ...EMPTY_PROJECTION, loadedToolNames: [] });
+
+        expect(nextStep).toBe('An item read without `fields` shows its field names.');
+    });
+
+    it('does not warn when no fields were requested', () => {
+        expect(summarizeDatasetItems({ hasOnlyEmptyItems: true }).summary).toBe('Fetched all 3 items.');
+    });
+
+    it('does not warn when the returned items have content', () => {
+        expect(summarizeDatasetItems({ fields: ['price'] }).summary).toBe('Fetched all 3 items.');
     });
 });
 

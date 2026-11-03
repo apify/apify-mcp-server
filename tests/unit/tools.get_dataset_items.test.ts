@@ -225,6 +225,26 @@ describe('get-dataset-items', () => {
         );
     });
 
+    async function callWithEmptyProjectionCheck(items: Record<string, unknown>[]) {
+        const listItemsSpy = vi.fn().mockResolvedValue({ items, total: 3 });
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'DsWkzbQMuFYuam3YF', fields: 'price,rating' },
+                stubApifyClient(listItemsSpy),
+            ),
+        );
+        expect(listItemsSpy).toHaveBeenCalledWith(expect.objectContaining({ fields: ['price', 'rating'] }));
+        return (result as { structuredContent: { summary: string } }).structuredContent.summary;
+    }
+
+    it('warns when the requested fields match nothing in the returned items', async () => {
+        expect(await callWithEmptyProjectionCheck([{}, {}, {}])).toContain('None of them has the requested fields');
+    });
+
+    it('does not warn when a returned item has a requested field', async () => {
+        expect(await callWithEmptyProjectionCheck([{ price: 10 }, {}, {}])).not.toContain('None of them');
+    });
+
     it('content[0] mirrors the structuredContent data and does not echo the desc input param', async () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext({ datasetId: 'DsWkzbQMuFYuam3YF' }, stubApifyClient()),
