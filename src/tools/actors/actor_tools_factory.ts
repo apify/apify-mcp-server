@@ -300,6 +300,9 @@ export function fixActorNameInputAndLog(actorName: string, extra?: Record<string
     return fixed;
 }
 
+export const EMPTY_ACTOR_NAME_MESSAGE =
+    '"actor" must not be empty. Give the Actor ID or its name in the "username/name" form.';
+
 /** The `:toolName` of the removed `actorName:toolName` form; a URL's `scheme://` is not one. */
 export const MCP_TOOL_NAME_SUFFIX = /:[^/]*$/;
 
