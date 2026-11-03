@@ -152,6 +152,9 @@ export async function getNormalActorsAsTools(
             waitSecs: WAIT_SECS_INPUT_PROPERTY,
         };
 
+        // The closure below must capture only the note, not `contract`: that would keep the
+        // per-call copy of the input schema alive for the session's lifetime.
+        const contractDescription = contract.description;
         // Names call-actor only when the session actually has it.
         const buildDescription = (context: ToolDescriptionContext): string => {
             const { hasTool } = context;
@@ -159,7 +162,7 @@ export async function getNormalActorsAsTools(
 ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this specific Actor.\n` : ''}Actor description: ${actorDescription}`;
             const policyDescription = getActorToolPolicy(actorFullName)?.buildDescription?.(context);
             if (policyDescription) description += `\n\n${policyDescription}`;
-            if (contract.description) description += `\n\n${contract.description}`;
+            if (contractDescription) description += `\n\n${contractDescription}`;
             return description;
         };
 
@@ -168,12 +171,12 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
             ACTOR_MAX_MEMORY_MBYTES,
         );
 
-        let ajvValidate;
+        let compiled;
         try {
             // Unknown properties are silently stripped by AJV's removeAdditional option.
             // Dynamic Actor input fields are part of the Actor's own inputSchema, so they
             // are declared properties and won't be stripped.
-            ajvValidate = compileUntrustedSchema(inputSchema);
+            compiled = compileUntrustedSchema(inputSchema as ToolInputSchema);
         } catch (e) {
             // SchemaTooLargeError logs as a soft fail; a genuine AJV compile error stays an error.
             logHttpError(e, 'Failed to compile schema', {
@@ -191,10 +194,11 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
             actorFullName: definition.actorFullName,
             description: buildDescription(ALL_TOOLS_PRESENT),
             buildDescription,
-            inputSchema: inputSchema as ToolInputSchema,
+            // The compile cache returns one schema object per content, so sessions share one copy.
+            inputSchema: compiled.schema,
             // Canonical RunResponse shape — same as call-actor and get-actor-run.
             outputSchema: actorRunOutputSchema,
-            ajvValidate,
+            ajvValidate: compiled.validate,
             paymentRequired: true,
             memoryMbytes,
             icons: definition.pictureUrl ? [{ src: definition.pictureUrl, mimeType: 'image/png' }] : undefined,
