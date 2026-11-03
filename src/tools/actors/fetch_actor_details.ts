@@ -235,6 +235,7 @@ export function buildActorDetailsTextResponse(options: {
     if (serverInterface?.text) texts.push(serverInterface.text);
 
     const isMcpServerActor =
+        details.actorInfo.actorStandby?.isEnabled === true &&
         details.webServerMcpPath &&
         !INPUT_INTERFACE_ACTORS.has(`${details.actorInfo.username}/${details.actorInfo.name}`);
     const mcpNextStep = isMcpServerActor

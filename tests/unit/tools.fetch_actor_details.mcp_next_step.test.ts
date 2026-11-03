@@ -5,7 +5,13 @@ import { getOwnServerRemedy } from '../../src/tools/actor_tool_naming.js';
 import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
 import { actorDetailsOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { Actor, ActorDefinitionWithServerInterface, HelperTool } from '../../src/types.js';
-import { DEFAULT_BUILD_ID, mockActorBuildClient, mockBuild, mockStandbyActor } from './helpers/actor_build_client.js';
+import {
+    DEFAULT_BUILD_ID,
+    mockActor,
+    mockActorBuildClient,
+    mockBuild,
+    mockStandbyActor,
+} from './helpers/actor_build_client.js';
 import { expectSchemaConformingStructuredContent, stubToolCallContext, textOf } from './helpers/tool_context.js';
 
 const MCP_SERVER_ACTOR = mockStandbyActor(undefined, { username: 'apify', name: 'example-mcp-server' });
@@ -52,6 +58,15 @@ describe('identifying an MCP server Actor in fetch-actor-details', () => {
 
     it('adds no MCP sentence for an Actor without an MCP path', async () => {
         const { text, structuredContent } = await callDetails(MCP_SERVER_ACTOR, {});
+
+        expect(structuredContent).not.toHaveProperty('nextStep');
+        expect(text).not.toContain('This Actor is an MCP server');
+    });
+
+    // fetch-actor-mcp-tool-list refuses an Actor without Actor Standby, so the details must not offer it.
+    it('adds no MCP sentence for an Actor with standby off that declares an MCP path', async () => {
+        const actor = mockActor({ username: 'apify', name: 'example-mcp-server' });
+        const { text, structuredContent } = await callDetails(actor, { webServerMcpPath: '/mcp' });
 
         expect(structuredContent).not.toHaveProperty('nextStep');
         expect(text).not.toContain('This Actor is an MCP server');
