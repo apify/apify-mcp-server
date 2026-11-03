@@ -101,7 +101,8 @@ export async function dispatchToolCall(params: {
         case TOOL_TYPE.INTERNAL:
         case TOOL_TYPE.ACTOR_SERVER: {
             try {
-                log.info(`Calling internal tool${logContext?.messageSuffix ?? ''}`, {
+                const toolKind = tool.type === TOOL_TYPE.ACTOR_SERVER ? 'Server Actor tool' : 'internal tool';
+                log.info(`Calling ${toolKind}${logContext?.messageSuffix ?? ''}`, {
                     ...logContext?.fields,
                     toolName: tool.name,
                     mcpSessionId,
