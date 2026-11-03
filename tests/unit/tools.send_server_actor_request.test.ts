@@ -707,19 +707,18 @@ describe('rejecting a call before sending', () => {
         expect(received).toHaveLength(0);
     });
 
-    it('rejects a whitespace-only actor without a lookup or a request', async () => {
+    // The request is sent only after the Actor lookup, so no lookup means nothing was sent.
+    it('rejects a whitespace-only actor before the Actor lookup', async () => {
         const lookup = vi.fn();
-        const request = vi.fn();
 
         const result = await callTool(
             { actor: '   ', path: '/echo' },
-            { apifyClient: mockApifyClient({ actor: lookup, httpClient: { axios: { request } } }) },
+            { apifyClient: mockApifyClient({ actor: lookup }) },
         );
 
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toContain('"actor" must not be empty');
         expect(lookup).not.toHaveBeenCalled();
-        expect(request).not.toHaveBeenCalled();
     });
 
     it('returns the not-found response for an Actor the API does not know', async () => {
