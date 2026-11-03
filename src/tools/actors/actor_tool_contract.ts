@@ -14,8 +14,8 @@ For detailed data from a specific platform (e.g. Amazon products with prices, In
  * no references to any specific client or its built-in tools, so the same text works
  * for every MCP client.
  */
-const WEB_FETCH_ADDITIONAL_DESC = `Use this tool to fetch a specific URL and return its complete content.
-It renders JavaScript and bypasses anti-bot protection, so it also retrieves pages where a plain HTTP fetch gets blocked, fails with an error such as 403 or 429, or returns incomplete content.
+const WEB_FETCH_ADDITIONAL_DESC = `Use this tool to fetch a URL and return its complete content.
+It renders JavaScript and bypasses anti-bot protection, so it also retrieves pages where a plain HTTP fetch is blocked, fails (e.g. 403 or 429), or returns incomplete content.
 The page comes back verbatim, with no summarization.
 In query, formats is a comma-separated string, such as "markdown,links", and headers is a JSON object as a string, such as {"Accept-Language":"fr-FR"}.
 Example: {"query":{"url":"https://example.com","formats":"markdown"}}
@@ -25,7 +25,7 @@ Examples of when to use:
 - A previous attempt to fetch a page was blocked, returned an error or CAPTCHA, or came back incomplete because the page needs JavaScript rendering
 - Verbatim page content is needed, e.g. for quoting, extraction, or archiving
 
-This tool does not search the web - it needs a URL. To find pages by query, use a web search tool instead.
+It does not search the web - it needs a URL. To find pages by query, use a web search tool.
 If the exact URL cannot be fetched (e.g. a non-http(s) scheme such as ftp:), say so rather than silently substituting a different URL.`;
 
 /** Appended to the `apify/web-search` Actor tool description. */
