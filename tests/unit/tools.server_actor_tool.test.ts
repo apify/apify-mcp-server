@@ -165,6 +165,14 @@ describe('the input schema of a Server Actor tool', () => {
         expect(ajvValidate({ method: 'GET', path: '/status/404' })).toBe(true);
     });
 
+    // The send tool's example names Apify API parameters, which this Actor does not take.
+    it('points the query at the operations in the description', () => {
+        const query = schemasOf({}).inputSchema.properties?.query as Record<string, unknown>;
+
+        expect(query.description).toContain('as the operations in the description list them');
+        expect(query.description).not.toContain('limit');
+    });
+
     it('keeps the input schema the same size for any number of documented paths', () => {
         const pathsOf = (count: number) =>
             Object.fromEntries(Array.from({ length: count }, (_, i) => [`/path-${i}`, { get: {} }]));

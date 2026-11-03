@@ -76,7 +76,9 @@ export function buildServerActorToolSchemas({
     const args = z.object({
         method: methods.length === 1 ? method.default(methods[0]) : method,
         path: defaultPath === undefined ? path : path.default(defaultPath),
-        query: sendServerActorRequestArgs.shape.query,
+        query: sendServerActorRequestArgs.shape.query.describe(
+            'Query parameters of the operation, by name, as the operations in the description list them. A boolean is sent as true or false.',
+        ),
         ...(hasRequestBody && { body: sendServerActorRequestArgs.shape.body }),
     });
     return {
