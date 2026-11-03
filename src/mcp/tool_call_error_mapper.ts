@@ -87,8 +87,7 @@ export function buildToolCallErrorResult(error: unknown, params: ToolCallErrorPa
     }
 
     const { toolStatus, callDiagnostics } = buildExecutionDiagnostics({ error, isAborted, actorName, actorId });
-    // Tools parse their arguments with Zod, so a thrown Zod error here is bad input; malformed upstream responses
-    // fail inside the tool and reach respondServerError instead.
+    // Only argument parsing throws Zod errors this far; tools catch upstream response validation errors themselves.
     if (isZodValidationError(error)) {
         return {
             kind: TOOL_CALL_ERROR_KIND.EXECUTION,

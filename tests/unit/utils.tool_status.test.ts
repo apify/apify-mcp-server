@@ -224,7 +224,7 @@ describe('extractAjvErrorDetails', () => {
     });
 });
 
-describe('formatZodIssues', () => {
+describe('formatting Zod issues as argument clauses', () => {
     // Real Zod errors: the formatter reads Zod's issue shape and its default "received <type>" text.
     function issuesOf(schema: z.ZodType, input: unknown) {
         return schema.safeParse(input).error!.issues;

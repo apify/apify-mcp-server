@@ -193,11 +193,7 @@ export function extractAjvErrorDetails(errors: ErrorObject[] | null | undefined)
     return diagnostics;
 }
 
-/**
- * One clause per Zod issue, joined with "; ": the dotted path (`arguments` at the root), then the types the issue or
- * its union branches expect and the received type from Zod's default message. An issue that expects no type, such
- * as a refinement, keeps its own message.
- */
+/** Formats Zod issues as "path: expected A or B, got C" clauses joined by "; "; C comes from Zod's default message. */
 export function formatZodIssues(issues: ZodError['issues']): string {
     return issues
         .map((issue) => {
