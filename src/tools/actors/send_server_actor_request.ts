@@ -59,15 +59,14 @@ type SendServerActorRequestArgs = z.infer<typeof sendServerActorRequestArgs>;
 
 /**
  * The input schema and validator of a selected Server Actor's tool: this tool's arguments without `actor`, `method`
- * narrowed to the documented ones, a default for a single method or path, and `body` only when an operation takes
- * one. `path` is a plain string, not an enum: a creator can document thousands of paths, and the Actor Server
- * answers an unknown one with a 404.
+ * narrowed to the documented ones with a default for a single method, and `body` only when an operation takes one.
+ * `path` is a plain string, not an enum: a creator can document thousands of paths, and the Actor Server answers an
+ * unknown one with a 404.
  */
 export function buildServerActorToolSchemas({
     methods,
-    defaultPath,
     hasRequestBody,
-}: Pick<ServerActorToolInfo, 'methods' | 'defaultPath' | 'hasRequestBody'>) {
+}: Pick<ServerActorToolInfo, 'methods' | 'hasRequestBody'>) {
     const method = z.enum(methods).describe('HTTP method of the operation.');
     const path = z
         .string()
@@ -75,7 +74,7 @@ export function buildServerActorToolSchemas({
         .describe('The path of an operation listed in the description. Replace each {name} with its value.');
     const args = z.object({
         method: methods.length === 1 ? method.default(methods[0]) : method,
-        path: defaultPath === undefined ? path : path.default(defaultPath),
+        path,
         query: sendServerActorRequestArgs.shape.query.describe(
             'Query parameters of the operation, by name, as the operations in the description list them. A boolean is sent as true or false.',
         ),
@@ -83,7 +82,7 @@ export function buildServerActorToolSchemas({
     });
     return {
         inputSchema: z.toJSONSchema(args) as ToolInputSchema,
-        // `useDefaults` fills a defaulted method or path before the request is built from the arguments.
+        // `useDefaults` fills a defaulted method before the request is built from the arguments.
         ajvValidate: new Ajv({ coerceTypes: false, strict: false, removeAdditional: true, useDefaults: true }).compile(
             fixZodSchemaRequired(z.toJSONSchema(args)),
         ),

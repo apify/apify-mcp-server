@@ -335,8 +335,6 @@ export function buildServerActorToolInfo(schema: unknown, actorFullName: string)
         (context) => ({ operations: operations.map((operation) => buildServerOperationDetails(operation, context)) }),
         CLIENT_DESCRIPTION_MAX_LENGTH * 4,
     )?.json;
-    const paths = new Set(operations.map((operation) => operation.path));
-    const [defaultPath] = paths.size === 1 && !/\{[^}]*\}/.test(operations[0].path) ? paths : [];
     const operationLines: string[] = [];
     let length = 0;
     for (const operation of operations) {
@@ -347,7 +345,6 @@ export function buildServerActorToolInfo(schema: unknown, actorFullName: string)
     }
     return {
         methods: API_METHODS.filter((apiMethod) => operations.some((operation) => operation.method === apiMethod)),
-        ...(defaultPath !== undefined && { defaultPath }),
         hasRequestBody: operations.some((operation) => listOperationInputs(operation, schema).requestBody?.isJson),
         ...(full !== undefined && full.length <= CLIENT_DESCRIPTION_MAX_LENGTH && { fullOperations: full }),
         operationLines,

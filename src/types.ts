@@ -94,8 +94,6 @@ export type ActorDefinitionPruned = Pick<
 export type ServerActorToolInfo = {
     /** The documented methods, for the tool's input schema. */
     methods: ApiMethod[];
-    /** The only documented path, when there is one and it has no `{name}` template. */
-    defaultPath?: string;
     /** Whether an operation takes a JSON request body. */
     hasRequestBody: boolean;
     /** Every operation in full; absent when it alone exceeds the description limit. */

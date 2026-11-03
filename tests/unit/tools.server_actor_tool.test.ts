@@ -209,19 +209,13 @@ describe('the input schema of a Server Actor tool', () => {
         expect(sizeOf(10_000)).toBe(sizeOf(2));
     });
 
-    it('defaults a single method and path, which the validator fills in', () => {
-        const { inputSchema, ajvValidate } = schemasOf({ methods: ['POST'], defaultPath: '/' });
-        const args: Record<string, unknown> = {};
+    it('defaults a single method, which the validator fills in', () => {
+        const { inputSchema, ajvValidate } = schemasOf({ methods: ['POST'] });
+        const args: Record<string, unknown> = { path: '/' };
 
-        expect(inputSchema.properties).toMatchObject({ method: { default: 'POST' }, path: { default: '/' } });
+        expect(inputSchema.properties).toMatchObject({ method: { default: 'POST' } });
         expect(ajvValidate(args)).toBe(true);
         expect(args).toEqual({ method: 'POST', path: '/' });
-    });
-
-    it('defaults the path only for a single path with no template', () => {
-        expect(infoOf(SCHEMA).defaultPath).toBeUndefined();
-        expect(infoOf({ paths: { '/': { get: {}, post: {} } } }).defaultPath).toBe('/');
-        expect(infoOf({ paths: { '/status/{code}': { get: {} } } }).defaultPath).toBeUndefined();
     });
 
     it('leaves the body out when no operation takes one', () => {

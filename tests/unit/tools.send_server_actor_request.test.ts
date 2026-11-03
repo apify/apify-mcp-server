@@ -878,7 +878,6 @@ describe("a selected Server Actor's own tool", () => {
         const cached = actorDefinitionCache.get(SERVER_ACTOR)!;
         const webServerToolInfo: ServerActorToolInfo = {
             methods: ['POST'],
-            defaultPath: '/echo',
             hasRequestBody: true,
             operationLines: [],
             operationCount: 1,
@@ -907,17 +906,17 @@ describe("a selected Server Actor's own tool", () => {
         const received = recordRequests();
 
         // Upserted directly, as a loader without the provider or the pre-initialize path of auto mode does.
-        const result = await callOwnTool({ body: { a: 1 } }, { paymentProvider: makePaymentProvider() });
+        const result = await callOwnTool({ path: '/echo', body: { a: 1 } }, { paymentProvider: makePaymentProvider() });
 
         expect(result.isError).toBe(true);
         expect((result.content as { text: string }[])[0].text).toContain('is not supported in agentic payment mode');
         expect(received).toHaveLength(0);
     });
 
-    it('sends the request to its Actor through the same execution, filling a single method and path', async () => {
+    it('sends the request to its Actor through the same execution, filling a single method', async () => {
         const received = recordRequests();
 
-        const result = await callOwnTool({ body: { a: 1 } });
+        const result = await callOwnTool({ path: '/echo', body: { a: 1 } });
 
         expect(received).toMatchObject([{ method: 'POST', url: '/echo', body: '{"a":1}' }]);
         expect(result.structuredContent).toMatchObject({ actorName: SERVER_ACTOR, interface: 'server', status: 200 });
@@ -926,7 +925,7 @@ describe("a selected Server Actor's own tool", () => {
     it('ignores an actor argument and sends to its own Actor', async () => {
         const received = recordRequests();
 
-        const result = await callOwnTool({ actor: 'apify/web-fetch', body: { a: 1 } });
+        const result = await callOwnTool({ actor: 'apify/web-fetch', path: '/echo', body: { a: 1 } });
 
         expect(received).toHaveLength(1);
         expect(result.structuredContent).toMatchObject({ actorName: SERVER_ACTOR });

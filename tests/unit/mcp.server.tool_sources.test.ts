@@ -104,7 +104,7 @@ describe('composing tools in a payment-provider session', () => {
         const definition = {
             id: 'server-actor-id',
             actorFullName: 'apify/server-actor-test',
-            webServerToolInfo: { methods: ['GET'], defaultPath: '/add', operationLines: [], operationCount: 1 },
+            webServerToolInfo: { methods: ['GET'], operationLines: [], operationCount: 1 },
         } as unknown as ActorDefinitionPruned;
         const actor = mockActor({ actorStandby: { isEnabled: true } });
         vi.mocked(getActors).mockResolvedValueOnce(
