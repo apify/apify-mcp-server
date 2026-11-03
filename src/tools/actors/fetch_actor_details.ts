@@ -328,9 +328,13 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         loadedToolNames,
     });
 
-    // An MCP server Actor's nextStep already says how to use it; call-actor does not run it.
+    // An MCP server Actor's nextStep covers it unless it names the list tool and no tool can call the listed tools.
     // Resolved Actor ID, not the raw `actor` input — that may itself be an ID.
-    const runnableGuidance = structuredContent.nextStep
+    const isCoveredByNextStep =
+        structuredContent.nextStep &&
+        (loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL) ||
+            !loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST));
+    const runnableGuidance = isCoveredByNextStep
         ? ''
         : buildActorNotRunnableGuidance(details.actorInfo.id, loadedToolNames, loadedActorIds);
     if (runnableGuidance) texts.push(runnableGuidance);
