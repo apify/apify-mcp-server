@@ -32,7 +32,7 @@ describe('compileUntrustedSchema', () => {
         expect(input).toEqual({ url: 'https://example.com' });
     });
 
-    it('returns one validator for schemas with the same content and separate ones otherwise', () => {
+    it('caches validator for identical schemas', () => {
         const schema = () => ({ type: 'object', properties: { url: { type: 'string' } }, required: ['url'] });
         const first = compileUntrustedSchema(schema());
         expect(compileUntrustedSchema(schema())).toBe(first);
