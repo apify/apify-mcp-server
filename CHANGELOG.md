@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 
 - Compile untrusted schemas on a fresh Ajv instance and cache validators by content ([#1786](https://github.com/apify/apify-mcp-server/pull/1786)) ([ce708a0](https://github.com/apify/apify-mcp-server/commit/ce708a01f3f0b9cef322f8a01274f37bf8e41757)) by [@jirispilka](https://github.com/jirispilka), closes [#905](https://github.com/apify/apify-mcp-server/issues/905)
 - Keep the keywords next to a $ref when dereferencing ([#1783](https://github.com/apify/apify-mcp-server/pull/1783)) ([174ecf8](https://github.com/apify/apify-mcp-server/commit/174ecf8cc96d1c4f0f9b10e6a91ec9f5eb22905d)) by [@jirispilka](https://github.com/jirispilka)
+- Reject Actor names that normalize to empty ([#1802](https://github.com/apify/apify-mcp-server/pull/1802)) ([2337062](https://github.com/apify/apify-mcp-server/commit/233706221b9ea163c43fc5ac5d27edb3f2312e45)) by [@jirispilka](https://github.com/jirispilka), closes [#1797](https://github.com/apify/apify-mcp-server/issues/1797)
 
 ### ⚡ Performance
 
