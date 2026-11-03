@@ -312,11 +312,14 @@ export const MCP_TOOL_NAME_SUFFIX = /:[^/]*$/;
  */
 export function fixActorNameInput(actorName: string): string {
     const s = stripQuoteWrappers(actorName).replace(/\s*\/\s*/g, '/');
-    return s
-        .replace(/\s+/g, ' ')
-        .trim()
-        .replace(/^\/+|\/+$/g, '')
-        .replace(MCP_TOOL_NAME_SUFFIX, '');
+    return (
+        s
+            .replace(/\s+/g, ' ')
+            .trim()
+            // The lookbehind starts a trailing match only at the start of a slash run, so long runs stay linear.
+            .replace(/^\/+|(?<!\/)\/+$/g, '')
+            .replace(MCP_TOOL_NAME_SUFFIX, '')
+    );
 }
 
 /**
