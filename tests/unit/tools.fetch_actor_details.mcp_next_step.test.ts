@@ -56,6 +56,14 @@ describe('identifying an MCP server Actor in fetch-actor-details', () => {
         expect(text).toContain(structuredContent.nextStep);
     });
 
+    it('gives the own-server remedy once when the session has no list tool and no run tool', async () => {
+        const { text } = await callDetails(MCP_SERVER_ACTOR, { webServerMcpPath: '/mcp' }, [
+            HELPER_TOOLS.ACTOR_GET_DETAILS,
+        ]);
+
+        expect(text.split(getOwnServerRemedy())).toHaveLength(2);
+    });
+
     it('adds no MCP sentence for an Actor without an MCP path', async () => {
         const { text, structuredContent } = await callDetails(MCP_SERVER_ACTOR, {});
 

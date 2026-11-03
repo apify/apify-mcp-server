@@ -327,8 +327,11 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         loadedToolNames,
     });
 
+    // An MCP server Actor's nextStep already says how to use it; call-actor does not run it.
     // Resolved Actor ID, not the raw `actor` input — that may itself be an ID.
-    const runnableGuidance = buildActorNotRunnableGuidance(details.actorInfo.id, loadedToolNames, loadedActorIds);
+    const runnableGuidance = structuredContent.nextStep
+        ? ''
+        : buildActorNotRunnableGuidance(details.actorInfo.id, loadedToolNames, loadedActorIds);
     if (runnableGuidance) texts.push(runnableGuidance);
 
     return respondOk(texts, { structuredContent });
