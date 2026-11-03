@@ -48,7 +48,10 @@ export function prepareToolCallContext(input: {
     requestOrigin?: REQUEST_ORIGIN;
 }): PrepareToolCallContextResult {
     const { provider, tool, args, apifyToken, meta, requestHeaders, requestOrigin } = input;
-    const toolRedactedArgs = tool.type === TOOL_TYPE.INTERNAL && tool.redactArgs ? tool.redactArgs(args) : args;
+    const toolRedactedArgs =
+        (tool.type === TOOL_TYPE.INTERNAL || tool.type === TOOL_TYPE.ACTOR_SERVER) && tool.redactArgs
+            ? tool.redactArgs(args)
+            : args;
 
     if (!provider) {
         const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin });

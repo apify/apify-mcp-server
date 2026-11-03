@@ -28,7 +28,7 @@ type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 export const MAX_UNTRUSTED_SCHEMA_BYTES = 262_144;
 
 const UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE = 1000;
-const untrustedValidatorCache = new LruCache<ValidateFunction<unknown>>({
+const untrustedValidatorCache = new LruCache<{ validate: ValidateFunction<unknown>; schema: object }>({
     maxLength: UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE,
 });
 
@@ -38,7 +38,9 @@ const untrustedValidatorCache = new LruCache<ValidateFunction<unknown>>({
  * Create a fresh Ajv instance per compilation to avoid unbounded memory growth.
  * Ajv internally caches every compiled schema in a Map that is never evicted.
  */
-export function compileUntrustedSchema(schema: object): ValidateFunction<unknown> {
+export function compileUntrustedSchema<T extends object>(
+    schema: T,
+): { validate: ValidateFunction<unknown>; schema: T } {
     const serialized = JSON.stringify(schema);
     // Ajv codegen is synchronous; an oversized untrusted schema would freeze the event loop.
     if (Buffer.byteLength(serialized) > MAX_UNTRUSTED_SCHEMA_BYTES) {
@@ -46,12 +48,13 @@ export function compileUntrustedSchema(schema: object): ValidateFunction<unknown
     }
 
     const cacheKey = createHash('sha256').update(serialized).digest('base64');
-    const cached = untrustedValidatorCache.get(cacheKey);
+    // A hit holds a schema with the same content as `schema`, so it is still a T.
+    const cached = untrustedValidatorCache.get(cacheKey) as { validate: ValidateFunction<unknown>; schema: T } | null;
     if (cached) return cached;
 
-    const validate = createAjv().compile(schema);
-    untrustedValidatorCache.add(cacheKey, validate);
-    return validate;
+    const compiled = { validate: createAjv().compile(schema), schema };
+    untrustedValidatorCache.add(cacheKey, compiled);
+    return compiled;
 }
 
 /**

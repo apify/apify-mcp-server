@@ -147,6 +147,33 @@ describe('prepareToolCall()', () => {
         });
     });
 
+    it('records the Actor interface a call goes through in telemetry, also when its arguments are invalid', async () => {
+        await withServer(async (server) => {
+            const { tool } = makeRecorderTool('recorder-tool');
+            server.upsertTools([tool, sendServerActorRequest]);
+            const prepare = async (name: string, args: Record<string, unknown>) => {
+                const telemetryData = { tool_name: name } as ToolCallTelemetryProperties;
+                await prepareToolCall({
+                    ...prepareFields(server),
+                    apifyToken: 'fake-token',
+                    name,
+                    args,
+                    meta: undefined,
+                    requestHeaders: undefined,
+                    isTaskRequest: false,
+                    mcpSessionId: 's1',
+                    telemetryData,
+                    clientContext: undefined,
+                });
+                return telemetryData;
+            };
+
+            const serverCall = await prepare(HELPER_TOOLS.ACTOR_SERVER_REQUEST, { actor: 'apify/server-actor-test' });
+            expect(serverCall.actor_interface).toBe('server');
+            expect(await prepare('recorder-tool', {})).not.toHaveProperty('actor_interface');
+        });
+    });
+
     it('carries the trace id on the client and in telemetry only when telemetry is on', async () => {
         await withServer(async (server) => {
             const { tool } = makeRecorderTool('recorder-tool');

@@ -7,6 +7,7 @@ import {
     ACTOR_MAX_MEMORY_MBYTES,
     FAILURE_CATEGORY,
     HELPER_TOOLS,
+    MAX_INLINE_BYTES,
     OFFICIAL_ACTORS_WITH_SIDE_EFFECTS,
     OFFICIAL_APIFY_USERNAMES,
 } from '../../const.js';
@@ -31,10 +32,27 @@ import { getActorDefinitionCached } from '../../utils/actor.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildActorInputSchema, compileUntrustedSchema } from '../actor_input_schema.js';
-import { actorNameToToolName, isActorBlockedUnderPaymentProvider, resolveActorToolMode } from '../actor_tool_naming.js';
-import { buildEnrichedDirectActorOutputSchema, actorRunOutputSchema } from '../structured_output_schemas.js';
+import {
+    actorNameToToolName,
+    getActorToolModeFromInterfaces,
+    isActorBlockedUnderPaymentProvider,
+    resolveActorInterfaces,
+    resolveActorTenancy,
+    resolveActorToolMode,
+} from '../actor_tool_naming.js';
+import {
+    buildEnrichedDirectActorOutputSchema,
+    actorRunOutputSchema,
+    serverActorRequestOutputSchema,
+} from '../structured_output_schemas.js';
 import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from './actor_run_response.js';
 import { buildDirectActorContract, getActorToolPolicy } from './actor_tool_contract.js';
+import {
+    buildServerActorToolSchemas,
+    executeSendServerActorRequest,
+    redactServerActorRequestArgs,
+} from './send_server_actor_request.js';
+import { buildServerActorToolDescription, formatTenancyBilling } from './server_interface_details.js';
 
 /**
  * MCP-only opt-in injected next to the Actor's own input fields. Same contract as `call-actor`'s
@@ -152,6 +170,9 @@ export async function getNormalActorsAsTools(
             waitSecs: WAIT_SECS_INPUT_PROPERTY,
         };
 
+        // The closure below must capture only the note, not `contract`: that would keep the
+        // per-call copy of the input schema alive for the session's lifetime.
+        const contractDescription = contract.description;
         // Names call-actor only when the session actually has it.
         const buildDescription = (context: ToolDescriptionContext): string => {
             const { hasTool } = context;
@@ -159,7 +180,7 @@ export async function getNormalActorsAsTools(
 ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this specific Actor.\n` : ''}Actor description: ${actorDescription}`;
             const policyDescription = getActorToolPolicy(actorFullName)?.buildDescription?.(context);
             if (policyDescription) description += `\n\n${policyDescription}`;
-            if (contract.description) description += `\n\n${contract.description}`;
+            if (contractDescription) description += `\n\n${contractDescription}`;
             return description;
         };
 
@@ -168,12 +189,12 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
             ACTOR_MAX_MEMORY_MBYTES,
         );
 
-        let ajvValidate;
+        let compiled;
         try {
             // Unknown properties are silently stripped by AJV's removeAdditional option.
             // Dynamic Actor input fields are part of the Actor's own inputSchema, so they
             // are declared properties and won't be stripped.
-            ajvValidate = compileUntrustedSchema(inputSchema);
+            compiled = compileUntrustedSchema(inputSchema as ToolInputSchema);
         } catch (e) {
             // SchemaTooLargeError logs as a soft fail; a genuine AJV compile error stays an error.
             logHttpError(e, 'Failed to compile schema', {
@@ -191,10 +212,11 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
             actorFullName: definition.actorFullName,
             description: buildDescription(ALL_TOOLS_PRESENT),
             buildDescription,
-            inputSchema: inputSchema as ToolInputSchema,
+            // The compile cache returns one schema object per content, so sessions share one copy.
+            inputSchema: compiled.schema,
             // Canonical RunResponse shape — same as call-actor and get-actor-run.
             outputSchema: actorRunOutputSchema,
-            ajvValidate,
+            ajvValidate: compiled.validate,
             paymentRequired: true,
             memoryMbytes,
             icons: definition.pictureUrl ? [{ src: definition.pictureUrl, mimeType: 'image/png' }] : undefined,
@@ -215,6 +237,63 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
         await enrichActorToolOutputSchemas(tools, actorStore);
     }
 
+    return tools;
+}
+
+/**
+ * Builds the own tool of each Actor served through its server interface: `send-server-actor-request` with the Actor
+ * fixed, its documented operations in the description and its methods and paths in the input schema.
+ * `readOnlyHint` is the Actor's, as for a run tool.
+ */
+export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
+    const tools: ToolEntry[] = [];
+    for (const actorInfo of actorsInfo) {
+        const { definition, actor } = actorInfo;
+        const toolInfo = definition.webServerToolInfo;
+        // `getActorsAsTools` reports an Actor without it.
+        if (!toolInfo) continue;
+        const { actorFullName, description } = definition;
+        const isReadOnly = isReadOnlyActor(actorInfo);
+        const costNotice = formatTenancyBilling({
+            tenancy: resolveActorTenancy(actor),
+            idleTimeoutSecs: actor.actorStandby?.idleTimeoutSecs,
+        });
+        // Names fetch-actor-details only when the session has it, and only when the operations are not in full.
+        const buildDescription = ({ hasTool }: ToolDescriptionContext): string => {
+            const head = `This tool sends one HTTP request to the server interface of the Actor "${actorFullName}" and returns the response.
+${hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_SERVER_REQUEST}" if user requests this specific Actor.\n` : ''}Actor description: ${description}
+${costNotice}
+The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text; other content types, and bodies over ${MAX_INLINE_BYTES} bytes, are not returned.
+
+Operations:
+`;
+            return buildServerActorToolDescription(head, toolInfo, hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS));
+        };
+        tools.push({
+            type: TOOL_TYPE.ACTOR_SERVER,
+            name: actorNameToToolName(actorFullName),
+            title: actorFullName,
+            actorId: definition.id,
+            actorFullName,
+            description: buildDescription(ALL_TOOLS_PRESENT),
+            buildDescription,
+            ...buildServerActorToolSchemas(toolInfo),
+            outputSchema: serverActorRequestOutputSchema,
+            icons: definition.pictureUrl ? [{ src: definition.pictureUrl, mimeType: 'image/png' }] : undefined,
+            annotations: {
+                title: actorFullName,
+                readOnlyHint: isReadOnly,
+                destructiveHint: !isReadOnly,
+                openWorldHint: true,
+            },
+            redactArgs: redactServerActorRequestArgs,
+            // Composition drops the tool in a payment-provider session, but a tool upserted before composition
+            // (auto mode before initialize, `processParamsGetTools`) is still rejected here before any request.
+            hasPaymentProviderStandbyCheck: true,
+            call: async (toolArgs) =>
+                executeSendServerActorRequest({ ...toolArgs, args: { ...toolArgs.args, actor: actorFullName } }),
+        });
+    }
     return tools;
 }
 
@@ -295,6 +374,9 @@ export function fixActorNameInputAndLog(actorName: string, extra?: Record<string
     }
     return fixed;
 }
+
+export const EMPTY_ACTOR_NAME_MESSAGE =
+    '"actor" must not be empty. Give the Actor ID or its name in the "username/name" form.';
 
 /** The `:toolName` of the removed `actorName:toolName` form; a URL's `scheme://` is not one. */
 export const MCP_TOOL_NAME_SUFFIX = /:[^/]*$/;
@@ -400,9 +482,10 @@ export async function getActorsAsTools(
     const clonedActors = structuredClone(actorsInfo);
     const nonNullActors = clonedActors.filter((actorInfo): actorInfo is ActorInfo => Boolean(actorInfo));
 
-    // Split MCP-server vs normal Actors. Under `paymentProvider`, standby/MCP-server
+    // Split server-interface vs MCP-server vs normal Actors. Under `paymentProvider`, standby/MCP-server
     // Actors are reported as STANDBY_PAYMENT_NOT_SUPPORTED errors instead of contributing
     // tools — the platform API hard-rejects standby runs under third-party providers.
+    const serverActorsInfo: ActorInfo[] = [];
     const actorMCPServersInfo: ActorInfo[] = [];
     const normalActorsInfo: ActorInfo[] = [];
     for (const actorInfo of nonNullActors) {
@@ -411,7 +494,10 @@ export async function getActorsAsTools(
             continue;
         }
 
-        const toolMode = resolveActorToolMode(actorInfo);
+        // `call-actor` starts runs, so only an Actor's own tool takes the server interface.
+        const toolMode = isDirectTool
+            ? resolveActorToolMode(actorInfo)
+            : getActorToolModeFromInterfaces(resolveActorInterfaces(actorInfo));
         if (toolMode === ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP) {
             const error = ActorLoadError.serverActorWithoutMcpNotSupported(actorInfo.definition.actorFullName);
             log.softFail('Skipping server Actor with no MCP server and an empty input schema', {
@@ -423,7 +509,19 @@ export async function getActorsAsTools(
             errors.push(error);
             continue;
         }
-        if (toolMode === ACTOR_TOOL_MODE.MCP) actorMCPServersInfo.push(actorInfo);
+        if (toolMode === ACTOR_TOOL_MODE.SERVER && !actorInfo.definition.webServerToolInfo) {
+            // A definition built before `webServerToolInfo` existed has a server interface and no tool to serve.
+            const error = ActorLoadError.loadFailed(actorInfo.definition.actorFullName);
+            log.warning('Skipping Server Actor whose definition has no tool info', {
+                actorName: actorInfo.definition.actorFullName,
+                mcpSessionId,
+                actorLoadErrorKind: error.kind,
+            });
+            errors.push(error);
+            continue;
+        }
+        if (toolMode === ACTOR_TOOL_MODE.SERVER) serverActorsInfo.push(actorInfo);
+        else if (toolMode === ACTOR_TOOL_MODE.MCP) actorMCPServersInfo.push(actorInfo);
         else normalActorsInfo.push(actorInfo);
     }
 
@@ -432,5 +530,5 @@ export async function getActorsAsTools(
         getMCPServersAsTools(actorMCPServersInfo, apifyClient, mcpSessionId),
     ]);
 
-    return { tools: [...normalTools, ...mcpServerTools], errors };
+    return { tools: [...normalTools, ...getServerActorsAsTools(serverActorsInfo), ...mcpServerTools], errors };
 }

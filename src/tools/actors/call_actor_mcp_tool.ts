@@ -24,7 +24,7 @@ import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondRaw, respondServerError, respondUserError } from '../../utils/mcp.js';
 import { resolveActorInterfaces } from '../actor_tool_naming.js';
 import { anyJsonObjectSchema } from '../structured_output_schemas.js';
-import { fixActorNameInputAndLog } from './actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 
 /** The MCP spec's upper bound for a tool name. */
@@ -92,6 +92,7 @@ export async function runOnActorMcpServer(
         );
     }
     const actorName = fixActorNameInputAndLog(params.actor, { mcpSessionId });
+    if (!actorName) return respondUserError(EMPTY_ACTOR_NAME_MESSAGE);
     const cached = await getActorDefinitionCached(actorName, apifyClient);
     if (!cached) return buildActorNotFoundResponse(actorName, loadedToolNames);
     const { definition, info } = cached;
@@ -179,6 +180,7 @@ export const callActorMcpTool: ToolEntry = Object.freeze({
     ajvValidate: compileSchema(z.toJSONSchema(callActorMcpToolArgs)),
     // A third-party payment provider cannot pay for a Server Actor run, so such a session is rejected before the call.
     hasPaymentProviderStandbyCheck: true,
+    actorInterface: 'mcp',
     annotations: {
         title: 'Call Actor MCP tool',
         readOnlyHint: false,

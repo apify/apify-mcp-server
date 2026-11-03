@@ -14,6 +14,7 @@ import type {
     ActorInterfaces,
     ActorTenancy,
     InternalToolArgs,
+    ServerActorToolInfo,
     ToolDescriptionContext,
     ToolEntry,
     ToolInputSchema,
@@ -29,7 +30,7 @@ import { apiCallArgsShape, redactApiCallArgs } from '../api/apify_api_request.js
 import { API_METHODS, type ApiMethod, isRecord } from '../api/apify_api_spec.js';
 import { parseBaseMimeType } from '../storage/storage_helpers.js';
 import { anyJsonValueSchema, serverActorRequestOutputSchema } from '../structured_output_schemas.js';
-import { fixActorNameInputAndLog } from './actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 
 const sendServerActorRequestArgs = z.object({
@@ -55,6 +56,38 @@ const sendServerActorRequestArgs = z.object({
         .meta(anyJsonValueSchema),
 });
 type SendServerActorRequestArgs = z.infer<typeof sendServerActorRequestArgs>;
+
+/**
+ * The input schema and validator of a selected Server Actor's tool: this tool's arguments without `actor`, `method`
+ * narrowed to the documented ones with a default for a single method, and `body` only when an operation takes one.
+ * `path` is a plain string, not an enum: a creator can document thousands of paths, and the Actor Server answers an
+ * unknown one with a 404.
+ */
+export function buildServerActorToolSchemas({
+    methods,
+    hasRequestBody,
+}: Pick<ServerActorToolInfo, 'methods' | 'hasRequestBody'>) {
+    const method = z.enum(methods).describe('HTTP method of the operation.');
+    const path = z
+        .string()
+        .min(1)
+        .describe('The path of an operation listed in the description. Replace each {name} with its value.');
+    const args = z.object({
+        method: methods.length === 1 ? method.default(methods[0]) : method,
+        path,
+        query: sendServerActorRequestArgs.shape.query.describe(
+            'Query parameters of the operation, by name, as the operations in the description list them. A boolean is sent as true or false.',
+        ),
+        ...(hasRequestBody && { body: sendServerActorRequestArgs.shape.body }),
+    });
+    return {
+        inputSchema: z.toJSONSchema(args) as ToolInputSchema,
+        // `useDefaults` fills a defaulted method before the request is built from the arguments.
+        ajvValidate: new Ajv({ coerceTypes: false, strict: false, removeAdditional: true, useDefaults: true }).compile(
+            fixZodSchemaRequired(z.toJSONSchema(args)),
+        ),
+    };
+}
 
 /** The Actor and the request as sent: the fields every response about a sent request starts with. */
 type ServerActorRequest = {
@@ -392,6 +425,7 @@ export async function executeSendServerActorRequest(
     }
 
     const actorName = fixActorNameInputAndLog(args.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_SERVER_REQUEST });
+    if (!actorName) return respondUserError(EMPTY_ACTOR_NAME_MESSAGE);
     const cached = await getActorDefinitionCached(actorName, apifyClient);
     if (!cached) return buildActorNotFoundResponse(actorName, loadedToolNames);
     const { definition, info } = cached;
@@ -455,7 +489,7 @@ export async function executeSendServerActorRequest(
 }
 
 /** The logged arguments: the body can carry secrets, and an Actor Server can take a credential under any query name. */
-function redactServerActorRequestArgs({ actor, query, ...rest }: Record<string, unknown>) {
+export function redactServerActorRequestArgs({ actor, query, ...rest }: Record<string, unknown>) {
     return {
         actor,
         ...redactApiCallArgs(rest),
@@ -503,6 +537,7 @@ export const sendServerActorRequest: ToolEntry = Object.freeze({
     ),
     // A third-party payment provider cannot pay for an Actor Server run, so such a session is rejected before the call.
     hasPaymentProviderStandbyCheck: true,
+    actorInterface: 'server',
     annotations: {
         title: 'Send Server Actor request',
         readOnlyHint: false,

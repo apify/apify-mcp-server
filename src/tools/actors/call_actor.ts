@@ -46,7 +46,12 @@ import {
     CALL_ACTOR_WAIT_SECS_DEFAULT,
     fetchActorRunData,
 } from './actor_run_response.js';
-import { fixActorNameInputAndLog, getActorsAsTools, MCP_TOOL_NAME_SUFFIX } from './actor_tools_factory.js';
+import {
+    EMPTY_ACTOR_NAME_MESSAGE,
+    fixActorNameInputAndLog,
+    getActorsAsTools,
+    MCP_TOOL_NAME_SUFFIX,
+} from './actor_tools_factory.js';
 
 // ---------------------------------------------------------------------------
 // Shared call-actor description building blocks
@@ -351,7 +356,8 @@ export async function checkPaymentProviderStandbyConflict(params: {
 }): Promise<Record<string, unknown> | null> {
     const { tool, args, paymentProvider, apifyToken, mcpSessionId } = params;
     if (!paymentProvider || !tool.hasPaymentProviderStandbyCheck) return null;
-    const actorName = args.actor;
+    // A Server Actor's own tool takes no `actor` argument: its Actor is fixed.
+    const actorName = tool.type === TOOL_TYPE.ACTOR_SERVER ? tool.actorFullName : args.actor;
     if (typeof actorName !== 'string' || !actorName) return null;
 
     const normalizedActorName = fixActorNameInputAndLog(actorName, { mcpSessionId });
@@ -500,6 +506,7 @@ export async function callActorPreExecute(
     const legacyRejection = buildLegacyMcpSyntaxRejection(options.route, parsedArgs.actor, loadedToolNames);
     if (legacyRejection) return { earlyResponse: legacyRejection };
     const actorName = fixActorNameInputAndLog(parsedArgs.actor, { mcpSessionId, route: options.route });
+    if (!actorName) return { earlyResponse: respondUserError(EMPTY_ACTOR_NAME_MESSAGE) };
 
     // For definition resolution we always use a token-based client; payment provider is only for actual Actor runs.
     // Standby/MCP-server Actors under a third-party payment provider are rejected upstream by
@@ -621,6 +628,7 @@ export const callActor: ToolEntry = Object.freeze({
     ajvValidate: callActorAjvValidate,
     paymentRequired: true,
     hasPaymentProviderStandbyCheck: true,
+    actorInterface: 'input',
     annotations: {
         title: 'Call Actor',
         readOnlyHint: false,
