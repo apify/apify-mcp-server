@@ -35,10 +35,8 @@ const untrustedValidatorCache = new LruCache<ValidateFunction<unknown>>({
 /**
  * Compiles an Actor or proxied-MCP input schema, one validator per schema content.
  *
- * Each miss compiles on a fresh Ajv instance, never on the shared one. Ajv compiles through `new Function`, and V8
- * keeps every distinct source it has compiled that way, past full GCs. A shared instance numbers its scope names
- * with a counter that never resets, so the same schema produced different source each time and every compile
- * stayed resident. On a fresh instance identical schemas compile to identical source. Same as apify-core#27900.
+ * Create a fresh Ajv instance per compilation to avoid unbounded memory growth.
+ * Ajv internally caches every compiled schema in a Map that is never evicted.
  */
 export function compileUntrustedSchema(schema: object): ValidateFunction<unknown> {
     const serialized = JSON.stringify(schema);

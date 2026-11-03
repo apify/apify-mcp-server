@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ajv, compileSchema, fixZodSchemaRequired } from '../../src/utils/ajv.js';
+import { compileSchema, createAjv, fixZodSchemaRequired } from '../../src/utils/ajv.js';
 
 describe('compileSchema', () => {
     it('validates declared properties normally', () => {
@@ -109,12 +109,12 @@ describe('fixZodSchemaRequired', () => {
     });
 });
 
-describe('ajv instance — regex keywords disabled (ReDoS guard)', () => {
+describe('createAjv — regex keywords disabled (ReDoS guard)', () => {
     // The `pattern`/`patternProperties`/`format` keywords compile an attacker-controlled RegExp from
     // untrusted schemas, enabling catastrophic-backtracking ReDoS. They are removed from the instance,
     // so the keyword is ignored: a value that would violate the pattern still validates.
     it('does not enforce `pattern` (no RegExp is compiled from the schema)', () => {
-        const validate = ajv.compile({
+        const validate = createAjv().compile({
             type: 'object',
             properties: { q: { type: 'string', pattern: '^(a+)+$' } },
             required: ['q'],
@@ -123,7 +123,7 @@ describe('ajv instance — regex keywords disabled (ReDoS guard)', () => {
     });
 
     it('does not enforce `patternProperties`', () => {
-        const validate = ajv.compile({
+        const validate = createAjv().compile({
             type: 'object',
             patternProperties: { '^(a+)+$': { type: 'string' } },
         });
@@ -131,7 +131,7 @@ describe('ajv instance — regex keywords disabled (ReDoS guard)', () => {
     });
 
     it('does not enforce `format`', () => {
-        const validate = ajv.compile({
+        const validate = createAjv().compile({
             type: 'object',
             properties: { email: { type: 'string', format: 'email' } },
         });
@@ -139,9 +139,9 @@ describe('ajv instance — regex keywords disabled (ReDoS guard)', () => {
     });
 });
 
-describe('ajv instance — Actor input schemas', () => {
+describe('createAjv — Actor input schemas', () => {
     it('strips extra properties when schema has additionalProperties: false', () => {
-        const validate = ajv.compile({
+        const validate = createAjv().compile({
             type: 'object',
             properties: { url: { type: 'string' } },
             required: ['url'],
@@ -154,7 +154,7 @@ describe('ajv instance — Actor input schemas', () => {
     });
 
     it('keeps extra properties when schema omits additionalProperties', () => {
-        const validate = ajv.compile({
+        const validate = createAjv().compile({
             type: 'object',
             properties: { url: { type: 'string' } },
             required: ['url'],

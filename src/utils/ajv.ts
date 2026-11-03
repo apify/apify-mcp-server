@@ -1,7 +1,10 @@
 import type { ValidateFunction } from 'ajv';
 import Ajv from 'ajv';
 
-/** Ajv with the server's validation policy. Shared for our own schemas; `compileUntrustedSchema` takes a fresh one. */
+/**
+ * Ajv with the server's validation policy. One instance per compile, never shared: Ajv caches every compiled
+ * schema in a Map that is never evicted.
+ */
 export function createAjv(): Ajv {
     const instance = new Ajv({ coerceTypes: 'array', strict: false, removeAdditional: true });
 
@@ -19,8 +22,6 @@ export function createAjv(): Ajv {
     instance.removeKeyword('format');
     return instance;
 }
-
-export const ajv = createAjv();
 
 /**
  * Removes the `$schema` property and drops fields with real `default` values from `required`.
@@ -58,7 +59,7 @@ export function fixZodSchemaRequired(schema: Record<string, unknown>): Record<st
  * and fixing the required array.
  *
  * **Unknown properties are silently stripped** by the AJV `removeAdditional: true` option
- * (set on the shared `ajv` instance). MCP / LLM clients regularly send extra top-level keys
+ * (set in `createAjv`). MCP / LLM clients regularly send extra top-level keys
  * (client metadata, duplicated hints, transport leftovers) that would otherwise cause validation
  * failures. Stripping them is safer than allowing them through with `additionalProperties: true`,
  * because no downstream code should rely on undeclared properties.
@@ -68,5 +69,5 @@ export function fixZodSchemaRequired(schema: Record<string, unknown>): Record<st
  * so they are never subject to this stripping.
  */
 export function compileSchema(schema: Record<string, unknown>): ValidateFunction {
-    return ajv.compile(fixZodSchemaRequired(schema));
+    return createAjv().compile(fixZodSchemaRequired(schema));
 }

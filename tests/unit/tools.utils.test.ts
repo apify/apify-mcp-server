@@ -21,7 +21,7 @@ import { TOOL_TYPE } from '../../src/types.js';
 import { extractActorName, getToolFullName, getToolPublicFieldOnly } from '../../src/utils/tools.js';
 
 describe('compileUntrustedSchema', () => {
-    it('keeps the shared instance configuration: strips unknown properties and ignores `pattern`', () => {
+    it('applies the server validation policy: strips unknown properties and ignores `pattern`', () => {
         const validate = compileUntrustedSchema({
             type: 'object',
             properties: { url: { type: 'string', pattern: '^(a+)+$' } },
