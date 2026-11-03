@@ -292,6 +292,12 @@ describe('sending the request', () => {
         expect(result.isError).toBe(true);
     });
 
+    it('keeps a string body as a string', () => {
+        const args = { actor: 'apify/web-fetch', method: 'POST', path: '/', body: 'text' };
+        expect(sendServerActorRequest.ajvValidate(args)).toBe(true);
+        expect(args.body).toBe('text');
+    });
+
     it('sends to an Actor with both an API schema and an MCP path, even one that would not resolve', async () => {
         const received = recordRequests();
         // An MCP path off the standby origin fails only an MCP call; the HTTP interface does not depend on it.

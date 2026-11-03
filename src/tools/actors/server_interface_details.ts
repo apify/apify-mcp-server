@@ -49,12 +49,16 @@ function formatDetailsCall(actorFullName: string, serverInterface: true | string
     return `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorFullName, output: { serverInterface } })}`;
 }
 
-/** `undefined` when the references expand past `MAX_INLINE_BYTES`. */
-function renderWithinBudget<T>(
+/**
+ * `render`, and it as fenced JSON; `undefined` when the inlined `$ref` targets exceed `maxExpansionBytes`. The
+ * caller checks the output size.
+ */
+function formatDereferencedJson<T>(
     schema: unknown,
     render: (context: DereferenceContext) => T,
+    maxExpansionBytes = MAX_INLINE_BYTES,
 ): { value: T; json: string } | undefined {
-    const budget = { remainingBytes: MAX_INLINE_BYTES };
+    const budget = { remainingBytes: maxExpansionBytes };
     try {
         const value = render({ spec: schema, shouldKeepExamples: true, budget });
         return { value, json: wrapJsonText(value) };
@@ -117,14 +121,25 @@ function buildServerInterfaceFacts(
     };
 }
 
-/** What a request costs, from the facts. */
-function formatCostNotice({ tenancy, idleTimeoutSecs }: ServerInterfaceDetails, hasPaymentProvider: boolean): string {
-    if (hasPaymentProvider) return 'Requests to a server interface are not supported in agentic payment mode.';
+/**
+ * How the Actor's tenancy bills its server interface: a run in your account (single-tenant) or per-event charges
+ * (multi-tenant).
+ */
+export function formatTenancyBilling({
+    tenancy,
+    idleTimeoutSecs,
+}: Pick<ServerInterfaceDetails, 'tenancy' | 'idleTimeoutSecs'>): string {
     if (tenancy === ACTOR_TENANCY.MULTI_TENANT) {
         return `${tenancy}: requests are charged per event and start no run in your account.`;
     }
     const idleTimeout = idleTimeoutSecs === undefined ? 'its idle timeout' : `its idle timeout of ${idleTimeoutSecs} s`;
     return `${tenancy}: the first request starts a run in your account, kept for ${idleTimeout}.`;
+}
+
+/** What a request costs, from the facts. */
+function formatCostNotice(facts: ServerInterfaceDetails, hasPaymentProvider: boolean): string {
+    if (hasPaymentProvider) return 'Requests to a server interface are not supported in agentic payment mode.';
+    return formatTenancyBilling(facts);
 }
 
 function formatSendExample(actorFullName: string, lead: string, { method, path }: ServerOperation): string {
@@ -146,7 +161,7 @@ function buildOperationsSection(
     operations: ServerOperation[],
 ): ServerInterfaceSection | { error: string } {
     const header = formatHeader(`# Server interface of ${actorFullName}`, 'a request to one of them', operations[0]);
-    const full = renderWithinBudget(schema, (context) => ({
+    const full = formatDereferencedJson(schema, (context) => ({
         ...facts,
         operations: operations.map((operation) => buildServerOperationDetails(operation, context)),
     }));
@@ -172,7 +187,7 @@ function buildOperationSection(
         'this request',
         operation,
     );
-    const one = renderWithinBudget(schema, (context) => ({
+    const one = formatDereferencedJson(schema, (context) => ({
         ...facts,
         operations: [buildServerOperationDetails(operation, context)],
     }));
