@@ -250,15 +250,15 @@ export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
         if (!toolInfo) continue;
         const { actorFullName } = definition;
         const isReadOnly = isReadOnlyActor(actorInfo);
-        // Names fetch-actor-details only when the session has it, and only when the operations are not in full.
-        const billing = formatTenancyBilling({
+        const costNotice = formatTenancyBilling({
             tenancy: resolveActorTenancy(actor),
             idleTimeoutSecs: actor.actorStandby?.idleTimeoutSecs,
         });
+        // Names fetch-actor-details only when the session has it, and only when the operations are not in full.
         const buildDescription = ({ hasTool }: ToolDescriptionContext): string => {
             const head = `This tool sends one HTTP request to the server interface of the Actor "${actorFullName}" and returns the response.
 ${hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_SERVER_REQUEST}" if user requests this specific Actor.\n` : ''}Actor description: ${definition.description}
-${billing}
+${costNotice}
 The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text; other content types, and bodies over ${MAX_INLINE_BYTES} bytes, are not returned.
 
 Operations:
