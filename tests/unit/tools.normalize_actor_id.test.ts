@@ -56,6 +56,24 @@ describe('fixActorNameInput', () => {
         expect(fixActorNameInput('"apify / rag-web-browser"')).toBe('apify/rag-web-browser');
     });
 
+    it('strips leading and trailing slashes', () => {
+        expect(fixActorNameInput('/apify/rag-web-browser')).toBe('apify/rag-web-browser');
+        expect(fixActorNameInput('apify/rag-web-browser/')).toBe('apify/rag-web-browser');
+        expect(fixActorNameInput('//apify/rag-web-browser//')).toBe('apify/rag-web-browser');
+    });
+
+    it('strips slash padding inside quote wrappers', () => {
+        expect(fixActorNameInput('"/apify/rag-web-browser/"')).toBe('apify/rag-web-browser');
+    });
+
+    it('strips a trailing slash before dropping the :toolName suffix', () => {
+        expect(fixActorNameInput('apify/example-mcp-server:add/')).toBe('apify/example-mcp-server');
+    });
+
+    it('reduces a lone slash to an empty name', () => {
+        expect(fixActorNameInput('/')).toBe('');
+    });
+
     it('drops the :toolName suffix of the removed actorName:toolName form', () => {
         expect(fixActorNameInput('apify/example-mcp-server:add')).toBe('apify/example-mcp-server');
         expect(fixActorNameInput('https://apify.com/apify/rag-web-browser')).toBe(
