@@ -127,7 +127,7 @@ describe('a field projection that matches nothing in the returned items', () => 
         expect(summary).toBe(
             'Fetched 20 of 100 items (offset=0). None of them has the requested fields (price, rating).',
         );
-        expect(nextStep).toContain(HELPER_TOOLS.DATASET_GET);
+        expect(nextStep).toContain(`${HELPER_TOOLS.DATASET_GET} with datasetId=ds-1`);
         expect(nextStep).not.toContain('offset=20');
     });
 

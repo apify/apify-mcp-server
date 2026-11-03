@@ -174,7 +174,7 @@ export function buildDatasetItemsSummaryNextStep(params: {
     offset: number;
     fields: readonly string[];
     hasOnlyEmptyItems: boolean;
-    /** Active loaded tool set; gates the terminal get-dataset reference (see #1007). */
+    /** Active loaded tool set; gates the get-dataset references (see #1007). */
     loadedToolNames: readonly string[];
 }): { summary: string; nextStep: string } {
     const { datasetId, itemCount, totalItemCount, offset, fields, hasOnlyEmptyItems, loadedToolNames } = params;
