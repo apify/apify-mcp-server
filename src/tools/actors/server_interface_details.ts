@@ -121,8 +121,11 @@ function buildServerInterfaceFacts(
     };
 }
 
-/** What a request costs, by tenancy. */
-export function formatServerRequestCost({
+/**
+ * How the Actor's tenancy bills its server interface: a run in your account (single-tenant) or per-event charges
+ * (multi-tenant).
+ */
+export function formatTenancyBilling({
     tenancy,
     idleTimeoutSecs,
 }: Pick<ServerInterfaceDetails, 'tenancy' | 'idleTimeoutSecs'>): string {
@@ -136,7 +139,7 @@ export function formatServerRequestCost({
 /** What a request costs, from the facts. */
 function formatCostNotice(facts: ServerInterfaceDetails, hasPaymentProvider: boolean): string {
     if (hasPaymentProvider) return 'Requests to a server interface are not supported in agentic payment mode.';
-    return formatServerRequestCost(facts);
+    return formatTenancyBilling(facts);
 }
 
 function formatSendExample(actorFullName: string, lead: string, { method, path }: ServerOperation): string {
