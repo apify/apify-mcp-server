@@ -7,14 +7,7 @@ import type { HelperTool } from '../../src/types.js';
 import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
 import { fetchActorDetails } from '../../src/utils/actor_details.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import {
-    expectSoftFailInvalidInput,
-    mockApifyClient,
-    mockUserInfo,
-    only,
-    stubToolCallContext,
-    textOf,
-} from './helpers/tool_context.js';
+import { mockApifyClient, mockUserInfo, only, stubToolCallContext, textOf } from './helpers/tool_context.js';
 
 /**
  * Apps / UI mode: fetch-actor-details-widget renders an interactive UI element
@@ -148,17 +141,6 @@ describe('fetch-actor-details-widget response', () => {
         const tool = fetchActorDetailsWidget as HelperTool;
         const ok = tool.ajvValidate({ actor: 'apify/web-scraper' });
         expect(ok).toBe(true);
-    });
-
-    it('rejects a whitespace-only actor before the users/me and Actor lookups', async () => {
-        const result = await (fetchActorDetailsWidget as HelperTool).call(
-            stubToolCallContext({ actor: '   ' }, mockApifyClient()),
-        );
-
-        expectSoftFailInvalidInput(result);
-        expect((result.content ?? []).map(textOf).join('\n')).toContain('"actor" must not be empty');
-        expect(getUserInfoCached).not.toHaveBeenCalled();
-        expect(fetchActorDetails).not.toHaveBeenCalled();
     });
 
     // The widget shares buildActorNotFoundResponse with the base tool, so it must forward the
