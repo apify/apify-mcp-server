@@ -59,25 +59,23 @@ type SendServerActorRequestArgs = z.infer<typeof sendServerActorRequestArgs>;
 
 /**
  * The input schema and validator of a selected Server Actor's tool: this tool's arguments without `actor`, `method`
- * and `path` narrowed to the documented ones, each with a default when there is one, and `body` only when an
- * operation takes one. A templated path cannot be an enum, so then `path` is a string that lists the paths.
+ * narrowed to the documented ones, a default for a single method or path, and `body` only when an operation takes
+ * one. `path` is a plain string, not an enum: a creator can document thousands of paths, and the Actor Server
+ * answers an unknown one with a 404.
  */
 export function buildServerActorToolSchemas({
     methods,
-    paths,
+    defaultPath,
     hasRequestBody,
-}: Pick<ServerActorToolInfo, 'methods' | 'paths' | 'hasRequestBody'>) {
+}: Pick<ServerActorToolInfo, 'methods' | 'defaultPath' | 'hasRequestBody'>) {
     const method = z.enum(methods).describe('HTTP method of the operation.');
-    const isTemplated = paths.some((path) => /\{[^}]*\}/.test(path));
-    const path = isTemplated
-        ? z
-              .string()
-              .min(1)
-              .describe(`The path of an operation: ${paths.join(', ')}. Replace each {name} with its value.`)
-        : z.enum(paths).describe('The path of an operation.');
+    const path = z
+        .string()
+        .min(1)
+        .describe('The path of an operation listed in the description. Replace each {name} with its value.');
     const args = z.object({
         method: methods.length === 1 ? method.default(methods[0]) : method,
-        path: paths.length === 1 && !isTemplated ? path.default(paths[0]) : path,
+        path: defaultPath === undefined ? path : path.default(defaultPath),
         query: sendServerActorRequestArgs.shape.query,
         ...(hasRequestBody && { body: sendServerActorRequestArgs.shape.body }),
     });

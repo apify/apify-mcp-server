@@ -144,24 +144,38 @@ describe('serving a selected Server Actor through its server interface', () => {
 
 describe('the input schema of a Server Actor tool', () => {
     const schemasOf = (info: Partial<ServerActorToolInfo>) =>
-        buildServerActorToolSchemas({ methods: ['GET'], paths: ['/'], hasRequestBody: false, ...info });
+        buildServerActorToolSchemas({ methods: ['GET'], hasRequestBody: false, ...info });
 
-    it('narrows the method and the path to the documented ones and requires them', () => {
-        const { inputSchema } = schemasOf({
-            methods: ['GET', 'POST'],
-            paths: ['/add', '/empty'],
-            hasRequestBody: true,
-        });
+    it('narrows the method to the documented ones, and requires the method and the path', () => {
+        const { inputSchema, ajvValidate } = schemasOf({ methods: ['GET', 'POST'], hasRequestBody: true });
 
-        expect(inputSchema.properties).toMatchObject({
-            method: { enum: ['GET', 'POST'] },
-            path: { enum: ['/add', '/empty'] },
-        });
+        expect(inputSchema.properties).toMatchObject({ method: { enum: ['GET', 'POST'] } });
         expect(inputSchema.required).toEqual(['method', 'path']);
+        expect(ajvValidate({ method: 'DELETE', path: '/add' })).toBe(false);
+    });
+
+    // The Actor Server answers an unknown path with a 404, and the send tool adds the recovery text.
+    it('takes the path as a plain string that points at the operations in the description', () => {
+        const { inputSchema, ajvValidate } = schemasOf({});
+        const path = inputSchema.properties?.path as Record<string, unknown>;
+
+        expect(path).toMatchObject({ type: 'string', minLength: 1 });
+        expect(path).not.toHaveProperty('enum');
+        expect(path.description).toContain('listed in the description');
+        expect(ajvValidate({ method: 'GET', path: '/status/404' })).toBe(true);
+    });
+
+    it('keeps the input schema the same size for any number of documented paths', () => {
+        const pathsOf = (count: number) =>
+            Object.fromEntries(Array.from({ length: count }, (_, i) => [`/path-${i}`, { get: {} }]));
+        const sizeOf = (count: number) =>
+            JSON.stringify(buildServerActorToolSchemas(infoOf({ paths: pathsOf(count) })).inputSchema).length;
+
+        expect(sizeOf(10_000)).toBe(sizeOf(2));
     });
 
     it('defaults a single method and path, which the validator fills in', () => {
-        const { inputSchema, ajvValidate } = schemasOf({ methods: ['POST'], paths: ['/'] });
+        const { inputSchema, ajvValidate } = schemasOf({ methods: ['POST'], defaultPath: '/' });
         const args: Record<string, unknown> = {};
 
         expect(inputSchema.properties).toMatchObject({ method: { default: 'POST' }, path: { default: '/' } });
@@ -169,21 +183,10 @@ describe('the input schema of a Server Actor tool', () => {
         expect(args).toEqual({ method: 'POST', path: '/' });
     });
 
-    it('rejects a method or a path outside the documented ones', () => {
-        const { ajvValidate } = schemasOf({ methods: ['GET', 'POST'], paths: ['/add', '/empty'] });
-
-        expect(ajvValidate({ method: 'DELETE', path: '/add' })).toBe(false);
-        expect(ajvValidate({ method: 'GET', path: '/admin' })).toBe(false);
-    });
-
-    it('takes a templated path as a string that lists the paths, with no default', () => {
-        const { inputSchema, ajvValidate } = schemasOf({ paths: ['/status/{code}'] });
-        const path = inputSchema.properties?.path as Record<string, unknown>;
-
-        expect(path).not.toHaveProperty('enum');
-        expect(path).not.toHaveProperty('default');
-        expect(path.description).toContain('/status/{code}');
-        expect(ajvValidate({ path: '/status/404' })).toBe(true);
+    it('defaults the path only for a single path with no template', () => {
+        expect(infoOf(SCHEMA).defaultPath).toBeUndefined();
+        expect(infoOf({ paths: { '/': { get: {}, post: {} } } }).defaultPath).toBe('/');
+        expect(infoOf({ paths: { '/status/{code}': { get: {} } } }).defaultPath).toBeUndefined();
     });
 
     it('leaves the body out when no operation takes one', () => {
@@ -197,7 +200,6 @@ describe('the length of a Server Actor tool description', () => {
     const LINES = ['- GET /a: A.', '- GET /b: B.', '- GET /c: C.'];
     const infoWith = (fullLength: number, overrides: Partial<ServerActorToolInfo> = {}): ServerActorToolInfo => ({
         methods: ['GET'],
-        paths: ['/a', '/b', '/c'],
         hasRequestBody: false,
         fullOperations: 'f'.repeat(fullLength),
         operationLines: LINES,
@@ -281,12 +283,8 @@ describe('the operations in a Server Actor tool description', () => {
         expect(info.operationLines.length).toBeLessThan(count);
     });
 
-    it('come with the documented methods and paths, and whether an operation takes a body', () => {
-        expect(infoOf(SCHEMA)).toMatchObject({
-            methods: ['GET', 'POST'],
-            paths: ['/add', '/empty'],
-            hasRequestBody: true,
-        });
+    it('come with the documented methods, and whether an operation takes a body', () => {
+        expect(infoOf(SCHEMA)).toMatchObject({ methods: ['GET', 'POST'], hasRequestBody: true });
         expect(buildServerActorToolInfo({ paths: {} }, 'apify/server-actor-test')).toBeUndefined();
     });
 });

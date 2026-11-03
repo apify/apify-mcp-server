@@ -878,7 +878,7 @@ describe("a selected Server Actor's own tool", () => {
         const cached = actorDefinitionCache.get(SERVER_ACTOR)!;
         const webServerToolInfo: ServerActorToolInfo = {
             methods: ['POST'],
-            paths: ['/echo'],
+            defaultPath: '/echo',
             hasRequestBody: true,
             operationLines: [],
             operationCount: 1,
