@@ -7,7 +7,7 @@ import {
     buildApifySpecificProperties,
     decodeDotPropertyNames,
     encodeDotPropertyNames,
-    fixedAjvCompile,
+    compileUntrustedSchema,
     inferArrayItemsTypeIfMissing,
     inferArrayItemType,
     MAX_UNTRUSTED_SCHEMA_BYTES,
@@ -18,13 +18,35 @@ import {
 import { isActorBlockedUnderPaymentProvider } from '../../src/tools/actor_tool_naming.js';
 import type { ActorInputSchema, SchemaProperties, ToolBase, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
-import { ajv } from '../../src/utils/ajv.js';
 import { extractActorName, getToolFullName, getToolPublicFieldOnly } from '../../src/utils/tools.js';
 
-describe('fixedAjvCompile — untrusted schema size cap', () => {
-    it('compiles a normal-sized schema', () => {
-        const validate = fixedAjvCompile(ajv, { type: 'object', properties: { url: { type: 'string' } } });
-        expect(validate({ url: 'https://example.com' })).toBe(true);
+describe('compileUntrustedSchema', () => {
+    it('applies the server validation policy: strips unknown properties and ignores `pattern`', () => {
+        const validate = compileUntrustedSchema({
+            type: 'object',
+            properties: { url: { type: 'string', pattern: '^(a+)+$' } },
+            additionalProperties: false,
+        });
+        const input = { url: 'https://example.com', extra: 1 };
+        expect(validate(input)).toBe(true);
+        expect(input).toEqual({ url: 'https://example.com' });
+    });
+
+    it('caches validator for identical schemas', () => {
+        const schema = () => ({ type: 'object', properties: { url: { type: 'string' } }, required: ['url'] });
+        const first = compileUntrustedSchema(schema());
+        expect(compileUntrustedSchema(schema())).toBe(first);
+        expect(compileUntrustedSchema({ ...schema(), required: [] })).not.toBe(first);
+    });
+
+    it('generates identical validator source for equivalent rules on separate cache misses', () => {
+        const schema = { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] };
+        const first = compileUntrustedSchema({ ...schema, description: 'First Actor input' });
+        const second = compileUntrustedSchema({ ...schema, description: 'Second Actor input' });
+
+        expect(second).not.toBe(first);
+        // V8 retains distinct generated source; a reused Ajv changes its scope names on every compile.
+        expect(second.toString()).toBe(first.toString());
     });
 
     it('throws SchemaTooLargeError on an oversized schema before AJV codegen runs (DoS guard)', () => {
@@ -32,7 +54,7 @@ describe('fixedAjvCompile — untrusted schema size cap', () => {
         for (let i = 0; i < 16000; i++) properties[`p${i}`] = { type: 'string' };
         const huge = { type: 'object', properties };
         expect(JSON.stringify(huge).length).toBeGreaterThan(MAX_UNTRUSTED_SCHEMA_BYTES);
-        expect(() => fixedAjvCompile(ajv, huge)).toThrow(SchemaTooLargeError);
+        expect(() => compileUntrustedSchema(huge)).toThrow(SchemaTooLargeError);
     });
 });
 
@@ -1183,7 +1205,7 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
                 description: '',
                 inputSchema,
             } as ToolBase);
-            const validate = fixedAjvCompile(ajv, inputSchema);
+            const validate = compileUntrustedSchema(inputSchema);
 
             expect(inputSchema.required).toEqual(['query']);
             expect((pub.inputSchema as { required?: string[] }).required).toEqual(['query']);
@@ -1229,7 +1251,7 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
         expect(displayProperties.categoryFilterWords.description).toContain('kept-0');
 
         // A value that a partial enum would have cut is now accepted; only `type` is enforced.
-        const validate = fixedAjvCompile(ajv, inputSchema);
+        const validate = compileUntrustedSchema(inputSchema);
         expect(validate({ categoryFilterWords: [droppedValue] })).toBe(true);
     });
 });
