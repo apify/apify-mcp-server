@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS, RAG_WEB_BROWSER } from '../../src/const.js';
 import { ACTOR_LOAD_ERROR_KIND } from '../../src/errors.js';
+import { actorDefinitionCache } from '../../src/state.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { getActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import { buildServerActorToolSchemas } from '../../src/tools/actors/send_server_actor_request.js';
@@ -132,6 +133,32 @@ describe('serving a selected Server Actor through its server interface', () => {
         const { tools } = await loadTools(SCHEMA, { actor: { username, name } });
 
         expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR]);
+    });
+
+    // A definition built before the tool info existed, such as one restored from a cache, has no tool to serve.
+    it('reports a Server Actor whose definition carries no tool instead of dropping it', async () => {
+        const actor = mockActor({
+            id: 'stale-server-actor',
+            name: 'stale-server-actor',
+            isPublic: true,
+            actorStandby: { isEnabled: true },
+        });
+        const { apifyClient } = mockActorBuildClient({
+            actor,
+            defaultBuild: mockDefaultBuild({ webServerSchema: SCHEMA }),
+        });
+        const actorName = `${actor.username}/${actor.name}`;
+        await getActorsAsTools([actorName], apifyClient);
+        const cached = actorDefinitionCache.get(actorName)!;
+        actorDefinitionCache.set(actorName, {
+            ...cached,
+            definition: { ...cached.definition, webServerToolInfo: undefined },
+        });
+
+        const { tools, errors } = await getActorsAsTools([actorName], apifyClient);
+
+        expect(tools).toEqual([]);
+        expect(errors).toMatchObject([{ kind: ACTOR_LOAD_ERROR_KIND.LOAD_FAILED, actorName }]);
     });
 
     it('is not served in a payment-provider session', async () => {
@@ -294,7 +321,9 @@ describe('the operations in a Server Actor tool description', () => {
         const tool = await loadServerTool({ paths });
 
         expect(tool.buildDescription?.(only(HELPER_TOOLS.ACTOR_GET_DETAILS))).toMatch(
-            new RegExp(`… and \\d+ more\n${HELPER_TOOLS.ACTOR_GET_DETAILS} with .*"serverInterface":true}} lists every operation\\.$`),
+            new RegExp(
+                `… and \\d+ more\n${HELPER_TOOLS.ACTOR_GET_DETAILS} with .*"serverInterface":true}} lists every operation\\.$`,
+            ),
         );
     });
 

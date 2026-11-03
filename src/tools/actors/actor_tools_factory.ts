@@ -246,6 +246,7 @@ export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
     for (const actorInfo of actorsInfo) {
         const { definition, actor } = actorInfo;
         const toolInfo = definition.webServerToolInfo;
+        // `getActorsAsTools` reports an Actor without it.
         if (!toolInfo) continue;
         const { actorFullName } = definition;
         const isReadOnly = isReadOnlyActor(actorInfo);
@@ -497,6 +498,17 @@ export async function getActorsAsTools(
                 mcpSessionId,
                 actorLoadErrorKind: error.kind,
                 failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+            });
+            errors.push(error);
+            continue;
+        }
+        if (toolMode === ACTOR_TOOL_MODE.SERVER && !actorInfo.definition.webServerToolInfo) {
+            // A definition built before `webServerToolInfo` existed has a server interface and no tool to serve.
+            const error = ActorLoadError.loadFailed(actorInfo.definition.actorFullName);
+            log.warning('Skipping Server Actor whose definition has no tool info', {
+                actorName: actorInfo.definition.actorFullName,
+                mcpSessionId,
+                actorLoadErrorKind: error.kind,
             });
             errors.push(error);
             continue;
