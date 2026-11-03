@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS, INPUT_INTERFACE_ACTORS, MAX_INLINE_BYTES } from '../../const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
 import type {
     ConsoleLinkContext,
     HelperTool,
@@ -23,7 +23,7 @@ import { buildConsoleActorUrl, getConsoleLinkContext, VERBATIM_LINKS_NUDGE } fro
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import { canRunActor, getOwnServerRemedy } from '../actor_tool_naming.js';
+import { canRunActor, getOwnServerRemedy, hasMcpInterface } from '../actor_tool_naming.js';
 import { resolveSiblingNextStep } from '../storage/storage_helpers.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
@@ -234,10 +234,11 @@ export function buildActorDetailsTextResponse(options: {
 
     if (serverInterface?.text) texts.push(serverInterface.text);
 
-    const isMcpServerActor =
-        details.actorInfo.actorStandby?.isEnabled === true &&
-        details.webServerMcpPath &&
-        !INPUT_INTERFACE_ACTORS.has(`${details.actorInfo.username}/${details.actorInfo.name}`);
+    const isMcpServerActor = hasMcpInterface(
+        details.actorInfo,
+        details.webServerMcpPath,
+        `${details.actorInfo.username}/${details.actorInfo.name}`,
+    );
     const mcpNextStep = isMcpServerActor
         ? resolveSiblingNextStep(
               HELPER_TOOLS.ACTOR_MCP_TOOL_LIST,
