@@ -238,6 +238,15 @@ describe('formatting Zod issues as argument clauses', () => {
         );
     });
 
+    it('does not describe an object union using the types of its invalid child fields', () => {
+        const schema = z.object({
+            output: z.union([z.object({ name: z.string() }), z.object({ count: z.number() })]),
+        });
+        const issues = issuesOf(schema, { output: { name: 1, count: 'invalid' } });
+
+        expect(formatZodIssues(issues)).toBe(`output: ${issues[0].message}`);
+    });
+
     it('reports a missing required argument as received undefined', () => {
         expect(formatZodIssues(issuesOf(z.object({ actor: z.string() }), {}))).toBe(
             'actor: expected string, got undefined',
