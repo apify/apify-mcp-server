@@ -25,7 +25,7 @@ Examples of when to use:
 - A previous attempt to fetch a page was blocked, returned an error or CAPTCHA, or came back incomplete because the page needs JavaScript rendering
 - Verbatim page content is needed, e.g. for quoting, extraction, or archiving
 
-It does not search the web - it needs a URL. To find pages by query, use a web search tool.
+It does not search the web - it needs a URL.
 If the exact URL cannot be fetched (e.g. a non-http(s) scheme such as ftp:), say so rather than silently substituting a different URL.`;
 
 /** Appended to the `apify/web-search` Actor tool description. */
