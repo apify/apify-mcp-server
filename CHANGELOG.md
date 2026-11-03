@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Enable send-server-actor-request by default ([#1745](https://github.com/apify/apify-mcp-server/pull/1745)) ([3a2c855](https://github.com/apify/apify-mcp-server/commit/3a2c855b2362ba73fbde64cd523e1a98d83fd883)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#1702](https://github.com/apify/apify-mcp-server/issues/1702)
+- [**breaking**] Serve a selected Server Actor through its server interface ([#1747](https://github.com/apify/apify-mcp-server/pull/1747)) ([b1bef99](https://github.com/apify/apify-mcp-server/commit/b1bef99b281ef367493d6bd73306697c9f6d1318)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#1689](https://github.com/apify/apify-mcp-server/issues/1689)
 
 ### 🐛 Bug Fixes
 
