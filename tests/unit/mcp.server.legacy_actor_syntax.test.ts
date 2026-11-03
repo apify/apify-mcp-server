@@ -53,6 +53,35 @@ describe('legacy Actor MCP syntax rejection', () => {
         },
     );
 
+    // Normalization strips slash padding and quotes before it drops `:tool`, so the check must see the same name.
+    it.each(['apify/rag-web-browser:add/', '"apify/rag-web-browser:add/"'])(
+        'rejects %s, the syntax with slash padding, before metadata lookup',
+        async (actor) => {
+            const lookup = vi.spyOn(ApifyClient.prototype, 'actor').mockImplementation(() => {
+                throw new Error('Actor metadata unavailable');
+            });
+
+            await withServer(async (server) => {
+                server.upsertTools([callActor, callActorMcpTool]);
+                const result = await getRequestHandler(server, 'tools/call')(
+                    {
+                        method: 'tools/call',
+                        params: {
+                            name: callActor.name,
+                            arguments: { actor, input: {} },
+                            _meta: { mcpSessionId: 's1' },
+                        },
+                    },
+                    { signal: new AbortController().signal, sendNotification: vi.fn() },
+                );
+
+                expect(result.isError).toBe(true);
+                expect(JSON.stringify(result.content)).toContain('no longer supported');
+                expect(lookup).not.toHaveBeenCalled();
+            });
+        },
+    );
+
     it('omits an unavailable replacement and gives a configuration remedy', async () => {
         vi.spyOn(ApifyClient.prototype, 'actor').mockImplementation(() => {
             throw new Error('Actor metadata unavailable');

@@ -311,6 +311,11 @@ export const MCP_TOOL_NAME_SUFFIX = /:[^/]*$/;
  * It also drops the `:toolName` of the removed `actorName:toolName` form, since a name never contains a colon.
  */
 export function fixActorNameInput(actorName: string): string {
+    return normalizeActorNameInput(actorName).replace(MCP_TOOL_NAME_SUFFIX, '');
+}
+
+/** {@link fixActorNameInput} without dropping the `:toolName` suffix, so the legacy-syntax check sees the same name. */
+export function normalizeActorNameInput(actorName: string): string {
     const s = stripQuoteWrappers(actorName).replace(/\s*\/\s*/g, '/');
     return (
         s
@@ -318,7 +323,6 @@ export function fixActorNameInput(actorName: string): string {
             .trim()
             // The lookbehind starts a trailing match only at the start of a slash run, so long runs stay linear.
             .replace(/^\/+|(?<!\/)\/+$/g, '')
-            .replace(MCP_TOOL_NAME_SUFFIX, '')
     );
 }
 
