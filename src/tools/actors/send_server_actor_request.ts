@@ -485,7 +485,6 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         USAGE EXAMPLES:
         - user_input: Search the web for the latest AI news with apify/web-search
         - user_input: Find articles about Apify from the past week with apify/web-search
-        - user_input: Get the content of https://example.com with apify/web-fetch
     `;
 }
 

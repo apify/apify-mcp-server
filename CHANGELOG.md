@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.20.2 - **not yet released**
 
+### 🚀 Features
+
+- Enable send-server-actor-request by default ([#1745](https://github.com/apify/apify-mcp-server/pull/1745)) ([3a2c855](https://github.com/apify/apify-mcp-server/commit/3a2c855b2362ba73fbde64cd523e1a98d83fd883)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#1702](https://github.com/apify/apify-mcp-server/issues/1702)
+
 ### 🐛 Bug Fixes
 
 - Compile untrusted schemas on a fresh Ajv instance and cache validators by content ([#1786](https://github.com/apify/apify-mcp-server/pull/1786)) ([ce708a0](https://github.com/apify/apify-mcp-server/commit/ce708a01f3f0b9cef322f8a01274f37bf8e41757)) by [@jirispilka](https://github.com/jirispilka), closes [#905](https://github.com/apify/apify-mcp-server/issues/905)
