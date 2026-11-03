@@ -51,7 +51,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `fetch_actor_mcp_tool_list.ts` (`fetch-actor-mcp-tool-list`: an uncached `tools/list` through
     `runOnActorMcpServer` that follows `nextCursor` within one `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC` for all pages,
     fails on a failed page and stops after `MAX_TOOL_LIST_PAGES`;
-    `fetch-actor-details` never connects to an MCP server),
+    `fetch-actor-details` never connects to an MCP server; for an MCP server Actor outside `INPUT_INTERFACE_ACTORS` its
+    `nextStep` names this tool when the session has it, otherwise the own-server remedy),
     `actor_tool_contract.ts` (Actor-specific presentation policies plus direct-tool input restrictions
     and defaults, shared by schema generation, the call engine's denied-input check and execution;
     generic calls skip direct-only restrictions and defaults), and

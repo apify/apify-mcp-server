@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
+import { HELPER_TOOLS, INPUT_INTERFACE_ACTORS, MAX_INLINE_BYTES } from '../../const.js';
 import type {
     ConsoleLinkContext,
     HelperTool,
@@ -24,6 +24,7 @@ import { wrapJsonText } from '../../utils/encode_text.js';
 import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunActor, getOwnServerRemedy } from '../actor_tool_naming.js';
+import { resolveSiblingNextStep } from '../storage/storage_helpers.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 import type { ServerInterfaceSection } from './server_interface_details.js';
@@ -183,11 +184,12 @@ export function buildActorDetailsTextResponse(options: {
     actorOutputSchema?: Record<string, unknown> | null;
     serverInterface?: ServerInterfaceSection;
     linkContext?: ConsoleLinkContext;
+    loadedToolNames: readonly string[];
 }): {
     texts: string[];
     structuredContent: Record<string, unknown>;
 } {
-    const { details, output, actorOutputSchema, serverInterface, linkContext } = options;
+    const { details, output, actorOutputSchema, serverInterface, linkContext, loadedToolNames } = options;
 
     const actorUrl =
         buildConsoleActorUrl(linkContext, details.actorInfo.id) ??
@@ -232,6 +234,20 @@ export function buildActorDetailsTextResponse(options: {
 
     if (serverInterface?.text) texts.push(serverInterface.text);
 
+    const isMcpServerActor =
+        details.webServerMcpPath &&
+        !INPUT_INTERFACE_ACTORS.has(`${details.actorInfo.username}/${details.actorInfo.name}`);
+    const mcpNextStep = isMcpServerActor
+        ? resolveSiblingNextStep(
+              HELPER_TOOLS.ACTOR_MCP_TOOL_LIST,
+              loadedToolNames,
+              `This Actor is an MCP server; ${HELPER_TOOLS.ACTOR_MCP_TOOL_LIST} lists its tools.`,
+              'This Actor is an MCP server. Its MCP tools cannot be listed in this configuration. ' +
+                  `To use them, ${getOwnServerRemedy()}`,
+          )
+        : undefined;
+    if (mcpNextStep) texts.push(mcpNextStep);
+
     if (linkContext) {
         texts.push(VERBATIM_LINKS_NUDGE);
     }
@@ -242,6 +258,7 @@ export function buildActorDetailsTextResponse(options: {
         inputSchema: output.inputSchema ? details.inputSchema : undefined,
         outputSchema: output.outputSchema ? (actorOutputSchema ?? {}) : undefined,
         serverInterface: serverInterface?.serverInterface,
+        ...(mcpNextStep && { nextStep: mcpNextStep }),
     };
 
     return { texts, structuredContent };
@@ -305,6 +322,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         actorOutputSchema,
         serverInterface,
         linkContext,
+        loadedToolNames,
     });
 
     // Resolved Actor ID, not the raw `actor` input — that may itself be an ID.
