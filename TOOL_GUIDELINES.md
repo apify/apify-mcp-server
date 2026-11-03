@@ -55,6 +55,7 @@ sentence can block a listing. Every configuration of this server must pass them.
 - Exception: `search-actors` and its widget have an optional `useCase` argument (not a tool) that `withoutUseCaseField` removes from the served schema for clients `isStoreUseCaseServable` does not allow.
 - Read and write operations are separate tools; a generic write tool stays out of every selectable
   category. A tool that takes freeform paths or bodies names the target API in its description.
+- Exception: `send-server-actor-request` sends any method to a Server Actor's API and is in the `actors` category.
 - A minimal valid call must succeed: never require an input that has a default.
 
 ## Annotations
