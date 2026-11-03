@@ -171,12 +171,12 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
             ACTOR_MAX_MEMORY_MBYTES,
         );
 
-        let ajvValidate;
+        let compiled;
         try {
             // Unknown properties are silently stripped by AJV's removeAdditional option.
             // Dynamic Actor input fields are part of the Actor's own inputSchema, so they
             // are declared properties and won't be stripped.
-            ajvValidate = compileUntrustedSchema(inputSchema);
+            compiled = compileUntrustedSchema(inputSchema as ToolInputSchema);
         } catch (e) {
             // SchemaTooLargeError logs as a soft fail; a genuine AJV compile error stays an error.
             logHttpError(e, 'Failed to compile schema', {
@@ -194,11 +194,11 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
             actorFullName: definition.actorFullName,
             description: buildDescription(ALL_TOOLS_PRESENT),
             buildDescription,
-            // The cached validator already holds this schema; point at it so sessions share one copy.
-            inputSchema: ajvValidate.schema as ToolInputSchema,
+            // The compile cache returns one schema object per content, so sessions share one copy.
+            inputSchema: compiled.schema,
             // Canonical RunResponse shape — same as call-actor and get-actor-run.
             outputSchema: actorRunOutputSchema,
-            ajvValidate,
+            ajvValidate: compiled.validate,
             paymentRequired: true,
             memoryMbytes,
             icons: definition.pictureUrl ? [{ src: definition.pictureUrl, mimeType: 'image/png' }] : undefined,

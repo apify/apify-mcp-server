@@ -22,7 +22,7 @@ import { extractActorName, getToolFullName, getToolPublicFieldOnly } from '../..
 
 describe('compileUntrustedSchema', () => {
     it('applies the server validation policy: strips unknown properties and ignores `pattern`', () => {
-        const validate = compileUntrustedSchema({
+        const { validate } = compileUntrustedSchema({
             type: 'object',
             properties: { url: { type: 'string', pattern: '^(a+)+$' } },
             additionalProperties: false,
@@ -41,8 +41,8 @@ describe('compileUntrustedSchema', () => {
 
     it('generates identical validator source for equivalent rules on separate cache misses', () => {
         const schema = { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] };
-        const first = compileUntrustedSchema({ ...schema, description: 'First Actor input' });
-        const second = compileUntrustedSchema({ ...schema, description: 'Second Actor input' });
+        const { validate: first } = compileUntrustedSchema({ ...schema, description: 'First Actor input' });
+        const { validate: second } = compileUntrustedSchema({ ...schema, description: 'Second Actor input' });
 
         expect(second).not.toBe(first);
         // V8 retains distinct generated source; a reused Ajv changes its scope names on every compile.
@@ -1205,7 +1205,7 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
                 description: '',
                 inputSchema,
             } as ToolBase);
-            const validate = compileUntrustedSchema(inputSchema);
+            const { validate } = compileUntrustedSchema(inputSchema);
 
             expect(inputSchema.required).toEqual(['query']);
             expect((pub.inputSchema as { required?: string[] }).required).toEqual(['query']);
@@ -1251,7 +1251,7 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
         expect(displayProperties.categoryFilterWords.description).toContain('kept-0');
 
         // A value that a partial enum would have cut is now accepted; only `type` is enforced.
-        const validate = compileUntrustedSchema(inputSchema);
+        const { validate } = compileUntrustedSchema(inputSchema);
         expect(validate({ categoryFilterWords: [droppedValue] })).toBe(true);
     });
 });

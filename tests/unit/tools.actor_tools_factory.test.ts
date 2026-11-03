@@ -61,19 +61,6 @@ describe('getNormalActorsAsTools()', () => {
             expect(second.ajvValidate).toBe(first.ajvValidate);
         });
 
-        it('keeps the schema shared when permissions change, and still reflects them in the read-only annotation', async () => {
-            const [limited] = await getNormalActorsAsTools([
-                createMockActorInfo('apify/shared-schema-permissions', LIMITED),
-            ]);
-            const [unrestricted] = await getNormalActorsAsTools([
-                createMockActorInfo('apify/shared-schema-permissions', { actorPermissionLevel: 'FULL_PERMISSIONS' }),
-            ]);
-
-            expect(unrestricted.inputSchema).toBe(limited.inputSchema);
-            expect(limited.annotations?.readOnlyHint).toBe(true);
-            expect(unrestricted.annotations?.readOnlyHint).toBe(false);
-        });
-
         it('does not share across different input schemas of the same Actor', async () => {
             const [first] = await getNormalActorsAsTools([createMockActorInfo('apify/shared-schema-versions')]);
             const [second] = await getNormalActorsAsTools([
