@@ -279,6 +279,23 @@ describe('the operations in a Server Actor tool description', () => {
         expect(tool.buildDescription?.(only()).endsWith(lines)).toBe(true);
     });
 
+    // The tool has no body argument for it, and it sends only JSON.
+    it('mark a body that is not JSON, such as a form, as not supported', () => {
+        const form = { 'application/x-www-form-urlencoded': {} };
+        const info = infoOf({
+            paths: {
+                '/login': { post: { summary: 'Log in', requestBody: { required: true, content: form } } },
+                '/note': { post: { requestBody: { content: form } } },
+            },
+        });
+
+        expect(info.operationLines).toEqual([
+            '- POST /login {required application/x-www-form-urlencoded body: not supported}: Log in.',
+            '- POST /note {application/x-www-form-urlencoded body: not supported}',
+        ]);
+        expect(info.hasRequestBody).toBe(false);
+    });
+
     it('keep only what can fit the description limit', () => {
         const count = 1000;
         const paths = Object.fromEntries(Array.from({ length: count }, (_, i) => [`/path-${i}`, { get: {} }]));

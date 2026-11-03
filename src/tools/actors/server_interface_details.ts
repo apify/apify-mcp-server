@@ -281,18 +281,22 @@ function formatInputs(inputs: OperationInput[]): string {
 
 /**
  * E.g. `- GET /search [q:string required, limit:integer]: Search the web.`, or
- * `- POST / {url:string required, formats:array}: Fetch a URL.` for a JSON body. Any other body, such as a JSON
- * schema that lists no properties or a form, reads `{request body}`, with `required` when it is.
+ * `- POST / {url:string required, formats:array}: Fetch a URL.` for a JSON body. A JSON body that lists no
+ * properties reads `{request body}`, with `required` when it is. A body the tool cannot send, such as a form, reads
+ * `{application/x-www-form-urlencoded body: not supported}`.
  */
 function formatOperationLine(serverOperation: ServerOperation, schema: unknown): string {
     const { method, path, operation } = serverOperation;
     const { parameters, requestBody } = listOperationInputs(serverOperation, schema);
     let text = `- ${method} ${path}`;
     if (parameters.length > 0) text += ` [${formatInputs(parameters)}]`;
-    if (requestBody) {
-        text += requestBody.properties
-            ? ` {${formatInputs(requestBody.properties)}}`
-            : ` {request body${requestBody.isRequired ? ' required' : ''}}`;
+    if (requestBody?.properties) {
+        text += ` {${formatInputs(requestBody.properties)}}`;
+    } else if (requestBody && !requestBody.isJson && requestBody.contentTypes.length > 0) {
+        const required = requestBody.isRequired ? 'required ' : '';
+        text += ` {${required}${requestBody.contentTypes.join('|')} body: not supported}`;
+    } else if (requestBody) {
+        text += ` {request body${requestBody.isRequired ? ' required' : ''}}`;
     }
     const { summary } = operation;
     if (typeof summary === 'string' && summary) text += `: ${summary}${/[.!?]$/.test(summary) ? '' : '.'}`;
