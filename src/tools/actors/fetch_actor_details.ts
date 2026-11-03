@@ -25,7 +25,7 @@ import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunActor, getOwnServerRemedy } from '../actor_tool_naming.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
-import { fixActorNameInputAndLog } from './actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from './actor_tools_factory.js';
 import type { ServerInterfaceSection } from './server_interface_details.js';
 import { buildServerInterfaceDetails } from './server_interface_details.js';
 
@@ -264,6 +264,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
     const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_GET_DETAILS });
+    if (!actorName) return respondUserError(EMPTY_ACTOR_NAME_MESSAGE);
 
     const resolvedOutput = resolveOutputOptions(parsed.output);
     // Skip the /users/me round-trip when pricing isn't rendered (e.g. inputSchema-only requests). In that case

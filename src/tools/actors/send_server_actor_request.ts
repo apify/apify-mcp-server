@@ -29,7 +29,7 @@ import { apiCallArgsShape, redactApiCallArgs } from '../api/apify_api_request.js
 import { API_METHODS, type ApiMethod, isRecord } from '../api/apify_api_spec.js';
 import { parseBaseMimeType } from '../storage/storage_helpers.js';
 import { anyJsonValueSchema, serverActorRequestOutputSchema } from '../structured_output_schemas.js';
-import { fixActorNameInputAndLog } from './actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 
 const sendServerActorRequestArgs = z.object({
@@ -392,6 +392,7 @@ export async function executeSendServerActorRequest(
     }
 
     const actorName = fixActorNameInputAndLog(args.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_SERVER_REQUEST });
+    if (!actorName) return respondUserError(EMPTY_ACTOR_NAME_MESSAGE);
     const cached = await getActorDefinitionCached(actorName, apifyClient);
     if (!cached) return buildActorNotFoundResponse(actorName, loadedToolNames);
     const { definition, info } = cached;

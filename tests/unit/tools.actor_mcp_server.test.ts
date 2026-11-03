@@ -320,6 +320,21 @@ describe('call-actor-mcp-tool', () => {
         expect(requestHeaders).toHaveLength(0);
     });
 
+    it('rejects a whitespace-only actor without a lookup or a connection', async () => {
+        const lookup = vi.fn();
+
+        const result = await execute(
+            executeCallActorMcpTool,
+            { tool: 'add', actor: '   ' },
+            { apifyClient: mockApifyClient({ actor: lookup }) },
+        );
+
+        expectSoftFailInvalidInput(result);
+        expect((result.content as { text: string }[])[0].text).toContain('"actor" must not be empty');
+        expect(lookup).not.toHaveBeenCalled();
+        expect(requestHeaders).toHaveLength(0);
+    });
+
     it('requires a token without connecting', async () => {
         const result = await dispatch(
             callActorMcpTool,

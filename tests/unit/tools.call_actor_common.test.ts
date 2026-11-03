@@ -1,7 +1,8 @@
 import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
+import { ApifyClient } from '../../src/apify_client.js';
 import {
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
     FAILURE_CATEGORY,
@@ -14,12 +15,21 @@ import {
     buildCallActorDescription,
     buildCallActorErrorResponse,
     callActorArgs,
+    callActorPreExecute,
     callOptionsSchema,
     resolveAndValidateActor,
 } from '../../src/tools/actors/call_actor.js';
 import type { InternalToolArgs, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
-import { only, textOf, type TextToolResult } from './helpers/tool_context.js';
+import type { ToolResponse } from '../../src/utils/mcp.js';
+import {
+    expectSoftFailInvalidInput,
+    mockApifyClient,
+    only,
+    stubToolCallContext,
+    textOf,
+    type TextToolResult,
+} from './helpers/tool_context.js';
 
 vi.mock('../../src/tools/actors/actor_tools_factory.js', async () => {
     const actual = await vi.importActual<Record<string, unknown>>('../../src/tools/actors/actor_tools_factory.js');
@@ -439,6 +449,23 @@ describe('call_actor_common', () => {
                     'would exceed that quota is rejected.',
             );
             expect(description).not.toMatch(/retry/i);
+        });
+    });
+
+    describe('rejecting an empty Actor name', () => {
+        it('rejects a whitespace-only actor before the Actor lookup', async () => {
+            const lookup = vi.spyOn(ApifyClient.prototype, 'actor');
+            onTestFinished(() => lookup.mockRestore());
+
+            const preResult = await callActorPreExecute(
+                stubToolCallContext({ actor: '   ', input: {} }, mockApifyClient()),
+                { route: HELPER_TOOLS.ACTOR_CALL },
+            );
+
+            const { earlyResponse } = preResult as { earlyResponse: ToolResponse };
+            expectSoftFailInvalidInput(earlyResponse);
+            expect((earlyResponse.content ?? []).map(textOf).join('\n')).toContain('"actor" must not be empty');
+            expect(lookup).not.toHaveBeenCalled();
         });
     });
 
