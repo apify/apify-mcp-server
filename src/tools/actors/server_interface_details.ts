@@ -334,11 +334,11 @@ function cutOperationLines(lines: readonly string[], count: number, maxLength: n
 export function buildServerActorToolInfo(schema: unknown, actorFullName: string): ServerActorToolInfo | undefined {
     const operations = listServerOperations(schema);
     if (operations.length === 0) return undefined;
-    const inputs = operations.map((operation) => listOperationInputs(operation, schema));
     const operationLines: string[] = [];
     let length = 0;
-    for (const [index, operation] of operations.entries()) {
-        const line = formatOperationLine(operation, inputs[index]);
+    // Read inputs only as needed: many operations can share a large body schema.
+    for (const operation of operations) {
+        const line = formatOperationLine(operation, listOperationInputs(operation, schema));
         length += line.length + 1;
         if (length > CLIENT_DESCRIPTION_MAX_LENGTH) break;
         operationLines.push(line);
@@ -356,7 +356,7 @@ export function buildServerActorToolInfo(schema: unknown, actorFullName: string)
             : undefined;
     return {
         methods: API_METHODS.filter((apiMethod) => operations.some((operation) => operation.method === apiMethod)),
-        hasRequestBody: inputs.some((operationInputs) => operationInputs.requestBody?.isJson),
+        hasRequestBody: operations.some((operation) => listOperationInputs(operation, schema).requestBody?.isJson),
         ...(full !== undefined && full.length <= CLIENT_DESCRIPTION_MAX_LENGTH && { fullOperations: full }),
         operationLines,
         operationCount: operations.length,

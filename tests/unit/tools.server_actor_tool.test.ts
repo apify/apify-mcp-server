@@ -344,6 +344,92 @@ describe('the operations in a Server Actor tool description', () => {
         expect(info.operationLines.length).toBeLessThan(count);
     });
 
+    it('keeps required body properties beside a referenced schema alias', () => {
+        const info = infoOf({
+            paths: {
+                '/fetch': {
+                    post: {
+                        requestBody: {
+                            required: true,
+                            content: { 'application/json': { schema: { $ref: '#/components/schemas/Fetch' } } },
+                        },
+                    },
+                },
+            },
+            components: {
+                schemas: {
+                    Fetch: {
+                        $ref: '#/components/schemas/Base',
+                        properties: { url: { type: 'string' } },
+                        required: ['url'],
+                    },
+                    Base: { type: 'object' },
+                },
+            },
+        });
+
+        expect(info.operationLines).toEqual(['- POST /fetch {url:string required}']);
+    });
+
+    it('keeps the parameter type beside a referenced schema alias', () => {
+        const info = infoOf({
+            paths: {
+                '/search': {
+                    get: {
+                        parameters: [{ name: 'count', in: 'query', schema: { $ref: '#/components/schemas/Count' } }],
+                    },
+                },
+            },
+            components: {
+                schemas: {
+                    Count: { $ref: '#/components/schemas/Number', type: 'integer' },
+                    Number: { type: 'number' },
+                },
+            },
+        });
+
+        expect(info.operationLines).toEqual(['- GET /search [count:integer]']);
+    });
+
+    it('avoids reading body properties for every documented operation', () => {
+        const count = 1000;
+        let propertyReads = 0;
+        const schema = {
+            paths: Object.fromEntries(
+                Array.from({ length: count }, (_, i) => [
+                    `/path-${i}`,
+                    { post: { requestBody: { content: { 'application/json': { schema: { $ref: '#/body' } } } } } },
+                ]),
+            ),
+            body: {
+                type: 'object',
+                // Count reads rather than rely on timing or garbage collection.
+                get properties() {
+                    propertyReads += 1;
+                    return { url: { type: 'string' } };
+                },
+            },
+        };
+
+        const info = infoOf(schema);
+
+        expect(info.hasRequestBody).toBe(true);
+        expect(info.operationLines.length).toBeLessThan(count);
+        expect(propertyReads).toBeLessThan(count);
+    });
+
+    it('finds a JSON body after the operation lines are cut', () => {
+        const info = infoOf({
+            paths: {
+                ...pathsOf(1000),
+                '/submit': { post: { requestBody: { content: { 'application/json': {} } } } },
+            },
+        });
+
+        expect(info.hasRequestBody).toBe(true);
+        expect(info.operationLines.join('\n')).not.toContain('/submit');
+    });
+
     it('come with the documented methods, and whether an operation takes a body', () => {
         expect(infoOf(SCHEMA)).toMatchObject({ methods: ['GET', 'POST'], hasRequestBody: true });
         expect(buildServerActorToolInfo({ paths: {} }, 'apify/server-actor-test')).toBeUndefined();

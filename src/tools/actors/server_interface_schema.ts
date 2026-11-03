@@ -152,9 +152,14 @@ export function buildServerOperationDetails(
     };
 }
 
+/** Keep keywords beside an alias's own `$ref`; following the whole chain would discard them. */
+function resolveOneRef(node: unknown, schema: unknown): unknown {
+    return isRecord(node) && typeof node.$ref === 'string' ? resolveLocalRef(schema, node.$ref) : node;
+}
+
 /** E.g. `string`, or `string|null` for a list of types; `undefined` when the schema names no type. */
 function getTypeName(node: unknown, schema: unknown): string | undefined {
-    const resolved = resolveRef(node, schema);
+    const resolved = resolveOneRef(node, schema);
     if (!isRecord(resolved)) return undefined;
     const types = [resolved.type].flat().filter((type): type is string => typeof type === 'string');
     return types.length > 0 ? types.join('|') : undefined;
@@ -184,7 +189,7 @@ function getJsonMediaSchema(content: Record<string, unknown>): { schema: unknown
 
 /** The top-level properties of a body schema; `undefined` when it lists none. */
 function listBodyInputs(bodySchema: unknown, schema: unknown): OperationInput[] | undefined {
-    const resolved = resolveRef(bodySchema, schema);
+    const resolved = resolveOneRef(bodySchema, schema);
     if (!isRecord(resolved) || !isRecord(resolved.properties)) return undefined;
     const required = Array.isArray(resolved.required) ? resolved.required : [];
     const inputs = Object.entries(resolved.properties).map(([name, property]) => ({
