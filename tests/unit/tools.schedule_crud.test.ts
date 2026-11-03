@@ -321,7 +321,7 @@ describe('update-schedule', () => {
     });
 
     it('leaves name validation to the API instead of throwing a ZodError at the client', async () => {
-        // The shared AJV instance strips the `pattern` keyword, so a regex here would not gate the
+        // The server's AJV strips the `pattern` keyword, so a regex here would not gate the
         // call — it would only throw inside the tool body and reach the client as serialised JSON.
         const { apifyClient, calls } = mockScheduleApiClient(mockSchedule());
         await run(

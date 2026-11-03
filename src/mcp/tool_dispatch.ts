@@ -205,7 +205,7 @@ export async function dispatchToolCall(params: {
                     }));
                     logHttpError(
                         outcome.error,
-                        `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}'`,
+                        `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorFullName}'`,
                         {
                             actorId: tool.actorId,
                             toolName: tool.originToolName,
@@ -213,7 +213,7 @@ export async function dispatchToolCall(params: {
                         },
                     );
                     result = respondErrorNoTelemetry(
-                        `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}': ${remoteMcpFailureDetail(outcome.error)}`,
+                        `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorFullName}': ${remoteMcpFailureDetail(outcome.error)}`,
                     );
                     break;
                 }

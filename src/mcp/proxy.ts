@@ -2,11 +2,10 @@ import { createHash } from 'node:crypto';
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
-import { fixedAjvCompile } from '../tools/actor_input_schema.js';
+import { compileUntrustedSchema } from '../tools/actor_input_schema.js';
 import { parseActorFullName } from '../tools/actor_tool_naming.js';
 import type { ActorMcpTool, ToolEntry } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
-import { ajv } from '../utils/ajv.js';
 import {
     MAX_TOOL_NAME_LENGTH,
     MAX_TOOL_NAME_USERNAME_LENGTH,
@@ -65,12 +64,13 @@ export async function getMCPServerTools(
         (tool): ActorMcpTool => ({
             type: TOOL_TYPE.ACTOR_MCP,
             actorId: actorID,
+            actorFullName,
             serverUrl,
             originToolName: tool.name,
             name: getProxyMCPServerToolName(actorFullName, tool.name, shouldCapUsername),
             description: tool.description || '',
             inputSchema: tool.inputSchema,
-            ajvValidate: fixedAjvCompile(ajv, tool.inputSchema),
+            ajvValidate: compileUntrustedSchema(tool.inputSchema),
             annotations: tool.annotations,
         }),
     );

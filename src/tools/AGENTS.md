@@ -31,13 +31,12 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     schema and README stay on the default build; `hasWebServerSchemaOperations` detects operations the send tool
     can call in the publisher's schema; `webServerOperations` caches each operation with its required inputs, which
     the send tool lists after a 400/404/405/422),
-    `server_interface_schema.ts` (the server-interface text of `fetch-actor-details`: by default one summary line,
-    served only with `send-server-actor-request`; `output.serverInterface: true` returns every operation in the
-    `get-apify-api-details` shape (`buildServerOperationDetails`, through the API tools' `dereference`: local
-    references inlined, examples kept, no responses, components or `servers`) while the text fits
-    `MAX_INLINE_BYTES`, else one line per operation (`formatOperationLine`), cut with `… and N more`;
-    `"METHOD /path"` returns that one operation; reference expansion has a byte budget, as a creator schema can
-    expand exponentially),
+    `server_interface_schema.ts` (the operations a Server Actor's `webServerSchema` documents, in the
+    `get-apify-api-details` shape through the API tools' `dereference`; no prose),
+    `server_interface_details.ts` (the server-interface section of `fetch-actor-details`: the
+    `structuredContent.serverInterface` object, and the text derived from it; the summary is served only with
+    `send-server-actor-request`, and the operations in full give way to `operationIndex` over `MAX_INLINE_BYTES`,
+    with a byte budget on reference expansion since a creator schema can expand exponentially),
     `send_server_actor_request.ts` (`send-server-actor-request`: one HTTP request to a Server Actor's API, gated on
     the `server` interface and sent through `sendApifyApiRequest` with raw response
     bytes, no redirects, the `MAX_INLINE_BYTES` cap after decompression and the `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`

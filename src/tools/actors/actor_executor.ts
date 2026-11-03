@@ -4,7 +4,6 @@ import { FAILURE_CATEGORY } from '../../const.js';
 import type { ActorExecutionParams, ActorExecutionResult, ActorExecutor } from '../../types.js';
 import { isActorInputValidationError } from '../../utils/apify_errors.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
-import { redactSkyfirePayId } from '../../utils/logging.js';
 import { buildInvalidInputTexts, respondUserError } from '../../utils/mcp.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
 import { abortRunOnSignal, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './actor_run_response.js';
@@ -31,13 +30,12 @@ export const actorExecutor: ActorExecutor = {
         // before the Actor produced output. Mirrors executeCallActor.
         // AJV doesn't fill `default` values, so apply the 30 s default here when the LLM omits waitSecs.
         const waitSecs = taskMode ? undefined : (argsWaitSecs ?? CALL_ACTOR_WAIT_SECS_DEFAULT);
-        const redactedInput = redactSkyfirePayId(params.input);
 
         if (abortSignal?.aborted) {
             log.info('Actor run aborted by client before start', {
                 actorName: actorFullName,
                 mcpSessionId,
-                input: redactedInput,
+                input: params.input,
             });
             return null;
         }
@@ -74,7 +72,7 @@ export const actorExecutor: ActorExecutor = {
                 actorName: actorFullName,
                 mcpSessionId,
                 runId: actorRun.id,
-                input: redactedInput,
+                input: params.input,
             });
             return null;
         }
@@ -95,7 +93,7 @@ export const actorExecutor: ActorExecutor = {
                 actorName: actorFullName,
                 mcpSessionId,
                 runId: actorRun.id,
-                input: redactedInput,
+                input: params.input,
             });
             return null;
         }
