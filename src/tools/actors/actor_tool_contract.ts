@@ -85,7 +85,6 @@ const ACTOR_TOOL_POLICIES: Readonly<Record<string, ActorToolPolicyConfig>> = {
         },
     },
     [RAG_WEB_BROWSER]: {
-        exposedInputs: ['query', 'maxResults', 'outputFormats'],
         serverTool: { buildDescription: () => RAG_WEB_BROWSER_ADDITIONAL_DESC },
     },
     [WEB_FETCH]: {
