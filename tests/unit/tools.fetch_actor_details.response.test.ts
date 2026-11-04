@@ -68,6 +68,7 @@ describe('buildActorDetailsTextResponse()', () => {
             const { texts } = buildActorDetailsTextResponse({
                 details: MOCK_DETAILS,
                 loadedToolNames: [],
+                loadedActorIds: new Set(),
                 output: inputSchemaOnlyOutput,
                 linkContext,
             });
@@ -83,6 +84,7 @@ describe('buildActorDetailsTextResponse()', () => {
             const { texts } = buildActorDetailsTextResponse({
                 details: MOCK_DETAILS,
                 loadedToolNames: [],
+                loadedActorIds: new Set(),
                 output: inputSchemaOnlyOutput,
                 linkContext,
             });
@@ -95,6 +97,7 @@ describe('buildActorDetailsTextResponse()', () => {
             const { texts } = buildActorDetailsTextResponse({
                 details: MOCK_DETAILS,
                 loadedToolNames: [],
+                loadedActorIds: new Set(),
                 output: inputSchemaOnlyOutput,
                 linkContext,
             });
@@ -106,6 +109,7 @@ describe('buildActorDetailsTextResponse()', () => {
             const { texts } = buildActorDetailsTextResponse({
                 details: MOCK_DETAILS,
                 loadedToolNames: [],
+                loadedActorIds: new Set(),
                 output: inputSchemaOnlyOutput,
             });
 

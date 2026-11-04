@@ -185,11 +185,13 @@ export function buildActorDetailsTextResponse(options: {
     serverInterface?: ServerInterfaceSection;
     linkContext?: ConsoleLinkContext;
     loadedToolNames: readonly string[];
+    loadedActorIds: ReadonlySet<string>;
 }): {
     texts: string[];
     structuredContent: Record<string, unknown>;
 } {
-    const { details, output, actorOutputSchema, serverInterface, linkContext, loadedToolNames } = options;
+    const { details, output, actorOutputSchema, serverInterface, linkContext, loadedToolNames, loadedActorIds } =
+        options;
 
     const actorUrl =
         buildConsoleActorUrl(linkContext, details.actorInfo.id) ??
@@ -234,12 +236,15 @@ export function buildActorDetailsTextResponse(options: {
 
     if (serverInterface?.text) texts.push(serverInterface.text);
 
-    const isMcpServerActor = hasMcpInterface(
-        details.actorInfo,
-        details.webServerMcpPath,
-        `${details.actorInfo.username}/${details.actorInfo.name}`,
-    );
-    const mcpNextStep = isMcpServerActor
+    // A session that serves the Actor's own MCP tools needs no pointer to them.
+    const needsMcpNextStep =
+        !loadedActorIds.has(details.actorInfo.id) &&
+        hasMcpInterface(
+            details.actorInfo,
+            details.webServerMcpPath,
+            `${details.actorInfo.username}/${details.actorInfo.name}`,
+        );
+    const mcpNextStep = needsMcpNextStep
         ? resolveSiblingNextStep(
               HELPER_TOOLS.ACTOR_MCP_TOOL_LIST,
               loadedToolNames,
@@ -326,6 +331,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         serverInterface,
         linkContext,
         loadedToolNames,
+        loadedActorIds,
     });
 
     // An MCP server Actor's nextStep covers it unless it names the list tool and no tool can call the listed tools.

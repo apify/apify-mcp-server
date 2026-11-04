@@ -20,12 +20,14 @@ async function callDetails(
     actor: Actor,
     definition: Partial<ActorDefinitionWithServerInterface>,
     loadedToolNames?: readonly string[],
+    loadedActorIds?: readonly string[],
 ) {
     const { apifyClient } = mockActorBuildClient({ actor, defaultBuild: mockBuild(DEFAULT_BUILD_ID, definition) });
     // inputSchema only: no pricing, so no users/me lookup.
     const result = await (fetchActorDetails as HelperTool).call(
         stubToolCallContext({ actor: `${actor.username}/${actor.name}`, output: { inputSchema: true } }, apifyClient, {
             loadedToolNames,
+            loadedActorIds,
         }),
     );
     return {
@@ -62,6 +64,19 @@ describe('identifying an MCP server Actor in fetch-actor-details', () => {
         ]);
 
         expect(text.split(getOwnServerRemedy())).toHaveLength(2);
+    });
+
+    // The session already serves the Actor's own MCP tools, so the own-server remedy would be false.
+    it("adds no MCP sentence when the session serves the Actor's own tools", async () => {
+        const { text, structuredContent } = await callDetails(
+            MCP_SERVER_ACTOR,
+            { webServerMcpPath: '/mcp' },
+            [HELPER_TOOLS.ACTOR_GET_DETAILS],
+            [MCP_SERVER_ACTOR.id],
+        );
+
+        expect(structuredContent).not.toHaveProperty('nextStep');
+        expect(text).not.toContain(getOwnServerRemedy());
     });
 
     it('adds no MCP sentence for an Actor without an MCP path', async () => {
