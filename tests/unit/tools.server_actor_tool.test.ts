@@ -10,11 +10,12 @@ import {
     buildServerActorToolDescription,
     buildServerActorToolInfo,
     CLIENT_DESCRIPTION_MAX_LENGTH,
+    formatTenancyBilling,
 } from '../../src/tools/actors/server_interface_details.js';
 import { listCommaJoinedQueryParameters } from '../../src/tools/actors/server_interface_schema.js';
 import { serverActorRequestOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { Actor, ServerActorToolInfo, ToolEntry } from '../../src/types.js';
-import { TOOL_TYPE } from '../../src/types.js';
+import { ACTOR_TENANCY, TOOL_TYPE } from '../../src/types.js';
 import { mockActor, mockActorBuildClient, mockDefaultBuild } from './helpers/actor_build_client.js';
 import { makePaymentProvider } from './helpers/mcp_server.js';
 import { only } from './helpers/tool_context.js';
@@ -77,6 +78,8 @@ const WEB_FETCH_LIVE_SCHEMA = {
                     {
                         name: 'formats',
                         in: 'query',
+                        style: 'form',
+                        explode: false,
                         description:
                             'Select one or more formats: `markdown`, `html`, `text`, `links`, `raw`. If omitted, ' +
                             'defaults to `markdown` for HTML/PDF, `text` for text-based content, or `raw` for ' +
@@ -531,16 +534,16 @@ describe('the operations in a Server Actor tool description', () => {
 
 describe('the default apify/web-fetch tool', () => {
     const [username, name] = WEB_FETCH.split('/');
-    const loadWebFetchTool = () =>
-        loadServerTool(WEB_FETCH_LIVE_SCHEMA, {
-            username,
-            name,
-            description:
-                'Download any web page by URL and convert it to clean Markdown, plain text, HTML, and other formats. ' +
-                'Automatically renders JavaScript and works around bot blocking. The Actor provides a real-time API ' +
-                'for quick response times.',
-            actorStandby: { isEnabled: true, tenancy: 'MULTI_TENANT' },
-        });
+    const webFetchActor: Partial<Actor> = {
+        username,
+        name,
+        description:
+            'Download any web page by URL and convert it to clean Markdown, plain text, HTML, and other formats. ' +
+            'Automatically renders JavaScript and works around bot blocking. The Actor provides a real-time API ' +
+            'for quick response times.',
+        actorStandby: { isEnabled: true, tenancy: 'MULTI_TENANT' },
+    };
+    const loadWebFetchTool = () => loadServerTool(WEB_FETCH_LIVE_SCHEMA, webFetchActor);
 
     // No web-fetch exception: the tool is what any Server Actor with this schema gets.
     it('is served as a Server Actor tool: GET or POST, a required path, a body, and an untyped query', async () => {
@@ -564,17 +567,26 @@ describe('the default apify/web-fetch tool', () => {
         expect(tool.ajvValidate({ query: { url: 'https://example.com' } })).toBe(false);
     });
 
-    it('carries the policy text, its example call and both operations as lines within the client limit', async () => {
+    it('carries the policy text, its example call, the billing and both operations as lines within the client limit', async () => {
         const tool = await loadWebFetchTool();
 
         expect(tool.description).toContain(
             'Example: {"method":"GET","path":"/","query":{"url":"https://example.com","formats":["markdown"]}}',
         );
+        expect(tool.description).toContain(formatTenancyBilling({ tenancy: ACTOR_TENANCY.MULTI_TENANT }));
         expect(tool.description).toContain(
             'Operations:\n- GET / [url:string required, formats:array, unwrap:boolean, headers:string, wait:integer]: Fetch a URL.',
         );
         expect(tool.description).toContain('- POST / {url:string required');
         expect(tool.description!.length).toBeLessThanOrEqual(CLIENT_DESCRIPTION_MAX_LENGTH);
+    });
+
+    // On the argument the agent fills in: agents rewrote ftp:// URLs to https:// when the note was elsewhere.
+    it('carries the url scheme note on its query input', async () => {
+        const tool = await loadWebFetchTool();
+        const query = tool.inputSchema.properties?.query as { description: string };
+
+        expect(query.description).toContain('ftp:');
     });
 
     it('keeps the read-only hint of the Actor', async () => {
@@ -583,14 +595,17 @@ describe('the default apify/web-fetch tool', () => {
         expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
     });
 
-    // The live schema documents `formats` on GET / as `style: form, explode: false`; the test fixture above does not.
     it('lists formats as the comma-joined query parameter of GET /', () => {
-        const schema = structuredClone(WEB_FETCH_LIVE_SCHEMA) as {
-            paths: { '/': { get: { parameters: Record<string, unknown>[] } } };
-        };
-        schema.paths['/'].get.parameters[1] = { ...schema.paths['/'].get.parameters[1], style: 'form', explode: false };
+        expect(listCommaJoinedQueryParameters(WEB_FETCH_LIVE_SCHEMA)).toEqual({ 'GET /': ['formats'] });
+    });
 
-        expect(listCommaJoinedQueryParameters(schema)).toEqual({ 'GET /': ['formats'], 'POST /': [] });
-        expect(listCommaJoinedQueryParameters(WEB_FETCH_LIVE_SCHEMA)).toEqual({});
+    // Without its server interface the Actor is a run tool again, whose input is the Actor's own schema.
+    it('falls back to a run tool without the server example when Actor Standby is off', async () => {
+        const { tools } = await loadTools(WEB_FETCH_LIVE_SCHEMA, {
+            actor: { ...webFetchActor, actorStandby: { isEnabled: false } },
+        });
+
+        expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR]);
+        expect(tools[0].description).not.toContain('"method"');
     });
 });

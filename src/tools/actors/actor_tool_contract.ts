@@ -26,6 +26,14 @@ Examples of when to use:
 It does not search the web - it needs a URL. To find pages by query, use a web search tool.
 If the exact URL cannot be fetched (e.g. a non-http(s) scheme such as ftp:), say so rather than silently substituting a different URL.`;
 
+/**
+ * Appended to the `query` input description of the `apify/web-fetch` tool. Lives on the input because that is what
+ * an agent reads while writing the argument: agents silently rewrote ftp:// URLs to https:// instead of telling
+ * the user the scheme is unsupported.
+ */
+const WEB_FETCH_URL_SCHEME_NOTE =
+    'url takes http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.';
+
 /** Appended to the `apify/web-search` Actor tool description. */
 const WEB_SEARCH_ADDITIONAL_DESC = `Use this tool to search the web by query and get one page of organic results: title, URL, snippet and position (up to about 10 results; links and snippets only, no page content).
 countryCode and languageCode set the locale, dateFrom and dateTo bound the publication date, allowedDomains and blockedDomains restrict or exclude sites.
@@ -45,12 +53,21 @@ type DirectActorPolicyConfig = {
     deniedInputsReason?: string;
 };
 
+type ServerActorToolPolicyConfig = {
+    buildDescription?: (context: ToolDescriptionContext) => string;
+    /** Appended to the description of the named inputs of the tool (`query`, `body`). */
+    inputDescriptionSuffixes?: Readonly<Record<string, string>>;
+};
+
 type ActorToolPolicyConfig = {
     /** Direct tools only; `call-actor` and the widgets keep the Actor's own contract. */
     directInput?: DirectActorPolicyConfig;
     /** Only these inputs are served; the others are hidden but still accepted and passed to the run. */
     exposedInputs?: readonly string[];
+    /** Appended to the run tool's description. */
     buildDescription?: (context: ToolDescriptionContext) => string;
+    /** The Actor's own tool when it is served through its server interface; a run tool gets none of it. */
+    serverTool?: ServerActorToolPolicyConfig;
 };
 
 /** Presentation rules preserve existing generic-call behavior; directInput is direct-tool-only. */
@@ -68,7 +85,10 @@ const ACTOR_TOOL_POLICIES: Readonly<Record<string, ActorToolPolicyConfig>> = {
         buildDescription: () => RAG_WEB_BROWSER_ADDITIONAL_DESC,
     },
     [WEB_FETCH]: {
-        buildDescription: () => WEB_FETCH_ADDITIONAL_DESC,
+        serverTool: {
+            buildDescription: () => WEB_FETCH_ADDITIONAL_DESC,
+            inputDescriptionSuffixes: { query: WEB_FETCH_URL_SCHEME_NOTE },
+        },
     },
     [WEB_SEARCH]: {
         buildDescription: () => WEB_SEARCH_ADDITIONAL_DESC,

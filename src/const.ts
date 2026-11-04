@@ -25,6 +25,12 @@ export const CODE_RUNTIME_ACTOR_NAME = 'apify/code-runtime';
 export const MAX_INLINE_BYTES = 256 * 1024;
 
 /**
+ * Where a Server Actor response body is cut. Larger than `MAX_INLINE_BYTES`, and the start is returned rather than
+ * nothing: the caller has paid for the response and has no storage to read the rest from.
+ */
+export const MAX_SERVER_ACTOR_RESPONSE_BYTES = 1024 * 1024;
+
+/**
  * Advisory threshold (uncompressed bytes) above which dataset tools append a size hint steering the
  * caller to narrow the fetch. A soft hint, not a truncation cap; ~50 KB mirrors the ~25k-token budget.
  */

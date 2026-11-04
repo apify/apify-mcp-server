@@ -318,7 +318,7 @@ https://mcp.apify.com?tools=apify/instagram-scraper
 - `call-actor` no longer calls tools on MCP server Actors: the `actorName:toolName` form is rejected. Use `call-actor-mcp-tool` with `actor`, `tool`, and `arguments`. A selection that names `call-actor` alone needs `call-actor-mcp-tool` added.
 - `fetch-actor-details` no longer lists an MCP server Actor's tools, and `output.mcpTools` is ignored. Use `fetch-actor-mcp-tool-list`, which returns the definitions in `structuredContent.tools`. A selection that names `fetch-actor-details` alone needs `fetch-actor-mcp-tool-list` added.
 - A selected Actor with an API schema (a Server Actor) gets a tool that sends one HTTP request to its API, with `method`, `path`, and `query` arguments, instead of a tool that starts a run. If the Actor is also an MCP server, the selection no longer loads its MCP tools: use `call-actor-mcp-tool`. `call-actor` still starts runs of the Actor. `apify/rag-web-browser` and `apify/web-search` keep their run tools.
-- `apify--web-fetch` sends one HTTP request to the Web Fetch Actor's API instead of starting a run, and returns the HTTP response. Its arguments are `method`, `path` and `query`, for example `{"method": "GET", "path": "/", "query": {"url": "https://example.com", "formats": ["markdown", "links"]}}`.
+- `apify--web-fetch` sends one HTTP request to the Web Fetch Actor's API instead of starting a run, and returns the HTTP response. Its arguments are `method`, `path`, `query` and, for `POST /`, `body`, for example `{"method": "GET", "path": "/", "query": {"url": "https://example.com", "formats": ["markdown", "links"]}}`.
 
 </details>
 

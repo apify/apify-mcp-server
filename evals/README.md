@@ -143,8 +143,8 @@ response, with no run, dataset or `get-dataset-items` step. Probed 2026-11-04 ov
 is sent comma-joined (`formats=markdown,links`), as the schema documents (the Actor also accepts
 repeated parameters); a 200 body is a JSON object with `fetch` (including `fetch.httpStatusCode`),
 `metadata` and one field per requested format; `unwrap=true` returns the first format as the body
-(`text/markdown`); a body over 262144 bytes is not returned and the call fails with `bodyOmitted`
-(#1738); `ftp://` returns 400 `INVALID_URL` ("Unsupported URL protocol"); an unreachable host returns
+(`text/markdown`); a body over 1048576 bytes is cut there and its start returned with `bodyTruncated` and a
+`nextStep` (#1738); `ftp://` returns 400 `INVALID_URL` ("Unsupported URL protocol"); an unreachable host returns
 HTTP 502 `UPSTREAM_FETCH_ERROR`, a failed call.
 
 The web-selection family (`merge/web-selection/*`, 9 items: 7 proper + 2 with `expectedErrors`) covers
@@ -155,8 +155,8 @@ summarizing fetch. Also stateless — no fixtures script.
 Known residual (2026-08-21): on `merge/web-fetch/unsupported-protocol`,
 claude-haiku-4-5 reproducibly rewrites the ftp:// URL to https:// without telling the user,
 despite the scheme note in both the tool description and the `url` parameter — a model-level
-limit the case documents on purpose; stronger models pass. Since #1647 the note is in the tool
-description only; not re-measured.
+limit the case documents on purpose; stronger models pass. Since #1647 the note is on the tool's `query`
+input and in the description.
 
 ### Tool-call mode
 

@@ -4,8 +4,14 @@ import dedent from 'dedent';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { readBodyUnderCap, sendApifyApiRequest } from '../../apify_client.js';
-import { FAILURE_CATEGORY, HELPER_TOOLS, HTTP_FORBIDDEN, HTTP_UNAUTHORIZED, MAX_INLINE_BYTES } from '../../const.js';
+import { readBodyToCap, sendApifyApiRequest } from '../../apify_client.js';
+import {
+    FAILURE_CATEGORY,
+    HELPER_TOOLS,
+    HTTP_FORBIDDEN,
+    HTTP_UNAUTHORIZED,
+    MAX_SERVER_ACTOR_RESPONSE_BYTES,
+} from '../../const.js';
 import { getActorMCPServerPath, resolveOnStandbyOrigin } from '../../mcp/actors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import { isTextualMimeType, maskSessionToken, parseCharset, REDACTED } from '../../resources/api_resources.js';
@@ -35,8 +41,10 @@ import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from './actor_tools
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 
 const queryValue = z.union([z.string(), z.number(), z.boolean()]);
-/** The API tools' `query` plus arrays: an Actor Server can document an array parameter, sent as a repeated parameter. */
-const serverActorQuery = z.record(z.string(), z.union([queryValue, z.array(queryValue)])).optional();
+/** The API tools' `query` plus arrays: an Actor Server can document an array parameter. One flat union, so a bad value gets one error per shape. */
+const serverActorQuery = z
+    .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(queryValue)]))
+    .optional();
 
 const sendServerActorRequestArgs = z.object({
     actor: z
@@ -104,12 +112,13 @@ type ServerActorRequest = {
     path: string;
 };
 
-/** What the Actor Server sent back; `body` is absent when it exceeded `MAX_INLINE_BYTES`, where reading stopped. */
+/** What the Actor Server sent back; `isTruncated` when `body` was cut at `MAX_SERVER_ACTOR_RESPONSE_BYTES`, where reading stopped. */
 type ServerActorResponse = {
     status: number;
     contentType?: string;
     location?: string;
-    body?: Buffer;
+    body: Buffer;
+    isTruncated: boolean;
 };
 
 /** The request may have gone out, but its response did not fully arrive; `status` is set when the headers did. */
@@ -168,56 +177,20 @@ function buildRequestUrl(
             ),
         };
     }
+    // The operation is looked up by the path as the agent wrote it, the form the description lists; `url.pathname`
+    // is percent-encoded. A query written into the path is not part of the operation.
+    const commaJoined = commaJoinedQueryParameters?.[`${method} ${path.split(/[?#]/, 1)[0]}`] ?? [];
     // Not axios `params`: apify-client's serializer sends a boolean as 1 or 0. Not `url.searchParams`: it would
     // encode the query written into the path again.
-    const commaJoined = findCommaJoinedQueryParameters(commaJoinedQueryParameters, method, url.pathname);
     const addedQuery = new URLSearchParams(
         Object.entries(query ?? {}).flatMap(([name, value]): [string, string][] => {
             if (!Array.isArray(value)) return [[name, String(value)]];
+            if (value.length === 0) return [];
             return commaJoined.includes(name) ? [[name, value.join(',')]] : value.map((item) => [name, String(item)]);
         }),
     ).toString();
     if (addedQuery) url.search = url.search ? `${url.search}&${addedQuery}` : addedQuery;
     return { url };
-}
-
-/** The comma-joined query parameters of the operation `method` and `pathname` fill; a documented template path matches its filled-in form. */
-function findCommaJoinedQueryParameters(
-    byOperation: ActorDefinitionPruned['webServerCommaJoinedQueryParameters'],
-    method: string,
-    pathname: string,
-): string[] {
-    const exact = byOperation?.[`${method} ${pathname}`];
-    if (exact) return exact;
-    for (const [operation, parameters] of Object.entries(byOperation ?? {})) {
-        const [documentedMethod, documentedPath] = operation.split(' ');
-        if (documentedMethod === method && matchesPathTemplate(documentedPath, pathname)) return parameters;
-    }
-    return [];
-}
-
-/**
- * Matches a request pathname to a documented operation's path template so the caller can select its query-array
- * encoding. For example, `GET /status/{code}` may document comma-joined `tags`: a request to `/status/204` must
- * then send `tags=a,b`, even though the cache key contains `{code}`. The caller checks exact paths first.
- *
- * Supports whole-segment parameters only: `{code}` matches one nonempty segment. Other segments match literally.
- * Comparing segments avoids regex backtracking on Actor-controlled paths, which could block the server before
- * the HTTP request timeout starts.
- *
- * @example matchesPathTemplate('/status/{code}', '/status/204') // true
- * @example matchesPathTemplate('/status/{code}', '/status/') // false: empty parameter
- * @example matchesPathTemplate('/status/{code}', '/status/204/details') // false: extra segment
- */
-export function matchesPathTemplate(template: string, pathname: string): boolean {
-    const templateSegments = template.split('/');
-    const segments = pathname.split('/');
-    return (
-        templateSegments.length === segments.length &&
-        templateSegments.every((segment, index) =>
-            /^\{[^{}]+\}$/.test(segment) ? segments[index] !== '' : segment === segments[index],
-        )
-    );
 }
 
 /** A response header's value; `undefined` when it is absent or not a single string. */
@@ -227,9 +200,9 @@ function readHeader(headers: AxiosResponse['headers'], name: string): string | u
 }
 
 /**
- * Sends the request once, without following redirects, and reads the body up to `MAX_INLINE_BYTES`. The deadline
- * covers reading the body too. Any failure is thrown as an `IncompleteResponseError`: even a connection that drops
- * before the status may have delivered the request.
+ * Sends the request once, without following redirects, and reads the body up to `MAX_SERVER_ACTOR_RESPONSE_BYTES`.
+ * The deadline covers reading the body too. Any failure is thrown as an `IncompleteResponseError`: even a
+ * connection that drops before the status may have delivered the request.
  */
 async function sendRequest({
     client,
@@ -260,6 +233,7 @@ async function sendRequest({
             }),
             responseType: 'stream',
             maxRedirects: 0,
+            maxContentLength: MAX_SERVER_ACTOR_RESPONSE_BYTES,
             signal: AbortSignal.any([signal, deadline]),
         });
         status = response.status;
@@ -267,7 +241,7 @@ async function sendRequest({
             status,
             contentType: readHeader(response.headers, 'content-type'),
             location: readHeader(response.headers, 'location'),
-            body: await readBodyUnderCap(response),
+            ...(await readBodyToCap(response)),
         };
     } catch (error) {
         throw new IncompleteResponseError(toPlainError(error).message, status, deadline.aborted);
@@ -296,6 +270,11 @@ function decodeBody(body: Buffer, charset: string, token: string): string | unde
         return value.includes(token) ? JSON.stringify(value.replaceAll(token, REDACTED)) : literal;
     });
 }
+
+/** The `nextStep` of a response whose body was cut at `MAX_SERVER_ACTOR_RESPONSE_BYTES`. */
+const TRUNCATED_BODY_NEXT_STEP =
+    `The body is truncated at ${MAX_SERVER_ACTOR_RESPONSE_BYTES} bytes and the rest is not returned. ` +
+    'Request a smaller response, for example fewer items or a smaller format.';
 
 /** Longest `errorMessage` returned; the full error stays in `body`. */
 const ERROR_MESSAGE_MAX_LENGTH = 1_000;
@@ -379,6 +358,7 @@ function buildResponse(
                   httpStatus: status,
                   structuredContent,
               });
+    const bytes = response.body.length;
     const rejectBody = (reason: string) => {
         const summary = `${outcome}. The body is not returned: ${reason}. The request itself was sent.`;
         const structuredContent = {
@@ -386,7 +366,7 @@ function buildResponse(
             status,
             ...(contentType && { contentType }),
             ...(location && { location }),
-            ...(response.body !== undefined && { bytes: response.body.length }),
+            bytes,
             bodyOmitted: true,
             reason,
             summary,
@@ -394,8 +374,6 @@ function buildResponse(
         return respondError([JSON.stringify(structuredContent), summary], structuredContent);
     };
 
-    if (response.body === undefined) return rejectBody(`it is larger than ${MAX_INLINE_BYTES} bytes`);
-    const bytes = response.body.length;
     const mimeType = parseBaseMimeType(contentType);
     if (bytes > 0 && !isTextualMimeType(mimeType)) {
         return rejectBody(
@@ -407,22 +385,27 @@ function buildResponse(
     if (body === undefined) return rejectBody(`its charset "${charset}" is not supported`);
 
     const bodyNote = bytes === 0 ? 'an empty body' : `${bytes} bytes of ${mimeType}`;
+    const truncatedNote = response.isTruncated ? ', the start of a longer body' : '';
     const redirectNote = location ? ` The redirect to ${location} was not followed.` : '';
-    const summary = `${outcome} with ${bodyNote}.${redirectNote}`;
+    const summary = `${outcome} with ${bodyNote}${truncatedNote}.${redirectNote}`;
     const errorMessage = status >= 400 && body ? getReadableErrorMessage(body) : undefined;
-    const nextStep = buildRequestRecoveryText({
+    const recoveryText = buildRequestRecoveryText({
         status,
         actorName: request.actorName,
         loadedToolNames,
         hasErrorMessage: errorMessage !== undefined,
         operations,
     });
+    const nextStep =
+        [response.isTruncated ? TRUNCATED_BODY_NEXT_STEP : undefined, recoveryText].filter(Boolean).join(' ') ||
+        undefined;
     const data = {
         ...request,
         status,
         ...(contentType && { contentType }),
         body,
         bytes,
+        ...(response.isTruncated && { bodyTruncated: true }),
         ...(location && { location }),
     };
     const structuredContent = {
@@ -561,7 +544,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         Give the method, the path, and optionally query parameters and a JSON body; the Actor Server's host and your Apify API token are added for you.
         Only an Actor with an Actor Server and an API schema takes requests here; the Actor accepts or rejects the method and path.
         A request to a single-tenant Actor Server can start a run of the Actor in your account, kept until its idle timeout; a multi-tenant Actor Server charges per event.
-        The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text; other content types, and bodies over ${MAX_INLINE_BYTES} bytes, are not returned.
+        The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text, cut at ${MAX_SERVER_ACTOR_RESPONSE_BYTES} bytes; other content types are not returned.
 
         Example call: {"actor": "apify/web-search", "method": "GET", "path": "/", "query": {"query": "AI news", "maxResults": 5}}
 

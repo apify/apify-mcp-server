@@ -288,11 +288,7 @@ describe('prepareToolCall()', () => {
             type: 'object',
             properties: {
                 path: { type: 'string', description: 'The path on the Actor Server, starting with /.' },
-                query: {
-                    type: 'object',
-                    description: 'Query parameters, by name, for example {"limit": 10}.',
-                    additionalProperties: { type: 'string' },
-                },
+                query: { type: 'object', description: 'Query parameters, by name, for example {"limit": 10}.' },
                 tags: { type: 'array', items: { type: 'string', description: 'One tag, such as "news".' } },
             },
             required: ['path'],
@@ -331,10 +327,13 @@ describe('prepareToolCall()', () => {
         });
 
         it('uses the parent description for an invalid query value', async () => {
-            const message = await failureMessage({ path: '/', query: { limit: {} } });
+            const message = await failureMessage(
+                { actor: 'apify/web-search', method: 'GET', path: '/', query: { limit: {} } },
+                sendServerActorRequest,
+            );
 
             expect(message).toContain('/query/limit: must be string, got object');
-            expect(message).toContain('Parameter /query: Query parameters, by name');
+            expect(message).toContain('Parameter /query: Query parameters of the operation, by name');
         });
 
         it('reports the received type and the description for a wrong type', async () => {

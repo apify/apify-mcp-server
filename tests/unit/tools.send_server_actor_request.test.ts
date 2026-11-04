@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -8,16 +7,14 @@ import Ajv from 'ajv';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
-import { FAILURE_CATEGORY, HELPER_TOOLS, MAX_INLINE_BYTES, TOOL_STATUS } from '../../src/const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, MAX_SERVER_ACTOR_RESPONSE_BYTES, TOOL_STATUS } from '../../src/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
 import { getServerActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import {
     executeSendServerActorRequest,
-    matchesPathTemplate,
     RECOVERY_MAX_OPERATIONS,
     sendServerActorRequest,
 } from '../../src/tools/actors/send_server_actor_request.js';
-import { listCommaJoinedQueryParameters } from '../../src/tools/actors/server_interface_schema.js';
 import { serverActorRequestOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type {
     Actor,
@@ -290,97 +287,34 @@ describe('sending the request', () => {
         });
     });
 
-    it('sends an array query value as a repeated parameter', async () => {
+    it('sends an array query value as a repeated parameter, and an empty array as nothing', async () => {
         const received = recordRequests();
 
-        const result = await dispatchTool({ path: '/echo', query: { formats: ['markdown', 'links'], n: [1] } });
+        const result = await dispatchTool({
+            path: '/echo',
+            query: { formats: ['markdown', 'links'], n: [1], none: [] },
+        });
 
         expect(result.isError).toBe(false);
         expect(received[0].url).toBe('/echo?formats=markdown&formats=links&n=1');
     });
 
-    it('joins an array with commas for a parameter the operation documents explode: false', async () => {
+    it('joins an array with commas for a parameter the operation documents explode: false, by the path as written', async () => {
         const received = recordRequests();
         seedActor('apify/comma-actor', {
-            definition: {
-                webServerCommaJoinedQueryParameters: { 'GET /echo': ['formats'], 'GET /status/{code}': ['tags'] },
-            },
+            definition: { webServerCommaJoinedQueryParameters: { 'GET /echo': ['formats'] } },
         });
 
         await callTool({ actor: 'apify/comma-actor', path: '/echo', query: { formats: ['a', 'b'], n: [1, 2] } });
-        await callTool({ actor: 'apify/comma-actor', path: '/status/204', query: { tags: ['x', 'y'] } });
+        await callTool({ actor: 'apify/comma-actor', path: '/echo?x=1', query: { formats: ['a', 'b'] } });
         await callTool({ actor: 'apify/comma-actor', method: 'POST', path: '/echo', query: { formats: ['a', 'b'] } });
 
         expect(received.map((request) => request.url)).toEqual([
             '/echo?formats=a%2Cb&n=1&n=2',
-            '/status/204?tags=x%2Cy',
+            '/echo?x=1&formats=a%2Cb',
             '/echo?formats=a&formats=b',
         ]);
     });
-
-    it('rejects an adversarial template match within a bounded subprocess', () => {
-        const moduleUrl = new URL('../../src/tools/actors/send_server_actor_request.ts', import.meta.url).href;
-        const template = `/${Array.from({ length: 16 }, (_, index) => `{p${index}}`).join('-')}/end`;
-        const pathname = `/${'-'.repeat(90)}/no-end`;
-        const script = `
-            import { matchesPathTemplate } from ${JSON.stringify(moduleUrl)};
-            process.stdout.write(String(matchesPathTemplate(${JSON.stringify(template)}, ${JSON.stringify(pathname)})));
-        `;
-
-        const output = execFileSync(process.execPath, ['--import', 'tsx', '--input-type=module', '--eval', script], {
-            encoding: 'utf8',
-            timeout: 5_000,
-        });
-
-        expect(output).toBe('false');
-    });
-
-    it('matches parameters only when they fill a whole path segment', () => {
-        expect(matchesPathTemplate('/{prefix}ho', '/echo')).toBe(false);
-    });
-
-    it.each(['/status/', '/status/204/details', '/statuses/204'])(
-        'does not match /status/{code} against %s',
-        (pathname) => {
-            expect(matchesPathTemplate('/status/{code}', pathname)).toBe(false);
-        },
-    );
-
-    it.each([false, true])(
-        'uses the literal operation encoding before a template (literal comma-joined: %s)',
-        async (isCommaJoined) => {
-            const received = recordRequests();
-            const parameter = (explode: boolean) => ({
-                name: 'formats',
-                in: 'query',
-                explode,
-                schema: { type: 'array', items: { type: 'string' } },
-            });
-            const schema = {
-                paths: {
-                    '/{name}': {
-                        get: { parameters: [{ ...parameter(false), name: isCommaJoined ? 'tags' : 'formats' }] },
-                    },
-                    '/echo': { get: { parameters: [parameter(!isCommaJoined)] } },
-                },
-            };
-            seedActor('apify/overlapping-paths', {
-                definition: {
-                    webServerCommaJoinedQueryParameters: listCommaJoinedQueryParameters(schema),
-                },
-            });
-
-            await callTool({
-                actor: 'apify/overlapping-paths',
-                path: '/echo',
-                query: { formats: ['markdown', 'links'] },
-            });
-
-            expect(received[0].url).toBe(
-                isCommaJoined ? '/echo?formats=markdown%2Clinks' : '/echo?formats=markdown&formats=links',
-            );
-        },
-    );
 
     it.each([
         ['null', null],
@@ -548,33 +482,36 @@ describe('returning the response', () => {
     });
 
     it.each(['/bytes', '/gzip'])(
-        'returns a %s body of exactly the inline limit, counted after decompression',
+        'returns a %s body of exactly the response limit whole, counted after decompression',
         async (path) => {
-            const result = await callTool({ path: `${path}?n=${MAX_INLINE_BYTES}` });
+            const result = await callTool({ path: `${path}?n=${MAX_SERVER_ACTOR_RESPONSE_BYTES}` });
 
             expect(result.isError).toBe(false);
-            expect(result.structuredContent).toMatchObject({ bytes: MAX_INLINE_BYTES });
+            expect(result.structuredContent).toMatchObject({ bytes: MAX_SERVER_ACTOR_RESPONSE_BYTES });
+            expect(result.structuredContent).not.toHaveProperty('bodyTruncated');
+            expect(result.structuredContent).not.toHaveProperty('nextStep');
         },
     );
 
+    // The caller has paid for the response and has no storage to read the rest from, so the start is returned.
     it.each(['/bytes', '/gzip'])(
-        'does not return a %s body over the inline limit, keeps the status, and says the request was sent',
+        'returns the start of a %s body over the response limit, marked as truncated, with the limit as the hint',
         async (path) => {
-            const result = await callTool({ path: `${path}?n=${MAX_INLINE_BYTES + 1}` });
+            const result = await callTool({ path: `${path}?n=${MAX_SERVER_ACTOR_RESPONSE_BYTES + 1}` });
 
-            expectSoftFailInvalidInput(result);
-            expect(result.content[0].text).toContain(`larger than ${MAX_INLINE_BYTES} bytes`);
-            expect(result.content[0].text).toContain('The request itself was sent.');
-            expect(result.content[0].text).not.toContain('aaa');
-            expect(result.structuredContent).toMatchObject({
-                status: 200,
-                bodyOmitted: true,
-                reason: expect.stringContaining(`larger than ${MAX_INLINE_BYTES} bytes`),
-            });
-            expect(result.structuredContent).not.toHaveProperty('body');
-            expect(result.structuredContent).not.toHaveProperty('bytes');
-            const validate = new Ajv({ strict: false }).compile(serverActorRequestOutputSchema);
-            expect(validate(result.structuredContent), JSON.stringify(validate.errors)).toBe(true);
+            expect(result.isError).toBe(false);
+            expectSchemaConformingStructuredContent(result, serverActorRequestOutputSchema);
+            const { body, bytes, nextStep } = result.structuredContent as {
+                body: string;
+                bytes: number;
+                nextStep: string;
+            };
+            expect(result.structuredContent).toMatchObject({ status: 200, bodyTruncated: true });
+            expect(bytes).toBeGreaterThan(0);
+            expect(bytes).toBeLessThanOrEqual(MAX_SERVER_ACTOR_RESPONSE_BYTES);
+            expect(body).toBe('a'.repeat(bytes));
+            expect(nextStep).toContain(String(MAX_SERVER_ACTOR_RESPONSE_BYTES));
+            expect(result.content.at(-1)?.text).toBe(nextStep);
             expect(result.toolTelemetry).toMatchObject({
                 httpStatus: 200,
                 actorTenancy: ACTOR_TENANCY.SINGLE_TENANT,
