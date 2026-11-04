@@ -23,7 +23,8 @@ import { buildConsoleActorUrl, getConsoleLinkContext, VERBATIM_LINKS_NUDGE } fro
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import { canRunActor, getOwnServerRemedy } from '../actor_tool_naming.js';
+import { canRunActor, getOwnServerRemedy, hasMcpInterface } from '../actor_tool_naming.js';
+import { resolveSiblingNextStep } from '../storage/storage_helpers.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from './actor_tools_factory.js';
 import type { ServerInterfaceSection } from './server_interface_details.js';
@@ -183,11 +184,14 @@ export function buildActorDetailsTextResponse(options: {
     actorOutputSchema?: Record<string, unknown> | null;
     serverInterface?: ServerInterfaceSection;
     linkContext?: ConsoleLinkContext;
+    loadedToolNames: readonly string[];
+    loadedActorIds: ReadonlySet<string>;
 }): {
     texts: string[];
     structuredContent: Record<string, unknown>;
 } {
-    const { details, output, actorOutputSchema, serverInterface, linkContext } = options;
+    const { details, output, actorOutputSchema, serverInterface, linkContext, loadedToolNames, loadedActorIds } =
+        options;
 
     const actorUrl =
         buildConsoleActorUrl(linkContext, details.actorInfo.id) ??
@@ -232,6 +236,25 @@ export function buildActorDetailsTextResponse(options: {
 
     if (serverInterface?.text) texts.push(serverInterface.text);
 
+    // A session that serves the Actor's own MCP tools needs no pointer to them.
+    const needsMcpNextStep =
+        !loadedActorIds.has(details.actorInfo.id) &&
+        hasMcpInterface(
+            details.actorInfo,
+            details.webServerMcpPath,
+            `${details.actorInfo.username}/${details.actorInfo.name}`,
+        );
+    const mcpNextStep = needsMcpNextStep
+        ? resolveSiblingNextStep(
+              HELPER_TOOLS.ACTOR_MCP_TOOL_LIST,
+              loadedToolNames,
+              `This Actor is an MCP server; ${HELPER_TOOLS.ACTOR_MCP_TOOL_LIST} lists its tools.`,
+              'This Actor is an MCP server. Its MCP tools cannot be listed in this configuration. ' +
+                  `To use them, ${getOwnServerRemedy()}`,
+          )
+        : undefined;
+    if (mcpNextStep) texts.push(mcpNextStep);
+
     if (linkContext) {
         texts.push(VERBATIM_LINKS_NUDGE);
     }
@@ -242,6 +265,7 @@ export function buildActorDetailsTextResponse(options: {
         inputSchema: output.inputSchema ? details.inputSchema : undefined,
         outputSchema: output.outputSchema ? (actorOutputSchema ?? {}) : undefined,
         serverInterface: serverInterface?.serverInterface,
+        ...(mcpNextStep && { nextStep: mcpNextStep }),
     };
 
     return { texts, structuredContent };
@@ -306,10 +330,19 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         actorOutputSchema,
         serverInterface,
         linkContext,
+        loadedToolNames,
+        loadedActorIds,
     });
 
+    // An MCP server Actor's nextStep covers it unless it names the list tool and no tool can call the listed tools.
     // Resolved Actor ID, not the raw `actor` input — that may itself be an ID.
-    const runnableGuidance = buildActorNotRunnableGuidance(details.actorInfo.id, loadedToolNames, loadedActorIds);
+    const isCoveredByNextStep =
+        structuredContent.nextStep &&
+        (loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL) ||
+            !loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST));
+    const runnableGuidance = isCoveredByNextStep
+        ? ''
+        : buildActorNotRunnableGuidance(details.actorInfo.id, loadedToolNames, loadedActorIds);
     if (runnableGuidance) texts.push(runnableGuidance);
 
     return respondOk(texts, { structuredContent });

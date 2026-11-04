@@ -67,6 +67,8 @@ describe('buildActorDetailsTextResponse()', () => {
         it('links the input schema to the Console Actor detail page (Console has no /input sub-page)', () => {
             const { texts } = buildActorDetailsTextResponse({
                 details: MOCK_DETAILS,
+                loadedToolNames: [],
+                loadedActorIds: new Set(),
                 output: inputSchemaOnlyOutput,
                 linkContext,
             });
@@ -81,6 +83,8 @@ describe('buildActorDetailsTextResponse()', () => {
         it('embeds the input schema in an unchanged ```json fence (R5)', () => {
             const { texts } = buildActorDetailsTextResponse({
                 details: MOCK_DETAILS,
+                loadedToolNames: [],
+                loadedActorIds: new Set(),
                 output: inputSchemaOnlyOutput,
                 linkContext,
             });
@@ -92,6 +96,8 @@ describe('buildActorDetailsTextResponse()', () => {
         it('appends the verbatim-links nudge as the last text', () => {
             const { texts } = buildActorDetailsTextResponse({
                 details: MOCK_DETAILS,
+                loadedToolNames: [],
+                loadedActorIds: new Set(),
                 output: inputSchemaOnlyOutput,
                 linkContext,
             });
@@ -102,6 +108,8 @@ describe('buildActorDetailsTextResponse()', () => {
         it('keeps the public /input link and omits the nudge without a link context', () => {
             const { texts } = buildActorDetailsTextResponse({
                 details: MOCK_DETAILS,
+                loadedToolNames: [],
+                loadedActorIds: new Set(),
                 output: inputSchemaOnlyOutput,
             });
 
