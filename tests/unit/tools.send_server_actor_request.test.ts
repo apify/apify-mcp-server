@@ -287,10 +287,19 @@ describe('sending the request', () => {
         });
     });
 
+    it('sends an array query value as a repeated parameter', async () => {
+        const received = recordRequests();
+
+        const result = await dispatchTool({ path: '/echo', query: { formats: ['markdown', 'links'], n: [1] } });
+
+        expect(result.isError).toBe(false);
+        expect(received[0].url).toBe('/echo?formats=markdown&formats=links&n=1');
+    });
+
     it.each([
         ['null', null],
-        ['a singleton array', [1]],
         ['an object', { a: 1 }],
+        ['an array with an object', [{ a: 1 }]],
     ])('rejects %s as a query value through dispatch before sending a POST', async (_label, value) => {
         const received = recordRequests();
         const result = await dispatchTool({ query: { deleteAll: value } });

@@ -26,12 +26,16 @@ import { toPlainError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondServerError, respondUserError } from '../../utils/mcp.js';
 import { resolveActorInterfaces, resolveActorTenancy } from '../actor_tool_naming.js';
-import { apiCallArgsShape, redactApiCallArgs } from '../api/apify_api_request.js';
+import { redactApiCallArgs } from '../api/apify_api_request.js';
 import { API_METHODS, type ApiMethod, isRecord } from '../api/apify_api_spec.js';
 import { parseBaseMimeType } from '../storage/storage_helpers.js';
 import { anyJsonValueSchema, serverActorRequestOutputSchema } from '../structured_output_schemas.js';
 import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
+
+const queryValue = z.union([z.string(), z.number(), z.boolean()]);
+/** The API tools' `query` plus arrays: an Actor Server can document an array parameter, sent as a repeated parameter. */
+const serverActorQuery = z.record(z.string(), z.union([queryValue, z.array(queryValue)])).optional();
 
 const sendServerActorRequestArgs = z.object({
     actor: z
@@ -45,9 +49,10 @@ const sendServerActorRequestArgs = z.object({
             The path of an operation in the Actor API schema, starting with /. Take it from the schema; do not guess it.
             A query string written into the path is sent too.
         `),
-    query: apiCallArgsShape.query.describe(
+    query: serverActorQuery.describe(
         'Query parameters, by name, for example {"limit": 10, "verbose": true}; a boolean is sent as true or ' +
-            'false. Added to a query string in the path.',
+            'false, and an array as a repeated parameter (["a", "b"] is sent as name=a&name=b). Added to a query ' +
+            'string in the path.',
     ),
     body: z
         .unknown()
@@ -76,7 +81,7 @@ export function buildServerActorToolSchemas({
         method: methods.length === 1 ? method.default(methods[0]) : method,
         path,
         query: sendServerActorRequestArgs.shape.query.describe(
-            'Query parameters of the operation, by name, as the operations in the description list them. A boolean is sent as true or false.',
+            'Query parameters of the operation, by name, as the operations in the description list them. A boolean is sent as true or false, and an array as a repeated parameter.',
         ),
         ...(hasRequestBody && { body: sendServerActorRequestArgs.shape.body }),
     });
@@ -166,7 +171,9 @@ function buildRequestUrl(
     // Not axios `params`: apify-client's serializer sends a boolean as 1 or 0. Not `url.searchParams`: it would
     // encode the query written into the path again.
     const addedQuery = new URLSearchParams(
-        Object.entries(query ?? {}).map(([name, value]): [string, string] => [name, String(value)]),
+        Object.entries(query ?? {}).flatMap(([name, value]): [string, string][] =>
+            (Array.isArray(value) ? value : [value]).map((item) => [name, String(item)]),
+        ),
     ).toString();
     if (addedQuery) url.search = url.search ? `${url.search}&${addedQuery}` : addedQuery;
     return { url };
