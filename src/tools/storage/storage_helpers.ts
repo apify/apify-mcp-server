@@ -178,7 +178,7 @@ export function buildDatasetItemsSummaryNextStep(params: {
     loadedToolNames: readonly string[];
 }): { summary: string; nextStep: string } {
     const { datasetId, itemCount, totalItemCount, offset, fields, hasOnlyEmptyItems, loadedToolNames } = params;
-    if (totalItemCount > 0 && offset >= totalItemCount) {
+    if (itemCount === 0 && totalItemCount > 0 && offset >= totalItemCount) {
         return {
             summary:
                 `Offset ${offset} is past the last item: the dataset has ${totalItemCount} ` +
@@ -197,7 +197,7 @@ export function buildDatasetItemsSummaryNextStep(params: {
             ? `Use ${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} to see the field list if you need the data structure.`
             : `No more pages. Inspect the returned items directly.`;
     }
-    if (fields.length === 0 || itemCount === 0 || !hasOnlyEmptyItems) return { summary, nextStep };
+    if (fields.length === 0 || totalItemCount === 0 || !hasOnlyEmptyItems) return { summary, nextStep };
     return {
         summary: `${summary} None of them has the requested fields (${fields.join(', ')}).`,
         nextStep: suggestTool(HELPER_TOOLS.DATASET_GET, loadedToolNames)

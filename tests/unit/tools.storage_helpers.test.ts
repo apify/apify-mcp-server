@@ -89,6 +89,13 @@ describe('dataset items requested past the last item', () => {
         });
     });
 
+    // The item count can lag new pushes, so a page that returned items is not past the end.
+    it('describes a page that returned items as fetched, even when the item count is behind', () => {
+        const { summary } = summarizeDatasetItems({ offset: 20, itemCount: 5, totalItemCount: 20 });
+
+        expect(summary).not.toContain('past the last item');
+    });
+
     it('counts a one-item dataset in the singular', () => {
         const { summary } = summarizeDatasetItems({ offset: 5, itemCount: 0, totalItemCount: 1 });
 
@@ -129,6 +136,14 @@ describe('a field projection that matches nothing in the returned items', () => 
         );
         expect(nextStep).toContain(`${HELPER_TOOLS.DATASET_GET} with datasetId=ds-1`);
         expect(nextStep).not.toContain('offset=20');
+    });
+
+    // With clean=true the API drops the empty objects, so the page comes back empty.
+    it('says so when clean=true dropped every projected item', () => {
+        const { summary, nextStep } = summarizeDatasetItems({ ...EMPTY_PROJECTION, itemCount: 0 });
+
+        expect(summary).toContain('None of them has the requested fields (price, rating).');
+        expect(nextStep).not.toContain('offset=0');
     });
 
     it('names no tool for the field list when the session lacks get-dataset', () => {
