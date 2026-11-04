@@ -3,16 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.20.2 - **not yet released**
+## 0.20.3 - **not yet released**
 
 ### 🚀 Features
 
 - Enable send-server-actor-request by default ([#1745](https://github.com/apify/apify-mcp-server/pull/1745)) ([3a2c855](https://github.com/apify/apify-mcp-server/commit/3a2c855b2362ba73fbde64cd523e1a98d83fd883)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#1702](https://github.com/apify/apify-mcp-server/issues/1702)
 - [**breaking**] Serve a selected Server Actor through its server interface ([#1747](https://github.com/apify/apify-mcp-server/pull/1747)) ([b1bef99](https://github.com/apify/apify-mcp-server/commit/b1bef99b281ef367493d6bd73306697c9f6d1318)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#1689](https://github.com/apify/apify-mcp-server/issues/1689)
+- [**breaking**] Serve the default web-fetch tool through its server interface ([#1810](https://github.com/apify/apify-mcp-server/pull/1810)) ([496a385](https://github.com/apify/apify-mcp-server/commit/496a385ca011a0c5fd8d0b3add9318aa65d8d312)) by [@jirispilka](https://github.com/jirispilka), closes [#1647](https://github.com/apify/apify-mcp-server/issues/1647), [#1808](https://github.com/apify/apify-mcp-server/issues/1808)
 
 ### 🐛 Bug Fixes
 
-- Compile untrusted schemas on a fresh Ajv instance and cache validators by content ([#1786](https://github.com/apify/apify-mcp-server/pull/1786)) ([ce708a0](https://github.com/apify/apify-mcp-server/commit/ce708a01f3f0b9cef322f8a01274f37bf8e41757)) by [@jirispilka](https://github.com/jirispilka), closes [#905](https://github.com/apify/apify-mcp-server/issues/905)
 - Keep the keywords next to a $ref when dereferencing ([#1783](https://github.com/apify/apify-mcp-server/pull/1783)) ([174ecf8](https://github.com/apify/apify-mcp-server/commit/174ecf8cc96d1c4f0f9b10e6a91ec9f5eb22905d)) by [@jirispilka](https://github.com/jirispilka)
 - Reject Actor names that normalize to empty ([#1802](https://github.com/apify/apify-mcp-server/pull/1802)) ([2337062](https://github.com/apify/apify-mcp-server/commit/233706221b9ea163c43fc5ac5d27edb3f2312e45)) by [@jirispilka](https://github.com/jirispilka), closes [#1797](https://github.com/apify/apify-mcp-server/issues/1797)
 - Describe platform charges for free-priced Actors ([#1807](https://github.com/apify/apify-mcp-server/pull/1807)) ([c86c99f](https://github.com/apify/apify-mcp-server/commit/c86c99f9df799398845c87d2917d30d33ff8b15c)) by [@jirispilka](https://github.com/jirispilka), closes [#1794](https://github.com/apify/apify-mcp-server/issues/1794)
