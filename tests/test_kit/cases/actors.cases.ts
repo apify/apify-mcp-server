@@ -3,7 +3,10 @@ import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
 import { actorNameToToolName, getCategoryTools } from '@apify/actors-mcp-server/internals.js';
-import { MAX_INLINE_BYTES, MAX_LIMIT_WITH_INPUT_SCHEMA } from '@apify/actors-mcp-server/internals/test-kit.js';
+import {
+    MAX_LIMIT_WITH_INPUT_SCHEMA,
+    MAX_SERVER_ACTOR_RESPONSE_BYTES,
+} from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
     ACTOR_EXAMPLE_MCP_SERVER,
@@ -1102,30 +1105,33 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        name: 'returns a Server Actor body of exactly the inline limit and rejects one byte more, compressed too',
+        name: 'returns a Server Actor body of exactly the response limit whole, and the start of one byte more, compressed too',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const exact = await sendServerActorRequest(client, {
                 method: 'GET',
                 path: '/bytes',
-                query: { n: MAX_INLINE_BYTES },
+                query: { n: MAX_SERVER_ACTOR_RESPONSE_BYTES },
             });
             const over = await sendServerActorRequest(client, {
                 method: 'GET',
                 path: '/bytes',
-                query: { n: MAX_INLINE_BYTES + 1 },
+                query: { n: MAX_SERVER_ACTOR_RESPONSE_BYTES + 1 },
             });
             const overCompressed = await sendServerActorRequest(client, {
                 method: 'GET',
                 path: '/gzip',
-                query: { n: MAX_INLINE_BYTES + 1 },
+                query: { n: MAX_SERVER_ACTOR_RESPONSE_BYTES + 1 },
             });
 
-            expect(exact.sc).toMatchObject({ status: 200, bytes: MAX_INLINE_BYTES });
-            expect(over.result.isError).toBe(true);
-            expect(over.text).toContain(`larger than ${MAX_INLINE_BYTES} bytes`);
-            expect(overCompressed.result.isError).toBe(true);
-            expect(overCompressed.text).toContain(`larger than ${MAX_INLINE_BYTES} bytes`);
+            expect(exact.sc).toMatchObject({ status: 200, bytes: MAX_SERVER_ACTOR_RESPONSE_BYTES });
+            expect(exact.sc).not.toHaveProperty('bodyTruncated');
+            for (const { result, sc, text } of [over, overCompressed]) {
+                expect(result.isError).not.toBe(true);
+                expect(sc).toMatchObject({ status: 200, bodyTruncated: true });
+                expect((sc as { bytes: number }).bytes).toBeLessThanOrEqual(MAX_SERVER_ACTOR_RESPONSE_BYTES);
+                expect(text).toContain(`truncated at ${MAX_SERVER_ACTOR_RESPONSE_BYTES} bytes`);
+            }
         }),
     },
     {
