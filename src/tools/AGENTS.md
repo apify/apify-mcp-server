@@ -18,9 +18,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 - `actor_tool_naming.ts` — Actor tool names and `resolveActorInterfaces`, the one rule for which interfaces an
   Actor has: `input` (a run tool through its input schema), `mcp` (its MCP server) and `server` (its HTTP API,
   `hasWebServerSchema`). Two routes derive from the set. `resolveActorToolMode` gives a selected Actor's own tool,
-  read by tool loading: a server tool if `server`, else a run tool if `input`, else MCP tools if `mcp`, else none
-  (`SERVER_ACTOR_WITHOUT_MCP`). `getActorToolModeFromInterfaces` gives the `call-actor` route, which skips the
-  server interface, so `call-actor` still starts runs of a Server Actor that is not an MCP server.
+  read by tool loading: a server tool if `server`, else MCP tools if `mcp`, else a run tool if `input`, else none
+  (`SERVER_ACTOR_WITHOUT_MCP`). `getActorToolModeFromInterfaces` gives the `call-actor` route: a run if `input`, else
+  MCP tools if `mcp`; it skips the server interface, so `call-actor` still starts runs of a Server Actor. The three
+  interfaces are independent: an MCP-server Actor with a non-empty input schema has `input` too.
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
   - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), delete
     (`delete_actor.ts`), the actor-tools factory (run tools, proxied MCP tools, and a Server Actor's own tool

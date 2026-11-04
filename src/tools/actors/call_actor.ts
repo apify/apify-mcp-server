@@ -142,7 +142,7 @@ export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOL
     const sections: string[] = [
         'Call any Actor from the Apify Store.',
         workflowSection,
-        `MCP server Actors are not run here${hasTool(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL) ? `; ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} calls their MCP tools` : ''}.`,
+        `An Actor whose only interface is an MCP server is not run here${hasTool(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL) ? `; ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} calls its MCP tools` : ''}.`,
         ...(hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST) ? [buildCallActorServerActorSection(ctx)] : []),
         dedent`
             IMPORTANT:
@@ -379,11 +379,11 @@ export async function checkPaymentProviderStandbyConflict(params: {
 }
 
 /** Rejection for an Actor that is an MCP server: its input interface is unused, so a run of it is a mistake. */
-function respondMcpServerActor(actorFullName: string, route: string, loadedToolNames: readonly string[]): ToolResponse {
+function respondMcpServerActor(actorFullName: string, loadedToolNames: readonly string[]): ToolResponse {
     const replacement = loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL)
         ? ` Its MCP tools can be called with ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL}.`
         : ` Its MCP tools cannot be called in this configuration. To use them, ${getOwnServerRemedy()}`;
-    return respondUserError(`Actor '${actorFullName}' is an MCP server, which ${route} does not run.${replacement}`, {
+    return respondUserError(`Actor '${actorFullName}' has no input schema to run; it is an MCP server.${replacement}`, {
         detail: 'MCP server Actor',
     });
 }
@@ -524,7 +524,7 @@ export async function callActorPreExecute(
         };
     }
     if (resolution?.toolMode === ACTOR_TOOL_MODE.MCP) {
-        return { earlyResponse: respondMcpServerActor(resolution.actorFullName, options.route, loadedToolNames) };
+        return { earlyResponse: respondMcpServerActor(resolution.actorFullName, loadedToolNames) };
     }
     return { parsed: { ...parsedArgs, actor: actorName } };
 }

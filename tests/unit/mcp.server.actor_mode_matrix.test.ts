@@ -117,7 +117,7 @@ function earlyText(result: Awaited<ReturnType<typeof preExecute>>): string {
 beforeEach(() => {
     seedActor(RUN_ONLY, { input: NON_EMPTY_INPUT });
     seedActor(RUN_ONLY_STALE_PATH, { webServerMcpPath: '/mcp', input: NON_EMPTY_INPUT });
-    seedActor(STANDBY_MCP, { webServerMcpPath: '/mcp', isStandbyEnabled: true, input: NON_EMPTY_INPUT });
+    seedActor(STANDBY_MCP, { webServerMcpPath: '/mcp', isStandbyEnabled: true });
     seedActor(WEB_SEARCH, {
         webServerMcpPath: '/mcp',
         isStandbyEnabled: true,
@@ -134,7 +134,11 @@ describe('Actor run/standby mode decision table', () => {
     it.each([
         ['a run-only Actor', RUN_ONLY, ['acme--run-only']],
         ['a run-only Actor carrying a leftover webServerMcpPath', RUN_ONLY_STALE_PATH, ['acme--run-only-stale-path']],
-        ['a standby Actor exposing an MCP server (proxied tools only)', STANDBY_MCP, ['acme--standby-mcp--add']],
+        [
+            'a standby Actor exposing an MCP server and no input schema (proxied tools only)',
+            STANDBY_MCP,
+            ['acme--standby-mcp--add'],
+        ],
         [
             'a standby Actor carrying an MCP path and an HTTP schema (its server tool)',
             WEB_SEARCH,
@@ -158,8 +162,11 @@ describe('Actor run/standby mode decision table', () => {
     });
 
     describe('call-actor routing', () => {
-        it('runs a run-only Actor through its input schema despite its leftover MCP path', async () => {
-            const result = await preExecute(RUN_ONLY_STALE_PATH);
+        it.each([
+            ['a run-only Actor despite its leftover MCP path', RUN_ONLY_STALE_PATH],
+            ['an MCP-server Actor with an input schema', WEB_SEARCH],
+        ])('runs %s through its input schema', async (_label, actor) => {
+            const result = await preExecute(actor);
 
             expect('earlyResponse' in result).toBe(false);
         });
@@ -186,7 +193,7 @@ describe('Actor run/standby mode decision table', () => {
             expect('earlyResponse' in result).toBe(false);
         });
 
-        it('rejects a standby Actor exposing an MCP server, naming call-actor-mcp-tool only when the session has it', async () => {
+        it('rejects an MCP-server Actor with no input schema, naming call-actor-mcp-tool only when the session has it', async () => {
             const withMcpTool = earlyResponseOf(await preExecute(STANDBY_MCP));
             const withoutMcpTool = earlyText(await preExecute(STANDBY_MCP, [HELPER_TOOLS.ACTOR_CALL]));
 
