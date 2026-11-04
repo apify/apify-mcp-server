@@ -85,7 +85,7 @@ export type ActorDefinitionPruned = Pick<
     hasWebServerSchema: boolean;
     /** The schema's operations with their required inputs, e.g. `GET / (required: query)`, for request recovery text. */
     webServerOperations?: string[];
-    /** Per operation, the query parameters a list fills comma-joined (`listCommaJoinedQueryParameters`); absent without any. */
+    /** Per operation, comma-joined query parameters; empty entries preserve literal path precedence. Absent when none need joining. */
     webServerCommaJoinedQueryParameters?: Record<string, string[]>;
     /** What the Actor's own tool is built from when it is served through its server interface. */
     webServerToolInfo?: ServerActorToolInfo;

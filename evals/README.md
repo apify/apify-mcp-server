@@ -140,8 +140,8 @@ before blaming the tool (httpbin outages are common; the status/format reference
 truthfully reported upstream error). Since #1647 the default tool is the Actor's Server Actor tool: it
 sends one request (`method`, `path`, `query`) to the Actor's server interface, and the result is the HTTP
 response, with no run, dataset or `get-dataset-items` step. Probed 2026-11-04 over `GET /`: `formats`
-is sent as a repeated parameter (`formats=markdown&formats=links`; the Actor also takes
-`markdown,links`); a 200 body is a JSON object with `fetch` (including `fetch.httpStatusCode`),
+is sent comma-joined (`formats=markdown,links`), as the schema documents (the Actor also accepts
+repeated parameters); a 200 body is a JSON object with `fetch` (including `fetch.httpStatusCode`),
 `metadata` and one field per requested format; `unwrap=true` returns the first format as the body
 (`text/markdown`); a body over 262144 bytes is not returned and the call fails with `bodyOmitted`
 (#1738); `ftp://` returns 400 `INVALID_URL` ("Unsupported URL protocol"); an unreachable host returns

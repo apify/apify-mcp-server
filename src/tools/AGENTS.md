@@ -37,7 +37,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     schema and README stay on the default build; `hasWebServerSchemaOperations` detects operations the send tool
     can call in the publisher's schema; `webServerOperations` caches each operation with its required inputs, which
     the send tool lists after a 400/404/405/422, and `webServerCommaJoinedQueryParameters` the query parameters a
-    list fills comma-joined, `explode: false`; a list fills any other as a repeated parameter),
+    list fills comma-joined, `explode: false`; empty entries preserve literal path precedence over templates, and
+    the map is absent when none need joining; a list fills any other as a repeated parameter),
     `server_interface_schema.ts` (the operations a Server Actor's `webServerSchema` documents, in the
     `get-apify-api-details` shape through the API tools' `dereference`; no prose),
     `server_interface_details.ts` (the server-interface section of `fetch-actor-details`: the

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -12,9 +13,11 @@ import { actorDefinitionCache } from '../../src/state.js';
 import { getServerActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import {
     executeSendServerActorRequest,
+    matchesPathTemplate,
     RECOVERY_MAX_OPERATIONS,
     sendServerActorRequest,
 } from '../../src/tools/actors/send_server_actor_request.js';
+import { listCommaJoinedQueryParameters } from '../../src/tools/actors/server_interface_schema.js';
 import { serverActorRequestOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type {
     Actor,
@@ -314,6 +317,70 @@ describe('sending the request', () => {
             '/echo?formats=a&formats=b',
         ]);
     });
+
+    it('rejects an adversarial template match within a bounded subprocess', () => {
+        const moduleUrl = new URL('../../src/tools/actors/send_server_actor_request.ts', import.meta.url).href;
+        const template = `/${Array.from({ length: 16 }, (_, index) => `{p${index}}`).join('-')}/end`;
+        const pathname = `/${'-'.repeat(90)}/no-end`;
+        const script = `
+            import { matchesPathTemplate } from ${JSON.stringify(moduleUrl)};
+            process.stdout.write(String(matchesPathTemplate(${JSON.stringify(template)}, ${JSON.stringify(pathname)})));
+        `;
+
+        const output = execFileSync(process.execPath, ['--import', 'tsx', '--input-type=module', '--eval', script], {
+            encoding: 'utf8',
+            timeout: 5_000,
+        });
+
+        expect(output).toBe('false');
+    });
+
+    it('matches parameters only when they fill a whole path segment', () => {
+        expect(matchesPathTemplate('/{prefix}ho', '/echo')).toBe(false);
+    });
+
+    it.each(['/status/', '/status/204/details', '/statuses/204'])(
+        'does not match /status/{code} against %s',
+        (pathname) => {
+            expect(matchesPathTemplate('/status/{code}', pathname)).toBe(false);
+        },
+    );
+
+    it.each([false, true])(
+        'uses the literal operation encoding before a template (literal comma-joined: %s)',
+        async (isCommaJoined) => {
+            const received = recordRequests();
+            const parameter = (explode: boolean) => ({
+                name: 'formats',
+                in: 'query',
+                explode,
+                schema: { type: 'array', items: { type: 'string' } },
+            });
+            const schema = {
+                paths: {
+                    '/{name}': {
+                        get: { parameters: [{ ...parameter(false), name: isCommaJoined ? 'tags' : 'formats' }] },
+                    },
+                    '/echo': { get: { parameters: [parameter(!isCommaJoined)] } },
+                },
+            };
+            seedActor('apify/overlapping-paths', {
+                definition: {
+                    webServerCommaJoinedQueryParameters: listCommaJoinedQueryParameters(schema),
+                },
+            });
+
+            await callTool({
+                actor: 'apify/overlapping-paths',
+                path: '/echo',
+                query: { formats: ['markdown', 'links'] },
+            });
+
+            expect(received[0].url).toBe(
+                isCommaJoined ? '/echo?formats=markdown%2Clinks' : '/echo?formats=markdown&formats=links',
+            );
+        },
+    );
 
     it.each([
         ['null', null],

@@ -187,6 +187,8 @@ function findCommaJoinedQueryParameters(
     method: string,
     pathname: string,
 ): string[] {
+    const exact = byOperation?.[`${method} ${pathname}`];
+    if (exact) return exact;
     for (const [operation, parameters] of Object.entries(byOperation ?? {})) {
         const [documentedMethod, documentedPath] = operation.split(' ');
         if (documentedMethod === method && matchesPathTemplate(documentedPath, pathname)) return parameters;
@@ -194,13 +196,26 @@ function findCommaJoinedQueryParameters(
     return [];
 }
 
-function matchesPathTemplate(template: string, pathname: string): boolean {
+/**
+ * Matches a request pathname to a documented operation's path template so the caller can select its query-array
+ * encoding. For example, `GET /status/{code}` may document comma-joined `tags`: a request to `/status/204` must
+ * then send `tags=a,b`, even though the cache key contains `{code}`. The caller checks exact paths first.
+ *
+ * Supports whole-segment parameters only: `{code}` matches one nonempty segment. Other segments match literally.
+ * Comparing segments avoids regex backtracking on Actor-controlled paths, which could block the server before
+ * the HTTP request timeout starts.
+ *
+ * @example matchesPathTemplate('/status/{code}', '/status/204') // true
+ * @example matchesPathTemplate('/status/{code}', '/status/') // false: empty parameter
+ * @example matchesPathTemplate('/status/{code}', '/status/204/details') // false: extra segment
+ */
+export function matchesPathTemplate(template: string, pathname: string): boolean {
     const templateSegments = template.split('/');
     const segments = pathname.split('/');
     return (
         templateSegments.length === segments.length &&
         templateSegments.every((segment, index) =>
-            segment.startsWith('{') && segment.endsWith('}') ? segments[index] !== '' : segment === segments[index],
+            /^\{[^{}]+\}$/.test(segment) ? segments[index] !== '' : segment === segments[index],
         )
     );
 }
