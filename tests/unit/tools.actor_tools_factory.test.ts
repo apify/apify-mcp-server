@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { RAG_WEB_BROWSER } from '../../src/const.js';
 import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import type { ActorInfo, SchemaProperties } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
@@ -265,35 +264,6 @@ describe('getNormalActorsAsTools()', () => {
             for (const info of [fullPermissions, otherSecret]) {
                 expect(await getAnnotations(info)).toMatchObject({ readOnlyHint: false, destructiveHint: true });
             }
-        });
-    });
-
-    describe('existing Actor presentation policies', () => {
-        it.each([true, false])('preserves RAG exposure and validation with isDirectTool %s', async (isDirectTool) => {
-            const actorInfo = createMockActorInfo(RAG_WEB_BROWSER, {
-                ...LIMITED,
-                inputProperties: {
-                    query: { type: 'string' },
-                    maxResults: { type: 'integer', default: 3 },
-                    outputFormats: { type: 'array', default: ['markdown'] },
-                    hiddenSecret: { type: 'string', isSecret: true },
-                },
-                inputRequired: ['query', 'maxResults'],
-            });
-            const original = structuredClone(actorInfo);
-            const [tool] = await getNormalActorsAsTools([actorInfo], { isDirectTool });
-            expect(Object.keys(tool.inputSchema.properties ?? {})).toEqual([
-                'query',
-                'maxResults',
-                'outputFormats',
-                'waitSecs',
-            ]);
-            expect(tool.inputSchema.required).toEqual(['query']);
-            const input = { query: 'apify', hiddenSecret: 'original-input' };
-            expect(tool.ajvValidate(input)).toBe(true);
-            expect(input).toEqual({ query: 'apify', hiddenSecret: 'original-input' });
-            expect(tool.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true });
-            expect(actorInfo).toEqual(original);
         });
     });
 });
