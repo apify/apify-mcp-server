@@ -21,21 +21,24 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   read by tool loading: a server tool if `server`, else MCP tools if `mcp`, else a run tool if `input`, else none
   (`SERVER_ACTOR_WITHOUT_MCP`). `getActorToolModeFromInterfaces` gives the `call-actor` route, which skips the
   server interface, so `call-actor` still starts runs of a Server Actor. Actors in `INPUT_INTERFACE_ACTORS`
-  (`../const.ts`: web-fetch, web-search, rag-web-browser) are served as run tools although they declare an MCP
+  (`../const.ts`: web-search, rag-web-browser) are served as run tools although they declare an MCP
   path or a server interface, unless their input schema is empty, in which case they get no tool.
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
   - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), delete
     (`delete_actor.ts`), the actor-tools factory (run tools, proxied MCP tools, and a Server Actor's own tool
     (`getServerActorsAsTools`, type `actor-server`): `send-server-actor-request`'s execution and output with the
     Actor fixed, `method` narrowed to the documented ones, `path` a plain string (no enum: a schema can document
-    thousands of paths), and the operations in the description; an Actor with a server interface and no
-    `webServerToolInfo` is reported as `load-failed`), the direct actor-tool executor (`actor_executor.ts`),
+    thousands of paths), the policy's `serverTool` text and input notes (`getActorToolPolicy`) and the operations in the
+    description; an Actor with a server interface and no `webServerToolInfo` is reported as `load-failed`; the
+    default `apify/web-fetch` tool is served this way), the direct actor-tool executor (`actor_executor.ts`),
     `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`, and resolves the build
     the server-interface fields — `webServerMcpPath`, `webServerSchema` — are read from when standby is on,
     `resolveServerInterfaceDefinition`, shared with `fetchActorDetails` in `../utils/actor_details.ts`; the input
     schema and README stay on the default build; `hasWebServerSchemaOperations` detects operations the send tool
     can call in the publisher's schema; `webServerOperations` caches each operation with its required inputs, which
-    the send tool lists after a 400/404/405/422),
+    the send tool lists after a 400/404/405/422, and `webServerCommaJoinedQueryParameters` the query parameters a
+    list fills comma-joined, `explode: false`, per operation, looked up by the path as sent; absent when none
+    need joining; a list fills any other as a repeated parameter, and an empty list nothing),
     `server_interface_schema.ts` (the operations a Server Actor's `webServerSchema` documents, in the
     `get-apify-api-details` shape through the API tools' `dereference`; no prose),
     `server_interface_details.ts` (the server-interface section of `fetch-actor-details`: the
@@ -48,7 +51,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     per definition); `server_interface_schema.ts` reads each operation's inputs for it, `listOperationInputs`),
     `send_server_actor_request.ts` (`send-server-actor-request`: one HTTP request to a Server Actor's API, gated on
     the `server` interface and sent through `sendApifyApiRequest` with raw response
-    bytes, no redirects, the `MAX_INLINE_BYTES` cap after decompression and the `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`
+    bytes, no redirects, the body cut at `MAX_INLINE_BYTES` after decompression (`readBodyToCap`; the
+    start is returned with `bodyTruncated` and a `nextStep`) and the `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`
     deadline; the path is resolved against the Actor's `standbyUrl` and must keep its origin; query values are
     validated without coercion; text uses the declared charset, UTF-8 by default, and rejects unsupported
     charsets while keeping the HTTP status; refused bodies retain structured request/status metadata with

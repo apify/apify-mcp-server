@@ -1363,11 +1363,17 @@ export const serverActorRequestOutputSchema = {
         contentType: { type: 'string', description: 'Content-Type of the response; absent when it had none' },
         body: {
             type: 'string',
-            description: 'Response body as text; empty when the response had none; absent when omitted',
+            description:
+                'Response body as text; empty when the response had none; its start when truncated; absent when omitted',
         },
         bytes: {
             type: 'integer',
-            description: 'Response body size in bytes, after decompression; absent when over the limit',
+            description: 'Size of the body received in bytes, after decompression',
+        },
+        bodyTruncated: {
+            type: 'boolean',
+            const: true,
+            description: 'The response body is longer than the limit; body holds its start',
         },
         bodyOmitted: {
             type: 'boolean',

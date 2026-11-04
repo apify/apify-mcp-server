@@ -333,7 +333,7 @@ describe('prepareToolCall()', () => {
             );
 
             expect(message).toContain('/query/limit: must be string, got object');
-            expect(message).toContain('Parameter /query: Query parameters, by name');
+            expect(message).toContain('Parameter /query: Query parameters of the operation, by name');
         });
 
         it('reports the received type and the description for a wrong type', async () => {

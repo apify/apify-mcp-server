@@ -209,9 +209,6 @@ export function buildActorInputSchema(actorFullName: string, input: ActorInputSc
     const finalSchema = policy?.exposedInputs
         ? pruneSchemaPropertiesByWhitelist(working, policy.exposedInputs)
         : working;
-    for (const [name, description] of Object.entries(policy?.inputDescriptionSuffixes ?? {})) {
-        if (finalSchema.properties[name]) finalSchema.properties[name].description += ` ${description}`;
-    }
 
     finalSchema.$id = getToolSchemaID(actorFullName);
     return { inputSchema: finalSchema };

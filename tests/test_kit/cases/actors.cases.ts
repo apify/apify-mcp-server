@@ -3,7 +3,7 @@ import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
 import { actorNameToToolName, getCategoryTools } from '@apify/actors-mcp-server/internals.js';
-import { MAX_INLINE_BYTES, MAX_LIMIT_WITH_INPUT_SCHEMA } from '@apify/actors-mcp-server/internals/test-kit.js';
+import { MAX_LIMIT_WITH_INPUT_SCHEMA, MAX_INLINE_BYTES } from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
     ACTOR_EXAMPLE_MCP_SERVER,
@@ -1102,30 +1102,29 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        name: 'returns a Server Actor body of exactly the inline limit and rejects one byte more, compressed too',
+        name: 'returns a Server Actor body of exactly the inline limit whole, and the start of one byte more, compressed too',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
-            const exact = await sendServerActorRequest(client, {
-                method: 'GET',
-                path: '/bytes',
-                query: { n: MAX_INLINE_BYTES },
-            });
-            const over = await sendServerActorRequest(client, {
-                method: 'GET',
-                path: '/bytes',
-                query: { n: MAX_INLINE_BYTES + 1 },
-            });
-            const overCompressed = await sendServerActorRequest(client, {
-                method: 'GET',
-                path: '/gzip',
-                query: { n: MAX_INLINE_BYTES + 1 },
-            });
+            for (const path of ['/bytes', '/gzip']) {
+                const exact = await sendServerActorRequest(client, {
+                    method: 'GET',
+                    path,
+                    query: { n: MAX_INLINE_BYTES },
+                });
+                const over = await sendServerActorRequest(client, {
+                    method: 'GET',
+                    path,
+                    query: { n: MAX_INLINE_BYTES + 1 },
+                });
 
-            expect(exact.sc).toMatchObject({ status: 200, bytes: MAX_INLINE_BYTES });
-            expect(over.result.isError).toBe(true);
-            expect(over.text).toContain(`larger than ${MAX_INLINE_BYTES} bytes`);
-            expect(overCompressed.result.isError).toBe(true);
-            expect(overCompressed.text).toContain(`larger than ${MAX_INLINE_BYTES} bytes`);
+                expect(exact.result.isError).not.toBe(true);
+                expect(exact.sc).toMatchObject({ status: 200, bytes: MAX_INLINE_BYTES });
+                expect(exact.sc).not.toHaveProperty('bodyTruncated');
+                expect(over.result.isError).not.toBe(true);
+                expect(over.sc).toMatchObject({ status: 200, bodyTruncated: true });
+                expect((over.sc as { bytes: number }).bytes).toBeLessThanOrEqual(MAX_INLINE_BYTES);
+                expect(over.text).toContain(`${MAX_INLINE_BYTES}-byte limit`);
+            }
         }),
     },
     {
@@ -1235,6 +1234,28 @@ export const actorsCases: Case[] = [
 
             expect(result.isError).not.toBe(true);
             expect((result as { structuredContent?: { runId?: string } }).structuredContent?.runId).toBeTruthy();
+        }),
+    },
+    {
+        // isDeploymentTest: the default web-fetch tool, sent through its server interface, with an array query value.
+        name: 'fetches a page with the default web-fetch tool through GET /',
+        isDeploymentTest: true,
+        run: withClient({}, async (client) => {
+            const result = await client.callTool({
+                name: 'apify--web-fetch',
+                arguments: {
+                    method: 'GET',
+                    path: '/',
+                    query: { url: 'https://example.com', formats: ['markdown', 'links'] },
+                },
+            });
+
+            expect(result.isError).not.toBe(true);
+            const sc = (result as { structuredContent?: ServerActorRequestContent }).structuredContent;
+            expect(sc?.status).toBe(200);
+            expect(JSON.parse(sc!.body)).toEqual(
+                expect.objectContaining({ markdown: expect.any(String), links: expect.any(Array) }),
+            );
         }),
     },
     {

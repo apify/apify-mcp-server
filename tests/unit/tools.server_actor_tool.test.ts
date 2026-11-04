@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { HELPER_TOOLS, RAG_WEB_BROWSER } from '../../src/const.js';
+import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
 import { ACTOR_LOAD_ERROR_KIND } from '../../src/errors.js';
 import { actorDefinitionCache } from '../../src/state.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
@@ -10,10 +10,12 @@ import {
     buildServerActorToolDescription,
     buildServerActorToolInfo,
     CLIENT_DESCRIPTION_MAX_LENGTH,
+    formatTenancyBilling,
 } from '../../src/tools/actors/server_interface_details.js';
+import { listCommaJoinedQueryParameters } from '../../src/tools/actors/server_interface_schema.js';
 import { serverActorRequestOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { Actor, ServerActorToolInfo, ToolEntry } from '../../src/types.js';
-import { TOOL_TYPE } from '../../src/types.js';
+import { ACTOR_TENANCY, TOOL_TYPE } from '../../src/types.js';
 import { mockActor, mockActorBuildClient, mockDefaultBuild } from './helpers/actor_build_client.js';
 import { makePaymentProvider } from './helpers/mcp_server.js';
 import { only } from './helpers/tool_context.js';
@@ -49,6 +51,112 @@ const LONG_SCHEMA = {
     paths: {
         ...SCHEMA.paths,
         '/empty': { get: { summary: 'Return no content', description: 'a'.repeat(CLIENT_DESCRIPTION_MAX_LENGTH) } },
+    },
+};
+
+/** apify/web-fetch's API schema as served on 2026-10-28: the request side the tool renders, texts as written. */
+const WEB_FETCH_LIVE_SCHEMA = {
+    openapi: '3.0.0',
+    paths: {
+        '/': {
+            get: {
+                summary: 'Fetch a URL',
+                description:
+                    'Fetches the resource at the URL and returns its content converted to requested formats plus ' +
+                    'metadata. Choose `POST` instead of query params to send a JSON request body.',
+                parameters: [
+                    {
+                        name: 'url',
+                        in: 'query',
+                        required: true,
+                        description:
+                            'The URL to fetch. Only `http://` and `https://` schemes are supported; others are ' +
+                            'rejected. Only `url` is required.',
+                        schema: { $ref: '#/components/schemas/FetchRequest/properties/url' },
+                        example: 'https://apify.com',
+                    },
+                    {
+                        name: 'formats',
+                        in: 'query',
+                        style: 'form',
+                        explode: false,
+                        description:
+                            'Select one or more formats: `markdown`, `html`, `text`, `links`, `raw`. If omitted, ' +
+                            'defaults to `markdown` for HTML/PDF, `text` for text-based content, or `raw` for ' +
+                            'images, archives, and other binary content.',
+                        schema: { $ref: '#/components/schemas/FetchRequest/properties/formats' },
+                    },
+                    {
+                        name: 'unwrap',
+                        in: 'query',
+                        description: 'See the unwrap property.',
+                        schema: { $ref: '#/components/schemas/FetchRequest/properties/unwrap' },
+                    },
+                    {
+                        name: 'headers',
+                        in: 'query',
+                        description:
+                            'Extra HTTP headers to send with the request, as a JSON string. For example: ' +
+                            '`{"Accept-Language":"fr-FR"}`.',
+                        schema: { type: 'string' },
+                    },
+                    {
+                        name: 'wait',
+                        in: 'query',
+                        description:
+                            'Milliseconds to wait after the page loads, for content that shows up late. From 1 to ' +
+                            '60000. Setting it renders the page in a real browser, so content loaded by JavaScript ' +
+                            'is included. Rendered requests are slower.',
+                        schema: { $ref: '#/components/schemas/FetchRequest/properties/wait' },
+                    },
+                ],
+            },
+            post: {
+                summary: 'Fetch a URL',
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/FetchRequest' } } },
+                },
+            },
+        },
+    },
+    components: {
+        schemas: {
+            FetchRequest: {
+                type: 'object',
+                required: ['url'],
+                properties: {
+                    url: {
+                        type: 'string',
+                        format: 'uri-reference',
+                        description:
+                            'The URL to fetch. Only `http://` and `https://` schemes are supported; others are rejected.',
+                        example: 'https://apify.com',
+                    },
+                    formats: {
+                        type: 'array',
+                        description:
+                            "The Actor converts the fetched content to the requested format(s). A format that doesn't " +
+                            'apply to the content type returns `null`; if none of the requested formats apply, the ' +
+                            'request fails with `UNSUPPORTED_CONTENT_TYPE`. If omitted, defaults to `markdown` for ' +
+                            'HTML/PDF, `text` for text-based content, or `raw` for images, archives, and other binary ' +
+                            'content. Composes freely with `unwrap`.',
+                        items: { type: 'string', enum: ['markdown', 'html', 'text', 'links', 'raw'] },
+                    },
+                    unwrap: { type: 'boolean', description: 'Returns the first producible format as the body.' },
+                    headers: { type: 'object', additionalProperties: { type: 'string' } },
+                    wait: {
+                        type: 'integer',
+                        minimum: 1,
+                        maximum: 60000,
+                        description:
+                            'Milliseconds to wait after the page loads, for content that shows up late. From 1 to ' +
+                            '60000. Setting it renders the page in a real browser, so content loaded by JavaScript ' +
+                            'is included. Rendered requests are slower.',
+                    },
+                },
+            },
+        },
     },
 };
 
@@ -193,16 +301,7 @@ describe('the input schema of a Server Actor tool', () => {
 
         expect(path).toMatchObject({ type: 'string', minLength: 1 });
         expect(path).not.toHaveProperty('enum');
-        expect(path.description).toContain('listed in the description');
         expect(ajvValidate({ method: 'GET', path: '/status/404' })).toBe(true);
-    });
-
-    // The send tool's example names Apify API parameters, which this Actor does not take.
-    it('points the query at the operations in the description', () => {
-        const query = schemasOf({}).inputSchema.properties?.query as Record<string, unknown>;
-
-        expect(query.description).toContain('as the operations in the description list them');
-        expect(query.description).not.toContain('limit');
     });
 
     it('defaults a single method, which the validator fills in', () => {
@@ -277,9 +376,6 @@ describe('the operations in a Server Actor tool description', () => {
     it('are the operations in full when they fit, with no lookup to point at', async () => {
         const tool = await loadServerTool(SCHEMA);
 
-        expect(tool.description).toContain(
-            'single-tenant: the first request starts a run in your account, kept for its idle timeout of 300 s.',
-        );
         expect(tool.description).toContain('Operations:\n```json\n{"operations":[{"method":"GET","path":"/add"');
         expect(tool.description).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
     });
@@ -433,5 +529,83 @@ describe('the operations in a Server Actor tool description', () => {
     it('come with the documented methods, and whether an operation takes a body', () => {
         expect(infoOf(SCHEMA)).toMatchObject({ methods: ['GET', 'POST'], hasRequestBody: true });
         expect(buildServerActorToolInfo({ paths: {} }, 'apify/server-actor-test')).toBeUndefined();
+    });
+});
+
+describe('the default apify/web-fetch tool', () => {
+    const [username, name] = WEB_FETCH.split('/');
+    const webFetchActor: Partial<Actor> = {
+        username,
+        name,
+        description:
+            'Download any web page by URL and convert it to clean Markdown, plain text, HTML, and other formats. ' +
+            'Automatically renders JavaScript and works around bot blocking. The Actor provides a real-time API ' +
+            'for quick response times.',
+        actorStandby: { isEnabled: true, tenancy: 'MULTI_TENANT' },
+    };
+    const loadWebFetchTool = () => loadServerTool(WEB_FETCH_LIVE_SCHEMA, webFetchActor);
+
+    // No web-fetch exception: the tool is what any Server Actor with this schema gets.
+    it('is served as a Server Actor tool: GET or POST, a required path, a body, and an untyped query', async () => {
+        const tool = await loadWebFetchTool();
+
+        expect(tool.type).toBe(TOOL_TYPE.ACTOR_SERVER);
+        expect(tool.inputSchema.properties).toMatchObject({
+            method: { enum: ['GET', 'POST'] },
+            path: { type: 'string' },
+        });
+        expect(tool.inputSchema.properties).toHaveProperty('body');
+        expect(tool.inputSchema.properties?.query).not.toHaveProperty('properties');
+        expect(tool.inputSchema.required).toEqual(['method', 'path']);
+        expect(
+            tool.ajvValidate({
+                method: 'GET',
+                path: '/',
+                query: { url: 'https://example.com', formats: ['markdown'] },
+            }),
+        ).toBe(true);
+        expect(tool.ajvValidate({ query: { url: 'https://example.com' } })).toBe(false);
+    });
+
+    it('carries the policy text, its example call, the billing and both operations as lines within the client limit', async () => {
+        const tool = await loadWebFetchTool();
+
+        expect(tool.description).toContain(
+            'Example: {"method":"GET","path":"/","query":{"url":"https://example.com","formats":["markdown"]}}',
+        );
+        expect(tool.description).toContain(formatTenancyBilling({ tenancy: ACTOR_TENANCY.MULTI_TENANT }));
+        expect(tool.description).toContain(
+            'Operations:\n- GET / [url:string required, formats:array, unwrap:boolean, headers:string, wait:integer]: Fetch a URL.',
+        );
+        expect(tool.description).toContain('- POST / {url:string required');
+        expect(tool.description!.length).toBeLessThanOrEqual(CLIENT_DESCRIPTION_MAX_LENGTH);
+    });
+
+    // On the argument the agent fills in: agents rewrote ftp:// URLs to https:// when the note was elsewhere.
+    it('carries the url scheme note on its query input', async () => {
+        const tool = await loadWebFetchTool();
+        const query = tool.inputSchema.properties?.query as { description: string };
+
+        expect(query.description).toContain('ftp:');
+    });
+
+    it('keeps the read-only hint of the Actor', async () => {
+        const tool = await loadWebFetchTool();
+
+        expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+    });
+
+    it('lists formats as the comma-joined query parameter of GET /', () => {
+        expect(listCommaJoinedQueryParameters(WEB_FETCH_LIVE_SCHEMA)).toEqual({ 'GET /': ['formats'] });
+    });
+
+    // Without its server interface the Actor is a run tool again, whose input is the Actor's own schema.
+    it('falls back to a run tool without the server example when Actor Standby is off', async () => {
+        const { tools } = await loadTools(WEB_FETCH_LIVE_SCHEMA, {
+            actor: { ...webFetchActor, actorStandby: { isEnabled: false } },
+        });
+
+        expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR]);
+        expect(tools[0].description).not.toContain('"method"');
     });
 });

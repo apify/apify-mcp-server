@@ -134,20 +134,29 @@ export function isMaxContentLengthAbort(err: unknown): boolean {
 }
 
 /**
- * Reads the body of a `responseType: 'stream'` response from `sendApifyApiRequest`; `undefined` when it passed
- * `MAX_INLINE_BYTES`, where axios stopped reading. Any other failure mid-body propagates, so a partial body is
- * never returned.
+ * Reads the body of a `responseType: 'stream'` response from `sendApifyApiRequest` up to `MAX_INLINE_BYTES`:
+ * `isTruncated` when axios stopped reading there, with the bytes read before it. Any other failure mid-body
+ * propagates.
  */
-export async function readBodyUnderCap(response: Pick<AxiosResponse<unknown>, 'data'>): Promise<Buffer | undefined> {
+export async function readBodyToCap(
+    response: Pick<AxiosResponse<unknown>, 'data'>,
+): Promise<{ body: Buffer; isTruncated: boolean }> {
     const chunks: Buffer[] = [];
+    let isTruncated = false;
     try {
         // Chunks are Buffers (`objectMode: false`).
         for await (const chunk of response.data as AsyncIterable<Buffer | string>) {
             chunks.push(Buffer.from(chunk));
         }
     } catch (err) {
-        if (isMaxContentLengthAbort(err)) return undefined;
-        throw err;
+        if (!isMaxContentLengthAbort(err)) throw err;
+        isTruncated = true;
     }
-    return Buffer.concat(chunks);
+    return { body: Buffer.concat(chunks), isTruncated };
+}
+
+/** The whole body, or `undefined` when it passed the cap: a partial body is never returned. */
+export async function readBodyUnderCap(response: Pick<AxiosResponse<unknown>, 'data'>): Promise<Buffer | undefined> {
+    const { body, isTruncated } = await readBodyToCap(response);
+    return isTruncated ? undefined : body;
 }
