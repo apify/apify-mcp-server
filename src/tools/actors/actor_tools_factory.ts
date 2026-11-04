@@ -243,7 +243,7 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
 /**
  * Builds the own tool of each Actor served through its server interface: `send-server-actor-request` with the Actor
  * fixed, its documented operations in the description and its methods and paths in the input schema.
- * `readOnlyHint` is the Actor's, as for a run tool.
+ * `readOnlyHint` and the policy text (`getActorToolPolicy`) are the Actor's, as for a run tool.
  */
 export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
     const tools: ToolEntry[] = [];
@@ -259,12 +259,14 @@ export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
             idleTimeoutSecs: actor.actorStandby?.idleTimeoutSecs,
         });
         // Names fetch-actor-details only when the session has it, and only when the operations are not in full.
-        const buildDescription = ({ hasTool }: ToolDescriptionContext): string => {
+        const buildDescription = (context: ToolDescriptionContext): string => {
+            const { hasTool } = context;
+            const policyDescription = getActorToolPolicy(actorFullName)?.buildDescription?.(context);
             const head = `This tool sends one HTTP request to the server interface of the Actor "${actorFullName}" and returns the response.
 ${hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_SERVER_REQUEST}" if user requests this specific Actor.\n` : ''}Actor description: ${description}
 ${costNotice}
 The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text; other content types, and bodies over ${MAX_INLINE_BYTES} bytes, are not returned.
-
+${policyDescription ? `\n${policyDescription}\n` : ''}
 Operations:
 `;
             return buildServerActorToolDescription(head, toolInfo, hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS));

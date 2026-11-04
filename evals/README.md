@@ -137,11 +137,15 @@ selection among the defaults, and multi-fetch chains. They create no named accou
 there is no fixtures script. The cases fetch live third-party pages (example.com, rfc-editor.org,
 httpbin.org), so a failure can also mean the page changed or the host is down — check the target
 before blaming the tool (httpbin outages are common; the status/format references tolerate a
-truthfully reported upstream error). Platform behavior the cases are built on (probed 2026-08-20):
-an HTTP 4xx/5xx from the target page still ends the run SUCCEEDED with `fetch.httpStatusCode` in
-the item; an unreachable domain either fails the run ("Could not connect…") or succeeds with an
-empty 502 item, depending on unblocker routing; JSON content fails `text`/`markdown` formats with a
-status message telling the agent to add `raw`; `ftp://` fails with "Unsupported URL protocol".
+truthfully reported upstream error). Since #1647 the default tool is the Actor's Server Actor tool: it
+sends one request (`method`, `path`, `query`) to the Actor's server interface, and the result is the HTTP
+response, with no run, dataset or `get-dataset-items` step. Probed 2026-11-04 over `GET /`: `formats`
+is sent as a repeated parameter (`formats=markdown&formats=links`; the Actor also takes
+`markdown,links`); a 200 body is a JSON object with `fetch` (including `fetch.httpStatusCode`),
+`metadata` and one field per requested format; `unwrap=true` returns the first format as the body
+(`text/markdown`); a body over 262144 bytes is not returned and the call fails with `bodyOmitted`
+(#1738); `ftp://` returns 400 `INVALID_URL` ("Unsupported URL protocol"); an unreachable host returns
+HTTP 502 `UPSTREAM_FETCH_ERROR`, a failed call.
 
 The web-selection family (`merge/web-selection/*`, 9 items: 7 proper + 2 with `expectedErrors`) covers
 the clash between the default web tools: web search by query (`apify/rag-web-browser`) vs
@@ -151,7 +155,8 @@ summarizing fetch. Also stateless — no fixtures script.
 Known residual (2026-08-21): on `merge/web-fetch/unsupported-protocol`,
 claude-haiku-4-5 reproducibly rewrites the ftp:// URL to https:// without telling the user,
 despite the scheme note in both the tool description and the `url` parameter — a model-level
-limit the case documents on purpose; stronger models pass.
+limit the case documents on purpose; stronger models pass. Since #1647 the note is in the tool
+description only; not re-measured.
 
 ### Tool-call mode
 
