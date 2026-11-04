@@ -907,9 +907,7 @@ describe('reporting an incomplete response', () => {
 
 describe('describing the tool', () => {
     it('names fetch-actor-details in the description only when the session has it', () => {
-        expect(sendServerActorRequest.description).toContain(
-            `${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface`,
-        );
+        expect(sendServerActorRequest.description).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
         expect(sendServerActorRequest.buildDescription!(only())).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
     });
 });

@@ -51,9 +51,9 @@ const sendServerActorRequestArgs = z.object({
             A query string written into the path is sent too.
         `),
     query: serverActorQuery.describe(
-        'Query parameters, by name, for example {"limit": 10, "verbose": true}; a boolean is sent as true or ' +
-            'false, and an array as a repeated parameter (["a", "b"] is sent as name=a&name=b), or comma-joined ' +
-            '(name=a,b) where the operation documents the parameter so. Added to a query string in the path.',
+        'Query parameters of the operation, by name. A boolean is sent as true or false, and an array as a ' +
+            'repeated parameter (name=a&name=b), or comma-joined (name=a,b) where the operation documents the ' +
+            'parameter so. Added to a query string in the path.',
     ),
     body: z
         .unknown()
@@ -81,9 +81,7 @@ export function buildServerActorToolSchemas({
     const args = z.object({
         method: methods.length === 1 ? method.default(methods[0]) : method,
         path,
-        query: sendServerActorRequestArgs.shape.query.describe(
-            'Query parameters of the operation, by name, as the operations in the description list them. A boolean is sent as true or false, and an array as a repeated or comma-joined parameter, as the operation documents it.',
-        ),
+        query: sendServerActorRequestArgs.shape.query,
         ...(hasRequestBody && { body: sendServerActorRequestArgs.shape.body }),
     });
     return {

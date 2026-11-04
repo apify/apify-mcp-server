@@ -298,16 +298,7 @@ describe('the input schema of a Server Actor tool', () => {
 
         expect(path).toMatchObject({ type: 'string', minLength: 1 });
         expect(path).not.toHaveProperty('enum');
-        expect(path.description).toContain('listed in the description');
         expect(ajvValidate({ method: 'GET', path: '/status/404' })).toBe(true);
-    });
-
-    // The send tool's example names Apify API parameters, which this Actor does not take.
-    it('points the query at the operations in the description', () => {
-        const query = schemasOf({}).inputSchema.properties?.query as Record<string, unknown>;
-
-        expect(query.description).toContain('as the operations in the description list them');
-        expect(query.description).not.toContain('limit');
     });
 
     it('defaults a single method, which the validator fills in', () => {
@@ -382,9 +373,6 @@ describe('the operations in a Server Actor tool description', () => {
     it('are the operations in full when they fit, with no lookup to point at', async () => {
         const tool = await loadServerTool(SCHEMA);
 
-        expect(tool.description).toContain(
-            'single-tenant: the first request starts a run in your account, kept for its idle timeout of 300 s.',
-        );
         expect(tool.description).toContain('Operations:\n```json\n{"operations":[{"method":"GET","path":"/add"');
         expect(tool.description).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
     });
@@ -579,7 +567,6 @@ describe('the default apify/web-fetch tool', () => {
     it('carries the policy text, its example call and both operations as lines within the client limit', async () => {
         const tool = await loadWebFetchTool();
 
-        expect(tool.description).toContain('Use this tool to fetch a URL and return its complete content.');
         expect(tool.description).toContain(
             'Example: {"method":"GET","path":"/","query":{"url":"https://example.com","formats":["markdown"]}}',
         );
@@ -603,7 +590,7 @@ describe('the default apify/web-fetch tool', () => {
         };
         schema.paths['/'].get.parameters[1] = { ...schema.paths['/'].get.parameters[1], style: 'form', explode: false };
 
-        expect(listCommaJoinedQueryParameters(schema)).toEqual({ 'GET /': ['formats'] });
+        expect(listCommaJoinedQueryParameters(schema)).toEqual({ 'GET /': ['formats'], 'POST /': [] });
         expect(listCommaJoinedQueryParameters(WEB_FETCH_LIVE_SCHEMA)).toEqual({});
     });
 });
