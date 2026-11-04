@@ -38,8 +38,8 @@ endpoints. The API tools' `callApi` (`../tools/api/apify_api_request.ts`) reuses
 tools too. `get-key-value-store-record` builds its inlined-record URI with `buildUrlOnOrigin()`.
 
 `sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through
-`httpClient.axios.request` with `maxContentLength`, `MAX_INLINE_BYTES` unless the caller sets it; `readBodyUnderCap()`
-next to it reads a streamed body, `undefined` past the cap, over `readBodyToCap()`, which keeps the start for
+`httpClient.axios.request` with `maxContentLength: MAX_INLINE_BYTES`; `readBodyUnderCap()` next to it reads a
+streamed body, `undefined` past the cap, over `readBodyToCap()`, which keeps the start for
 `send-server-actor-request`. `readApiResource()` sends
 `{ method: 'GET', responseType: 'stream' }` through `sendApifyApiRequest()`, reads the body, and branches
 on the declared Content-Type: textual base types (text/*, JSON, XML) as `text` with the full

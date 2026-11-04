@@ -116,25 +116,16 @@ export class ApifyClient extends _ApifyClient {
  * status after: a non-2xx response resolves, and so does a 3xx with `maxRedirects: 0`. It skips
  * `httpClient.call()`, which retries (a write could apply twice, and a body over the size cap is downloaded
  * again) and turns a streamed error body into a junk message; that also skips its User-Agent. axios aborts a
- * body over `maxContentLength`, `MAX_INLINE_BYTES` unless set, mid-stream (checked in axios 1.16.1), so it is never
- * buffered whole.
+ * body over `MAX_INLINE_BYTES` mid-stream (checked in axios 1.16.1), so it is never buffered whole.
  */
 export async function sendApifyApiRequest(
     apifyClient: ApifyClient,
     config: Pick<
         AxiosRequestConfig,
-        | 'url'
-        | 'method'
-        | 'params'
-        | 'data'
-        | 'headers'
-        | 'responseType'
-        | 'signal'
-        | 'maxRedirects'
-        | 'maxContentLength'
+        'url' | 'method' | 'params' | 'data' | 'headers' | 'responseType' | 'signal' | 'maxRedirects'
     >,
 ): Promise<AxiosResponse<unknown>> {
-    return apifyClient.httpClient.axios.request<unknown>({ maxContentLength: MAX_INLINE_BYTES, ...config });
+    return apifyClient.httpClient.axios.request<unknown>({ ...config, maxContentLength: MAX_INLINE_BYTES });
 }
 
 /** The mid-consumption abort axios raises when a body crosses `maxContentLength`. */
@@ -143,7 +134,7 @@ export function isMaxContentLengthAbort(err: unknown): boolean {
 }
 
 /**
- * Reads the body of a `responseType: 'stream'` response from `sendApifyApiRequest` up to its `maxContentLength`:
+ * Reads the body of a `responseType: 'stream'` response from `sendApifyApiRequest` up to `MAX_INLINE_BYTES`:
  * `isTruncated` when axios stopped reading there, with the bytes read before it. Any other failure mid-body
  * propagates.
  */

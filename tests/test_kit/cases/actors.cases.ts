@@ -3,10 +3,7 @@ import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
 import { actorNameToToolName, getCategoryTools } from '@apify/actors-mcp-server/internals.js';
-import {
-    MAX_LIMIT_WITH_INPUT_SCHEMA,
-    MAX_SERVER_ACTOR_RESPONSE_BYTES,
-} from '@apify/actors-mcp-server/internals/test-kit.js';
+import { MAX_LIMIT_WITH_INPUT_SCHEMA, MAX_INLINE_BYTES } from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
     ACTOR_EXAMPLE_MCP_SERVER,
@@ -1105,20 +1102,28 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        // The fixture serves at most this many bytes, so the truncated start of a longer body is a unit test only.
-        name: 'returns a Server Actor body of exactly the response limit whole, compressed too',
+        name: 'returns a Server Actor body of exactly the inline limit whole, and the start of one byte more, compressed too',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             for (const path of ['/bytes', '/gzip']) {
-                const { result, sc } = await sendServerActorRequest(client, {
+                const exact = await sendServerActorRequest(client, {
                     method: 'GET',
                     path,
-                    query: { n: MAX_SERVER_ACTOR_RESPONSE_BYTES },
+                    query: { n: MAX_INLINE_BYTES },
+                });
+                const over = await sendServerActorRequest(client, {
+                    method: 'GET',
+                    path,
+                    query: { n: MAX_INLINE_BYTES + 1 },
                 });
 
-                expect(result.isError).not.toBe(true);
-                expect(sc).toMatchObject({ status: 200, bytes: MAX_SERVER_ACTOR_RESPONSE_BYTES });
-                expect(sc).not.toHaveProperty('bodyTruncated');
+                expect(exact.result.isError).not.toBe(true);
+                expect(exact.sc).toMatchObject({ status: 200, bytes: MAX_INLINE_BYTES });
+                expect(exact.sc).not.toHaveProperty('bodyTruncated');
+                expect(over.result.isError).not.toBe(true);
+                expect(over.sc).toMatchObject({ status: 200, bodyTruncated: true });
+                expect((over.sc as { bytes: number }).bytes).toBeLessThanOrEqual(MAX_INLINE_BYTES);
+                expect(over.text).toContain(`${MAX_INLINE_BYTES}-byte limit`);
             }
         }),
     },

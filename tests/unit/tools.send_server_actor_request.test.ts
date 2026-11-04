@@ -7,7 +7,7 @@ import Ajv from 'ajv';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
-import { FAILURE_CATEGORY, HELPER_TOOLS, MAX_SERVER_ACTOR_RESPONSE_BYTES, TOOL_STATUS } from '../../src/const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, MAX_INLINE_BYTES, TOOL_STATUS } from '../../src/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
 import { getServerActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import {
@@ -84,13 +84,13 @@ async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
         case '/escaped-token-cut':
             // An escaped token before a string the limit cuts: the body no longer parses whole.
             res.writeHead(200, { 'content-type': 'application/json' });
-            res.end(`{"error":"\\u0074est-token","pad":"${'a'.repeat(MAX_SERVER_ACTOR_RESPONSE_BYTES)}"}`);
+            res.end(`{"error":"\\u0074est-token","pad":"${'a'.repeat(MAX_INLINE_BYTES)}"}`);
             return;
         case '/escaped-token-cut-inside': {
             // The limit cuts inside the string that carries the escaped token, after it: the last literal is unterminated.
-            const pad = 'a'.repeat(MAX_SERVER_ACTOR_RESPONSE_BYTES - 256 * 1024);
+            const pad = 'a'.repeat(MAX_INLINE_BYTES / 2);
             res.writeHead(200, { 'content-type': 'application/json' });
-            res.end(`{"pad":"${pad}","error":"\\u0074est-token${'b'.repeat(512 * 1024)}\\u0074est-token"}`);
+            res.end(`{"pad":"${pad}","error":"\\u0074est-token${'b'.repeat(MAX_INLINE_BYTES)}\\u0074est-token"}`);
             return;
         }
         case '/big-error':
@@ -496,10 +496,10 @@ describe('returning the response', () => {
     it.each(['/bytes', '/gzip'])(
         'returns a %s body of exactly the response limit whole, counted after decompression',
         async (path) => {
-            const result = await callTool({ path: `${path}?n=${MAX_SERVER_ACTOR_RESPONSE_BYTES}` });
+            const result = await callTool({ path: `${path}?n=${MAX_INLINE_BYTES}` });
 
             expect(result.isError).toBe(false);
-            expect(result.structuredContent).toMatchObject({ bytes: MAX_SERVER_ACTOR_RESPONSE_BYTES });
+            expect(result.structuredContent).toMatchObject({ bytes: MAX_INLINE_BYTES });
             expect(result.structuredContent).not.toHaveProperty('bodyTruncated');
             expect(result.structuredContent).not.toHaveProperty('nextStep');
         },
@@ -509,7 +509,7 @@ describe('returning the response', () => {
     it.each(['/bytes', '/gzip'])(
         'returns the start of a %s body over the response limit, marked as truncated, with the limit as the hint',
         async (path) => {
-            const result = await callTool({ path: `${path}?n=${MAX_SERVER_ACTOR_RESPONSE_BYTES + 1}` });
+            const result = await callTool({ path: `${path}?n=${MAX_INLINE_BYTES + 1}` });
 
             expect(result.isError).toBe(false);
             expectSchemaConformingStructuredContent(result, serverActorRequestOutputSchema);
@@ -520,9 +520,9 @@ describe('returning the response', () => {
             };
             expect(result.structuredContent).toMatchObject({ status: 200, bodyTruncated: true });
             expect(bytes).toBeGreaterThan(0);
-            expect(bytes).toBeLessThanOrEqual(MAX_SERVER_ACTOR_RESPONSE_BYTES);
+            expect(bytes).toBeLessThanOrEqual(MAX_INLINE_BYTES);
             expect(body).toBe('a'.repeat(bytes));
-            expect(nextStep).toContain(String(MAX_SERVER_ACTOR_RESPONSE_BYTES));
+            expect(nextStep).toContain(String(MAX_INLINE_BYTES));
             expect(result.content.at(-1)?.text).toBe(nextStep);
             expect(result.toolTelemetry).toMatchObject({
                 httpStatus: 200,

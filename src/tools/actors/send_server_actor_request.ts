@@ -5,13 +5,7 @@ import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { readBodyToCap, sendApifyApiRequest } from '../../apify_client.js';
-import {
-    FAILURE_CATEGORY,
-    HELPER_TOOLS,
-    HTTP_FORBIDDEN,
-    HTTP_UNAUTHORIZED,
-    MAX_SERVER_ACTOR_RESPONSE_BYTES,
-} from '../../const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, HTTP_FORBIDDEN, HTTP_UNAUTHORIZED, MAX_INLINE_BYTES } from '../../const.js';
 import { getActorMCPServerPath, resolveOnStandbyOrigin } from '../../mcp/actors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import { isTextualMimeType, maskSessionToken, parseCharset, REDACTED } from '../../resources/api_resources.js';
@@ -112,7 +106,7 @@ type ServerActorRequest = {
     path: string;
 };
 
-/** What the Actor Server sent back; `isTruncated` when `body` was cut at `MAX_SERVER_ACTOR_RESPONSE_BYTES`, where reading stopped. */
+/** What the Actor Server sent back; `isTruncated` when `body` was cut at `MAX_INLINE_BYTES`, where reading stopped. */
 type ServerActorResponse = {
     status: number;
     contentType?: string;
@@ -200,7 +194,7 @@ function readHeader(headers: AxiosResponse['headers'], name: string): string | u
 }
 
 /**
- * Sends the request once, without following redirects, and reads the body up to `MAX_SERVER_ACTOR_RESPONSE_BYTES`.
+ * Sends the request once, without following redirects, and reads the body up to `MAX_INLINE_BYTES`.
  * The deadline covers reading the body too. Any failure is thrown as an `IncompleteResponseError`: even a
  * connection that drops before the status may have delivered the request.
  */
@@ -233,7 +227,6 @@ async function sendRequest({
             }),
             responseType: 'stream',
             maxRedirects: 0,
-            maxContentLength: MAX_SERVER_ACTOR_RESPONSE_BYTES,
             signal: AbortSignal.any([signal, deadline]),
         });
         status = response.status;
@@ -301,9 +294,9 @@ function maskJsonStringLiterals(text: string, token: string): string {
     );
 }
 
-/** The `nextStep` of a response whose body was cut at `MAX_SERVER_ACTOR_RESPONSE_BYTES`. Reading stops at the chunk that crosses the limit, so `bytes` is a little under it. */
+/** The `nextStep` of a response whose body was cut at `MAX_INLINE_BYTES`. Reading stops at the chunk that crosses the limit, so `bytes` is a little under it. */
 const TRUNCATED_BODY_NEXT_STEP =
-    `The body is over the ${MAX_SERVER_ACTOR_RESPONSE_BYTES}-byte limit; only its start is returned, and the rest ` +
+    `The body is over the ${MAX_INLINE_BYTES}-byte limit; only its start is returned, and the rest ` +
     'is not. Request a smaller response, for example fewer items or a smaller format.';
 
 /** Longest `errorMessage` returned; the full error stays in `body`. */
@@ -574,7 +567,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         Give the method, the path, and optionally query parameters and a JSON body; the Actor Server's host and your Apify API token are added for you.
         Only an Actor with an Actor Server and an API schema takes requests here; the Actor accepts or rejects the method and path.
         A request to a single-tenant Actor Server can start a run of the Actor in your account, kept until its idle timeout; a multi-tenant Actor Server charges per event.
-        The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text, cut at ${MAX_SERVER_ACTOR_RESPONSE_BYTES} bytes; other content types are not returned.
+        The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text, cut at ${MAX_INLINE_BYTES} bytes; other content types are not returned.
 
         Example call: {"actor": "apify/web-search", "method": "GET", "path": "/", "query": {"query": "AI news", "maxResults": 5}}
 

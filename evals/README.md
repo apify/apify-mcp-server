@@ -143,7 +143,7 @@ response, with no run, dataset or `get-dataset-items` step. Probed 2026-11-04 ov
 is sent comma-joined (`formats=markdown,links`), as the schema documents (the Actor also accepts
 repeated parameters); a 200 body is a JSON object with `fetch` (including `fetch.httpStatusCode`),
 `metadata` and one field per requested format; `unwrap=true` returns the first format as the body
-(`text/markdown`); a body over 1048576 bytes is cut there and its start returned with `bodyTruncated` and a
+(`text/markdown`); a body over 262144 bytes is cut there and its start returned with `bodyTruncated` and a
 `nextStep` (#1738); `ftp://` returns 400 `INVALID_URL` ("Unsupported URL protocol"); an unreachable host returns
 HTTP 502 `UPSTREAM_FETCH_ERROR`, a failed call.
 

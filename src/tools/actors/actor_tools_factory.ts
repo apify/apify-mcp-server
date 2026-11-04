@@ -7,7 +7,7 @@ import {
     ACTOR_MAX_MEMORY_MBYTES,
     FAILURE_CATEGORY,
     HELPER_TOOLS,
-    MAX_SERVER_ACTOR_RESPONSE_BYTES,
+    MAX_INLINE_BYTES,
     OFFICIAL_ACTORS_WITH_SIDE_EFFECTS,
     OFFICIAL_APIFY_USERNAMES,
 } from '../../const.js';
@@ -272,7 +272,7 @@ export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
             const head = `This tool sends one HTTP request to the server interface of the Actor "${actorFullName}" and returns the response.
 ${hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_SERVER_REQUEST}" if user requests this specific Actor.\n` : ''}Actor description: ${description}
 ${costNotice}
-The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text, cut at ${MAX_SERVER_ACTOR_RESPONSE_BYTES} bytes; other content types are not returned.
+The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text, cut at ${MAX_INLINE_BYTES} bytes; other content types are not returned.
 ${policyDescription ? `\n${policyDescription}\n` : ''}
 Operations:
 `;
