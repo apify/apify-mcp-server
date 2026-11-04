@@ -17,6 +17,7 @@ const WEB_FETCH_ADDITIONAL_DESC = `Use this tool to fetch a URL and return its c
 It renders JavaScript and bypasses anti-bot protection, so it also retrieves pages where a plain HTTP fetch is blocked, fails (e.g. 403 or 429), or returns incomplete content.
 The page comes back verbatim, with no summarization, as a JSON object with a field per requested format.
 Example: {"method":"GET","path":"/","query":{"url":"https://example.com","formats":["markdown"]}}
+wait is in milliseconds (1 to 60000), for pages whose content shows up late.
 
 Examples of when to use:
 - User provides a URL and wants its content, its data or links, or an answer that requires reading that page
