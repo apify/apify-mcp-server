@@ -68,8 +68,6 @@ type ServerActorToolPolicyConfig = {
 type ActorToolPolicyConfig = {
     /** Direct tools only; `call-actor` and the widgets keep the Actor's own contract. */
     directInput?: DirectActorPolicyConfig;
-    /** Only these inputs are served; the others are hidden but still accepted and passed to the run. */
-    exposedInputs?: readonly string[];
     /** The Actor's own tool when it is served through its server interface; a run tool gets none of it. */
     serverTool?: ServerActorToolPolicyConfig;
 };
