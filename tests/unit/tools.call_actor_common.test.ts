@@ -54,14 +54,14 @@ describe('call_actor_common', () => {
             expect(buildCallActorDescription()).toContain('with waitSecs > 0 also reports dataset field metadata');
         });
 
-        it('says an MCP-only Actor is not run here, naming call-actor-mcp-tool only when the session has it', () => {
+        it('says an MCP server Actor with no input schema is not run here, naming call-actor-mcp-tool only when the session has it', () => {
             const withMcpTool = buildCallActorDescription();
             const withoutMcpTool = buildCallActorDescription(only(HELPER_TOOLS.ACTOR_GET_DETAILS));
 
             expect(withMcpTool).toContain(
-                `An Actor whose only interface is an MCP server is not run here; ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL}`,
+                `An MCP server Actor with no input schema is not run here; ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL}`,
             );
-            expect(withoutMcpTool).toContain('An Actor whose only interface is an MCP server is not run here.');
+            expect(withoutMcpTool).toContain('An MCP server Actor with no input schema is not run here.');
             expect(withoutMcpTool).not.toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
         });
 

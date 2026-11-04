@@ -314,9 +314,9 @@ describe('call-actor-mcp-tool', () => {
 
         const result = (await executeCallActorMcpTool(context)) as ToolResult;
 
-        expect((result.content as { text: string }[])[0].text).toBe(
-            "Actor 'apify/server-actor-test' is not an MCP server. Its HTTP API can be called with apify--server-actor-test.",
-        );
+        const { text } = (result.content as { text: string }[])[0];
+        expect(text).toContain('called with apify--server-actor-test.');
+        expect(text).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
     });
 
     it('returns the not-found response for an Actor the API does not know, without connecting', async () => {

@@ -147,7 +147,7 @@ export function getServerInstructions(
 
     const dedicatedToolsVsCallActor = hasCall
         ? `- **Dedicated Actor tools vs \`${HELPER_TOOLS.ACTOR_CALL}\`:**
-  Prefer dedicated tools when available; use \`${HELPER_TOOLS.ACTOR_CALL}\` only when no specialized tool exists in the Apify store.
+  Prefer dedicated tools when available; use \`${HELPER_TOOLS.ACTOR_CALL}\` when no dedicated tool exists, or when the user wants a run with its results in a dataset.
 `
         : '';
 

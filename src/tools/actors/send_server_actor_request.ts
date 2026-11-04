@@ -581,22 +581,18 @@ const EXAMPLE_ACTORS = [
         call: `{"actor": "${WEB_SEARCH}", "method": "GET", "path": "/", "query": {"query": "AI news", "maxResults": 5}}`,
         usage: `- user_input: Search the web for the latest AI news with ${WEB_SEARCH}\n- user_input: Find articles about Apify from the past week with ${WEB_SEARCH}`,
     },
-    {
-        actor: undefined,
-        call: '{"actor": "username/name", "method": "GET", "path": "/search", "query": {"query": "AI news"}}',
-        usage: '- user_input: Call the /search endpoint of username/name for AI news',
-    },
 ] as const;
 
-function buildExample(hasTool: ToolDescriptionContext['hasTool']): { call: string; usage: string } {
-    return EXAMPLE_ACTORS.find(({ actor }) => actor === undefined || !hasTool(actorNameToToolName(actor)))!;
-}
+const PLACEHOLDER_EXAMPLE = {
+    call: '{"actor": "username/name", "method": "GET", "path": "/search", "query": {"query": "AI news"}}',
+    usage: '- user_input: Call the /search endpoint of username/name for AI news',
+};
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
     const details = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
         ? ` ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface returns the documented operations with their parameters.`
         : '';
-    const example = buildExample(hasTool);
+    const example = EXAMPLE_ACTORS.find(({ actor }) => !hasTool(actorNameToToolName(actor))) ?? PLACEHOLDER_EXAMPLE;
     return dedent`
         Send one HTTP request to an Actor Server: the HTTP API of a Server Actor, documented in its API schema (OpenAPI) and README.${details}
         Give the method, the path, and optionally query parameters and a JSON body; the Actor Server's host and your Apify API token are added for you.

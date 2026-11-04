@@ -466,6 +466,7 @@ describe('serving a selected Server Actor through its server interface', () => {
 
         expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR_SERVER]);
         expect(tools[0].description).toContain('Example: {"method":"GET","path":"/search"');
+        expect(tools[0].description).not.toContain(WEB_FETCH);
     });
 
     // A definition built before the tool info existed, such as one restored from a cache, has no tool to serve.
@@ -847,7 +848,6 @@ describe('the default apify/web-search tool', () => {
         return tools[0];
     };
 
-    // No web-search exception: the tool is what any Server Actor with this schema gets.
     it('is served as a Server Actor tool: GET or POST, a required path, a body, and an untyped query', async () => {
         const tool = await loadWebSearchTool();
 

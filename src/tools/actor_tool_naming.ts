@@ -35,13 +35,8 @@ import { ACTOR_TENANCY, ACTOR_TOOL_MODE } from '../types.js';
 export function resolveActorInterfaces({ actor, definition, webServerMcpPath }: ActorInfo): ActorInterfaces {
     if (actor.actorStandby?.isEnabled !== true) return { input: true, mcp: false, server: false };
 
-    const mcp = Boolean(webServerMcpPath);
     const hasInputProperties = Object.keys(definition.input?.properties ?? {}).length > 0;
-    return {
-        input: hasInputProperties,
-        mcp,
-        server: definition.hasWebServerSchema,
-    };
+    return { input: hasInputProperties, mcp: Boolean(webServerMcpPath), server: definition.hasWebServerSchema };
 }
 
 /** The own-tool column of the table on {@link resolveActorInterfaces}. */

@@ -142,13 +142,12 @@ export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOL
     const sections: string[] = [
         'Call any Actor from the Apify Store.',
         workflowSection,
-        `An Actor whose only interface is an MCP server is not run here${hasTool(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL) ? `; ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} calls its MCP tools` : ''}.`,
+        `An MCP server Actor with no input schema is not run here${hasTool(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL) ? `; ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} calls its MCP tools` : ''}.`,
         ...(hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST) ? [buildCallActorServerActorSection(ctx)] : []),
         dedent`
             IMPORTANT:
             - Waits up to waitSecs (default 30s) for completion; returns run status and storage IDs, and with waitSecs > 0 also reports dataset field metadata
             - Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with the datasetId to fetch results; non-terminal runs include a nextStep with polling instructions
-            - Use dedicated Actor tools when available for better experience
         `,
         buildCallActorUsageSection(),
         dedent`
@@ -378,7 +377,7 @@ export async function checkPaymentProviderStandbyConflict(params: {
     return respondStandbyRejection(error, { mcpSessionId, paymentProviderId: paymentProvider.id });
 }
 
-/** Rejection for an Actor that is an MCP server: its input interface is unused, so a run of it is a mistake. */
+/** Rejection for an MCP server Actor with no input schema: there is nothing to run. */
 function respondMcpServerActor(actorFullName: string, loadedToolNames: readonly string[]): ToolResponse {
     const replacement = loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL)
         ? ` Its MCP tools can be called with ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL}.`
@@ -491,7 +490,7 @@ export async function resolveAndValidateActor(params: {
 
 /**
  * Performs the pre-execution checks common to both modes: parses args and rejects an Actor that `call-actor`
- * cannot run (a standby Actor with neither an MCP server nor an input schema, or an MCP server).
+ * cannot run (a standby Actor with neither an MCP server nor an input schema, or an MCP server with no input schema).
  *
  * Applies the same `actor` string normalization as `getActorsAsTools` **before** routing so clients cannot pass a
  * clean-enough id for definition fetch but a dirty id to `apifyClient.actor()` (see Mezmo: e.g. trailing `` ` ``

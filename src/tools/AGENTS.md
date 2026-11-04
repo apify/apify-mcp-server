@@ -30,8 +30,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     thousands of paths), the policy's `serverTool` text and input notes (`getActorToolPolicy`) and the operations in the
     description; an Actor with a server interface and no `webServerToolInfo` is reported as `load-failed`; the
     default `apify/web-fetch` and `apify/web-search` tools and a selected `apify/rag-web-browser` are served this
-    way), the direct actor-tool executor
-    (`actor_executor.ts`),
+    way), the direct actor-tool executor (`actor_executor.ts`),
     `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`, and resolves the build
     the server-interface fields — `webServerMcpPath`, `webServerSchema` — are read from when standby is on,
     `resolveServerInterfaceDefinition`, shared with `fetchActorDetails` in `../utils/actor_details.ts`; the input

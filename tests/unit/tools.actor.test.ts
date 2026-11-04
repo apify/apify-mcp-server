@@ -89,13 +89,12 @@ function makeActorInfo(opts: {
     webServerMcpPath?: string | null;
     input?: unknown;
     hasWebServerSchema?: boolean;
-    actorFullName?: string;
 }): ActorInfo {
     return {
         webServerMcpPath: opts.webServerMcpPath ?? null,
         definition: {
             id: 'actor-id',
-            actorFullName: opts.actorFullName ?? 'acme/actor',
+            actorFullName: 'acme/actor',
             input: opts.input as ActorInputSchema | undefined,
             hasWebServerSchema: opts.hasWebServerSchema ?? false,
         },
