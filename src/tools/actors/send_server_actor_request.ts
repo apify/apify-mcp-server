@@ -251,9 +251,10 @@ async function sendRequest({
 /**
  * The body decoded with `charset`, the session token masked before and after decoding; `undefined` when
  * `TextDecoder` does not support the charset. In a JSON body whose escapes hide the token, only the string
- * literals holding it are rewritten, so numbers and formatting stay as sent.
+ * literals holding it are rewritten, so numbers and formatting stay as sent. A body cut at the limit no longer
+ * parses whole, so its literals are checked one by one, the unterminated last one included.
  */
-function decodeBody(body: Buffer, charset: string, token: string): string | undefined {
+function decodeBody(body: Buffer, charset: string, token: string, isTruncated: boolean): string | undefined {
     let text: string;
     try {
         text = new TextDecoder(charset).decode(maskSessionToken(body, token)).replaceAll(token, REDACTED);
@@ -263,12 +264,41 @@ function decodeBody(body: Buffer, charset: string, token: string): string | unde
     try {
         if (!JSON.stringify(JSON.parse(text)).includes(token)) return text;
     } catch {
-        return text;
+        if (!isTruncated) return text;
     }
-    return text.replace(/"(?:[^"\\]|\\.)*"/g, (literal) => {
-        const value = JSON.parse(literal) as string;
-        return value.includes(token) ? JSON.stringify(value.replaceAll(token, REDACTED)) : literal;
-    });
+    return maskJsonStringLiterals(text, token);
+}
+
+/** The value of a JSON string literal; `undefined` when `literal` is not one. */
+function parseStringLiteral(literal: string): string | undefined {
+    try {
+        const value: unknown = JSON.parse(literal);
+        return typeof value === 'string' ? value : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+/** `literal` without an escape the cut split (`\\`, `\\u12`), which no closing quote could complete. */
+function dropCutEscape(literal: string): string {
+    const withoutUnicode = literal.replace(/\\u[0-9a-fA-F]{0,3}$/, '');
+    const trailingBackslashes = /\\*$/.exec(withoutUnicode)?.[0].length ?? 0;
+    return trailingBackslashes % 2 === 1 ? withoutUnicode.slice(0, -1) : withoutUnicode;
+}
+
+/** Masks the token in each JSON string literal of `text`, complete or cut off at its end. */
+function maskJsonStringLiterals(text: string, token: string): string {
+    return text.replace(
+        /("(?:[^"\\]|\\.)*")|("(?:[^"\\]|\\.)*\\?$)/g,
+        (match: string, complete: string | undefined, unterminated: string | undefined) => {
+            if (complete !== undefined) {
+                const value = parseStringLiteral(complete);
+                return value?.includes(token) ? JSON.stringify(value.replaceAll(token, REDACTED)) : match;
+            }
+            const value = parseStringLiteral(`${dropCutEscape(unterminated ?? '')}"`);
+            return value?.includes(token) ? JSON.stringify(value.replaceAll(token, REDACTED)).slice(0, -1) : match;
+        },
+    );
 }
 
 /** The `nextStep` of a response whose body was cut at `MAX_SERVER_ACTOR_RESPONSE_BYTES`. Reading stops at the chunk that crosses the limit, so `bytes` is a little under it. */
@@ -381,7 +411,7 @@ function buildResponse(
         );
     }
     const charset = parseCharset(contentType) ?? 'utf-8';
-    const body = bytes === 0 ? '' : decodeBody(response.body, charset, token);
+    const body = bytes === 0 ? '' : decodeBody(response.body, charset, token, response.isTruncated);
     if (body === undefined) return rejectBody(`its charset "${charset}" is not supported`);
 
     const bodyNote = bytes === 0 ? 'an empty body' : `${bytes} bytes of ${mimeType}`;

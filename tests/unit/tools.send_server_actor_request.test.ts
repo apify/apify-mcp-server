@@ -81,6 +81,18 @@ async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
             res.writeHead(400, { 'content-type': 'application/json' });
             res.end('{"n": 12345678901234567890, "error": "\\u0074est-token"}');
             return;
+        case '/escaped-token-cut':
+            // An escaped token before a string the limit cuts: the body no longer parses whole.
+            res.writeHead(200, { 'content-type': 'application/json' });
+            res.end(`{"error":"\\u0074est-token","pad":"${'a'.repeat(MAX_SERVER_ACTOR_RESPONSE_BYTES)}"}`);
+            return;
+        case '/escaped-token-cut-inside': {
+            // The limit cuts inside the string that carries the escaped token, after it: the last literal is unterminated.
+            const pad = 'a'.repeat(MAX_SERVER_ACTOR_RESPONSE_BYTES - 256 * 1024);
+            res.writeHead(200, { 'content-type': 'application/json' });
+            res.end(`{"pad":"${pad}","error":"\\u0074est-token${'b'.repeat(512 * 1024)}\\u0074est-token"}`);
+            return;
+        }
         case '/big-error':
             res.writeHead(400, { 'content-type': 'application/json' });
             res.end(JSON.stringify({ error: 'e'.repeat(200_000) }));
@@ -574,6 +586,24 @@ describe('returning an Actor Server error', () => {
         expect(errorMessage.length).toBeLessThan(2_000);
         // The text holds the body once, inside the structuredContent JSON; the message copies are capped.
         expect(JSON.stringify(result.content).length).toBeLessThan(210_000);
+    });
+
+    it('masks a token that JSON escapes hide before the limit cuts the body', async () => {
+        const result = await callTool({ path: '/escaped-token-cut' });
+        const { body } = result.structuredContent as { body: string };
+
+        expect(result.structuredContent).toMatchObject({ bodyTruncated: true });
+        expect(body.startsWith('{"error":"[REDACTED]"')).toBe(true);
+        expect(JSON.stringify(result)).not.toContain(TOKEN);
+    });
+
+    it('masks a token that JSON escapes hide in the string the limit cuts', async () => {
+        const result = await callTool({ path: '/escaped-token-cut-inside' });
+        const { body } = result.structuredContent as { body: string };
+
+        expect(result.structuredContent).toMatchObject({ bodyTruncated: true });
+        expect(body).toContain('"error":"[REDACTED]b');
+        expect(JSON.stringify(result)).not.toContain(TOKEN);
     });
 
     it('keeps numbers as sent when it masks a token that JSON escapes hide', async () => {
