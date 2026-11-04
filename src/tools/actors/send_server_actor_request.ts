@@ -11,6 +11,7 @@ import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import { isTextualMimeType, maskSessionToken, parseCharset, REDACTED } from '../../resources/api_resources.js';
 import type {
     Actor,
+    ActorDefinitionPruned,
     ActorInterfaces,
     ActorTenancy,
     InternalToolArgs,
@@ -51,8 +52,8 @@ const sendServerActorRequestArgs = z.object({
         `),
     query: serverActorQuery.describe(
         'Query parameters, by name, for example {"limit": 10, "verbose": true}; a boolean is sent as true or ' +
-            'false, and an array as a repeated parameter (["a", "b"] is sent as name=a&name=b). Added to a query ' +
-            'string in the path.',
+            'false, and an array as a repeated parameter (["a", "b"] is sent as name=a&name=b), or comma-joined ' +
+            '(name=a,b) where the operation documents the parameter so. Added to a query string in the path.',
     ),
     body: z
         .unknown()
@@ -81,7 +82,7 @@ export function buildServerActorToolSchemas({
         method: methods.length === 1 ? method.default(methods[0]) : method,
         path,
         query: sendServerActorRequestArgs.shape.query.describe(
-            'Query parameters of the operation, by name, as the operations in the description list them. A boolean is sent as true or false, and an array as a repeated parameter.',
+            'Query parameters of the operation, by name, as the operations in the description list them. A boolean is sent as true or false, and an array as a repeated or comma-joined parameter, as the operation documents it.',
         ),
         ...(hasRequestBody && { body: sendServerActorRequestArgs.shape.body }),
     });
@@ -150,7 +151,8 @@ function buildNoServerInterfaceText(
 function buildRequestUrl(
     actor: Pick<Actor, 'standbyUrl'>,
     actorName: string,
-    { path, query }: Pick<SendServerActorRequestArgs, 'path' | 'query'>,
+    { method, path, query }: Pick<SendServerActorRequestArgs, 'method' | 'path' | 'query'>,
+    commaJoinedQueryParameters: ActorDefinitionPruned['webServerCommaJoinedQueryParameters'],
 ): { url: URL } | { error: ToolResponse } {
     const resolved = resolveOnStandbyOrigin(actor, path);
     if (!resolved) {
@@ -170,13 +172,39 @@ function buildRequestUrl(
     }
     // Not axios `params`: apify-client's serializer sends a boolean as 1 or 0. Not `url.searchParams`: it would
     // encode the query written into the path again.
+    const commaJoined = findCommaJoinedQueryParameters(commaJoinedQueryParameters, method, url.pathname);
     const addedQuery = new URLSearchParams(
-        Object.entries(query ?? {}).flatMap(([name, value]): [string, string][] =>
-            (Array.isArray(value) ? value : [value]).map((item) => [name, String(item)]),
-        ),
+        Object.entries(query ?? {}).flatMap(([name, value]): [string, string][] => {
+            if (!Array.isArray(value)) return [[name, String(value)]];
+            return commaJoined.includes(name) ? [[name, value.join(',')]] : value.map((item) => [name, String(item)]);
+        }),
     ).toString();
     if (addedQuery) url.search = url.search ? `${url.search}&${addedQuery}` : addedQuery;
     return { url };
+}
+
+/** The comma-joined query parameters of the operation `method` and `pathname` fill; a documented template path matches its filled-in form. */
+function findCommaJoinedQueryParameters(
+    byOperation: ActorDefinitionPruned['webServerCommaJoinedQueryParameters'],
+    method: string,
+    pathname: string,
+): string[] {
+    for (const [operation, parameters] of Object.entries(byOperation ?? {})) {
+        const [documentedMethod, documentedPath] = operation.split(' ');
+        if (documentedMethod === method && matchesPathTemplate(documentedPath, pathname)) return parameters;
+    }
+    return [];
+}
+
+function matchesPathTemplate(template: string, pathname: string): boolean {
+    const templateSegments = template.split('/');
+    const segments = pathname.split('/');
+    return (
+        templateSegments.length === segments.length &&
+        templateSegments.every((segment, index) =>
+            segment.startsWith('{') && segment.endsWith('}') ? segments[index] !== '' : segment === segments[index],
+        )
+    );
 }
 
 /** A response header's value; `undefined` when it is absent or not a single string. */
@@ -459,7 +487,12 @@ export async function executeSendServerActorRequest(
             respondUserError(buildNoServerInterfaceText(definition.actorFullName, interfaces, loadedToolNames)),
         );
     }
-    const target = buildRequestUrl(info, definition.actorFullName, args);
+    const target = buildRequestUrl(
+        info,
+        definition.actorFullName,
+        args,
+        definition.webServerCommaJoinedQueryParameters,
+    );
     if ('error' in target) return withActorTelemetry(target.error);
 
     const { url } = target;

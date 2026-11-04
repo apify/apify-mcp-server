@@ -120,6 +120,26 @@ export function buildServerOperationIndex(operations: ServerOperation[], schema:
     }));
 }
 
+/**
+ * Per operation (`GET /`), the query parameters documented `style: form, explode: false`, which a list fills
+ * comma-joined (`formats=a,b`); OpenAPI's default, `explode: true`, repeats the parameter. Only operations with one.
+ */
+export function listCommaJoinedQueryParameters(schema: unknown): Record<string, string[]> {
+    const byOperation: Record<string, string[]> = {};
+    for (const { method, path, operation } of listServerOperations(schema)) {
+        const names: string[] = [];
+        for (const parameter of Array.isArray(operation.parameters) ? operation.parameters : []) {
+            const resolved = resolveRef(parameter, schema);
+            if (!isRecord(resolved) || resolved.in !== 'query' || typeof resolved.name !== 'string') continue;
+            if (resolved.explode === false && (resolved.style === undefined || resolved.style === 'form')) {
+                names.push(resolved.name);
+            }
+        }
+        if (names.length > 0) byOperation[formatOperationName({ method, path })] = names;
+    }
+    return byOperation;
+}
+
 export function listDocumentedOperations(schema: unknown): string[] {
     return buildServerOperationIndex(listServerOperations(schema), schema).map((entry) => {
         const name = formatOperationName(entry);

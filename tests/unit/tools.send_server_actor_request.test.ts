@@ -296,6 +296,25 @@ describe('sending the request', () => {
         expect(received[0].url).toBe('/echo?formats=markdown&formats=links&n=1');
     });
 
+    it('joins an array with commas for a parameter the operation documents explode: false', async () => {
+        const received = recordRequests();
+        seedActor('apify/comma-actor', {
+            definition: {
+                webServerCommaJoinedQueryParameters: { 'GET /echo': ['formats'], 'GET /status/{code}': ['tags'] },
+            },
+        });
+
+        await callTool({ actor: 'apify/comma-actor', path: '/echo', query: { formats: ['a', 'b'], n: [1, 2] } });
+        await callTool({ actor: 'apify/comma-actor', path: '/status/204', query: { tags: ['x', 'y'] } });
+        await callTool({ actor: 'apify/comma-actor', method: 'POST', path: '/echo', query: { formats: ['a', 'b'] } });
+
+        expect(received.map((request) => request.url)).toEqual([
+            '/echo?formats=a%2Cb&n=1&n=2',
+            '/status/204?tags=x%2Cy',
+            '/echo?formats=a&formats=b',
+        ]);
+    });
+
     it.each([
         ['null', null],
         ['an object', { a: 1 }],

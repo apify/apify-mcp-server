@@ -11,6 +11,7 @@ import {
     buildServerActorToolInfo,
     CLIENT_DESCRIPTION_MAX_LENGTH,
 } from '../../src/tools/actors/server_interface_details.js';
+import { listCommaJoinedQueryParameters } from '../../src/tools/actors/server_interface_schema.js';
 import { serverActorRequestOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { Actor, ServerActorToolInfo, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
@@ -593,5 +594,16 @@ describe('the default apify/web-fetch tool', () => {
         const tool = await loadWebFetchTool();
 
         expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+    });
+
+    // The live schema documents `formats` on GET / as `style: form, explode: false`; the test fixture above does not.
+    it('lists formats as the comma-joined query parameter of GET /', () => {
+        const schema = structuredClone(WEB_FETCH_LIVE_SCHEMA) as {
+            paths: { '/': { get: { parameters: Record<string, unknown>[] } } };
+        };
+        schema.paths['/'].get.parameters[1] = { ...schema.paths['/'].get.parameters[1], style: 'form', explode: false };
+
+        expect(listCommaJoinedQueryParameters(schema)).toEqual({ 'GET /': ['formats'] });
+        expect(listCommaJoinedQueryParameters(WEB_FETCH_LIVE_SCHEMA)).toEqual({});
     });
 });
