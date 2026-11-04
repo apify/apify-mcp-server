@@ -271,10 +271,10 @@ function decodeBody(body: Buffer, charset: string, token: string): string | unde
     });
 }
 
-/** The `nextStep` of a response whose body was cut at `MAX_SERVER_ACTOR_RESPONSE_BYTES`. */
+/** The `nextStep` of a response whose body was cut at `MAX_SERVER_ACTOR_RESPONSE_BYTES`. Reading stops at the chunk that crosses the limit, so `bytes` is a little under it. */
 const TRUNCATED_BODY_NEXT_STEP =
-    `The body is truncated at ${MAX_SERVER_ACTOR_RESPONSE_BYTES} bytes and the rest is not returned. ` +
-    'Request a smaller response, for example fewer items or a smaller format.';
+    `The body is over the ${MAX_SERVER_ACTOR_RESPONSE_BYTES}-byte limit; only its start is returned, and the rest ` +
+    'is not. Request a smaller response, for example fewer items or a smaller format.';
 
 /** Longest `errorMessage` returned; the full error stays in `body`. */
 const ERROR_MESSAGE_MAX_LENGTH = 1_000;
