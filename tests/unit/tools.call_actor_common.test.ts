@@ -43,7 +43,7 @@ describe('call_actor_common', () => {
         it('prefers dedicated tools without promoting a web tool example', () => {
             const description = buildCallActorDescription();
 
-            expect(description).toContain('Always use dedicated tools when available');
+            expect(description).toContain('Prefer the dedicated tool when the session has one');
             expect(description).not.toContain('apify--rag-web-browser');
             expect(description).not.toContain(RAG_WEB_BROWSER);
         });

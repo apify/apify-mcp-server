@@ -63,6 +63,17 @@ export function getActorToolModeFromInterfaces({
     return ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP;
 }
 
+/**
+ * The tool a session calls a Server Actor's HTTP API with: the Actor's own tool when loaded (its description says to
+ * prefer it), else `send-server-actor-request` when loaded, else none.
+ */
+export function findServerTool(actorFullName: string, loadedToolNames: readonly string[]): string | undefined {
+    const ownTool = actorNameToToolName(actorFullName);
+    if (loadedToolNames.includes(ownTool)) return ownTool;
+    if (loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)) return HELPER_TOOLS.ACTOR_SERVER_REQUEST;
+    return undefined;
+}
+
 /** Multi-tenant when the Actor's standby configuration says so; single-tenant otherwise, the platform default. */
 export function resolveActorTenancy(actor: Pick<Actor, 'actorStandby'>): ActorTenancy {
     return actor.actorStandby?.tenancy === 'MULTI_TENANT' ? ACTOR_TENANCY.MULTI_TENANT : ACTOR_TENANCY.SINGLE_TENANT;

@@ -4,6 +4,7 @@ import { ApifyClient } from '../../src/apify_client.js';
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS, WEB_SEARCH } from '../../src/const.js';
 import { connectMCPClient } from '../../src/mcp/client.js';
 import { actorDefinitionCache } from '../../src/state.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { callActorPreExecute, executeCallActor } from '../../src/tools/actors/call_actor.js';
 import { executeCallActorMcpTool } from '../../src/tools/actors/call_actor_mcp_tool.js';
 import { buildServerActorToolInfo } from '../../src/tools/actors/server_interface_details.js';
@@ -224,6 +225,24 @@ describe('Actor run/standby mode decision table', () => {
             expect(text).toContain('has no MCP tools or input interface');
             expect(text).toContain(STANDBY_EMPTY);
             expect(text).not.toContain(STANDBY_EMPTY_ID);
+        });
+
+        it("names the Actor's own server tool over the HTTP request tool when both are loaded", async () => {
+            seedActor(STANDBY_EMPTY, { isStandbyEnabled: true, hasWebServerSchema: true });
+            const ownTool = actorNameToToolName(STANDBY_EMPTY);
+            const options = { loadedToolNames: [ownTool, HELPER_TOOLS.ACTOR_SERVER_REQUEST] };
+
+            const bare = await executeCallActor(
+                stubToolCallContext(
+                    { actor: STANDBY_EMPTY, input: {} },
+                    new ApifyClient({ token: 'test-token' }),
+                    options,
+                ),
+            );
+
+            const text = firstText(bare);
+            expect(text).toContain(`through ${ownTool}.`);
+            expect(text).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
         });
 
         it.each([true, false])('names the HTTP request tool only when loaded: %s', async (hasRequestTool) => {

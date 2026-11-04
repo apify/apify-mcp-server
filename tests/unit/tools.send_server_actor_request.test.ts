@@ -7,8 +7,17 @@ import Ajv from 'ajv';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
-import { defaults, FAILURE_CATEGORY, HELPER_TOOLS, MAX_INLINE_BYTES, TOOL_STATUS } from '../../src/const.js';
+import {
+    defaults,
+    FAILURE_CATEGORY,
+    HELPER_TOOLS,
+    MAX_INLINE_BYTES,
+    RAG_WEB_BROWSER,
+    TOOL_STATUS,
+    WEB_SEARCH,
+} from '../../src/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { getServerActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import {
     executeSendServerActorRequest,
@@ -947,7 +956,17 @@ describe('describing the tool', () => {
 
     it('does not give a default Actor as its example, since that Actor has its own tool in the default session', () => {
         // The own tool says to use it instead of this one for that Actor; an example naming it would contradict that.
-        for (const actor of defaults.actors) expect(sendServerActorRequest.description).not.toContain(actor);
+        const defaultSession = only(HELPER_TOOLS.ACTOR_GET_DETAILS, ...defaults.actors.map(actorNameToToolName));
+        const description = sendServerActorRequest.buildDescription!(defaultSession);
+
+        for (const actor of defaults.actors) expect(description).not.toContain(actor);
+    });
+
+    it("switches the example off apify/rag-web-browser when the session has that Actor's own tool", () => {
+        const description = sendServerActorRequest.buildDescription!(only(actorNameToToolName(RAG_WEB_BROWSER)));
+
+        expect(description).not.toContain(RAG_WEB_BROWSER);
+        expect(description).toContain(`"actor": "${WEB_SEARCH}"`);
     });
 });
 

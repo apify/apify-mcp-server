@@ -37,7 +37,7 @@ import {
 import { buildPermissionApprovalTexts } from '../../utils/payment_errors.js';
 import { classifyFailureCategory, extractAjvErrorDetails } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
-import { getOwnServerRemedy, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
+import { findServerTool, getOwnServerRemedy, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
 import { actorRunOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
 import {
@@ -67,15 +67,15 @@ function buildCallActorServerActorSection({ hasTool }: ToolDescriptionContext): 
 - For one or a few results, ${HELPER_TOOLS.ACTOR_SERVER_REQUEST} returns them in the HTTP response, without a batch run${operations}`;
 }
 
-/** Shared "two ways to run" + USAGE section — identical in both modes. */
+/** Shared "two ways to use an Actor" + USAGE section — identical in both modes. */
 function buildCallActorUsageSection(): string {
-    return `There are two ways to run Actors:
-1. Dedicated Actor tools: These are pre-configured tools, offering a simpler and more direct experience.
-2. Generic call-actor tool (${HELPER_TOOLS.ACTOR_CALL}): Use this when a dedicated tool is not available or when you want to run any Actor dynamically. This tool is especially useful if you do not want to add specific tools or your client does not support dynamic tool registration.
+    return `There are two ways to use an Actor:
+1. Its dedicated tool, when the session has one: a Server Actor's tool sends one HTTP request to its API, an MCP server Actor's tools call its MCP server, and any other Actor's tool starts a run.
+2. The generic ${HELPER_TOOLS.ACTOR_CALL} tool: starts a run of any Actor and stores the results in a dataset.
 
 USAGE:
-- Always use dedicated tools when available
-- Use the generic call-actor tool only if a dedicated tool does not exist for your Actor.`;
+- Prefer the dedicated tool when the session has one for the Actor
+- Use ${HELPER_TOOLS.ACTOR_CALL} when no dedicated tool exists, or when the user wants a run with its results in a dataset.`;
 }
 
 /** Shared examples section — identical in both modes. */
@@ -516,9 +516,10 @@ export async function callActorPreExecute(
 
     if (resolution?.toolMode === ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP) {
         const error = ActorLoadError.serverActorWithoutMcpNotSupported(resolution.actorFullName);
-        if (resolution.interfaces.server && loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)) {
-            error.message += ` Its HTTP API is available through ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}.`;
-        }
+        const serverTool = resolution.interfaces.server
+            ? findServerTool(resolution.actorFullName, loadedToolNames)
+            : undefined;
+        if (serverTool) error.message += ` Its HTTP API is available through ${serverTool}.`;
         return {
             earlyResponse: respondStandbyRejection(error, { mcpSessionId }),
         };

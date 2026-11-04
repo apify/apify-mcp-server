@@ -304,6 +304,21 @@ describe('call-actor-mcp-tool', () => {
         expect(requestHeaders).toHaveLength(0);
     });
 
+    it("names the Actor's own server tool when the session has it", async () => {
+        seedActor('apify/server-actor-test', { definition: { webServerMcpPath: undefined, hasWebServerSchema: true } });
+        const context = stubToolCallContext(
+            { actor: 'apify/server-actor-test', tool: 'add' },
+            new ApifyClient({ token: TOKEN }),
+            { loadedToolNames: ['apify--server-actor-test', HELPER_TOOLS.ACTOR_SERVER_REQUEST] },
+        );
+
+        const result = (await executeCallActorMcpTool(context)) as ToolResult;
+
+        expect((result.content as { text: string }[])[0].text).toBe(
+            "Actor 'apify/server-actor-test' is not an MCP server. Its HTTP API can be called with apify--server-actor-test.",
+        );
+    });
+
     it('returns the not-found response for an Actor the API does not know, without connecting', async () => {
         const unknownActorClient = Object.assign(
             new ApifyClient({ token: TOKEN }),
