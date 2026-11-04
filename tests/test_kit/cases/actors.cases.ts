@@ -1259,10 +1259,10 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        // isDeploymentTest: the web-search tool, sent through its server interface, with a comma-joined list.
-        name: 'searches the web with the web-search tool through GET /',
+        // isDeploymentTest: the default web-search tool, sent through its server interface, with a comma-joined list.
+        name: 'searches the web with the default web-search tool through GET /',
         isDeploymentTest: true,
-        run: withClient({ tools: ['apify/web-search'] }, async (client) => {
+        run: withClient({}, async (client) => {
             const result = await client.callTool({
                 name: 'apify--web-search',
                 arguments: {

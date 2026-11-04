@@ -144,7 +144,7 @@ export const INPUT_INTERFACE_ACTORS: ReadonlySet<string> = new Set([RAG_WEB_BROW
  */
 export const INPUT_WITH_MCP_ACTORS: ReadonlySet<string> = new Set([WEB_FETCH, WEB_SEARCH]);
 export const defaults = {
-    actors: [RAG_WEB_BROWSER, WEB_FETCH],
+    actors: [WEB_SEARCH, WEB_FETCH],
 };
 
 /** API rejects `includeInputSchema=true` above this; mirrors apify-core `MAX_LIMIT_WITH_INPUT_SCHEMA`. */
