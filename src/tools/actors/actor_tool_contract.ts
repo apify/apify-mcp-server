@@ -1,8 +1,11 @@
 import { RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../const.js';
 import type { ActorInputSchema, ToolDescriptionContext } from '../../types.js';
 
+/** Appended to the `apify/rag-web-browser` tool description, a Server Actor tool (`GET /search`). */
 const RAG_WEB_BROWSER_ADDITIONAL_DESC = `Use this tool for generic web content: it searches the web by query and returns the text of the top results.
 This tool scrapes the data itself - it does NOT just find tools.
+Example: {"method":"GET","path":"/search","query":{"query":"latest AI agent payment protocols","maxResults":3}}
+If query is a URL, the tool fetches that page instead of searching.
 
 Examples of when to use:
 - General questions answered by web pages (e.g., "What's the weather in Prague?", "Latest news about the EU AI Act", "How does HTTP/3 work?")
@@ -85,7 +88,7 @@ const ACTOR_TOOL_POLICIES: Readonly<Record<string, ActorToolPolicyConfig>> = {
     },
     [RAG_WEB_BROWSER]: {
         exposedInputs: ['query', 'maxResults', 'outputFormats'],
-        buildDescription: () => RAG_WEB_BROWSER_ADDITIONAL_DESC,
+        serverTool: { buildDescription: () => RAG_WEB_BROWSER_ADDITIONAL_DESC },
     },
     [WEB_FETCH]: {
         serverTool: {

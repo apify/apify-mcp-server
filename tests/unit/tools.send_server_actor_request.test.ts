@@ -7,7 +7,7 @@ import Ajv from 'ajv';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
-import { FAILURE_CATEGORY, HELPER_TOOLS, MAX_INLINE_BYTES, TOOL_STATUS } from '../../src/const.js';
+import { defaults, FAILURE_CATEGORY, HELPER_TOOLS, MAX_INLINE_BYTES, TOOL_STATUS } from '../../src/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
 import { getServerActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import {
@@ -943,6 +943,11 @@ describe('describing the tool', () => {
     it('names fetch-actor-details in the description only when the session has it', () => {
         expect(sendServerActorRequest.description).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
         expect(sendServerActorRequest.buildDescription!(only())).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+    });
+
+    it('does not give a default Actor as its example, since that Actor has its own tool in the default session', () => {
+        // The own tool says to use it instead of this one for that Actor; an example naming it would contradict that.
+        for (const actor of defaults.actors) expect(sendServerActorRequest.description).not.toContain(actor);
     });
 });
 

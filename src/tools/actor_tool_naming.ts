@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import log from '@apify/log';
 
-import { APIFY_MCP_URL, HELPER_TOOLS, INPUT_INTERFACE_ACTORS, INPUT_WITH_MCP_ACTORS } from '../const.js';
+import { APIFY_MCP_URL, HELPER_TOOLS } from '../const.js';
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../mcp/const.js';
 import type { Actor, ActorInfo, ActorInterfaces, ActorTenancy, ToolDescriptionContext } from '../types.js';
 import { ACTOR_TENANCY, ACTOR_TOOL_MODE } from '../types.js';
@@ -25,13 +25,8 @@ import { ACTOR_TENANCY, ACTOR_TOOL_MODE } from '../types.js';
  *
  * "server" is the Actor's `actorStandby.isEnabled` (the API field is named standby). "MCP path" is
  * `webServerMcpPath`. "HTTP schema" is `definition.hasWebServerSchema`.
- * Actors in `INPUT_INTERFACE_ACTORS` (`../const.ts`) are served through the input interface although they declare
- * other interfaces: their MCP path reads as absent, and their own tool never takes `SERVER`. With an empty input
- * schema (including a malformed one `pruneActorDefinition` drops) they get no tool, like any other server Actor.
  * An MCP-server Actor does not get `input` even with a non-empty input schema: Store data shows that
- * interface is unused on such Actors. Actors in `INPUT_WITH_MCP_ACTORS` are the exception: with an MCP path and a
- * non-empty input schema they get both `input` and `mcp`. `input` is checked first, so `call-actor` runs them (and so
- * does their own tool without a server interface), and `call-actor-mcp-tool` reaches their MCP server.
+ * interface is unused on such Actors.
  * The input schema counts as empty when the definition has no `input`, `input.properties` is missing,
  * or `input.properties` has zero keys. Nothing else counts — a non-empty `required` with no properties
  * still reads as empty.
@@ -39,10 +34,10 @@ import { ACTOR_TENANCY, ACTOR_TOOL_MODE } from '../types.js';
 export function resolveActorInterfaces({ actor, definition, webServerMcpPath }: ActorInfo): ActorInterfaces {
     if (actor.actorStandby?.isEnabled !== true) return { input: true, mcp: false, server: false };
 
-    const mcp = Boolean(webServerMcpPath) && !INPUT_INTERFACE_ACTORS.has(definition.actorFullName);
+    const mcp = Boolean(webServerMcpPath);
     const hasInputProperties = Object.keys(definition.input?.properties ?? {}).length > 0;
     return {
-        input: hasInputProperties && (!mcp || INPUT_WITH_MCP_ACTORS.has(definition.actorFullName)),
+        input: hasInputProperties && !mcp,
         mcp,
         server: definition.hasWebServerSchema,
     };
@@ -51,7 +46,7 @@ export function resolveActorInterfaces({ actor, definition, webServerMcpPath }: 
 /** The own-tool column of the table on {@link resolveActorInterfaces}. */
 export function resolveActorToolMode(actorInfo: ActorInfo): ACTOR_TOOL_MODE {
     const interfaces = resolveActorInterfaces(actorInfo);
-    if (interfaces.server && !INPUT_INTERFACE_ACTORS.has(actorInfo.definition.actorFullName)) {
+    if (interfaces.server) {
         return ACTOR_TOOL_MODE.SERVER;
     }
     return getActorToolModeFromInterfaces(interfaces);

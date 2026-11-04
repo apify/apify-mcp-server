@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
-import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_SEARCH } from '../../src/const.js';
+import { HELPER_TOOLS } from '../../src/const.js';
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../../src/mcp/const.js';
 import {
     actorNameToToolName,
@@ -149,34 +149,6 @@ describe('interface availability and tool routing', () => {
             { input: false, mcp: false, server: false },
             ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,
             ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,
-        ],
-        [
-            'input-interface Actor declaring an MCP path, with an HTTP schema',
-            {
-                isStandbyEnabled: true,
-                webServerMcpPath: '/mcp',
-                hasWebServerSchema: true,
-                actorFullName: RAG_WEB_BROWSER,
-            },
-            { input: true, mcp: false, server: true },
-            ACTOR_TOOL_MODE.RUN,
-            ACTOR_TOOL_MODE.RUN,
-        ],
-        // The input-interface override only drops the MCP interface; it does not waive the empty-schema rule.
-        [
-            'input-interface Actor with an empty input schema',
-            { isStandbyEnabled: true, webServerMcpPath: '/mcp', actorFullName: RAG_WEB_BROWSER, input: undefined },
-            { input: false, mcp: false, server: false },
-            ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,
-            ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,
-        ],
-        // Keeps its input interface beside the MCP server: its own tool is the server tool, call-actor runs it.
-        [
-            'input-with-MCP Actor declaring an MCP path, with an HTTP schema',
-            { isStandbyEnabled: true, webServerMcpPath: '/mcp', hasWebServerSchema: true, actorFullName: WEB_SEARCH },
-            { input: true, mcp: true, server: true },
-            ACTOR_TOOL_MODE.SERVER,
-            ACTOR_TOOL_MODE.RUN,
         ],
     ] as const)('resolves %s', (_label, opts, interfaces, ownToolMode, callActorMode) => {
         const actorInfo = makeActorInfo({ input: NON_EMPTY_INPUT, ...opts });

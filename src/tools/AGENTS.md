@@ -20,11 +20,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   `hasWebServerSchema`). Two routes derive from the set. `resolveActorToolMode` gives a selected Actor's own tool,
   read by tool loading: a server tool if `server`, else a run tool if `input`, else MCP tools if `mcp`, else none
   (`SERVER_ACTOR_WITHOUT_MCP`). `getActorToolModeFromInterfaces` gives the `call-actor` route, which skips the
-  server interface, so `call-actor` still starts runs of a Server Actor. Actors in `INPUT_INTERFACE_ACTORS`
-  (`../const.ts`: rag-web-browser) are served as run tools although they declare an MCP
-  path or a server interface, unless their input schema is empty, in which case they get no tool.
-  Actors in `INPUT_WITH_MCP_ACTORS` (web-fetch, web-search) keep `input` beside `mcp`, and `input` is checked
-  before `mcp`, so `call-actor` runs them and `call-actor-mcp-tool` reaches their MCP server.
+  server interface, so `call-actor` still starts runs of a Server Actor that is not an MCP server.
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
   - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), delete
     (`delete_actor.ts`), the actor-tools factory (run tools, proxied MCP tools, and a Server Actor's own tool
@@ -32,7 +28,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     Actor fixed, `method` narrowed to the documented ones, `path` a plain string (no enum: a schema can document
     thousands of paths), the policy's `serverTool` text and input notes (`getActorToolPolicy`) and the operations in the
     description; an Actor with a server interface and no `webServerToolInfo` is reported as `load-failed`; the
-    default `apify/web-fetch` and `apify/web-search` tools are served this way), the direct actor-tool executor
+    default `apify/web-fetch` and `apify/web-search` tools and a selected `apify/rag-web-browser` are served this
+    way), the direct actor-tool executor
     (`actor_executor.ts`),
     `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`, and resolves the build
     the server-interface fields — `webServerMcpPath`, `webServerSchema` — are read from when standby is on,

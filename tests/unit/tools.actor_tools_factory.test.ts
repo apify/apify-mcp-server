@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
-import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
+import { RAG_WEB_BROWSER } from '../../src/const.js';
 import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import type { ActorInfo, SchemaProperties } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
@@ -296,17 +295,5 @@ describe('getNormalActorsAsTools()', () => {
             expect(tool.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true });
             expect(actorInfo).toEqual(original);
         });
-    });
-
-    it('describes RAG page content without referring to Web Fetch', async () => {
-        const [tool] = await getNormalActorsAsTools([createMockActorInfo(RAG_WEB_BROWSER)]);
-        const alone = getToolPublicFieldOnly(tool, { presentTools: new Set([tool.name]) }).description;
-        const together = getToolPublicFieldOnly(tool, {
-            presentTools: new Set([tool.name, actorNameToToolName(WEB_FETCH)]),
-        }).description;
-
-        expect(together).toBe(alone);
-        expect(together).toContain('text of the top results');
-        expect(together).not.toContain(WEB_FETCH);
     });
 });

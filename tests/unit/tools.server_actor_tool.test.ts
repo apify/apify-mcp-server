@@ -460,11 +460,12 @@ describe('serving a selected Server Actor through its server interface', () => {
         expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR_SERVER]);
     });
 
-    it('leaves an Actor served through its input interface a run tool', async () => {
+    it('serves apify/rag-web-browser as a Server Actor tool with its policy text', async () => {
         const [username, name] = RAG_WEB_BROWSER.split('/');
         const { tools } = await loadTools(SCHEMA, { actor: { username, name } });
 
-        expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR]);
+        expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR_SERVER]);
+        expect(tools[0].description).toContain('Example: {"method":"GET","path":"/search"');
     });
 
     // A definition built before the tool info existed, such as one restored from a cache, has no tool to serve.

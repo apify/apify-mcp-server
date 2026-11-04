@@ -135,7 +135,11 @@ describe('Actor run/standby mode decision table', () => {
         ['a run-only Actor', RUN_ONLY, ['acme--run-only']],
         ['a run-only Actor carrying a leftover webServerMcpPath', RUN_ONLY_STALE_PATH, ['acme--run-only-stale-path']],
         ['a standby Actor exposing an MCP server (proxied tools only)', STANDBY_MCP, ['acme--standby-mcp--add']],
-        ['an input-with-MCP Actor carrying an MCP path and an HTTP schema', WEB_SEARCH, ['apify--web-search']],
+        [
+            'a standby Actor carrying an MCP path and an HTTP schema (its server tool)',
+            WEB_SEARCH,
+            ['apify--web-search'],
+        ],
         ['a standby Actor with no MCP server but a non-empty input schema', STANDBY_INPUT, ['acme--standby-input']],
         ['a standby Actor with no MCP server and an empty input schema', STANDBY_EMPTY, []],
     ])('tools/list surface for %s', async (_label, actor, expected) => {
@@ -154,14 +158,11 @@ describe('Actor run/standby mode decision table', () => {
     });
 
     describe('call-actor routing', () => {
-        it.each([RUN_ONLY_STALE_PATH, WEB_SEARCH])(
-            'runs %s through its input schema despite its MCP path',
-            async (actor) => {
-                const result = await preExecute(actor);
+        it('runs a run-only Actor through its input schema despite its leftover MCP path', async () => {
+            const result = await preExecute(RUN_ONLY_STALE_PATH);
 
-                expect('earlyResponse' in result).toBe(false);
-            },
-        );
+            expect('earlyResponse' in result).toBe(false);
+        });
 
         it('leaves the MCP server of apify/web-search reachable through call-actor-mcp-tool', async () => {
             const response = await executeCallActorMcpTool(

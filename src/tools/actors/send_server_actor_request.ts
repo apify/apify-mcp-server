@@ -569,15 +569,15 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         A request to a single-tenant Actor Server can start a run of the Actor in your account, kept until its idle timeout; a multi-tenant Actor Server charges per event.
         The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text, cut at ${MAX_INLINE_BYTES} bytes; other content types are not returned.
 
-        Example call: {"actor": "apify/web-search", "method": "GET", "path": "/", "query": {"query": "AI news", "maxResults": 5}}
+        Example call: {"actor": "apify/rag-web-browser", "method": "GET", "path": "/search", "query": {"query": "AI news", "maxResults": 3}}
 
         USAGE:
         - Use when the Actor that fits the user's request has an Actor Server, and its API schema or README names the endpoint for the task.
         - Fits requests for one or a few results returned in the HTTP response. Larger batches depend on the endpoint and the response size and time limits.
 
         USAGE EXAMPLES:
-        - user_input: Search the web for the latest AI news with apify/web-search
-        - user_input: Find articles about Apify from the past week with apify/web-search
+        - user_input: Search the web for the latest AI news and read the top pages with apify/rag-web-browser
+        - user_input: Read https://docs.apify.com as Markdown with apify/rag-web-browser
     `;
 }
 
