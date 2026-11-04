@@ -968,6 +968,16 @@ describe('describing the tool', () => {
         expect(description).not.toContain(RAG_WEB_BROWSER);
         expect(description).toContain(`"actor": "${WEB_SEARCH}"`);
     });
+
+    it("gives a placeholder example when the session has both web Actors' own tools", () => {
+        const description = sendServerActorRequest.buildDescription!(
+            only(actorNameToToolName(RAG_WEB_BROWSER), actorNameToToolName(WEB_SEARCH)),
+        );
+
+        expect(description).not.toContain(RAG_WEB_BROWSER);
+        expect(description).not.toContain(WEB_SEARCH);
+        expect(description).toContain('"actor": "username/name"');
+    });
 });
 
 describe("a selected Server Actor's own tool", () => {

@@ -568,19 +568,28 @@ export function redactServerActorRequestArgs({ actor, query, ...rest }: Record<s
 
 /**
  * The example names an Actor whose own tool is not in the session, since that tool says to use it instead of this
- * one: apify/rag-web-browser (not a default tool), else apify/web-search when the session selected rag-web-browser.
+ * one: apify/rag-web-browser (not a default tool), else apify/web-search, else a placeholder when both are selected.
  */
-function buildExample(hasTool: ToolDescriptionContext['hasTool']): { call: string; usage: string } {
-    if (hasTool(actorNameToToolName(RAG_WEB_BROWSER))) {
-        return {
-            call: `{"actor": "${WEB_SEARCH}", "method": "GET", "path": "/", "query": {"query": "AI news", "maxResults": 5}}`,
-            usage: `- user_input: Search the web for the latest AI news with ${WEB_SEARCH}\n- user_input: Find articles about Apify from the past week with ${WEB_SEARCH}`,
-        };
-    }
-    return {
+const EXAMPLE_ACTORS = [
+    {
+        actor: RAG_WEB_BROWSER,
         call: `{"actor": "${RAG_WEB_BROWSER}", "method": "GET", "path": "/search", "query": {"query": "AI news", "maxResults": 3}}`,
         usage: `- user_input: Search the web for the latest AI news and read the top pages with ${RAG_WEB_BROWSER}\n- user_input: Read https://docs.apify.com as Markdown with ${RAG_WEB_BROWSER}`,
-    };
+    },
+    {
+        actor: WEB_SEARCH,
+        call: `{"actor": "${WEB_SEARCH}", "method": "GET", "path": "/", "query": {"query": "AI news", "maxResults": 5}}`,
+        usage: `- user_input: Search the web for the latest AI news with ${WEB_SEARCH}\n- user_input: Find articles about Apify from the past week with ${WEB_SEARCH}`,
+    },
+    {
+        actor: undefined,
+        call: '{"actor": "username/name", "method": "GET", "path": "/search", "query": {"query": "AI news"}}',
+        usage: '- user_input: Call the /search endpoint of username/name for AI news',
+    },
+] as const;
+
+function buildExample(hasTool: ToolDescriptionContext['hasTool']): { call: string; usage: string } {
+    return EXAMPLE_ACTORS.find(({ actor }) => actor === undefined || !hasTool(actorNameToToolName(actor)))!;
 }
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {

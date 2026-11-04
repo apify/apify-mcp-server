@@ -199,7 +199,7 @@ The server adds `get-dataset-items`, `get-key-value-store-record`, `get-actor-ru
 
 You can also expose a specific Actor as its own tool, for example `apify/instagram-scraper`. The server builds the tool's parameters from the Actor's input schema, so the agent knows exactly what to pass. A Server Actor with an API schema, such as `apify/web-fetch`, `apify/web-search`, or `apify/rag-web-browser`, gets a tool that sends one HTTP request to its API instead.
 
-**Actors that run their own MCP server.** Some Actors are MCP servers themselves. `fetch-actor-mcp-tool-list` lists their tools, and `call-actor-mcp-tool` calls one. When such an Actor is loaded as a tool source, its tools are exposed under names in the form `username--actor-name--tool-name`. Apify Store also lists MCP-related Actors from independent creators; those are separate products with their own READMEs and pricing.
+**Actors that run their own MCP server.** Some Actors are MCP servers themselves. `fetch-actor-mcp-tool-list` lists their tools, and `call-actor-mcp-tool` calls one. When such an Actor is loaded as a tool source and has no API schema, its tools are exposed under names in the form `username--actor-name--tool-name`; an Actor with an API schema, such as `apify/web-search`, gets its server tool instead, and `call-actor-mcp-tool` reaches its MCP tools. Apify Store also lists MCP-related Actors from independent creators; those are separate products with their own READMEs and pricing.
 
 ## 🛠️ Tools, resources, and prompts
 
