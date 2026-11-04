@@ -1259,6 +1259,28 @@ export const actorsCases: Case[] = [
         }),
     },
     {
+        // isDeploymentTest: the web-search tool, sent through its server interface, with a comma-joined list.
+        name: 'searches the web with the web-search tool through GET /',
+        isDeploymentTest: true,
+        run: withClient({ tools: ['apify/web-search'] }, async (client) => {
+            const result = await client.callTool({
+                name: 'apify--web-search',
+                arguments: {
+                    method: 'GET',
+                    path: '/',
+                    query: { query: 'apify', maxResults: 2, allowedDomains: ['apify.com'] },
+                },
+            });
+
+            expect(result.isError).not.toBe(true);
+            const sc = (result as { structuredContent?: ServerActorRequestContent }).structuredContent;
+            expect(sc?.status).toBe(200);
+            const { results } = JSON.parse(sc!.body) as { results: { domain: string }[] };
+            expect(results.length).toBeGreaterThan(0);
+            for (const { domain } of results) expect(domain).toMatch(/(^|\.)apify\.com$/);
+        }),
+    },
+    {
         name: 'summarizes a Server Actor interface and navigates it with fetch-actor-details',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {

@@ -35,9 +35,11 @@ If the exact URL cannot be fetched (e.g. a non-http(s) scheme such as ftp:), say
 const WEB_FETCH_URL_SCHEME_NOTE =
     'url takes http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.';
 
-/** Appended to the `apify/web-search` Actor tool description. */
+/** Appended to the `apify/web-search` tool description, a Server Actor tool (`GET /` and `POST /`). */
 const WEB_SEARCH_ADDITIONAL_DESC = `Use this tool to search the web by query and get one page of organic results: title, URL, snippet and position (up to about 10 results; links and snippets only, no page content).
 countryCode and languageCode set the locale, dateFrom and dateTo bound the publication date, allowedDomains and blockedDomains restrict or exclude sites.
+Example: {"method":"GET","path":"/","query":{"query":"latest AI agent payment protocols","maxResults":5}}
+allowedDomains and blockedDomains are lists of hostnames, such as ["example.com","example.org"]; dateFrom and dateTo are YYYY-MM-DD.
 
 Examples of when to use:
 - The user wants links to choose from or to know which pages exist for a topic (e.g., "find the official docs for X", "recent articles about Y, with links")
@@ -92,7 +94,7 @@ const ACTOR_TOOL_POLICIES: Readonly<Record<string, ActorToolPolicyConfig>> = {
         },
     },
     [WEB_SEARCH]: {
-        buildDescription: () => WEB_SEARCH_ADDITIONAL_DESC,
+        serverTool: { buildDescription: () => WEB_SEARCH_ADDITIONAL_DESC },
     },
 };
 

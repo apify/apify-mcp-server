@@ -134,9 +134,15 @@ export const WEB_SEARCH = 'apify/web-search';
 /**
  * Actors served through the input interface (a run per call) although they declare `webServerMcpPath` or a server
  * interface. Hand-wired for selected Apify Actors so the served tool does not change when the Actor's other
- * interfaces do. `apify/rag-web-browser` is a default tool with a server interface.
+ * interfaces do. `apify/rag-web-browser` has a server interface.
  */
-export const INPUT_INTERFACE_ACTORS: ReadonlySet<string> = new Set([WEB_SEARCH, RAG_WEB_BROWSER]);
+export const INPUT_INTERFACE_ACTORS: ReadonlySet<string> = new Set([RAG_WEB_BROWSER]);
+/**
+ * Apify Actors whose input interface stays available although they declare an MCP server, so `call-actor` runs
+ * them. Their own tool comes from the server interface, and their MCP tools stay reachable through
+ * `call-actor-mcp-tool`.
+ */
+export const INPUT_WITH_MCP_ACTORS: ReadonlySet<string> = new Set([WEB_FETCH, WEB_SEARCH]);
 export const defaults = {
     actors: [RAG_WEB_BROWSER, WEB_FETCH],
 };
