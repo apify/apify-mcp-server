@@ -75,7 +75,7 @@ function buildCallActorUsageSection(): string {
 
 USAGE:
 - Prefer the dedicated tool when the session has one for the Actor
-- Use ${HELPER_TOOLS.ACTOR_CALL} when no dedicated tool exists, or when the user wants a run with its results in a dataset.`;
+- ${HELPER_TOOLS.ACTOR_CALL} runs an Actor that has no dedicated tool, and batch work whose results belong in a dataset.`;
 }
 
 /** Shared examples section — identical in both modes. */
