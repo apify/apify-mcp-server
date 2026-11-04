@@ -320,10 +320,11 @@ export function fixActorNameInput(actorName: string): string {
 
 /** {@link fixActorNameInput} without dropping the `:toolName` suffix, so the legacy-syntax check sees the same name. */
 export function normalizeActorNameInput(actorName: string): string {
-    const s = stripQuoteWrappers(actorName).replace(/\s*\/\s*/g, '/');
+    const s = stripQuoteWrappers(actorName)
+        .replace(/\s+/g, ' ')
+        .replace(/ ?\/ ?/g, '/');
     return (
         s
-            .replace(/\s+/g, ' ')
             .trim()
             // The lookbehind starts a trailing match only at the start of a slash run, so long runs stay linear.
             .replace(/^\/+|(?<!\/)\/+$/g, '')
