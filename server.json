@@ -11,14 +11,14 @@
   "version": "0.21.0",
   "icons": [
     {
-      "src": "https://raw.githubusercontent.com/apify/apify-mcp-server/master/docs/apify-icon.png",
+      "src": "https://mcp.apify.com/images/apify-icon.png",
       "mimeType": "image/png",
       "sizes": [
         "512x512"
       ]
     },
     {
-      "src": "https://raw.githubusercontent.com/apify/apify-mcp-server/master/docs/apify-icon.svg",
+      "src": "https://mcp.apify.com/images/apify-icon.svg",
       "mimeType": "image/svg+xml",
       "sizes": [
         "any"
