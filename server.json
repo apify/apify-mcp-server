@@ -3,7 +3,7 @@
   "name": "com.apify/apify-mcp-server",
   "title": "Apify MCP Server",
   "description": "Extract data from any website with thousands of scrapers, crawlers, and automations on Apify Store ⚡",
-  "websiteUrl": "https://docs.apify.com/integrations/mcp",
+  "websiteUrl": "https://mcp.apify.com",
   "repository": {
     "url": "https://github.com/apify/apify-mcp-server",
     "source": "github"

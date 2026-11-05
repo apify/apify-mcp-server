@@ -1,7 +1,7 @@
 import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it } from 'vitest';
 
-import { APIFY_DOCS_MCP_URL, APIFY_MCP_URL, SERVER_NAME, SERVER_TITLE } from '../../src/const.js';
+import { APIFY_MCP_URL, SERVER_NAME, SERVER_TITLE } from '../../src/const.js';
 import { getServerCard, getServerInfo } from '../../src/server_card.js';
 import type { ServerCard, ServerCardRemote, ServerCardRepository } from '../../src/types.js';
 import { readJsonFile } from '../../src/utils/generic.js';
@@ -90,7 +90,7 @@ describe('getServerCard()', () => {
 
             expect(card.title).toBe(SERVER_TITLE);
             expect(card.title).toBe(serverJson.title);
-            expect(card.websiteUrl).toBe(APIFY_DOCS_MCP_URL);
+            expect(card.websiteUrl).toBe(APIFY_MCP_URL);
             expect(card.websiteUrl).toBe(serverJson.websiteUrl);
             expect(card.serverUrl).toBe(APIFY_MCP_URL);
         });
@@ -174,7 +174,7 @@ describe('getServerInfo()', () => {
         expect(info.title).toBe(SERVER_TITLE);
         expect(info.version).toBe(getPackageVersion());
         expect(info.description).toBe(serverJson.description);
-        expect(info.websiteUrl).toBe(APIFY_DOCS_MCP_URL);
+        expect(info.websiteUrl).toBe(APIFY_MCP_URL);
         expect(info.icons).toEqual(serverJson.icons);
     });
 });

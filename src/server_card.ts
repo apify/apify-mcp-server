@@ -36,7 +36,7 @@ export function getServerInfo(): Implementation {
         title: SERVER_TITLE,
         version: getPackageVersion()!,
         description: serverJson.description,
-        websiteUrl: APIFY_DOCS_MCP_URL,
+        websiteUrl: APIFY_MCP_URL,
         icons: [...serverJson.icons],
     };
 }
@@ -66,7 +66,7 @@ export function getServerCard(): ServerCard {
         title: SERVER_TITLE,
         description: serverJson.description,
         version: getPackageVersion()!,
-        websiteUrl: APIFY_DOCS_MCP_URL,
+        websiteUrl: APIFY_MCP_URL,
         repository: serverJson.repository,
         icons: [...serverJson.icons],
         remotes: serverJson.remotes,
