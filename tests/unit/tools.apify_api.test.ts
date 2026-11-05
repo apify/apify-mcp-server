@@ -1294,8 +1294,9 @@ describe.each([
     { name: HELPER_TOOLS.API_READ, tool: apifyApiRead, args: { path: '/v2/datasets' } },
     { name: HELPER_TOOLS.API_WRITE, tool: apifyApiWrite, args: { path: '/v2/datasets/abc', method: 'DELETE' } },
 ])('$name validates query values without coercing them', ({ tool, args }) => {
-    it('rejects a null query value', () => {
-        expect(tool.ajvValidate({ ...args, query: { limit: null } })).toBe(false);
+    // Either would be sent as an empty value, such as ?status=.
+    it.each([{ value: null }, { value: [] }])('rejects the query value $value', ({ value }) => {
+        expect(tool.ajvValidate({ ...args, query: { status: value } })).toBe(false);
     });
 
     it('accepts an array query value', () => {

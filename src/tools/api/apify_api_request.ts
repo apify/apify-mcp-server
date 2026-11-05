@@ -19,7 +19,7 @@ import type { ApiMethod, ApiOperation } from './apify_api_spec.js';
 import { fetchApiOperationIndex, isRecord } from './apify_api_spec.js';
 
 /** One query parameter value. */
-export const queryValueSchema = z.union([z.string(), z.number(), z.boolean()]);
+const queryValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 type QueryValue = z.infer<typeof queryValueSchema>;
 
 /** Input fields the read and write tools share. */
@@ -33,7 +33,7 @@ export const apiCallArgsShape = {
                 'A query string written into the path is sent too.',
         ),
     query: z
-        .record(z.string(), z.union([queryValueSchema, z.array(queryValueSchema)]))
+        .record(z.string(), z.union([queryValueSchema, z.array(queryValueSchema).min(1)]))
         .optional()
         .describe(
             'Query parameters, by name, for example {"limit": 10}. An array is sent comma-separated. ' +
@@ -285,8 +285,8 @@ export async function callApi(params: {
         response = await sendApifyApiRequest(client, {
             url,
             method,
-            // The API reads a list as one comma-separated value (OpenAPI `style: form, explode: false`);
-            // axios would send an array as `name[]=a&name[]=b`.
+            // The API reads a list as one comma-separated value (OpenAPI `style: form, explode: false`).
+            // Joined here, not left to apify-client's query serializer.
             params:
                 params.query &&
                 Object.fromEntries(
