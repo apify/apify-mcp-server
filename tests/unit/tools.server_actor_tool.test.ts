@@ -10,12 +10,11 @@ import {
     buildServerActorToolDescription,
     buildServerActorToolInfo,
     CLIENT_DESCRIPTION_MAX_LENGTH,
-    formatTenancyBilling,
 } from '../../src/tools/actors/server_interface_details.js';
 import { listCommaJoinedQueryParameters } from '../../src/tools/actors/server_interface_schema.js';
 import { serverActorRequestOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { Actor, ServerActorToolInfo, ToolEntry } from '../../src/types.js';
-import { ACTOR_TENANCY, TOOL_TYPE } from '../../src/types.js';
+import { TOOL_TYPE } from '../../src/types.js';
 import { mockActor, mockActorBuildClient, mockDefaultBuild } from './helpers/actor_build_client.js';
 import { makePaymentProvider } from './helpers/mcp_server.js';
 import { only } from './helpers/tool_context.js';
@@ -460,12 +459,11 @@ describe('serving a selected Server Actor through its server interface', () => {
         expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR_SERVER]);
     });
 
-    it('serves apify/rag-web-browser as a Server Actor tool with its policy text', async () => {
+    it('serves apify/rag-web-browser as a Server Actor tool that names no other web Actor', async () => {
         const [username, name] = RAG_WEB_BROWSER.split('/');
         const { tools } = await loadTools(SCHEMA, { actor: { username, name } });
 
         expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR_SERVER]);
-        expect(tools[0].description).toContain('Example: {"method":"GET","path":"/search"');
         expect(tools[0].description).not.toContain(WEB_FETCH);
     });
 
@@ -615,12 +613,13 @@ describe('the operations in a Server Actor tool description', () => {
         expect(tool.buildDescription?.(only()).endsWith(lines)).toBe(true);
     });
 
-    it('prefer this tool over send-server-actor-request only when the session has it', async () => {
+    it('names send-server-actor-request only when the session has it', async () => {
         const tool = await loadServerTool(SCHEMA);
-        const instead = `Use this tool instead of the "${HELPER_TOOLS.ACTOR_SERVER_REQUEST}"`;
 
-        expect(tool.buildDescription?.(only(HELPER_TOOLS.ACTOR_SERVER_REQUEST))).toContain(instead);
-        expect(tool.buildDescription?.(only())).not.toContain(instead);
+        expect(tool.buildDescription?.(only(HELPER_TOOLS.ACTOR_SERVER_REQUEST))).toContain(
+            HELPER_TOOLS.ACTOR_SERVER_REQUEST,
+        );
+        expect(tool.buildDescription?.(only())).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
     });
 
     it('point at the list of every operation when the lines are cut', async () => {
@@ -788,26 +787,13 @@ describe('the default apify/web-fetch tool', () => {
         expect(tool.ajvValidate({ query: { url: 'https://example.com' } })).toBe(false);
     });
 
-    it('carries the policy text, its example call, the billing and both operations as lines within the client limit', async () => {
+    // The session may not serve the web search tool, and a description names no absent tool.
+    it('names the web search tool only when the session has it', async () => {
         const tool = await loadWebFetchTool();
+        const webSearchTool = actorNameToToolName(WEB_SEARCH);
 
-        expect(tool.description).toContain(
-            'Example: {"method":"GET","path":"/","query":{"url":"https://example.com","formats":["markdown"]}}',
-        );
-        expect(tool.description).toContain(formatTenancyBilling({ tenancy: ACTOR_TENANCY.MULTI_TENANT }));
-        expect(tool.description).toContain(
-            'Operations:\n- GET / [url:string required, formats:array, unwrap:boolean, headers:string, wait:integer]: Fetch a URL.',
-        );
-        expect(tool.description).toContain('- POST / {url:string required');
-        expect(tool.description!.length).toBeLessThanOrEqual(CLIENT_DESCRIPTION_MAX_LENGTH);
-    });
-
-    // On the argument the agent fills in: agents rewrote ftp:// URLs to https:// when the note was elsewhere.
-    it('carries the url scheme note on its query input', async () => {
-        const tool = await loadWebFetchTool();
-        const query = tool.inputSchema.properties?.query as { description: string };
-
-        expect(query.description).toContain('ftp:');
+        expect(tool.buildDescription?.(only(webSearchTool))).toContain(webSearchTool);
+        expect(tool.buildDescription?.(only())).not.toContain(webSearchTool);
     });
 
     it('keeps the read-only hint of the Actor', async () => {
@@ -868,26 +854,24 @@ describe('the default apify/web-search tool', () => {
         ).toBe(true);
     });
 
-    it('carries the policy text, its example call and both operations as lines within the client limit', async () => {
+    // The session may not serve the other web Actor tools, and a description names no absent tool.
+    it('names the web fetch tool only when the session has it, and rag-web-browser never', async () => {
         const tool = await loadWebSearchTool();
+        const webFetchTool = actorNameToToolName(WEB_FETCH);
 
-        expect(tool.description).toContain('Use this tool to search the web by query');
-        expect(tool.description).toContain(
-            'Example: {"method":"GET","path":"/","query":{"query":"latest AI agent payment protocols","maxResults":5}}',
-        );
-        expect(tool.description).toContain(
-            'Operations:\n- GET / [query:string required, provider:string, maxResults:integer, languageCode:string,',
-        );
-        expect(tool.description).toContain('- POST / {query:string required');
-        expect(tool.description!.length).toBeLessThanOrEqual(CLIENT_DESCRIPTION_MAX_LENGTH);
+        expect(tool.buildDescription?.(only(webFetchTool))).toContain(webFetchTool);
+        expect(tool.buildDescription?.(only())).not.toContain(webFetchTool);
+        expect(tool.description).not.toContain(RAG_WEB_BROWSER);
     });
 
-    // The session may not have the other web Actor tools, so the description names none of them.
-    it('names no other web Actor in its description', async () => {
+    // The policy replaces the generic Server Actor input text with the tool's own.
+    it('describes its own query input', async () => {
         const tool = await loadWebSearchTool();
+        const generic = buildServerActorToolSchemas({ methods: ['GET'], hasRequestBody: false }).inputSchema.properties
+            ?.query as { description: string };
+        const query = tool.inputSchema.properties?.query as { description: string };
 
-        expect(tool.description).not.toContain(WEB_FETCH);
-        expect(tool.description).not.toContain(RAG_WEB_BROWSER);
+        expect(query.description).not.toBe(generic.description);
     });
 
     it('keeps the read-only hint of the Actor', async () => {

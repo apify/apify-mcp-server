@@ -588,6 +588,9 @@ const PLACEHOLDER_EXAMPLE = {
     usage: '- user_input: Call the /search endpoint of username/name for AI news',
 };
 
+/** How a request is sent and its body returned; in the description of this tool and of every selected Server Actor tool. */
+export const SERVER_REQUEST_TRANSPORT_NOTE = `The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text, cut at ${MAX_INLINE_BYTES} bytes; other content types are not returned.`;
+
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
     const details = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
         ? ` ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface returns the documented operations with their parameters.`
@@ -598,7 +601,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         Give the method, the path, and optionally query parameters and a JSON body; the Actor Server's host and your Apify API token are added for you.
         Only an Actor with an Actor Server and an API schema takes requests here; the Actor accepts or rejects the method and path.
         A request to a single-tenant Actor Server can start a run of the Actor in your account, kept until its idle timeout; a multi-tenant Actor Server charges per event.
-        The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text, cut at ${MAX_INLINE_BYTES} bytes; other content types are not returned.
+        ${SERVER_REQUEST_TRANSPORT_NOTE}
 
         Example call: ${example.call}
 
