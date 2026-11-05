@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 - Reject Actor names that normalize to empty ([#1802](https://github.com/apify/apify-mcp-server/pull/1802)) ([2337062](https://github.com/apify/apify-mcp-server/commit/233706221b9ea163c43fc5ac5d27edb3f2312e45)) by [@jirispilka](https://github.com/jirispilka), closes [#1797](https://github.com/apify/apify-mcp-server/issues/1797)
 - Describe platform charges for free-priced Actors ([#1807](https://github.com/apify/apify-mcp-server/pull/1807)) ([c86c99f](https://github.com/apify/apify-mcp-server/commit/c86c99f9df799398845c87d2917d30d33ff8b15c)) by [@jirispilka](https://github.com/jirispilka), closes [#1794](https://github.com/apify/apify-mcp-server/issues/1794)
 - Rewrite apify--web-fetch and apify--web-search tool text ([#1823](https://github.com/apify/apify-mcp-server/pull/1823)) ([1ba9c37](https://github.com/apify/apify-mcp-server/commit/1ba9c37a131765a614fa0f8450c463f2186e8c09)) by [@jirispilka](https://github.com/jirispilka), closes [#1815](https://github.com/apify/apify-mcp-server/issues/1815), [#1822](https://github.com/apify/apify-mcp-server/issues/1822)
+- Reject null query values and send arrays comma-separated ([#1750](https://github.com/apify/apify-mcp-server/pull/1750)) ([46000a7](https://github.com/apify/apify-mcp-server/commit/46000a70fd7c6bcc00270ca995ceb856914ac276)) by [@jirispilka](https://github.com/jirispilka), closes [#1716](https://github.com/apify/apify-mcp-server/issues/1716)
 
 ### ⚡ Performance
 
