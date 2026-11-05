@@ -2,15 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.21.2 - **not yet released**
+## [0.21.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.2) (2026-11-05)
 
 ### 🚀 Features
 
 - Log argument key names of rejected tool calls ([#1840](https://github.com/apify/apify-mcp-server/pull/1840)) ([d343cf2](https://github.com/apify/apify-mcp-server/commit/d343cf2e803456c514a412945a4c43c97d5b3275)) by [@jirispilka](https://github.com/jirispilka), closes [#1815](https://github.com/apify/apify-mcp-server/issues/1815)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.21.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.1) (2026-11-05)
 
 ### 🐛 Bug Fixes
