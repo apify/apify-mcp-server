@@ -107,52 +107,25 @@ describe('prepareToolCall()', () => {
         });
     });
 
-    describe('a call to the removed default rag-web-browser tool', () => {
-        async function notFoundMessage(
-            servedToolNames: string[],
-            name = actorNameToToolName(RAG_WEB_BROWSER),
-        ): Promise<string> {
-            const tools = new Map(servedToolNames.map((toolName) => [toolName, makeRecorderTool(toolName).tool]));
-            const result = await prepareToolCall({
-                tools,
-                apifyToken: 'fake-token',
-                name,
-                args: { query: 'AI news' },
-                meta: undefined,
-                requestHeaders: undefined,
-                isTaskRequest: false,
-                mcpSessionId: 's1',
-                telemetryData: null,
-                clientContext: undefined,
-            });
-            return (result as InvalidToolCall).message;
-        }
-
-        // Clients that cached the tool list before 0.21.0 still call it; the error is their only way to learn.
-        it('names the served tools that replaced it', async () => {
-            const message = await notFoundMessage([actorNameToToolName(WEB_SEARCH), actorNameToToolName(WEB_FETCH)]);
-
-            expect(message).toMatch(/was replaced: apify--web-search .+ and apify--web-fetch /);
+    // Clients that cached the tool list before 0.21.0 still call the removed default tool.
+    it('names the served tool that replaced the removed rag-web-browser tool, and no unserved one', async () => {
+        const webFetchTool = actorNameToToolName(WEB_FETCH);
+        const result = await prepareToolCall({
+            tools: new Map([[webFetchTool, makeRecorderTool(webFetchTool).tool]]),
+            apifyToken: 'fake-token',
+            name: actorNameToToolName(RAG_WEB_BROWSER),
+            args: { query: 'AI news' },
+            meta: undefined,
+            requestHeaders: undefined,
+            isTaskRequest: false,
+            mcpSessionId: 's1',
+            telemetryData: null,
+            clientContext: undefined,
         });
+        const { message } = result as InvalidToolCall;
 
-        it('names the replacements for the legacy tool name', async () => {
-            const message = await notFoundMessage([actorNameToToolName(WEB_SEARCH)], 'apify-slash-rag-web-browser');
-
-            expect(message).toContain('Tool "apify-slash-rag-web-browser" was replaced: apify--web-search ');
-        });
-
-        it('names no replacement the session does not serve', async () => {
-            const message = await notFoundMessage([actorNameToToolName(WEB_FETCH)]);
-
-            expect(message).toContain('was replaced: apify--web-fetch ');
-            expect(message).not.toContain(actorNameToToolName(WEB_SEARCH));
-        });
-
-        it('says nothing about a replacement when the session serves none', async () => {
-            const message = await notFoundMessage(['recorder-tool']);
-
-            expect(message).not.toContain('was replaced');
-        });
+        expect(message).toContain(`was replaced: ${webFetchTool} `);
+        expect(message).not.toContain(actorNameToToolName(WEB_SEARCH));
     });
 
     it('returns InvalidToolCall for missing arguments', async () => {

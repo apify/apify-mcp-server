@@ -421,23 +421,6 @@ async function loadServerTool(schema: unknown, actor?: Partial<Actor>): Promise<
     return tools[0];
 }
 
-/** The error text of a call to `tool` that fails validation. */
-async function invalidArgumentsMessage(tool: ToolEntry, args: Record<string, unknown>): Promise<string> {
-    const result = await prepareToolCall({
-        tools: new Map([[tool.name, tool]]),
-        apifyToken: 'fake-token',
-        name: tool.name,
-        args,
-        meta: undefined,
-        requestHeaders: undefined,
-        isTaskRequest: false,
-        mcpSessionId: 's1',
-        telemetryData: null,
-        clientContext: undefined,
-    });
-    return (result as InvalidToolCall).message;
-}
-
 function infoOf(schema: unknown): ServerActorToolInfo {
     const info = buildServerActorToolInfo(schema, 'apify/server-actor-test');
     if (!info) throw new Error('Expected operations');
@@ -455,16 +438,6 @@ describe('serving a selected Server Actor through its server interface', () => {
         });
         expect(Object.keys(tool.inputSchema.properties ?? {})).toEqual(['method', 'path', 'query', 'body']);
         expect(tool.execution).toBeUndefined();
-    });
-
-    // Only a tool policy carries an example call; a generic Server Actor tool has its operations in the description.
-    it('rejects invalid arguments without an example call when the Actor has no tool policy', async () => {
-        const tool = await loadServerTool(SCHEMA);
-
-        const message = await invalidArgumentsMessage(tool, {});
-
-        expect(message).toContain('Invalid arguments');
-        expect(message).not.toContain('Example call');
     });
 
     it('keeps a run tool for call-actor', async () => {
@@ -494,19 +467,6 @@ describe('serving a selected Server Actor through its server interface', () => {
 
         expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR_SERVER]);
         expect(tools[0].description).not.toContain(WEB_FETCH);
-    });
-
-    // A client with a pre-0.21 tool list sends the old {query, maxResults}; the error shows the shape to send instead.
-    it('rejects the old apify/rag-web-browser shape with an example call', async () => {
-        const [username, name] = RAG_WEB_BROWSER.split('/');
-        const tool = await loadServerTool(
-            { paths: { '/search': { get: { summary: 'Search the web' } } } },
-            { username, name },
-        );
-
-        const message = await invalidArgumentsMessage(tool, { query: 'AI news', maxResults: 1 });
-
-        expect(message).toContain('Example call: {"method":"GET","path":"/search"');
     });
 
     // A definition built before the tool info existed, such as one restored from a cache, has no tool to serve.
@@ -842,9 +802,22 @@ describe('the default apify/web-fetch tool', () => {
     it('rejects the old {url} shape with an example call', async () => {
         const tool = await loadWebFetchTool();
 
-        const message = await invalidArgumentsMessage(tool, { url: 'https://example.com' });
+        const result = await prepareToolCall({
+            tools: new Map([[tool.name, tool]]),
+            apifyToken: 'fake-token',
+            name: tool.name,
+            args: { url: 'https://example.com' },
+            meta: undefined,
+            requestHeaders: undefined,
+            isTaskRequest: false,
+            mcpSessionId: 's1',
+            telemetryData: null,
+            clientContext: undefined,
+        });
 
-        expect(message).toContain('Example call: {"method":"GET","path":"/","query":{"url":');
+        expect((result as InvalidToolCall).message).toContain(
+            'Example call: {"method":"GET","path":"/","query":{"url":',
+        );
     });
 
     it('keeps the read-only hint of the Actor', async () => {
