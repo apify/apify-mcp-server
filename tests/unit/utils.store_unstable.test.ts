@@ -173,8 +173,14 @@ describe('free-form /unstable/store items', () => {
         expect(card.match(new RegExp(`\\*\\*${field}:\\*\\*`, 'gi'))).toHaveLength(1);
     });
 
-    it('leaves out null fields', () => {
-        expect(mapUnstableStoreItem({ ...UNSTABLE_STORE_ITEM, badge: null })).not.toHaveProperty('extraFields');
+    // An empty value would show as a label with nothing after it.
+    it.each([
+        { kind: 'null', value: null },
+        { kind: 'a blank string', value: '   ' },
+        { kind: 'an empty array', value: [] },
+        { kind: 'an empty object', value: {} },
+    ])('leaves out a field holding $kind', ({ value }) => {
+        expect(mapUnstableStoreItem({ ...UNSTABLE_STORE_ITEM, badge: value })).not.toHaveProperty('extraFields');
     });
 });
 

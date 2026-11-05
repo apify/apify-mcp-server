@@ -93,12 +93,19 @@ export function buildUnstableStoreSearchUrl(options: Omit<UnstableStoreSearchOpt
     return url;
 }
 
-/** A field the endpoint omits stays absent, as on `/v2/store`, so the card renders both the same. */
+/** `null`, a blank string, `[]` or `{}`: the card would show the label with nothing after it. */
+const isEmptyStoreValue = (value: unknown) =>
+    value === undefined ||
+    value === null ||
+    (typeof value === 'string' && value.trim() === '') ||
+    (typeof value === 'object' && Object.keys(value).length === 0);
+
+/** A field the endpoint omits or leaves empty stays absent, as on `/v2/store`, so the card renders both the same. */
 export function mapUnstableStoreItem(item: UnstableStoreItem): ActorStoreList {
     const known: KnownStoreFields = {};
     const extraFields: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(item)) {
-        if (BASE_STORE_FIELDS.has(key) || value === undefined || value === null) continue;
+        if (BASE_STORE_FIELDS.has(key) || isEmptyStoreValue(value)) continue;
         const parsed = isKnownStoreField(key) ? knownStoreFieldSchemas[key].safeParse(value) : undefined;
         if (parsed?.success) {
             Object.assign(known, { [key]: parsed.data });
