@@ -353,6 +353,9 @@ export async function prepareToolCall(params: {
                 decodedArgs,
             };
         }
+        // Key names only, never values: they show which call shape a rejected client sends. Read before validation,
+        // since AJV removes unknown keys and `toolArgs` can be `decodedArgs` itself (a payment provider may return it).
+        const argKeys = Object.keys(decodedArgs).slice(0, 20).join(',').slice(0, 200);
         if (!tool.ajvValidate(toolArgs)) {
             const errors = tool.ajvValidate.errors || [];
             const exampleCall =
@@ -360,8 +363,6 @@ export async function prepareToolCall(params: {
                     ? getActorToolPolicy(tool.actorFullName)?.serverTool?.exampleCall
                     : undefined;
             const ajvErrorDetails = extractAjvErrorDetails(errors);
-            // Key names only, never values: they show which call shape a rejected client sends.
-            const argKeys = Object.keys(decodedArgs).slice(0, 20).join(',').slice(0, 200);
             return {
                 message: [
                     `Invalid arguments for tool "${tool.name}".`,
