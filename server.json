@@ -25,24 +25,6 @@
       ]
     }
   ],
-  "packages": [
-    {
-      "registryType": "npm",
-      "identifier": "@apify/actors-mcp-server",
-      "version": "0.21.1",
-      "transport": {
-        "type": "stdio"
-      },
-      "environmentVariables": [
-        {
-          "name": "APIFY_TOKEN",
-          "description": "Apify API token for authentication with Apify platform services. Optional if you are logged in with the Apify CLI.",
-          "isRequired": false,
-          "isSecret": true
-        }
-      ]
-    }
-  ],
   "remotes": [
     {
       "type": "streamable-http",
