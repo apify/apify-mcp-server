@@ -2,6 +2,7 @@ import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ApifyApiError } from 'apify-client';
 
 import {
+    APIFY_ERROR_TYPE_ACTOR_DISABLED,
     APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK,
     APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS,
     APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED,
@@ -32,9 +33,13 @@ export function isMemoryQuotaError(error: unknown): error is ApifyApiError {
 /**
  * True when the account is blocked from a platform feature: the monthly usage or a service hard limit, unpaid
  * invoices, or a plan that doesn't include the feature. Only some of these API messages say what to do next.
+ * Run starts send the same reason as `actor-disabled` when the API's cached user still had Actors enabled.
  */
 export function isPlatformFeatureDisabledError(error: unknown): error is ApifyApiError {
-    return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_PLATFORM_FEATURE_DISABLED;
+    return (
+        error instanceof ApifyApiError &&
+        (error.type === APIFY_ERROR_TYPE_PLATFORM_FEATURE_DISABLED || error.type === APIFY_ERROR_TYPE_ACTOR_DISABLED)
+    );
 }
 
 /** True when the API rejects a supplied `publicConfig` field or a request to publish the task. */

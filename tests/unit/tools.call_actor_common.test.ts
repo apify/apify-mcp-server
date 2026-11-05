@@ -3,6 +3,7 @@ import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+    APIFY_ERROR_TYPE_ACTOR_DISABLED,
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
     APIFY_ERROR_TYPE_PLATFORM_FEATURE_DISABLED,
     FAILURE_CATEGORY,
@@ -350,36 +351,40 @@ describe('call_actor_common', () => {
             );
         });
 
-        it('keeps the platform message and adds the billing hint for a billing block, not the generic fallback', () => {
-            const error = new ApifyApiError(
-                {
-                    data: {
-                        error: {
-                            type: APIFY_ERROR_TYPE_PLATFORM_FEATURE_DISABLED,
-                            message:
-                                "You've reached your monthly usage limit of $200.00. To increase the limit, open https://console.apify.com/billing/limits?openMonthlyUsageLimitsModal=1.",
+        // Run starts can send the block as `actor-disabled` while the API's cached user still has Actors enabled.
+        it.each([APIFY_ERROR_TYPE_PLATFORM_FEATURE_DISABLED, APIFY_ERROR_TYPE_ACTOR_DISABLED])(
+            'keeps the platform message and adds the billing hint for a %s billing block, not the generic fallback',
+            (type) => {
+                const error = new ApifyApiError(
+                    {
+                        data: {
+                            error: {
+                                type,
+                                message:
+                                    "You've reached your monthly usage limit of $200.00. To increase the limit, open https://console.apify.com/billing/limits?openMonthlyUsageLimitsModal=1.",
+                            },
                         },
-                    },
-                    status: 403,
-                } as AxiosResponse,
-                1,
-            );
+                        status: 403,
+                    } as AxiosResponse,
+                    1,
+                );
 
-            const response = buildCallActorErrorResponse({
-                actorName: 'apify/instagram-scraper',
-                error,
-                actorId: 'actor-999',
-                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
-            });
+                const response = buildCallActorErrorResponse({
+                    actorName: 'apify/instagram-scraper',
+                    error,
+                    actorId: 'actor-999',
+                    loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
+                });
 
-            expect(response.isError).toBe(true);
-            const allText = (response.content ?? []).map(textOf).join('\n');
-            expect(allText).toContain('console.apify.com/billing/limits');
-            expect(allText).toContain(PLATFORM_FEATURE_DISABLED_MESSAGE);
-            // The Actor exists; pointing the model at search or the Actor name sends it the wrong way.
-            expect(allText).not.toContain('verify the Actor name');
-            expect(allText).not.toContain(HELPER_TOOLS.STORE_SEARCH);
-        });
+                expect(response.isError).toBe(true);
+                const allText = (response.content ?? []).map(textOf).join('\n');
+                expect(allText).toContain('console.apify.com/billing/limits');
+                expect(allText).toContain(PLATFORM_FEATURE_DISABLED_MESSAGE);
+                // The Actor exists; pointing the model at search or the Actor name sends it the wrong way.
+                expect(allText).not.toContain('verify the Actor name');
+                expect(allText).not.toContain(HELPER_TOOLS.STORE_SEARCH);
+            },
+        );
 
         it('echoes the input schema and platform message for a start() invalid-input error, not the generic fallback', () => {
             const error = new ApifyApiError(
