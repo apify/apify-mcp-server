@@ -7,7 +7,6 @@ import {
     ACTOR_MAX_MEMORY_MBYTES,
     FAILURE_CATEGORY,
     HELPER_TOOLS,
-    MAX_INLINE_BYTES,
     OFFICIAL_ACTORS_WITH_SIDE_EFFECTS,
     OFFICIAL_APIFY_USERNAMES,
 } from '../../const.js';
@@ -51,6 +50,7 @@ import {
     buildServerActorToolSchemas,
     executeSendServerActorRequest,
     redactServerActorRequestArgs,
+    SERVER_REQUEST_TRANSPORT_NOTE,
 } from './send_server_actor_request.js';
 import { buildServerActorToolDescription, formatTenancyBilling } from './server_interface_details.js';
 
@@ -258,21 +258,23 @@ export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
         });
         const policy = getActorToolPolicy(actorFullName)?.serverTool;
         const schemas = buildServerActorToolSchemas(toolInfo);
-        for (const [name, suffix] of Object.entries(policy?.inputDescriptionSuffixes ?? {})) {
+        for (const [name, text] of Object.entries(policy?.inputDescriptions ?? {})) {
             const property = schemas.inputSchema.properties?.[name] as { description?: string } | undefined;
-            if (property) property.description = `${property.description ?? ''} ${suffix}`.trim();
+            if (property) property.description = text;
         }
+        // The policy text, when the Actor has one, stands in for the generic opening and the Actor's own description.
         // Names fetch-actor-details only when the session has it, and only when the operations are not in full.
         const buildDescription = (context: ToolDescriptionContext): string => {
             const { hasTool } = context;
-            const policyDescription = policy?.buildDescription?.(context);
-            const head = `This tool sends one HTTP request to the server interface of the Actor "${actorFullName}" and returns the response.
-${hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_SERVER_REQUEST}" if user requests this specific Actor.\n` : ''}Actor description: ${description}
-${costNotice}
-The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text, cut at ${MAX_INLINE_BYTES} bytes; other content types are not returned.
-${policyDescription ? `\n${policyDescription}\n` : ''}
-Operations:
-`;
+            const about =
+                policy?.buildDescription?.(context) ??
+                `This tool sends one HTTP request to the server interface of the Actor "${actorFullName}" and returns the response.\nActor description: ${description}`;
+            const preferThisTool = hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST)
+                ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_SERVER_REQUEST}" if user requests this specific Actor.`
+                : undefined;
+            const head = [about, '', costNotice, SERVER_REQUEST_TRANSPORT_NOTE, preferThisTool, '', 'Operations:', '']
+                .filter((line) => line !== undefined)
+                .join('\n');
             return buildServerActorToolDescription(head, toolInfo, hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS));
         };
         tools.push({
