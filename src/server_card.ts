@@ -4,7 +4,6 @@ import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 import {
     APIFY_DOCS_MCP_URL,
     APIFY_FAVICON_URL,
-    APIFY_LOGO_URL,
     APIFY_MCP_URL,
     HELPER_TOOLS,
     SERVER_NAME,
@@ -26,21 +25,9 @@ const serverJson = readJsonFile<{
     name: string;
     description: string;
     repository: ServerCardRepository;
+    icons: ServerCard['icons'];
     remotes: ServerCardRemote[];
 }>(import.meta.url, '../server.json');
-
-/**
- * Server icon, shared by the initialize response and the server card so the two cannot diverge.
- * PNG rather than the `.ico` favicon: the registry schema restricts `icons[].mimeType` to
- * png/jpeg/jpg/svg+xml/webp.
- */
-const SERVER_ICONS: ServerCard['icons'] = [
-    {
-        src: APIFY_LOGO_URL,
-        mimeType: 'image/png',
-        sizes: ['180x180'],
-    },
-];
 
 /** Returns the `serverInfo` (MCP `Implementation`) advertised in the initialize response. */
 export function getServerInfo(): Implementation {
@@ -50,7 +37,7 @@ export function getServerInfo(): Implementation {
         version: getPackageVersion()!,
         description: serverJson.description,
         websiteUrl: APIFY_DOCS_MCP_URL,
-        icons: [...SERVER_ICONS],
+        icons: [...serverJson.icons],
     };
 }
 
@@ -81,7 +68,7 @@ export function getServerCard(): ServerCard {
         version: getPackageVersion()!,
         websiteUrl: APIFY_DOCS_MCP_URL,
         repository: serverJson.repository,
-        icons: [...SERVER_ICONS],
+        icons: [...serverJson.icons],
         remotes: serverJson.remotes,
         serverUrl: APIFY_MCP_URL,
 

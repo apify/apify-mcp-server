@@ -208,7 +208,8 @@ jobs:
 
     publish_to_mcp_registry:
         name: Publish to MCP Registry
-        needs: [ release_metadata ]
+        # The registry validates `packages[]` against npm, so the version must be published first.
+        needs: [ release_metadata, publish_to_npm ]
         runs-on: ubuntu-latest
         steps:
             -   uses: actions/checkout@v6

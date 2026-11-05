@@ -1,9 +1,9 @@
 import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it } from 'vitest';
 
-import { APIFY_DOCS_MCP_URL, APIFY_LOGO_URL, APIFY_MCP_URL, SERVER_NAME, SERVER_TITLE } from '../../src/const.js';
+import { APIFY_DOCS_MCP_URL, APIFY_MCP_URL, SERVER_NAME, SERVER_TITLE } from '../../src/const.js';
 import { getServerCard, getServerInfo } from '../../src/server_card.js';
-import type { ServerCardRemote, ServerCardRepository } from '../../src/types.js';
+import type { ServerCard, ServerCardRemote, ServerCardRepository } from '../../src/types.js';
 import { readJsonFile } from '../../src/utils/generic.js';
 import { getPackageVersion } from '../../src/utils/version.js';
 
@@ -11,7 +11,10 @@ const serverJson = readJsonFile<{
     $schema: string;
     name: string;
     description: string;
+    title: string;
+    websiteUrl: string;
     repository: ServerCardRepository;
+    icons: ServerCard['icons'];
     remotes: ServerCardRemote[];
 }>(import.meta.url, '../../server.json');
 
@@ -74,25 +77,28 @@ describe('getServerCard()', () => {
             expect(card.name).toMatch(REGISTRY_NAME_PATTERN);
         });
 
-        it('sources repository and remotes from server.json', () => {
+        it('sources repository, icons and remotes from server.json', () => {
             const card = getServerCard();
 
             expect(card.repository).toEqual(serverJson.repository);
+            expect(card.icons).toEqual(serverJson.icons);
             expect(card.remotes).toEqual(serverJson.remotes);
         });
 
-        it('exposes title, websiteUrl and serverUrl', () => {
+        it('exposes title, websiteUrl and serverUrl matching server.json', () => {
             const card = getServerCard();
 
             expect(card.title).toBe(SERVER_TITLE);
+            expect(card.title).toBe(serverJson.title);
             expect(card.websiteUrl).toBe(APIFY_DOCS_MCP_URL);
+            expect(card.websiteUrl).toBe(serverJson.websiteUrl);
             expect(card.serverUrl).toBe(APIFY_MCP_URL);
         });
 
-        it('uses an icon with a registry-permitted mime type', () => {
+        it('includes a PNG icon, which every icon-rendering client must support', () => {
             const card = getServerCard();
 
-            expect(card.icons).toEqual([{ src: APIFY_LOGO_URL, mimeType: 'image/png', sizes: ['180x180'] }]);
+            expect(card.icons.some((icon) => icon.mimeType === 'image/png')).toBe(true);
         });
     });
 
@@ -169,6 +175,6 @@ describe('getServerInfo()', () => {
         expect(info.version).toBe(getPackageVersion());
         expect(info.description).toBe(serverJson.description);
         expect(info.websiteUrl).toBe(APIFY_DOCS_MCP_URL);
-        expect(info.icons).toEqual([{ src: APIFY_LOGO_URL, mimeType: 'image/png', sizes: ['180x180'] }]);
+        expect(info.icons).toEqual(serverJson.icons);
     });
 });

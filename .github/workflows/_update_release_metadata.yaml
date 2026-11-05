@@ -73,7 +73,7 @@ jobs:
                 run: jq '.version = "${{ needs.release_metadata.outputs.version_number }}"' manifest.json > manifest.json.tmp && mv manifest.json.tmp manifest.json
 
             -   name: Update server.json version
-                run: jq '.version = "${{ needs.release_metadata.outputs.version_number }}"' server.json > server.json.tmp && mv server.json.tmp server.json
+                run: jq '.version = "${{ needs.release_metadata.outputs.version_number }}" | .packages[].version = "${{ needs.release_metadata.outputs.version_number }}"' server.json > server.json.tmp && mv server.json.tmp server.json
 
             # Written via heredoc, not an action `with:` input: action inputs become env vars,
             # and Linux caps a single env var at 128 KiB (MAX_ARG_STRLEN) — the changelog
