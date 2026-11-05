@@ -394,6 +394,8 @@ export type ActorStoreList = Omit<ActorStoreListOutdated, 'stats'> & {
     userFullName?: string;
     /** Populated when the search call is made with `includeInputSchema=true`. */
     inputSchema?: ActorStoreInputSchema;
+    /** `/unstable/store` fields the card has no renderer for, shown as they come. */
+    extraFields?: Record<string, unknown>;
     stats: Partial<ActorStats> & {
         actorReviewCount?: number;
         actorReviewRating?: number;
@@ -810,6 +812,7 @@ export type StructuredActorCard = {
     isDeprecated: boolean;
     inputFields?: ActorStoreInputSchema;
     inputFieldsTruncated?: boolean;
+    extraFields?: Record<string, unknown>;
     inputFieldsTotalCount?: number;
 };
 

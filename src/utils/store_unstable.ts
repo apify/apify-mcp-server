@@ -11,51 +11,46 @@ import type { ActorStoreList } from '../types.js';
 // Read once at import, so the tool schema and the routing always agree.
 export const IS_UNSTABLE_STORE_SEARCH_ENABLED = ['true', '1'].includes(process.env.APIFY_STORE_UNSTABLE_ENDPOINT ?? '');
 
-export const UNSTABLE_STORE_CARD_FIELDS = [
-    'name',
-    'username',
-    'title',
-    'description',
-    'pictureUrl',
-    'url',
-    'modifiedAt',
-    'currentPricingInfo',
-    'stats',
-    'rating',
-    'categories',
-    'inputSchema',
-] as const;
-
-const unstableStoreItemSchema = z.object({
+/**
+ * The base fields every item has. The rest is apify-core's to change: a field the card knows is
+ * rendered as such, and any other, or one in a shape the card does not know, is shown as it comes.
+ */
+const unstableStoreItemSchema = z.looseObject({
     id: z.string(),
     name: z.string(),
     username: z.string(),
-    title: z.string().optional(),
-    description: z.string().optional(),
-    pictureUrl: z.string().optional(),
+    title: z.string(),
     url: z.string(),
-    modifiedAt: z.iso.datetime().optional(),
     // `pricing_info.ts` reads the fields it knows and tolerates the rest.
     currentPricingInfo: z.custom<ActorRunPricingInfo>(
         (value) => typeof (value as { pricingModel?: unknown } | null)?.pricingModel === 'string',
     ),
-    stats: z
-        .object({
-            totalUsers: z.number().optional(),
-            totalUsers30Days: z.number().optional(),
-            bookmarkCount: z.number().optional(),
-        })
-        .optional(),
-    rating: z.object({ average: z.number().optional(), reviewCount: z.number().optional() }).optional(),
-    categories: z.array(z.string()).optional(),
-    inputSchema: z
-        .object({
-            type: z.literal('object'),
-            properties: z.record(z.string(), z.object({ type: z.union([z.string(), z.array(z.string())]) })),
-            required: z.array(z.string()).optional(),
-        })
-        .optional(),
 });
+
+const knownStoreFieldSchemas = {
+    description: z.string(),
+    pictureUrl: z.string(),
+    modifiedAt: z.iso.datetime(),
+    stats: z.strictObject({
+        totalUsers: z.number().optional(),
+        totalUsers30Days: z.number().optional(),
+        bookmarkCount: z.number().optional(),
+    }),
+    rating: z.strictObject({ average: z.number().optional(), reviewCount: z.number().optional() }),
+    categories: z.array(z.string()),
+    inputSchema: z.object({
+        type: z.literal('object'),
+        properties: z.record(z.string(), z.object({ type: z.union([z.string(), z.array(z.string())]) })),
+        required: z.array(z.string()).optional(),
+    }),
+};
+
+type KnownStoreFields = { [K in keyof typeof knownStoreFieldSchemas]?: z.infer<(typeof knownStoreFieldSchemas)[K]> };
+
+const isKnownStoreField = (key: string): key is keyof typeof knownStoreFieldSchemas =>
+    Object.hasOwn(knownStoreFieldSchemas, key);
+
+const BASE_STORE_FIELDS: ReadonlySet<string> = new Set(Object.keys(unstableStoreItemSchema.shape));
 
 const unstableStorePageSchema = z.object({
     data: z.object({
@@ -88,7 +83,7 @@ export function buildUnstableStoreSearchUrl(options: Omit<UnstableStoreSearchOpt
     const url = new URL('/unstable/store', getApifyAPIBaseUrl());
     if (options.search) url.searchParams.set('search', options.search);
     url.searchParams.set('limit', String(options.limit));
-    url.searchParams.set('fields', UNSTABLE_STORE_CARD_FIELDS.join(','));
+    url.searchParams.set('include', 'inputSchema');
     if (options.cursor) url.searchParams.set('recommId', options.cursor);
     if (options.allowsAgenticUsers !== undefined) {
         url.searchParams.set('allowsAgenticUsers', String(options.allowsAgenticUsers));
@@ -100,28 +95,41 @@ export function buildUnstableStoreSearchUrl(options: Omit<UnstableStoreSearchOpt
 
 /** A field the endpoint omits stays absent, as on `/v2/store`, so the card renders both the same. */
 export function mapUnstableStoreItem(item: UnstableStoreItem): ActorStoreList {
+    const known: KnownStoreFields = {};
+    const extraFields: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(item)) {
+        if (BASE_STORE_FIELDS.has(key) || value === undefined || value === null) continue;
+        const parsed = isKnownStoreField(key) ? knownStoreFieldSchemas[key].safeParse(value) : undefined;
+        if (parsed?.success) {
+            Object.assign(known, { [key]: parsed.data });
+        } else {
+            extraFields[key] = value;
+        }
+    }
+
     const stats: ActorStoreList['stats'] = {
-        ...(item.stats?.totalUsers !== undefined && { totalUsers: item.stats.totalUsers }),
-        ...(item.stats?.totalUsers30Days !== undefined && { totalUsers30Days: item.stats.totalUsers30Days }),
-        ...(item.stats?.bookmarkCount !== undefined && { bookmarkCount: item.stats.bookmarkCount }),
+        ...(known.stats?.totalUsers !== undefined && { totalUsers: known.stats.totalUsers }),
+        ...(known.stats?.totalUsers30Days !== undefined && { totalUsers30Days: known.stats.totalUsers30Days }),
+        ...(known.stats?.bookmarkCount !== undefined && { bookmarkCount: known.stats.bookmarkCount }),
     };
     const mapped: ActorStoreList & { modifiedAt?: Date } = {
         id: item.id,
         name: item.name,
         username: item.username,
         title: item.title,
-        description: item.description,
-        pictureUrl: item.pictureUrl,
+        description: known.description,
+        pictureUrl: known.pictureUrl,
         url: item.url,
         // apify-client parses the `/v2/store` dates, and the card formats a Date.
-        ...(item.modifiedAt !== undefined && { modifiedAt: new Date(item.modifiedAt) }),
+        ...(known.modifiedAt !== undefined && { modifiedAt: new Date(known.modifiedAt) }),
         currentPricingInfo: item.currentPricingInfo,
         stats,
-        ...(item.stats?.bookmarkCount !== undefined && { bookmarkCount: item.stats.bookmarkCount }),
-        ...(item.rating?.average !== undefined && { actorReviewRating: item.rating.average }),
-        ...(item.rating?.reviewCount !== undefined && { actorReviewCount: item.rating.reviewCount }),
-        categories: item.categories,
-        inputSchema: item.inputSchema,
+        ...(known.stats?.bookmarkCount !== undefined && { bookmarkCount: known.stats.bookmarkCount }),
+        ...(known.rating?.average !== undefined && { actorReviewRating: known.rating.average }),
+        ...(known.rating?.reviewCount !== undefined && { actorReviewCount: known.rating.reviewCount }),
+        categories: known.categories,
+        inputSchema: known.inputSchema,
+        ...(Object.keys(extraFields).length > 0 && { extraFields }),
     };
     return mapped;
 }

@@ -176,6 +176,20 @@ function extractActorData(actor: Actor | ActorStoreList, options: ActorCardOptio
     return data;
 }
 
+const getExtraFields = (actor: Actor | ActorStoreList) => ('extraFields' in actor ? actor.extraFields : undefined);
+
+// `agentHint` → `Agent hint`
+const formatFieldLabel = (key: string) => {
+    const words = key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
+    return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+const formatFieldValue = (value: unknown) => {
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value) && value.every((entry) => typeof entry !== 'object')) return value.join(', ');
+    return typeof value === 'object' ? JSON.stringify(value) : String(value);
+};
+
 /**
  * Formats Actor details into a markdown Actor card.
  * Used in both default (text-only) and OpenAI (widget) modes as the LLM-facing text content.
@@ -229,6 +243,9 @@ export function formatActorToActorCard(
             markdownLines.push('\n>This Actor is deprecated and may not be maintained anymore.');
         }
     }
+    for (const [key, value] of Object.entries(getExtraFields(actor) ?? {})) {
+        markdownLines.push(`- **${formatFieldLabel(key)}:** ${formatFieldValue(value)}`);
+    }
     const inputSchema = getInputSchema(actor);
     if (inputSchema) {
         const line = inputFieldsToString(inputSchema);
@@ -254,6 +271,7 @@ export function formatActorToStructuredCard(
     const inputSchema = getInputSchema(actor);
     const inputFieldsTotalCount = inputSchema ? Object.keys(inputSchema.properties).length : 0;
     const isInputFieldsTruncated = inputFieldsTotalCount > MAX_INPUT_FIELDS_IN_ACTOR_CARD;
+    const extraFields = getExtraFields(actor);
 
     return {
         title: data.title,
@@ -274,6 +292,7 @@ export function formatActorToStructuredCard(
             inputFieldsTruncated: true,
             inputFieldsTotalCount,
         }),
+        ...(extraFields && { extraFields }),
     };
 }
 

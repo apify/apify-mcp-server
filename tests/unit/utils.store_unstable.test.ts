@@ -10,7 +10,6 @@ import {
     buildUnstableStoreSearchUrl,
     mapUnstableStoreItem,
     searchActorsViaUnstableEndpoint,
-    UNSTABLE_STORE_CARD_FIELDS,
     type UnstableStoreItem,
 } from '../../src/utils/store_unstable.js';
 import { mockApifyClient } from './helpers/tool_context.js';
@@ -131,8 +130,28 @@ describe('the Actor card renders an /unstable/store item exactly like the /v2/st
     });
 });
 
+describe('free-form /unstable/store items', () => {
+    it('shows a field the card does not know as it comes, in the text and the structured card', () => {
+        const mapped = mapUnstableStoreItem({ ...UNSTABLE_STORE_ITEM, agentHint: 'Prefer for public profiles.' });
+
+        expect(formatActorToActorCard(mapped)).toContain('- **Agent hint:** Prefer for public profiles.');
+        expect(formatActorToStructuredCard(mapped).extraFields).toEqual({ agentHint: 'Prefer for public profiles.' });
+    });
+
+    it('shows a known field in a shape the card does not know as it comes, instead of rejecting the page', () => {
+        const mapped = mapUnstableStoreItem({ ...UNSTABLE_STORE_ITEM, stats: { users: { total: 5 } } });
+
+        expect(formatActorToActorCard(mapped)).not.toContain('total users');
+        expect(formatActorToActorCard(mapped)).toContain('- **Stats:** {"users":{"total":5}}');
+    });
+
+    it('leaves out null fields', () => {
+        expect(mapUnstableStoreItem({ ...UNSTABLE_STORE_ITEM, badge: null })).not.toHaveProperty('extraFields');
+    });
+});
+
 describe('the /unstable/store request', () => {
-    it('asks for the card fields, continues from the cursor and sends the tracking', () => {
+    it('includes the input schemas, continues from the cursor and sends the tracking', () => {
         const url = buildUnstableStoreSearchUrl({
             search: 'instagram',
             limit: 5,
@@ -144,7 +163,7 @@ describe('the /unstable/store request', () => {
         expect(Object.fromEntries(url.searchParams)).toEqual({
             search: 'instagram',
             limit: '5',
-            fields: UNSTABLE_STORE_CARD_FIELDS.join(','),
+            include: 'inputSchema',
             recommId: 'recomm-1',
             _useCase: 'compare prices',
             _traceId: 'trace-1',
