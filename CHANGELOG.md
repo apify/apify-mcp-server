@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.21.3 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Add icon, title and website to server.json ([#1835](https://github.com/apify/apify-mcp-server/pull/1835)) ([21f6c12](https://github.com/apify/apify-mcp-server/commit/21f6c1247b61e0acce5a9916857cd3061d922d82)) by [@jancurn](https://github.com/jancurn)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.21.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.2) (2026-11-05)
 
 ### 🚀 Features
