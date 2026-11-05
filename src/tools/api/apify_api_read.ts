@@ -46,7 +46,7 @@ export const apifyApiRead: ToolEntry = Object.freeze({
     buildDescription,
     inputSchema: z.toJSONSchema(apifyApiReadArgs) as ToolInputSchema,
     outputSchema: apifyApiCallOutputSchema,
-    // The shared validator coerces null and singleton arrays into scalar query values.
+    // The shared validator coerces a null query value to "", which is sent as ?name=.
     ajvValidate: new Ajv({ coerceTypes: false, strict: false, removeAdditional: true }).compile(
         fixZodSchemaRequired(z.toJSONSchema(apifyApiReadArgs)),
     ),

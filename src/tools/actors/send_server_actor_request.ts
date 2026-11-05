@@ -43,7 +43,7 @@ import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from './actor_tools
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 
 const queryValue = z.union([z.string(), z.number(), z.boolean()]);
-/** The API tools' `query` plus arrays: an Actor Server can document an array parameter. One flat union, so a bad value gets one error per shape. */
+/** Scalars and arrays: an Actor Server can document an array parameter. One flat union, so a bad value gets one error per shape. */
 const serverActorQuery = z
     .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(queryValue)]))
     .optional();

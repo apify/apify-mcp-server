@@ -18,7 +18,7 @@ import { API_RESOURCE_ALIASES, normalizeApiPath } from './apify_api_path.js';
 import type { ApiMethod, ApiOperation } from './apify_api_spec.js';
 import { fetchApiOperationIndex, isRecord } from './apify_api_spec.js';
 
-/** One query parameter value. */
+/** A scalar query parameter value. */
 const queryValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 type QueryValue = z.infer<typeof queryValueSchema>;
 
@@ -32,8 +32,9 @@ export const apiCallArgsShape = {
                 'written username~name, or ~name for one you own, as in /v2/actors/~my-actor. ' +
                 'A query string written into the path is sent too.',
         ),
+    // One flat union, so a bad value gets one error per shape.
     query: z
-        .record(z.string(), z.union([queryValueSchema, z.array(queryValueSchema).min(1)]))
+        .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(queryValueSchema).min(1)]))
         .optional()
         .describe(
             'Query parameters, by name, for example {"limit": 10}. An array is sent comma-separated. ' +
@@ -286,7 +287,7 @@ export async function callApi(params: {
             url,
             method,
             // The API reads a list as one comma-separated value (OpenAPI `style: form, explode: false`).
-            // Joined here, not left to apify-client's query serializer.
+            // Joined here: apify-client's query serializer gets the same only implicitly, through String().
             params:
                 params.query &&
                 Object.fromEntries(

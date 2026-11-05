@@ -1295,8 +1295,9 @@ describe.each([
     { name: HELPER_TOOLS.API_WRITE, tool: apifyApiWrite, args: { path: '/v2/datasets/abc', method: 'DELETE' } },
 ])('$name validates query values without coercing them', ({ tool, args }) => {
     // Either would be sent as an empty value, such as ?status=.
-    it.each([{ value: null }, { value: [] }])('rejects the query value $value', ({ value }) => {
+    it.each([{ value: null }, { value: [] }])('rejects the query value $value with one anyOf error', ({ value }) => {
         expect(tool.ajvValidate({ ...args, query: { status: value } })).toBe(false);
+        expect(tool.ajvValidate.errors?.filter((error) => error.keyword === 'anyOf')).toHaveLength(1);
     });
 
     it('accepts an array query value', () => {
