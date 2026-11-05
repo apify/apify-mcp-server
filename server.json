@@ -8,7 +8,7 @@
     "url": "https://github.com/apify/apify-mcp-server",
     "source": "github"
   },
-  "version": "0.21.0",
+  "version": "0.21.1",
   "icons": [
     {
       "src": "https://mcp.apify.com/images/apify-icon.png",
@@ -29,7 +29,7 @@
     {
       "registryType": "npm",
       "identifier": "@apify/actors-mcp-server",
-      "version": "0.21.0",
+      "version": "0.21.1",
       "transport": {
         "type": "stdio"
       },

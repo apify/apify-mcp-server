@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
 import { ACTOR_LOAD_ERROR_KIND } from '../../src/errors.js';
+import type { InvalidToolCall } from '../../src/mcp/tool_call_engine.js';
+import { prepareToolCall } from '../../src/mcp/tool_call_engine.js';
 import { actorDefinitionCache } from '../../src/state.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { getActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
@@ -794,6 +796,28 @@ describe('the default apify/web-fetch tool', () => {
 
         expect(tool.buildDescription?.(only(webSearchTool))).toContain(webSearchTool);
         expect(tool.buildDescription?.(only())).not.toContain(webSearchTool);
+    });
+
+    // A client with a pre-0.21 tool list sends the old {url} shape; the error shows the shape to send instead.
+    it('rejects the old {url} shape with an example call', async () => {
+        const tool = await loadWebFetchTool();
+
+        const result = await prepareToolCall({
+            tools: new Map([[tool.name, tool]]),
+            apifyToken: 'fake-token',
+            name: tool.name,
+            args: { url: 'https://example.com' },
+            meta: undefined,
+            requestHeaders: undefined,
+            isTaskRequest: false,
+            mcpSessionId: 's1',
+            telemetryData: null,
+            clientContext: undefined,
+        });
+
+        expect((result as InvalidToolCall).message).toContain(
+            'Example call: {"method":"GET","path":"/","query":{"url":',
+        );
     });
 
     it('keeps the read-only hint of the Actor', async () => {
