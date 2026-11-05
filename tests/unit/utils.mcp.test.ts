@@ -1,9 +1,11 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ApifyApiError } from 'apify-client';
+import type { AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 
-import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
+import { APIFY_ERROR_TYPE_PLATFORM_FEATURE_DISABLED, FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
 import type { HelperTool } from '../../src/types.js';
+import { PLATFORM_FEATURE_DISABLED_MESSAGE } from '../../src/utils/apify_errors.js';
 import { wrapJsonText } from '../../src/utils/encode_text.js';
 import {
     computeToolResponseBytes,
@@ -260,6 +262,25 @@ describe('getToolCallErrorUserText()', () => {
         expect(text).toContain('account limit for concurrent Actor runs');
         expect(text).toContain('console.apify.com/billing/subscription');
         expect(text).not.toContain('Verify the tool name');
+    });
+
+    it('replaces the 403 access hint with the billing hint for a billing block', () => {
+        const error = new ApifyApiError(
+            {
+                data: {
+                    error: {
+                        type: APIFY_ERROR_TYPE_PLATFORM_FEATURE_DISABLED,
+                        message: 'Too many outstanding invoices',
+                    },
+                },
+                status: 403,
+            } as AxiosResponse,
+            1,
+        );
+        const text = getToolCallErrorUserText('apify/instagram-scraper', error);
+        expect(text).toContain('Too many outstanding invoices');
+        expect(text).toContain(PLATFORM_FEATURE_DISABLED_MESSAGE);
+        expect(text).not.toContain(getHttpErrorHint(403));
     });
 
     it('sources the 401 hint from getHttpErrorHint', () => {
