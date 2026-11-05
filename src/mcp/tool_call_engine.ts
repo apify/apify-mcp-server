@@ -318,7 +318,7 @@ export async function prepareToolCall(params: {
         args = decodeDotPropertyNames(args as Record<string, unknown>) as Record<string, unknown>;
         decodedArgs = args as Record<string, unknown>;
 
-        const {
+        let {
             toolArgsWithoutPayment: toolArgs,
             toolArgsRedacted: logSafeArgs,
             apifyClient,
@@ -356,6 +356,19 @@ export async function prepareToolCall(params: {
         // Key names only, never values: they show which call shape a rejected client sends. Read before validation,
         // since AJV removes unknown keys and `toolArgs` can be `decodedArgs` itself (a payment provider may return it).
         const argKeys = Object.keys(decodedArgs).slice(0, 20).join(',').slice(0, 200);
+        const legacyInputPath =
+            tool.type === TOOL_TYPE.ACTOR_SERVER
+                ? getActorToolPolicy(tool.actorFullName)?.serverTool?.legacyInputPath
+                : undefined;
+        if (legacyInputPath && Object.keys(toolArgs).length && !('method' in toolArgs) && !('path' in toolArgs)) {
+            const { waitSecs: _waitSecs, ...query } = toolArgs;
+            toolArgs = { method: 'GET', path: legacyInputPath, query };
+            log.info('Rewrote pre-0.21 tool arguments', {
+                toolName: tool.name,
+                mcpSessionId: params.mcpSessionId,
+                argKeys,
+            });
+        }
         if (!tool.ajvValidate(toolArgs)) {
             const errors = tool.ajvValidate.errors || [];
             const exampleCall =

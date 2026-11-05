@@ -86,6 +86,8 @@ type ServerActorToolPolicyConfig = {
     inputDescriptions?: Readonly<Record<string, string>>;
     /** A valid call, also in the validation error: a client with an old tool list may not have the description. */
     exampleCall?: string;
+    /** The path a call with the pre-0.21 Actor input (no `method`, no `path`) is sent to, as `GET` with that input as `query`. */
+    legacyInputPath?: string;
 };
 
 type ActorToolPolicyConfig = {
@@ -109,6 +111,7 @@ const ACTOR_TOOL_POLICIES: Readonly<Record<string, ActorToolPolicyConfig>> = {
         serverTool: {
             buildDescription: () => RAG_WEB_BROWSER_ADDITIONAL_DESC,
             exampleCall: RAG_WEB_BROWSER_EXAMPLE_CALL,
+            legacyInputPath: '/search',
         },
     },
     [WEB_FETCH]: {
@@ -116,6 +119,7 @@ const ACTOR_TOOL_POLICIES: Readonly<Record<string, ActorToolPolicyConfig>> = {
             buildDescription: buildWebFetchDescription,
             inputDescriptions: WEB_FETCH_INPUT_DESCRIPTIONS,
             exampleCall: WEB_FETCH_EXAMPLE_CALL,
+            legacyInputPath: '/',
         },
     },
     [WEB_SEARCH]: {
