@@ -2,10 +2,17 @@ import { RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../const.js';
 import type { ActorInputSchema, ToolDescriptionContext } from '../../types.js';
 import { actorNameToToolName } from '../actor_tool_naming.js';
 
+const RAG_WEB_BROWSER_EXAMPLE_CALL =
+    '{"method":"GET","path":"/search","query":{"query":"latest AI agent payment protocols","maxResults":3}}';
+const WEB_FETCH_EXAMPLE_CALL =
+    '{"method":"GET","path":"/","query":{"url":"https://example.com","formats":["markdown"]}}';
+const WEB_SEARCH_EXAMPLE_CALL =
+    '{"method":"GET","path":"/","query":{"query":"latest AI agent payment protocols","maxResults":5}}';
+
 /** Appended to the `apify/rag-web-browser` tool description, a Server Actor tool (`GET /search`). */
 const RAG_WEB_BROWSER_ADDITIONAL_DESC = `Use this tool for generic web content: it searches the web by query and returns the text of the top results.
 This tool scrapes the data itself - it does NOT just find tools.
-Example: {"method":"GET","path":"/search","query":{"query":"latest AI agent payment protocols","maxResults":3}}
+Example: ${RAG_WEB_BROWSER_EXAMPLE_CALL}
 If query is a URL, the tool fetches that page instead of searching.
 
 Examples of when to use:
@@ -27,7 +34,7 @@ formats selects markdown, html, text, links (a deduplicated list) or raw (the or
 The page is fetched without running JavaScript unless wait is set, which renders it in a real browser and waits the given milliseconds for late-loaded content; a rendered request is slower. The Actor handles common bot protection and rate limits, so it also retrieves pages where a plain HTTP fetch is blocked.
 Use it when the user gives a URL and wants its content, data or links, or an answer that requires reading that page.
 It does not search the web; it needs a URL.${hasTool(webSearchTool) ? ` To find pages by query, use ${webSearchTool}.` : ''}
-Example: {"method":"GET","path":"/","query":{"url":"https://example.com","formats":["markdown"]}}`;
+Example: ${WEB_FETCH_EXAMPLE_CALL}`;
 };
 
 /** The `apify/web-search` tool description. */
@@ -37,7 +44,7 @@ const buildWebSearchDescription = ({ hasTool }: ToolDescriptionContext): string 
 provider picks google (the default) or duckduckgo; maxResults caps the results, and omitting it returns the whole page, about 10; countryCode and languageCode localize the ranking; dateFrom and dateTo (YYYY-MM-DD) bound the publication date; allowedDomains and blockedDomains (up to 10 hostnames each, subdomains included) restrict or exclude sites.
 Use it when the user wants links to choose from, wants to know which pages exist for a topic, or asks a question that a result title or snippet answers.
 It does not fetch page content; it returns links and snippets only.${hasTool(webFetchTool) ? ` To read a result page, use ${webFetchTool}.` : ''}
-Example: {"method":"GET","path":"/","query":{"query":"latest AI agent payment protocols","maxResults":5}}`;
+Example: ${WEB_SEARCH_EXAMPLE_CALL}`;
 };
 
 /**
@@ -77,6 +84,8 @@ type ServerActorToolPolicyConfig = {
     buildDescription?: (context: ToolDescriptionContext) => string;
     /** Replaces the description of the named inputs of the tool (`path`, `query`, `body`). */
     inputDescriptions?: Readonly<Record<string, string>>;
+    /** A valid call, also in the validation error: a client with an old tool list may not have the description. */
+    exampleCall?: string;
 };
 
 type ActorToolPolicyConfig = {
@@ -97,18 +106,23 @@ const ACTOR_TOOL_POLICIES: Readonly<Record<string, ActorToolPolicyConfig>> = {
         },
     },
     [RAG_WEB_BROWSER]: {
-        serverTool: { buildDescription: () => RAG_WEB_BROWSER_ADDITIONAL_DESC },
+        serverTool: {
+            buildDescription: () => RAG_WEB_BROWSER_ADDITIONAL_DESC,
+            exampleCall: RAG_WEB_BROWSER_EXAMPLE_CALL,
+        },
     },
     [WEB_FETCH]: {
         serverTool: {
             buildDescription: buildWebFetchDescription,
             inputDescriptions: WEB_FETCH_INPUT_DESCRIPTIONS,
+            exampleCall: WEB_FETCH_EXAMPLE_CALL,
         },
     },
     [WEB_SEARCH]: {
         serverTool: {
             buildDescription: buildWebSearchDescription,
             inputDescriptions: WEB_SEARCH_INPUT_DESCRIPTIONS,
+            exampleCall: WEB_SEARCH_EXAMPLE_CALL,
         },
     },
 };
