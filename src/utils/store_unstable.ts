@@ -86,7 +86,8 @@ export function buildUnstableStoreSearchUrl(
     const url = new URL(apiBaseUrl.replace(/\/v2$/, '/unstable/store'));
     if (options.search) url.searchParams.set('search', options.search);
     url.searchParams.set('limit', String(options.limit));
-    url.searchParams.set('include', 'inputSchema');
+    // Core reads Mongo only for what `include` asks for; without `currentPricingInfo` PPE Actors come without prices.
+    url.searchParams.set('include', 'inputSchema,currentPricingInfo');
     if (options.cursor) url.searchParams.set('recommId', options.cursor);
     if (options.allowsAgenticUsers !== undefined) {
         url.searchParams.set('allowsAgenticUsers', String(options.allowsAgenticUsers));

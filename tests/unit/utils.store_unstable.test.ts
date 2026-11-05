@@ -189,7 +189,7 @@ describe('free-form /unstable/store items', () => {
 describe('the /unstable/store request', () => {
     const API_BASE_URL = 'https://api.apify.com/v2';
 
-    it('includes the input schemas, continues from the cursor and sends the tracking', () => {
+    it('includes the input schemas and current pricing, continues from the cursor and sends the tracking', () => {
         const url = buildUnstableStoreSearchUrl(API_BASE_URL, {
             search: 'instagram',
             limit: 5,
@@ -201,7 +201,7 @@ describe('the /unstable/store request', () => {
         expect(Object.fromEntries(url.searchParams)).toEqual({
             search: 'instagram',
             limit: '5',
-            include: 'inputSchema',
+            include: 'inputSchema,currentPricingInfo',
             recommId: 'recomm-1',
             _useCase: 'compare prices',
             _traceId: 'trace-1',
