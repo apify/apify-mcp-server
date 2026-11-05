@@ -5,7 +5,7 @@ import { z } from 'zod';
 import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
-import { getApifyAPIBaseUrl, sendApifyApiRequest } from '../apify_client.js';
+import { getApifyAPIBaseUrl } from '../apify_client.js';
 import type { ActorStoreList } from '../types.js';
 
 // Read once at import, so the tool schema and the routing always agree.
@@ -145,15 +145,12 @@ export async function searchActorsViaUnstableEndpoint(
     options: UnstableStoreSearchOptions,
 ): Promise<UnstableStoreSearchPage> {
     const { apifyClient, ...query } = options;
-    const response = await sendApifyApiRequest(apifyClient, {
+    // `httpClient.call()` retries 429, 5xx and network errors, as `/v2/store` does through `store().list()`,
+    // and throws the API error with its status, like `store().list()`.
+    const response = await apifyClient.httpClient.call({
         url: buildUnstableStoreSearchUrl(query).toString(),
         method: 'GET',
     });
-    if (response.status >= 300) {
-        const apiMessage = (response.data as { error?: { message?: unknown } } | undefined)?.error?.message;
-        const message = typeof apiMessage === 'string' ? apiMessage : `Request failed with status ${response.status}`;
-        throw Object.assign(new Error(`Store search failed: ${message}`), { statusCode: response.status });
-    }
 
     const parsed = unstableStorePageSchema.safeParse(response.data);
     if (!parsed.success) {

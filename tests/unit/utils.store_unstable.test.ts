@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { ApifyClient } from '../../src/apify_client.js';
 import { MAX_EXTRA_FIELD_VALUE_LENGTH } from '../../src/const.js';
 import type { ActorStoreList, HelperTool } from '../../src/types.js';
 import {
@@ -13,7 +14,6 @@ import {
     searchActorsViaUnstableEndpoint,
     type UnstableStoreItem,
 } from '../../src/utils/store_unstable.js';
-import { mockApifyClient } from './helpers/tool_context.js';
 
 const tieredEventPrices = (priceUsd: number) =>
     Object.fromEntries(
@@ -92,14 +92,16 @@ const UNSTABLE_STORE_ITEM: UnstableStoreItem = {
     inputSchema: INPUT_SCHEMA,
 };
 
-/** An apify-client whose axios instance answers with the given `GET /unstable/store` responses in order. */
+/** A real apify-client, so its retries run, whose axios instance answers with the given responses in order. */
 const mockUnstableStoreClient = (...responses: { status: number; data: unknown }[]) => {
-    const request = vi.fn();
+    const apifyClient = new ApifyClient({ token: 'test-token', minDelayBetweenRetriesMillis: 1 });
+    const request = vi.spyOn(apifyClient.httpClient.axios, 'request');
     for (const response of responses) request.mockResolvedValueOnce(response);
-    return { request, apifyClient: mockApifyClient({ httpClient: { axios: { request } } }) };
+    return { request, apifyClient };
 };
 
-const requestedUrl = (request: ReturnType<typeof vi.fn>, call = 0) => new URL(request.mock.calls[call][0].url);
+const requestedUrl = (request: { mock: { calls: unknown[][] } }, call = 0) =>
+    new URL((request.mock.calls[call][0] as { url: string }).url);
 
 describe('the Actor card renders an /unstable/store item exactly like the /v2/store item', () => {
     // Both paths feed the same card builder, so the mapping is the only place they can diverge.
@@ -262,8 +264,20 @@ describe('paging /unstable/store by cursor', () => {
             searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient, limit: 5 }),
         ).rejects.toMatchObject({
             statusCode: 400,
-            message: "Store search failed: Schema validation failed: Parameter 'recommId' is invalid.",
+            message: "Schema validation failed: Parameter 'recommId' is invalid.",
         });
+    });
+
+    // The /v2/store path retries through apify-client, so one 503 must not fail the search here either.
+    it('retries a 503', async () => {
+        const { apifyClient } = mockUnstableStoreClient(
+            { status: 503, data: { error: { type: 'service-unavailable', message: 'Service unavailable.' } } },
+            page([UNSTABLE_STORE_ITEM], 'recomm-1'),
+        );
+
+        const result = await searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient, limit: 5 });
+
+        expect(result.nextCursor).toBe('recomm-1');
     });
 
     it('throws a server-side error when the response does not match the contract', async () => {
@@ -289,12 +303,11 @@ describe('searchAgentSafeActors data source', () => {
         vi.resetModules();
         // The flag is read once, when the module loads.
         const { searchAgentSafeActors: searchWithFlag } = await import('../../src/utils/actor_search.js');
-        const store = vi.fn();
-        const request = vi.fn().mockResolvedValue({
+        const { request, apifyClient } = mockUnstableStoreClient({
             status: 200,
             data: { data: { items: [UNSTABLE_STORE_ITEM], count: 1, limit: 5, recommId: 'recomm-1' } },
         });
-        const apifyClient = mockApifyClient({ store, httpClient: { axios: { request } } });
+        const store = vi.spyOn(apifyClient, 'store');
 
         const result = await searchWithFlag({
             keywords: 'instagram',
@@ -328,14 +341,13 @@ describe('search-actors served from /unstable/store', () => {
     };
 
     const mockClientAnswering = (items: UnstableStoreItem[], recommId: string) => {
-        const request = vi.fn().mockResolvedValue({
+        const { request, apifyClient } = mockUnstableStoreClient({
             status: 200,
             data: { data: { items, count: items.length, limit: 5, recommId } },
         });
-        const apifyClient = mockApifyClient({
-            httpClient: { axios: { request } },
-            user: () => ({ get: async () => ({ id: 'user-1', plan: { tier: 'FREE' } }) }),
-        });
+        vi.spyOn(apifyClient, 'user').mockReturnValue({
+            get: async () => ({ id: 'user-1', plan: { tier: 'FREE' } }),
+        } as unknown as ReturnType<ApifyClient['user']>);
         return { request, apifyClient };
     };
 
