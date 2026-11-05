@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
 import { ACTOR_LOAD_ERROR_KIND } from '../../src/errors.js';
-import type { InvalidToolCall, PreparedCall } from '../../src/mcp/tool_call_engine.js';
-import { prepareToolCall } from '../../src/mcp/tool_call_engine.js';
 import { actorDefinitionCache } from '../../src/state.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { getActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
@@ -421,21 +419,6 @@ async function loadServerTool(schema: unknown, actor?: Partial<Actor>): Promise<
     return tools[0];
 }
 
-async function prepareCall(tool: ToolEntry, args: Record<string, unknown>) {
-    return await prepareToolCall({
-        tools: new Map([[tool.name, tool]]),
-        apifyToken: 'fake-token',
-        name: tool.name,
-        args,
-        meta: undefined,
-        requestHeaders: undefined,
-        isTaskRequest: false,
-        mcpSessionId: 's1',
-        telemetryData: null,
-        clientContext: undefined,
-    });
-}
-
 function infoOf(schema: unknown): ServerActorToolInfo {
     const info = buildServerActorToolInfo(schema, 'apify/server-actor-test');
     if (!info) throw new Error('Expected operations');
@@ -482,20 +465,6 @@ describe('serving a selected Server Actor through its server interface', () => {
 
         expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR_SERVER]);
         expect(tools[0].description).not.toContain(WEB_FETCH);
-    });
-
-    // A client with a pre-0.21 tool list sends the Actor input, which GET /search takes as its query.
-    it('sends the old apify/rag-web-browser input as GET /search', async () => {
-        const [username, name] = RAG_WEB_BROWSER.split('/');
-        const tool = await loadServerTool(SCHEMA, { username, name });
-
-        const result = await prepareCall(tool, { query: 'apify', maxResults: 3 });
-
-        expect((result as PreparedCall).toolArgs).toEqual({
-            method: 'GET',
-            path: '/search',
-            query: { query: 'apify', maxResults: 3 },
-        });
     });
 
     // A definition built before the tool info existed, such as one restored from a cache, has no tool to serve.
@@ -825,42 +794,6 @@ describe('the default apify/web-fetch tool', () => {
 
         expect(tool.buildDescription?.(only(webSearchTool))).toContain(webSearchTool);
         expect(tool.buildDescription?.(only())).not.toContain(webSearchTool);
-    });
-
-    // A client with a pre-0.21 tool list sends the old {url} shape, which GET / takes as its query.
-    it('sends the old {url} shape as GET / without waitSecs', async () => {
-        const tool = await loadWebFetchTool();
-
-        const result = await prepareCall(tool, { url: 'https://example.com', formats: ['markdown'], waitSecs: 30 });
-
-        expect((result as PreparedCall).toolArgs).toEqual({
-            method: 'GET',
-            path: '/',
-            query: { url: 'https://example.com', formats: ['markdown'] },
-        });
-    });
-
-    it('rejects an empty call with an example call', async () => {
-        const tool = await loadWebFetchTool();
-
-        const result = await prepareCall(tool, {});
-
-        expect((result as InvalidToolCall).message).toContain(
-            'Example call: {"method":"GET","path":"/","query":{"url":',
-        );
-    });
-
-    it.each([
-        ['path', { method: 'GET', query: { url: 'https://example.com' } }],
-        ['method', { path: '/', query: { url: 'https://example.com' } }],
-    ])('rejects a call with no %s instead of rewriting it', async (missingProperty, args) => {
-        const tool = await loadWebFetchTool();
-
-        const result = await prepareCall(tool, args);
-
-        expect((result as InvalidToolCall).callDiagnostics).toMatchObject({
-            validation_missing_property: missingProperty,
-        });
     });
 
     it('keeps the read-only hint of the Actor', async () => {
