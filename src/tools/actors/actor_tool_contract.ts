@@ -40,9 +40,9 @@ Example: {"method":"GET","path":"/","query":{"query":"latest AI agent payment pr
 };
 
 /**
- * The input descriptions of the two tools, one entry per parameter of `GET /`. The url scheme rule lives on the
- * input because that is what an agent reads while writing the argument: agents silently rewrote ftp:// URLs to
- * https:// instead of telling the user the scheme is unsupported.
+ * The input descriptions of the two tools: `path`, and `query` listing every parameter of `GET /`. The url scheme
+ * rule lives on the input because that is what an agent reads while writing the argument: agents silently rewrote
+ * ftp:// URLs to https:// instead of telling the user the scheme is unsupported.
  */
 const WEB_FETCH_INPUT_DESCRIPTIONS = {
     path: 'Always "/".',

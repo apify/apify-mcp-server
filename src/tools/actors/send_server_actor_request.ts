@@ -588,7 +588,7 @@ const PLACEHOLDER_EXAMPLE = {
     usage: '- user_input: Call the /search endpoint of username/name for AI news',
 };
 
-/** How this tool and every selected Server Actor tool send a request and return its body; one sentence in each description. */
+/** How a request is sent and its body returned; in the description of this tool and of every selected Server Actor tool. */
 export const SERVER_REQUEST_TRANSPORT_NOTE = `The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text, cut at ${MAX_INLINE_BYTES} bytes; other content types are not returned.`;
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {

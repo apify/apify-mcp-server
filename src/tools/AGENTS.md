@@ -27,10 +27,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     (`delete_actor.ts`), the actor-tools factory (run tools, proxied MCP tools, and a Server Actor's own tool
     (`getServerActorsAsTools`, type `actor-server`): `send-server-actor-request`'s execution and output with the
     Actor fixed, `method` narrowed to the documented ones, `path` a plain string (no enum: a schema can document
-    thousands of paths), the policy's `serverTool` text and input notes (`getActorToolPolicy`) and the operations in the
-    description; an Actor with a server interface and no `webServerToolInfo` is reported as `load-failed`; the
-    default `apify/web-fetch` and `apify/web-search` tools and a selected `apify/rag-web-browser` are served this
-    way), the direct actor-tool executor (`actor_executor.ts`),
+    thousands of paths), the policy's `serverTool` text and input descriptions (`getActorToolPolicy`) replacing the
+    generic ones, and the operations in the description; an Actor with a server interface and no `webServerToolInfo`
+    is reported as `load-failed`; the default `apify/web-fetch` and `apify/web-search` tools and a selected
+    `apify/rag-web-browser` are served this way), the direct actor-tool executor (`actor_executor.ts`),
     `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`, and resolves the build
     the server-interface fields — `webServerMcpPath`, `webServerSchema` — are read from when standby is on,
     `resolveServerInterfaceDefinition`, shared with `fetchActorDetails` in `../utils/actor_details.ts`; the input

@@ -240,8 +240,9 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
 /**
  * Builds the own tool of each Actor served through its server interface: `send-server-actor-request` with the Actor
  * fixed, its documented operations in the description and its methods and paths in the input schema.
- * `readOnlyHint` is the Actor's, as for a run tool; the policy's `serverTool` (`getActorToolPolicy`) adds its text and
- * input notes.
+ * `readOnlyHint` is the Actor's, as for a run tool. The policy's `serverTool` (`getActorToolPolicy`), when the Actor
+ * has one, replaces the generic opening and the Actor description with its own text and the generic input
+ * descriptions with its own.
  */
 export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
     const tools: ToolEntry[] = [];
@@ -262,7 +263,6 @@ export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
             const property = schemas.inputSchema.properties?.[name] as { description?: string } | undefined;
             if (property) property.description = text;
         }
-        // The policy text, when the Actor has one, stands in for the generic opening and the Actor's own description.
         // Names fetch-actor-details only when the session has it, and only when the operations are not in full.
         const buildDescription = (context: ToolDescriptionContext): string => {
             const { hasTool } = context;
