@@ -174,12 +174,9 @@ export async function getNormalActorsAsTools(
         // per-call copy of the input schema alive for the session's lifetime.
         const contractDescription = contract.description;
         // Names call-actor only when the session actually has it.
-        const buildDescription = (context: ToolDescriptionContext): string => {
-            const { hasTool } = context;
+        const buildDescription = ({ hasTool }: ToolDescriptionContext): string => {
             let description = `This tool calls the Actor "${actorFullName}" and retrieves its output results.
 ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this specific Actor.\n` : ''}Actor description: ${actorDescription}`;
-            const policyDescription = getActorToolPolicy(actorFullName)?.buildDescription?.(context);
-            if (policyDescription) description += `\n\n${policyDescription}`;
             if (contractDescription) description += `\n\n${contractDescription}`;
             return description;
         };

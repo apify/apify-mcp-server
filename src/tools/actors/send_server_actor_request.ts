@@ -5,7 +5,15 @@ import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { readBodyToCap, sendApifyApiRequest } from '../../apify_client.js';
-import { FAILURE_CATEGORY, HELPER_TOOLS, HTTP_FORBIDDEN, HTTP_UNAUTHORIZED, MAX_INLINE_BYTES } from '../../const.js';
+import {
+    FAILURE_CATEGORY,
+    HELPER_TOOLS,
+    HTTP_FORBIDDEN,
+    HTTP_UNAUTHORIZED,
+    MAX_INLINE_BYTES,
+    RAG_WEB_BROWSER,
+    WEB_SEARCH,
+} from '../../const.js';
 import { getActorMCPServerPath, resolveOnStandbyOrigin } from '../../mcp/actors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import { isTextualMimeType, maskSessionToken, parseCharset, REDACTED } from '../../resources/api_resources.js';
@@ -26,7 +34,7 @@ import { fixZodSchemaRequired } from '../../utils/ajv.js';
 import { toPlainError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondServerError, respondUserError } from '../../utils/mcp.js';
-import { resolveActorInterfaces, resolveActorTenancy } from '../actor_tool_naming.js';
+import { actorNameToToolName, resolveActorInterfaces, resolveActorTenancy } from '../actor_tool_naming.js';
 import { redactApiCallArgs } from '../api/apify_api_request.js';
 import { API_METHODS, type ApiMethod, isRecord } from '../api/apify_api_spec.js';
 import { parseBaseMimeType } from '../storage/storage_helpers.js';
@@ -558,10 +566,33 @@ export function redactServerActorRequestArgs({ actor, query, ...rest }: Record<s
     };
 }
 
+/**
+ * The example names an Actor whose own tool is not in the session, since that tool says to use it instead of this
+ * one: apify/rag-web-browser (not a default tool), else apify/web-search, else a placeholder when both are selected.
+ */
+const EXAMPLE_ACTORS = [
+    {
+        actor: RAG_WEB_BROWSER,
+        call: `{"actor": "${RAG_WEB_BROWSER}", "method": "GET", "path": "/search", "query": {"query": "AI news", "maxResults": 3}}`,
+        usage: `- user_input: Search the web for the latest AI news and read the top pages with ${RAG_WEB_BROWSER}\n- user_input: Read https://docs.apify.com as Markdown with ${RAG_WEB_BROWSER}`,
+    },
+    {
+        actor: WEB_SEARCH,
+        call: `{"actor": "${WEB_SEARCH}", "method": "GET", "path": "/", "query": {"query": "AI news", "maxResults": 5}}`,
+        usage: `- user_input: Search the web for the latest AI news with ${WEB_SEARCH}\n- user_input: Find articles about Apify from the past week with ${WEB_SEARCH}`,
+    },
+] as const;
+
+const PLACEHOLDER_EXAMPLE = {
+    call: '{"actor": "username/name", "method": "GET", "path": "/search", "query": {"query": "AI news"}}',
+    usage: '- user_input: Call the /search endpoint of username/name for AI news',
+};
+
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
     const details = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS)
         ? ` ${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface returns the documented operations with their parameters.`
         : '';
+    const example = EXAMPLE_ACTORS.find(({ actor }) => !hasTool(actorNameToToolName(actor))) ?? PLACEHOLDER_EXAMPLE;
     return dedent`
         Send one HTTP request to an Actor Server: the HTTP API of a Server Actor, documented in its API schema (OpenAPI) and README.${details}
         Give the method, the path, and optionally query parameters and a JSON body; the Actor Server's host and your Apify API token are added for you.
@@ -569,15 +600,14 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         A request to a single-tenant Actor Server can start a run of the Actor in your account, kept until its idle timeout; a multi-tenant Actor Server charges per event.
         The request is sent once, with no retries and without following redirects. A JSON, text, or XML response body is returned as text, cut at ${MAX_INLINE_BYTES} bytes; other content types are not returned.
 
-        Example call: {"actor": "apify/web-search", "method": "GET", "path": "/", "query": {"query": "AI news", "maxResults": 5}}
+        Example call: ${example.call}
 
         USAGE:
         - Use when the Actor that fits the user's request has an Actor Server, and its API schema or README names the endpoint for the task.
         - Fits requests for one or a few results returned in the HTTP response. Larger batches depend on the endpoint and the response size and time limits.
 
         USAGE EXAMPLES:
-        - user_input: Search the web for the latest AI news with apify/web-search
-        - user_input: Find articles about Apify from the past week with apify/web-search
+        ${example.usage}
     `;
 }
 

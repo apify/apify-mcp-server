@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
+import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
 import { ACTOR_LOAD_ERROR_KIND } from '../../src/errors.js';
 import { actorDefinitionCache } from '../../src/state.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
@@ -160,6 +160,225 @@ const WEB_FETCH_LIVE_SCHEMA = {
     },
 };
 
+/** apify/web-search's API schema as served on 2026-11-04 (build OitYfemqCzJSA6yMQ): the request side the tool renders, texts as written. */
+const WEB_SEARCH_LIVE_SCHEMA = {
+    openapi: '3.0.0',
+    paths: {
+        '/': {
+            get: {
+                summary: 'Run a search',
+                description:
+                    'Runs one search and returns one page of organic results. Parameters go in the query ' +
+                    'string; array fields are comma-separated, e.g. ' +
+                    '`allowedDomains=example.com,example.org`. Use `POST` to send them as a JSON object ' +
+                    'instead.',
+                parameters: [
+                    {
+                        name: 'query',
+                        in: 'query',
+                        required: true,
+                        example: 'latest AI agent payment protocols',
+                        schema: {
+                            $ref: '#/components/schemas/SearchRequest/properties/query',
+                        },
+                    },
+                    {
+                        name: 'provider',
+                        in: 'query',
+                        required: false,
+                        schema: {
+                            $ref: '#/components/schemas/SearchRequest/properties/provider',
+                        },
+                    },
+                    {
+                        name: 'maxResults',
+                        in: 'query',
+                        required: false,
+                        schema: {
+                            $ref: '#/components/schemas/SearchRequest/properties/maxResults',
+                        },
+                    },
+                    {
+                        name: 'languageCode',
+                        in: 'query',
+                        required: false,
+                        schema: {
+                            $ref: '#/components/schemas/SearchRequest/properties/languageCode',
+                        },
+                    },
+                    {
+                        name: 'countryCode',
+                        in: 'query',
+                        required: false,
+                        schema: {
+                            $ref: '#/components/schemas/SearchRequest/properties/countryCode',
+                        },
+                    },
+                    {
+                        name: 'location',
+                        in: 'query',
+                        required: false,
+                        schema: {
+                            $ref: '#/components/schemas/SearchRequest/properties/location',
+                        },
+                    },
+                    {
+                        name: 'dateFrom',
+                        in: 'query',
+                        required: false,
+                        schema: {
+                            $ref: '#/components/schemas/SearchRequest/properties/dateFrom',
+                        },
+                    },
+                    {
+                        name: 'dateTo',
+                        in: 'query',
+                        required: false,
+                        schema: {
+                            $ref: '#/components/schemas/SearchRequest/properties/dateTo',
+                        },
+                    },
+                    {
+                        name: 'allowedDomains',
+                        in: 'query',
+                        required: false,
+                        style: 'form',
+                        explode: false,
+                        description: 'Comma-separated list of hostnames, e.g. `example.com,example.org`.',
+                        schema: {
+                            $ref: '#/components/schemas/SearchRequest/properties/allowedDomains',
+                        },
+                    },
+                    {
+                        name: 'blockedDomains',
+                        in: 'query',
+                        required: false,
+                        style: 'form',
+                        explode: false,
+                        description: 'Comma-separated list of hostnames, e.g. `pinterest.com,reddit.com`.',
+                        schema: {
+                            $ref: '#/components/schemas/SearchRequest/properties/blockedDomains',
+                        },
+                    },
+                ],
+            },
+            post: {
+                summary: 'Run a search',
+                description:
+                    'Runs one search and returns the same results as `GET /`. Unlike `GET`, the parameters ' +
+                    'are sent as a JSON object in the request body, so array fields such as `allowedDomains` ' +
+                    'are real JSON arrays rather than comma-separated strings.',
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: {
+                                $ref: '#/components/schemas/SearchRequest',
+                            },
+                            example: {
+                                query: 'latest AI agent payment protocols',
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+    components: {
+        schemas: {
+            SearchRequest: {
+                type: 'object',
+                required: ['query'],
+                properties: {
+                    query: {
+                        type: 'string',
+                        description:
+                            'Operators like `site:` pass through unchecked. Use `allowedDomains` and ' +
+                            '`blockedDomains` to enforce domain filters, and `dateFrom` and `dateTo` for dates.',
+                        example: 'latest AI agent payment protocols',
+                    },
+                    provider: {
+                        type: 'string',
+                        description:
+                            '`google` is the default search engine, supports `location`, and returns the most data. ' +
+                            '`duckduckgo` has no `location`, covers fewer countries, and fills fewer fields. Use it ' +
+                            'for a second, independent ranking, or when Google finds nothing. Each search is charged ' +
+                            'separately.',
+                        enum: ['google', 'duckduckgo'],
+                        default: 'google',
+                    },
+                    maxResults: {
+                        type: 'integer',
+                        description:
+                            'Maximum number of organic results to return. Omit it to get every result on the page. ' +
+                            'You get fewer when the page has fewer, or when domain filters remove some.',
+                        minimum: 1,
+                    },
+                    languageCode: {
+                        type: 'string',
+                        description:
+                            'ISO 639-1 code with an optional region suffix, like `en`, `de`, or `pt-BR`. See ' +
+                            'https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes. Google uses it to ' +
+                            'localize the interface and bias ranking, without translating or strictly filtering ' +
+                            "results. DuckDuckGo picks the matching regional variant, or the country's default.",
+                        default: 'en',
+                    },
+                    countryCode: {
+                        type: 'string',
+                        description:
+                            'ISO 3166-1 alpha-2 code, like `US`, `DE`, or `CZ`. The search runs as if you were in ' +
+                            'that country, changing result order and which local businesses appear. Google queries ' +
+                            "that country's domain (`google.de` for `DE`). DuckDuckGo picks the matching region, " +
+                            "preferring the `languageCode` variant (`CA` with `fr`) over the default. Results aren't " +
+                            'limited to sites hosted or registered there. Web Search returns `INVALID_COUNTRY` if ' +
+                            'the provider has no market there.',
+                        default: 'US',
+                    },
+                    location: {
+                        type: 'string',
+                        description:
+                            'A place name, most specific first, like `Paris, Ile-de-France, France`. Google treats ' +
+                            'it as your location for local and "near me" results. It doesn\'t filter pages. It\'s ' +
+                            "best-effort and not validated: Google may ignore places it can't resolve. Using it with " +
+                            'DuckDuckGo returns `INVALID_PARAMETER`.',
+                    },
+                    dateFrom: {
+                        type: 'string',
+                        pattern: '^\\d{4}-\\d{2}-\\d{2}$',
+                        description: 'The earliest publication date to include, as `YYYY-MM-DD`. Best-effort.',
+                    },
+                    dateTo: {
+                        type: 'string',
+                        pattern: '^\\d{4}-\\d{2}-\\d{2}$',
+                        description: 'The latest publication date to include, as `YYYY-MM-DD`. Best-effort.',
+                    },
+                    allowedDomains: {
+                        type: 'array',
+                        description:
+                            'Return only results from these domains. You can list up to 10 domains. A domain matches ' +
+                            'itself and its subdomains, so `wikipedia.org` covers `en.wikipedia.org`. A top-level ' +
+                            'domain like `gov` matches every domain under it.',
+                        items: {
+                            type: 'string',
+                        },
+                        maxItems: 10,
+                    },
+                    blockedDomains: {
+                        type: 'array',
+                        description:
+                            'Exclude results from these domains. You can list up to 10 domains. Matching works like ' +
+                            '`allowedDomains`, including subdomains and top-level domains.',
+                        items: {
+                            type: 'string',
+                        },
+                        maxItems: 10,
+                    },
+                },
+            },
+        },
+    },
+};
+
 /** `count` documented paths, `/path-0`, `/path-1`, …, each with a bare GET. */
 function pathsOf(count: number): Record<string, unknown> {
     return Object.fromEntries(Array.from({ length: count }, (_, i) => [`/path-${i}`, { get: {} }]));
@@ -241,11 +460,13 @@ describe('serving a selected Server Actor through its server interface', () => {
         expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR_SERVER]);
     });
 
-    it('leaves an Actor served through its input interface a run tool', async () => {
+    it('serves apify/rag-web-browser as a Server Actor tool with its policy text', async () => {
         const [username, name] = RAG_WEB_BROWSER.split('/');
         const { tools } = await loadTools(SCHEMA, { actor: { username, name } });
 
-        expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR]);
+        expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR_SERVER]);
+        expect(tools[0].description).toContain('Example: {"method":"GET","path":"/search"');
+        expect(tools[0].description).not.toContain(WEB_FETCH);
     });
 
     // A definition built before the tool info existed, such as one restored from a cache, has no tool to serve.
@@ -607,5 +828,77 @@ describe('the default apify/web-fetch tool', () => {
 
         expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR]);
         expect(tools[0].description).not.toContain('"method"');
+    });
+});
+
+describe('the default apify/web-search tool', () => {
+    const [username, name] = WEB_SEARCH.split('/');
+    const webSearchActor: Partial<Actor> = {
+        username,
+        name,
+        description:
+            'Search the web and get organic results as JSON with title, URL, snippet, and position. You can filter ' +
+            'by date, country, language, and domain. The Actor provides a real-time API.',
+        actorStandby: { isEnabled: true, tenancy: 'MULTI_TENANT' },
+    };
+    // The Actor is also an MCP server; the server interface takes its tool slot.
+    const loadWebSearchTool = async () => {
+        const { tools } = await loadTools(WEB_SEARCH_LIVE_SCHEMA, { actor: webSearchActor, webServerMcpPath: '/mcp' });
+        expect(tools).toHaveLength(1);
+        return tools[0];
+    };
+
+    it('is served as a Server Actor tool: GET or POST, a required path, a body, and an untyped query', async () => {
+        const tool = await loadWebSearchTool();
+
+        expect(tool.type).toBe(TOOL_TYPE.ACTOR_SERVER);
+        expect(tool.inputSchema.properties).toMatchObject({
+            method: { enum: ['GET', 'POST'] },
+            path: { type: 'string' },
+        });
+        expect(tool.inputSchema.properties).toHaveProperty('body');
+        expect(tool.inputSchema.properties?.query).not.toHaveProperty('properties');
+        expect(tool.inputSchema.required).toEqual(['method', 'path']);
+        expect(
+            tool.ajvValidate({
+                method: 'GET',
+                path: '/',
+                query: { query: 'apify', maxResults: 2, allowedDomains: ['apify.com', 'docs.apify.com'] },
+            }),
+        ).toBe(true);
+    });
+
+    it('carries the policy text, its example call and both operations as lines within the client limit', async () => {
+        const tool = await loadWebSearchTool();
+
+        expect(tool.description).toContain('Use this tool to search the web by query');
+        expect(tool.description).toContain(
+            'Example: {"method":"GET","path":"/","query":{"query":"latest AI agent payment protocols","maxResults":5}}',
+        );
+        expect(tool.description).toContain(
+            'Operations:\n- GET / [query:string required, provider:string, maxResults:integer, languageCode:string,',
+        );
+        expect(tool.description).toContain('- POST / {query:string required');
+        expect(tool.description!.length).toBeLessThanOrEqual(CLIENT_DESCRIPTION_MAX_LENGTH);
+    });
+
+    // The session may not have the other web Actor tools, so the description names none of them.
+    it('names no other web Actor in its description', async () => {
+        const tool = await loadWebSearchTool();
+
+        expect(tool.description).not.toContain(WEB_FETCH);
+        expect(tool.description).not.toContain(RAG_WEB_BROWSER);
+    });
+
+    it('keeps the read-only hint of the Actor', async () => {
+        const tool = await loadWebSearchTool();
+
+        expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+    });
+
+    it('lists allowedDomains and blockedDomains as the comma-joined query parameters of GET /', () => {
+        expect(listCommaJoinedQueryParameters(WEB_SEARCH_LIVE_SCHEMA)).toEqual({
+            'GET /': ['allowedDomains', 'blockedDomains'],
+        });
     });
 });

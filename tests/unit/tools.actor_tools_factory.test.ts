@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
-import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import type { ActorInfo, SchemaProperties } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
@@ -267,56 +265,5 @@ describe('getNormalActorsAsTools()', () => {
                 expect(await getAnnotations(info)).toMatchObject({ readOnlyHint: false, destructiveHint: true });
             }
         });
-    });
-
-    describe('existing Actor presentation policies', () => {
-        it.each([true, false])('preserves RAG exposure and validation with isDirectTool %s', async (isDirectTool) => {
-            const actorInfo = createMockActorInfo(RAG_WEB_BROWSER, {
-                ...LIMITED,
-                inputProperties: {
-                    query: { type: 'string' },
-                    maxResults: { type: 'integer', default: 3 },
-                    outputFormats: { type: 'array', default: ['markdown'] },
-                    hiddenSecret: { type: 'string', isSecret: true },
-                },
-                inputRequired: ['query', 'maxResults'],
-            });
-            const original = structuredClone(actorInfo);
-            const [tool] = await getNormalActorsAsTools([actorInfo], { isDirectTool });
-            expect(Object.keys(tool.inputSchema.properties ?? {})).toEqual([
-                'query',
-                'maxResults',
-                'outputFormats',
-                'waitSecs',
-            ]);
-            expect(tool.inputSchema.required).toEqual(['query']);
-            const input = { query: 'apify', hiddenSecret: 'original-input' };
-            expect(tool.ajvValidate(input)).toBe(true);
-            expect(input).toEqual({ query: 'apify', hiddenSecret: 'original-input' });
-            expect(tool.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true });
-            expect(actorInfo).toEqual(original);
-        });
-
-        it('describes Web Search results without page content or sibling referrals', async () => {
-            const [tool] = await getNormalActorsAsTools([createMockActorInfo(WEB_SEARCH)]);
-
-            expect(tool.description).toContain('one page of organic results');
-            expect(tool.description).toContain('title, URL, snippet and position');
-            expect(tool.description).toContain('no page content');
-            expect(tool.description).not.toContain(WEB_FETCH);
-            expect(tool.description).not.toContain(RAG_WEB_BROWSER);
-        });
-    });
-
-    it('describes RAG page content without referring to Web Fetch', async () => {
-        const [tool] = await getNormalActorsAsTools([createMockActorInfo(RAG_WEB_BROWSER)]);
-        const alone = getToolPublicFieldOnly(tool, { presentTools: new Set([tool.name]) }).description;
-        const together = getToolPublicFieldOnly(tool, {
-            presentTools: new Set([tool.name, actorNameToToolName(WEB_FETCH)]),
-        }).description;
-
-        expect(together).toBe(alone);
-        expect(together).toContain('text of the top results');
-        expect(together).not.toContain(WEB_FETCH);
     });
 });

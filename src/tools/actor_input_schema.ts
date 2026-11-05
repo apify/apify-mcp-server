@@ -17,7 +17,6 @@ import {
     addResourcePickerProperties as addArrayResourcePickerProperties,
 } from '../utils/apify_properties.js';
 import { getToolSchemaID } from './actor_tool_naming.js';
-import { getActorToolPolicy } from './actors/actor_tool_contract.js';
 
 type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 
@@ -205,39 +204,8 @@ export function buildActorInputSchema(actorFullName: string, input: ActorInputSc
         delete (working as { $schema?: string }).$schema;
     }
 
-    const policy = getActorToolPolicy(actorFullName);
-    const finalSchema = policy?.exposedInputs
-        ? pruneSchemaPropertiesByWhitelist(working, policy.exposedInputs)
-        : working;
-
-    finalSchema.$id = getToolSchemaID(actorFullName);
-    return { inputSchema: finalSchema };
-}
-
-/**
- * Returns a shallow-cloned input schema that keeps only whitelisted properties
- * and filters the required array accordingly. All other top-level fields are preserved.
- * If properties are missing, the original input is returned unchanged.
- *
- * Exposure policies can offer a subset of Actor inputs without redefining the schema.
- */
-export function pruneSchemaPropertiesByWhitelist(
-    input: ActorInputSchema,
-    whitelist: Iterable<string>,
-): ActorInputSchema {
-    if (!input || !input.properties || typeof input.properties !== 'object' || !whitelist) return input;
-
-    const allowed = new Set<string>(Array.from(whitelist));
-    const newProps: Record<string, SchemaProperties> = {};
-    for (const key of Object.keys(input.properties)) {
-        if (allowed.has(key)) newProps[key] = input.properties[key];
-    }
-
-    const cloned: ActorInputSchema = { ...input, properties: newProps };
-    if (Array.isArray(input.required)) {
-        cloned.required = input.required.filter((k) => allowed.has(k));
-    }
-    return cloned;
+    working.$id = getToolSchemaID(actorFullName);
+    return { inputSchema: working };
 }
 
 /**

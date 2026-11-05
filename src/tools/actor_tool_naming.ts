@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import log from '@apify/log';
 
-import { APIFY_MCP_URL, HELPER_TOOLS, INPUT_INTERFACE_ACTORS } from '../const.js';
+import { APIFY_MCP_URL, HELPER_TOOLS } from '../const.js';
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../mcp/const.js';
 import type { Actor, ActorInfo, ActorInterfaces, ActorTenancy, ToolDescriptionContext } from '../types.js';
 import { ACTOR_TENANCY, ACTOR_TOOL_MODE } from '../types.js';
@@ -10,14 +10,17 @@ import { ACTOR_TENANCY, ACTOR_TOOL_MODE } from '../types.js';
 /**
  * The single rule for which interfaces an Actor has. Two routes are derived from it: the Actor's own tool
  * (`resolveActorToolMode`, read by tool loading) and `call-actor` (`getActorToolModeFromInterfaces`, read through
- * `getActorToolResolutionCached`). The own tool takes the server interface first, then the MCP server, then the
- * input interface; `call-actor` never takes the server interface, so it still starts runs of such an Actor.
+ * `getActorToolResolutionCached`). The three interfaces are independent of each other. The own tool takes the server
+ * interface first, then the MCP server, then the input interface; `call-actor` takes the input interface first, then
+ * the MCP server, and never the server interface, so it still starts runs of such an Actor.
  *
  * | server | MCP path | input schema | HTTP schema | `input` | `mcp` | `server` | own tool                   | `call-actor`               |
  * |--------|----------|--------------|-------------|---------|-------|----------|----------------------------|----------------------------|
  * | off    | any      | any          | any         | true    | false | false    | `RUN`                      | `RUN`                      |
- * | on     | present  | any          | yes         | false   | true  | true     | `SERVER`                   | `MCP`                      |
- * | on     | present  | any          | no          | false   | true  | false    | `MCP`                      | `MCP`                      |
+ * | on     | present  | non-empty    | yes         | true    | true  | true     | `SERVER`                   | `RUN`                      |
+ * | on     | present  | non-empty    | no          | true    | true  | false    | `MCP`                      | `RUN`                      |
+ * | on     | present  | empty        | yes         | false   | true  | true     | `SERVER`                   | `MCP`                      |
+ * | on     | present  | empty        | no          | false   | true  | false    | `MCP`                      | `MCP`                      |
  * | on     | absent   | non-empty    | yes         | true    | false | true     | `SERVER`                   | `RUN`                      |
  * | on     | absent   | non-empty    | no          | true    | false | false    | `RUN`                      | `RUN`                      |
  * | on     | absent   | empty        | yes         | false   | false | true     | `SERVER`                   | `SERVER_ACTOR_WITHOUT_MCP` |
@@ -25,11 +28,6 @@ import { ACTOR_TENANCY, ACTOR_TOOL_MODE } from '../types.js';
  *
  * "server" is the Actor's `actorStandby.isEnabled` (the API field is named standby). "MCP path" is
  * `webServerMcpPath`. "HTTP schema" is `definition.hasWebServerSchema`.
- * Actors in `INPUT_INTERFACE_ACTORS` (`../const.ts`) are served through the input interface although they declare
- * other interfaces: their MCP path reads as absent, and their own tool never takes `SERVER`. With an empty input
- * schema (including a malformed one `pruneActorDefinition` drops) they get no tool, like any other server Actor.
- * An MCP-server Actor does not get `input` even with a non-empty input schema: Store data shows that
- * interface is unused on such Actors.
  * The input schema counts as empty when the definition has no `input`, `input.properties` is missing,
  * or `input.properties` has zero keys. Nothing else counts — a non-empty `required` with no properties
  * still reads as empty.
@@ -37,28 +35,38 @@ import { ACTOR_TENANCY, ACTOR_TOOL_MODE } from '../types.js';
 export function resolveActorInterfaces({ actor, definition, webServerMcpPath }: ActorInfo): ActorInterfaces {
     if (actor.actorStandby?.isEnabled !== true) return { input: true, mcp: false, server: false };
 
-    const mcp = Boolean(webServerMcpPath) && !INPUT_INTERFACE_ACTORS.has(definition.actorFullName);
     const hasInputProperties = Object.keys(definition.input?.properties ?? {}).length > 0;
-    return { input: hasInputProperties && !mcp, mcp, server: definition.hasWebServerSchema };
+    return { input: hasInputProperties, mcp: Boolean(webServerMcpPath), server: definition.hasWebServerSchema };
 }
 
 /** The own-tool column of the table on {@link resolveActorInterfaces}. */
 export function resolveActorToolMode(actorInfo: ActorInfo): ACTOR_TOOL_MODE {
-    const interfaces = resolveActorInterfaces(actorInfo);
-    if (interfaces.server && !INPUT_INTERFACE_ACTORS.has(actorInfo.definition.actorFullName)) {
-        return ACTOR_TOOL_MODE.SERVER;
-    }
-    return getActorToolModeFromInterfaces(interfaces);
+    const { server, mcp, input } = resolveActorInterfaces(actorInfo);
+    if (server) return ACTOR_TOOL_MODE.SERVER;
+    if (mcp) return ACTOR_TOOL_MODE.MCP;
+    if (input) return ACTOR_TOOL_MODE.RUN;
+    return ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP;
 }
 
-/** The `call-actor` column of the table on {@link resolveActorInterfaces}: MCP tools, else a run, else none. */
+/** The `call-actor` column of the table on {@link resolveActorInterfaces}: a run, else MCP tools, else none. */
 export function getActorToolModeFromInterfaces({
     input,
     mcp,
 }: ActorInterfaces): Exclude<ACTOR_TOOL_MODE, typeof ACTOR_TOOL_MODE.SERVER> {
-    if (mcp) return ACTOR_TOOL_MODE.MCP;
     if (input) return ACTOR_TOOL_MODE.RUN;
+    if (mcp) return ACTOR_TOOL_MODE.MCP;
     return ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP;
+}
+
+/**
+ * The tool a session calls a Server Actor's HTTP API with: the Actor's own tool when loaded (its description says to
+ * prefer it), else `send-server-actor-request` when loaded, else none.
+ */
+export function findServerTool(actorFullName: string, loadedToolNames: readonly string[]): string | undefined {
+    const ownTool = actorNameToToolName(actorFullName);
+    if (loadedToolNames.includes(ownTool)) return ownTool;
+    if (loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)) return HELPER_TOOLS.ACTOR_SERVER_REQUEST;
+    return undefined;
 }
 
 /** Multi-tenant when the Actor's standby configuration says so; single-tenant otherwise, the platform default. */

@@ -148,7 +148,7 @@ repeated parameters); a 200 body is a JSON object with `fetch` (including `fetch
 HTTP 502 `UPSTREAM_FETCH_ERROR`, a failed call.
 
 The web-selection family (`merge/web-selection/*`, 9 items: 7 proper + 2 with `expectedErrors`) covers
-the clash between the default web tools: web search by query (`apify/rag-web-browser`) vs
+the clash between the default web tools: web search by query (`apify/web-search`) vs
 single-URL verbatim fetch (`apify/web-fetch`) vs Actor discovery (`search-actors`) vs a
 specialized Actor for structured platform data, plus coexistence with a client's built-in,
 summarizing fetch. Also stateless — no fixtures script.

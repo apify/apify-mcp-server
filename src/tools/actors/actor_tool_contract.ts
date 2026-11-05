@@ -1,8 +1,11 @@
 import { RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../const.js';
 import type { ActorInputSchema, ToolDescriptionContext } from '../../types.js';
 
+/** Appended to the `apify/rag-web-browser` tool description, a Server Actor tool (`GET /search`). */
 const RAG_WEB_BROWSER_ADDITIONAL_DESC = `Use this tool for generic web content: it searches the web by query and returns the text of the top results.
 This tool scrapes the data itself - it does NOT just find tools.
+Example: {"method":"GET","path":"/search","query":{"query":"latest AI agent payment protocols","maxResults":3}}
+If query is a URL, the tool fetches that page instead of searching.
 
 Examples of when to use:
 - General questions answered by web pages (e.g., "What's the weather in Prague?", "Latest news about the EU AI Act", "How does HTTP/3 work?")
@@ -35,9 +38,11 @@ If the exact URL cannot be fetched (e.g. a non-http(s) scheme such as ftp:), say
 const WEB_FETCH_URL_SCHEME_NOTE =
     'url takes http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.';
 
-/** Appended to the `apify/web-search` Actor tool description. */
+/** Appended to the `apify/web-search` tool description, a Server Actor tool (`GET /` and `POST /`). */
 const WEB_SEARCH_ADDITIONAL_DESC = `Use this tool to search the web by query and get one page of organic results: title, URL, snippet and position (up to about 10 results; links and snippets only, no page content).
 countryCode and languageCode set the locale, dateFrom and dateTo bound the publication date, allowedDomains and blockedDomains restrict or exclude sites.
+Example: {"method":"GET","path":"/","query":{"query":"latest AI agent payment protocols","maxResults":5}}
+allowedDomains and blockedDomains are lists of hostnames, such as ["example.com","example.org"]; dateFrom and dateTo are YYYY-MM-DD.
 
 Examples of when to use:
 - The user wants links to choose from or to know which pages exist for a topic (e.g., "find the official docs for X", "recent articles about Y, with links")
@@ -63,10 +68,6 @@ type ServerActorToolPolicyConfig = {
 type ActorToolPolicyConfig = {
     /** Direct tools only; `call-actor` and the widgets keep the Actor's own contract. */
     directInput?: DirectActorPolicyConfig;
-    /** Only these inputs are served; the others are hidden but still accepted and passed to the run. */
-    exposedInputs?: readonly string[];
-    /** Appended to the run tool's description. */
-    buildDescription?: (context: ToolDescriptionContext) => string;
     /** The Actor's own tool when it is served through its server interface; a run tool gets none of it. */
     serverTool?: ServerActorToolPolicyConfig;
 };
@@ -82,8 +83,7 @@ const ACTOR_TOOL_POLICIES: Readonly<Record<string, ActorToolPolicyConfig>> = {
         },
     },
     [RAG_WEB_BROWSER]: {
-        exposedInputs: ['query', 'maxResults', 'outputFormats'],
-        buildDescription: () => RAG_WEB_BROWSER_ADDITIONAL_DESC,
+        serverTool: { buildDescription: () => RAG_WEB_BROWSER_ADDITIONAL_DESC },
     },
     [WEB_FETCH]: {
         serverTool: {
@@ -92,7 +92,7 @@ const ACTOR_TOOL_POLICIES: Readonly<Record<string, ActorToolPolicyConfig>> = {
         },
     },
     [WEB_SEARCH]: {
-        buildDescription: () => WEB_SEARCH_ADDITIONAL_DESC,
+        serverTool: { buildDescription: () => WEB_SEARCH_ADDITIONAL_DESC },
     },
 };
 

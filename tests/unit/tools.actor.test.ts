@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
-import { HELPER_TOOLS, WEB_SEARCH } from '../../src/const.js';
+import { HELPER_TOOLS } from '../../src/const.js';
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../../src/mcp/const.js';
 import {
     actorNameToToolName,
@@ -89,13 +89,12 @@ function makeActorInfo(opts: {
     webServerMcpPath?: string | null;
     input?: unknown;
     hasWebServerSchema?: boolean;
-    actorFullName?: string;
 }): ActorInfo {
     return {
         webServerMcpPath: opts.webServerMcpPath ?? null,
         definition: {
             id: 'actor-id',
-            actorFullName: opts.actorFullName ?? 'acme/actor',
+            actorFullName: 'acme/actor',
             input: opts.input as ActorInputSchema | undefined,
             hasWebServerSchema: opts.hasWebServerSchema ?? false,
         },
@@ -116,15 +115,29 @@ describe('interface availability and tool routing', () => {
             ACTOR_TOOL_MODE.RUN,
         ],
         [
-            'server interface on, MCP path, HTTP schema',
+            'server interface on, MCP path, input schema, HTTP schema',
             { isStandbyEnabled: true, webServerMcpPath: '/mcp', hasWebServerSchema: true },
+            { input: true, mcp: true, server: true },
+            ACTOR_TOOL_MODE.SERVER,
+            ACTOR_TOOL_MODE.RUN,
+        ],
+        [
+            'server interface on, MCP path, input schema, no HTTP schema',
+            { isStandbyEnabled: true, webServerMcpPath: '/mcp' },
+            { input: true, mcp: true, server: false },
+            ACTOR_TOOL_MODE.MCP,
+            ACTOR_TOOL_MODE.RUN,
+        ],
+        [
+            'server interface on, MCP path, no input schema, HTTP schema',
+            { isStandbyEnabled: true, webServerMcpPath: '/mcp', input: undefined, hasWebServerSchema: true },
             { input: false, mcp: true, server: true },
             ACTOR_TOOL_MODE.SERVER,
             ACTOR_TOOL_MODE.MCP,
         ],
         [
-            'server interface on, MCP path, no HTTP schema',
-            { isStandbyEnabled: true, webServerMcpPath: '/mcp' },
+            'server interface on, MCP path, no input schema, no HTTP schema',
+            { isStandbyEnabled: true, webServerMcpPath: '/mcp', input: undefined },
             { input: false, mcp: true, server: false },
             ACTOR_TOOL_MODE.MCP,
             ACTOR_TOOL_MODE.MCP,
@@ -146,21 +159,6 @@ describe('interface availability and tool routing', () => {
         [
             'server interface on, no MCP path, no input schema, no HTTP schema',
             { isStandbyEnabled: true, input: undefined },
-            { input: false, mcp: false, server: false },
-            ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,
-            ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,
-        ],
-        [
-            'input-interface Actor declaring an MCP path, with an HTTP schema',
-            { isStandbyEnabled: true, webServerMcpPath: '/mcp', hasWebServerSchema: true, actorFullName: WEB_SEARCH },
-            { input: true, mcp: false, server: true },
-            ACTOR_TOOL_MODE.RUN,
-            ACTOR_TOOL_MODE.RUN,
-        ],
-        // The input-interface override only drops the MCP interface; it does not waive the empty-schema rule.
-        [
-            'input-interface Actor with an empty input schema',
-            { isStandbyEnabled: true, webServerMcpPath: '/mcp', actorFullName: WEB_SEARCH, input: undefined },
             { input: false, mcp: false, server: false },
             ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,
             ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP,

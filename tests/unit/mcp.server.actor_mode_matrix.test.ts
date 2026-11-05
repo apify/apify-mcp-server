@@ -2,8 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS, WEB_SEARCH } from '../../src/const.js';
+import { connectMCPClient } from '../../src/mcp/client.js';
 import { actorDefinitionCache } from '../../src/state.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { callActorPreExecute, executeCallActor } from '../../src/tools/actors/call_actor.js';
+import { executeCallActorMcpTool } from '../../src/tools/actors/call_actor_mcp_tool.js';
+import { buildServerActorToolInfo } from '../../src/tools/actors/server_interface_details.js';
 import type { ActorDefinitionWithInfo } from '../../src/types.js';
 import type { ToolResponse } from '../../src/utils/mcp.js';
 import { withServer } from './helpers/mcp_server.js';
@@ -20,11 +24,23 @@ vi.mock('../../src/mcp/client.js', () => ({
         listTools: async () => ({
             tools: [{ name: 'add', description: 'adds', inputSchema: { type: 'object', properties: {} } }],
         }),
+        callTool: async () => ({ content: [{ type: 'text', text: 'remote result' }] }),
         close: async () => {},
     })),
 }));
 
 const NON_EMPTY_INPUT = { type: 'object', properties: { url: { type: 'string', description: 'a url' } } };
+/** One operation of apify/web-search's API schema. */
+const WEB_SEARCH_SCHEMA = {
+    paths: {
+        '/': {
+            get: {
+                summary: 'Run a search',
+                parameters: [{ name: 'query', in: 'query', required: true, schema: { type: 'string' } }],
+            },
+        },
+    },
+};
 
 /** Every cell of the decision table, seeded as a public Actor so the cache's owner gate is bypassed. */
 const RUN_ONLY = 'acme/run-only';
@@ -41,6 +57,7 @@ function seedActor(
         webServerMcpPath?: string;
         isStandbyEnabled?: boolean;
         hasWebServerSchema?: boolean;
+        webServerSchema?: unknown;
         input?: unknown;
         cacheKey?: string;
     },
@@ -53,7 +70,8 @@ function seedActor(
             description: 'test Actor',
             defaultRunOptions: { memoryMbytes: 1024 },
             ...(opts.webServerMcpPath && { webServerMcpPath: opts.webServerMcpPath }),
-            hasWebServerSchema: opts.hasWebServerSchema,
+            hasWebServerSchema: opts.hasWebServerSchema ?? opts.webServerSchema !== undefined,
+            webServerToolInfo: buildServerActorToolInfo(opts.webServerSchema, name),
             ...(opts.input !== undefined && { input: opts.input }),
         },
         info: {
@@ -100,8 +118,13 @@ function earlyText(result: Awaited<ReturnType<typeof preExecute>>): string {
 beforeEach(() => {
     seedActor(RUN_ONLY, { input: NON_EMPTY_INPUT });
     seedActor(RUN_ONLY_STALE_PATH, { webServerMcpPath: '/mcp', input: NON_EMPTY_INPUT });
-    seedActor(STANDBY_MCP, { webServerMcpPath: '/mcp', isStandbyEnabled: true, input: NON_EMPTY_INPUT });
-    seedActor(WEB_SEARCH, { webServerMcpPath: '/mcp', isStandbyEnabled: true, input: NON_EMPTY_INPUT });
+    seedActor(STANDBY_MCP, { webServerMcpPath: '/mcp', isStandbyEnabled: true });
+    seedActor(WEB_SEARCH, {
+        webServerMcpPath: '/mcp',
+        isStandbyEnabled: true,
+        webServerSchema: WEB_SEARCH_SCHEMA,
+        input: NON_EMPTY_INPUT,
+    });
     seedActor(STANDBY_INPUT, { isStandbyEnabled: true, input: NON_EMPTY_INPUT });
     seedActor(STANDBY_EMPTY, { isStandbyEnabled: true });
     seedActor(STANDBY_EMPTY, { isStandbyEnabled: true, cacheKey: STANDBY_EMPTY_ID });
@@ -112,23 +135,58 @@ describe('Actor run/standby mode decision table', () => {
     it.each([
         ['a run-only Actor', RUN_ONLY, ['acme--run-only']],
         ['a run-only Actor carrying a leftover webServerMcpPath', RUN_ONLY_STALE_PATH, ['acme--run-only-stale-path']],
-        ['a standby Actor exposing an MCP server (proxied tools only)', STANDBY_MCP, ['acme--standby-mcp--add']],
-        ['an input-interface Actor carrying an MCP path', WEB_SEARCH, ['apify--web-search']],
+        [
+            'a standby Actor exposing an MCP server and no input schema (proxied tools only)',
+            STANDBY_MCP,
+            ['acme--standby-mcp--add'],
+        ],
+        [
+            'a standby Actor carrying an MCP path and an HTTP schema (its server tool)',
+            WEB_SEARCH,
+            ['apify--web-search'],
+        ],
         ['a standby Actor with no MCP server but a non-empty input schema', STANDBY_INPUT, ['acme--standby-input']],
         ['a standby Actor with no MCP server and an empty input schema', STANDBY_EMPTY, []],
     ])('tools/list surface for %s', async (_label, actor, expected) => {
         expect(await loadedToolNames(actor)).toEqual(expected);
     });
 
-    describe('call-actor routing', () => {
-        it.each([RUN_ONLY_STALE_PATH, WEB_SEARCH])(
-            'runs %s through its input schema despite its MCP path',
-            async (actor) => {
-                const result = await preExecute(actor);
+    it('serves apify/web-search as a server tool, not a run tool', async () => {
+        const inputSchema = await withServer(async (server) => {
+            await server.loadToolsByName([WEB_SEARCH], new ApifyClient({ token: 'test-token' }));
+            return server.tools.get('apify--web-search')?.inputSchema;
+        });
 
-                expect('earlyResponse' in result).toBe(false);
-            },
-        );
+        expect(inputSchema?.properties).toHaveProperty('method');
+        expect(inputSchema?.properties).toHaveProperty('path');
+        expect(inputSchema?.properties).not.toHaveProperty('url');
+    });
+
+    describe('call-actor routing', () => {
+        it.each([
+            ['a run-only Actor despite its leftover MCP path', RUN_ONLY_STALE_PATH],
+            ['an MCP-server Actor with an input schema', WEB_SEARCH],
+        ])('runs %s through its input schema', async (_label, actor) => {
+            const result = await preExecute(actor);
+
+            expect('earlyResponse' in result).toBe(false);
+        });
+
+        it('leaves the MCP server of apify/web-search reachable through call-actor-mcp-tool', async () => {
+            const response = await executeCallActorMcpTool(
+                stubToolCallContext(
+                    { actor: WEB_SEARCH, tool: 'search', arguments: { query: 'apify' } },
+                    new ApifyClient({ token: 'test-token' }),
+                ),
+            );
+
+            expect(response.isError).not.toBe(true);
+            expect(vi.mocked(connectMCPClient)).toHaveBeenLastCalledWith(
+                'https://apify-web-search.apify.actor/mcp',
+                expect.anything(),
+                undefined,
+            );
+        });
 
         it('runs a standby Actor with no MCP server but a non-empty input schema', async () => {
             const result = await preExecute(STANDBY_INPUT);
@@ -136,7 +194,7 @@ describe('Actor run/standby mode decision table', () => {
             expect('earlyResponse' in result).toBe(false);
         });
 
-        it('rejects a standby Actor exposing an MCP server, naming call-actor-mcp-tool only when the session has it', async () => {
+        it('rejects an MCP-server Actor with no input schema, naming call-actor-mcp-tool only when the session has it', async () => {
             const withMcpTool = earlyResponseOf(await preExecute(STANDBY_MCP));
             const withoutMcpTool = earlyText(await preExecute(STANDBY_MCP, [HELPER_TOOLS.ACTOR_CALL]));
 
@@ -167,6 +225,24 @@ describe('Actor run/standby mode decision table', () => {
             expect(text).toContain('has no MCP tools or input interface');
             expect(text).toContain(STANDBY_EMPTY);
             expect(text).not.toContain(STANDBY_EMPTY_ID);
+        });
+
+        it("names the Actor's own server tool over the HTTP request tool when both are loaded", async () => {
+            seedActor(STANDBY_EMPTY, { isStandbyEnabled: true, hasWebServerSchema: true });
+            const ownTool = actorNameToToolName(STANDBY_EMPTY);
+            const options = { loadedToolNames: [ownTool, HELPER_TOOLS.ACTOR_SERVER_REQUEST] };
+
+            const bare = await executeCallActor(
+                stubToolCallContext(
+                    { actor: STANDBY_EMPTY, input: {} },
+                    new ApifyClient({ token: 'test-token' }),
+                    options,
+                ),
+            );
+
+            const text = firstText(bare);
+            expect(text).toContain(`through ${ownTool}.`);
+            expect(text).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
         });
 
         it.each([true, false])('names the HTTP request tool only when loaded: %s', async (hasRequestTool) => {

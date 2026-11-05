@@ -863,7 +863,7 @@ export const actorRunOutputSchema = {
  * Returns a per-tool clone of {@link actorRunOutputSchema} with `storages.datasets.default.itemsSchema`
  * declared as a JSON Schema describing each dataset row, inferred from historical successful runs.
  *
- * Used for direct actor tools (e.g. `apify--rag-web-browser`) where the target Actor is known
+ * Used for direct actor tools (e.g. `apify--instagram-scraper`) where the target Actor is known
  * at `tools/list` time, so the LLM can plan field projection before calling the tool. The same
  * shape is injected into `structuredContent.storages.datasets.default.itemsSchema` by the direct
  * actor executors so the declared schema matches the runtime response.
