@@ -13,13 +13,13 @@ Examples of when to use:
 
 For detailed data from a specific platform (e.g. Amazon products with prices, Instagram posts, Google Maps places with ratings), a specialized Actor from the Apify Store returns complete, structured results; this tool returns page text only.`;
 
-/**
- * The `apify/web-fetch` and `apify/web-search` tool descriptions, Server Actor tools (`GET /` and `POST /`), share
- * one shape: what the tool returns, the parameters that change what it returns, when it fits, what it does not do,
- * and an example call. The facts are the Actors' own API schemas. Client-agnostic on purpose: no references to any
- * specific client or its built-in tools, so the same text works for every MCP client; the sibling web tool is named
- * only when the session serves it.
- */
+// The `apify/web-fetch` and `apify/web-search` tool descriptions, Server Actor tools (`GET /` and `POST /`), share
+// one shape: what the tool returns, the parameters that change what it returns, when it fits, what it does not do,
+// and an example call. The facts are the Actors' own API schemas. Client-agnostic on purpose: no references to any
+// specific client or its built-in tools, so the same text works for every MCP client; the sibling web tool is named
+// only when the session serves it.
+
+/** The `apify/web-fetch` tool description. */
 const buildWebFetchDescription = ({ hasTool }: ToolDescriptionContext): string => {
     const webSearchTool = actorNameToToolName(WEB_SEARCH);
     return `Fetches one URL and returns its content as a JSON object with a field per requested format, plus metadata such as the final URL, HTTP status, content type and page title.
@@ -30,6 +30,7 @@ It does not search the web; it needs a URL.${hasTool(webSearchTool) ? ` To find 
 Example: {"method":"GET","path":"/","query":{"url":"https://example.com","formats":["markdown"]}}`;
 };
 
+/** The `apify/web-search` tool description. */
 const buildWebSearchDescription = ({ hasTool }: ToolDescriptionContext): string => {
     const webFetchTool = actorNameToToolName(WEB_FETCH);
     return `Runs one web search and returns one page of organic results as JSON: title, URL, snippet and position of each result, with publication date, publisher and sublinks when the search engine provides them.

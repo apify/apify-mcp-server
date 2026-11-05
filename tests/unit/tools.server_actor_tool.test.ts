@@ -459,12 +459,11 @@ describe('serving a selected Server Actor through its server interface', () => {
         expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR_SERVER]);
     });
 
-    it('serves apify/rag-web-browser as a Server Actor tool with its policy text', async () => {
+    it('serves apify/rag-web-browser as a Server Actor tool that names no other web Actor', async () => {
         const [username, name] = RAG_WEB_BROWSER.split('/');
         const { tools } = await loadTools(SCHEMA, { actor: { username, name } });
 
         expect(tools.map((tool) => tool.type)).toEqual([TOOL_TYPE.ACTOR_SERVER]);
-        expect(tools[0].description).toContain('Example: {"method":"GET","path":"/search"');
         expect(tools[0].description).not.toContain(WEB_FETCH);
     });
 
@@ -614,12 +613,13 @@ describe('the operations in a Server Actor tool description', () => {
         expect(tool.buildDescription?.(only()).endsWith(lines)).toBe(true);
     });
 
-    it('prefer this tool over send-server-actor-request only when the session has it', async () => {
+    it('names send-server-actor-request only when the session has it', async () => {
         const tool = await loadServerTool(SCHEMA);
-        const instead = `Use this tool instead of the "${HELPER_TOOLS.ACTOR_SERVER_REQUEST}"`;
 
-        expect(tool.buildDescription?.(only(HELPER_TOOLS.ACTOR_SERVER_REQUEST))).toContain(instead);
-        expect(tool.buildDescription?.(only())).not.toContain(instead);
+        expect(tool.buildDescription?.(only(HELPER_TOOLS.ACTOR_SERVER_REQUEST))).toContain(
+            HELPER_TOOLS.ACTOR_SERVER_REQUEST,
+        );
+        expect(tool.buildDescription?.(only())).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
     });
 
     it('point at the list of every operation when the lines are cut', async () => {
