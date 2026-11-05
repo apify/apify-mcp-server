@@ -497,17 +497,8 @@ export async function executeSyncToolCall(
         sendNotification,
         emitLog,
     } = params;
-    const {
-        tool,
-        toolArgs,
-        logSafeArgs,
-        apifyClient,
-        actorName,
-        actorId,
-        standbyRejection,
-        paymentRequiredResult,
-        legacyInputNote,
-    } = prepared;
+    const { tool, toolArgs, logSafeArgs, apifyClient, actorName, actorId, standbyRejection, paymentRequiredResult } =
+        prepared;
     const resolvedToolName = getToolFullName(tool);
 
     const nudge = (result: unknown, callDiagnostics: CallDiagnostics): Record<string, unknown> =>
@@ -556,12 +547,12 @@ export async function executeSyncToolCall(
             actorId,
             taskMode: false,
         });
-        const result = legacyInputNote
+        const result = prepared.legacyInputNote
             ? {
                   ...dispatchResult.result,
                   content: [
                       ...((dispatchResult.result.content as unknown[] | undefined) ?? []),
-                      { type: 'text', text: legacyInputNote },
+                      { type: 'text', text: prepared.legacyInputNote },
                   ],
               }
             : dispatchResult.result;
