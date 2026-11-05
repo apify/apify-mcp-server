@@ -25,7 +25,7 @@ import { toPlainError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondServerError, respondUserError } from '../../utils/mcp.js';
 import { resolveActorInterfaces, resolveActorTenancy } from '../actor_tool_naming.js';
-import { apiCallArgsShape, redactApiCallArgs } from '../api/apify_api_request.js';
+import { queryValueSchema, redactApiCallArgs } from '../api/apify_api_request.js';
 import { API_METHODS, type ApiMethod, isRecord } from '../api/apify_api_spec.js';
 import { parseBaseMimeType } from '../storage/storage_helpers.js';
 import { anyJsonValueSchema, serverActorRequestOutputSchema } from '../structured_output_schemas.js';
@@ -44,10 +44,14 @@ const sendServerActorRequestArgs = z.object({
             The path of an operation in the Actor API schema, starting with /. Take it from the schema; do not guess it.
             A query string written into the path is sent too.
         `),
-    query: apiCallArgsShape.query.describe(
-        'Query parameters, by name, for example {"limit": 10, "verbose": true}; a boolean is sent as true or ' +
-            'false. Added to a query string in the path.',
-    ),
+    // Scalars only: unlike the Apify API, an Actor Server documents no format for a list.
+    query: z
+        .record(z.string(), queryValueSchema)
+        .optional()
+        .describe(
+            'Query parameters, by name, as the Actor API schema lists them; a boolean is sent as true or false. ' +
+                'Added to a query string in the path.',
+        ),
     body: z.unknown().optional().describe('The JSON request body, sent as application/json. Not allowed with GET.'),
 });
 type SendServerActorRequestArgs = z.infer<typeof sendServerActorRequestArgs>;

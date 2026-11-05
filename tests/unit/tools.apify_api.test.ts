@@ -428,6 +428,14 @@ describe('apify-api-read', () => {
         expect(readSentUrl()).toBe(`${BASE_URL}/datasets/abc?methods=a&methodName=b`);
     });
 
+    it('sends an array query value as one comma-separated value', async () => {
+        requestMock.mockResolvedValue(mockResponse(200, { data: {} }));
+
+        await callTool(apifyApiRead, { path: 'actor-runs', query: { status: ['FAILED', 'ABORTED'], limit: 5 } });
+
+        expect(readSentUrl()).toBe(`${BASE_URL}/actor-runs?status=FAILED,ABORTED&limit=5`);
+    });
+
     it('sends one GET to the path and returns the body as the API sends it', async () => {
         const body = { data: { total: 1, items: [{ id: 'abc' }] } };
         requestMock.mockResolvedValue(mockResponse(200, body));
@@ -1286,11 +1294,11 @@ describe.each([
     { name: HELPER_TOOLS.API_READ, tool: apifyApiRead, args: { path: '/v2/datasets' } },
     { name: HELPER_TOOLS.API_WRITE, tool: apifyApiWrite, args: { path: '/v2/datasets/abc', method: 'DELETE' } },
 ])('$name validates query values without coercing them', ({ tool, args }) => {
-    it.each([{ value: null }, { value: [10] }])('rejects the query value $value', ({ value }) => {
-        expect(tool.ajvValidate({ ...args, query: { limit: value } })).toBe(false);
+    it('rejects a null query value', () => {
+        expect(tool.ajvValidate({ ...args, query: { limit: null } })).toBe(false);
     });
 
-    it('accepts string, number, and boolean query values', () => {
-        expect(tool.ajvValidate({ ...args, query: { limit: 10, desc: true, format: 'json' } })).toBe(true);
+    it('accepts an array query value', () => {
+        expect(tool.ajvValidate({ ...args, query: { status: ['FAILED', 'ABORTED'] } })).toBe(true);
     });
 });

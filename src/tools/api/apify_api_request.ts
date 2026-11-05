@@ -18,6 +18,10 @@ import { API_RESOURCE_ALIASES, normalizeApiPath } from './apify_api_path.js';
 import type { ApiMethod, ApiOperation } from './apify_api_spec.js';
 import { fetchApiOperationIndex, isRecord } from './apify_api_spec.js';
 
+/** One query parameter value. */
+export const queryValueSchema = z.union([z.string(), z.number(), z.boolean()]);
+type QueryValue = z.infer<typeof queryValueSchema>;
+
 /** Input fields the read and write tools share. */
 export const apiCallArgsShape = {
     path: z
@@ -29,9 +33,12 @@ export const apiCallArgsShape = {
                 'A query string written into the path is sent too.',
         ),
     query: z
-        .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+        .record(z.string(), z.union([queryValueSchema, z.array(queryValueSchema)]))
         .optional()
-        .describe('Query parameters, by name, for example {"limit": 10}. Added to a query string in the path.'),
+        .describe(
+            'Query parameters, by name, for example {"limit": 10}. An array is sent comma-separated. ' +
+                'Added to a query string in the path.',
+        ),
 };
 
 /** The shared description lines of the read and write tools. */
@@ -251,7 +258,7 @@ export async function callApi(params: {
     token?: string;
     method: ApiMethod;
     path: string;
-    query?: Record<string, string | number | boolean>;
+    query?: Record<string, QueryValue | QueryValue[]>;
     /** JSON request body; only the write tool sends one. */
     body?: unknown;
     /** Aborts the request when the client cancels the tool call. */
@@ -278,7 +285,16 @@ export async function callApi(params: {
         response = await sendApifyApiRequest(client, {
             url,
             method,
-            params: params.query,
+            // The API reads a list as one comma-separated value (OpenAPI `style: form, explode: false`);
+            // axios would send an array as `name[]=a&name[]=b`.
+            params:
+                params.query &&
+                Object.fromEntries(
+                    Object.entries(params.query).map(([name, value]) => [
+                        name,
+                        Array.isArray(value) ? value.join(',') : value,
+                    ]),
+                ),
             // Serialized here: axios would send a string as a form and refuse a number. With only the JSON
             // header, a JSON-looking string would reach the API as the object it holds.
             ...(params.body !== undefined && {
