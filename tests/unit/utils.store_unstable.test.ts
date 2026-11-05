@@ -187,8 +187,10 @@ describe('free-form /unstable/store items', () => {
 });
 
 describe('the /unstable/store request', () => {
+    const API_BASE_URL = 'https://api.apify.com/v2';
+
     it('includes the input schemas, continues from the cursor and sends the tracking', () => {
-        const url = buildUnstableStoreSearchUrl({
+        const url = buildUnstableStoreSearchUrl(API_BASE_URL, {
             search: 'instagram',
             limit: 5,
             cursor: 'recomm-1',
@@ -207,10 +209,23 @@ describe('the /unstable/store request', () => {
     });
 
     it('browses without a search when the keywords are empty, and forwards the agentic filter', () => {
-        const url = buildUnstableStoreSearchUrl({ search: '', limit: 5, allowsAgenticUsers: true });
+        const url = buildUnstableStoreSearchUrl(API_BASE_URL, { search: '', limit: 5, allowsAgenticUsers: true });
 
         expect(url.searchParams.has('search')).toBe(false);
         expect(url.searchParams.get('allowsAgenticUsers')).toBe('true');
+    });
+
+    // `/v2/store` goes to the client's `baseUrl`, which an explicit option sets over the env default.
+    it("goes to the client's API host, like /v2/store", async () => {
+        const apifyClient = new ApifyClient({ token: 'test-token', baseUrl: 'https://api.staging.example/proxy' });
+        const request = vi
+            .spyOn(apifyClient.httpClient.axios, 'request')
+            .mockResolvedValueOnce({ status: 200, data: { data: { items: [], count: 0, limit: 5 } } });
+
+        await searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient, limit: 5 });
+
+        const url = requestedUrl(request);
+        expect(`${url.origin}${url.pathname}`).toBe('https://api.staging.example/proxy/unstable/store');
     });
 });
 

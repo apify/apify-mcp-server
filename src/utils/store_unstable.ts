@@ -5,7 +5,6 @@ import { z } from 'zod';
 import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
-import { getApifyAPIBaseUrl } from '../apify_client.js';
 import type { ActorStoreList } from '../types.js';
 
 // Read once at import, so the tool schema and the routing always agree.
@@ -79,8 +78,12 @@ export type UnstableStoreSearchPage = {
     nextCursor?: string;
 };
 
-export function buildUnstableStoreSearchUrl(options: Omit<UnstableStoreSearchOptions, 'apifyClient'>): URL {
-    const url = new URL('/unstable/store', getApifyAPIBaseUrl());
+/** `apiBaseUrl` is the client's `baseUrl` (`<origin>/v2`), so the request goes where `/v2/store` goes. */
+export function buildUnstableStoreSearchUrl(
+    apiBaseUrl: string,
+    options: Omit<UnstableStoreSearchOptions, 'apifyClient'>,
+): URL {
+    const url = new URL(apiBaseUrl.replace(/\/v2$/, '/unstable/store'));
     if (options.search) url.searchParams.set('search', options.search);
     url.searchParams.set('limit', String(options.limit));
     url.searchParams.set('include', 'inputSchema');
@@ -148,7 +151,7 @@ export async function searchActorsViaUnstableEndpoint(
     // `httpClient.call()` retries 429, 5xx and network errors, as `/v2/store` does through `store().list()`,
     // and throws the API error with its status, like `store().list()`.
     const response = await apifyClient.httpClient.call({
-        url: buildUnstableStoreSearchUrl(query).toString(),
+        url: buildUnstableStoreSearchUrl(apifyClient.baseUrl, query).toString(),
         method: 'GET',
     });
 
