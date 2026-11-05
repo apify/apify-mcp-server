@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { MAX_EXTRA_FIELD_VALUE_LENGTH } from '../../src/const.js';
 import type { ActorStoreList, HelperTool } from '../../src/types.js';
 import {
     DEFAULT_CARD_OPTIONS,
@@ -145,6 +146,33 @@ describe('free-form /unstable/store items', () => {
         expect(formatActorToActorCard(mapped)).toContain('- **Stats:** {"users":{"total":5}}');
     });
 
+    it('puts a multi-line value on one card line, so it cannot open its own markdown section', () => {
+        const mapped = mapUnstableStoreItem({ ...UNSTABLE_STORE_ITEM, agentHint: 'Prefer for profiles.\n\n# Actors:' });
+
+        expect(formatActorToActorCard(mapped)).toContain('- **Agent hint:** Prefer for profiles. # Actors:');
+    });
+
+    it('caps a long value', () => {
+        const mapped = mapUnstableStoreItem({ ...UNSTABLE_STORE_ITEM, agentHint: 'x'.repeat(5000) });
+
+        const line = formatActorToActorCard(mapped)
+            .split('\n')
+            .find((cardLine) => cardLine.startsWith('- **Agent hint:**'));
+        expect(line).toHaveLength('- **Agent hint:** '.length + MAX_EXTRA_FIELD_VALUE_LENGTH);
+    });
+
+    // The raw value replaces the card's fallback line, so the field is not shown twice with different values.
+    it.each([
+        ['description', '- **Description:** No description provided.'],
+        ['categories', '- **Categories:** Uncategorized'],
+    ])('shows %s in an unknown shape once', (field, fallbackLine) => {
+        const mapped = mapUnstableStoreItem({ ...UNSTABLE_STORE_ITEM, [field]: { primary: 'SOCIAL_MEDIA' } });
+
+        const card = formatActorToActorCard(mapped);
+        expect(card).not.toContain(fallbackLine);
+        expect(card.match(new RegExp(`\\*\\*${field}:\\*\\*`, 'gi'))).toHaveLength(1);
+    });
+
     it('leaves out null fields', () => {
         expect(mapUnstableStoreItem({ ...UNSTABLE_STORE_ITEM, badge: null })).not.toHaveProperty('extraFields');
     });
@@ -283,28 +311,68 @@ describe('search-actors served from /unstable/store', () => {
         vi.resetModules();
     });
 
-    it('takes a cursor and returns the next one', async () => {
+    /** Loads both search tools with the flag on, which is read once when the tool modules load. */
+    const loadToolsWithFlag = async () => {
         vi.stubEnv('APIFY_STORE_UNSTABLE_ENDPOINT', '1');
         vi.resetModules();
-        // The flag is read once when the tool module loads.
         const { searchActors } = await import('../../src/tools/actors/search_actors.js');
+        const { searchActorsWidget } = await import('../../src/tools/widgets/search_actors_widget.js');
         const { stubToolCallContext } = await import('./helpers/tool_context.js');
+        return { searchActors, searchActorsWidget, stubToolCallContext };
+    };
+
+    const mockClientAnswering = (items: UnstableStoreItem[], recommId: string) => {
         const request = vi.fn().mockResolvedValue({
             status: 200,
-            data: { data: { items: [UNSTABLE_STORE_ITEM], count: 1, limit: 5, recommId: 'recomm-2' } },
+            data: { data: { items, count: items.length, limit: 5, recommId } },
         });
         const apifyClient = mockApifyClient({
             httpClient: { axios: { request } },
             user: () => ({ get: async () => ({ id: 'user-1', plan: { tier: 'FREE' } }) }),
         });
+        return { request, apifyClient };
+    };
+
+    type SearchResult = { structuredContent: { nextCursor?: string }; content: { text: string }[] };
+
+    it('takes a cursor and returns the next one', async () => {
+        const { searchActors, stubToolCallContext } = await loadToolsWithFlag();
+        const { request, apifyClient } = mockClientAnswering([UNSTABLE_STORE_ITEM], 'recomm-2');
 
         const result = (await (searchActors as HelperTool).call(
             stubToolCallContext({ keywords: 'instagram', limit: 5, cursor: 'recomm-1' }, apifyClient),
-        )) as { structuredContent: { nextCursor?: string }; content: { text: string }[] };
+        )) as SearchResult;
 
         expect(searchActors.inputSchema.properties).toHaveProperty('cursor');
         expect(requestedUrl(request).searchParams.get('recommId')).toBe('recomm-1');
         expect(result.structuredContent.nextCursor).toBe('recomm-2');
         expect(result.content[0].text).toContain('recomm-2');
+    });
+
+    // The store drops Actors after ranking, so later pages can still have results.
+    it('returns the next cursor on an empty page instead of suggesting other keywords', async () => {
+        const { searchActors, stubToolCallContext } = await loadToolsWithFlag();
+        const { apifyClient } = mockClientAnswering([], 'recomm-2');
+
+        const result = (await (searchActors as HelperTool).call(
+            stubToolCallContext({ keywords: 'instagram', limit: 5 }, apifyClient),
+        )) as SearchResult;
+        const text = result.content.map((part) => part.text).join('\n');
+
+        expect(result.structuredContent.nextCursor).toBe('recomm-2');
+        expect(text).toContain('recomm-2');
+        expect(text).not.toContain('Keywords can include');
+    });
+
+    it('returns the next cursor on an empty widget page', async () => {
+        const { searchActorsWidget, stubToolCallContext } = await loadToolsWithFlag();
+        const { apifyClient } = mockClientAnswering([], 'recomm-2');
+
+        const result = (await (searchActorsWidget as HelperTool).call(
+            stubToolCallContext({ keywords: 'instagram', limit: 5 }, apifyClient),
+        )) as SearchResult;
+
+        expect(result.structuredContent.nextCursor).toBe('recomm-2');
+        expect(result.content.map((part) => part.text).join('\n')).toContain('recomm-2');
     });
 });

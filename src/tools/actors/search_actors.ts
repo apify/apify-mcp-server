@@ -146,18 +146,29 @@ export function buildSearchActorsResult(
 
 /**
  * Builds the empty-results guidance message for when no Actors are found.
- * Past offset 0 the query may have matched, so keyword guidance does not apply (see apify/apify-mcp-server#1276).
+ * Past offset 0, or with a cursor to come from or go to, the query may have matched, so keyword guidance
+ * does not apply (see apify/apify-mcp-server#1276).
  * The text does not say the results ended: the Store filters results after paging, so an empty page can come
  * before non-empty ones (see apify/apify-mcp-server#1593).
  */
-export function buildNoActorsFoundInstructions(keywords: string, offset: number, cursor?: string): string {
-    if (cursor) return `No Actors returned on this page of the search query "${keywords}".`;
+export function buildNoActorsFoundInstructions(
+    keywords: string,
+    offset: number,
+    cursor?: string,
+    nextCursor?: string,
+): string {
+    if (cursor || nextCursor) return `No Actors returned on this page of the search query "${keywords}".`;
     if (offset > 0) return `No Actors returned at offset ${offset} for the search query "${keywords}".`;
     return dedent`
         No Actors were found for the search query "${keywords}".
         Keywords can include the named platform and/or data type (e.g. "TikTok posts").
         A platform-only query such as "TikTok" is an option if more specific results do not fit.
     `;
+}
+
+/** The cursor line of a `/unstable/store` page, empty or not; empty string without a next page. */
+export function buildNextPageCursorLine(nextCursor?: string): string {
+    return nextCursor ? `- **Next page cursor:** \`${nextCursor}\`` : '';
 }
 
 /** Caveat for the whole result list — appended only when at least one result lacks a run path. */
@@ -247,9 +258,15 @@ export const searchActors: ToolEntry = Object.freeze({
         ]);
 
         if (actors.length === 0) {
-            const instructions = buildNoActorsFoundInstructions(parsed.keywords, offset, cursor);
-            return respondOk(instructions, {
-                structuredContent: { actors: [], query: parsed.keywords, count: 0, instructions },
+            const instructions = buildNoActorsFoundInstructions(parsed.keywords, offset, cursor, nextCursor);
+            return respondOk([instructions, buildNextPageCursorLine(nextCursor)].filter(Boolean).join('\n\n'), {
+                structuredContent: {
+                    actors: [],
+                    query: parsed.keywords,
+                    count: 0,
+                    instructions,
+                    ...(nextCursor && { nextCursor }),
+                },
             });
         }
 
@@ -278,7 +295,7 @@ export const searchActors: ToolEntry = Object.freeze({
 
             # Actors:
         `;
-        const nextPage = nextCursor ? `- **Next page cursor:** \`${nextCursor}\`` : '';
+        const nextPage = buildNextPageCursorLine(nextCursor);
         return respondOk([header, actorCardText, nextPage, footer].filter(Boolean).join('\n\n'), {
             structuredContent,
         });

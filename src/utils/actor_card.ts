@@ -1,4 +1,11 @@
-import { APIFY_STORE_URL, MAX_INPUT_FIELDS_IN_ACTOR_CARD, OFFICIAL_APIFY_USERNAMES } from '../const.js';
+import { truncate } from '@apify/utilities';
+
+import {
+    APIFY_STORE_URL,
+    MAX_EXTRA_FIELD_VALUE_LENGTH,
+    MAX_INPUT_FIELDS_IN_ACTOR_CARD,
+    OFFICIAL_APIFY_USERNAMES,
+} from '../const.js';
 import type { Actor, ActorCardOptions, ActorStoreInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
 import { buildConsoleActorUrl } from './console_link.js';
 import {
@@ -184,11 +191,15 @@ const formatFieldLabel = (key: string) => {
     return words.charAt(0).toUpperCase() + words.slice(1);
 };
 
-const formatFieldValue = (value: unknown) => {
+const stringifyFieldValue = (value: unknown) => {
     if (typeof value === 'string') return value;
     if (Array.isArray(value) && value.every((entry) => typeof entry !== 'object')) return value.join(', ');
     return typeof value === 'object' ? JSON.stringify(value) : String(value);
 };
+
+// One capped line: a newline in Store text would let it open its own markdown section in the card.
+const formatFieldValue = (value: unknown) =>
+    truncate(stringifyFieldValue(value).replace(/\s+/g, ' ').trim(), MAX_EXTRA_FIELD_VALUE_LENGTH, '…');
 
 /**
  * Formats Actor details into a markdown Actor card.
@@ -200,13 +211,15 @@ export function formatActorToActorCard(
 ): string {
     const data = extractActorData(actor, options);
     const userTier = options.userTier ?? 'FREE';
+    // A known field in a shape the card does not know comes as an extra field; it replaces the card's fallback line.
+    const extraFields = getExtraFields(actor) ?? {};
 
     const markdownLines = [
         `## [${data.title}](${data.actorUrl}) (\`${data.actorFullName}\`)`,
         `- **URL:** ${data.actorUrl}`,
     ];
 
-    if (options.includeDescription) {
+    if (options.includeDescription && !('description' in extraFields)) {
         markdownLines.push(`- **Description:** ${data.description}`);
     }
 
@@ -233,9 +246,11 @@ export function formatActorToActorCard(
         markdownLines.push(
             `- **Developed by:** [${data.developer.username}](${data.developer.url}) ${data.developer.isOfficialApify ? '(Apify)' : '(community)'}`,
         );
-        markdownLines.push(
-            `- **Categories:** ${data.categories.length ? data.categories.join(', ') : 'Uncategorized'}`,
-        );
+        if (!('categories' in extraFields)) {
+            markdownLines.push(
+                `- **Categories:** ${data.categories.length ? data.categories.join(', ') : 'Uncategorized'}`,
+            );
+        }
         if (data.modifiedAt) {
             markdownLines.push(`- **Last modified:** ${data.modifiedAt}`);
         }
@@ -243,7 +258,7 @@ export function formatActorToActorCard(
             markdownLines.push('\n>This Actor is deprecated and may not be maintained anymore.');
         }
     }
-    for (const [key, value] of Object.entries(getExtraFields(actor) ?? {})) {
+    for (const [key, value] of Object.entries(extraFields)) {
         markdownLines.push(`- **${formatFieldLabel(key)}:** ${formatFieldValue(value)}`);
     }
     const inputSchema = getInputSchema(actor);

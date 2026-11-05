@@ -14,6 +14,7 @@ import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunAnyActor, getActorCallabilityCaveat } from '../actor_tool_naming.js';
 import {
     buildActorCallabilityCaveat,
+    buildNextPageCursorLine,
     buildNoActorsFoundInstructions,
     buildSearchActorsResult,
     searchActorsBaseArgsSchema,
@@ -99,13 +100,14 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
             // emit an empty array rather than dropping the field.
             // `/unstable/store` ignores the offset, so it must not show up in the result text either.
             const offset = IS_UNSTABLE_STORE_SEARCH_ENABLED ? 0 : parsed.offset;
-            const instructions = buildNoActorsFoundInstructions(parsed.keywords, offset, cursor);
-            return respondOk(instructions, {
+            const instructions = buildNoActorsFoundInstructions(parsed.keywords, offset, cursor, nextCursor);
+            return respondOk([instructions, buildNextPageCursorLine(nextCursor)].filter(Boolean), {
                 structuredContent: {
                     actors: [],
                     query: parsed.keywords,
                     count: 0,
                     widgetActors: [],
+                    ...(nextCursor && { nextCursor }),
                 },
             });
         }
@@ -136,7 +138,8 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
             loadedToolNames,
             loadedActorIds,
         );
-        if (nextCursor) texts.push(`- **Next page cursor:** \`${nextCursor}\``);
+        const nextPage = buildNextPageCursorLine(nextCursor);
+        if (nextPage) texts.push(nextPage);
         if (callabilityCaveat) texts.push(callabilityCaveat);
 
         const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
