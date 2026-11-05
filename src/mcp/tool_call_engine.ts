@@ -360,6 +360,8 @@ export async function prepareToolCall(params: {
                     ? getActorToolPolicy(tool.actorFullName)?.serverTool?.exampleCall
                     : undefined;
             const ajvErrorDetails = extractAjvErrorDetails(errors);
+            // Key names only, never values: they show which call shape a rejected client sends.
+            const argKeys = Object.keys(decodedArgs).slice(0, 20).join(',').slice(0, 200);
             return {
                 message: [
                     `Invalid arguments for tool "${tool.name}".`,
@@ -377,10 +379,12 @@ export async function prepareToolCall(params: {
                 callDiagnostics: {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
                     ...ajvErrorDetails,
+                    validation_arg_keys: argKeys,
                     ...buildActorFields(actorName, actorId),
                 },
                 resolvedToolName,
                 decodedArgs,
+                logFields: { argKeys },
             };
         }
 
