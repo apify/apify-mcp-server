@@ -23,7 +23,9 @@ import { getPackageVersion } from './utils/version.js';
 const serverJson = readJsonFile<{
     $schema: string;
     name: string;
+    title: string;
     description: string;
+    websiteUrl: string;
     repository: ServerCardRepository;
     icons: ServerCard['icons'];
     remotes: ServerCardRemote[];
@@ -33,10 +35,10 @@ const serverJson = readJsonFile<{
 export function getServerInfo(): Implementation {
     return {
         name: SERVER_NAME,
-        title: SERVER_TITLE,
+        title: serverJson.title,
         version: getPackageVersion()!,
         description: serverJson.description,
-        websiteUrl: APIFY_MCP_URL,
+        websiteUrl: serverJson.websiteUrl,
         icons: [...serverJson.icons],
     };
 }
@@ -63,10 +65,10 @@ export function getServerCard(): ServerCard {
         $schema: serverJson.$schema,
 
         name: serverJson.name,
-        title: SERVER_TITLE,
+        title: serverJson.title,
         description: serverJson.description,
         version: getPackageVersion()!,
-        websiteUrl: APIFY_MCP_URL,
+        websiteUrl: serverJson.websiteUrl,
         repository: serverJson.repository,
         icons: [...serverJson.icons],
         remotes: serverJson.remotes,

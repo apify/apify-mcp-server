@@ -85,12 +85,10 @@ describe('getServerCard()', () => {
             expect(card.remotes).toEqual(serverJson.remotes);
         });
 
-        it('exposes title, websiteUrl and serverUrl matching server.json', () => {
+        it('sources title and websiteUrl from server.json', () => {
             const card = getServerCard();
 
-            expect(card.title).toBe(SERVER_TITLE);
             expect(card.title).toBe(serverJson.title);
-            expect(card.websiteUrl).toBe(APIFY_MCP_URL);
             expect(card.websiteUrl).toBe(serverJson.websiteUrl);
             expect(card.serverUrl).toBe(APIFY_MCP_URL);
         });
@@ -171,10 +169,10 @@ describe('getServerInfo()', () => {
         const info = getServerInfo();
 
         expect(info.name).toBe(SERVER_NAME);
-        expect(info.title).toBe(SERVER_TITLE);
+        expect(info.title).toBe(serverJson.title);
         expect(info.version).toBe(getPackageVersion());
         expect(info.description).toBe(serverJson.description);
-        expect(info.websiteUrl).toBe(APIFY_MCP_URL);
+        expect(info.websiteUrl).toBe(serverJson.websiteUrl);
         expect(info.icons).toEqual(serverJson.icons);
     });
 });
