@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { HELPER_TOOLS } from '../../src/const.js';
 import { CATEGORY_NAMES, getCategoryTools, toolCategories } from '../../src/tools/index.js';
 import type { ToolCategory, ToolEntry } from '../../src/types.js';
 
@@ -42,8 +41,8 @@ describe('getCategoryTools', () => {
         const defaultResult = getCategoryTools('default');
         const appsResult = getCategoryTools('apps');
 
-        const defaultCallActor = defaultResult.actors.find((t: ToolEntry) => t.name === HELPER_TOOLS.ACTOR_CALL);
-        const appsCallActor = appsResult.actors.find((t: ToolEntry) => t.name === HELPER_TOOLS.ACTOR_CALL);
+        const defaultCallActor = defaultResult.actors.find((t: ToolEntry) => t.name === 'call-actor');
+        const appsCallActor = appsResult.actors.find((t: ToolEntry) => t.name === 'call-actor');
         expect(defaultCallActor).toBeDefined();
         expect(appsCallActor).toBeDefined();
         expect(defaultCallActor).toBe(appsCallActor);
@@ -53,8 +52,8 @@ describe('getCategoryTools', () => {
         const defaultResult = getCategoryTools('default');
         const appsResult = getCategoryTools('apps');
 
-        const defaultGetRun = defaultResult.runs.find((t: ToolEntry) => t.name === HELPER_TOOLS.ACTOR_RUNS_GET);
-        const appsGetRun = appsResult.runs.find((t: ToolEntry) => t.name === HELPER_TOOLS.ACTOR_RUNS_GET);
+        const defaultGetRun = defaultResult.runs.find((t: ToolEntry) => t.name === 'get-actor-run');
+        const appsGetRun = appsResult.runs.find((t: ToolEntry) => t.name === 'get-actor-run');
 
         expect(defaultGetRun).toBeDefined();
         expect(appsGetRun).toBeDefined();
@@ -85,11 +84,14 @@ describe('getCategoryTools', () => {
         const result = getCategoryTools('default');
         const actorNames = result.actors.map((t: ToolEntry) => t.name);
 
-        // Verify workflow order: search → details → call
+        // Verify workflow order: search → details → call → MCP tool list → MCP tool call → server request
         expect(actorNames).toEqual([
-            HELPER_TOOLS.STORE_SEARCH,
-            HELPER_TOOLS.ACTOR_GET_DETAILS,
-            HELPER_TOOLS.ACTOR_CALL,
+            'search-actors',
+            'fetch-actor-details',
+            'call-actor',
+            'fetch-actor-mcp-tool-list',
+            'call-actor-mcp-tool',
+            'send-server-actor-request',
         ]);
     });
 });

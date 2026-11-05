@@ -22,6 +22,7 @@ import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
 import { getActors } from '../../src/utils/tools_loader.js';
 import {
     getRequestHandler,
+    makeActorTool,
     makeArgsRecorderTool,
     makePaymentRequiredError,
     makeThrowingTool,
@@ -55,18 +56,6 @@ vi.mock('../../src/apify_client.js', async (importOriginal) => {
 
 const getActorsMock = vi.mocked(getActors);
 
-function makeActorTool(): ToolEntry {
-    return {
-        type: TOOL_TYPE.ACTOR,
-        name: 'test-actor-tool',
-        description: 'actor',
-        inputSchema: { type: 'object', properties: {} } as ToolInputSchema,
-        ajvValidate: compileSchema({ type: 'object', properties: {} }),
-        actorId: 'test/actor',
-        actorFullName: 'test/actor',
-    } as ToolEntry;
-}
-
 function makeActorMcpTool(): ToolEntry {
     return {
         type: TOOL_TYPE.ACTOR_MCP,
@@ -92,6 +81,7 @@ function makePaidCallActorTool(): ToolEntry {
         inputSchema: { type: 'object', properties: { actor: { type: 'string' } } } as ToolInputSchema,
         ajvValidate: compileSchema({ type: 'object', properties: { actor: { type: 'string' } } }),
         paymentRequired: true,
+        hasPaymentProviderStandbyCheck: true,
         outputSchema: { type: 'object', properties: { runId: { type: 'string' } }, required: ['runId'] },
         call: async () => respondRaw({ content: [{ type: 'text', text: 'dispatch is never reached' }] }),
     } as ToolEntry;
@@ -380,12 +370,18 @@ describe('createStatelessServer() tools/call', () => {
             }, options);
             const statelessProperties = trackSpy.mock.calls[0][2];
 
-            expect(Object.keys(statelessProperties).sort()).toEqual(Object.keys(legacyProperties).sort());
-            // Only the two values that describe the request itself may differ; both are deliberate.
+            // No session id, so no trace id.
+            expect(Object.keys(statelessProperties).sort()).toEqual(
+                Object.keys(legacyProperties)
+                    .filter((key) => key !== 'trace_id')
+                    .sort(),
+            );
+            // Only the values that describe the request itself may differ; all are deliberate.
             expect({ ...statelessProperties, tool_exec_time_ms: 0 }).toEqual({
                 ...legacyProperties,
                 tool_exec_time_ms: 0,
                 mcp_session_id: '',
+                trace_id: undefined,
                 mcp_protocol_version: STATELESS_PROTOCOL_VERSION,
             });
         });

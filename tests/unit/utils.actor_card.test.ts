@@ -56,7 +56,6 @@ const mockActorStoreList: ActorStoreList = {
     modifiedAt: new Date('2024-02-20T15:30:00Z'),
     categories: ['WEB_SCRAPING', 'AI'],
     actorReviewRating: 4.5,
-    bookmarkCount: 250,
     currentPricingInfo: {
         pricingModel: 'PRICE_PER_DATASET_ITEM',
         pricePerUnitUsd: 0.5,
@@ -66,7 +65,6 @@ const mockActorStoreList: ActorStoreList = {
         totalRuns: 10,
         totalUsers: 2000,
         totalUsers30Days: 800,
-        bookmarkCount: 250,
         actorReviewCount: 14,
         actorReviewRating: 4.5,
         publicActorRunStats30Days: {
@@ -202,7 +200,7 @@ describe('formatActorToActorCard', () => {
             expect(result).not.toContain('- **Pricing');
         });
 
-        it('includes bookmark count from Actor.stats', () => {
+        it('omits bookmarks the Actor API returns', () => {
             const result = formatActorToActorCard(mockActor, {
                 includeDescription: false,
                 includeStats: true,
@@ -211,7 +209,7 @@ describe('formatActorToActorCard', () => {
                 includeMetadata: false,
             });
 
-            expect(result).toContain('170 bookmarks');
+            expect(result).not.toContain('bookmarks');
         });
     });
 
@@ -442,7 +440,7 @@ describe('formatActorToStructuredCard', () => {
             expect(result.stats?.monthlyUsers).toBe(904);
         });
 
-        it('includes bookmarks from Actor.stats', () => {
+        it('omits bookmarks the Actor API returns', () => {
             const result = formatActorToStructuredCard(mockActor, {
                 includeDescription: false,
                 includeStats: true,
@@ -451,7 +449,7 @@ describe('formatActorToStructuredCard', () => {
                 includeMetadata: false,
             });
 
-            expect(result.stats?.bookmarks).toBe(170);
+            expect(result.stats).not.toHaveProperty('bookmarks');
         });
     });
 

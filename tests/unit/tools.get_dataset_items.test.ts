@@ -74,17 +74,17 @@ describe('get-dataset-items', () => {
 
     it('returns dataset items in structuredContent on happy path', async () => {
         const result = await (getDatasetItems as HelperTool).call(
-            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
+            stubToolCallContext({ datasetId: 'DsWkzbQMuFYuam3YF' }, stubApifyClient()),
         );
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
-        expect(structuredContent.datasetId).toBe('ds-1');
+        expect(structuredContent.datasetId).toBe('DsWkzbQMuFYuam3YF');
         expect(structuredContent.itemCount).toBe(MOCK_ITEMS.length);
     });
 
     it('encodes the data payload (without summary/nextStep) into the JSON content text', async () => {
         const result = await (getDatasetItems as HelperTool).call(
-            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
+            stubToolCallContext({ datasetId: 'DsWkzbQMuFYuam3YF' }, stubApifyClient()),
         );
         const { content, structuredContent } = result as TextToolResult;
 
@@ -94,7 +94,7 @@ describe('get-dataset-items', () => {
 
     it('defaults `limit` to 20 when caller omits it', async () => {
         const result = await (getDatasetItems as HelperTool).call(
-            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
+            stubToolCallContext({ datasetId: 'DsWkzbQMuFYuam3YF' }, stubApifyClient()),
         );
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
@@ -103,7 +103,7 @@ describe('get-dataset-items', () => {
 
     it('echoes the caller-provided `limit` in structuredContent', async () => {
         const result = await (getDatasetItems as HelperTool).call(
-            stubToolCallContext({ datasetId: 'ds-1', limit: 10 }, stubApifyClient()),
+            stubToolCallContext({ datasetId: 'DsWkzbQMuFYuam3YF', limit: 10 }, stubApifyClient()),
         );
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
@@ -113,7 +113,7 @@ describe('get-dataset-items', () => {
     it('emits structuredContent that validates against the outputSchema for an empty dataset', async () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext(
-                { datasetId: 'ds-1' },
+                { datasetId: 'DsWkzbQMuFYuam3YF' },
                 stubApifyClient(async () => ({ items: [], total: 0 })),
             ),
         );
@@ -136,7 +136,7 @@ describe('get-dataset-items', () => {
         const serverError = Object.assign(new Error('Internal server error'), { statusCode: 500 });
         await expect(
             (getDatasetItems as HelperTool).call(
-                stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClientThrowing(serverError)),
+                stubToolCallContext({ datasetId: 'DsWkzbQMuFYuam3YF' }, stubApifyClientThrowing(serverError)),
             ),
         ).rejects.toBe(serverError);
     });
@@ -147,7 +147,7 @@ describe('get-dataset-items', () => {
         await (getDatasetItems as HelperTool).call(
             stubToolCallContext(
                 {
-                    datasetId: 'ds-1',
+                    datasetId: 'DsWkzbQMuFYuam3YF',
                     fields: 'metadata.url,crawl.statusCode',
                 },
                 stubApifyClient(listItemsSpy),
@@ -160,7 +160,7 @@ describe('get-dataset-items', () => {
     it('rejects empty datasetId via ajv validation', () => {
         const tool = getDatasetItems as HelperTool;
         expect(tool.ajvValidate({ datasetId: '' })).toBe(false);
-        expect(tool.ajvValidate({ datasetId: 'ds-1' })).toBe(true);
+        expect(tool.ajvValidate({ datasetId: 'DsWkzbQMuFYuam3YF' })).toBe(true);
     });
 
     it('passes the wrapper-stripped datasetId to client.dataset()', async () => {
@@ -180,24 +180,24 @@ describe('get-dataset-items', () => {
         vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
 
         const result = await (getDatasetItems as HelperTool).call({
-            ...stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
+            ...stubToolCallContext({ datasetId: 'DsWkzbQMuFYuam3YF' }, stubApifyClient()),
             apifyToken: 'apify_ui_test',
         });
         const { structuredContent, content } = result as TextToolResult & {
             structuredContent: Record<string, unknown>;
         };
 
-        expect(structuredContent.apifyConsoleUrl).toBe('https://console.apify.com/storage/datasets/ds-1');
+        expect(structuredContent.apifyConsoleUrl).toBe('https://console.apify.com/storage/datasets/DsWkzbQMuFYuam3YF');
         // content: [0] plain JSON, [1] summary/nextStep, [2] Apify Console link.
         expect(content).toHaveLength(3);
         expect(content[2].text).toBe(
-            `Apify Console: https://console.apify.com/storage/datasets/ds-1\n${VERBATIM_LINKS_NUDGE}`,
+            `Apify Console: https://console.apify.com/storage/datasets/DsWkzbQMuFYuam3YF\n${VERBATIM_LINKS_NUDGE}`,
         );
     });
 
     it('emits a last-page summary and a get-dataset nextStep when all items are returned', async () => {
         const result = await (getDatasetItems as HelperTool).call(
-            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
+            stubToolCallContext({ datasetId: 'DsWkzbQMuFYuam3YF' }, stubApifyClient()),
         );
         const { content, structuredContent } = result as TextToolResult & {
             structuredContent: Record<string, unknown>;
@@ -205,7 +205,7 @@ describe('get-dataset-items', () => {
 
         expect(structuredContent.summary).toBe('Fetched all 1 items.');
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET);
-        expect(structuredContent.nextStep).toContain('datasetId=ds-1');
+        expect(structuredContent.nextStep).toContain('datasetId=DsWkzbQMuFYuam3YF');
         // summary + nextStep ship as a separate text block after the plain JSON.
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
     });
@@ -213,7 +213,7 @@ describe('get-dataset-items', () => {
     it('emits a pagination nextStep when more items remain', async () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext(
-                { datasetId: 'ds-1' },
+                { datasetId: 'DsWkzbQMuFYuam3YF' },
                 stubApifyClient(async () => ({ items: MANY_ITEMS, total: 100 })),
             ),
         );
@@ -227,7 +227,7 @@ describe('get-dataset-items', () => {
 
     it('content[0] mirrors the structuredContent data and does not echo the desc input param', async () => {
         const result = await (getDatasetItems as HelperTool).call(
-            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
+            stubToolCallContext({ datasetId: 'DsWkzbQMuFYuam3YF' }, stubApifyClient()),
         );
         const { content, structuredContent } = result as TextToolResult & {
             structuredContent: Record<string, unknown>;
@@ -236,5 +236,35 @@ describe('get-dataset-items', () => {
         const { summary, nextStep, ...data } = structuredContent;
         expect(JSON.parse(content[0].text)).toEqual(data);
         expect(structuredContent).not.toHaveProperty('desc');
+    });
+});
+
+describe('get-dataset-items with a bare dataset name', () => {
+    it("reads the name as one of the caller's own datasets", async () => {
+        const datasetSpy = vi.fn().mockReturnValue({ listItems: async () => ({ items: MOCK_ITEMS, total: 1 }) });
+
+        await (getDatasetItems as HelperTool).call(
+            stubToolCallContext({ datasetId: 'eval-ai-items' }, mockApifyClient({ dataset: datasetSpy })),
+        );
+
+        expect(datasetSpy).toHaveBeenCalledWith('~eval-ai-items');
+    });
+
+    it('links Console to the dataset ID, which the list response does not carry', async () => {
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
+        const client = mockApifyClient({
+            dataset: (_id: string) => ({
+                listItems: async () => ({ items: MOCK_ITEMS, total: 1 }),
+                get: async () => ({ id: 'WkzbQMuFYuamGv3YF', name: 'eval-ai-items' }),
+            }),
+        });
+
+        const result = await (getDatasetItems as HelperTool).call({
+            ...stubToolCallContext({ datasetId: 'eval-ai-items' }, client),
+            apifyToken: 'apify_ui_test',
+        });
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+        expect(structuredContent.apifyConsoleUrl).toBe('https://console.apify.com/storage/datasets/WkzbQMuFYuamGv3YF');
     });
 });

@@ -11,7 +11,6 @@ export const MOCK_STORE_ACTOR = {
     pictureUrl: 'https://example.com/pic.png',
     notice: null,
     badge: null,
-    bookmarkCount: 42,
     actorReviewRating: 4.5,
     actorReviewCount: 10,
     stats: {

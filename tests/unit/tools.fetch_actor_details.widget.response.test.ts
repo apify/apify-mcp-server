@@ -37,7 +37,6 @@ const MOCK_DETAILS = {
         pictureUrl: 'https://example.com/pic.png',
         categories: ['SCRAPING'],
     },
-    buildInfo: {},
     actorCard: '# Actor card',
     actorCardStructured: {
         id: 'actor-id-1',
@@ -108,6 +107,13 @@ describe('fetch-actor-details-widget response', () => {
         expect(meta.ui?.resourceUri).toBe(WIDGET_URIS.SEARCH_ACTORS);
         expect(meta.ui?.visibility).toEqual(['model', 'app']);
         expect(meta.ui?.csp).toBeDefined();
+    });
+
+    it('carries Actor-details status text on the tool definition, not the search status text', () => {
+        expect((fetchActorDetailsWidget as HelperTool)._meta).toMatchObject({
+            'openai/toolInvocation/invoking': 'Fetching Actor details...',
+            'openai/toolInvocation/invoked': 'Actor details loaded',
+        });
     });
 
     it('declares a strict input schema and strips stray keys like `output` at validation time', () => {

@@ -1,49 +1,68 @@
 import { RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../const.js';
 import type { ActorInputSchema, ToolDescriptionContext } from '../../types.js';
+import { actorNameToToolName } from '../actor_tool_naming.js';
 
+/** Appended to the `apify/rag-web-browser` tool description, a Server Actor tool (`GET /search`). */
 const RAG_WEB_BROWSER_ADDITIONAL_DESC = `Use this tool for generic web content: it searches the web by query and returns the text of the top results.
 This tool scrapes the data itself - it does NOT just find tools.
+Example: {"method":"GET","path":"/search","query":{"query":"latest AI agent payment protocols","maxResults":3}}
+If query is a URL, the tool fetches that page instead of searching.
 
 Examples of when to use:
 - General questions answered by web pages (e.g., "What's the weather in Prague?", "Latest news about the EU AI Act", "How does HTTP/3 work?")
 
 For detailed data from a specific platform (e.g. Amazon products with prices, Instagram posts, Google Maps places with ratings), a specialized Actor from the Apify Store returns complete, structured results; this tool returns page text only.`;
 
+// The `apify/web-fetch` and `apify/web-search` tool descriptions, Server Actor tools (`GET /` and `POST /`), share
+// one shape: what the tool returns, the parameters that change what it returns, when it fits, what it does not do,
+// and an example call. The facts are the Actors' own API schemas. Client-agnostic on purpose: no references to any
+// specific client or its built-in tools, so the same text works for every MCP client; the sibling web tool is named
+// only when the session serves it.
+
+/** The `apify/web-fetch` tool description. */
+const buildWebFetchDescription = ({ hasTool }: ToolDescriptionContext): string => {
+    const webSearchTool = actorNameToToolName(WEB_SEARCH);
+    return `Fetches one URL and returns its content as a JSON object with a field per requested format, plus metadata such as the final URL, HTTP status, content type and page title.
+formats selects markdown, html, text, links (a deduplicated list) or raw (the original bytes); when omitted, an HTML or PDF page comes back as markdown, other text as text and binary content as raw.
+The page is fetched without running JavaScript unless wait is set, which renders it in a real browser and waits the given milliseconds for late-loaded content; a rendered request is slower. The Actor handles common bot protection and rate limits, so it also retrieves pages where a plain HTTP fetch is blocked.
+Use it when the user gives a URL and wants its content, data or links, or an answer that requires reading that page.
+It does not search the web; it needs a URL.${hasTool(webSearchTool) ? ` To find pages by query, use ${webSearchTool}.` : ''}
+Example: {"method":"GET","path":"/","query":{"url":"https://example.com","formats":["markdown"]}}`;
+};
+
+/** The `apify/web-search` tool description. */
+const buildWebSearchDescription = ({ hasTool }: ToolDescriptionContext): string => {
+    const webFetchTool = actorNameToToolName(WEB_FETCH);
+    return `Runs one web search and returns one page of organic results as JSON: title, URL, snippet and position of each result, with publication date, publisher and sublinks when the search engine provides them.
+provider picks google (the default) or duckduckgo; maxResults caps the results, and omitting it returns the whole page, about 10; countryCode and languageCode localize the ranking; dateFrom and dateTo (YYYY-MM-DD) bound the publication date; allowedDomains and blockedDomains (up to 10 hostnames each, subdomains included) restrict or exclude sites.
+Use it when the user wants links to choose from, wants to know which pages exist for a topic, or asks a question that a result title or snippet answers.
+It does not fetch page content; it returns links and snippets only.${hasTool(webFetchTool) ? ` To read a result page, use ${webFetchTool}.` : ''}
+Example: {"method":"GET","path":"/","query":{"query":"latest AI agent payment protocols","maxResults":5}}`;
+};
+
 /**
- * Appended to the `apify/web-fetch` Actor tool description. Client-agnostic on purpose:
- * no references to any specific client or its built-in tools, so the same text works
- * for every MCP client.
+ * The input descriptions of the two tools: `path`, and `query` listing every parameter of `GET /`. The url scheme
+ * rule lives on the input because that is what an agent reads while writing the argument: agents silently rewrote
+ * ftp:// URLs to https:// instead of telling the user the scheme is unsupported.
  */
-const WEB_FETCH_ADDITIONAL_DESC = `Use this tool to fetch a specific http(s) URL and return its complete content (one URL per call; http and https only).
-It renders JavaScript and bypasses anti-bot protection, so it also retrieves pages where a plain HTTP fetch gets blocked, fails with an error such as 403 or 429, or returns incomplete content.
-The page comes back verbatim - full content, no summarization - as Markdown, plain text, HTML, the raw response body, or the list of links on the page.
+const WEB_FETCH_INPUT_DESCRIPTIONS = {
+    path: 'Always "/".',
+    query:
+        'url (required; http(s) only - for any other scheme, such as ftp:, tell the user this tool cannot fetch it ' +
+        'rather than substituting a different URL), formats (array of markdown, html, text, links, raw), unwrap ' +
+        '(boolean; returns the first producible format as the response body instead of a JSON object), headers ' +
+        '(extra request headers as a JSON string), wait (milliseconds, 1 to 60000; renders the page in a real ' +
+        'browser and waits for late-loaded content).',
+};
 
-Examples of when to use:
-- User provides a URL and wants its content, its data or links, or an answer that requires reading that page
-- A previous attempt to fetch a page was blocked, returned an error or CAPTCHA, or came back incomplete because the page needs JavaScript rendering
-- Verbatim page content is needed, e.g. for quoting, extraction, or archiving
-
-This tool does not search the web - it needs a URL. To find pages by query, use a web search tool instead.
-If the exact URL cannot be fetched (e.g. a non-http(s) scheme), say so rather than silently substituting a different URL.`;
-
-/**
- * Appended to the `url` parameter description of the `apify/web-fetch` tool. Lives on the
- * parameter because that is what an agent reads while writing the argument: agents
- * silently rewrote ftp:// URLs to https:// instead of telling the user the scheme is
- * unsupported.
- */
-const WEB_FETCH_URL_SCHEME_NOTE =
-    'http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.';
-
-/** Appended to the `apify/web-search` Actor tool description. */
-const WEB_SEARCH_ADDITIONAL_DESC = `Use this tool to search the web by query and get one page of organic results: title, URL, snippet and position (up to about 10 results; links and snippets only, no page content).
-countryCode and languageCode set the locale, dateFrom and dateTo bound the publication date, allowedDomains and blockedDomains restrict or exclude sites.
-
-Examples of when to use:
-- The user wants links to choose from or to know which pages exist for a topic (e.g., "find the official docs for X", "recent articles about Y, with links")
-- A question that a result title or snippet answers
-
-This tool does not fetch page content.`;
+const WEB_SEARCH_INPUT_DESCRIPTIONS = {
+    path: 'Always "/".',
+    query:
+        'query (required; operators such as site: pass through unchecked), provider (google, the default, or ' +
+        'duckduckgo), maxResults (integer; omitted returns the whole page), languageCode (ISO 639-1, such as en or ' +
+        'pt-BR), countryCode (ISO 3166-1 alpha-2, such as US or CZ), location (a place name, google only), dateFrom ' +
+        'and dateTo (YYYY-MM-DD), allowedDomains and blockedDomains (arrays of up to 10 hostnames).',
+};
 
 type DirectActorPolicyConfig = {
     /** Sent with the run input when the caller omits the field; the served schema shows it as the default. */
@@ -54,13 +73,17 @@ type DirectActorPolicyConfig = {
     deniedInputsReason?: string;
 };
 
+type ServerActorToolPolicyConfig = {
+    buildDescription?: (context: ToolDescriptionContext) => string;
+    /** Replaces the description of the named inputs of the tool (`path`, `query`, `body`). */
+    inputDescriptions?: Readonly<Record<string, string>>;
+};
+
 type ActorToolPolicyConfig = {
     /** Direct tools only; `call-actor` and the widgets keep the Actor's own contract. */
     directInput?: DirectActorPolicyConfig;
-    /** Only these inputs are served; the others are hidden but still accepted and passed to the run. */
-    exposedInputs?: readonly string[];
-    inputDescriptionSuffixes?: Readonly<Record<string, string>>;
-    buildDescription?: (context: ToolDescriptionContext) => string;
+    /** The Actor's own tool when it is served through its server interface; a run tool gets none of it. */
+    serverTool?: ServerActorToolPolicyConfig;
 };
 
 /** Presentation rules preserve existing generic-call behavior; directInput is direct-tool-only. */
@@ -74,15 +97,19 @@ const ACTOR_TOOL_POLICIES: Readonly<Record<string, ActorToolPolicyConfig>> = {
         },
     },
     [RAG_WEB_BROWSER]: {
-        exposedInputs: ['query', 'maxResults', 'outputFormats'],
-        buildDescription: () => RAG_WEB_BROWSER_ADDITIONAL_DESC,
+        serverTool: { buildDescription: () => RAG_WEB_BROWSER_ADDITIONAL_DESC },
     },
     [WEB_FETCH]: {
-        inputDescriptionSuffixes: { url: WEB_FETCH_URL_SCHEME_NOTE },
-        buildDescription: () => WEB_FETCH_ADDITIONAL_DESC,
+        serverTool: {
+            buildDescription: buildWebFetchDescription,
+            inputDescriptions: WEB_FETCH_INPUT_DESCRIPTIONS,
+        },
     },
     [WEB_SEARCH]: {
-        buildDescription: () => WEB_SEARCH_ADDITIONAL_DESC,
+        serverTool: {
+            buildDescription: buildWebSearchDescription,
+            inputDescriptions: WEB_SEARCH_INPUT_DESCRIPTIONS,
+        },
     },
 };
 

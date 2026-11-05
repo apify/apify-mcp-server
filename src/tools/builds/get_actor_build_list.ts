@@ -39,7 +39,7 @@ const getActorBuildListArgs = z.object({
  * One build as the list endpoint returns it (OpenAPI `BuildShort`). The client's item type leaves out
  * `actId` and `buildNumber`, which the API does send.
  */
-type BuildListItem = BuildCollectionClientListItem & Pick<Build, 'actId' | 'buildNumber'>;
+export type BuildListItem = BuildCollectionClientListItem & Pick<Build, 'actId' | 'buildNumber'>;
 
 /** Statuses of a build that ended without succeeding; the next step points at the newest one's log. */
 const FAILED_BUILD_STATUSES: ReadonlySet<string> = new Set(['FAILED', 'TIMED-OUT', 'ABORTED']);

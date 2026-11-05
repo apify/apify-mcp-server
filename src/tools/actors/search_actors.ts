@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS, MAX_LIMIT_WITH_INPUT_SCHEMA } from '../../const.js';
+import { HELPER_TOOLS, MAX_LIMIT_WITH_INPUT_SCHEMA, STORE_USE_CASE_MAX_LENGTH } from '../../const.js';
 import type {
     ActorStoreList,
     ConsoleLinkContext,
@@ -64,7 +64,14 @@ export const searchActorsBaseArgsSchema = z.object({
         .describe(`The maximum number of Actors to return (max = ${MAX_LIMIT_WITH_INPUT_SCHEMA}, default = 5).`),
     offset: IS_UNSTABLE_STORE_SEARCH_ENABLED
         ? z.number().int().min(0).default(0).describe('Deprecated and ignored: use `cursor` to get the next page.')
-        : z.number().int().min(0).default(0).describe('The number of elements to skip from the start (default = 0)'),
+        : z
+              .number()
+              .int()
+              .min(0)
+              .default(0)
+              .describe(
+                  'The number of elements to skip from the start (default = 0). Has no effect when keywords are set: every offset returns the first results.',
+              ),
     // `/unstable/store` pages by cursor, so only then the tool takes `cursor` and returns `nextCursor`.
     ...(IS_UNSTABLE_STORE_SEARCH_ENABLED && {
         cursor: z
@@ -74,6 +81,12 @@ export const searchActorsBaseArgsSchema = z.object({
             .optional()
             .describe('The `nextCursor` of a previous result with the same keywords, to get its next page.'),
     }),
+    // Withheld from Anthropic clients: `withoutUseCaseField` in utils/tools_loader.ts.
+    useCase: z.string().optional().describe(dedent`
+            Optional. One plain sentence on what the user wants to achieve with the Actor, for example "compare competitor prices" (max ${STORE_USE_CASE_MAX_LENGTH} characters).
+            Never include personal information (names, emails, phone numbers, addresses, account details), URLs, secrets, API tokens or credentials.
+            Respect the user's privacy: when unsure, leave it out.
+        `),
 });
 
 function buildDescription({ hasTool, clientParam }: ToolDescriptionContext): string {
@@ -106,7 +119,7 @@ Returns list of Actor cards with the following info:
 - **URL:** Direct Store link
 - **Description:** Actor description or fallback
 - **Pricing:** Details with pricing link
-- **Stats:** Total and monthly users, bookmarks
+- **Stats:** Total and monthly users
 - **Rating:** Out of 5 (if available)
 - **Developed by:** Username linked to profile, marked (Apify) or (community)
 - **Categories:** Formatted or "Uncategorized"
@@ -228,6 +241,7 @@ export const searchActors: ToolEntry = Object.freeze({
                 offset,
                 cursor,
                 paymentProvider,
+                useCase: parsed.useCase,
             }),
             getUserInfoCached(apifyToken, apifyClient),
         ]);

@@ -77,19 +77,23 @@ const CLAUDE_CONNECTOR_CLIENT_OPTIONS: SuiteClientOptions = {
 /** Tool/Actor selection, categories, env loading, auto-inject, server mode. */
 export const registrationCases: Case[] = [
     {
-        name: 'matches spec default: actors,docs,apify/rag-web-browser,apify/web-fetch when no params provided',
+        name: 'matches spec default: actors,docs,apify/web-search,apify/web-fetch when no params provided',
         isDeploymentTest: true,
         run: withClient({ telemetry: { enabled: false } }, async (client) => {
             const tools = await client.listTools();
             const names = getToolNames(tools);
 
-            // Equivalent to tools=actors,docs,apify/rag-web-browser,apify/web-fetch (no widgets outside apps).
-            const expectedActorsTools = ['fetch-actor-details', 'search-actors', 'call-actor'];
-            const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
-            const expectedActors = [
-                actorNameToToolName('apify/rag-web-browser'),
-                actorNameToToolName('apify/web-fetch'),
+            // Equivalent to tools=actors,docs,apify/web-search,apify/web-fetch (no widgets outside apps).
+            const expectedActorsTools = [
+                'fetch-actor-details',
+                'search-actors',
+                'call-actor',
+                'fetch-actor-mcp-tool-list',
+                'call-actor-mcp-tool',
+                'send-server-actor-request',
             ];
+            const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
+            const expectedActors = [actorNameToToolName('apify/web-search'), actorNameToToolName('apify/web-fetch')];
             const expectedTotal = expectedActorsTools.concat(expectedDocsTools, expectedActors);
             expect(names).toHaveLength(expectedTotal.length + AUTO_INJECTED_TOOL_NAMES.length);
 
@@ -104,7 +108,7 @@ export const registrationCases: Case[] = [
         isDeploymentTest: true,
         run: withClient({ telemetry: { enabled: true } }, async (client) => {
             const names = getToolNames(await client.listTools());
-            expect(names).toHaveLength(8 + AUTO_INJECTED_TOOL_NAMES.length);
+            expect(names).toHaveLength(11 + AUTO_INJECTED_TOOL_NAMES.length);
             expect(names).toContain('report-problem');
         }),
     },
@@ -116,6 +120,21 @@ export const registrationCases: Case[] = [
             expect(names).not.toContain('report-problem');
         }),
     },
+    ...[
+        { clientName: 'cursor', served: true },
+        { clientName: 'claude-ai', served: false },
+    ].map(
+        ({ clientName, served }): Case => ({
+            name: `${served ? 'adds' : 'omits'} the search-actors useCase for the ${clientName} client`,
+            isDeploymentTest: true,
+            run: withClient({ tools: ['search-actors'], clientName, telemetry: { enabled: true } }, async (client) => {
+                const { tools } = await client.listTools();
+                const search = tools.find((tool) => tool.name === 'search-actors');
+                expect(search).toBeDefined();
+                expect('useCase' in (search?.inputSchema.properties ?? {})).toBe(served);
+            }),
+        }),
+    ),
     {
         // Pinned ?tools= wins for call-actor even with report-problem auto-inject live.
         // No ?ui=: apps mode comes from the client's own UI-capability advertisement (serverMode 'auto'), not a URL override.

@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.19.4",
+  "version": "0.20.3",
   "type": "module",
   "description": "Apify MCP Server",
   "mcpName": "com.apify/apify-mcp-server",
@@ -26,7 +26,7 @@
     "./manifest.json": "./manifest.json"
   },
   "peerDependencies": {
-    "@modelcontextprotocol/client": "2.0.0"
+    "@modelcontextprotocol/client": "2.3.1"
   },
   "peerDependenciesMeta": {
     "@modelcontextprotocol/client": {
@@ -63,9 +63,9 @@
     "@apify/log": "^2.5.16",
     "@apify/utilities": "^2.25.1",
     "@modelcontextprotocol/ext-apps": "^1.1.2",
-    "@modelcontextprotocol/node": "2.0.0",
-    "@modelcontextprotocol/sdk": "1.30.0",
-    "@modelcontextprotocol/server": "2.0.0",
+    "@modelcontextprotocol/node": "2.1.1",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@modelcontextprotocol/server": "2.3.1",
     "@segment/analytics-node": "^2.3.0",
     "@sentry/node": "^10.38.0",
     "ajv": "^8.17.1",
@@ -75,6 +75,7 @@
     "dedent": "^1.7.2",
     "dotenv": "^17.4.1",
     "express": "^4.21.2",
+    "proxy-agent": "^6.5.0",
     "yargs": "^17.7.2",
     "zod": "^4.1.13"
   },
@@ -86,7 +87,7 @@
     "@langfuse/client": "5.9.1",
     "@langfuse/otel": "5.9.1",
     "@langfuse/tracing": "5.9.1",
-    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/client": "2.3.1",
     "@modelcontextprotocol/conformance": "0.2.0-alpha.9",
     "@opentelemetry/api": "1.9.1",
     "@opentelemetry/sdk-node": "0.220.0",

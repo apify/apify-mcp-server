@@ -24,6 +24,7 @@ import type { CaseCtx, SuiteClient, Transport } from './types.js';
 // Live fixtures from apify/mcp-server-test-actor (see DEVELOPMENT.md).
 export const ACTOR_NORMAL_MODE = 'apify/normal-mode-test-actor';
 export const ACTOR_EXAMPLE_MCP_SERVER = 'apify/example-mcp-server';
+export const ACTOR_SERVER_ACTOR_TEST = 'apify/server-actor-test';
 
 const STDIO_TRANSPORT: Transport = 'stdio';
 

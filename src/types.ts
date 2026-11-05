@@ -6,6 +6,7 @@ import type {
     ActorDefaultRunOptions,
     ActorDefinition,
     ActorRunPricingInfo,
+    ActorStandby,
     ActorStats,
     ActorStoreList as ActorStoreListOutdated,
 } from 'apify-client';
@@ -14,6 +15,7 @@ import type z from 'zod';
 import type { ApifyClient } from './apify_client.js';
 import type { FAILURE_CATEGORY, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
 import type { PaymentProvider, PaymentProviderId } from './payments/types.js';
+import type { ApiMethod } from './tools/api/apify_api_spec.js';
 import type { CATEGORY_NAMES } from './tools/registry.js';
 import type { ToolResponse } from './utils/mcp.js';
 import type { PricingTier, StructuredPricingInfo } from './utils/pricing_info.js';
@@ -63,6 +65,13 @@ export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
     input?: ActorInputSchema;
 };
 
+/** A build's `actorDefinition` with the server-interface fields apify-client's type omits. */
+export type ActorDefinitionWithServerInterface = ActorDefinition & {
+    webServerMcpPath?: string;
+    /** The Actor's HTTP interface in standby mode: an OpenAPI document as the publisher wrote it, unvalidated. */
+    webServerSchema?: unknown;
+};
+
 /**
  * Pruned Actor definition type.
  * The `id` property is set to Actor ID.
@@ -72,7 +81,32 @@ export type ActorDefinitionPruned = Pick<
     'id' | 'actorFullName' | 'buildTag' | 'readme' | 'readmeSummary' | 'input' | 'description' | 'defaultRunOptions'
 > & {
     webServerMcpPath?: string; // Optional, used for Actorized MCP server tools
+    /** Whether the server-interface build's `webServerSchema` declares at least one operation; the schema itself is not cached. */
+    hasWebServerSchema: boolean;
+    /** The schema's operations with their required inputs, e.g. `GET / (required: query)`, for request recovery text. */
+    webServerOperations?: string[];
+    /** Per operation (`GET /`), the query parameters a list fills comma-joined; absent when none need joining. */
+    webServerCommaJoinedQueryParameters?: Record<string, string[]>;
+    /** What the Actor's own tool is built from when it is served through its server interface. */
+    webServerToolInfo?: ServerActorToolInfo;
     pictureUrl?: string; // Optional, URL to the Actor's icon/picture
+};
+
+/** A selected Server Actor's tool, as `buildServerActorToolInfo` renders it from the API schema. */
+export type ServerActorToolInfo = {
+    /** The documented methods, for the tool's input schema. */
+    methods: ApiMethod[];
+    /** Whether an operation takes a JSON request body. */
+    hasRequestBody: boolean;
+    /** Every operation in full; absent when it alone exceeds the description limit. */
+    fullOperations?: string;
+    /** One line per operation, the first ones that can fit the description limit. */
+    operationLines: string[];
+    operationCount: number;
+    /** How `fetch-actor-details` returns one operation in full, for a description that lists every line. */
+    detailsHint: string;
+    /** How `fetch-actor-details` lists every operation, for a description that cuts the lines. */
+    listHint: string;
 };
 
 /**
@@ -81,7 +115,7 @@ export type ActorDefinitionPruned = Pick<
  */
 export type ActorDefinitionWithInfo = {
     definition: ActorDefinitionPruned;
-    info: ActorOutdated;
+    info: Actor;
 };
 
 /**
@@ -108,6 +142,12 @@ export type ToolBase = z.infer<typeof ToolSchema> & {
     /** Whether this tool requires payment validation before execution */
     paymentRequired?: boolean;
     /**
+     * Whether a third-party payment-provider session is rejected before the call when the Actor named in
+     * `args.actor`, or the fixed Actor of an {@link ActorServerTool}, has Actor Standby enabled; see
+     * `checkPaymentProviderStandbyConflict`.
+     */
+    hasPaymentProviderStandbyCheck?: boolean;
+    /**
      * Session-exact description builder for descriptions that reference sibling tools.
      * `description` must hold the {@link ALL_TOOLS_PRESENT} render for consumers without a
      * session tool set. Resolved at the tools/list boundary in `getToolPublicFieldOnly`.
@@ -131,6 +171,7 @@ export const TOOL_TYPE = {
     INTERNAL: 'internal',
     ACTOR: 'actor',
     ACTOR_MCP: 'actor-mcp',
+    ACTOR_SERVER: 'actor-server',
 } as const;
 
 /**
@@ -138,13 +179,37 @@ export const TOOL_TYPE = {
  */
 export type TOOL_TYPE = (typeof TOOL_TYPE)[keyof typeof TOOL_TYPE];
 
-/** How an Actor definition maps to the tool surface. */
+/** How an Actor definition maps to the tool surface; `resolveActorToolMode` derives it from {@link ActorInterfaces}. */
 export const ACTOR_TOOL_MODE = {
     RUN: 'RUN',
     MCP: 'MCP',
-    STANDBY_WITHOUT_MCP: 'STANDBY_WITHOUT_MCP',
+    SERVER: 'SERVER',
+    SERVER_ACTOR_WITHOUT_MCP: 'SERVER_ACTOR_WITHOUT_MCP',
 } as const;
 export type ACTOR_TOOL_MODE = (typeof ACTOR_TOOL_MODE)[keyof typeof ACTOR_TOOL_MODE];
+
+/** `actorStandby.tenancy` as the API returns it. */
+export type ActorStandbyTenancy = 'SINGLE_TENANT' | 'MULTI_TENANT';
+
+/** Whose run serves an Actor's server interface; `resolveActorTenancy` reads it off the Actor record. */
+export const ACTOR_TENANCY = {
+    SINGLE_TENANT: 'single-tenant',
+    MULTI_TENANT: 'multi-tenant',
+} as const;
+export type ActorTenancy = (typeof ACTOR_TENANCY)[keyof typeof ACTOR_TENANCY];
+
+/** Which interfaces an Actor has; `resolveActorInterfaces` holds the rule. */
+export type ActorInterfaces = {
+    /** The input schema: a run per call. */
+    input: boolean;
+    /** The MCP server at `webServerMcpPath`. */
+    mcp: boolean;
+    /** The HTTP API described by `webServerSchema`. */
+    server: boolean;
+};
+
+/** One of an Actor's interfaces, e.g. the one a tool call goes through. */
+export type ActorInterfaceName = keyof ActorInterfaces;
 
 /**
  * Type for Actor-based tools - tools that wrap Apify Actors.
@@ -216,6 +281,11 @@ export type HelperTool = ToolBase & {
      * arguments; it also sees undeclared keys, so build the copy as an allowlist.
      */
     redactArgs?: (args: Record<string, unknown>) => Record<string, unknown>;
+    /**
+     * The interface of the Actor in `args.actor` that the tool calls through, for telemetry; `extractActorInterface`
+     * reads an `actor:toolName` argument as `mcp`.
+     */
+    actorInterface?: ActorInterfaceName;
 };
 
 /**
@@ -227,11 +297,27 @@ export type ActorMcpTool = ToolBase & {
     type: typeof TOOL_TYPE.ACTOR_MCP;
     /** Origin MCP server tool name is needed for the tool call */
     originToolName: string;
-    /** ID of the Actorized MCP server - for example, apify/example-mcp-server */
+    /** ID of the Actorized MCP server */
     actorId: string;
+    /** Full name of the Actorized MCP server - for example, apify/example-mcp-server */
+    actorFullName: string;
     /** Connection URL of the Actorized MCP server */
     serverUrl: string;
 };
+
+/**
+ * A selected Server Actor's own tool: one HTTP request to the Actor's server interface, sent as
+ * `send-server-actor-request` sends it, with the Actor fixed.
+ * Type discriminator: {@link TOOL_TYPE.ACTOR_SERVER}
+ */
+export type ActorServerTool = ToolBase &
+    Pick<HelperTool, 'call' | 'redactArgs'> & {
+        type: typeof TOOL_TYPE.ACTOR_SERVER;
+        /** Stable Apify Actor ID */
+        actorId: string;
+        /** Full name of the Apify Actor (username/name) */
+        actorFullName: string;
+    };
 
 /**
  * Discriminated union of all tool types.
@@ -240,8 +326,9 @@ export type ActorMcpTool = ToolBase & {
  * - When type is 'internal', tool is guaranteed to be HelperTool
  * - When type is 'actor', tool is guaranteed to be ActorTool
  * - When type is 'actor-mcp', tool is guaranteed to be ActorMcpTool
+ * - When type is 'actor-server', tool is guaranteed to be ActorServerTool
  */
-export type ToolEntry = HelperTool | ActorTool | ActorMcpTool;
+export type ToolEntry = HelperTool | ActorTool | ActorMcpTool | ActorServerTool;
 
 export type ToolCategory = (typeof CATEGORY_NAMES)[number];
 /**
@@ -276,29 +363,30 @@ export type TelemetryEnv = (typeof TELEMETRY_ENV)[keyof typeof TELEMETRY_ENV];
  * Type representing the Actor information needed in order to turn it into an MCP server tool.
  */
 export type ActorInfo = {
-    webServerMcpPath: string | null; // Declared MCP endpoint; only means MCP when standby is on — see `resolveActorToolMode`
+    /** Declared MCP endpoint; only means MCP when standby is on — see `resolveActorInterfaces`. */
+    webServerMcpPath: string | null;
     definition: ActorDefinitionPruned;
-    actor: ActorOutdated;
+    actor: Actor;
 };
 
 /**
- * How an Actor is exposed as a tool, resolved once from its definition by `resolveActorToolMode`.
- * `mcpServerUrl` is present exactly when `toolMode` is {@link ACTOR_TOOL_MODE.MCP}, so callers
- * connect without a cast and an un-narrowed read is a compile error.
+ * How `call-actor` reaches an Actor, resolved once from its definition: the interface set
+ * (`resolveActorInterfaces`) and the `call-actor` route derived from it (`getActorToolModeFromInterfaces`),
+ * which never takes the server interface. The Actor's own tool is `resolveActorToolMode`'s.
  * `actorFullName` is the platform-canonical `username/name`, not whatever identifier the caller used —
  * messages built from it read the same whether the Actor was addressed by ID or by name.
  */
-export type ActorToolResolutionResult = { actorFullName: string } & (
-    | { toolMode: typeof ACTOR_TOOL_MODE.MCP; mcpServerUrl: string }
-    | { toolMode: typeof ACTOR_TOOL_MODE.RUN | typeof ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP }
-);
+export type ActorToolResolutionResult = {
+    actorFullName: string;
+    interfaces: ActorInterfaces;
+    toolMode: ACTOR_TOOL_MODE;
+};
 
 // `stats` is partial: the Recombee-backed store searches omit the counts they do not have.
 export type ActorStoreList = Omit<ActorStoreListOutdated, 'stats'> & {
     actorReviewCount?: number;
     actorReviewRating?: number;
     badge?: string | null;
-    bookmarkCount?: number;
     categories?: string[];
     currentPricingInfo: ActorRunPricingInfo;
     isWhiteListedForAgenticPayments?: boolean;
@@ -309,7 +397,6 @@ export type ActorStoreList = Omit<ActorStoreListOutdated, 'stats'> & {
     stats: Partial<ActorStats> & {
         actorReviewCount?: number;
         actorReviewRating?: number;
-        bookmarkCount?: number;
         publicActorRunStats30Days?: Partial<Record<string, number>> & {
             SUCCEEDED?: number;
             TOTAL?: number;
@@ -319,6 +406,7 @@ export type ActorStoreList = Omit<ActorStoreListOutdated, 'stats'> & {
 
 export type Actor = ActorOutdated & {
     actorPermissionLevel?: string;
+    actorStandby?: ActorStandby & { tenancy?: ActorStandbyTenancy };
     hasNoDataset?: boolean;
     isCritical?: boolean;
     isGeneric?: boolean;
@@ -332,7 +420,6 @@ export type Actor = ActorOutdated & {
         };
         actorReviewCount?: number;
         actorReviewRating?: number;
-        bookmarkCount?: number;
         lastRunStartedAt?: string | Date | null;
     };
 };
@@ -380,6 +467,7 @@ export type ToolCallTelemetryProperties = {
     mcp_protocol_version: string;
     mcp_client_capabilities: Record<string, unknown> | null;
     mcp_session_id: string;
+    trace_id?: string;
     transport_type: string;
     /** Raw `?client=` URL query-param value, when the connecting request carried one. */
     mcp_url_client: string;
@@ -397,6 +485,12 @@ export type ToolCallTelemetryProperties = {
     failure_category?: FailureCategory;
     failure_http_status?: number;
     failure_detail?: string;
+    /** The status an Actor's server returned to `send-server-actor-request`, whatever the tool status. */
+    http_status?: number;
+    /** Whose standby run `send-server-actor-request` reached. */
+    actor_tenancy?: ActorTenancy;
+    /** The Actor interface the call went through; absent for a tool that calls no Actor. */
+    actor_interface?: ActorInterfaceName;
     actor_name?: string;
     actor_id?: string;
     /** Run the call touched. `run_status` is the run's own outcome, distinct from `tool_status`. */
@@ -452,6 +546,8 @@ export type ToolTelemetryContext = {
     failureCategory?: FailureCategory;
     failureHttpStatus?: number;
     failureDetail?: string;
+    httpStatus?: number;
+    actorTenancy?: ActorTenancy;
     actorId?: string;
     ajvErrorDetails?: AjvErrorDetails;
 };
@@ -461,6 +557,8 @@ export type CallDiagnostics = Pick<
     | 'failure_category'
     | 'failure_http_status'
     | 'failure_detail'
+    | 'http_status'
+    | 'actor_tenancy'
     | 'actor_name'
     | 'actor_id'
     | 'run_id'
@@ -540,8 +638,8 @@ export type ActorExecutionParams = {
      * task mode would let the task complete before the Actor has produced output.
      */
     taskMode?: boolean;
-    /** Whether the session serves call-actor; without it, an Actor's tip gets the callability caveat. */
-    hasCallActorTool?: boolean;
+    /** Whether the session can run the Actor a tip recommends; when it cannot, the tip gets the callability caveat. */
+    canRunTipActor?: (recommendedActorId: string) => boolean;
 };
 
 /**
@@ -703,7 +801,6 @@ export type StructuredActorCard = {
     stats?: {
         totalUsers: number;
         monthlyUsers: number;
-        bookmarks?: number;
     };
     rating?: {
         average: number;
@@ -734,7 +831,7 @@ export type ConsoleLinkContext = {
 export type ActorCardOptions = {
     /** Include description text only */
     includeDescription?: boolean;
-    /** Include usage statistics (users, runs, success rate, bookmarks) */
+    /** Include usage statistics (users, runs, success rate) */
     includeStats?: boolean;
     /** Include pricing information */
     includePricing?: boolean;

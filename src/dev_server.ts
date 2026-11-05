@@ -143,8 +143,10 @@ type EraRoutableRequest = {
  */
 export async function isStatelessRequest(req: EraRoutableRequest): Promise<boolean> {
     // `express.json()` already parsed the body, so nothing is read from the stream — which is what
-    // lets the narrow shape above stand in for a full `IncomingMessage`.
-    return !(await isLegacyRequest(await toWebRequest(req as NodeIncomingMessageLike, req.body)));
+    // lets the narrow shape above stand in for a full `IncomingMessage`. Passing it as `parsedBody`
+    // also skips the SDK's 4 MiB read limit, which would route a larger 2025-era request to the
+    // stateless path; `express.json()` already caps the body at `MAX_REQUEST_BODY_BYTES`.
+    return !(await isLegacyRequest(await toWebRequest(req as NodeIncomingMessageLike, req.body), req.body));
 }
 
 /**
@@ -253,7 +255,7 @@ export function createExpressApp(): express.Express {
     // Express's 100 KB default is too small for tool calls that carry files. See apify/apify-mcp-server#1610.
     app.use(express.json({ limit: MAX_REQUEST_BODY_BYTES }));
     app.post('/', async (req: Request, res: Response) => {
-        log.info('Received MCP request:', req.body);
+        log.info('Received MCP request:', { method: req.body?.method });
         try {
             if (await isStatelessRequest(req)) {
                 await serveStatelessRequest(req, res, taskStore);

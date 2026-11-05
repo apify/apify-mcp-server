@@ -4,7 +4,7 @@ import { expect } from 'vitest';
 
 import { SKYFIRE_ENABLED_TOOLS } from '@apify/actors-mcp-server/internals/test-kit.js';
 
-import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE, skipOnStdio } from '../helpers.js';
+import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE, ACTOR_SERVER_ACTOR_TEST, skipOnStdio } from '../helpers.js';
 import type { Case } from '../types.js';
 
 /** Skyfire and x402 payment modes. */
@@ -147,23 +147,58 @@ export const paymentsCases: Case[] = [
         },
     },
     {
-        name: 'should return error when calling a standby Actor via call-actor in x402 payment mode',
+        name: 'rejects standby Actors and legacy MCP syntax in x402 payment mode',
         isDeploymentTest: false,
         skipIf: skipOnStdio,
         run: async (ctx) => {
             const client = await ctx.createClientFn({ payment: 'x402' });
             try {
-                const result = await client.callTool({
-                    name: 'call-actor',
-                    arguments: { actor: ACTOR_EXAMPLE_MCP_SERVER, input: {} },
-                });
-                expect(result).toBeDefined();
-                expect(result.isError).toBe(true);
-                const content = result.content as { text: string }[];
-                expect(content.length).toBeGreaterThan(0);
-                expect(content[0].text).toContain('is not supported in agentic payment mode');
+                for (const actor of [ACTOR_EXAMPLE_MCP_SERVER, `${ACTOR_EXAMPLE_MCP_SERVER}:add`]) {
+                    const result = await client.callTool({
+                        name: 'call-actor',
+                        arguments: { actor, input: {} },
+                    });
+                    expect(result.isError).toBe(true);
+                    const content = result.content as { text: string }[];
+                    expect(content[0].text).toContain(
+                        actor === ACTOR_EXAMPLE_MCP_SERVER
+                            ? 'is not supported in agentic payment mode'
+                            : 'no longer supported',
+                    );
+                    expect(content[0].text).not.toContain('call-actor-mcp-tool');
+                    expect(result).not.toHaveProperty('toolTelemetry');
+                }
             } finally {
                 await client.close();
+            }
+        },
+    },
+    {
+        name: 'does not list or run send-server-actor-request, or list the Actor MCP tools, in x402 or skyfire payment mode',
+        isDeploymentTest: false,
+        skipIf: skipOnStdio,
+        run: async (ctx) => {
+            // A default session, the actors category, and the tool named in tools=.
+            const selections = [undefined, ['actors'], ['send-server-actor-request']];
+            for (const payment of ['x402', 'skyfire'] as const) {
+                for (const tools of selections) {
+                    const client = await ctx.createClientFn({ payment, tools });
+                    try {
+                        const names = (await client.listTools()).tools.map((tool) => tool.name);
+                        expect(names).not.toContain('send-server-actor-request');
+                        expect(names).not.toContain('call-actor-mcp-tool');
+                        expect(names).not.toContain('fetch-actor-mcp-tool-list');
+                        // An unknown tool is a protocol error, so no request reaches the Actor.
+                        await expect(
+                            client.callTool({
+                                name: 'send-server-actor-request',
+                                arguments: { actor: ACTOR_SERVER_ACTOR_TEST, method: 'GET', path: '/add' },
+                            }),
+                        ).rejects.toThrow('Tool "send-server-actor-request" was not found');
+                    } finally {
+                        await client.close();
+                    }
+                }
             }
         },
     },

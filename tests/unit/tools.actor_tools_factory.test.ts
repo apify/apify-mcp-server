@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
-import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import type { ActorInfo, SchemaProperties } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
@@ -29,6 +27,7 @@ function createMockActorInfo(actorFullName: string, options: MockActorOptions = 
             readme: '',
             description: `Test Actor ${actorFullName}`,
             defaultRunOptions: { memoryMbytes: 1024, timeoutSecs: 300, build: 'latest' },
+            hasWebServerSchema: false,
             input: {
                 type: 'object',
                 properties: {
@@ -50,7 +49,29 @@ async function getAnnotations(actorInfo: ActorInfo) {
 const LIMITED = { actorPermissionLevel: 'LIMITED_PERMISSIONS' };
 
 describe('getNormalActorsAsTools()', () => {
-    // Regression: #1513 — the validator required a property the platform fills from its default.
+    describe('input schema and validator are shared across sessions', () => {
+        it('shares one input schema and validator between builds of the same Actor', async () => {
+            // Each session's build starts from its own clone of the definition, as getActorsAsTools hands them out.
+            const [first] = await getNormalActorsAsTools([createMockActorInfo('apify/shared-schema-copies')]);
+            const [second] = await getNormalActorsAsTools([createMockActorInfo('apify/shared-schema-copies')]);
+
+            expect(second.inputSchema).toBe(first.inputSchema);
+            expect(second.ajvValidate).toBe(first.ajvValidate);
+        });
+
+        it('does not share across different input schemas of the same Actor', async () => {
+            const [first] = await getNormalActorsAsTools([createMockActorInfo('apify/shared-schema-versions')]);
+            const [second] = await getNormalActorsAsTools([
+                createMockActorInfo('apify/shared-schema-versions', {
+                    inputProperties: { depth: { type: 'integer' } },
+                }),
+            ]);
+
+            expect(second.inputSchema).not.toBe(first.inputSchema);
+            expect(second.ajvValidate).not.toBe(first.ajvValidate);
+        });
+    });
+
     describe('input validation', () => {
         const actorInfo = createMockActorInfo('apify/screenshot-url', {
             inputProperties: {
@@ -244,69 +265,5 @@ describe('getNormalActorsAsTools()', () => {
                 expect(await getAnnotations(info)).toMatchObject({ readOnlyHint: false, destructiveHint: true });
             }
         });
-    });
-
-    describe('existing Actor presentation policies', () => {
-        it.each([true, false])('preserves RAG exposure and validation with isDirectTool %s', async (isDirectTool) => {
-            const actorInfo = createMockActorInfo(RAG_WEB_BROWSER, {
-                ...LIMITED,
-                inputProperties: {
-                    query: { type: 'string' },
-                    maxResults: { type: 'integer', default: 3 },
-                    outputFormats: { type: 'array', default: ['markdown'] },
-                    hiddenSecret: { type: 'string', isSecret: true },
-                },
-                inputRequired: ['query', 'maxResults'],
-            });
-            const original = structuredClone(actorInfo);
-            const [tool] = await getNormalActorsAsTools([actorInfo], { isDirectTool });
-            expect(Object.keys(tool.inputSchema.properties ?? {})).toEqual([
-                'query',
-                'maxResults',
-                'outputFormats',
-                'waitSecs',
-            ]);
-            expect(tool.inputSchema.required).toEqual(['query']);
-            const input = { query: 'apify', hiddenSecret: 'original-input' };
-            expect(tool.ajvValidate(input)).toBe(true);
-            expect(input).toEqual({ query: 'apify', hiddenSecret: 'original-input' });
-            expect(tool.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true });
-            expect(actorInfo).toEqual(original);
-        });
-
-        it('describes Web Search results without page content or sibling referrals', async () => {
-            const [tool] = await getNormalActorsAsTools([createMockActorInfo(WEB_SEARCH)]);
-
-            expect(tool.description).toContain('one page of organic results');
-            expect(tool.description).toContain('title, URL, snippet and position');
-            expect(tool.description).toContain('no page content');
-            expect(tool.description).not.toContain(WEB_FETCH);
-            expect(tool.description).not.toContain(RAG_WEB_BROWSER);
-        });
-
-        it.each([true, false])('preserves Web Fetch descriptions with isDirectTool %s', async (isDirectTool) => {
-            const actorInfo = createMockActorInfo(WEB_FETCH, { ...LIMITED });
-            const original = structuredClone(actorInfo);
-            const [tool] = await getNormalActorsAsTools([actorInfo], { isDirectTool });
-            expect(tool.description).toContain('Use this tool to fetch a specific http(s) URL');
-            expect(tool.inputSchema.properties?.url).toMatchObject({
-                description:
-                    'The URL to process http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.',
-            });
-            expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
-            expect(actorInfo).toEqual(original);
-        });
-    });
-
-    it('describes RAG page content without referring to Web Fetch', async () => {
-        const [tool] = await getNormalActorsAsTools([createMockActorInfo(RAG_WEB_BROWSER)]);
-        const alone = getToolPublicFieldOnly(tool, { presentTools: new Set([tool.name]) }).description;
-        const together = getToolPublicFieldOnly(tool, {
-            presentTools: new Set([tool.name, actorNameToToolName(WEB_FETCH)]),
-        }).description;
-
-        expect(together).toBe(alone);
-        expect(together).toContain('text of the top results');
-        expect(together).not.toContain(WEB_FETCH);
     });
 });

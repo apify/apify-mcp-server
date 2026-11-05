@@ -125,6 +125,7 @@ describe('get-dataset', () => {
         expectSoftFailInvalidInput(result);
         expect(structuredContent).toBeUndefined();
         expect(content[0].text).toContain("Dataset 'missing' not found");
+        expect(content[0].text).toContain('a name (resolved against your own datasets)');
     });
 
     it('rejects empty datasetId via ajv validation', () => {
@@ -251,5 +252,17 @@ describe('get-dataset fields normalization', () => {
         expect(content[2].text).toBe(
             `Apify Console: https://console.apify.com/storage/datasets/ds-1\n${VERBATIM_LINKS_NUDGE}`,
         );
+    });
+});
+
+describe('get-dataset with a bare dataset name', () => {
+    it("reads the name as one of the caller's own datasets", async () => {
+        const datasetSpy = vi.fn().mockReturnValue({ get: async () => MOCK_DATASET });
+
+        await (getDataset as HelperTool).call(
+            stubToolCallContext({ datasetId: 'eval-ai-items' }, mockApifyClient({ dataset: datasetSpy })),
+        );
+
+        expect(datasetSpy).toHaveBeenCalledWith('~eval-ai-items');
     });
 });

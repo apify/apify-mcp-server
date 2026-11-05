@@ -33,14 +33,18 @@ Two MCP protocol revisions are served, each by its own adapter:
 - `errors.ts` — protocol-neutral domain errors mapped by each protocol adapter.
 - `tool_call_engine.ts` — shared `tools/call` orchestration. `prepareToolCall()` handles
   preparation; `executeSyncToolCall()` runs synchronous calls.
-- `client.ts` — `connectMCPClient(url, token)`: transport negotiation.
+- `client.ts` — `connectMCPClient(url, options)`: transport negotiation; both transports send the token and the
+  session's request origin (`ApifyClient.requestOrigin`, `APIFY_AI` for the Apify AI client) on every request.
 - `remote_tool_call.ts` — `withRemoteMcpClient()`: connect-call-close round trip for
-  `tool_dispatch.ts` and `call_actor.ts`'s remote tool calls.
+  `tool_dispatch.ts` and the MCP server Actor tools (`runOnActorMcpServer` in `call_actor_mcp_tool.ts`).
 - `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`, `getProxyMCPServerToolName(actorFullName, toolName)`.
-- `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`.
+- `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`; `resolveOnStandbyOrigin()`:
+  resolves a path against the Actor's `standbyUrl` (no `standbyUrl`, no URL) and flags a path that leaves that
+  origin, for `getActorMCPServerURL()` and `send-server-actor-request`.
 - `utils.ts` — `processParamsGetTools()`: turns `?actors=` URL params into tools.
 - `tool_call_error_mapper.ts` — shared tool-call error classification.
-- `tool_dispatch.ts` — neutral dispatch for internal, Actor MCP, and Actor tools.
+- `tool_dispatch.ts` — neutral dispatch for internal, Actor MCP, Actor, and Actor server tools (the last run their
+  `call`, as internal tools do).
 - `tool_call_telemetry.ts` — shared tool-call telemetry preparation and logging.
 - `task_execution.ts` — legacy long-running task execution and status notifications. `tasks/cancel`
   reaches the Actor run through `createTaskCancellationWatcher` (`utils.ts`), which polls the

@@ -103,6 +103,17 @@ describe('isStatelessRequest()', () => {
         await expect(isStatelessRequest(post(body))).resolves.toBe(false);
     });
 
+    it('keeps a claim-less request over the SDK 4 MiB body limit on the stateful path', async () => {
+        const body = {
+            jsonrpc: '2.0',
+            id: 2,
+            method: 'tools/call',
+            params: { name: 'some-tool', arguments: { content: 'x'.repeat(5 * 1024 * 1024) } },
+        };
+
+        await expect(isStatelessRequest(post(body))).resolves.toBe(false);
+    });
+
     it('keeps session operations on the stateful path', async () => {
         // `express.json()` leaves an empty object behind on a body-less request.
         for (const method of ['GET', 'DELETE']) {
@@ -173,7 +184,10 @@ function statelessRequest(
     params: Record<string, unknown> = {},
     meta: Record<string, unknown> = {},
 ): { body: unknown; headers: Record<string, string> } {
-    const headers: Record<string, string> = { 'mcp-method': method };
+    const headers: Record<string, string> = {
+        'mcp-method': method,
+        'mcp-protocol-version': STATELESS_PROTOCOL_VERSION,
+    };
     if (typeof params.name === 'string') headers['mcp-name'] = params.name;
     return {
         body: { jsonrpc: '2.0', id: 1, method, params: { ...params, _meta: { ...ENVELOPE, ...meta } } },
@@ -458,6 +472,43 @@ describe('createExpressApp() era routing', () => {
         });
     });
 
+    it('accepts a 2025-era session tool call body over the SDK 4 MiB body limit', async () => {
+        const { tool, received } = makeRecorderTool('source-tool');
+        getActorsMock.mockResolvedValue([tool]);
+
+        await withDevServer(async (post) => {
+            const init = await post(
+                DEV_URL,
+                {
+                    jsonrpc: '2.0',
+                    id: 1,
+                    method: 'initialize',
+                    params: {
+                        protocolVersion: '2025-11-25',
+                        clientInfo: { name: 'legacy-client', version: '1.0.0' },
+                        capabilities: {},
+                    },
+                },
+                { authorization: 'Bearer dev-token' },
+            );
+            const sessionId = init.headers.get('mcp-session-id') ?? '';
+
+            const response = await post(
+                DEV_URL,
+                {
+                    jsonrpc: '2.0',
+                    id: 2,
+                    method: 'tools/call',
+                    params: { name: tool.name, arguments: { content: 'x'.repeat(5 * 1024 * 1024) } },
+                },
+                { 'mcp-session-id': sessionId, 'mcp-protocol-version': '2025-11-25' },
+            );
+
+            expect(response.status).toBe(200);
+            expect(received.called).toBe(true);
+        });
+    });
+
     it('rejects a body over MAX_REQUEST_BODY_BYTES with 413', async () => {
         const { tool, received } = makeRecorderTool('source-tool');
         getActorsMock.mockResolvedValue([tool]);
@@ -473,5 +524,18 @@ describe('createExpressApp() era routing', () => {
             expect(response.status).toBe(413);
             expect(received.called).toBe(false);
         });
+    });
+});
+
+describe('dev server request log', () => {
+    it('logs the method of an incoming request, never its body', async () => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => log);
+        const { body, headers } = statelessRequest('tools/list', { secret: 'secret-keywords' });
+        await withDevServer(async (post) => {
+            await post(DEV_URL, body, { ...headers, authorization: 'Bearer dev-token' });
+        });
+        const logged = JSON.stringify(info.mock.calls);
+        expect(logged).toContain('tools/list');
+        expect(logged).not.toContain('secret-keywords');
     });
 });

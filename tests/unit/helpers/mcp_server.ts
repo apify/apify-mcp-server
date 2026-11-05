@@ -169,14 +169,16 @@ async function callStatelessMethod(
             },
         },
     };
-    // The revision requires the method — and, where the body names a target, that target — in
-    // headers as well; the entry refuses a request whose headers and body disagree.
+    // The revision requires the protocol version and the method — and, where the body names a
+    // target, that target — in headers as well; the entry refuses a request whose headers and
+    // body disagree.
     const headers: Record<string, string> = {
         'content-type': 'application/json',
         accept: 'application/json, text/event-stream',
         'mcp-method': method,
+        'mcp-protocol-version': STATELESS_PROTOCOL_VERSION,
     };
-    const target = params.name ?? params.uri;
+    const target = params.name ?? params.uri ?? params.taskId;
     if (typeof target === 'string') headers['mcp-name'] = target;
 
     const response = await handler.fetch(
@@ -250,6 +252,20 @@ export function makePermissionApprovalError(): ApifyApiError {
         } as AxiosResponse,
         1,
     );
+}
+
+/** A minimal ACTOR tool with an empty input schema; tests spy on `actorExecutor` to read what dispatch passes it. */
+export function makeActorTool(options: { name?: string; actorFullName?: string; actorId?: string } = {}): ToolEntry {
+    const { name = 'test-actor-tool', actorFullName = 'test/actor', actorId = 'test/actor' } = options;
+    return {
+        type: TOOL_TYPE.ACTOR,
+        name,
+        description: 'actor',
+        inputSchema: { type: 'object', properties: {} } as ToolInputSchema,
+        ajvValidate: compileSchema({ type: 'object', properties: {} }),
+        actorId,
+        actorFullName,
+    } as ToolEntry;
 }
 
 /**
@@ -339,12 +355,16 @@ export function makeArgsRecorderTool(name = 'recorder-tool'): {
  */
 export function makeRecorderTool(
     name: string,
-    options: { paymentRequired?: boolean; taskSupport?: (typeof ALLOWED_TASK_TOOL_EXECUTION_MODES)[number] } = {},
+    options: {
+        paymentRequired?: boolean;
+        hasPaymentProviderStandbyCheck?: boolean;
+        taskSupport?: (typeof ALLOWED_TASK_TOOL_EXECUTION_MODES)[number];
+    } = {},
 ): {
     tool: ToolEntry;
     received: { called: boolean; progressTracker: InternalToolArgs['progressTracker'] | undefined };
 } {
-    const { paymentRequired = false, taskSupport } = options;
+    const { paymentRequired = false, hasPaymentProviderStandbyCheck = false, taskSupport } = options;
     const received: { called: boolean; progressTracker: InternalToolArgs['progressTracker'] | undefined } = {
         called: false,
         progressTracker: undefined,
@@ -356,6 +376,7 @@ export function makeRecorderTool(
         inputSchema: { type: 'object', properties: {}, additionalProperties: true },
         ajvValidate: Object.assign(() => true, { errors: null }) as unknown as ToolEntry['ajvValidate'],
         paymentRequired,
+        hasPaymentProviderStandbyCheck,
         annotations: {},
         ...(taskSupport ? { execution: { taskSupport } } : {}),
         call: async (toolArgs: InternalToolArgs) => {

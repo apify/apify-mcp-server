@@ -19,6 +19,9 @@ export type ApiParameter = {
     isRequired: boolean;
     description?: string;
     schema?: unknown;
+    /** Kept only for Actor schemas, see `DereferenceContext`. */
+    example?: unknown;
+    examples?: unknown;
 };
 
 export type ApiOperation = {
@@ -35,11 +38,24 @@ export type ApiOperation = {
     /** Path and query parameters; header parameters are left out, the tools never send them. */
     parameters: ApiParameter[];
     /** Dereferenced JSON schema of the request body; absent when the operation takes none. */
-    requestBody?: { isRequired: boolean; schema: unknown };
+    requestBody?: { isRequired: boolean; schema: unknown; example?: unknown; examples?: unknown };
 };
 
-/** Schema keywords that only cost context. `x-*` vendor extensions are dropped by prefix in `dereference()`. */
-const DROPPED_SCHEMA_KEYS: ReadonlySet<string> = new Set(['example', 'examples']);
+/**
+ * What `dereference()` resolves against. The Apify spec drops examples; an Actor schema keeps them, since the
+ * creator's examples show a valid call. `budget` bounds the expansion of an untrusted schema: it is mutated, and
+ * `dereference()` throws `DereferenceBudgetError` when it runs out, or when a schema nests past `MAX_SCHEMA_DEPTH`.
+ */
+export type DereferenceContext = {
+    spec: unknown;
+    shouldKeepExamples?: boolean;
+    budget?: { remainingBytes: number };
+};
+
+export class DereferenceBudgetError extends Error {}
+
+/** Real schemas nest a few dozen levels; past this, an untrusted schema could overflow the stack. */
+const MAX_SCHEMA_DEPTH = 256;
 
 const openApiOperationValidator = z.object({
     operationId: z.string().min(1),
@@ -57,11 +73,16 @@ const openApiParameterValidator = z.object({
     required: z.boolean().optional(),
     description: z.string().optional(),
     schema: z.unknown().optional(),
+    example: z.unknown().optional(),
+    examples: z.unknown().optional(),
 });
 
 const openApiRequestBodyValidator = z.object({
     required: z.boolean().optional(),
-    content: z.record(z.string(), z.object({ schema: z.unknown().optional() })),
+    content: z.record(
+        z.string(),
+        z.object({ schema: z.unknown().optional(), example: z.unknown().optional(), examples: z.unknown().optional() }),
+    ),
 });
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -69,39 +90,113 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** Walks a local `#/...` reference; `undefined` when it does not resolve. */
-function resolveLocalRef(spec: unknown, ref: string): unknown {
+export function resolveLocalRef(spec: unknown, ref: string): unknown {
     if (!ref.startsWith('#/')) return undefined;
     let node: unknown = spec;
     for (const segment of ref.slice(2).split('/')) {
-        if (!isRecord(node)) return undefined;
-        node = node[segment];
+        const key = segment.replaceAll('~1', '/').replaceAll('~0', '~');
+        if (typeof node !== 'object' || node === null || !Object.hasOwn(node, key)) return undefined;
+        node = (node as Record<string, unknown>)[key];
     }
     return node;
 }
 
 /**
- * Resolves local `$ref`s and drops examples and vendor extensions. Property names under `properties`
- * are kept as they are, since a property can be named `example`.
+ * Resolves local `$ref`s and drops vendor extensions, and examples unless the context keeps them; kept examples
+ * are data and stay as written. Keywords next to a `$ref` are kept and override the target's. A reference that
+ * does not resolve stays as written. Property names under `properties` are kept as they are, since a property can
+ * be named `example`.
  */
-function dereference(node: unknown, spec: unknown, seenRefs: ReadonlySet<string> = new Set()): unknown {
-    if (Array.isArray(node)) return node.map((item) => dereference(item, spec, seenRefs));
-    if (!isRecord(node)) return node;
-    if (typeof node.$ref === 'string') {
-        // A reference cycle would recurse forever; the published spec has none.
-        if (seenRefs.has(node.$ref)) return {};
-        return dereference(resolveLocalRef(spec, node.$ref), spec, new Set([...seenRefs, node.$ref]));
+function dereference(root: unknown, context: DereferenceContext): unknown {
+    // The references on the path to the current node; meeting one of them again is a cycle.
+    const expandingRefs = new Set<string>();
+
+    function visit(node: unknown, depth: number): unknown {
+        if (!Array.isArray(node) && !isRecord(node)) return node;
+        if (depth >= MAX_SCHEMA_DEPTH) throw new DereferenceBudgetError();
+        if (Array.isArray(node)) return node.map((item) => visit(item, depth + 1));
+        if (typeof node.$ref !== 'string') return visitKeywords(node, depth);
+        const { $ref: ref, ...siblings } = node;
+        const target = expandRef(ref, depth);
+        // OpenAPI 3.1 lets keywords such as `description` sit next to a `$ref` and override the target's.
+        return isRecord(target) ? { ...target, ...visitKeywords(siblings, depth) } : target;
     }
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(node)) {
-        if (DROPPED_SCHEMA_KEYS.has(key) || key.startsWith('x-')) continue;
-        result[key] =
-            key === 'properties' && isRecord(value)
-                ? Object.fromEntries(
-                      Object.entries(value).map(([name, schema]) => [name, dereference(schema, spec, seenRefs)]),
-                  )
-                : dereference(value, spec, seenRefs);
+
+    function expandRef(ref: string, depth: number): unknown {
+        // A reference cycle would recurse forever; a cycle renders as an empty schema.
+        if (expandingRefs.has(ref)) return {};
+        const target = resolveLocalRef(context.spec, ref);
+        if (target === undefined) return { $ref: ref };
+        chargeExpansion(target, context);
+        expandingRefs.add(ref);
+        try {
+            return visit(target, depth + 1);
+        } finally {
+            expandingRefs.delete(ref);
+        }
     }
-    return result;
+
+    function visitKeywords(node: Record<string, unknown>, depth: number): Record<string, unknown> {
+        const result: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(node)) {
+            if (key.startsWith('x-')) continue;
+            if (key === 'example' || key === 'examples') {
+                if (!context.shouldKeepExamples) continue;
+                // A record under `examples` is an OpenAPI examples map; a JSON Schema `examples` is an array.
+                result[key] = key === 'examples' && isRecord(value) ? resolveExamplesMap(value, context) : value;
+                continue;
+            }
+            if (key === 'properties' && isRecord(value)) {
+                result[key] = Object.fromEntries(
+                    Object.entries(value).map(([name, schema]) => [name, visit(schema, depth + 1)]),
+                );
+                continue;
+            }
+            result[key] = visit(value, depth + 1);
+        }
+        return result;
+    }
+
+    return visit(root, 0);
+}
+
+/** Charges the size of a reference's target to the budget, if there is one. */
+function chargeExpansion(target: unknown, context: DereferenceContext): void {
+    if (!context.budget) return;
+    // Shared references can expand exponentially, so each expansion costs the size of its target.
+    try {
+        context.budget.remainingBytes -= Buffer.byteLength(JSON.stringify(target));
+    } catch (error) {
+        // A target nested too deep for JSON.stringify is too large to render.
+        if (error instanceof RangeError) throw new DereferenceBudgetError();
+        throw error;
+    }
+    if (context.budget.remainingBytes < 0) throw new DereferenceBudgetError();
+}
+
+/** An OpenAPI examples map, each local Reference Object replaced by its target as written; the rest as written. */
+function resolveExamplesMap(examples: Record<string, unknown>, context: DereferenceContext): Record<string, unknown> {
+    const resolved: Record<string, unknown> = {};
+    for (const [name, example] of Object.entries(examples)) {
+        const target =
+            isRecord(example) && typeof example.$ref === 'string'
+                ? resolveLocalRef(context.spec, example.$ref)
+                : undefined;
+        if (target !== undefined) chargeExpansion(target, context);
+        resolved[name] = target === undefined ? example : target;
+    }
+    return resolved;
+}
+
+/** `application/json`, also with parameters such as `; charset=utf-8`, or a `+json` type such as `application/vnd.api+json`. */
+function isJsonMediaType(mediaType: string): boolean {
+    const base = mediaType.split(';')[0].trim().toLowerCase();
+    return base === 'application/json' || base.endsWith('+json');
+}
+
+/** The JSON media type every body is sent as, else the wildcard type the key-value store record operations declare. */
+export function pickJsonMedia<T>(content: Record<string, T>): T | undefined {
+    return content['application/json'] ?? content[Object.keys(content).find(isJsonMediaType) ?? '*/*'];
 }
 
 /** Lowercase words of a text, splitting camelCase, snake_case, kebab-case, and paths. */
@@ -113,12 +208,12 @@ function splitWords(text: string): string[] {
         .filter(Boolean);
 }
 
-function parseParameters(rawParameters: unknown[] | undefined, spec: unknown): ApiParameter[] {
+export function parseParameters(rawParameters: unknown[] | undefined, context: DereferenceContext): ApiParameter[] {
     const parameters: ApiParameter[] = [];
     for (const rawParameter of rawParameters ?? []) {
-        const parsed = openApiParameterValidator.safeParse(dereference(rawParameter, spec));
+        const parsed = openApiParameterValidator.safeParse(dereference(rawParameter, context));
         if (!parsed.success) continue;
-        const { name, in: location, required, description, schema } = parsed.data;
+        const { name, in: location, required, description, schema, example, examples } = parsed.data;
         if (location !== 'path' && location !== 'query') continue;
         parameters.push({
             name,
@@ -127,20 +222,27 @@ function parseParameters(rawParameters: unknown[] | undefined, spec: unknown): A
             isRequired: location === 'path' || required === true,
             ...(description && { description }),
             ...(schema !== undefined && { schema }),
+            ...(example !== undefined && { example }),
+            ...(examples !== undefined && { examples }),
         });
     }
     return parameters;
 }
 
-function parseRequestBody(rawRequestBody: unknown, spec: unknown): ApiOperation['requestBody'] {
+export function parseRequestBody(rawRequestBody: unknown, context: DereferenceContext): ApiOperation['requestBody'] {
     if (rawRequestBody === undefined) return undefined;
-    const parsed = openApiRequestBodyValidator.safeParse(dereference(rawRequestBody, spec));
+    const parsed = openApiRequestBodyValidator.safeParse(dereference(rawRequestBody, context));
     if (!parsed.success) return undefined;
     const { content, required } = parsed.data;
-    // Every body is sent as JSON; the key-value store record operations declare `*/*`.
-    const media = content['application/json'] ?? content['*/*'];
+    const media = pickJsonMedia(content);
     if (!media) return undefined;
-    return { isRequired: required === true, schema: media.schema ?? {} };
+    const { schema, example, examples } = media;
+    return {
+        isRequired: required === true,
+        schema: schema ?? {},
+        ...(example !== undefined && { example }),
+        ...(examples !== undefined && { examples }),
+    };
 }
 
 /**
@@ -158,7 +260,7 @@ export function buildApiOperationIndex(spec: unknown, rules?: readonly ApiBlockR
             const parsed = openApiOperationValidator.safeParse(pathItem[method.toLowerCase()]);
             if (!parsed.success || parsed.data.deprecated || isEndpointBlocked(method, path, rules)) continue;
             const { operationId, summary, description, tags, parameters, requestBody } = parsed.data;
-            const body = parseRequestBody(requestBody, spec);
+            const body = parseRequestBody(requestBody, { spec });
             index.set(operationId, {
                 operationId,
                 method,
@@ -167,7 +269,7 @@ export function buildApiOperationIndex(spec: unknown, rules?: readonly ApiBlockR
                 description: description ?? '',
                 docsUrl: `${API_DOCS_BASE_URL}/${splitWords(operationId).join('-')}`,
                 tags: tags ?? [],
-                parameters: parseParameters(parameters, spec),
+                parameters: parseParameters(parameters, { spec }),
                 ...(body && { requestBody: body }),
             });
         }
