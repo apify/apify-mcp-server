@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.20.3 - **not yet released**
+## [0.21.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.0) (2026-11-05)
 
 ### 🚀 Features
 
@@ -25,7 +24,6 @@ All notable changes to this project will be documented in this file.
 - Share each Actor tool&#x27;s built input schema across sessions ([#1787](https://github.com/apify/apify-mcp-server/pull/1787)) ([126ce60](https://github.com/apify/apify-mcp-server/commit/126ce606a852291e71d4a298570935e14ed2aa8b)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.20.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.20.1) (2026-11-03)
 
 ### 🚀 Features
