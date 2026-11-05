@@ -237,10 +237,22 @@ export async function executeToolAndUpdateTask(params: {
         let result: Record<string, unknown> = {};
 
         // Callback to propagate Actor run statusMessage into the task store and emit a push notification.
-        // TODO(TC-3): cancel arriving while this is scheduled throws cancelled → working;
-        // currently swallowed by progress.ts's tick catch — guard or catch explicitly.
         const onStatusMessage = async (message: string) => {
-            await taskStore.updateTaskStatus(taskId, 'working', message, mcpSessionId);
+            try {
+                await taskStore.updateTaskStatus(taskId, 'working', message, mcpSessionId);
+            } catch (error) {
+                // The store rejects cancelled → working when tasks/cancel lands first, and an expired task.
+                const isExpectedRejection =
+                    isTaskNotFoundError(error) ||
+                    (await isTaskCancelled(taskId, mcpSessionId, taskStore).catch(() => false));
+                if (isExpectedRejection) return;
+                log.softFail('[executeToolAndUpdateTask] Failed to update the task status message', {
+                    taskId,
+                    mcpSessionId,
+                    errMessage: sanitizeMezmoMessage(error instanceof Error ? error.message : String(error)),
+                });
+                return;
+            }
             await emitTaskStatusNotification(taskId, mcpSessionId, taskStore, server);
         };
 

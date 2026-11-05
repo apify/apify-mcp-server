@@ -20,6 +20,8 @@ export async function resolvePaymentProvider(
         x402: async () => X402PaymentProvider.create(),
     };
 
-    const factory = providers[paymentParam as PaymentProviderId];
-    return factory?.();
+    // Own-property check: a bare index resolves `Object.prototype` names such as `constructor` to a
+    // truthy non-provider, which the HTTP auth gate would accept and skip token validation for.
+    if (!Object.hasOwn(providers, paymentParam)) return undefined;
+    return providers[paymentParam as PaymentProviderId]();
 }

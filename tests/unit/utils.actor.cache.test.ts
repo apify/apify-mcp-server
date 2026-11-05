@@ -108,10 +108,10 @@ describe('getActorDefinitionCached — tenant isolation', () => {
 });
 
 describe('getActorToolResolutionCached()', () => {
-    it('derives the MCP URL from a cached Actor the caller may see', async () => {
+    it('classifies a cached MCP server Actor without resolving its MCP URL, so a path off its origin does not throw', async () => {
         seedCache('acme/mcp-public', true, 'owner-6', {
             id: 'actorpub',
-            webServerMcpPath: '/mcp',
+            webServerMcpPath: 'https://elsewhere.example/mcp',
             isStandbyEnabled: true,
         });
 
@@ -119,14 +119,13 @@ describe('getActorToolResolutionCached()', () => {
 
         expect(result).toEqual({
             toolMode: ACTOR_TOOL_MODE.MCP,
-            mcpServerUrl: 'https://acme-mcp-public.apify.actor/mcp',
             actorFullName: 'acme/mcp-public',
             interfaces: { input: false, mcp: true, server: false },
         });
         expect(getActorDefinitionMock).not.toHaveBeenCalled();
     });
 
-    it('does NOT leak a cached private Actor MCP URL to a non-owner', async () => {
+    it('does NOT leak a cached private MCP server Actor to a non-owner', async () => {
         seedCache('acme/mcp-private', false, 'owner-7', {
             id: 'actorpriv',
             webServerMcpPath: '/mcp',

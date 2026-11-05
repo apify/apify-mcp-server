@@ -11,38 +11,60 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 ## Files
 
 - `registry.ts` — tool categories and the tools in each (`index.ts` re-exports them), plus tools in no
-  category (`ALL_WIDGET_TOOLS`, `UNCATEGORIZED_TOOLS`; `send-server-actor-request` is there until it is enabled by
-  default).
+  category (`ALL_WIDGET_TOOLS`, `UNCATEGORIZED_TOOLS`).
 - `structured_output_schemas.ts` — shared JSON-schema definitions for structured
   output across tools.
 - `utils.ts` — shared tool helpers (schema property shaping, AJV compile).
 - `actor_tool_naming.ts` — Actor tool names and `resolveActorInterfaces`, the one rule for which interfaces an
   Actor has: `input` (a run tool through its input schema), `mcp` (its MCP server) and `server` (its HTTP API,
-  `hasWebServerSchema`). `resolveActorToolMode` derives the tool slot from the set — MCP tools if `mcp`, else a
-  run tool if `input`, else none (`SERVER_ACTOR_WITHOUT_MCP`) — and tool loading and `call-actor` routing both
-  read it. Actors in `INPUT_INTERFACE_ACTORS` (`../const.ts`) read as having no MCP interface, so they are
-  served as run tools although they declare `webServerMcpPath`, unless their input schema is empty, in which
-  case they get no tool.
+  `hasWebServerSchema`). Two routes derive from the set. `resolveActorToolMode` gives a selected Actor's own tool,
+  read by tool loading: a server tool if `server`, else MCP tools if `mcp`, else a run tool if `input`, else none
+  (`SERVER_ACTOR_WITHOUT_MCP`). `getActorToolModeFromInterfaces` gives the `call-actor` route: a run if `input`, else
+  MCP tools if `mcp`; it skips the server interface, so `call-actor` still starts runs of a Server Actor. The three
+  interfaces are independent: an MCP-server Actor with a non-empty input schema has `input` too.
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
   - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), delete
-    (`delete_actor.ts`), the actor-tools factory, the direct actor-tool executor (`actor_executor.ts`),
+    (`delete_actor.ts`), the actor-tools factory (run tools, proxied MCP tools, and a Server Actor's own tool
+    (`getServerActorsAsTools`, type `actor-server`): `send-server-actor-request`'s execution and output with the
+    Actor fixed, `method` narrowed to the documented ones, `path` a plain string (no enum: a schema can document
+    thousands of paths), the policy's `serverTool` text and input notes (`getActorToolPolicy`) and the operations in the
+    description; an Actor with a server interface and no `webServerToolInfo` is reported as `load-failed`; the
+    default `apify/web-fetch` and `apify/web-search` tools and a selected `apify/rag-web-browser` are served this
+    way), the direct actor-tool executor (`actor_executor.ts`),
     `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`, and resolves the build
     the server-interface fields — `webServerMcpPath`, `webServerSchema` — are read from when standby is on,
     `resolveServerInterfaceDefinition`, shared with `fetchActorDetails` in `../utils/actor_details.ts`; the input
     schema and README stay on the default build; `hasWebServerSchemaOperations` detects operations the send tool
     can call in the publisher's schema; `webServerOperations` caches each operation with its required inputs, which
-    the send tool lists after a 400/404/405/422),
-    `server_interface_schema.ts` (the server-interface text of `fetch-actor-details`: by default one summary line,
-    served only with `send-server-actor-request`; `output.serverInterface: true` lists the operations, with the API
-    schema as written while it fits `MAX_INLINE_BYTES`; `"METHOD /path"` returns one operation excerpt and `"#/..."`
-    the raw node at a local JSON pointer; references are not expanded or fetched),
+    the send tool lists after a 400/404/405/422, and `webServerCommaJoinedQueryParameters` the query parameters a
+    list fills comma-joined, `explode: false`, per operation, looked up by the path as sent; absent when none
+    need joining; a list fills any other as a repeated parameter, and an empty list nothing),
+    `server_interface_schema.ts` (the operations a Server Actor's `webServerSchema` documents, in the
+    `get-apify-api-details` shape through the API tools' `dereference`; no prose),
+    `server_interface_details.ts` (the server-interface section of `fetch-actor-details`: the
+    `structuredContent.serverInterface` object, and the text derived from it; the summary is served only with
+    `send-server-actor-request`, and the operations in full give way to `operationIndex` over `MAX_INLINE_BYTES`,
+    with a byte budget on reference expansion since a creator schema can expand exponentially; also a selected
+    Server Actor's tool description, within `CLIENT_DESCRIPTION_MAX_LENGTH` (4,096 characters, the Claude Code cut):
+    the operations in full when it fits, else `formatOperationLine` lines, cut with `… and N more` and a pointer to
+    `serverInterface: true` (`buildServerActorToolDescription`, from what `buildServerActorToolInfo` renders once
+    per definition); `server_interface_schema.ts` reads each operation's inputs for it, `listOperationInputs`),
     `send_server_actor_request.ts` (`send-server-actor-request`: one HTTP request to a Server Actor's API, gated on
     the `server` interface and sent through `sendApifyApiRequest` with raw response
-    bytes, no redirects, the `MAX_INLINE_BYTES` cap after decompression and the `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`
+    bytes, no redirects, the body cut at `MAX_INLINE_BYTES` after decompression (`readBodyToCap`; the
+    start is returned with `bodyTruncated` and a `nextStep`) and the `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`
     deadline; the path is resolved against the Actor's `standbyUrl` and must keep its origin; query values are
     validated without coercion; text uses the declared charset, UTF-8 by default, and rejects unsupported
     charsets while keeping the HTTP status; refused bodies retain structured request/status metadata with
     `bodyOmitted` and `reason`, and `bytes` only when the full size is known; session tokens are masked after decoding too),
+    `call_actor_mcp_tool.ts` (`call-actor-mcp-tool`: one `tools/call` on an MCP server Actor's server, gated on the
+    `mcp` interface, with the remote `CallToolResult` passed through except for internal telemetry;
+    `runOnActorMcpServer` resolves the Actor and its MCP URL, connects under the caller's token and turns a failed
+    connection, an abort or a remote error into a response),
+    `fetch_actor_mcp_tool_list.ts` (`fetch-actor-mcp-tool-list`: an uncached `tools/list` through
+    `runOnActorMcpServer` that follows `nextCursor` within one `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC` for all pages,
+    fails on a failed page and stops after `MAX_TOOL_LIST_PAGES`;
+    `fetch-actor-details` never connects to an MCP server),
     `actor_tool_contract.ts` (Actor-specific presentation policies plus direct-tool input restrictions
     and defaults, shared by schema generation, the call engine's denied-input check and execution;
     generic calls skip direct-only restrictions and defaults), and
@@ -110,9 +132,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).
   - `searchActorsBaseArgsSchema` has an optional `useCase` (Store search context). `withoutUseCaseField` in `utils/tools_loader.ts` removes it from the served schema; `ActorsMcpServer.composeToolsForClient` applies that for clients `isStoreUseCaseServable` does not allow. The call passes it to `searchAgentSafeActors`, which sanitizes it.
-- `../utils/apify_resource_id.ts` holds the helpers that resolve an Actor, task, or schedule given by ID or
-  name, where a name alone means one of the caller's own. The task, schedule, and versions tools use them,
-  and so do `build-actor` and the `actorId` filter of `get-actor-build-list` and `get-actor-run-list`.
+- `../utils/apify_resource_id.ts` holds the helpers that resolve an Actor, task, schedule, or storage given by
+  ID or name, where a name alone means one of the caller's own. The task, schedule, and versions tools use them,
+  and so do `build-actor` and the `actorId` filter of `get-actor-build-list` and `get-actor-run-list`. The
+  dataset and key-value store tools reach them through `fetchStorageByIdOrName` in `storage/storage_helpers.ts`.
 
 ## Rules when editing here
 

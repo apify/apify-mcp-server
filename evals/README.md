@@ -123,27 +123,40 @@ The deterministic platform facts the judge used to score here live in
 `tests/test_kit/cases/schedules.cases.ts` instead, asserted against the live API. Those cases name their
 schedules `test-sched-*`; the sweep only ever touches `eval-*`.
 
+The storage family (`merge/storage/*`, 3 items: 2 proper + 1 with `expectedErrors`) covers reading a
+dataset and a key-value store record that the user names the way they would, by bare name (#1628). The
+API reads a bare value as an ID, so the tools resolve it as `~name`; before that, every first call failed
+with "not found" and the zero-tool-error gate fails the item on it. Two permanent read-only fixtures,
+the dataset `eval-storage-products` (three items) and the key-value store `eval-storage-settings` (a
+`CONFIG` record), are seeded by `pnpm run evals:mcp-agent:fixtures` when their content is missing; no case writes, so
+nothing is reset or swept. The not-found case asks for a dataset that does not exist.
+
 The web-fetch family (`merge/web-fetch/*`, 11 items: 8 proper + 3 with `expectedErrors`) covers the
 `apify/web-fetch` default Actor tool: fetching, output formats, HTTP status reporting, tool
 selection among the defaults, and multi-fetch chains. They create no named account state, so
 there is no fixtures script. The cases fetch live third-party pages (example.com, rfc-editor.org,
 httpbin.org), so a failure can also mean the page changed or the host is down — check the target
 before blaming the tool (httpbin outages are common; the status/format references tolerate a
-truthfully reported upstream error). Platform behavior the cases are built on (probed 2026-08-20):
-an HTTP 4xx/5xx from the target page still ends the run SUCCEEDED with `fetch.httpStatusCode` in
-the item; an unreachable domain either fails the run ("Could not connect…") or succeeds with an
-empty 502 item, depending on unblocker routing; JSON content fails `text`/`markdown` formats with a
-status message telling the agent to add `raw`; `ftp://` fails with "Unsupported URL protocol".
+truthfully reported upstream error). Since #1647 the default tool is the Actor's Server Actor tool: it
+sends one request (`method`, `path`, `query`) to the Actor's server interface, and the result is the HTTP
+response, with no run, dataset or `get-dataset-items` step. Probed 2026-11-04 over `GET /`: `formats`
+is sent comma-joined (`formats=markdown,links`), as the schema documents (the Actor also accepts
+repeated parameters); a 200 body is a JSON object with `fetch` (including `fetch.httpStatusCode`),
+`metadata` and one field per requested format; `unwrap=true` returns the first format as the body
+(`text/markdown`); a body over 262144 bytes is cut there and its start returned with `bodyTruncated` and a
+`nextStep` (#1738); `ftp://` returns 400 `INVALID_URL` ("Unsupported URL protocol"); an unreachable host returns
+HTTP 502 `UPSTREAM_FETCH_ERROR`, a failed call.
 
 The web-selection family (`merge/web-selection/*`, 9 items: 7 proper + 2 with `expectedErrors`) covers
-the clash between the default web tools: web search by query (`apify/rag-web-browser`) vs
+the clash between the default web tools: web search by query (`apify/web-search`) vs
 single-URL verbatim fetch (`apify/web-fetch`) vs Actor discovery (`search-actors`) vs a
 specialized Actor for structured platform data, plus coexistence with a client's built-in,
 summarizing fetch. Also stateless — no fixtures script.
 Known residual (2026-08-21): on `merge/web-fetch/unsupported-protocol`,
 claude-haiku-4-5 reproducibly rewrites the ftp:// URL to https:// without telling the user,
 despite the scheme note in both the tool description and the `url` parameter — a model-level
-limit the case documents on purpose; stronger models pass.
+limit the case documents on purpose; stronger models pass. Since #1647 the note is on the tool's `query`
+input and in the description.
 
 ### Tool-call mode
 

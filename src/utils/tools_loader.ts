@@ -58,19 +58,15 @@ const ALL_INTERNAL_TOOL_NAMES: Set<string> = (() => {
 
 type NormalizedInput = {
     /**
-     * Cleaned tool selectors (trimmed, non-empty). `undefined` when `input.tools`
-     * was not provided at all. Use `selectors?.length === 0` to detect an
-     * explicitly-empty list.
+     * Trimmed, non-empty selectors with `RETIRED_SELECTOR_NAMES` dropped. `undefined` when `input.tools`
+     * was not given; `[]` when it was empty or held only retired names, which both phases treat alike.
      */
     selectors: string[] | undefined;
     /** `true` when `input.actors` was explicitly empty (`[]` or `''`). */
     actorsExplicitlyEmpty: boolean;
 };
 
-/**
- * Normalize the raw {@link Input} into cleaned selectors + the explicit-empty flag.
- * Shared by both loader phases so semantics stay consistent.
- */
+/** Shared by both loader phases so they read `input.tools` and `input.actors` the same way. */
 function normalizeInput(input: Input): NormalizedInput {
     const raw = input.tools;
     const selectors =
@@ -79,7 +75,7 @@ function normalizeInput(input: Input): NormalizedInput {
             : (Array.isArray(raw) ? raw : [raw])
                   .map(String)
                   .map((s) => s.trim())
-                  .filter((s) => s !== '');
+                  .filter((s) => s !== '' && !RETIRED_SELECTOR_NAMES.has(s));
     return {
         selectors,
         actorsExplicitlyEmpty: input.actors === '' || (Array.isArray(input.actors) && input.actors.length === 0),
@@ -99,29 +95,16 @@ export function isReportProblemExplicitlySelected(input: Input): boolean {
 }
 
 /**
- * Resolve the list of Actor names (`username/name`) to fetch from the input.
- *
- * **Mode-agnostic** — the result does NOT depend on `SERVER_MODE`. An Actor tool
- * is identified by name, and the same Actor entry is reused across modes; only
- * the *internal* tool variants around it differ by mode.
- *
- * Selectors classified as "actor names":
- *   - NOT a retired selector (`RETIRED_SELECTOR_NAMES`: `'preview'`, `'experimental'`, `'add-actor'`, `'get-actor-log'`,
- *     `'source'`)
- *   - NOT a category name (from `CATEGORY_NAME_SET`)
- *   - NOT the name of an internal tool in any mode (from `ALL_INTERNAL_TOOL_NAMES`)
- *
- * If no selectors / no explicit actors: the defaults apply (or empty when
- * `actors` was explicitly set to empty).
+ * Resolve the Actor names (`username/name`) to fetch. A selector is an Actor name when it is neither
+ * a category nor an internal tool of any mode, so the result does not depend on `SERVER_MODE`.
+ * Without selectors and explicit actors the defaults apply, or nothing when `actors` was set empty.
  */
 export function resolveActorsToLoad(input: Input): string[] {
     const { selectors, actorsExplicitlyEmpty } = normalizeInput(input);
 
-    // Selectors that aren't retired, categories, or internal tools in any mode → Actor names.
     const actorSelectorsFromTools: string[] = [];
     if (selectors !== undefined) {
         for (const sel of selectors) {
-            if (RETIRED_SELECTOR_NAMES.has(sel)) continue;
             if (CATEGORY_NAME_SET.has(sel)) continue;
             if (ALL_INTERNAL_TOOL_NAMES.has(sel)) continue;
             actorSelectorsFromTools.push(sel);
@@ -245,9 +228,6 @@ export function getToolsForServerMode(
     const internalSelections: ToolEntry[] = [];
     if (selectors !== undefined && selectors.length > 0) {
         for (const sel of selectors) {
-            // Retired selectors (add-actor, experimental, preview, get-actor-log, source) are inert.
-            if (RETIRED_SELECTOR_NAMES.has(sel)) continue;
-
             const categoryTools = categories[sel as ToolCategory];
             if (categoryTools) {
                 internalSelections.push(...categoryTools);

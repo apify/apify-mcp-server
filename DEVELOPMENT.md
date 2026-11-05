@@ -98,7 +98,7 @@ pnpm install        # installs root + src/web (workspace package) in one pass
 
 Widget code lives in `src/web/` (a self-contained React project). Widgets are rendered based on tool output — to add data to a widget, modify the corresponding tool's return value.
 
-> **UI mode:** Widget rendering requires the server to run in UI mode. Use `?ui=true` (e.g., `/mcp?ui=true`) or set `UI_MODE=true`.
+> **UI mode:** Widget rendering requires the server to run in UI mode. Use `?ui=true` (e.g., `http://localhost:3001/?ui=true` for the local dev server, which serves MCP at `/` only) or set `UI_MODE=true`.
 
 See the [OpenAI Apps SDK documentation](https://developers.openai.com/apps-sdk) for background on MCP Apps and widgets.
 
@@ -168,7 +168,7 @@ Integration tests run against three purpose-built Actors defined in [apify/mcp-s
 | Actor | Constant | Purpose |
 |---|---|---|
 | `apify/normal-mode-test-actor` | `ACTOR_NORMAL_MODE` | A normal Actor that writes dataset and key-value-store output. Exercises `call-actor`, the canonical run response, and the storage tools (`get-dataset-items`, `get-dataset`, `get-key-value-store-*`). |
-| `apify/example-mcp-server` | `ACTOR_EXAMPLE_MCP_SERVER` | A standby MCP-server Actor. Exercises the MCP-in-MCP proxy path, where the server registers the Actor's own MCP tools as sub-tools. |
+| `apify/example-mcp-server` | `ACTOR_EXAMPLE_MCP_SERVER` | A standby MCP-server Actor. Exercises `call-actor-mcp-tool`, `fetch-actor-mcp-tool-list` and the MCP-in-MCP proxy path, where the server registers the Actor's own MCP tools as sub-tools. |
 | `apify/server-actor-test` | `ACTOR_SERVER_ACTOR_TEST` | A single-tenant Server Actor with an API schema (`webServerSchema`) and an input schema, no MCP path. Its HTTP API adds two numbers (`GET`/`POST /add`, the same item as a normal run) and has test endpoints that echo requests and return fixed statuses, content types, sizes, delays and a redirect. Exercises `send-server-actor-request` and the server-interface section of `fetch-actor-details`. |
 
 ### Test structure
@@ -256,7 +256,7 @@ mcpc --json @stdio tools-call search-actors keywords:="scraper" | jq ‘.content
 
 Run [MCPJam](https://www.mcpjam.com/) with `npx @mcpjam/inspector@latest`.
 
-1. Click **"Add new server"**, enter URL `http://localhost:3001/mcp?ui=true`, select **"No authentication"**
+1. Click **"Add new server"**, enter URL `http://localhost:3001/?ui=true` (the dev server serves MCP at `/`; `/mcp` returns 404), and add an `Authorization: Bearer <your Apify token>` header, since the dev server does not read `APIFY_TOKEN` from its environment
 2. **App Builder** — select a tool, fill arguments, execute, view rendered widget
 3. **Chat** — add an OpenAI/Anthropic/OpenRouter API key to chat with widget rendering inline
 

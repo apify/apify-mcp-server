@@ -3,7 +3,7 @@ import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
 import { actorNameToToolName, getCategoryTools } from '@apify/actors-mcp-server/internals.js';
-import { MAX_INLINE_BYTES, MAX_LIMIT_WITH_INPUT_SCHEMA } from '@apify/actors-mcp-server/internals/test-kit.js';
+import { MAX_LIMIT_WITH_INPUT_SCHEMA, MAX_INLINE_BYTES } from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
     ACTOR_EXAMPLE_MCP_SERVER,
@@ -314,7 +314,6 @@ export const actorsCases: Case[] = [
                         metadata: false,
                         inputSchema: true,
                         readme: false,
-                        mcpTools: false,
                     },
                 },
             });
@@ -341,7 +340,6 @@ export const actorsCases: Case[] = [
                         metadata: false,
                         inputSchema: false,
                         readme: false,
-                        mcpTools: false,
                     },
                 },
             });
@@ -353,85 +351,32 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        name: 'should list MCP tools when output={ mcpTools: true } for MCP server Actor',
-        isDeploymentTest: false,
+        name: 'lists the MCP tools of an MCP server Actor with fetch-actor-mcp-tool-list',
+        isDeploymentTest: true,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
-                name: 'fetch-actor-details',
-                arguments: {
-                    actor: ACTOR_EXAMPLE_MCP_SERVER,
-                    output: {
-                        description: false,
-                        stats: false,
-                        pricing: false,
-                        rating: false,
-                        metadata: false,
-                        inputSchema: false,
-                        readme: false,
-                        mcpTools: true,
-                    },
-                },
+                name: 'fetch-actor-mcp-tool-list',
+                arguments: { actor: ACTOR_EXAMPLE_MCP_SERVER },
             });
 
-            const content = result.content as { text: string }[];
-            expect(content.some((item) => item.text.includes('Available MCP Tools'))).toBe(true);
-            expect(content.some((item) => item.text.includes('add'))).toBe(true);
+            expect(result.isError ?? false).toBe(false);
+            const { tools } = result.structuredContent as { tools: { name: string; inputSchema: unknown }[] };
+            expect(tools.find((tool) => tool.name === 'add')?.inputSchema).toBeDefined();
+            expect((result.content as { text: string }[]).some((item) => item.text.startsWith('add: '))).toBe(true);
+            validateStructuredOutputForTool(result, 'fetch-actor-mcp-tool-list', 'default');
         }),
     },
     {
-        name: 'should return graceful note when output={ mcpTools: true } for regular Actor',
+        name: 'rejects an Actor that is not an MCP server in fetch-actor-mcp-tool-list',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
-                name: 'fetch-actor-details',
-                arguments: {
-                    actor: ACTOR_NORMAL_MODE,
-                    output: {
-                        description: false,
-                        stats: false,
-                        pricing: false,
-                        rating: false,
-                        metadata: false,
-                        inputSchema: false,
-                        readme: false,
-                        mcpTools: true,
-                    },
-                },
+                name: 'fetch-actor-mcp-tool-list',
+                arguments: { actor: ACTOR_NORMAL_MODE },
             });
 
-            const content = result.content as { text: string }[];
-            expect(content.some((item) => item.text.includes('This Actor is not an MCP server'))).toBe(true);
-        }),
-    },
-    {
-        name: 'should return structured output for fetch-actor-details with selective output matching outputSchema',
-        isDeploymentTest: false,
-        run: withClient({ tools: ['actors'] }, async (client) => {
-            const toolName = 'fetch-actor-details';
-
-            // Test with output={ mcpTools: true } - should validate against schema even with selective fields
-            const result = await client.callTool({
-                name: toolName,
-                arguments: {
-                    actor: ACTOR_EXAMPLE_MCP_SERVER,
-                    output: {
-                        description: false,
-                        stats: false,
-                        pricing: false,
-                        rating: false,
-                        metadata: false,
-                        inputSchema: false,
-                        readme: false,
-                        mcpTools: true,
-                    },
-                },
-            });
-
-            const content = result.content as { text: string; isError?: boolean }[];
-            expect(content.length).toBeGreaterThan(0);
-
-            // This should validate successfully - structured output must match schema
-            validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
+            expect(result.isError).toBe(true);
+            expect((result.content as { text: string }[])[0].text).toContain('is not an MCP server');
         }),
     },
     {
@@ -453,7 +398,6 @@ export const actorsCases: Case[] = [
                         metadata: false,
                         inputSchema: false,
                         readme: true,
-                        mcpTools: false,
                     },
                 },
             });
@@ -481,7 +425,6 @@ export const actorsCases: Case[] = [
                         metadata: false,
                         inputSchema: false,
                         readme: false,
-                        mcpTools: false,
                     },
                 },
             });
@@ -512,7 +455,6 @@ export const actorsCases: Case[] = [
                         metadata: false,
                         inputSchema: false,
                         readme: true,
-                        mcpTools: false,
                     },
                 },
             });
@@ -566,10 +508,8 @@ export const actorsCases: Case[] = [
 
             const content = result.content as { text: string }[];
             // Should contain all default sections (description, stats, pricing, rating, metadata, readme, inputSchema)
-            // but NOT mcpTools (which defaults to false)
             expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
-            expect(content.some((item) => item.text.includes('Available MCP Tools'))).toBe(false);
         }),
     },
     {
@@ -588,7 +528,6 @@ export const actorsCases: Case[] = [
                         metadata: false,
                         inputSchema: true,
                         readme: true,
-                        mcpTools: false,
                     },
                 },
             });
@@ -628,7 +567,6 @@ export const actorsCases: Case[] = [
                         metadata: false,
                         inputSchema: false,
                         readme: false,
-                        mcpTools: false,
                     },
                 },
             });
@@ -660,7 +598,6 @@ export const actorsCases: Case[] = [
                         metadata: false,
                         inputSchema: false,
                         readme: false,
-                        mcpTools: false,
                     },
                 },
             });
@@ -693,7 +630,6 @@ export const actorsCases: Case[] = [
                         metadata: true,
                         inputSchema: false,
                         readme: false,
-                        mcpTools: false,
                     },
                 },
             });
@@ -724,7 +660,6 @@ export const actorsCases: Case[] = [
                         metadata: true,
                         inputSchema: false,
                         readme: false,
-                        mcpTools: false,
                     },
                 },
             });
@@ -861,7 +796,6 @@ export const actorsCases: Case[] = [
                             metadata: option.field === 'metadata',
                             inputSchema: option.field === 'inputSchema',
                             readme: option.field === 'readme',
-                            mcpTools: false,
                         },
                     },
                 });
@@ -896,7 +830,6 @@ export const actorsCases: Case[] = [
                         metadata: true,
                         inputSchema: false,
                         readme: false,
-                        mcpTools: false,
                     },
                 },
             });
@@ -1091,7 +1024,7 @@ export const actorsCases: Case[] = [
     {
         name: 'sends a JSON body to a Server Actor and returns its JSON response as text',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const { result, sc } = await sendServerActorRequest(client, {
                 method: 'POST',
                 path: '/add',
@@ -1114,7 +1047,7 @@ export const actorsCases: Case[] = [
         // The fixture answers asText=1 with a 400, so this pins the true/false encoding.
         name: 'sends a query boolean to a Server Actor as true and returns its text response',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const { sc } = await sendServerActorRequest(client, {
                 method: 'GET',
                 path: '/add',
@@ -1129,7 +1062,7 @@ export const actorsCases: Case[] = [
     {
         name: 'returns a Server Actor error body with its status as an error',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const { result, sc } = await sendServerActorRequest(client, { method: 'GET', path: '/status/404' });
 
             expect(result.isError).toBe(true);
@@ -1140,7 +1073,7 @@ export const actorsCases: Case[] = [
     {
         name: 'returns an empty body for a 204 from a Server Actor',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const { result, sc } = await sendServerActorRequest(client, { method: 'GET', path: '/empty' });
 
             expect(result.isError).not.toBe(true);
@@ -1151,7 +1084,7 @@ export const actorsCases: Case[] = [
     {
         name: 'rejects a binary Server Actor response by its content type',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const { result, text } = await sendServerActorRequest(client, { method: 'GET', path: '/binary' });
 
             expect(result.isError).toBe(true);
@@ -1161,7 +1094,7 @@ export const actorsCases: Case[] = [
     {
         name: 'returns a Server Actor redirect with its location without following it',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const { result, sc } = await sendServerActorRequest(client, { method: 'GET', path: '/redirect' });
 
             expect(result.isError).not.toBe(true);
@@ -1169,37 +1102,36 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        name: 'returns a Server Actor body of exactly the inline limit and rejects one byte more, compressed too',
+        name: 'returns a Server Actor body of exactly the inline limit whole, and the start of one byte more, compressed too',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
-            const exact = await sendServerActorRequest(client, {
-                method: 'GET',
-                path: '/bytes',
-                query: { n: MAX_INLINE_BYTES },
-            });
-            const over = await sendServerActorRequest(client, {
-                method: 'GET',
-                path: '/bytes',
-                query: { n: MAX_INLINE_BYTES + 1 },
-            });
-            const overCompressed = await sendServerActorRequest(client, {
-                method: 'GET',
-                path: '/gzip',
-                query: { n: MAX_INLINE_BYTES + 1 },
-            });
+        run: withClient({ tools: ['actors'] }, async (client) => {
+            for (const path of ['/bytes', '/gzip']) {
+                const exact = await sendServerActorRequest(client, {
+                    method: 'GET',
+                    path,
+                    query: { n: MAX_INLINE_BYTES },
+                });
+                const over = await sendServerActorRequest(client, {
+                    method: 'GET',
+                    path,
+                    query: { n: MAX_INLINE_BYTES + 1 },
+                });
 
-            expect(exact.sc).toMatchObject({ status: 200, bytes: MAX_INLINE_BYTES });
-            expect(over.result.isError).toBe(true);
-            expect(over.text).toContain(`larger than ${MAX_INLINE_BYTES} bytes`);
-            expect(overCompressed.result.isError).toBe(true);
-            expect(overCompressed.text).toContain(`larger than ${MAX_INLINE_BYTES} bytes`);
+                expect(exact.result.isError).not.toBe(true);
+                expect(exact.sc).toMatchObject({ status: 200, bytes: MAX_INLINE_BYTES });
+                expect(exact.sc).not.toHaveProperty('bodyTruncated');
+                expect(over.result.isError).not.toBe(true);
+                expect(over.sc).toMatchObject({ status: 200, bodyTruncated: true });
+                expect((over.sc as { bytes: number }).bytes).toBeLessThanOrEqual(MAX_INLINE_BYTES);
+                expect(over.text).toContain(`${MAX_INLINE_BYTES}-byte limit`);
+            }
         }),
     },
     {
         // The router strips the Authorization header, so the token travels in the body the fixture echoes.
         name: 'masks the session token a Server Actor echoes',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const token = resolveToken()!;
             const { result, sc } = await sendServerActorRequest(client, {
                 method: 'POST',
@@ -1216,7 +1148,7 @@ export const actorsCases: Case[] = [
         name: 'returns nothing for a Server Actor request the client cancels',
         isDeploymentTest: false,
         skipIf: skipUnlessStdio,
-        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const controller = new AbortController();
             setTimeout(() => controller.abort(), 1_000);
 
@@ -1242,7 +1174,7 @@ export const actorsCases: Case[] = [
         isDeploymentTest: false,
         skipIf: skipUnlessStdio,
         timeout: 150_000,
-        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await (client as ClientV1).callTool(
                 {
                     name: 'send-server-actor-request',
@@ -1262,9 +1194,96 @@ export const actorsCases: Case[] = [
         }),
     },
     {
+        name: 'serves a selected Server Actor as one tool that sends a request to its server interface',
+        isDeploymentTest: false,
+        run: withClient({ tools: [ACTOR_SERVER_ACTOR_TEST] }, async (client) => {
+            const toolName = actorNameToToolName(ACTOR_SERVER_ACTOR_TEST);
+            const { tools } = await client.listTools();
+            const tool = tools.find((entry) => entry.name === toolName);
+            const properties = (tool?.inputSchema.properties ?? {}) as Record<string, { enum?: string[] }>;
+            expect(Object.keys(properties)).toEqual(['method', 'path', 'query', 'body']);
+            expect(properties.method.enum).toEqual(expect.arrayContaining(['GET', 'POST']));
+            // The full rendering is over 4,096 characters, so the description lists one line per operation.
+            expect(tool?.description).toContain(
+                '- POST /add [asText:boolean] {firstNumber:integer required, secondNumber:integer required}: Add two numbers (JSON body).',
+            );
+            expect(tool?.description?.length).toBeLessThanOrEqual(4096);
+            // The session has no fetch-actor-details, so the description names none.
+            expect(tool?.description).not.toContain('fetch-actor-details');
+
+            const result = await client.callTool({
+                name: toolName,
+                arguments: { method: 'GET', path: '/add', query: { firstNumber: 2, secondNumber: 3 } },
+            });
+
+            expect(result.isError).not.toBe(true);
+            validateStructuredOutput(result, tool?.outputSchema, toolName);
+            const sc = (result as { structuredContent?: ServerActorRequestContent }).structuredContent;
+            expect(sc).toMatchObject({ status: 200, interface: 'server', method: 'GET' });
+            expect(JSON.parse(sc!.body)).toMatchObject({ sum: 5 });
+        }),
+    },
+    {
+        name: 'runs a selected Server Actor from its input with call-actor',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['actors', ACTOR_SERVER_ACTOR_TEST] }, async (client) => {
+            const result = await client.callTool({
+                name: 'call-actor',
+                arguments: { actor: ACTOR_SERVER_ACTOR_TEST, input: { firstNumber: 2, secondNumber: 3 } },
+            });
+
+            expect(result.isError).not.toBe(true);
+            expect((result as { structuredContent?: { runId?: string } }).structuredContent?.runId).toBeTruthy();
+        }),
+    },
+    {
+        // isDeploymentTest: the default web-fetch tool, sent through its server interface, with an array query value.
+        name: 'fetches a page with the default web-fetch tool through GET /',
+        isDeploymentTest: true,
+        run: withClient({}, async (client) => {
+            const result = await client.callTool({
+                name: 'apify--web-fetch',
+                arguments: {
+                    method: 'GET',
+                    path: '/',
+                    query: { url: 'https://example.com', formats: ['markdown', 'links'] },
+                },
+            });
+
+            expect(result.isError).not.toBe(true);
+            const sc = (result as { structuredContent?: ServerActorRequestContent }).structuredContent;
+            expect(sc?.status).toBe(200);
+            expect(JSON.parse(sc!.body)).toEqual(
+                expect.objectContaining({ markdown: expect.any(String), links: expect.any(Array) }),
+            );
+        }),
+    },
+    {
+        // isDeploymentTest: the default web-search tool, sent through its server interface, with a comma-joined list.
+        name: 'searches the web with the default web-search tool through GET /',
+        isDeploymentTest: true,
+        run: withClient({}, async (client) => {
+            const result = await client.callTool({
+                name: 'apify--web-search',
+                arguments: {
+                    method: 'GET',
+                    path: '/',
+                    query: { query: 'apify', maxResults: 2, allowedDomains: ['apify.com'] },
+                },
+            });
+
+            expect(result.isError).not.toBe(true);
+            const sc = (result as { structuredContent?: ServerActorRequestContent }).structuredContent;
+            expect(sc?.status).toBe(200);
+            const { results } = JSON.parse(sc!.body) as { results: { domain: string }[] };
+            expect(results.length).toBeGreaterThan(0);
+            for (const { domain } of results) expect(domain).toMatch(/(^|\.)apify\.com$/);
+        }),
+    },
+    {
         name: 'summarizes a Server Actor interface and navigates it with fetch-actor-details',
         isDeploymentTest: false,
-        run: withClient({ tools: ['actors', 'send-server-actor-request'] }, async (client) => {
+        run: withClient({ tools: ['actors'] }, async (client) => {
             const call = async (actor: string, output?: Record<string, unknown>) => {
                 const result = await client.callTool({
                     name: 'fetch-actor-details',
@@ -1280,19 +1299,12 @@ export const actorsCases: Case[] = [
             expect(list.text).toContain(
                 `send-server-actor-request sends a request to one of them: {"actor":"${ACTOR_SERVER_ACTOR_TEST}"`,
             );
-            expect(list.text).toContain('- POST /add: Add two numbers (JSON body). Required: request body.');
-            for (const key of ['openapi', 'paths', 'components']) expect(list.text).toContain(`"${key}":`);
+            expect(list.text).toContain('"method":"POST","path":"/add","summary":"Add two numbers (JSON body)"');
+            for (const key of ['openapi', 'responses', 'components']) expect(list.text).not.toContain(`"${key}":`);
             const operation = await call(ACTOR_SERVER_ACTOR_TEST, { serverInterface: 'GET /add' });
             expect(operation.result.isError).not.toBe(true);
-            for (const part of ['"operation":', 'Components are omitted', '"$ref":"#/components/parameters/AsText"']) {
-                expect(operation.text).toContain(part);
-            }
-            expect(operation.text).toContain('"$ref":"#/components/responses/Add"');
-            const parameter = await call(ACTOR_SERVER_ACTOR_TEST, {
-                serverInterface: '#/components/parameters/AsText',
-            });
-            expect(parameter.result.isError).not.toBe(true);
-            expect(parameter.text).toContain('"name":"asText"');
+            expect(operation.text).toContain('"name":"asText"');
+            expect(operation.text).not.toContain('"$ref":');
             const unknown = await call(ACTOR_SERVER_ACTOR_TEST, { serverInterface: 'GET /nope' });
             expect(unknown.result.isError).toBe(true);
             expect(unknown.text).toMatch(

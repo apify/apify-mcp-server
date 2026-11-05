@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
 /**
- * Fixtures for the `merge/tasks/*` and `merge/schedules/*` agent evals.
+ * Fixtures for the `merge/tasks/*`, `merge/schedules/*` and `merge/storage/*` agent evals.
  *
  * Deletes the schedules and tasks a run left behind (delete rule in `sweep.ts`), then resets the
- * two permanent read-only fixtures, creating them if missing. Schedules go before tasks and the
- * task fixture before the schedule fixture, because the fixture schedule runs the fixture task.
+ * two permanent read-only task and schedule fixtures, creating them if missing. Schedules go before
+ * tasks and the task fixture before the schedule fixture, because the fixture schedule runs the
+ * fixture task. Last, seeds the named dataset and key-value store fixtures if their content is missing.
  *
  * Usage: pnpm run evals:mcp-agent:fixtures [--run-id <id>] [--dry-run]
  */
@@ -30,6 +31,19 @@ const FIXTURE_SCHEDULE = {
     isEnabled: false,
     isExclusive: true,
 };
+
+/**
+ * Permanent read-only fixtures for the `merge/storage/*` cases, which address them by bare name.
+ * The storage tools only read, so no case can change them and they are seeded once, never reset.
+ */
+const FIXTURE_DATASET_NAME = 'eval-storage-products';
+const FIXTURE_DATASET_ITEMS = [
+    { name: 'Aeropress Go', priceUsd: 39.95 },
+    { name: 'Hario V60', priceUsd: 27.5 },
+    { name: 'Chemex Classic', priceUsd: 49 },
+];
+const FIXTURE_KEY_VALUE_STORE_NAME = 'eval-storage-settings';
+const FIXTURE_RECORD = { key: 'CONFIG', value: { currency: 'EUR', maxResults: 25 } };
 
 /** `--dry-run` prints what the run would change and writes nothing. */
 const IS_DRY_RUN = process.argv.includes('--dry-run');
@@ -126,6 +140,22 @@ async function main() {
             ? undefined
             : await client.schedules().create({ ...scheduleFields, name: FIXTURE_SCHEDULE_NAME });
         console.log(`🌱 ${DRY}Created fixture schedule "${FIXTURE_SCHEDULE_NAME}"${created ? ` (${created.id})` : ''}`);
+    }
+
+    // Check the content, not the storage: a seed that failed after the create is repaired on the next run.
+    if (!(await client.dataset(`~${FIXTURE_DATASET_NAME}`).get())?.itemCount) {
+        if (!IS_DRY_RUN) {
+            const dataset = await client.datasets().getOrCreate(FIXTURE_DATASET_NAME);
+            await client.dataset(dataset.id).pushItems(FIXTURE_DATASET_ITEMS);
+        }
+        console.log(`🌱 ${DRY}Created fixture dataset "${FIXTURE_DATASET_NAME}"`);
+    }
+    if (!(await client.keyValueStore(`~${FIXTURE_KEY_VALUE_STORE_NAME}`).recordExists(FIXTURE_RECORD.key))) {
+        if (!IS_DRY_RUN) {
+            const store = await client.keyValueStores().getOrCreate(FIXTURE_KEY_VALUE_STORE_NAME);
+            await client.keyValueStore(store.id).setRecord(FIXTURE_RECORD);
+        }
+        console.log(`🌱 ${DRY}Created fixture key-value store "${FIXTURE_KEY_VALUE_STORE_NAME}"`);
     }
 
     console.log(IS_DRY_RUN ? '✅ Dry run complete, nothing changed' : '✅ Fixtures ready');

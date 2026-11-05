@@ -56,6 +56,8 @@ export const HELPER_TOOLS = {
     ACTOR_CALL: 'call-actor',
     ACTOR_CREATE: 'create-actor',
     ACTOR_CALL_WIDGET: 'call-actor-widget',
+    ACTOR_MCP_TOOL_CALL: 'call-actor-mcp-tool',
+    ACTOR_MCP_TOOL_LIST: 'fetch-actor-mcp-tool-list',
     ACTOR_SERVER_REQUEST: 'send-server-actor-request',
     ACTOR_DELETE: 'delete-actor',
     ACTOR_GET_DETAILS: 'fetch-actor-details',
@@ -100,11 +102,11 @@ export const HELPER_TOOLS = {
 export type HelperToolName = (typeof HELPER_TOOLS)[keyof typeof HELPER_TOOLS];
 
 /**
- * Retired tool selectors: `add-actor` and `experimental` (add-actor was deleted in the stateless
- * migration), the deprecated `preview` pseudo-category, `get-actor-log` (renamed to
- * `get-actor-run-log`), and the `source` category (renamed to `versions`). They name neither a
- * registry category nor a real tool anymore, so they resolve to nothing — never loaded, never
- * treated as an Actor ID, never requiring a token by themselves.
+ * Tool selectors that no longer name a category or a tool: `add-actor` and `experimental` went with
+ * the stateless migration, `preview` was deprecated, `get-actor-log` became `get-actor-run-log` and
+ * `source` became `versions`. Old configs still send them, so they are dropped before selection and
+ * never read as Actor IDs. The token gate drops them before its emptiness check, so `docs,add-actor`
+ * needs no token while an all-retired list needs one, like an empty list.
  */
 export const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set([
     'add-actor',
@@ -129,13 +131,8 @@ export const APIFY_AI_CLIENT_NAME = 'apify-ai';
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
 export const WEB_FETCH = 'apify/web-fetch';
 export const WEB_SEARCH = 'apify/web-search';
-/**
- * Actors served through the input interface (a run per call) although they declare `webServerMcpPath`.
- * Hand-wired for selected Apify Actors so the served tool does not change when the Actor's MCP path does.
- */
-export const INPUT_INTERFACE_ACTORS: ReadonlySet<string> = new Set([WEB_SEARCH, WEB_FETCH]);
 export const defaults = {
-    actors: [RAG_WEB_BROWSER, WEB_FETCH],
+    actors: [WEB_SEARCH, WEB_FETCH],
 };
 
 /** API rejects `includeInputSchema=true` above this; mirrors apify-core `MAX_LIMIT_WITH_INPUT_SCHEMA`. */

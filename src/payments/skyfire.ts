@@ -1,5 +1,4 @@
 import type { ToolEntry } from '../types.js';
-import { redactSkyfirePayId } from '../utils/logging.js';
 import { appendToolDescription, cloneToolEntry } from '../utils/tools.js';
 import {
     PAYMENT_PROTOCOL_HEADER,
@@ -9,6 +8,12 @@ import {
     SKYFIRE_TOOL_INSTRUCTIONS,
 } from './const.js';
 import type { PaymentHeaders, PaymentProvider } from './types.js';
+
+const REDACTED_VALUE = '[REDACTED]';
+
+const isPlainRecord = (value: unknown): value is Record<string, unknown> => {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+};
 
 /**
  * Skyfire payment provider.
@@ -73,10 +78,14 @@ export class SkyfirePaymentProvider implements PaymentProvider {
     }
 
     redactForLogging(args: unknown): unknown {
-        // TODO: redactSkyfirePayId is still used directly by other in-repo callers
-        // (e.g. tools/actors/actor_executor.ts). Once those callers migrate to
-        // `paymentProvider.redactForLogging()`, remove the standalone function and
-        // centralize the redaction logic entirely inside this provider.
-        return redactSkyfirePayId(args);
+        if (!isPlainRecord(args) || !(SKYFIRE_PAY_ID_KEY in args)) {
+            return args;
+        }
+
+        if (args[SKYFIRE_PAY_ID_KEY] === REDACTED_VALUE) {
+            return args;
+        }
+
+        return { ...args, [SKYFIRE_PAY_ID_KEY]: REDACTED_VALUE };
     }
 }

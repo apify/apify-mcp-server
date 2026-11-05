@@ -16,11 +16,15 @@ import {
     buildBinaryRecordDisposition,
     buildConsoleLinkContent,
     buildStorageResponse,
+    fetchStorageByIdOrName,
     normalizeRecordKey,
+    resolveStorageId,
+    storageIdArgDescription,
+    storageNotFoundText,
 } from './storage_helpers.js';
 
 const getKeyValueStoreRecordArgs = z.object({
-    keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name.'),
+    keyValueStoreId: z.string().min(1).describe(storageIdArgDescription('keyValueStore')),
     recordKey: z.string().min(1).describe('Key of the record to retrieve.'),
 });
 
@@ -58,20 +62,27 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
         const parsed = getKeyValueStoreRecordArgs.parse(args);
         const keyValueStoreId = stripQuoteWrappers(parsed.keyValueStoreId);
         const recordKey = normalizeRecordKey(parsed.recordKey);
-        const store = client.keyValueStore(keyValueStoreId);
-        const record = await store.getRecord(recordKey);
-        if (record === undefined) {
+        const found = await fetchStorageByIdOrName(keyValueStoreId, async (safeId) =>
+            client.keyValueStore(safeId).getRecord(recordKey),
+        );
+        if (!found) {
             // getRecord returns undefined for both missing-store and missing-key; disambiguate.
-            const storeInfo = await store.get();
+            const storeInfo = await fetchStorageByIdOrName(keyValueStoreId, async (safeId) =>
+                client.keyValueStore(safeId).get(),
+            );
             const text = storeInfo
                 ? `Record '${recordKey}' not found in key-value store '${keyValueStoreId}'.`
-                : `Key-value store '${keyValueStoreId}' not found.`;
+                : storageNotFoundText('keyValueStore', keyValueStoreId);
             return respondUserError(text);
         }
-        const apifyConsoleUrl = buildConsoleKeyValueStoreUrl(
-            await getConsoleLinkContext(apifyToken, client),
-            keyValueStoreId,
-        );
+        const { result: record, safeId } = found;
+        const store = client.keyValueStore(safeId);
+        // Shared by the Console link and the public record link, so a name is read back once.
+        let storeIdPromise: Promise<string> | undefined;
+        const getStoreId = async () =>
+            (storeIdPromise ??= resolveStorageId(safeId, async (id) => client.keyValueStore(id).get()));
+        const linkContext = await getConsoleLinkContext(apifyToken, client);
+        const apifyConsoleUrl = linkContext ? buildConsoleKeyValueStoreUrl(linkContext, await getStoreId()) : undefined;
         // The SDK already parsed the body by Content-Type (JSON -> object, text/xml -> string, else -> Buffer);
         // branch on the resulting JS type, not on the MIME type.
         const { value, contentType } = record;
@@ -102,7 +113,8 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             const consoleLinkContent = buildConsoleLinkContent(apifyConsoleUrl);
             if (disposition.kind === 'linkOut') {
                 // base64-inlining a large binary would blow up the context window; return a link instead.
-                const uri = await store.getRecordPublicUrl(recordKey);
+                // The link is opened without a token, so it addresses the store by ID, not by `~name`.
+                const uri = await client.keyValueStore(await getStoreId()).getRecordPublicUrl(recordKey);
                 return respondRaw({
                     structuredContent,
                     content: [
