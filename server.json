@@ -32,7 +32,7 @@
       "headers": [
         {
           "name": "Authorization",
-          "description": "Apify API token, for example 'Bearer <apify-api-token>'. Without an Apify account, agents can buy a prepaid, spend-capped token with agentic payments (x402, MPP or Skyfire) at https://agi.apify.com.",
+          "description": "Apify API token, for example 'Bearer <apify-api-token>'. An account with a subscription is the recommended way to authenticate. Agents without an account can instead buy a prepaid, spend-capped token with agentic payments (x402, MPP, or Skyfire) at https://agi.apify.com.",
           "isRequired": true,
           "isSecret": true
         }
