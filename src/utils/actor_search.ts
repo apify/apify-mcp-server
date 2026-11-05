@@ -71,10 +71,10 @@ export async function searchAgentSafeActors(options: SearchAgentSafeActorsOption
     // so send them as empty keywords.
     const search = /[\p{L}\p{N}]/u.test(keywords) ? keywords : '';
     const allowsAgenticUsers = paymentProvider ? true : undefined;
+    const tracking = { ...apifyClient.storeSearchTracking, useCase: sanitizeUseCase(useCase) };
 
     if (IS_UNSTABLE_STORE_SEARCH_ENABLED) {
-        // `/unstable/store` rejects unknown params, so `_traceId` / `_useCase` are not sent.
-        return searchActorsViaUnstableEndpoint({ search, apifyClient, limit, cursor, allowsAgenticUsers });
+        return searchActorsViaUnstableEndpoint({ search, apifyClient, limit, cursor, allowsAgenticUsers, tracking });
     }
 
     const actors = await searchActorsByKeywords({
@@ -82,7 +82,7 @@ export async function searchAgentSafeActors(options: SearchAgentSafeActorsOption
         apifyClient,
         limit,
         offset,
-        tracking: { ...apifyClient.storeSearchTracking, useCase: sanitizeUseCase(useCase) },
+        tracking,
         allowsAgenticUsers,
         includeInputSchema: true,
     });

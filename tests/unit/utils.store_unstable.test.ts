@@ -132,8 +132,13 @@ describe('the Actor card renders an /unstable/store item exactly like the /v2/st
 });
 
 describe('the /unstable/store request', () => {
-    it('asks for the card fields and continues from the cursor', () => {
-        const url = buildUnstableStoreSearchUrl({ search: 'instagram', limit: 5, cursor: 'recomm-1' });
+    it('asks for the card fields, continues from the cursor and sends the tracking', () => {
+        const url = buildUnstableStoreSearchUrl({
+            search: 'instagram',
+            limit: 5,
+            cursor: 'recomm-1',
+            tracking: { useCase: 'compare prices', traceId: 'trace-1' },
+        });
 
         expect(url.pathname).toBe('/unstable/store');
         expect(Object.fromEntries(url.searchParams)).toEqual({
@@ -141,6 +146,8 @@ describe('the /unstable/store request', () => {
             limit: '5',
             fields: UNSTABLE_STORE_CARD_FIELDS.join(','),
             recommId: 'recomm-1',
+            _useCase: 'compare prices',
+            _traceId: 'trace-1',
         });
     });
 
@@ -236,10 +243,17 @@ describe('searchAgentSafeActors data source', () => {
         });
         const apifyClient = mockApifyClient({ store, httpClient: { axios: { request } } });
 
-        const result = await searchWithFlag({ keywords: 'instagram', apifyClient, limit: 5, offset: 20 });
+        const result = await searchWithFlag({
+            keywords: 'instagram',
+            apifyClient,
+            limit: 5,
+            offset: 20,
+            useCase: 'compare prices',
+        });
 
         expect(store).not.toHaveBeenCalled();
         expect(requestedUrl(request).searchParams.has('offset')).toBe(false);
+        expect(requestedUrl(request).searchParams.get('_useCase')).toBe('compare prices');
         expect(result.nextCursor).toBe('recomm-1');
     });
 });

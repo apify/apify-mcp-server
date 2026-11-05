@@ -74,6 +74,8 @@ export type UnstableStoreSearchOptions = {
     limit: number;
     cursor?: string;
     allowsAgenticUsers?: boolean;
+    /** Sent as `_traceId` and `_useCase`. */
+    tracking?: ApifyClient['storeSearchTracking'];
 };
 
 export type UnstableStoreSearchPage = {
@@ -91,6 +93,8 @@ export function buildUnstableStoreSearchUrl(options: Omit<UnstableStoreSearchOpt
     if (options.allowsAgenticUsers !== undefined) {
         url.searchParams.set('allowsAgenticUsers', String(options.allowsAgenticUsers));
     }
+    if (options.tracking?.useCase) url.searchParams.set('_useCase', options.tracking.useCase);
+    if (options.tracking?.traceId) url.searchParams.set('_traceId', options.tracking.traceId);
     return url;
 }
 
