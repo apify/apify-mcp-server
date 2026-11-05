@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.21.1 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Help clients with a pre-0.21 tool list recover ([#1838](https://github.com/apify/apify-mcp-server/pull/1838)) ([5760efb](https://github.com/apify/apify-mcp-server/commit/5760efb1319c955d5311091e5fba198d695b66ef)) by [@jirispilka](https://github.com/jirispilka), closes [#1815](https://github.com/apify/apify-mcp-server/issues/1815), [#1836](https://github.com/apify/apify-mcp-server/issues/1836)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.21.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.0) (2026-11-05)
 
 ### 🚀 Features
