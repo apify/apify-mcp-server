@@ -252,7 +252,6 @@ export const API_PUBLIC_BASE_URL = 'https://api.apify.com';
 export const API_PUBLIC_BASE_URL_STAGING = 'https://api-securitybyobscurity.apify.com';
 /** Staging MCP host; `getApifyAPIPublicBaseUrl` and `getConsoleBaseUrl` pick the staging origins when running on it. */
 export const STAGING_MCP_HOSTNAME = 'mcp-securitybyobscurity.apify.com';
-export const APIFY_FAVICON_URL = `${APIFY_STORE_URL}/favicon.ico`;
 export const APIFY_MCP_URL = 'https://mcp.apify.com';
 export const APIFY_DOCS_MCP_URL = 'https://docs.apify.com/integrations/mcp';
 

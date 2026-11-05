@@ -98,6 +98,12 @@ describe('getServerCard()', () => {
 
             expect(card.icons.some((icon) => icon.mimeType === 'image/png')).toBe(true);
         });
+
+        it('points iconUrl at the PNG icon from server.json', () => {
+            const card = getServerCard();
+
+            expect(card.iconUrl).toBe(serverJson.icons.find((icon) => icon.mimeType === 'image/png')?.src);
+        });
     });
 
     describe('SEP-1649 compatibility fields', () => {

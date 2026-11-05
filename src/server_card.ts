@@ -1,14 +1,7 @@
 import type { Implementation } from '@modelcontextprotocol/sdk/types.js';
 import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 
-import {
-    APIFY_DOCS_MCP_URL,
-    APIFY_FAVICON_URL,
-    APIFY_MCP_URL,
-    HELPER_TOOLS,
-    SERVER_NAME,
-    SERVER_TITLE,
-} from './const.js';
+import { APIFY_DOCS_MCP_URL, APIFY_MCP_URL, HELPER_TOOLS, SERVER_NAME, SERVER_TITLE } from './const.js';
 import type { ServerCard, ServerCardRemote, ServerCardRepository, ServerCardTool } from './types.js';
 import { SERVER_MODE } from './types.js';
 import { readJsonFile } from './utils/generic.js';
@@ -80,7 +73,7 @@ export function getServerCard(): ServerCard {
             title: SERVER_TITLE,
             version: getPackageVersion()!,
         },
-        iconUrl: APIFY_FAVICON_URL,
+        iconUrl: serverJson.icons.find((icon) => icon.mimeType === 'image/png')!.src,
         documentationUrl: APIFY_DOCS_MCP_URL,
         transport: {
             type: 'streamable-http',
