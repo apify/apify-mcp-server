@@ -361,6 +361,7 @@ export async function prepareToolCall(params: {
                 ? getActorToolPolicy(tool.actorFullName)?.serverTool?.legacyInputPath
                 : undefined;
         if (legacyInputPath && Object.keys(toolArgs).length && !('method' in toolArgs) && !('path' in toolArgs)) {
+            // `waitSecs` was the old run tool's wait cap, not an Actor input.
             const { waitSecs: _waitSecs, ...query } = toolArgs;
             toolArgs = { method: 'GET', path: legacyInputPath, query };
             log.info('Rewrote pre-0.21 tool arguments', {

@@ -827,8 +827,7 @@ describe('the default apify/web-fetch tool', () => {
         expect(tool.buildDescription?.(only())).not.toContain(webSearchTool);
     });
 
-    // A client with a pre-0.21 tool list sends the old {url} shape, which GET / takes as its query. `waitSecs` was
-    // the run tool's own wait cap, not an Actor input.
+    // A client with a pre-0.21 tool list sends the old {url} shape, which GET / takes as its query.
     it('sends the old {url} shape as GET / without waitSecs', async () => {
         const tool = await loadWebFetchTool();
 
@@ -851,12 +850,17 @@ describe('the default apify/web-fetch tool', () => {
         );
     });
 
-    it('rejects a call that has a method and no path', async () => {
+    it.each([
+        ['path', { method: 'GET', query: { url: 'https://example.com' } }],
+        ['method', { path: '/', query: { url: 'https://example.com' } }],
+    ])('rejects a call with no %s instead of rewriting it', async (missingProperty, args) => {
         const tool = await loadWebFetchTool();
 
-        const result = await prepareCall(tool, { method: 'GET', query: { url: 'https://example.com' } });
+        const result = await prepareCall(tool, args);
 
-        expect(result).not.toHaveProperty('toolArgs');
+        expect((result as InvalidToolCall).callDiagnostics).toMatchObject({
+            validation_missing_property: missingProperty,
+        });
     });
 
     it('keeps the read-only hint of the Actor', async () => {
