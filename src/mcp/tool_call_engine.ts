@@ -10,13 +10,22 @@ import dedent from 'dedent';
 import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
-import { ALLOWED_TASK_TOOL_EXECUTION_MODES, FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../const.js';
+import {
+    ALLOWED_TASK_TOOL_EXECUTION_MODES,
+    FAILURE_CATEGORY,
+    HELPER_TOOLS,
+    RAG_WEB_BROWSER,
+    TOOL_STATUS,
+    WEB_FETCH,
+    WEB_SEARCH,
+} from '../const.js';
 import { prepareToolCallContext } from '../payments/helpers.js';
 import type { PaymentMeta, PaymentProvider, RequestHeaders } from '../payments/types.js';
 import { decodeDotPropertyNames } from '../tools/actor_input_schema.js';
-import { legacyToolNameToNew } from '../tools/actor_tool_naming.js';
+import { actorNameToToolName, legacyToolNameToNew } from '../tools/actor_tool_naming.js';
 import {
     buildDeniedInputsNote,
+    getActorToolPolicy,
     getDeniedDirectActorInputs,
     getDirectActorPolicy,
 } from '../tools/actors/actor_tool_contract.js';
@@ -106,6 +115,23 @@ function buildAjvFailureText(errors: ErrorObject[], args: unknown, inputSchema: 
         }
     }
     return [`Validation errors: ${failures.join('; ')}.`, ...descriptions].join('\n');
+}
+
+/** The default tools that replaced the default `apify--rag-web-browser` in 0.21.0, with what each does. */
+const RAG_WEB_BROWSER_REPLACEMENTS = [
+    [actorNameToToolName(WEB_SEARCH), 'searches the web'],
+    [actorNameToToolName(WEB_FETCH), 'reads a page by URL'],
+] as const;
+
+/**
+ * For a call to the removed `apify--rag-web-browser` from a client with an old tool list, the served tools that
+ * replaced it; empty when the session serves neither, since served text names no absent tool.
+ */
+function buildReplacedToolText(name: string, tools: Map<string, ToolEntry>): string {
+    if ((legacyToolNameToNew(name) ?? name) !== actorNameToToolName(RAG_WEB_BROWSER)) return '';
+    const replacements = RAG_WEB_BROWSER_REPLACEMENTS.filter(([toolName]) => tools.has(toolName));
+    if (!replacements.length) return '';
+    return `\nTool "${name}" was replaced: ${replacements.map(([toolName, use]) => `${toolName} ${use}`).join(' and ')}.`;
 }
 
 /** A pre-dispatch failure that the shell converts to v1's protocol-error sequence. */
@@ -239,11 +265,12 @@ export async function prepareToolCall(params: {
     if (!toolEntry) {
         const availableTools = Array.from(tools.keys());
         return {
-            message: dedent`
+            message:
+                dedent`
                 Tool "${name}" was not found.
                 Available tools: ${availableTools.length > 0 ? availableTools.join(', ') : 'none'}.
                 Please verify the tool name is correct. You can list all available tools using the tools/list request.
-            `,
+            ` + buildReplacedToolText(name, tools),
             toolStatus: TOOL_STATUS.SOFT_FAIL,
             callDiagnostics: { failure_category: FAILURE_CATEGORY.INVALID_INPUT },
         };
@@ -328,6 +355,10 @@ export async function prepareToolCall(params: {
         }
         if (!tool.ajvValidate(toolArgs)) {
             const errors = tool.ajvValidate.errors || [];
+            const exampleCall =
+                tool.type === TOOL_TYPE.ACTOR_SERVER
+                    ? getActorToolPolicy(tool.actorFullName)?.serverTool?.exampleCall
+                    : undefined;
             const ajvErrorDetails = extractAjvErrorDetails(errors);
             return {
                 message: [
@@ -340,6 +371,7 @@ export async function prepareToolCall(params: {
                               `Please check the tool's input schema ${schemaHint} and ensure all required parameters are provided with correct types and values.`,
                           ]
                         : []),
+                    ...(exampleCall ? [`Example call: ${exampleCall}`] : []),
                 ].join('\n'),
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
                 callDiagnostics: {

@@ -2,7 +2,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
 
-import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
+import {
+    FAILURE_CATEGORY,
+    HELPER_TOOLS,
+    RAG_WEB_BROWSER,
+    TOOL_STATUS,
+    WEB_FETCH,
+    WEB_SEARCH,
+} from '../../src/const.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { InvalidToolCall, PreparedCall } from '../../src/mcp/tool_call_engine.js';
 import {
@@ -11,6 +18,7 @@ import {
     executeSyncToolCall,
     prepareToolCall,
 } from '../../src/mcp/tool_call_engine.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
 import { sendServerActorRequest } from '../../src/tools/actors/send_server_actor_request.js';
 import {
@@ -96,6 +104,54 @@ describe('prepareToolCall()', () => {
             expect(invalid.callDiagnostics.failure_category).toBe(FAILURE_CATEGORY.INVALID_INPUT);
             expect(invalid.message).toContain('was not found');
             expect(telemetryData.trace_id).toBe('s1');
+        });
+    });
+
+    describe('a call to the removed default rag-web-browser tool', () => {
+        async function notFoundMessage(
+            servedToolNames: string[],
+            name = actorNameToToolName(RAG_WEB_BROWSER),
+        ): Promise<string> {
+            const tools = new Map(servedToolNames.map((toolName) => [toolName, makeRecorderTool(toolName).tool]));
+            const result = await prepareToolCall({
+                tools,
+                apifyToken: 'fake-token',
+                name,
+                args: { query: 'AI news' },
+                meta: undefined,
+                requestHeaders: undefined,
+                isTaskRequest: false,
+                mcpSessionId: 's1',
+                telemetryData: null,
+                clientContext: undefined,
+            });
+            return (result as InvalidToolCall).message;
+        }
+
+        // Clients that cached the tool list before 0.21.0 still call it; the error is their only way to learn.
+        it('names the served tools that replaced it', async () => {
+            const message = await notFoundMessage([actorNameToToolName(WEB_SEARCH), actorNameToToolName(WEB_FETCH)]);
+
+            expect(message).toMatch(/was replaced: apify--web-search .+ and apify--web-fetch /);
+        });
+
+        it('names the replacements for the legacy tool name', async () => {
+            const message = await notFoundMessage([actorNameToToolName(WEB_SEARCH)], 'apify-slash-rag-web-browser');
+
+            expect(message).toContain('Tool "apify-slash-rag-web-browser" was replaced: apify--web-search ');
+        });
+
+        it('names no replacement the session does not serve', async () => {
+            const message = await notFoundMessage([actorNameToToolName(WEB_FETCH)]);
+
+            expect(message).toContain('was replaced: apify--web-fetch ');
+            expect(message).not.toContain(actorNameToToolName(WEB_SEARCH));
+        });
+
+        it('says nothing about a replacement when the session serves none', async () => {
+            const message = await notFoundMessage(['recorder-tool']);
+
+            expect(message).not.toContain('was replaced');
         });
     });
 
