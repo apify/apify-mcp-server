@@ -1,0 +1,1512 @@
+{
+  "new": {
+    "merge/actors/cost-and-input-before-running": {
+      "relation": "no v1 equivalent",
+      "score": 0.23,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/actors/nonexistent-actor-graceful": {
+      "relation": "no v1 equivalent",
+      "score": 0.22,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/actors/run-and-report-output": {
+      "relation": "no v1 equivalent",
+      "score": 0.3,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/actors/vague-need-shortlist": {
+      "relation": "no v1 equivalent",
+      "score": 0.25,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/dev/report-after-failure": {
+      "relation": "possibly related",
+      "score": 0.4,
+      "v1_case": "merge/mcp-agent/report-problem-on-tool-error",
+      "v1_query": "Use the apify/rag-web-browser Actor to scrape https://example.com and tell me the page title."
+    },
+    "merge/docs/how-do-i-with-citation": {
+      "relation": "no v1 equivalent",
+      "score": 0.26,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/docs/search-then-read-page": {
+      "relation": "no v1 equivalent",
+      "score": 0.22,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/runs/any-failures-recently": {
+      "relation": "no v1 equivalent",
+      "score": 0.12,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/runs/last-run-status-lazy": {
+      "relation": "no v1 equivalent",
+      "score": 0.2,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/runs/log-not-just-status": {
+      "relation": "no v1 equivalent",
+      "score": 0.22,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/runs/start-then-abort": {
+      "relation": "no v1 equivalent",
+      "score": 0.22,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/schedules/add-keep-existing": {
+      "relation": "possibly related",
+      "score": 0.43,
+      "v1_case": "merge/schedules/add-action-medium-1",
+      "v1_query": "My schedule eval-sched-target should also run apify/hello-world every time it fires, keeping whatever it already runs. Set that up and then tell me everything it runs now."
+    },
+    "merge/schedules/create-then-remove": {
+      "relation": "no v1 equivalent",
+      "score": 0.22,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/schedules/name-collision": {
+      "relation": "close equivalent",
+      "score": 0.81,
+      "v1_case": "merge/schedules/collision-hard-1",
+      "v1_query": "Create a schedule called eval-nightly-sum that runs my task eval-sum-nightly every day at 3:00 UTC."
+    },
+    "merge/schedules/not-found-honest": {
+      "relation": "no v1 equivalent",
+      "score": 0.31,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/schedules/pause-not-delete": {
+      "relation": "no v1 equivalent",
+      "score": 0.18,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/schedules/weekday-morning-prague": {
+      "relation": "no v1 equivalent",
+      "score": 0.36,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/storage/all-rows-one-call": {
+      "relation": "no v1 equivalent",
+      "score": 0.28,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/storage/count-lag-honesty": {
+      "relation": "no v1 equivalent",
+      "score": 0.15,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/storage/dig-out-a-run-input": {
+      "relation": "no v1 equivalent",
+      "score": 0.17,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/storage/run-then-pick-fields": {
+      "relation": "no v1 equivalent",
+      "score": 0.28,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/storage/shape-without-dumping": {
+      "relation": "no v1 equivalent",
+      "score": 0.14,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/storage/what-data-do-i-have": {
+      "relation": "no v1 equivalent",
+      "score": 0.36,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/tasks/change-stored-input": {
+      "relation": "no v1 equivalent",
+      "score": 0.25,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/tasks/name-collision": {
+      "relation": "close equivalent",
+      "score": 0.53,
+      "v1_case": "merge/tasks/create-collision",
+      "v1_query": "Create a task named eval-sum-hourly for apify/normal-mode-test-actor with firstNumber 3 and secondNumber 4. Then create a second task, also named eval-sum-hourly, for the same Actor, with firstNumber 7 and secondNumber 8. Tell me exactly what happened with each."
+    },
+    "merge/tasks/publish-requirement-discovery": {
+      "relation": "no v1 equivalent",
+      "score": 0.27,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/tasks/save-my-setup": {
+      "relation": "no v1 equivalent",
+      "score": 0.22,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/tasks/save-publish-check-remove": {
+      "relation": "no v1 equivalent",
+      "score": 0.21,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/web/escalate-when-blocked": {
+      "relation": "possibly related",
+      "score": 0.47,
+      "v1_case": "merge/web-selection/rag-blocked",
+      "v1_query": "Use Apify's web browser to read https://www.reddit.com/r/webscraping/ for me and tell me what's being discussed there."
+    },
+    "merge/web/list-the-links": {
+      "relation": "close equivalent",
+      "score": 0.68,
+      "v1_case": "merge/web-fetch/links-medium-1",
+      "v1_query": "Using Apify, list every link that appears on https://example.com."
+    },
+    "merge/web/markup-not-cleaned-up": {
+      "relation": "close equivalent",
+      "score": 0.64,
+      "v1_case": "merge/web-fetch/formats-easy-1",
+      "v1_query": "With Apify, get me the HTML source of https://example.com - the actual markup, not a cleaned-up version."
+    },
+    "merge/web/pdf-to-text": {
+      "relation": "close equivalent",
+      "score": 0.56,
+      "v1_case": "merge/web-fetch/formats-medium-1",
+      "v1_query": "Use Apify to read this PDF and tell me exactly what text it contains: https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
+    },
+    "merge/web/query-not-a-url": {
+      "relation": "no v1 equivalent",
+      "score": 0.22,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/web/reports-404-truthfully": {
+      "relation": "no v1 equivalent",
+      "score": 0.36,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/web/unreachable-host": {
+      "relation": "possibly related",
+      "score": 0.45,
+      "v1_case": "merge/web-fetch/unreachable",
+      "v1_query": "Use Apify to get the content of https://this-domain-definitely-does-not-exist-9x7q2.com and tell me what's on it."
+    },
+    "merge/web/unsupported-scheme-honesty": {
+      "relation": "no v1 equivalent",
+      "score": 0.28,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "merge/web/verbatim-single-url": {
+      "relation": "no v1 equivalent",
+      "score": 0.38,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/abort-actor-run/graceful-stop": {
+      "relation": "no v1 equivalent",
+      "score": 0.18,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/abort-actor-run/lazy-kill-it": {
+      "relation": "no v1 equivalent",
+      "score": 0.15,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/call-actor/budget-cap-one-dollar": {
+      "relation": "no v1 equivalent",
+      "score": 0.27,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/call-actor/lazy-just-run-hello": {
+      "relation": "possibly related",
+      "score": 0.39,
+      "v1_case": "pr/call-actor/hashtag-research-ai",
+      "v1_query": "Run apify/social-media-hashtag-research for #AI"
+    },
+    "pr/call-actor/memory-cap-512": {
+      "relation": "no v1 equivalent",
+      "score": 0.3,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/call-actor/wait-two-minutes": {
+      "relation": "no v1 equivalent",
+      "score": 0.32,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/create-actor-task/lazy-save-config": {
+      "relation": "no v1 equivalent",
+      "score": 0.32,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/create-actor-task/not-a-schedule-trap": {
+      "relation": "no v1 equivalent",
+      "score": 0.23,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/create-actor-task/with-stored-input": {
+      "relation": "no v1 equivalent",
+      "score": 0.21,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/create-schedule/created-paused": {
+      "relation": "no v1 equivalent",
+      "score": 0.32,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/create-schedule/explicit-cron": {
+      "relation": "no v1 equivalent",
+      "score": 0.3,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/create-schedule/lazy-every-morning": {
+      "relation": "possibly related",
+      "score": 0.39,
+      "v1_case": "pr/create-schedule/task-daily-prague",
+      "v1_query": "I already have a task called eval-sum-nightly. Schedule it to run every day at 9:00 Prague time."
+    },
+    "pr/create-schedule/timezone-prague": {
+      "relation": "possibly related",
+      "score": 0.4,
+      "v1_case": "pr/create-schedule/task-daily-prague",
+      "v1_query": "I already have a task called eval-sum-nightly. Schedule it to run every day at 9:00 Prague time."
+    },
+    "pr/delete-schedule/lazy-get-rid-of-it": {
+      "relation": "possibly related",
+      "score": 0.38,
+      "v1_case": "pr/get-schedule/add-action-reads-first",
+      "v1_query": "Add my task eval-sum-nightly to the schedule eval-nightly-sum."
+    },
+    "pr/delete-schedule/remove-completely-not-pause": {
+      "relation": "possibly related",
+      "score": 0.39,
+      "v1_case": "pr/delete-schedule/remove",
+      "v1_query": "Delete my schedule eval-nightly-sum, I don't need it anymore."
+    },
+    "pr/fetch-actor-details/lazy-cost-tweet-scraper": {
+      "relation": "no v1 equivalent",
+      "score": 0.35,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/fetch-actor-details/lazy-what-input-needed": {
+      "relation": "possibly related",
+      "score": 0.4,
+      "v1_case": "pr/fetch-actor-details/google-search-scraper",
+      "v1_query": "Scrape details of apify/google-search-scraper"
+    },
+    "pr/fetch-actor-details/lazy-whats-it-about": {
+      "relation": "close equivalent",
+      "score": 0.51,
+      "v1_case": "pr/fetch-actor-details/instagram-scraper-capabilities",
+      "v1_query": "What can apify/instagram-scraper do?"
+    },
+    "pr/fetch-apify-docs/explicit-url-page": {
+      "relation": "possibly related",
+      "score": 0.38,
+      "v1_case": "pr/fetch-apify-docs/mcp-integration-page",
+      "v1_query": "What does the Apify docs page at https://docs.apify.com/platform/integrations/mcp say?"
+    },
+    "pr/fetch-apify-docs/missing-page": {
+      "relation": "possibly related",
+      "score": 0.44,
+      "v1_case": "pr/fetch-apify-docs/mcp-integration-page",
+      "v1_query": "What does the Apify docs page at https://docs.apify.com/platform/integrations/mcp say?"
+    },
+    "pr/get-actor-run-list/lazy-what-ran-lately": {
+      "relation": "no v1 equivalent",
+      "score": 0.11,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-actor-run-list/only-failed-ones": {
+      "relation": "no v1 equivalent",
+      "score": 0.19,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-actor-run-log/error-message-not-status": {
+      "relation": "no v1 equivalent",
+      "score": 0.2,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-actor-run-log/last-50-lines": {
+      "relation": "no v1 equivalent",
+      "score": 0.0,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-actor-run-log/lazy-why-did-it-break": {
+      "relation": "no v1 equivalent",
+      "score": 0.13,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-actor-run/lazy-is-it-done": {
+      "relation": "no v1 equivalent",
+      "score": 0.15,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-actor-run/wait-until-finished": {
+      "relation": "no v1 equivalent",
+      "score": 0.17,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-actor-task/is-it-public": {
+      "relation": "no v1 equivalent",
+      "score": 0.3,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-actor-task/lazy-what-does-it-run": {
+      "relation": "no v1 equivalent",
+      "score": 0.31,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-dataset-items/lazy-show-data": {
+      "relation": "no v1 equivalent",
+      "score": 0.37,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-dataset-items/newest-first": {
+      "relation": "no v1 equivalent",
+      "score": 0.21,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-dataset-items/only-two-fields": {
+      "relation": "possibly related",
+      "score": 0.45,
+      "v1_case": "pr/get-dataset-items/select-title-url-fields",
+      "v1_query": "Retrieve only the title and url fields from dataset UvsU"
+    },
+    "pr/get-dataset-items/page-two": {
+      "relation": "no v1 equivalent",
+      "score": 0.22,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-dataset-list/include-unnamed": {
+      "relation": "possibly related",
+      "score": 0.46,
+      "v1_case": "pr/get-dataset-list/list-all",
+      "v1_query": "List all my datasets"
+    },
+    "pr/get-dataset-list/lazy-what-data-i-have": {
+      "relation": "close equivalent",
+      "score": 0.62,
+      "v1_case": "pr/get-dataset-list/account-datasets",
+      "v1_query": "What datasets do I have in my account?"
+    },
+    "pr/get-dataset-schema/from-ten-items": {
+      "relation": "no v1 equivalent",
+      "score": 0.31,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-dataset-schema/json-schema-for-dataset": {
+      "relation": "possibly related",
+      "score": 0.42,
+      "v1_case": "pr/get-dataset-schema/generate-from-10-items",
+      "v1_query": "Generate a JSON schema for dataset des32s using 10 items"
+    },
+    "pr/get-dataset-schema/lazy-what-shape": {
+      "relation": "no v1 equivalent",
+      "score": 0.28,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-dataset/lazy-how-many-rows": {
+      "relation": "close equivalent",
+      "score": 0.51,
+      "v1_case": "pr/get-dataset/item-count",
+      "v1_query": "How many items are in dataset abc123?"
+    },
+    "pr/get-dataset/when-created": {
+      "relation": "no v1 equivalent",
+      "score": 0.23,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-key-value-store-keys/first-five": {
+      "relation": "no v1 equivalent",
+      "score": 0.31,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-key-value-store-keys/lazy-whats-in-there": {
+      "relation": "no v1 equivalent",
+      "score": 0.25,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-key-value-store-list/include-unnamed": {
+      "relation": "no v1 equivalent",
+      "score": 0.23,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-key-value-store-list/lazy-my-stores": {
+      "relation": "close equivalent",
+      "score": 0.53,
+      "v1_case": "pr/get-key-value-store-list/list-all",
+      "v1_query": "List all my key-value stores"
+    },
+    "pr/get-key-value-store-record/input-of-run": {
+      "relation": "no v1 equivalent",
+      "score": 0.24,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-key-value-store-record/lazy-output": {
+      "relation": "no v1 equivalent",
+      "score": 0.3,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-key-value-store/lazy-store-info": {
+      "relation": "no v1 equivalent",
+      "score": 0.36,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-key-value-store/size-check": {
+      "relation": "no v1 equivalent",
+      "score": 0.23,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/get-schedule/lazy-when-next": {
+      "relation": "close equivalent",
+      "score": 0.5,
+      "v1_case": "pr/get-schedule/next-run",
+      "v1_query": "When will my schedule eval-nightly-sum run next?"
+    },
+    "pr/get-schedule/read-before-replacing-actions": {
+      "relation": "close equivalent",
+      "score": 0.82,
+      "v1_case": "pr/get-schedule/add-action-reads-first",
+      "v1_query": "Add my task eval-sum-nightly to the schedule eval-nightly-sum."
+    },
+    "pr/publish-actor-task/lazy-make-public": {
+      "relation": "no v1 equivalent",
+      "score": 0.22,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/publish-actor-task/let-people-find-it": {
+      "relation": "no v1 equivalent",
+      "score": 0.13,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/rag-web-browser/few-articles-by-topic": {
+      "relation": "no v1 equivalent",
+      "score": 0.29,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/rag-web-browser/lazy-latest-ai-chip-rules": {
+      "relation": "no v1 equivalent",
+      "score": 0.26,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/rag-web-browser/search-not-discovery-not-fetch": {
+      "relation": "no v1 equivalent",
+      "score": 0.24,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/report-problem/broken-tool-complaint": {
+      "relation": "no v1 equivalent",
+      "score": 0.0,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/search-actors/lazy-linkedin-jobs-typo": {
+      "relation": "no v1 equivalent",
+      "score": 0.34,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/search-actors/lazy-tiktok-comments-need": {
+      "relation": "no v1 equivalent",
+      "score": 0.29,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/search-actors/limit-three-amazon-reviews": {
+      "relation": "no v1 equivalent",
+      "score": 0.24,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/search-actors/tool-not-data-maps-reviews": {
+      "relation": "no v1 equivalent",
+      "score": 0.17,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/search-apify-docs/lazy-how-proxy-works": {
+      "relation": "close equivalent",
+      "score": 0.59,
+      "v1_case": "pr/search-apify-docs/apify-proxy-usage",
+      "v1_query": "How to use Apify Proxy"
+    },
+    "pr/search-apify-docs/lazy-webhooks-setup": {
+      "relation": "possibly related",
+      "score": 0.39,
+      "v1_case": "pr/search-apify-docs/apify-proxy-usage",
+      "v1_query": "How to use Apify Proxy"
+    },
+    "pr/search-apify-docs/vs-web-search-standby": {
+      "relation": "no v1 equivalent",
+      "score": 0.24,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/unpublish-actor-task/hide-not-delete": {
+      "relation": "no v1 equivalent",
+      "score": 0.24,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/unpublish-actor-task/lazy-take-down": {
+      "relation": "possibly related",
+      "score": 0.39,
+      "v1_case": "pr/unpublish-actor-task/insta-daily-keep-display-settings",
+      "v1_query": "Take my task insta-daily off its public page but keep its display settings"
+    },
+    "pr/update-actor-task/landing-page-title": {
+      "relation": "no v1 equivalent",
+      "score": 0.26,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/update-actor-task/lazy-change-numbers": {
+      "relation": "no v1 equivalent",
+      "score": 0.32,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/update-actor-task/switch-build": {
+      "relation": "no v1 equivalent",
+      "score": 0.34,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/update-schedule/change-frequency": {
+      "relation": "close equivalent",
+      "score": 0.57,
+      "v1_case": "pr/update-schedule/every-6-hours",
+      "v1_query": "Change my schedule eval-nightly-sum to run every 6 hours."
+    },
+    "pr/update-schedule/lazy-pause": {
+      "relation": "close equivalent",
+      "score": 0.56,
+      "v1_case": "pr/update-schedule/pause",
+      "v1_query": "Pause my schedule eval-nightly-sum."
+    },
+    "pr/update-schedule/turn-back-on": {
+      "relation": "close equivalent",
+      "score": 0.77,
+      "v1_case": "pr/update-schedule/resume",
+      "v1_query": "Turn my schedule eval-nightly-sum back on."
+    },
+    "pr/web-fetch/blocked-page-retry": {
+      "relation": "no v1 equivalent",
+      "score": 0.21,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/web-fetch/lazy-single-url-content": {
+      "relation": "no v1 equivalent",
+      "score": 0.14,
+      "v1_case": null,
+      "v1_query": null
+    },
+    "pr/web-fetch/links-on-page": {
+      "relation": "no v1 equivalent",
+      "score": 0.25,
+      "v1_case": null,
+      "v1_query": null
+    }
+  },
+  "retired": {
+    "merge/mcp-agent/call-actor-mcp-weather": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/call-google-maps-restaurants": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/call-tiktok-scraper": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/discover-and-call-actor-mcp-tool": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/fetch-details-mcp-tools-list": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/fetch-details-non-mcp-actor-graceful": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/instagram-posts": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/report-problem-on-tool-error": {
+      "relation": "reworded as",
+      "successors": [
+        "merge/dev/report-after-failure"
+      ]
+    },
+    "merge/mcp-agent/search-add-call-python-actor": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/search-generic-scrapers": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/search-google-maps": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/search-instagram-scrapers": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/search-tiktok-scrapers": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/storage-actor-run-list-seeded": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/storage-actor-run-status-seeded": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/storage-dataset-items-google-search": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/storage-dataset-items-hotels-bulk": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/storage-dataset-items-instagram": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/storage-dataset-items-maps-bulk": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/storage-dataset-items-reddit": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/storage-dataset-items-seeded": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/storage-dataset-items-tiktok": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/storage-dataset-items-youtube": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/storage-dataset-metadata-seeded": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/storage-dataset-schema-seeded": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/storage-kv-keys-seeded": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/storage-kv-record-seeded": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/storage-run-list-recent": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/workflow-mcp-discover-and-execute": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/mcp-agent/workflow-search-fetch-schema-call": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/schedules/add-action-medium-1": {
+      "relation": "reworded as",
+      "successors": [
+        "merge/schedules/add-keep-existing"
+      ]
+    },
+    "merge/schedules/chain-medium-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/schedules/collision-hard-1": {
+      "relation": "reworded as",
+      "successors": [
+        "merge/schedules/name-collision"
+      ]
+    },
+    "merge/schedules/create-easy-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/schedules/cron-hard-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/schedules/delete-hard-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/schedules/get-easy-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/schedules/loose-actor-hard-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/schedules/notfound-hard-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/schedules/pause-easy-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/tasks/chain-hard-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/tasks/chain-medium-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/tasks/create-collision": {
+      "relation": "reworded as",
+      "successors": [
+        "merge/tasks/name-collision"
+      ]
+    },
+    "merge/tasks/create-easy-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/tasks/get-easy-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/tasks/get-not-found": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/tasks/publish-discovery": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/tasks/publish-medium-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/tasks/update-easy-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/tasks/update-medium-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/web-fetch/chain-hard-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/web-fetch/fetch-easy-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/web-fetch/fetch-easy-2": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/web-fetch/format-discovery": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/web-fetch/formats-easy-1": {
+      "relation": "reworded as",
+      "successors": [
+        "merge/web/markup-not-cleaned-up"
+      ]
+    },
+    "merge/web-fetch/formats-medium-1": {
+      "relation": "reworded as",
+      "successors": [
+        "merge/web/pdf-to-text"
+      ]
+    },
+    "merge/web-fetch/links-medium-1": {
+      "relation": "reworded as",
+      "successors": [
+        "merge/web/list-the-links"
+      ]
+    },
+    "merge/web-fetch/selection-hard-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/web-fetch/status-hard-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/web-fetch/unreachable": {
+      "relation": "reworded as",
+      "successors": [
+        "merge/web/unreachable-host"
+      ]
+    },
+    "merge/web-fetch/unsupported-protocol": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/web-selection/blocked-native": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/web-selection/chain-medium-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/web-selection/discovery-easy-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/web-selection/fetch-easy-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/web-selection/fetch-medium-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/web-selection/rag-blocked": {
+      "relation": "reworded as",
+      "successors": [
+        "merge/web/escalate-when-blocked"
+      ]
+    },
+    "merge/web-selection/search-easy-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/web-selection/search-medium-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "merge/web-selection/structured-hard-1": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/abort-actor-run/stuck-run": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/apify--rag-web-browser/ai-articles-tech-blogs": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/apify--rag-web-browser/ai-articles-wired-verge": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/apify--rag-web-browser/ai-blog-articles": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/apify--rag-web-browser/ai-news-current": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/apify--rag-web-browser/climate-change-articles": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/apify--rag-web-browser/flight-prices-nyc-london": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/apify--rag-web-browser/iphone-launch-reactions": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/apify--rag-web-browser/news-cnn-bbc": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/apify--rag-web-browser/ny-weather-forecast": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/apify--rag-web-browser/sf-weather-forecast": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/apify--rag-web-browser/sf-weather-today": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/apify--rag-web-browser/tech-industry-news": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/call-actor/ecommerce-scraper-iphone": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/call-actor/google-search-restaurants": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/call-actor/hashtag-research-ai": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/call-actor/lazy-just-run-hello"
+      ]
+    },
+    "pr/call-actor/instagram-scraper-hashtag": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/call-actor/rag-web-browser": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/call-actor/tweet-scraper-profiles": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/call-actor/weather-scraper-nyc": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/create-actor-task/google-search-pizza": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/create-actor-task/instagram-insta-daily": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/create-actor-task/not-a-schedule": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/create-schedule/actor-weekly-monday": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/create-schedule/paused": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/create-schedule/task-daily-prague": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/create-schedule/lazy-every-morning",
+        "pr/create-schedule/timezone-prague"
+      ]
+    },
+    "pr/delete-schedule/remove": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/delete-schedule/remove-completely-not-pause"
+      ]
+    },
+    "pr/fetch-actor-details/google-search-scraper": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/fetch-actor-details/lazy-what-input-needed"
+      ]
+    },
+    "pr/fetch-actor-details/hashtag-research-features": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/fetch-actor-details/input-schema": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/fetch-actor-details/instagram-scraper-capabilities": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/fetch-actor-details/lazy-whats-it-about"
+      ]
+    },
+    "pr/fetch-actor-details/instagram-scraper-overview": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/fetch-actor-details/instagram-scraper-parameters": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/fetch-actor-details/instagram-scraper-pricing": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/fetch-actor-details/nonexistent-actor": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/fetch-actor-details/rag-web-browser-docs": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/fetch-actor-details/rag-web-browser-how-it-works": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/fetch-actor-details/rag-web-browser-pricing": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/fetch-actor-details/typo-actor-name": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/fetch-apify-docs/mcp-integration-page": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/fetch-apify-docs/explicit-url-page",
+        "pr/fetch-apify-docs/missing-page"
+      ]
+    },
+    "pr/fetch-apify-docs/nonexistent-page": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-actor-log/debug-failed-run": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-actor-log/missing-line-count": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-actor-run-list/recent-runs": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-actor-run/status": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-actor-task/insta-daily-config": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-actor-task/insta-daily-published": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-dataset-items/all-web-scraper-results": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-dataset-items/first-50-items": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-dataset-items/instagram-run-data": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-dataset-items/latest-run-output": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-dataset-items/query-markdown-fields": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-dataset-items/retrieve-results": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-dataset-items/select-title-url-fields": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/get-dataset-items/only-two-fields"
+      ]
+    },
+    "pr/get-dataset-list/account-datasets": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/get-dataset-list/lazy-what-data-i-have"
+      ]
+    },
+    "pr/get-dataset-list/last-10-newest-first": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-dataset-list/list-all": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/get-dataset-list/include-unnamed"
+      ]
+    },
+    "pr/get-dataset-schema/basic-schema": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-dataset-schema/generate-from-10-items": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/get-dataset-schema/json-schema-for-dataset"
+      ]
+    },
+    "pr/get-dataset-schema/infer-structure": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-dataset/fields-list": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-dataset/item-count": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/get-dataset/lazy-how-many-rows"
+      ]
+    },
+    "pr/get-dataset/metadata-stats": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-key-value-store-keys/list-keys": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-key-value-store-keys/which-keys-stored": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-key-value-store-list/account-stores": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-key-value-store-list/list-all": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/get-key-value-store-list/lazy-my-stores"
+      ]
+    },
+    "pr/get-key-value-store-record/data-json-record": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-key-value-store-record/input-record": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-key-value-store-record/output-record": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-key-value-store/details": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-key-value-store/metadata": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/get-schedule/add-action-reads-first": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/get-schedule/read-before-replacing-actions",
+        "pr/delete-schedule/lazy-get-rid-of-it"
+      ]
+    },
+    "pr/get-schedule/next-run": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/get-schedule/lazy-when-next"
+      ]
+    },
+    "pr/publish-actor-task/insta-daily": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/publish-actor-task/insta-daily-make-public": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/publish-actor-task/query-input-overview-view": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/publish-actor-task/write-access-granted": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/amazon-product-details": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/amazon-product-scrapers": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/data-extraction-tasks": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/ecommerce-data-extraction": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/facebook-data": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/flight-data-booking-sites": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/flight-data-extraction": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/instagram-ai-posts": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/instagram-posts": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/instagram-posts-ai": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/instagram-posts-generic": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/instagram-posts-the-rock": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/instagram-profile-scraping": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/instagram-scrapers-best": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/news-articles": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/playwright-mcp-server": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/skyscanner-flights": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/social-media-scraping": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/stackoverflow-quicksort": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/tiktok-comments-lazy-budget": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/tiktok-content": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/tiktok-scraper": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/twitter-ai-posts": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/twitter-scraping-tools": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/vague-scraping-need": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/weather-data-scraping": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-actors/weather-scraping-tools": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-apify-docs/actor-docs-overview": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-apify-docs/api-integration-guide": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-apify-docs/apify-proxy-usage": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/search-apify-docs/lazy-how-proxy-works",
+        "pr/search-apify-docs/lazy-webhooks-setup"
+      ]
+    },
+    "pr/search-apify-docs/build-actor-from-scratch": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-apify-docs/build-actor-guide": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-apify-docs/crawlee-web-scraping": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-apify-docs/error-handling-actors": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-apify-docs/input-schema-examples": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-apify-docs/mcp-server-docs": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/search-apify-docs/playwright-with-apify": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/unpublish-actor-task/insta-daily": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/unpublish-actor-task/insta-daily-keep-display-settings": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/unpublish-actor-task/lazy-take-down"
+      ]
+    },
+    "pr/update-actor-task/insta-daily-beta-build": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/update-actor-task/insta-daily-change-input": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/update-actor-task/insta-daily-landing-title": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/update-actor-task/publish-view-setup": {
+      "relation": "no direct successor",
+      "successors": []
+    },
+    "pr/update-schedule/every-6-hours": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/update-schedule/change-frequency"
+      ]
+    },
+    "pr/update-schedule/pause": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/update-schedule/lazy-pause"
+      ]
+    },
+    "pr/update-schedule/resume": {
+      "relation": "reworded as",
+      "successors": [
+        "pr/update-schedule/turn-back-on"
+      ]
+    },
+    "pr/web-fetch/example-com": {
+      "relation": "no direct successor",
+      "successors": []
+    }
+  }
+}
