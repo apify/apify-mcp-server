@@ -2,6 +2,7 @@ import { ApifyClient } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
+import { parseInputParamsFromUrl } from '../../src/mcp/utils.js';
 import type { ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
@@ -14,6 +15,7 @@ import {
     resolveToolNamesFromInput,
     toolNamesToInput,
 } from '../../src/utils/tools_loader.js';
+import { APIFY_AI_INTERNAL_TOOL_NAMES, APIFY_AI_TOOLS } from './helpers/apify_ai_tools.js';
 
 const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
 
@@ -354,5 +356,15 @@ describe('loadToolsFromInput explicit widget selection', () => {
         // The de-dup pass must collapse to exactly one widget entry.
         expect(toolNames.filter((n) => n === HELPER_TOOLS.STORE_SEARCH_WIDGET)).toHaveLength(1);
         expect(toolNames.filter((n) => n === HELPER_TOOLS.STORE_SEARCH)).toHaveLength(1);
+    });
+});
+
+/** Pins the Apify AI tool surface; offline, no network or fixture. */
+describe('Apify AI tool selection', () => {
+    // Default mode: the Apify AI MCP client does not advertise MCP Apps.
+    it('serves exactly the pinned internal tools', () => {
+        const url = `https://mcp.apify.com/?tools=${APIFY_AI_TOOLS.join(',')}`;
+        const toolNames = getToolsForServerMode(parseInputParamsFromUrl(url), [], 'default').map((t) => t.name);
+        expect(new Set(toolNames)).toEqual(new Set(APIFY_AI_INTERNAL_TOOL_NAMES));
     });
 });
