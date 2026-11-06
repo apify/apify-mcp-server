@@ -8,6 +8,7 @@ import {
     APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS,
     APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED,
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
+    APIFY_ERROR_TYPE_PLATFORM_FEATURE_DISABLED,
     FAILURE_CATEGORY,
     HELPER_TOOLS,
 } from '../../const.js';
@@ -23,6 +24,8 @@ import {
     isActorRunLimitError,
     isMemoryQuotaError,
     isPermissionApprovalError,
+    isPlatformFeatureDisabledError,
+    PLATFORM_FEATURE_DISABLED_MESSAGE,
 } from '../../utils/apify_errors.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
@@ -259,6 +262,15 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         return respondUserError(buildInvalidInputTexts(actorName, errMsg, inputSchema), {
             actorId,
             detail: errMsg.slice(0, 200),
+        });
+    }
+
+    // The Actor exists; the account is blocked by billing, so the "verify the Actor name" hint would mislead.
+    if (isPlatformFeatureDisabledError(error)) {
+        return respondUserError([`Failed to call Actor '${actorName}': ${errMsg}`, PLATFORM_FEATURE_DISABLED_MESSAGE], {
+            httpStatus: error.statusCode,
+            detail: APIFY_ERROR_TYPE_PLATFORM_FEATURE_DISABLED,
+            actorId,
         });
     }
 

@@ -2,11 +2,13 @@ import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ApifyApiError } from 'apify-client';
 
 import {
+    APIFY_ERROR_TYPE_ACTOR_DISABLED,
     APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK,
     APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS,
     APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED,
     APIFY_ERROR_TYPE_INVALID_INPUT,
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
+    APIFY_ERROR_TYPE_PLATFORM_FEATURE_DISABLED,
 } from '../const.js';
 
 // Helpers that read or classify an error received from the Apify API by its `type`. Kept in one leaf
@@ -26,6 +28,18 @@ export function isPermissionApprovalError(error: unknown): error is ApifyApiErro
 /** True when an Actor run is rejected because the account memory quota is exceeded. */
 export function isMemoryQuotaError(error: unknown): error is ApifyApiError {
     return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED;
+}
+
+/**
+ * True when the account is blocked from a platform feature: the monthly usage or a service hard limit, unpaid
+ * invoices, or a plan that doesn't include the feature. Only some of these API messages say what to do next.
+ * Run starts send the same reason as `actor-disabled` when the API's cached user still had Actors enabled.
+ */
+export function isPlatformFeatureDisabledError(error: unknown): error is ApifyApiError {
+    return (
+        error instanceof ApifyApiError &&
+        (error.type === APIFY_ERROR_TYPE_PLATFORM_FEATURE_DISABLED || error.type === APIFY_ERROR_TYPE_ACTOR_DISABLED)
+    );
 }
 
 /** True when the API rejects a supplied `publicConfig` field or a request to publish the task. */
@@ -59,6 +73,11 @@ export function isActorRunLimitError(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error);
     return message.includes(APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS);
 }
+
+/** Appended to a `platform-feature-disabled` error, whose own message names the reason. */
+export const PLATFORM_FEATURE_DISABLED_MESSAGE =
+    'This is a billing or plan restriction on the account, not an access problem. ' +
+    'See https://console.apify.com/billing.';
 
 /** User-facing message shown when an Actor run is rejected for hitting the concurrent-run limit. */
 export const ACTOR_RUN_LIMIT_MESSAGE =
