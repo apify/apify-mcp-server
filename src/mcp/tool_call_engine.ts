@@ -54,6 +54,7 @@ import {
     getToolFullName,
 } from '../utils/tools.js';
 import type { McpClientContext } from './client_context.js';
+import { addRunInputNote, rewriteRunInputAsServerRequest } from './run_input_rewrite.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
 import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
 import { dispatchToolCall } from './tool_dispatch.js';
@@ -65,13 +66,6 @@ const PROGRESS_TRACKER_INTERNAL_TOOLS = new Set<string>([
     HELPER_TOOLS.ACTOR_BUILD_GET,
     HELPER_TOOLS.ACTOR_BUILD,
 ]);
-
-/**
- * Where a call with the pre-0.21 Actor input of these tools is sent, as `GET` with that input as `query`. Clients
- * with a cached pre-0.21 tool list still send it (apify/ai-team#346). Remove once the "Rewrote pre-0.21 tool
- * arguments" log stops.
- */
-const LEGACY_INPUT_PATHS: Readonly<Record<string, string>> = { [WEB_FETCH]: '/', [RAG_WEB_BROWSER]: '/search' };
 
 /** The value or subschema at JSON pointer `path`: `undefined` when it does not exist. */
 function resolveJsonPointer(root: unknown, path: string, isSchema: boolean): unknown {
@@ -165,8 +159,8 @@ export type PreparedCall = {
     paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined;
     // The shell uses this decoded copy for telemetry.
     decodedArgs: Record<string, unknown>;
-    /** Set when pre-0.21 arguments were rewritten; added to the tool result. */
-    legacyInputNote?: string;
+    /** Set when run input was sent as a server request; added to the tool result. */
+    runInputNote?: string;
 };
 
 /** Result of the synchronous dispatch tail, including the exact wire payload. */
@@ -365,28 +359,19 @@ export async function prepareToolCall(params: {
         // Key names only, never values: they show which call shape a rejected client sends. Read before validation,
         // since AJV removes unknown keys and `toolArgs` can be `decodedArgs` itself (a payment provider may return it).
         const argKeys = Object.keys(decodedArgs).slice(0, 20).join(',').slice(0, 200);
-        const exampleCall =
-            tool.type === TOOL_TYPE.ACTOR_SERVER
-                ? getActorToolPolicy(tool.actorFullName)?.serverTool?.exampleCall
-                : undefined;
-        const legacyInputPath =
-            tool.type === TOOL_TYPE.ACTOR_SERVER ? LEGACY_INPUT_PATHS[tool.actorFullName] : undefined;
-        let legacyInputNote: string | undefined;
-        if (legacyInputPath && Object.keys(toolArgs).length && !('method' in toolArgs) && !('path' in toolArgs)) {
-            // `waitSecs` was the old run tool's wait cap, not an Actor input.
-            const { waitSecs: _waitSecs, ...query } = toolArgs;
-            toolArgs = { method: 'GET', path: legacyInputPath, query };
-            legacyInputNote =
-                `These arguments are the pre-0.21 input of this tool. They were sent as GET ${legacyInputPath} with the ` +
-                `arguments as query. The current input is {method, path, query}, for example: ${exampleCall}`;
-            log.info('Rewrote pre-0.21 tool arguments', {
-                toolName: tool.name,
-                mcpSessionId: params.mcpSessionId,
-                argKeys,
-            });
-        }
+        const runInputRewrite = rewriteRunInputAsServerRequest({
+            tool,
+            args: toolArgs,
+            argKeys,
+            mcpSessionId: params.mcpSessionId,
+        });
+        if (runInputRewrite) toolArgs = runInputRewrite.args;
         if (!tool.ajvValidate(toolArgs)) {
             const errors = tool.ajvValidate.errors || [];
+            const exampleCall =
+                tool.type === TOOL_TYPE.ACTOR_SERVER
+                    ? getActorToolPolicy(tool.actorFullName)?.serverTool?.exampleCall
+                    : undefined;
             const ajvErrorDetails = extractAjvErrorDetails(errors);
             return {
                 message: [
@@ -399,7 +384,7 @@ export async function prepareToolCall(params: {
                               `Please check the tool's input schema ${schemaHint} and ensure all required parameters are provided with correct types and values.`,
                           ]
                         : []),
-                    ...(legacyInputNote ? [legacyInputNote] : exampleCall ? [`Example call: ${exampleCall}`] : []),
+                    ...(runInputRewrite ? [runInputRewrite.note] : exampleCall ? [`Example call: ${exampleCall}`] : []),
                 ].join('\n'),
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
                 callDiagnostics: {
@@ -451,7 +436,7 @@ export async function prepareToolCall(params: {
             standbyRejection,
             paymentRequiredResult,
             decodedArgs,
-            legacyInputNote,
+            runInputNote: runInputRewrite?.note,
         };
     } catch (error) {
         // Keep protocol errors as JSON-RPC errors; classify other failures with actor context.
@@ -547,17 +532,11 @@ export async function executeSyncToolCall(
             actorId,
             taskMode: false,
         });
-        const result = prepared.legacyInputNote
-            ? {
-                  ...dispatchResult.result,
-                  content: [
-                      ...((dispatchResult.result.content as unknown[] | undefined) ?? []),
-                      { type: 'text', text: prepared.legacyInputNote },
-                  ],
-              }
-            : dispatchResult.result;
         return {
-            result: nudge(result, dispatchResult.callDiagnostics),
+            result: nudge(
+                addRunInputNote(dispatchResult.result, prepared.runInputNote),
+                dispatchResult.callDiagnostics,
+            ),
             toolStatus: dispatchResult.toolStatus,
             callDiagnostics: dispatchResult.callDiagnostics,
         };
