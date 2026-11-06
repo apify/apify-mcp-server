@@ -1,3 +1,4 @@
+import type { Actor } from 'apify-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
@@ -8,11 +9,19 @@ import {
     buildActorNotRunnableGuidance,
     buildFetchActorDetailsResult,
 } from '../../src/tools/actors/fetch_actor_details.js';
+import { actorDetailsOutputSchema } from '../../src/tools/structured_output_schemas.js';
+import { formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 import type { ActorDetailsResult } from '../../src/utils/actor_details.js';
 import { fetchActorDetails } from '../../src/utils/actor_details.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockApifyClient, mockUserInfo, stubToolCallContext, textOf } from './helpers/tool_context.js';
+import {
+    expectSchemaConformingStructuredContent,
+    mockApifyClient,
+    mockUserInfo,
+    stubToolCallContext,
+    textOf,
+} from './helpers/tool_context.js';
 
 vi.mock('../../src/utils/actor_details.js', async () => {
     const actual = await vi.importActual<Record<string, unknown>>('../../src/utils/actor_details.js');
@@ -151,6 +160,41 @@ describe('buildFetchActorDetailsResult()', () => {
         });
         expect(content[0].text).toContain('# [Input schema](https://console.apify.com/actors/actor-id-1)');
         expect(content.at(-1)?.text).toBe(VERBATIM_LINKS_NUDGE);
+    });
+
+    it('returns only the requested sections in structuredContent.actorInfo', async () => {
+        const paidDeprecatedActor = {
+            id: 'actor-id-1',
+            name: 'example-mcp-server',
+            username: 'apify',
+            title: 'Example MCP Server',
+            description: 'An example MCP server actor.',
+            isDeprecated: true,
+            categories: ['AI'],
+            modifiedAt: new Date('2026-10-26T15:34:39.068Z'),
+            stats: { totalUsers: 100, totalUsers30Days: 40 },
+            pricingInfos: [
+                { pricingModel: 'PER_ACTOR_RUN', pricePerUnitUsd: 0.25, startedAt: new Date('2026-01-01T00:00:00Z') },
+            ],
+        } as unknown as Actor;
+        vi.mocked(fetchActorDetails).mockImplementation(async (_client, _actorName, options) => ({
+            ...MOCK_DETAILS,
+            actorCardStructured: formatActorToStructuredCard(paidDeprecatedActor, options?.cardOptions),
+        }));
+
+        const result = await buildFetchActorDetailsResult(
+            stubToolCallContext({ actor: 'apify/example-mcp-server', output: { stats: true } }, mockApifyClient(), {
+                loadedToolNames: [HELPER_TOOLS.ACTOR_CALL],
+            }),
+        );
+
+        expectSchemaConformingStructuredContent(result, actorDetailsOutputSchema);
+        const { actorInfo } = (result as { structuredContent: { actorInfo: Record<string, unknown> } })
+            .structuredContent;
+        expect(actorInfo.stats).toEqual({ totalUsers: 100, monthlyUsers: 40 });
+        for (const section of ['pricing', 'developer', 'categories', 'modifiedAt', 'isDeprecated', 'description']) {
+            expect(actorInfo).not.toHaveProperty(section);
+        }
     });
 
     // The direct buildActorNotFoundResponse() tests below cannot see whether this function
