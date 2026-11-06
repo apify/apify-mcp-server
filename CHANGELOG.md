@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Add icon, title and website to server.json ([#1835](https://github.com/apify/apify-mcp-server/pull/1835)) ([21f6c12](https://github.com/apify/apify-mcp-server/commit/21f6c1247b61e0acce5a9916857cd3061d922d82)) by [@jancurn](https://github.com/jancurn)
+- Accept pre-0.21 input for web-fetch and rag-web-browser ([#1841](https://github.com/apify/apify-mcp-server/pull/1841)) ([97d54db](https://github.com/apify/apify-mcp-server/commit/97d54db1f347de2b3eed79c3739bbf13c9c2671f)) by [@jirispilka](https://github.com/jirispilka), closes [#346](https://github.com/apify/apify-mcp-server/issues/346)
 
 
 <!-- git-cliff-unreleased-end -->
