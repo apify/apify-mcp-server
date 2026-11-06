@@ -54,7 +54,7 @@ import {
     getToolFullName,
 } from '../utils/tools.js';
 import type { McpClientContext } from './client_context.js';
-import { addRunInputNote, rewriteRunInputAsServerRequest } from './run_input_rewrite.js';
+import { addCompatibilityNote, loadReplacedDefaultTool, rewriteRunInputAsServerRequest } from './run_input_rewrite.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
 import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
 import { dispatchToolCall } from './tool_dispatch.js';
@@ -159,8 +159,8 @@ export type PreparedCall = {
     paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined;
     // The shell uses this decoded copy for telemetry.
     decodedArgs: Record<string, unknown>;
-    /** Set when run input was sent as a server request; added to the tool result. */
-    runInputNote?: string;
+    /** Set when a pre-0.21 tool name or run input was accepted; added to the tool result. */
+    compatibilityNote?: string;
 };
 
 /** Result of the synchronous dispatch tail, including the exact wire payload. */
@@ -263,7 +263,28 @@ export async function prepareToolCall(params: {
         };
     }
 
-    const toolEntry = resolveToolEntry(name, tools);
+    let toolEntry = resolveToolEntry(name, tools);
+    const replacedToolText = toolEntry ? '' : buildReplacedToolText(name, tools);
+    try {
+        toolEntry ??= await loadReplacedDefaultTool({
+            name,
+            tools,
+            apifyToken,
+            requestOrigin,
+            mcpSessionId: params.mcpSessionId,
+        });
+    } catch (error) {
+        const outcome = classifyToolCallError(error, {
+            tools,
+            toolName: name,
+            failingToolName: name,
+            actorName: undefined,
+            actorId: undefined,
+            isAborted: Boolean(params.signal?.aborted),
+            mcpSessionId: params.mcpSessionId,
+        });
+        return { ...outcome, resolvedToolName: name, decodedArgs: (args ?? {}) as Record<string, unknown> };
+    }
 
     if (!toolEntry) {
         const availableTools = Array.from(tools.keys());
@@ -273,7 +294,7 @@ export async function prepareToolCall(params: {
                 Tool "${name}" was not found.
                 Available tools: ${availableTools.length > 0 ? availableTools.join(', ') : 'none'}.
                 Please verify the tool name is correct. You can list all available tools using the tools/list request.
-            ` + buildReplacedToolText(name, tools),
+            ` + replacedToolText,
             toolStatus: TOOL_STATUS.SOFT_FAIL,
             callDiagnostics: { failure_category: FAILURE_CATEGORY.INVALID_INPUT },
         };
@@ -366,6 +387,7 @@ export async function prepareToolCall(params: {
             mcpSessionId: params.mcpSessionId,
         });
         if (runInputRewrite) toolArgs = runInputRewrite.args;
+        const compatibilityNote = [replacedToolText.trim(), runInputRewrite?.note].filter(Boolean).join('\n');
         if (!tool.ajvValidate(toolArgs)) {
             const errors = tool.ajvValidate.errors || [];
             const exampleCall =
@@ -384,6 +406,7 @@ export async function prepareToolCall(params: {
                               `Please check the tool's input schema ${schemaHint} and ensure all required parameters are provided with correct types and values.`,
                           ]
                         : []),
+                    ...(replacedToolText ? [replacedToolText.trim()] : []),
                     ...(runInputRewrite ? [runInputRewrite.note] : exampleCall ? [`Example call: ${exampleCall}`] : []),
                 ].join('\n'),
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
@@ -436,7 +459,7 @@ export async function prepareToolCall(params: {
             standbyRejection,
             paymentRequiredResult,
             decodedArgs,
-            runInputNote: runInputRewrite?.note,
+            compatibilityNote: compatibilityNote || undefined,
         };
     } catch (error) {
         // Keep protocol errors as JSON-RPC errors; classify other failures with actor context.
@@ -534,7 +557,7 @@ export async function executeSyncToolCall(
         });
         return {
             result: nudge(
-                addRunInputNote(dispatchResult.result, prepared.runInputNote),
+                addCompatibilityNote(dispatchResult.result, prepared.compatibilityNote),
                 dispatchResult.callDiagnostics,
             ),
             toolStatus: dispatchResult.toolStatus,
