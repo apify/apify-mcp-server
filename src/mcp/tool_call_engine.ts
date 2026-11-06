@@ -54,6 +54,7 @@ import {
     getToolFullName,
 } from '../utils/tools.js';
 import type { McpClientContext } from './client_context.js';
+import { addRunInputNote, rewriteRunInputAsServerRequest } from './run_input_rewrite.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
 import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
 import { dispatchToolCall } from './tool_dispatch.js';
@@ -158,6 +159,8 @@ export type PreparedCall = {
     paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined;
     // The shell uses this decoded copy for telemetry.
     decodedArgs: Record<string, unknown>;
+    /** Set when run input was sent as a server request; added to the tool result. */
+    runInputNote?: string;
 };
 
 /** Result of the synchronous dispatch tail, including the exact wire payload. */
@@ -318,7 +321,7 @@ export async function prepareToolCall(params: {
         args = decodeDotPropertyNames(args as Record<string, unknown>) as Record<string, unknown>;
         decodedArgs = args as Record<string, unknown>;
 
-        const {
+        let {
             toolArgsWithoutPayment: toolArgs,
             toolArgsRedacted: logSafeArgs,
             apifyClient,
@@ -356,6 +359,13 @@ export async function prepareToolCall(params: {
         // Key names only, never values: they show which call shape a rejected client sends. Read before validation,
         // since AJV removes unknown keys and `toolArgs` can be `decodedArgs` itself (a payment provider may return it).
         const argKeys = Object.keys(decodedArgs).slice(0, 20).join(',').slice(0, 200);
+        const runInputRewrite = rewriteRunInputAsServerRequest({
+            tool,
+            args: toolArgs,
+            argKeys,
+            mcpSessionId: params.mcpSessionId,
+        });
+        if (runInputRewrite) toolArgs = runInputRewrite.args;
         if (!tool.ajvValidate(toolArgs)) {
             const errors = tool.ajvValidate.errors || [];
             const exampleCall =
@@ -374,7 +384,7 @@ export async function prepareToolCall(params: {
                               `Please check the tool's input schema ${schemaHint} and ensure all required parameters are provided with correct types and values.`,
                           ]
                         : []),
-                    ...(exampleCall ? [`Example call: ${exampleCall}`] : []),
+                    ...(runInputRewrite ? [runInputRewrite.note] : exampleCall ? [`Example call: ${exampleCall}`] : []),
                 ].join('\n'),
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
                 callDiagnostics: {
@@ -426,6 +436,7 @@ export async function prepareToolCall(params: {
             standbyRejection,
             paymentRequiredResult,
             decodedArgs,
+            runInputNote: runInputRewrite?.note,
         };
     } catch (error) {
         // Keep protocol errors as JSON-RPC errors; classify other failures with actor context.
@@ -522,7 +533,10 @@ export async function executeSyncToolCall(
             taskMode: false,
         });
         return {
-            result: nudge(dispatchResult.result, dispatchResult.callDiagnostics),
+            result: nudge(
+                addRunInputNote(dispatchResult.result, prepared.runInputNote),
+                dispatchResult.callDiagnostics,
+            ),
             toolStatus: dispatchResult.toolStatus,
             callDiagnostics: dispatchResult.callDiagnostics,
         };

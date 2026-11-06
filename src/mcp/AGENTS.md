@@ -33,6 +33,8 @@ Two MCP protocol revisions are served, each by its own adapter:
 - `errors.ts` — protocol-neutral domain errors mapped by each protocol adapter.
 - `tool_call_engine.ts` — shared `tools/call` orchestration. `prepareToolCall()` handles
   preparation; `executeSyncToolCall()` runs synchronous calls.
+- `run_input_rewrite.ts` — temporary: sends Actor run input given to the web-fetch and rag-web-browser Server Actor
+  tools (their pre-0.21 input) as a server request. Delete it and its calls in `tool_call_engine.ts` once its log stops.
 - `client.ts` — `connectMCPClient(url, options)`: transport negotiation; both transports send the token and the
   session's request origin (`ApifyClient.requestOrigin`, `APIFY_AI` for the Apify AI client) on every request.
 - `remote_tool_call.ts` — `withRemoteMcpClient()`: connect-call-close round trip for
