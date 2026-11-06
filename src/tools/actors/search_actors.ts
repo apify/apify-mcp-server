@@ -19,6 +19,7 @@ import { compileSchema } from '../../utils/ajv.js';
 import { getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { respondOk } from '../../utils/mcp.js';
 import type { PricingTier } from '../../utils/pricing_info.js';
+import { IS_UNSTABLE_STORE_SEARCH_ENABLED } from '../../utils/store_unstable.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunActor, canRunAnyActor, getActorCallabilityCaveat } from '../actor_tool_naming.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
@@ -61,14 +62,25 @@ export const searchActorsBaseArgsSchema = z.object({
         .max(MAX_LIMIT_WITH_INPUT_SCHEMA)
         .default(5)
         .describe(`The maximum number of Actors to return (max = ${MAX_LIMIT_WITH_INPUT_SCHEMA}, default = 5).`),
-    offset: z
-        .number()
-        .int()
-        .min(0)
-        .default(0)
-        .describe(
-            'The number of elements to skip from the start (default = 0). Has no effect when keywords are set: every offset returns the first results.',
-        ),
+    offset: IS_UNSTABLE_STORE_SEARCH_ENABLED
+        ? z.number().int().min(0).default(0).describe('Deprecated and ignored: use `cursor` to get the next page.')
+        : z
+              .number()
+              .int()
+              .min(0)
+              .default(0)
+              .describe(
+                  'The number of elements to skip from the start (default = 0). Has no effect when keywords are set: every offset returns the first results.',
+              ),
+    // `/unstable/store` pages by cursor, so only then the tool takes `cursor` and returns `nextCursor`.
+    ...(IS_UNSTABLE_STORE_SEARCH_ENABLED && {
+        cursor: z
+            .string()
+            .min(1)
+            .max(512)
+            .optional()
+            .describe('The `nextCursor` of a previous result with the same keywords, to get its next page.'),
+    }),
     // Withheld from Anthropic clients: `withoutUseCaseField` in utils/tools_loader.ts.
     useCase: z.string().optional().describe(dedent`
             Optional. One plain sentence on what the user wants to achieve with the Actor, for example "compare competitor prices" (max ${STORE_USE_CASE_MAX_LENGTH} characters).
@@ -134,17 +146,29 @@ export function buildSearchActorsResult(
 
 /**
  * Builds the empty-results guidance message for when no Actors are found.
- * Past offset 0 the query may have matched, so keyword guidance does not apply (see apify/apify-mcp-server#1276).
+ * Past offset 0, or with a cursor to come from or go to, the query may have matched, so keyword guidance
+ * does not apply (see apify/apify-mcp-server#1276).
  * The text does not say the results ended: the Store filters results after paging, so an empty page can come
  * before non-empty ones (see apify/apify-mcp-server#1593).
  */
-export function buildNoActorsFoundInstructions(keywords: string, offset: number): string {
+export function buildNoActorsFoundInstructions(
+    keywords: string,
+    offset: number,
+    cursor?: string,
+    nextCursor?: string,
+): string {
+    if (cursor || nextCursor) return `No Actors returned on this page of the search query "${keywords}".`;
     if (offset > 0) return `No Actors returned at offset ${offset} for the search query "${keywords}".`;
     return dedent`
         No Actors were found for the search query "${keywords}".
         Keywords can include the named platform and/or data type (e.g. "TikTok posts").
         A platform-only query such as "TikTok" is an option if more specific results do not fit.
     `;
+}
+
+/** The cursor line of a `/unstable/store` page, empty or not; empty string without a next page. */
+export function buildNextPageCursorLine(nextCursor?: string): string {
+    return nextCursor ? `- **Next page cursor:** \`${nextCursor}\`` : '';
 }
 
 /** Caveat for the whole result list — appended only when at least one result lacks a run path. */
@@ -194,7 +218,15 @@ export const searchActors: ToolEntry = Object.freeze({
     description: buildDescription(ALL_TOOLS_PRESENT),
     buildDescription,
     inputSchema: z.toJSONSchema(searchActorsBaseArgsSchema) as ToolInputSchema,
-    outputSchema: actorSearchOutputSchema,
+    outputSchema: IS_UNSTABLE_STORE_SEARCH_ENABLED
+        ? {
+              ...actorSearchOutputSchema,
+              properties: {
+                  ...actorSearchOutputSchema.properties,
+                  nextCursor: { type: 'string', description: 'Pass as `cursor` to get the next page of this search.' },
+              },
+          }
+        : actorSearchOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(searchActorsBaseArgsSchema)),
     annotations: {
         title: 'Search Actors',
@@ -206,14 +238,19 @@ export const searchActors: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyClient, paymentProvider, loadedToolNames, loadedActorIds } = toolArgs;
         const parsed = searchActorsBaseArgsSchema.parse(args);
+        // Only in the schema when the store search runs on `/unstable/store`.
+        const cursor = typeof parsed.cursor === 'string' ? parsed.cursor : undefined;
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
-        const [actors, { userPlanTier }] = await Promise.all([
+        // `/unstable/store` ignores the offset, so it must not show up in the result text either.
+        const offset = IS_UNSTABLE_STORE_SEARCH_ENABLED ? 0 : parsed.offset;
+        const [{ actors, nextCursor }, { userPlanTier }] = await Promise.all([
             searchAgentSafeActors({
                 keywords: parsed.keywords,
                 apifyClient,
                 limit: parsed.limit,
-                offset: parsed.offset,
+                offset,
+                cursor,
                 paymentProvider,
                 useCase: parsed.useCase,
             }),
@@ -221,9 +258,15 @@ export const searchActors: ToolEntry = Object.freeze({
         ]);
 
         if (actors.length === 0) {
-            const instructions = buildNoActorsFoundInstructions(parsed.keywords, parsed.offset);
-            return respondOk(instructions, {
-                structuredContent: { actors: [], query: parsed.keywords, count: 0, instructions },
+            const instructions = buildNoActorsFoundInstructions(parsed.keywords, offset, cursor, nextCursor);
+            return respondOk([instructions, buildNextPageCursorLine(nextCursor)].filter(Boolean).join('\n\n'), {
+                structuredContent: {
+                    actors: [],
+                    query: parsed.keywords,
+                    count: 0,
+                    instructions,
+                    ...(nextCursor && { nextCursor }),
+                },
             });
         }
 
@@ -239,6 +282,7 @@ export const searchActors: ToolEntry = Object.freeze({
             count: actors.length,
             userTier: userPlanTier,
             ...(footer && { instructions: footer }),
+            ...(nextCursor && { nextCursor }),
         };
 
         // The header is built with `dedent`; `actorCardText` is joined after it, not interpolated.
@@ -251,6 +295,9 @@ export const searchActors: ToolEntry = Object.freeze({
 
             # Actors:
         `;
-        return respondOk([header, actorCardText, footer].filter(Boolean).join('\n\n'), { structuredContent });
+        const nextPage = buildNextPageCursorLine(nextCursor);
+        return respondOk([header, actorCardText, nextPage, footer].filter(Boolean).join('\n\n'), {
+            structuredContent,
+        });
     },
 } as const satisfies HelperTool);

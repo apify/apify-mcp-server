@@ -129,6 +129,10 @@ Editing `src/web/src/widgets/*.tsx` triggers a hot-reload — the next widget re
 
 The MCP server listens on port `3001`. The HTTP server implementation is in `src/dev_server.ts`. The hosted production server behind [mcp.apify.com](https://mcp.apify.com) is located in the internal Apify repository.
 
+### Store search through `/unstable/store`
+
+`APIFY_STORE_UNSTABLE_ENDPOINT=true` (or `1`) routes `search-actors` and `search-actors-widget` through apify-core's `GET /unstable/store` instead of `GET /v2/store`. The endpoint ranks with Recombee and pages by cursor, so with the flag on the tools take a `cursor` argument, return `nextCursor`, and ignore `offset`. The flag is read once per process; with it off, the tools are unchanged. The mapping to the Actor card lives in `src/utils/store_unstable.ts`.
+
 ### Configuring APIFY_TOKEN for Claude Code
 
 Create or edit `.claude/settings.local.json`:

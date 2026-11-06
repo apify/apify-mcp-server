@@ -382,7 +382,8 @@ export type ActorToolResolutionResult = {
     toolMode: ACTOR_TOOL_MODE;
 };
 
-export type ActorStoreList = ActorStoreListOutdated & {
+// `stats` is partial: the Recombee-backed store searches omit the counts they do not have.
+export type ActorStoreList = Omit<ActorStoreListOutdated, 'stats'> & {
     actorReviewCount?: number;
     actorReviewRating?: number;
     badge?: string | null;
@@ -393,7 +394,9 @@ export type ActorStoreList = ActorStoreListOutdated & {
     userFullName?: string;
     /** Populated when the search call is made with `includeInputSchema=true`. */
     inputSchema?: ActorStoreInputSchema;
-    stats: ActorStats & {
+    /** `/unstable/store` fields the card has no renderer for, shown as they come. */
+    extraFields?: Record<string, unknown>;
+    stats: Partial<ActorStats> & {
         actorReviewCount?: number;
         actorReviewRating?: number;
         publicActorRunStats30Days?: Partial<Record<string, number>> & {
@@ -812,6 +815,7 @@ export type StructuredActorCard = {
     isDeprecated: boolean;
     inputFields?: ActorStoreInputSchema;
     inputFieldsTruncated?: boolean;
+    extraFields?: Record<string, unknown>;
     inputFieldsTotalCount?: number;
 };
 
