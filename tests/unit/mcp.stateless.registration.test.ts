@@ -3,6 +3,28 @@ import { describe, expect, it } from 'vitest';
 
 import { listStatelessHandlerMethods, STATELESS_PROTOCOL_VERSION, withStatelessServer } from './helpers/mcp_server.js';
 
+const STREAM_END_TIMEOUT_MILLIS = 1_000;
+
+/**
+ * Reads the body to its end, or cancels the read and returns `undefined` if the stream is still open
+ * after `timeoutMillis`.
+ */
+async function readBodyToEnd(response: Response, timeoutMillis: number): Promise<string | undefined> {
+    const reader = response.body!.getReader();
+    let isTimedOut = false;
+    const timer = setTimeout(() => {
+        isTimedOut = true;
+        void reader.cancel();
+    }, timeoutMillis);
+    const decoder = new TextDecoder();
+    let body = '';
+    for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+        body += decoder.decode(chunk.value, { stream: true });
+    }
+    clearTimeout(timer);
+    return isTimedOut ? undefined : body;
+}
+
 /**
  * Pins what the stateless (2026-07-28) adapter registers and advertises. The v2 SDK is a pinned beta,
  * so this suite doubles as the canary for a bump that moves request classification, the envelope
@@ -42,13 +64,37 @@ describe('createStatelessServer()', () => {
         });
     });
 
-    // Handler absence is all this can assert. Unlike `tasks/*`, registering nothing does not make
-    // the method answer method-not-found: the SDK's serving entry answers `subscriptions/listen`
-    // upstream of our handlers, with a stream that honors none of our declared capabilities.
-    // Refusing it outright is a follow-up (see the capability block in `stateless_server.ts`).
+    // Unlike `tasks/*`, registering nothing does not make the method answer method-not-found: the
+    // SDK's serving entry answers `subscriptions/listen` itself. No declared capability is
+    // subscribable, so it acknowledges an empty filter, sends a completion result and closes the
+    // stream (pinned below).
     it('registers no subscriptions/listen handler', async () => {
         await withStatelessServer(async ({ buildServer }) => {
             expect(listStatelessHandlerMethods(buildServer())).not.toContain('subscriptions/listen');
+        });
+    });
+
+    it('acknowledges subscriptions/listen with an empty filter, completes it and closes the stream', async () => {
+        await withStatelessServer(async ({ fetch }) => {
+            const { requestId, response } = await fetch('subscriptions/listen', {
+                notifications: {
+                    tools: { listChanged: true },
+                    resources: { listChanged: true },
+                    prompts: { listChanged: true },
+                },
+            });
+            expect(response.status).toBe(200);
+            expect(response.headers.get('content-type')).toContain('text/event-stream');
+
+            const body = await readBodyToEnd(response, STREAM_END_TIMEOUT_MILLIS);
+            expect(body, 'stream still open at the deadline').toBeDefined();
+            const [acknowledgement, completion] = body!
+                .split('\n')
+                .filter((line) => line.startsWith('data: '))
+                .map((line) => JSON.parse(line.slice('data: '.length)));
+            expect(acknowledgement).toMatchObject({ method: 'notifications/subscriptions/acknowledged' });
+            expect(acknowledgement).toHaveProperty('params.notifications', {});
+            expect(completion).toMatchObject({ id: requestId, result: { resultType: 'complete' } });
         });
     });
 
