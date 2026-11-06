@@ -7,8 +7,8 @@ Three files serving the MCP `resources/*` surface:
 
 - `resource_service.ts` — handles `ListResources` / `ListResourceTemplates` / read-resource
   requests. Takes an optional `apifyClient` on read, built by the server from the per-request
-  token (`_meta.apifyToken || options.token`). Token-only by design — no payment headers, so a
-  payment-only session (x402/Skyfire) gets no client and every read fails with `InvalidParamsError`.
+  token (`_meta.apifyToken || options.token`). Token-only by design — a session without a
+  token gets no client, and every read fails with `InvalidParamsError`.
   Routes every http(s) URI to `readApiResource()`, which owns the single origin gate; non-http
   schemes fall through to widgets/usage-guide/fallback. Throws protocol-neutral domain errors
   (`InvalidParamsError`/`InternalError` from `src/mcp/errors.ts`), never `McpError`. The protocol

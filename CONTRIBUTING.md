@@ -144,7 +144,7 @@ Use comments to guide reviewers:
         * `Context` — ambient state passed through a call chain (e.g., `ToolTelemetryContext`).
         * `Config` — static configuration shape (e.g., `WidgetConfig`).
         * Do not use `Type` or `Kind` suffixes.
-    * **Collections:** Name arrays as plurals (e.g., `actorTools`, `PRICING_TIERS`). Suffix Sets with `_SET` or use a descriptive plural (e.g., `CATEGORY_NAME_SET`, `SKYFIRE_ENABLED_TOOLS`). Name Maps and Records descriptively (e.g., `WIDGET_REGISTRY`, `LOG_LEVEL_MAP`).
+    * **Collections:** Name arrays as plurals (e.g., `actorTools`, `PRICING_TIERS`). Suffix Sets with `_SET` or use a descriptive plural (e.g., `CATEGORY_NAME_SET`). Name Maps and Records descriptively (e.g., `WIDGET_REGISTRY`, `LOG_LEVEL_MAP`).
     * **Units:** Suffix with the unit of measure (e.g., `externalCostUsd`, `intervalMillis`).
     * **Date/Time:** Suffix with `At` (e.g., `updateStartedAt`, `paidAt`).
     * **Zod Validators:** Suffix with `Validator`.
