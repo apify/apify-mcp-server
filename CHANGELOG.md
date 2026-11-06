@@ -2,15 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.21.4 - **not yet released**
+## [0.21.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.4) (2026-11-06)
 
 ### 🐛 Bug Fixes
 
 - Serve the removed apify--rag-web-browser in default sessions ([#1844](https://github.com/apify/apify-mcp-server/pull/1844)) ([c3a93a6](https://github.com/apify/apify-mcp-server/commit/c3a93a62ed6b474060f0246fed589cc2f8ec3d17)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.21.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.3) (2026-11-06)
 
 ### 🐛 Bug Fixes
