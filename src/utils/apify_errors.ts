@@ -4,6 +4,7 @@ import { ApifyApiError } from 'apify-client';
 import {
     APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK,
     APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS,
+    APIFY_ERROR_TYPE_CONCURRENT_RUNS_LIMIT_EXCEEDED,
     APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED,
     APIFY_ERROR_TYPE_INVALID_INPUT,
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
@@ -43,16 +44,19 @@ export function isActorInputValidationError(error: unknown): error is ApifyApiEr
 
 /**
  * The Apify platform refuses to start a run when the user hits their concurrent-run / usage limit.
- * A direct Actor run surfaces it as an `ApifyApiError` whose `type` is `cannot-start-actor-runs`;
- * a remote MCP-server Actor wraps it as an HTTP 500 whose body carries that same type string.
+ * A direct Actor run surfaces it as an `ApifyApiError` whose `type` is `concurrent-runs-limit-exceeded`
+ * (HTTP 402). The Actor Standby controller wraps a failed run start as `cannot-start-actor-runs`
+ * (HTTP 500); a remote MCP-server Actor passes that on as a plain Error whose message carries the type.
  * Either way it's a user billing condition, not a server fault — hence the duck-typed `type` check
- * plus a message-substring fallback (the wrapped case is a plain Error, not an `ApifyApiError`).
+ * plus a message-substring fallback for the wrapped case.
  */
 export function isActorRunLimitError(error: unknown): boolean {
     if (
         typeof error === 'object' &&
         error !== null &&
-        (error as { type?: unknown }).type === APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS
+        [APIFY_ERROR_TYPE_CONCURRENT_RUNS_LIMIT_EXCEEDED, APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS].some(
+            (type) => (error as { type?: unknown }).type === type,
+        )
     ) {
         return true;
     }
