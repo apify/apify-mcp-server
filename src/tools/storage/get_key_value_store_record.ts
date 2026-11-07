@@ -9,7 +9,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils/console_link.js';
-import { computeValueBytes, stripQuoteWrappers } from '../../utils/generic.js';
+import { computeValueBytes } from '../../utils/generic.js';
 import { respondRaw, respondUserError } from '../../utils/mcp.js';
 import { keyValueStoreRecordOutputSchema } from '../structured_output_schemas.js';
 import {
@@ -19,12 +19,24 @@ import {
     fetchStorageByIdOrName,
     normalizeRecordKey,
     resolveStorageId,
+    resolveStorageTarget,
     storageIdArgDescription,
     storageNotFoundText,
 } from './storage_helpers.js';
 
 const getKeyValueStoreRecordArgs = z.object({
-    keyValueStoreId: z.string().min(1).describe(storageIdArgDescription('keyValueStore')),
+    keyValueStoreId: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(`${storageIdArgDescription('keyValueStore')} Provide exactly one of keyValueStoreId or runId.`),
+    runId: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(
+            "Actor run ID; reads the record from the run's default key-value store. Provide exactly one of runId or keyValueStoreId.",
+        ),
     recordKey: z.string().min(1).describe('Key of the record to retrieve.'),
 });
 
@@ -60,7 +72,12 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client, apifyToken } = toolArgs;
         const parsed = getKeyValueStoreRecordArgs.parse(args);
-        const keyValueStoreId = stripQuoteWrappers(parsed.keyValueStoreId);
+        const target = await resolveStorageTarget(client, 'keyValueStore', {
+            storageId: parsed.keyValueStoreId,
+            runId: parsed.runId,
+        });
+        if ('error' in target) return respondUserError(target.error);
+        const keyValueStoreId = target.storageId;
         const recordKey = normalizeRecordKey(parsed.recordKey);
         const found = await fetchStorageByIdOrName(keyValueStoreId, async (safeId) =>
             client.keyValueStore(safeId).getRecord(recordKey),
