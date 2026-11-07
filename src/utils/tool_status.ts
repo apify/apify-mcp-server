@@ -1,5 +1,6 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { ErrorObject } from 'ajv';
+import type { ZodError } from 'zod';
 
 import { FAILURE_CATEGORY, HTTP_FORBIDDEN, HTTP_NOT_FOUND, HTTP_UNAUTHORIZED, TOOL_STATUS } from '../const.js';
 import type { RunResponse } from '../tools/actors/actor_run_response.js';
@@ -190,6 +191,26 @@ export function extractAjvErrorDetails(errors: ErrorObject[] | null | undefined)
     }
 
     return diagnostics;
+}
+
+/** Formats Zod issues as "path: expected A or B, got C" clauses joined by "; "; C comes from Zod's default message. */
+export function formatZodIssues(issues: ZodError['issues']): string {
+    return issues
+        .map((issue) => {
+            const path = issue.path.length > 0 ? issue.path.join('.') : 'arguments';
+            // Branch issues deeper than the union's own value expect a type of a child, not of this value.
+            const candidates =
+                issue.code === 'invalid_union'
+                    ? issue.errors.flat().filter((branch) => branch.path.length === 0)
+                    : [issue];
+            const expected = [
+                ...new Set(candidates.flatMap((candidate) => ('expected' in candidate ? [candidate.expected] : []))),
+            ];
+            if (expected.length === 0) return `${path}: ${issue.message}`;
+            const received = candidates.map((candidate) => /received (\w+)/.exec(candidate.message)?.[1]).find(Boolean);
+            return `${path}: expected ${expected.join(' or ')}${received ? `, got ${received}` : ''}`;
+        })
+        .join('; ');
 }
 
 /**

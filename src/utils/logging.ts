@@ -87,7 +87,7 @@ const TRANSIENT_UPSTREAM_MESSAGE_PATTERNS: readonly RegExp[] = [/socket hang up/
  * True when an error is a Zod parse failure (our ZodError, or SDK Zod 4's `$ZodError` shape).
  * Untrusted Actor MCP `tools/list` payloads that omit `inputSchema` land here — Actor bug, not ours.
  */
-function isZodValidationError(error: unknown): boolean {
+export function isZodValidationError(error: unknown): boolean {
     if (error instanceof ZodError) return true;
     if (typeof error !== 'object' || error === null) return false;
     const { name, issues } = error as { name?: unknown; issues?: unknown };

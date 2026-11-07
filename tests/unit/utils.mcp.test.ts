@@ -1,6 +1,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ApifyApiError } from 'apify-client';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
 import type { HelperTool } from '../../src/types.js';
@@ -165,6 +166,15 @@ describe('respondServerError()', () => {
         expect(result.isError).toBe(true);
         expect(result.content).toEqual([{ type: 'text', text: 'server broke' }]);
         expect(result.toolTelemetry).toMatchObject({
+            toolStatus: TOOL_STATUS.FAILED,
+            failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
+        });
+    });
+
+    // A malformed upstream MCP response also throws a Zod error; that is a server failure, not bad arguments.
+    it('derives FAILED + INTERNAL_ERROR for a Zod error from an upstream response', () => {
+        const { error } = z.object({ tools: z.array(z.object({ name: z.string() })) }).safeParse({ tools: [{}] });
+        expect(respondServerError('x', { error }).toolTelemetry).toMatchObject({
             toolStatus: TOOL_STATUS.FAILED,
             failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
         });
