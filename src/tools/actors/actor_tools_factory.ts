@@ -392,14 +392,26 @@ export const MCP_TOOL_NAME_SUFFIX = /:[^/]*$/;
 /**
  * Fixes Actor name strings (`username/name`) before cache + Apify API lookup.
  *
- * LLMs often wrap values in markdown quotes or smart quotes and insert spaces around `/`.
+ * LLMs often wrap values in markdown quotes or smart quotes, insert spaces around `/`, and pad the name with `/`.
  * The Apify API treats those as distinct strings → avoidable 404 SOFT_FAIL. This only trims
- * and strips common wrappers / spacing noise; valid names pass through unchanged.
+ * and strips common wrappers / spacing / slash padding noise; valid names pass through unchanged.
  * It also drops the `:toolName` of the removed `actorName:toolName` form, since a name never contains a colon.
  */
 export function fixActorNameInput(actorName: string): string {
-    const s = stripQuoteWrappers(actorName).replace(/\s*\/\s*/g, '/');
-    return s.replace(/\s+/g, ' ').trim().replace(MCP_TOOL_NAME_SUFFIX, '');
+    return normalizeActorNameInput(actorName).replace(MCP_TOOL_NAME_SUFFIX, '');
+}
+
+/** {@link fixActorNameInput} without dropping the `:toolName` suffix, so the legacy-syntax check sees the same name. */
+export function normalizeActorNameInput(actorName: string): string {
+    const s = stripQuoteWrappers(actorName)
+        .replace(/\s+/g, ' ')
+        .replace(/ ?\/ ?/g, '/');
+    return (
+        s
+            .trim()
+            // The lookbehind starts a trailing match only at the start of a slash run, so long runs stay linear.
+            .replace(/^\/+|(?<!\/)\/+$/g, '')
+    );
 }
 
 /**
