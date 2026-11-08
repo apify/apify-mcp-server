@@ -1,4 +1,5 @@
 <p align="center">
+[![MCP Security Audit](https://raw.githubusercontent.com/DSHCorrectover/mcp-security-scanner/main/badges/scanned.svg)](https://github.com/DSHCorrectover/mcp-security-scanner)
     <a href="https://mcp.apify.com">
         <img alt="Apify MCP server" src="docs/apify-mcp-server-header.png" width="100%">
     </a>
