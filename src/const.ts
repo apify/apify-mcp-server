@@ -43,6 +43,9 @@ export const TIP_MESSAGE_LIMIT = 300;
 /** When `false`, `resolveServerMode('auto', ...)` forces {@link SERVER_MODE.DEFAULT} regardless of client capabilities. */
 export const SERVER_MODE_AUTO_DETECTION_ENABLED = true;
 
+/** Matches the Apify API's payload limit (`MAX_PAYLOAD_SIZE_BYTES` in `@apify/consts`): no larger body can reach it. */
+export const MAX_REQUEST_BODY_BYTES = 9 * 1024 * 1024;
+
 export const SERVER_NAME = 'apify-mcp-server';
 export const SERVER_TITLE = 'Apify MCP Server';
 export const HELPER_TOOLS = {
@@ -51,7 +54,11 @@ export const HELPER_TOOLS = {
     ACTOR_BUILD_LOG: 'get-actor-build-log',
     ACTOR_BUILD_LIST_GET: 'get-actor-build-list',
     ACTOR_CALL: 'call-actor',
+    ACTOR_CREATE: 'create-actor',
     ACTOR_CALL_WIDGET: 'call-actor-widget',
+    ACTOR_MCP_TOOL_CALL: 'call-actor-mcp-tool',
+    ACTOR_MCP_TOOL_LIST: 'fetch-actor-mcp-tool-list',
+    ACTOR_SERVER_REQUEST: 'send-server-actor-request',
     ACTOR_DELETE: 'delete-actor',
     ACTOR_GET_DETAILS: 'fetch-actor-details',
     ACTOR_GET_DETAILS_WIDGET: 'fetch-actor-details-widget',
@@ -66,7 +73,10 @@ export const HELPER_TOOLS = {
     ACTOR_TASK_UPDATE: 'update-actor-task',
     ACTOR_TASK_PUBLISH: 'publish-actor-task',
     ACTOR_TASK_UNPUBLISH: 'unpublish-actor-task',
+    ACTOR_VERSION_CREATE: 'create-actor-version',
+    ACTOR_VERSION_DELETE: 'delete-actor-version',
     ACTOR_VERSION_GET: 'get-actor-version',
+    ACTOR_VERSION_UPDATE: 'update-actor-version',
     DATASET_GET: 'get-dataset',
     DATASET_LIST_GET: 'get-dataset-list',
     DATASET_GET_ITEMS: 'get-dataset-items',
@@ -83,88 +93,54 @@ export const HELPER_TOOLS = {
     STORE_SEARCH_WIDGET: 'search-actors-widget',
     DOCS_SEARCH: 'search-apify-docs',
     DOCS_FETCH: 'fetch-apify-docs',
+    API_SEARCH: 'apify-api-search',
+    API_DETAILS: 'apify-api-details',
+    API_READ: 'apify-api-read',
+    API_WRITE: 'apify-api-write',
     PROBLEM_REPORT: 'report-problem',
 } as const;
 export type HelperToolName = (typeof HELPER_TOOLS)[keyof typeof HELPER_TOOLS];
 
 /**
- * Retired tool selectors: `add-actor` and `experimental` (add-actor was deleted in the stateless
- * migration), the deprecated `preview` pseudo-category, and `get-actor-log` (renamed to
- * `get-actor-run-log`). They name neither a registry category nor a real tool anymore, so they
- * resolve to nothing — never loaded, never treated as an Actor ID, never requiring a token by
- * themselves.
+ * Tool selectors that no longer name a category or a tool: `add-actor` and `experimental` went with
+ * the stateless migration, `preview` was deprecated, `get-actor-log` became `get-actor-run-log` and
+ * `source` became `versions`. Old configs still send them, so they are dropped before selection and
+ * never read as Actor IDs. The token gate drops them before its emptiness check, so `docs,add-actor`
+ * needs no token while an all-retired list needs one, like an empty list.
  */
 export const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set([
     'add-actor',
     'experimental',
     'preview',
     'get-actor-log',
+    'source',
 ]);
 
 /**
- * Client-name substrings (lowercased, matched against `clientInfo.name`) that `report-problem` is
- * hidden from: Anthropic surfaces (Claude.ai / Claude Desktop / Claude Code /
- * `local-agent-mode-apify`) pending the directory review. Applied in the compose step — once per
- * connection on the 2025 path, per request on the 2026-07-28 one. Stateless `client-info` is
- * optional; a request declaring no client name matches no blocked substring and is served the tool
- * by policy. Substring matching covers new client builds without a maintained allowlist;
- * over-matching only hides an optional tool. Bypassed by explicit `?tools=report-problem`/`dev`.
+ * Anthropic client-name substrings (lowercased): not offered `report-problem` or the search tools' `useCase` input.
+ * `local-agent-mode` is Claude Desktop's local agent mode, named `local-agent-mode-<server name>`. A request with no name matches none.
  */
-export const REPORT_PROBLEM_BLOCKED_CLIENTS: string[] = ['claude', 'anthropic', 'local-agent-mode-apify'];
+export const ANTHROPIC_CLIENT_NAMES: string[] = ['claude', 'anthropic', 'local-agent-mode'];
 
 /**
- * `clientInfo.name` sent by the Apify Console AI chat backend during the MCP initialize handshake.
- * Runs started by this client are attributed to the APIFY_AI request origin.
+ * `clientInfo.name` sent by the Apify AI agent service (apify/apify-ai-agent) during the MCP
+ * initialize handshake. Runs started by this client are attributed to the APIFY_AI request origin.
  */
-export const APIFY_AI_CLIENT_NAME = 'apify-console-ai-chat';
+export const APIFY_AI_CLIENT_NAME = 'apify-ai';
 
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
-export const RAG_WEB_BROWSER_WHITELISTED_FIELDS = ['query', 'maxResults', 'outputFormats'];
-export const RAG_WEB_BROWSER_ADDITIONAL_DESC = `Use this tool when user wants to GET or RETRIEVE actual data immediately (one-time data retrieval).
-This tool scrapes the data itself - it does NOT just find tools.
-
-Examples of when to use:
-- User wants current/immediate data (e.g., "Get flight prices for tomorrow", "What's the weather today?")
-- User needs to fetch specific content now (e.g., "Fetch news articles from CNN", "Get product info from Amazon")
-- User has time indicators like "today", "current", "latest", "recent", "now"
-
-This is for general web scraping and immediate data needs. For repeated/scheduled scraping of specific platforms (e-commerce, social media), consider suggesting a specialized Actor from the Store for better performance and reliability.
-When the user provides one specific URL and wants that page's full or verbatim content, prefer the dedicated apify/web-fetch tool when it is available - this tool is for searching and scraping by query.
-If a scraped page comes back blocked or empty (e.g. the crawl reports a 403 or the page text is missing), do not give up: retry that URL with the apify/web-fetch tool when it is available - its anti-bot fetching gets through blocks this tool cannot.`;
-
 export const WEB_FETCH = 'apify/web-fetch';
-/**
- * Appended to the `apify/web-fetch` Actor tool description. Client-agnostic on purpose:
- * no references to any specific client or its built-in tools, so the same text works
- * for every MCP client. Tune only based on eval results (`web-fetch-evals` dataset).
- */
-export const WEB_FETCH_ADDITIONAL_DESC = `Use this tool to fetch a specific http(s) URL and return its complete content (one URL per call; http and https only).
-It renders JavaScript and bypasses anti-bot protection, so it also retrieves pages where a plain HTTP fetch gets blocked, fails with an error such as 403 or 429, or returns incomplete content.
-The page comes back verbatim - full content, no summarization - as Markdown, plain text, HTML, the raw response body, or the list of links on the page.
-
-Examples of when to use:
-- User provides a URL and wants its content, its data or links, or an answer that requires reading that page
-- A previous attempt to fetch a page was blocked, returned an error or CAPTCHA, or came back incomplete because the page needs JavaScript rendering
-- Verbatim page content is needed, e.g. for quoting, extraction, or archiving
-
-This tool does not search the web - it needs a URL. To find pages by query, use a web search tool instead.
-If the exact URL cannot be fetched (e.g. a non-http(s) scheme), say so rather than silently substituting a different URL.`;
-
-/**
- * Appended to the `url` parameter description of the `apify/web-fetch` tool. Lives on the
- * parameter because that is what an agent reads while writing the argument: eval agents
- * (web-fetch-evals-errors, unsupported-protocol case) silently rewrote ftp:// URLs to
- * https:// instead of telling the user the scheme is unsupported.
- */
-export const WEB_FETCH_URL_SCHEME_NOTE =
-    'http(s) URLs only - for any other scheme (e.g. ftp:), tell the user this tool cannot fetch it rather than substituting a different URL.';
-
+export const WEB_SEARCH = 'apify/web-search';
 export const defaults = {
-    actors: [RAG_WEB_BROWSER, WEB_FETCH],
+    actors: [WEB_SEARCH, WEB_FETCH],
 };
 
 /** API rejects `includeInputSchema=true` above this; mirrors apify-core `MAX_LIMIT_WITH_INPUT_SCHEMA`. */
 export const MAX_LIMIT_WITH_INPUT_SCHEMA = 10;
+/** Max `_useCase` length (UTF-16 code units) the API accepts. */
+export const STORE_USE_CASE_MAX_LENGTH = 1024;
+/** Max `_traceId` length (UTF-16 code units) the API accepts. */
+export const STORE_TRACE_ID_MAX_LENGTH = 256;
 /** Max input fields shown inline in text and structured Actor cards. */
 export const MAX_INPUT_FIELDS_IN_ACTOR_CARD = 20;
 
@@ -254,15 +230,29 @@ export const OFFICIAL_APIFY_USERNAMES: ReadonlySet<string> = new Set([
     'voyager',
 ]);
 
+/**
+ * Official Apify Actors that pass the input checks in `isReadOnlyActor` but still act outside
+ * their run storages, so their tools keep the destructive hints.
+ */
+export const OFFICIAL_ACTORS_WITH_SIDE_EFFECTS: ReadonlySet<string> = new Set([
+    'apify/send-mail', // Sends email.
+    'apify/actor-light-fixture', // Controls a physical light.
+    'apifyatevents/wishlist-raffle', // Submits a raffle entry with terms and marketing consent.
+    'tri_angle/sitemap-change-orchestrator', // Keeps a snapshot between runs and starts other Actor runs.
+]);
+
 export const APIFY_STORE_URL = 'https://apify.com';
 /** Apify Console origin (production). */
 export const CONSOLE_BASE_URL = 'https://console.apify.com';
 /** Apify Console origin on the staging cluster, selected when running on the staging MCP host. */
 export const CONSOLE_BASE_URL_STAGING = 'https://console-securitybyobscurity.apify.com';
-/** Staging MCP host; mirrors the check in `getActorMCPServerURL` to pick staging vs production origins. */
+/** Apify API origin clients are told to use (production); where requests go is `getApifyAPIBaseUrl()`. */
+export const API_PUBLIC_BASE_URL = 'https://api.apify.com';
+/** Apify API origin on the staging cluster, selected when running on the staging MCP host. */
+export const API_PUBLIC_BASE_URL_STAGING = 'https://api-securitybyobscurity.apify.com';
+/** Staging MCP host; `getApifyAPIPublicBaseUrl` and `getConsoleBaseUrl` pick the staging origins when running on it. */
 export const STAGING_MCP_HOSTNAME = 'mcp-securitybyobscurity.apify.com';
 export const APIFY_FAVICON_URL = `${APIFY_STORE_URL}/favicon.ico`;
-export const APIFY_LOGO_URL = `${APIFY_STORE_URL}/apple-icon.png`;
 export const APIFY_MCP_URL = 'https://mcp.apify.com';
 export const APIFY_DOCS_MCP_URL = 'https://docs.apify.com/integrations/mcp';
 
@@ -300,6 +290,12 @@ export const APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED = 'memory-limit-exceeded';
 export const APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS = 'cannot-start-actor-runs';
 export const APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK = 'cannot-publish-actor-task';
 export const APIFY_ERROR_TYPE_INVALID_INPUT = 'invalid-input';
+export const APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE = 'actor-name-not-unique';
+export const APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS = 'version-already-exists';
+export const APIFY_ERROR_TYPE_TOO_FEW_VERSIONS = 'too-few-versions';
+export const APIFY_ERROR_TYPE_TOO_MANY_VERSIONS = 'too-many-versions';
+export const APIFY_ERROR_TYPE_VERSIONS_SIZE_EXCEEDED = 'versions-size-exceeded';
+export const APIFY_ERROR_TYPE_PAGE_NOT_FOUND = 'page-not-found';
 
 // HTTP status codes
 export const HTTP_UNAUTHORIZED = 401;

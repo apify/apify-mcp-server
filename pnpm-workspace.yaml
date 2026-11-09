@@ -1,11 +1,11 @@
 packages:
   - "src/web"
 
-# 72-hour quarantine on newly published versions to blunt supply-chain attacks
+# 7-day quarantine on newly published versions to blunt supply-chain attacks
 # (compromised packages typically get yanked within hours of discovery, but the
 # longer window catches slow-detection cases too).
 # Excludes are scopes we publish ourselves and trust on the same release cadence.
-minimumReleaseAge: 4320
+minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
   - "@apify/*"
   - "@apify-packages/*"
@@ -40,7 +40,7 @@ strictDepBuilds: false
 
 # Dependency version overrides. pnpm 11 reads these from the workspace manifest, not package.json.
 overrides:
-  "@modelcontextprotocol/sdk": "1.30.0"
+  "@modelcontextprotocol/sdk": "1.32.1"
 
 # Required by pnpm v10+ modern `pnpm deploy`: workspace deps get copied ("injected")
 # into consumers' node_modules instead of symlinked, so deploy output is portable.

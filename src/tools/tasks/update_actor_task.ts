@@ -5,16 +5,10 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { isAmbiguousResourceId, toSafeResourceId } from '../../utils/apify_resource_id.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
-import { actorTaskOutputSchema } from '../structured_output_schemas.js';
-import {
-    getTaskByIdOrName,
-    isAmbiguousResourceId,
-    publicConfigSchema,
-    taskNameSchema,
-    taskResult,
-    toSafeResourceId,
-} from './task_helpers.js';
+import { actorTaskOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
+import { getTaskByIdOrName, publicConfigSchema, taskNameSchema, taskResult } from './task_helpers.js';
 
 const updateActorTaskArgs = z.object({
     taskId: z
@@ -26,9 +20,7 @@ const updateActorTaskArgs = z.object({
     name: taskNameSchema.optional().describe('New name of the task: 3-63 characters, letters, digits and dashes only.'),
     title: z.string().optional().describe('New human-readable title of the task.'),
     description: z.string().optional().describe('New short description of the task.'),
-    input: z
-        .object({})
-        .passthrough()
+    input: anyJsonObjectSchema
         .optional()
         .describe('Replacement input JSON for the task. Replaces the stored input, it is not merged into it.'),
     build: z.string().optional().describe('Actor build tag or number to run, e.g. "latest".'),

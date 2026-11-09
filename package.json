@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.17.4",
+  "version": "0.21.4",
   "type": "module",
   "description": "Apify MCP Server",
   "mcpName": "com.apify/apify-mcp-server",
@@ -26,14 +26,10 @@
     "./manifest.json": "./manifest.json"
   },
   "peerDependencies": {
-    "@modelcontextprotocol/client": "2.0.0",
-    "vitest": "^4.1.0"
+    "@modelcontextprotocol/client": "2.3.1"
   },
   "peerDependenciesMeta": {
     "@modelcontextprotocol/client": {
-      "optional": true
-    },
-    "vitest": {
       "optional": true
     }
   },
@@ -67,9 +63,9 @@
     "@apify/log": "^2.5.16",
     "@apify/utilities": "^2.25.1",
     "@modelcontextprotocol/ext-apps": "^1.1.2",
-    "@modelcontextprotocol/node": "2.0.0",
-    "@modelcontextprotocol/sdk": "1.30.0",
-    "@modelcontextprotocol/server": "2.0.0",
+    "@modelcontextprotocol/node": "2.1.1",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@modelcontextprotocol/server": "2.3.1",
     "@segment/analytics-node": "^2.3.0",
     "@sentry/node": "^10.38.0",
     "ajv": "^8.17.1",
@@ -79,18 +75,19 @@
     "dedent": "^1.7.2",
     "dotenv": "^17.4.1",
     "express": "^4.21.2",
+    "proxy-agent": "^6.5.0",
     "yargs": "^17.7.2",
     "zod": "^4.1.13"
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.206",
-    "@apify/mcpc": "^0.6.0",
+    "@apify/mcpc": "^0.7.0",
     "@apify/oxlint-config": "^0.2.10",
     "@apify/tsconfig": "^0.1.2",
     "@langfuse/client": "5.9.1",
     "@langfuse/otel": "5.9.1",
     "@langfuse/tracing": "5.9.1",
-    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/client": "2.3.1",
     "@modelcontextprotocol/conformance": "0.2.0-alpha.9",
     "@opentelemetry/api": "1.9.1",
     "@opentelemetry/sdk-node": "0.220.0",
@@ -132,15 +129,10 @@
     "test:integration:streamable": "pnpm run build && vitest run tests/integration/actor.server_streamable.test.ts",
     "test:integration:stateless": "pnpm run build && vitest run tests/integration/actor.server_stateless.test.ts",
     "test:conformance": "bash scripts/test_conformance.sh",
-    "test:e2e": "pnpm run build && vitest run --project e2e",
-    "//test:e2e": "TEMPORARY, AI-GENERATED, NOT HUMAN-MAINTAINED: v1 behavior pin for #1128. Delete with tests/e2e/. Never add to CI.",
-    "test:e2e:remote": "E2E_HTTP_ONLY=1 E2E_HTTP_BASE=${E2E_HTTP_BASE:-https://mcp.apify.com/} vitest run --project e2e",
-    "//test:e2e:remote": "Same case table against a deployed server. Bills real Actor runs to APIFY_TOKEN.",
     "inspector:stdio": "npx @modelcontextprotocol/inspector -e APIFY_TOKEN=$APIFY_TOKEN -- node dist/stdio.js",
     "evals:mcp-agent": "pnpm run build && tsx evals/runner/run.ts",
     "evals:mcp-agent:export-dataset": "tsx evals/scripts/export_dataset.ts",
-    "evals:mcp-agent:tasks-fixtures": "tsx evals/scripts/tasks_fixtures.ts",
-    "evals:mcp-agent:schedules-fixtures": "tsx evals/scripts/schedules_fixtures.ts"
+    "evals:mcp-agent:fixtures": "tsx evals/scripts/fixtures.ts"
   },
   "author": "Apify",
   "license": "MIT"

@@ -1,5 +1,12 @@
-import type { CallDiagnostics, HelperTool, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
-import { SERVER_MODE, TOOL_TYPE } from '../types.js';
+import type {
+    ActorInterfaceName,
+    CallDiagnostics,
+    HelperTool,
+    ToolBase,
+    ToolEntry,
+    ToolInputSchema,
+} from '../types.js';
+import { TOOL_TYPE } from '../types.js';
 import { fixZodSchemaRequired } from './ajv.js';
 
 /**
@@ -10,6 +17,7 @@ import { fixZodSchemaRequired } from './ajv.js';
 export function getToolFullName(tool: ToolEntry): string {
     switch (tool.type) {
         case TOOL_TYPE.ACTOR:
+        case TOOL_TYPE.ACTOR_SERVER:
             return tool.actorFullName;
         case TOOL_TYPE.INTERNAL:
         case TOOL_TYPE.ACTOR_MCP:
@@ -21,11 +29,11 @@ export function getToolFullName(tool: ToolEntry): string {
 
 /**
  * Extract stable Actor ID for telemetry.
- * Available for actor and actor-mcp tools; undefined for internal tools.
+ * Available for Actor, Actor-MCP and Actor-server tools; undefined for internal tools.
  */
 export function extractActorId(tool: ToolEntry): string | undefined {
-    if (tool.type === TOOL_TYPE.ACTOR || tool.type === TOOL_TYPE.ACTOR_MCP) return tool.actorId;
-    return undefined;
+    if (tool.type === TOOL_TYPE.INTERNAL) return undefined;
+    return tool.actorId;
 }
 
 /**
@@ -47,43 +55,36 @@ export function buildActorFields(
  * Returns undefined for other internal tools or when the arg is missing/invalid.
  */
 export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>): string | undefined {
-    if (tool.type === TOOL_TYPE.ACTOR) return tool.actorFullName;
-    if (tool.type === TOOL_TYPE.ACTOR_MCP) return tool.actorId;
+    if (tool.type !== TOOL_TYPE.INTERNAL) return tool.actorFullName;
 
-    // For call-actor, the actor name is in `args.actor`.
-    // The format can be "username/name" or "username/name:toolName" (MCP server Actors).
-    // Strip the optional `:toolName` suffix to get the base actor name.
+    // A legacy "username/name:toolName" value is logged by its Actor name.
     const actorArg = args?.actor;
     if (typeof actorArg !== 'string') return undefined;
     return actorArg.split(':')[0]?.trim() || undefined;
 }
 
+/**
+ * The Actor interface a tool call goes through, for telemetry: an Actor tool's own, or the one an internal tool
+ * declares, where `call-actor`'s `actor:toolName` form reaches the MCP server. `undefined` for a tool that calls
+ * no Actor.
+ */
+export function extractActorInterface(tool: ToolEntry, args?: Record<string, unknown>): ActorInterfaceName | undefined {
+    if (tool.type === TOOL_TYPE.ACTOR) return 'input';
+    if (tool.type === TOOL_TYPE.ACTOR_MCP) return 'mcp';
+    if (tool.type === TOOL_TYPE.ACTOR_SERVER) return 'server';
+    if (tool.actorInterface !== 'input') return tool.actorInterface;
+    return typeof args?.actor === 'string' && args.actor.includes(':') ? 'mcp' : 'input';
+}
+
 type ToolPublicFieldOptions = {
-    mode?: SERVER_MODE;
-    filterWidgetMeta?: boolean;
     /**
      * Names served in the same tools/list response. When set, tools with a `buildDescription`
      * render their description against it, so cross-tool references to absent tools are omitted.
      * When unset, `description` (the all-tools-present render) is returned as-is.
      */
     presentTools?: ReadonlySet<string>;
+    clientParam?: string;
 };
-
-/**
- * Strips widget-specific metadata (openai/* and ui keys) from tool metadata.
- * Used to hide widget metadata in non-apps modes.
- */
-function stripWidgetMeta(meta?: ToolBase['_meta']) {
-    if (!meta) return meta;
-
-    const filteredEntries = Object.entries(meta).filter(
-        ([key]) => !key.startsWith('openai/') && key !== 'ui' && key !== 'ui/resourceUri',
-    );
-
-    if (filteredEntries.length === 0) return undefined;
-
-    return Object.fromEntries(filteredEntries);
-}
 
 /**
  * Zod 4's z.toJSONSchema() lists properties with `.default()` in `required`.
@@ -99,11 +100,10 @@ function fixZodInputSchemaRequired(inputSchema: ToolBase['inputSchema']): ToolBa
  * Used for the tools list request.
  */
 export function getToolPublicFieldOnly(tool: ToolBase, options: ToolPublicFieldOptions = {}) {
-    const { mode, filterWidgetMeta = false, presentTools } = options;
-    const meta = filterWidgetMeta && mode !== SERVER_MODE.APPS ? stripWidgetMeta(tool._meta) : tool._meta;
+    const { presentTools, clientParam } = options;
     const description =
         tool.buildDescription && presentTools
-            ? tool.buildDescription({ hasTool: (name) => presentTools.has(name) })
+            ? tool.buildDescription({ hasTool: (name) => presentTools.has(name), clientParam })
             : tool.description;
 
     return {
@@ -115,7 +115,7 @@ export function getToolPublicFieldOnly(tool: ToolBase, options: ToolPublicFieldO
         annotations: tool.annotations,
         icons: tool.icons,
         execution: tool.execution,
-        _meta: meta,
+        _meta: tool._meta,
     };
 }
 
@@ -137,6 +137,7 @@ export function cloneToolEntry(toolEntry: ToolEntry): ToolEntry {
     // Store the original functions
     const originalAjvValidate = toolEntry.ajvValidate;
     const originalCall = toolEntry.type === TOOL_TYPE.INTERNAL ? toolEntry.call : undefined;
+    const originalRedactArgs = toolEntry.type === TOOL_TYPE.INTERNAL ? toolEntry.redactArgs : undefined;
     const originalBuildDescription = toolEntry.buildDescription;
 
     // Create a deep copy using JSON serialization (excluding functions)
@@ -151,6 +152,9 @@ export function cloneToolEntry(toolEntry: ToolEntry): ToolEntry {
     cloned.ajvValidate = originalAjvValidate;
     if (toolEntry.type === TOOL_TYPE.INTERNAL && originalCall) {
         (cloned as HelperTool).call = originalCall;
+    }
+    if (originalRedactArgs) {
+        (cloned as HelperTool).redactArgs = originalRedactArgs;
     }
     if (originalBuildDescription) {
         cloned.buildDescription = originalBuildDescription;

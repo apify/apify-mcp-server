@@ -7,6 +7,7 @@ import log from '@apify/log';
 import type { ApifyClient } from '../apify_client.js';
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
+import { canRunActor } from '../tools/actor_tool_naming.js';
 import { actorExecutor } from '../tools/actors/actor_executor.js';
 import type { ActorStore, CallDiagnostics, ToolEntry, ToolStatus } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
@@ -90,11 +91,18 @@ export async function dispatchToolCall(params: {
     let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
     // Always populate actor fields so they're tracked on both success and failure paths.
     let callDiagnostics: CallDiagnostics = { ...buildActorFields(actorName, actorId) };
+    const loadedToolNames = Array.from(tools.keys());
+    const loadedActorIds = new Set(
+        Array.from(tools.values(), extractActorId).filter((id): id is string => id !== undefined),
+    );
 
     switch (tool.type) {
-        case TOOL_TYPE.INTERNAL: {
+        // A Server Actor's tool runs `send-server-actor-request`'s execution, like an internal tool.
+        case TOOL_TYPE.INTERNAL:
+        case TOOL_TYPE.ACTOR_SERVER: {
             try {
-                log.info(`Calling internal tool${logContext?.messageSuffix ?? ''}`, {
+                const toolKind = tool.type === TOOL_TYPE.ACTOR_SERVER ? 'Server Actor tool' : 'internal tool';
+                log.info(`Calling ${toolKind}${logContext?.messageSuffix ?? ''}`, {
                     ...logContext?.fields,
                     toolName: tool.name,
                     mcpSessionId,
@@ -107,10 +115,8 @@ export async function dispatchToolCall(params: {
                     apifyClient,
                     actorStore,
                     paymentProvider,
-                    loadedToolNames: Array.from(tools.keys()),
-                    loadedActorIds: new Set(
-                        Array.from(tools.values(), extractActorId).filter((id): id is string => id !== undefined),
-                    ),
+                    loadedToolNames,
+                    loadedActorIds,
                     progressTracker,
                     mcpSessionId,
                     taskMode,
@@ -138,7 +144,7 @@ export async function dispatchToolCall(params: {
 
             const outcome = await withRemoteMcpClient(
                 tool.serverUrl,
-                apifyToken,
+                { token: apifyToken, requestOrigin: apifyClient.requestOrigin },
                 mcpSessionId,
                 signal,
                 async (client) => {
@@ -202,7 +208,7 @@ export async function dispatchToolCall(params: {
                     }));
                     logHttpError(
                         outcome.error,
-                        `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}'`,
+                        `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorFullName}'`,
                         {
                             actorId: tool.actorId,
                             toolName: tool.originToolName,
@@ -210,7 +216,7 @@ export async function dispatchToolCall(params: {
                         },
                     );
                     result = respondErrorNoTelemetry(
-                        `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}': ${remoteMcpFailureDetail(outcome.error)}`,
+                        `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorFullName}': ${remoteMcpFailureDetail(outcome.error)}`,
                     );
                     break;
                 }
@@ -260,6 +266,8 @@ export async function dispatchToolCall(params: {
                     mcpSessionId,
                     datasetItemsSchema: tool.datasetItemsSchema,
                     taskMode,
+                    canRunTipActor: (recommendedActorId) =>
+                        canRunActor(recommendedActorId, loadedToolNames, loadedActorIds),
                 });
 
                 if (!executorResult) {
@@ -291,7 +299,7 @@ export async function dispatchToolCall(params: {
         default:
             // Exhaustiveness guard mirroring getToolFullName: a new TOOL_TYPE member makes `tool`
             // non-`never` here and fails `satisfies never` at compile time. Unreachable at runtime —
-            // ToolEntry is a closed 3-way union. Unlike the pre-extraction fall-through (which also
+            // ToolEntry is a closed union. Unlike the pre-extraction fall-through (which also
             // listed available tools, called log.softFail, and sent a logging message before
             // throwing), this just throws with no side effects.
             throw new Error(`Unknown tool type "${(tool satisfies never as ToolEntry).type}"`);

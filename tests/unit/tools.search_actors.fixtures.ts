@@ -11,7 +11,6 @@ export const MOCK_STORE_ACTOR = {
     pictureUrl: 'https://example.com/pic.png',
     notice: null,
     badge: null,
-    bookmarkCount: 42,
     actorReviewRating: 4.5,
     actorReviewCount: 10,
     stats: {
@@ -25,3 +24,8 @@ export const MOCK_STORE_ACTOR = {
 } as unknown as ActorStoreList;
 
 export const SEARCH_KEYWORDS = 'web scraper';
+
+/** Zero-results guidance both search-actors variants return for SEARCH_KEYWORDS. */
+export const NO_ACTORS_FOUND_TEXT = `No Actors were found for the search query "${SEARCH_KEYWORDS}".
+Keywords can include the named platform and/or data type (e.g. "TikTok posts").
+A platform-only query such as "TikTok" is an option if more specific results do not fit.`;

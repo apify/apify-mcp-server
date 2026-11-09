@@ -6,9 +6,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { getCategoryTools, toolCategoriesEnabledByDefault } from '../../src/tools/index.js';
-import { getActorVersion } from '../../src/tools/source/get_actor_version.js';
-import { buildFilesRevision, compareSourcePaths } from '../../src/tools/source/source_files.js';
 import { getActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
+import { getActorVersion } from '../../src/tools/versions/get_actor_version.js';
+import { buildFilesRevision, compareSourcePaths } from '../../src/tools/versions/source_files.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import {
     expectSchemaConformingStructuredContent,
@@ -180,9 +180,15 @@ describe('get-actor-version', () => {
         }
     });
 
-    it('is served in the source category, which is not enabled by default', () => {
-        expect(getCategoryTools().source.map((tool) => tool.name)).toEqual([HELPER_TOOLS.ACTOR_VERSION_GET]);
-        expect(toolCategoriesEnabledByDefault).not.toContain('source');
+    it('is served in the versions category, which is not enabled by default', () => {
+        expect(getCategoryTools().versions.map((tool) => tool.name)).toEqual([
+            HELPER_TOOLS.ACTOR_VERSION_GET,
+            HELPER_TOOLS.ACTOR_CREATE,
+            HELPER_TOOLS.ACTOR_VERSION_UPDATE,
+            HELPER_TOOLS.ACTOR_VERSION_CREATE,
+            HELPER_TOOLS.ACTOR_VERSION_DELETE,
+        ]);
+        expect(toolCategoriesEnabledByDefault).not.toContain('versions');
     });
 
     describe('SOURCE_FILES', () => {
@@ -198,6 +204,7 @@ describe('get-actor-version', () => {
                     actorId: 'actor-1',
                     fullName: 'john/my-actor',
                     versionNumber: '0.1',
+                    buildTag: 'latest',
                     revision: expect.stringMatching(/^[0-9a-f]{16}$/),
                     files: [
                         { path: '.actor/actor.json', sizeBytes: 25, hash: sha256Prefix(ACTOR_JSON_SOURCE.content) },
@@ -208,7 +215,7 @@ describe('get-actor-version', () => {
                 });
                 expect(JSON.parse(result.content[0].text)).toEqual(structuredContent);
                 expect(result.content).toHaveLength(2);
-                expect(result.content[1].text).toBe('Read version 0.1 of john/my-actor.');
+                expect(result.content[1].text).toBe('Read version 0.1 (build tag latest) of john/my-actor.');
                 expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
                 const serialized = JSON.stringify(result);
                 for (const secret of LEAKABLE_VALUES) {
@@ -217,7 +224,7 @@ describe('get-actor-version', () => {
             },
         );
 
-        it('sorts the manifest in plain string order and computes the revision over sorted path and hash lines', async () => {
+        it('sorts the manifest in plain string order and computes the revision over the sorted path and hash pairs', async () => {
             // Locale order would put package.json before README.md; plain order puts the emoji, a UTF-16 surrogate pair,
             // before the fullwidth z.
             const names = ['\u{1F600}.txt', 'package.json', 'src/main.js', '\uFF5A.txt', 'README.md', 'Dockerfile'];
@@ -234,8 +241,8 @@ describe('get-actor-version', () => {
             const { structuredContent } = await callTool({});
 
             expect(structuredContent.files.map(({ path }) => path)).toEqual(sortedNames);
-            const lines = sortedNames.map((name) => `${name}\0${sha256Prefix(`${name}\n`)}\n`).join('');
-            expect(structuredContent.revision).toBe(sha256Prefix(lines));
+            const pairs = sortedNames.map((name) => [name, sha256Prefix(`${name}\n`)]);
+            expect(structuredContent.revision).toBe(sha256Prefix(JSON.stringify(pairs)));
         });
 
         it('gives the same revision whatever order the files are stored in, and a new one when a file changes', async () => {
@@ -249,6 +256,23 @@ describe('get-actor-version', () => {
 
             expect(reordered.structuredContent.revision).toBe(first.structuredContent.revision);
             expect(changed.structuredContent.revision).not.toBe(first.structuredContent.revision);
+        });
+
+        it('gives a version whose stored name holds NUL and a line break a revision of its own', async () => {
+            // Joined as path, NUL, hash, and a line break per file, the one file read the same as the two.
+            mockVersionRead({
+                sourceFiles: [
+                    { name: 'a', format: 'TEXT', content: 'A' },
+                    { name: 'b', format: 'TEXT', content: 'B' },
+                ],
+            });
+            const twoFiles = await callTool({});
+            const name = `a\0${sha256Prefix('A')}\nb`;
+            mockVersionRead({ sourceFiles: [{ name, format: 'TEXT', content: 'B' }] });
+            const oneFile = await callTool({});
+
+            expect(oneFile.structuredContent.files).toEqual([{ path: name, sizeBytes: 1, hash: sha256Prefix('B') }]);
+            expect(oneFile.structuredContent.revision).not.toBe(twoFiles.structuredContent.revision);
         });
 
         it('gives a new revision when a file is added, removed, or renamed', async () => {
@@ -442,7 +466,7 @@ describe('get-actor-version', () => {
             ]);
             expect(structuredContent.notFoundPaths).toEqual(['./missing.js', 'src/']);
             expect(result.content[1].text).toBe(
-                'Read version 0.1 of john/my-actor. Not found: ./missing.js, src/; check the paths against files (folders are not files).',
+                'Read version 0.1 (build tag latest) of john/my-actor. Not found: ./missing.js, src/; check the paths against files (folders are not files).',
             );
         });
 
@@ -598,7 +622,8 @@ describe('get-actor-version', () => {
                 actorId: 'actor-1',
                 fullName: 'john/my-actor',
                 versionNumber: '0.1',
-                revision: sha256Prefix(''),
+                buildTag: 'latest',
+                revision: sha256Prefix('[]'),
                 files: [],
                 contents: [],
             });
@@ -755,37 +780,37 @@ describe('get-actor-version', () => {
             {
                 outcome: 'only the read sentence when every file comes back',
                 args: { paths: ['file-00.txt'] },
-                summary: 'Read version 0.1 of john/my-actor.',
+                summary: 'Read version 0.1 (build tag latest) of john/my-actor.',
             },
             {
                 outcome: 'the files left out over the limit',
                 args: { paths: ['file-00.txt', 'file-01.txt', 'file-02.txt', 'file-03.txt'] },
                 summary:
-                    'Read version 0.1 of john/my-actor. Left out over the 256 KiB limit: file-02.txt, file-03.txt; ask for a file alone, or for part of it with startLine and lineCount.',
+                    'Read version 0.1 (build tag latest) of john/my-actor. Left out over the 256 KiB limit: file-02.txt, file-03.txt; ask for a file alone, or for part of it with startLine and lineCount.',
             },
             {
                 outcome: 'the paths with no file, a folder among them',
                 args: { paths: ['file-00.txt', 'missing.js', 'src'] },
                 summary:
-                    'Read version 0.1 of john/my-actor. Not found: missing.js, src; check the paths against files (folders are not files).',
+                    'Read version 0.1 (build tag latest) of john/my-actor. Not found: missing.js, src; check the paths against files (folders are not files).',
             },
             {
                 outcome: 'both the files left out and the paths with no file',
                 args: { paths: ['file-00.txt', 'file-01.txt', 'file-02.txt', 'missing.js'] },
                 summary:
-                    'Read version 0.1 of john/my-actor. Left out over the 256 KiB limit: file-02.txt; ask for a file alone, or for part of it with startLine and lineCount. Not found: missing.js; check the paths against files (folders are not files).',
+                    'Read version 0.1 (build tag latest) of john/my-actor. Left out over the 256 KiB limit: file-02.txt; ask for a file alone, or for part of it with startLine and lineCount. Not found: missing.js; check the paths against files (folders are not files).',
             },
             {
                 outcome: 'a line range left out over the limit, with a hint to ask for fewer lines',
                 args: { paths: ['big.js'], lineCount: 257 },
                 summary:
-                    'Read version 0.1 of john/my-actor. Left out over the 256 KiB limit: big.js; ask for fewer lines with lineCount.',
+                    'Read version 0.1 (build tag latest) of john/my-actor. Left out over the 256 KiB limit: big.js; ask for fewer lines with lineCount.',
             },
             {
                 outcome: 'a line range of a path with no file',
                 args: { paths: ['nope.js'], startLine: 1 },
                 summary:
-                    'Read version 0.1 of john/my-actor. Not found: nope.js; check the paths against files (folders are not files).',
+                    'Read version 0.1 (build tag latest) of john/my-actor. Not found: nope.js; check the paths against files (folders are not files).',
             },
         ])('says $outcome', async ({ args, summary }) => {
             const result = await callTool(args);
@@ -824,6 +849,82 @@ describe('get-actor-version', () => {
             expect(structuredContent.files.map(({ path }) => path)).toEqual(['src/main.js']);
         });
 
+        it('returns the build tag of the requested version and names it in the summary', async () => {
+            actorGetMock.mockResolvedValue(
+                mockActor([mockVersion(), mockVersion({ versionNumber: '0.2', buildTag: 'beta' })]),
+            );
+
+            const result = await callTool({ versionNumber: '0.2' });
+
+            expect(getActorVersionToolOutputSchema.properties.buildTag).toMatchObject({ type: 'string' });
+            expect(getActorVersionToolOutputSchema.required).not.toContain('buildTag');
+            expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
+            expect(result.structuredContent.buildTag).toBe('beta');
+            expect(result.content[1].text).toBe('Read version 0.2 (build tag beta) of john/my-actor.');
+        });
+
+        it.each([
+            ['without the field', { buildTag: undefined }],
+            ['with null', { buildTag: null }],
+        ])('leaves the build tag out for a version %s', async (_, overrides) => {
+            mockVersionRead(overrides);
+
+            const result = await callTool({});
+
+            expectSchemaConformingStructuredContent(result, getActorVersionToolOutputSchema);
+            expect(result.structuredContent).not.toHaveProperty('buildTag');
+            expect(result.content[1].text).toBe('Read version 0.1 of john/my-actor.');
+        });
+
+        it('reads the only version for a null versionNumber, which the input check turns into an empty string', async () => {
+            const args = { actor: 'john/my-actor', versionNumber: null };
+
+            expect((getActorVersion as HelperTool).ajvValidate(args)).toBe(true);
+            const { structuredContent } = await callTool(args);
+
+            expect(structuredContent.versionNumber).toBe('0.1');
+        });
+
+        it.each(['qGXMy0NAkWsIIb9LZ', 'john~my-actor'])(
+            'names the Actor by the full name in its document when given as %s',
+            async (actor) => {
+                const result = await callTool({ actor });
+
+                expect(actorMock.mock.calls).toEqual([[actor]]);
+                expect(result.structuredContent.fullName).toBe('john/my-actor');
+                expect(result.content[1].text).toBe('Read version 0.1 (build tag latest) of john/my-actor.');
+            },
+        );
+
+        it('looks up a bare name once, as the name of one of your own Actors', async () => {
+            const result = await callTool({ actor: 'my-actor' });
+
+            expect(actorMock.mock.calls).toEqual([['~my-actor']]);
+            expect(result.structuredContent.fullName).toBe('john/my-actor');
+        });
+
+        it('looks up a bare value shaped like an ID as a name when no Actor has that ID', async () => {
+            actorGetMock
+                .mockResolvedValueOnce(undefined)
+                .mockResolvedValueOnce({ ...mockActor(), name: 'myscraperversion2' });
+
+            const result = await callTool({ actor: 'myscraperversion2' });
+
+            expect(actorMock.mock.calls).toEqual([['myscraperversion2'], ['~myscraperversion2']]);
+            expect(result.structuredContent.fullName).toBe('john/myscraperversion2');
+        });
+
+        it.each(['john/missing', 'john~missing', '~missing'])('looks up %s once', async (actor) => {
+            actorGetMock.mockResolvedValue(undefined);
+
+            const text = await callToolExpectingUserError({ actor });
+
+            expect(actorMock.mock.calls).toEqual([[actor]]);
+            expect(text).toBe(
+                `Actor '${actor}' not found. The actor argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.`,
+            );
+        });
+
         it('refuses a version the Actor does not have', async () => {
             const text = await callToolExpectingUserError({ versionNumber: '9.9' });
 
@@ -831,7 +932,6 @@ describe('get-actor-version', () => {
         });
 
         it.each([
-            ['a bare name the API does not find', 'my-actor', undefined],
             [
                 'a run reached by extra path segments',
                 'john/my-actor/runs/last',
@@ -850,14 +950,14 @@ describe('get-actor-version', () => {
                 'john/my-actor/runs/last/key-value-store',
                 { id: 'kvs-1', userId: 'user-secret', username: 'john' },
             ],
-        ])('reports %s as a missing Actor, and that a bare name is not enough', async (_, actor, document) => {
+        ])('reports %s as a missing Actor', async (_, actor, document) => {
             actorGetMock.mockResolvedValue(document);
 
             const text = await callToolExpectingUserError({ actor });
 
-            expect(actorMock).toHaveBeenCalledWith(actor);
+            expect(actorMock.mock.calls).toEqual([[actor]]);
             expect(text).toBe(
-                `Actor '${actor}' not found. Give its ID or its full name, username/name; a name without the username is not enough.`,
+                `Actor '${actor}' not found. The actor argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.`,
             );
         });
 
@@ -1009,12 +1109,33 @@ describe('compareSourcePaths()', () => {
 });
 
 describe('buildFilesRevision()', () => {
+    it.each<[string, { path: string; hash: string }[], { path: string; hash: string }[]]>([
+        [
+            'a path that holds NUL, a hash, and a line break',
+            [
+                { path: 'a', hash: 'hash-a' },
+                { path: 'b', hash: 'hash-b' },
+            ],
+            [{ path: 'a\0hash-a\nb', hash: 'hash-b' }],
+        ],
+        [
+            'a path that holds a quote and a comma',
+            [
+                { path: 'a', hash: 'hash-a' },
+                { path: 'b', hash: 'hash-b' },
+            ],
+            [{ path: 'a","hash-a"],["b', hash: 'hash-b' }],
+        ],
+    ])('tells apart two file sets when %s', (_, files, otherFiles) => {
+        expect(buildFilesRevision(otherFiles)).not.toBe(buildFilesRevision(files));
+    });
+
     it('sorts the files by path itself, so callers can pass them in any order', () => {
         const revision = buildFilesRevision([
             { path: 'b', hash: 'hash-b' },
             { path: 'a', hash: 'hash-a' },
         ]);
 
-        expect(revision).toBe(sha256Prefix('a\0hash-a\nb\0hash-b\n'));
+        expect(revision).toBe(sha256Prefix('[["a","hash-a"],["b","hash-b"]]'));
     });
 });

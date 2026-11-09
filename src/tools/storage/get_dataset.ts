@@ -11,10 +11,16 @@ import { respondUserError } from '../../utils/mcp.js';
 import { datasetSizeNextStepHint, normalizeDatasetFields } from '../actors/actor_run_response.js';
 import { datasetMetadataOutputSchema } from '../structured_output_schemas.js';
 import { DEFAULT_DATASET_ITEMS_LIMIT } from './get_dataset_items.js';
-import { buildStorageResponse } from './storage_helpers.js';
+import {
+    buildStorageResponse,
+    fetchStorageByIdOrName,
+    resolveSiblingNextStep,
+    storageIdArgDescription,
+    storageNotFoundText,
+} from './storage_helpers.js';
 
 const getDatasetArgs = z.object({
-    datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
+    datasetId: z.string().min(1).describe(storageIdArgDescription('dataset')),
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
@@ -63,18 +69,20 @@ export const getDataset: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, apifyToken } = toolArgs;
+        const { args, apifyClient: client, apifyToken, loadedToolNames } = toolArgs;
         const parsed = getDatasetArgs.parse(args);
         const datasetId = stripQuoteWrappers(parsed.datasetId);
-        const dataset = await client.dataset(datasetId).get();
+        const dataset = (await fetchStorageByIdOrName(datasetId, async (safeId) => client.dataset(safeId).get()))
+            ?.result;
         if (!dataset) {
-            return respondUserError(`Dataset '${datasetId}' not found.`);
+            return respondUserError(storageNotFoundText('dataset', datasetId));
         }
         const linkContext = await getConsoleLinkContext(apifyToken, client);
         // The API also returns a raw `schema` (untyped in apify-client). It is 93–95% of the
         // response bytes on top store Actors and declares fields that may be absent from the
         // data, so drop it — get-dataset-schema infers a compact schema from real items (#882).
-        const { schema, ...metadata } = dataset as typeof dataset & { schema?: unknown };
+        // The URL signing key mints non-expiring links; the *PublicUrl fields expire, so they stay (apify/ai-team#330).
+        const { schema, urlSigningSecretKey, ...metadata } = dataset as typeof dataset & { schema?: unknown };
         // Apify returns `fields` slash-separated AND with array indices expanded
         // (e.g. `latestComments/0/owner/username`). For a real Instagram-scraper
         // dataset this inflates ~78 schema fields into 528 paths (~85% bloat) and
@@ -90,9 +98,13 @@ export const getDataset: ToolEntry = Object.freeze({
         // response today (only the dataset-list endpoint returns it), so read it defensively.
         const inflatedBytes = (dataset.stats as { inflatedBytes?: number } | undefined)?.inflatedBytes;
         const summary = `Dataset '${normalized.name ?? datasetId}' has ${normalized.itemCount ?? 0} items${fieldCount !== undefined ? `, ${fieldCount} fields` : ''}.`;
-        const nextStep = `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}`;
+        const nextStep = resolveSiblingNextStep(
+            HELPER_TOOLS.DATASET_GET_ITEMS,
+            loadedToolNames,
+            `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}`,
+        );
         return buildStorageResponse({
-            structuredContent: normalized as unknown as Record<string, unknown>,
+            structuredContent: normalized,
             summary,
             nextStep,
             apifyConsoleUrl: buildConsoleDatasetUrl(linkContext, dataset.id),

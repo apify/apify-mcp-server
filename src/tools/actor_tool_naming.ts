@@ -2,33 +2,76 @@ import { createHash } from 'node:crypto';
 
 import log from '@apify/log';
 
-import { HELPER_TOOLS } from '../const.js';
+import { APIFY_MCP_URL, HELPER_TOOLS } from '../const.js';
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../mcp/const.js';
-import type { ActorInfo } from '../types.js';
-import { ACTOR_TOOL_MODE } from '../types.js';
+import type { Actor, ActorInfo, ActorInterfaces, ActorTenancy, ToolDescriptionContext } from '../types.js';
+import { ACTOR_TENANCY, ACTOR_TOOL_MODE } from '../types.js';
 
 /**
- * The single rule for how an Actor is exposed as a tool. Tool loading and `call-actor` routing both
- * read it, so the two can never disagree.
+ * The single rule for which interfaces an Actor has. Two routes are derived from it: the Actor's own tool
+ * (`resolveActorToolMode`, read by tool loading) and `call-actor` (`getActorToolModeFromInterfaces`, read through
+ * `getActorToolResolutionCached`). The three interfaces are independent of each other. The own tool takes the server
+ * interface first, then the MCP server, then the input interface; `call-actor` takes the input interface first, then
+ * the MCP server, and never the server interface, so it still starts runs of such an Actor.
  *
- * | standby  | `webServerMcpPath` | input schema | result                |
- * |----------|--------------------|--------------|-----------------------|
- * | disabled | any (path ignored) | any          | `RUN`                 |
- * | enabled  | present            | any          | `MCP`                 |
- * | enabled  | absent             | non-empty    | `RUN`                 |
- * | enabled  | absent             | empty        | `STANDBY_WITHOUT_MCP` |
+ * | server | MCP path | input schema | HTTP schema | `input` | `mcp` | `server` | own tool                   | `call-actor`               |
+ * |--------|----------|--------------|-------------|---------|-------|----------|----------------------------|----------------------------|
+ * | off    | any      | any          | any         | true    | false | false    | `RUN`                      | `RUN`                      |
+ * | on     | present  | non-empty    | yes         | true    | true  | true     | `SERVER`                   | `RUN`                      |
+ * | on     | present  | non-empty    | no          | true    | true  | false    | `MCP`                      | `RUN`                      |
+ * | on     | present  | empty        | yes         | false   | true  | true     | `SERVER`                   | `MCP`                      |
+ * | on     | present  | empty        | no          | false   | true  | false    | `MCP`                      | `MCP`                      |
+ * | on     | absent   | non-empty    | yes         | true    | false | true     | `SERVER`                   | `RUN`                      |
+ * | on     | absent   | non-empty    | no          | true    | false | false    | `RUN`                      | `RUN`                      |
+ * | on     | absent   | empty        | yes         | false   | false | true     | `SERVER`                   | `SERVER_ACTOR_WITHOUT_MCP` |
+ * | on     | absent   | empty        | no          | false   | false | false    | `SERVER_ACTOR_WITHOUT_MCP` | `SERVER_ACTOR_WITHOUT_MCP` |
  *
+ * "server" is the Actor's `actorStandby.isEnabled` (the API field is named standby). "MCP path" is
+ * `webServerMcpPath`. "HTTP schema" is `definition.hasWebServerSchema`.
  * The input schema counts as empty when the definition has no `input`, `input.properties` is missing,
  * or `input.properties` has zero keys. Nothing else counts — a non-empty `required` with no properties
  * still reads as empty.
  */
+export function resolveActorInterfaces({ actor, definition, webServerMcpPath }: ActorInfo): ActorInterfaces {
+    if (actor.actorStandby?.isEnabled !== true) return { input: true, mcp: false, server: false };
+
+    const hasInputProperties = Object.keys(definition.input?.properties ?? {}).length > 0;
+    return { input: hasInputProperties, mcp: Boolean(webServerMcpPath), server: definition.hasWebServerSchema };
+}
+
+/** The own-tool column of the table on {@link resolveActorInterfaces}. */
 export function resolveActorToolMode(actorInfo: ActorInfo): ACTOR_TOOL_MODE {
-    if (actorInfo.actor.actorStandby?.isEnabled !== true) return ACTOR_TOOL_MODE.RUN;
-    if (actorInfo.webServerMcpPath) return ACTOR_TOOL_MODE.MCP;
-    if (Object.keys(actorInfo.definition.input?.properties ?? {}).length === 0) {
-        return ACTOR_TOOL_MODE.STANDBY_WITHOUT_MCP;
-    }
-    return ACTOR_TOOL_MODE.RUN;
+    const { server, mcp, input } = resolveActorInterfaces(actorInfo);
+    if (server) return ACTOR_TOOL_MODE.SERVER;
+    if (mcp) return ACTOR_TOOL_MODE.MCP;
+    if (input) return ACTOR_TOOL_MODE.RUN;
+    return ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP;
+}
+
+/** The `call-actor` column of the table on {@link resolveActorInterfaces}: a run, else MCP tools, else none. */
+export function getActorToolModeFromInterfaces({
+    input,
+    mcp,
+}: ActorInterfaces): Exclude<ACTOR_TOOL_MODE, typeof ACTOR_TOOL_MODE.SERVER> {
+    if (input) return ACTOR_TOOL_MODE.RUN;
+    if (mcp) return ACTOR_TOOL_MODE.MCP;
+    return ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP;
+}
+
+/**
+ * The tool a session calls a Server Actor's HTTP API with: the Actor's own tool when loaded (its description says to
+ * prefer it), else `send-server-actor-request` when loaded, else none.
+ */
+export function findServerTool(actorFullName: string, loadedToolNames: readonly string[]): string | undefined {
+    const ownTool = actorNameToToolName(actorFullName);
+    if (loadedToolNames.includes(ownTool)) return ownTool;
+    if (loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)) return HELPER_TOOLS.ACTOR_SERVER_REQUEST;
+    return undefined;
+}
+
+/** Multi-tenant when the Actor's standby configuration says so; single-tenant otherwise, the platform default. */
+export function resolveActorTenancy(actor: Pick<Actor, 'actorStandby'>): ActorTenancy {
+    return actor.actorStandby?.tenancy === 'MULTI_TENANT' ? ACTOR_TENANCY.MULTI_TENANT : ACTOR_TENANCY.SINGLE_TENANT;
 }
 
 /**
@@ -82,11 +125,38 @@ export function getToolSchemaID(actorName: string): string {
     return `https://apify.com/mcp/${actorNameToToolName(actorName)}/schema.json`;
 }
 
-/** Whether this session can run this Actor (call-actor, or the Actor's own tool, loaded); soft check for a guidance hint, not a hard gate. */
+/** `?client=claude` is the Claude connector URL; the only client whose add-a-server flow has a name. */
+export function isClaudeClient(clientParam?: string): boolean {
+    return clientParam === 'claude';
+}
+
+/** How to get an Actor this session cannot run. Tool results use the neutral wording; descriptions and instructions see `clientParam`. */
+export function getOwnServerRemedy(clientParam?: string): string {
+    const target = isClaudeClient(clientParam) ? 'Claude as a custom connector' : 'your agent';
+    return `create your own Apify MCP server configuration at ${APIFY_MCP_URL} and add it to ${target}.`;
+}
+
+/** In the `search-actors` description when the session has no run path, and under search results when the session cannot run some of the Actors listed. */
+export function getActorCallabilityCaveat(clientParam?: string): string {
+    return `This session can run only Actors already exposed as dedicated tools. Other Actors found
+here are informational and cannot be run in this configuration. To use one, ${getOwnServerRemedy(clientParam)}`;
+}
+
+/** Whether the session holds a tool that can run an arbitrary Actor. */
+export function canRunAnyActor(hasTool: ToolDescriptionContext['hasTool']): boolean {
+    return (
+        hasTool(HELPER_TOOLS.ACTOR_CALL) || hasTool(HELPER_TOOLS.ACTOR_CALL_WIDGET) || hasTool(HELPER_TOOLS.API_WRITE)
+    );
+}
+
+/** After an Actor's tip when the session cannot run the Actor the tip recommends. */
+export const ACTOR_TIP_CAVEAT = `This session cannot run the Actor this tip recommends. To use it, ${getOwnServerRemedy()}`;
+
+/** Whether this session can run this Actor (a tool that runs any Actor, or the Actor's own tool, loaded); soft check for a guidance hint, not a hard gate. */
 export function canRunActor(
     actorId: string,
     loadedToolNames: readonly string[],
     loadedActorIds: ReadonlySet<string>,
 ): boolean {
-    return loadedToolNames.includes(HELPER_TOOLS.ACTOR_CALL) || loadedActorIds.has(actorId);
+    return canRunAnyActor((name) => loadedToolNames.includes(name)) || loadedActorIds.has(actorId);
 }

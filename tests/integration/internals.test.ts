@@ -4,7 +4,6 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import log from '@apify/log';
 
 import { ApifyClient } from '../../src/apify_client.js';
-import { HELPER_TOOLS } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/index.js';
 import { getActorsAsTools } from '../../src/tools/index.js';
 import { SERVER_MODE } from '../../src/types.js';
@@ -39,7 +38,7 @@ describe('MCP server internals integration tests', () => {
         const names = actorsMcpServer.listAllToolNames();
         // call-actor seeds the 4 auto-injected helpers; then ACTOR_NORMAL_MODE is added on top.
         const expectedToolNames = [
-            HELPER_TOOLS.ACTOR_CALL,
+            'call-actor',
             'get-actor-run',
             'get-dataset-items',
             'get-key-value-store-record',

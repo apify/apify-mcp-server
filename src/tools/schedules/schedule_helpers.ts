@@ -9,8 +9,10 @@ import {
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
+import { getResourceByIdOrName } from '../../utils/apify_resource_id.js';
 import { toIsoString } from '../actors/actor_run_response.js';
-import { getResourceByIdOrName, getTaskByIdOrName } from '../tasks/task_helpers.js';
+import { anyJsonObjectSchema } from '../structured_output_schemas.js';
+import { getTaskByIdOrName } from '../tasks/task_helpers.js';
 
 /** A schedule action as the API accepts it on create and update (the server-assigned `id` is optional). */
 type ApiScheduleAction = NonNullable<ScheduleCreateOrUpdateData['actions']>[number];
@@ -39,7 +41,7 @@ export const CRON_EXPRESSION_DESCRIPTION =
 export const cronExpressionSchema = z.string().min(1).max(100);
 
 /**
- * Only the length caps the API enforces. No `pattern`: the shared AJV instance removes that keyword
+ * Only the length caps the API enforces. No `pattern`: the server's AJV removes that keyword
  * as a ReDoS mitigation (`utils/ajv.ts`), so a regex here never gates the call — it only fires in the
  * tool body's `parse()`, which throws a raw ZodError that reaches the client as serialised JSON with
  * the pattern in it. The API rejects the same name with a far better message, and the field's
@@ -53,7 +55,7 @@ const scheduleNameSchema = z.string().min(3).max(63);
  * pastes into an update unchanged.
  *
  * Deliberately not a z.union: zod renders a union as `anyOf` branches with `additionalProperties:
- * false`, and the shared AJV instance strips unknown properties (`removeAdditional` in utils/ajv.ts),
+ * false`, and the server's AJV strips unknown properties (`removeAdditional` in utils/ajv.ts),
  * so validating `{ taskId }` against the actorId branch would drop `taskId` before the taskId branch
  * is tried. "Exactly one of actorId / taskId" is therefore checked in `buildApiActions`.
  */
@@ -70,8 +72,7 @@ export const scheduleActionSchema = z.object({
         .min(1)
         .optional()
         .describe('Task to run: its ID, its name (resolved against your own tasks), or "username/task-name".'),
-    input: z
-        .looseObject({})
+    input: anyJsonObjectSchema
         .optional()
         .describe(
             'For an Actor: the input JSON it runs with. For a task: top-level keys that override the stored task input for this run (shallow merge; a nested object replaces the stored one).',

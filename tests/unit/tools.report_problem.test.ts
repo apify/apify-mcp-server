@@ -43,6 +43,18 @@ describe('reportProblem', () => {
         });
     });
 
+    describe('description', () => {
+        it('states what the tool is for without telling the agent when to call it', () => {
+            const { description } = reportProblem as HelperTool;
+            expect(description).toContain(
+                'Reports can describe missing tools or Actors, errors, timeouts, confusing results, steps that took ' +
+                    'several attempts, or tasks that the available tools could not complete. Reports help fix the ' +
+                    'problem for other users.',
+            );
+            expect(description).not.toContain('Call it when');
+        });
+    });
+
     describe('annotations', () => {
         it('is not read-only (submitting a report writes to the Apify team)', () => {
             expect((reportProblem as HelperTool).annotations?.readOnlyHint).toBe(false);
@@ -103,12 +115,18 @@ describe('reportProblem', () => {
     });
 
     describe('appendReportProblemNudge()', () => {
-        it('appends the nudge to a failed result when the tool is available', () => {
+        it('appends one sentence that offers report-problem without ordering a call', () => {
             const result = appendReportProblemNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
             });
-            expect(nudgeCount(result)).toBe(1);
+            expect(result.content).toEqual([
+                errorResult().content[0],
+                {
+                    type: 'text',
+                    text: `If you cannot resolve this yourself, you can report it to the Apify team with ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and this error).`,
+                },
+            ]);
         });
 
         it('does not append when the tool is unavailable', () => {
@@ -148,14 +166,19 @@ describe('reportProblem', () => {
             expect(nudgeCount(result)).toBe(0);
         });
 
-        it('appends the softer nudge for a genuine INVALID_INPUT with no 402 (input bug)', () => {
+        it('appends the bug-or-friction sentence for an INVALID_INPUT failure, such as not found or invalid input', () => {
             const result = appendReportProblemNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
                 failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
             });
-            expect(result.content.filter((c) => c.text === REPORT_PROBLEM_INVALID_INPUT_NUDGE)).toHaveLength(1);
-            expect(nudgeCount(result)).toBe(0);
+            expect(result.content).toEqual([
+                errorResult().content[0],
+                {
+                    type: 'text',
+                    text: `If this error looks like a bug, or was unclear or took several attempts to get past, you can report it to the Apify team with ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and what went wrong).`,
+                },
+            ]);
         });
 
         it('does not append any nudge for a 402 payment response, though 402 is classified INVALID_INPUT', () => {

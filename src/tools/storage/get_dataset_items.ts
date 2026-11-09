@@ -9,7 +9,14 @@ import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/conso
 import { parseCommaSeparatedList, stripQuoteWrappers } from '../../utils/generic.js';
 import { respondUserError } from '../../utils/mcp.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
-import { buildDatasetItemsSummaryNextStep, buildStorageResponse, catchNotFound } from './storage_helpers.js';
+import {
+    buildDatasetItemsSummaryNextStep,
+    buildStorageResponse,
+    fetchStorageByIdOrName,
+    resolveStorageId,
+    storageIdArgDescription,
+    storageNotFoundText,
+} from './storage_helpers.js';
 
 export const DEFAULT_DATASET_ITEMS_LIMIT = 20;
 
@@ -26,7 +33,7 @@ export function extractDotPrefixes(fields: string[]): string[] {
 }
 
 const getDatasetItemsArgs = z.object({
-    datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
+    datasetId: z.string().min(1).describe(storageIdArgDescription('dataset')),
     clean: z
         .boolean()
         .optional()
@@ -100,8 +107,8 @@ export const getDatasetItems: ToolEntry = Object.freeze({
 
         const effectiveLimit = parsed.limit ?? DEFAULT_DATASET_ITEMS_LIMIT;
         const datasetId = stripQuoteWrappers(parsed.datasetId);
-        const v = await catchNotFound(
-            client.dataset(datasetId).listItems({
+        const found = await fetchStorageByIdOrName(datasetId, async (safeId) =>
+            client.dataset(safeId).listItems({
                 clean: parsed.clean,
                 offset: parsed.offset,
                 limit: effectiveLimit,
@@ -111,12 +118,19 @@ export const getDatasetItems: ToolEntry = Object.freeze({
                 flatten,
             }),
         );
-        if (!v) {
-            return respondUserError(`Dataset '${datasetId}' not found.`);
+        if (!found) {
+            return respondUserError(storageNotFoundText('dataset', datasetId));
         }
+        const { result: v, safeId } = found;
 
         const offset = parsed.offset ?? 0;
-        const apifyConsoleUrl = buildConsoleDatasetUrl(await getConsoleLinkContext(apifyToken, client), datasetId);
+        const linkContext = await getConsoleLinkContext(apifyToken, client);
+        const apifyConsoleUrl = linkContext
+            ? buildConsoleDatasetUrl(
+                  linkContext,
+                  await resolveStorageId(safeId, async (id) => client.dataset(id).get()),
+              )
+            : undefined;
         const structuredContent = {
             datasetId,
             apifyConsoleUrl,

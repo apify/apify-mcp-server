@@ -11,7 +11,7 @@ import {
 import type { ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
-import { respondUserError } from '../../src/utils/mcp.js';
+import { respondServerError, respondUserError } from '../../src/utils/mcp.js';
 import { getRequestHandler } from './helpers/mcp_server.js';
 
 // The ACTOR branch of the tools/call handler runs actorExecutor.executeActorTool (a module
@@ -73,13 +73,18 @@ const nudgeTexts = (r: Record<string, unknown>): string[] => (r.content as { tex
 describe('report-problem nudge on the direct ACTOR path', () => {
     afterEach(() => vi.clearAllMocks());
 
-    it('appends the softer INVALID_INPUT nudge and strips internal toolTelemetry on dispatch', async () => {
+    it('appends the report-problem sentence once to an internal error and strips internal toolTelemetry', async () => {
+        const result = await dispatchActorCall(respondServerError('The Actor run failed.'));
+
+        expect(result.isError).toBe(true);
+        expect(nudgeTexts(result)).toEqual(['The Actor run failed.', REPORT_PROBLEM_NUDGE]);
+        expect(result.toolTelemetry).toBeUndefined();
+    });
+
+    it('appends the friction sentence to a not-found failure', async () => {
         const result = await dispatchActorCall(respondUserError("Run with ID 'x' not found."));
 
-        const texts = nudgeTexts(result);
         expect(result.isError).toBe(true);
-        expect(texts).toContain(REPORT_PROBLEM_INVALID_INPUT_NUDGE);
-        expect(texts).not.toContain(REPORT_PROBLEM_NUDGE);
-        expect(result.toolTelemetry).toBeUndefined();
+        expect(nudgeTexts(result)).toEqual(["Run with ID 'x' not found.", REPORT_PROBLEM_INVALID_INPUT_NUDGE]);
     });
 });

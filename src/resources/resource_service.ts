@@ -12,8 +12,8 @@ import type {
 import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
-import { getApifyAPIBaseUrl } from '../apify_client.js';
-import { InvalidParamsError } from '../mcp/errors.js';
+import { getApifyAPIPublicBaseUrl } from '../apify_client.js';
+import { InternalError, InvalidParamsError } from '../mcp/errors.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { SERVER_MODE } from '../types.js';
 import { readApiResource } from './api_resources.js';
@@ -105,21 +105,9 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             };
         }
 
-        if (getMode() === SERVER_MODE.APPS && uri.startsWith('ui://widget/')) {
-            const widget = getAvailableWidgets().get(uri);
-
-            if (!widget || !widget.exists) {
-                return {
-                    contents: [
-                        {
-                            uri,
-                            mimeType: 'text/plain',
-                            text: `Widget ${uri} is not available. ${!widget ? 'Not found in registry.' : `File not found at ${widget.jsPath}`}`,
-                        },
-                    ],
-                };
-            }
-
+        const widget = getMode() === SERVER_MODE.APPS ? getAvailableWidgets().get(uri) : undefined;
+        if (widget) {
+            // No adapter logs resource errors, so the path is logged here and kept out of the error.
             try {
                 log.debug('Reading widget file', { uri, jsPath: widget.jsPath });
                 const widgetJs = readFileSync(widget.jsPath, 'utf-8');
@@ -148,16 +136,12 @@ export function createResourceService(options: ResourceServiceOptions): Resource
                     contents: [widgetContent],
                 };
             } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                return {
-                    contents: [
-                        {
-                            uri,
-                            mimeType: 'text/plain',
-                            text: `Failed to load widget: ${errorMessage}`,
-                        },
-                    ],
-                };
+                log.error('Failed to load widget', {
+                    uri,
+                    jsPath: widget.jsPath,
+                    errMessage: error instanceof Error ? error.message : String(error),
+                });
+                throw new InternalError(`Failed to load widget ${uri}.`, { uri });
             }
         }
 
@@ -172,7 +156,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
     // Advertisement only, NOT a route table: the read path stays a generic proxy, and any other
     // Apify API GET URL is readable the same way.
     const listResourceTemplates = async (): Promise<ListResourceTemplatesResult> => {
-        const api = getApifyAPIBaseUrl();
+        const api = getApifyAPIPublicBaseUrl();
         return {
             resourceTemplates: [
                 {

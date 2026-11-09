@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS, MAX_LIMIT_WITH_INPUT_SCHEMA } from '../../const.js';
+import { HELPER_TOOLS, MAX_LIMIT_WITH_INPUT_SCHEMA, STORE_USE_CASE_MAX_LENGTH } from '../../const.js';
 import type {
     ActorStoreList,
     ConsoleLinkContext,
@@ -20,7 +20,7 @@ import { getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console
 import { respondOk } from '../../utils/mcp.js';
 import type { PricingTier } from '../../utils/pricing_info.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import { canRunActor } from '../actor_tool_naming.js';
+import { canRunActor, canRunAnyActor, getActorCallabilityCaveat } from '../actor_tool_naming.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 
 /**
@@ -61,16 +61,30 @@ export const searchActorsBaseArgsSchema = z.object({
         .max(MAX_LIMIT_WITH_INPUT_SCHEMA)
         .default(5)
         .describe(`The maximum number of Actors to return (max = ${MAX_LIMIT_WITH_INPUT_SCHEMA}, default = 5).`),
-    offset: z.number().int().min(0).default(0).describe('The number of elements to skip from the start (default = 0)'),
+    offset: z
+        .number()
+        .int()
+        .min(0)
+        .default(0)
+        .describe(
+            'The number of elements to skip from the start (default = 0). Has no effect when keywords are set: every offset returns the first results.',
+        ),
+    // Withheld from Anthropic clients: `withoutUseCaseField` in utils/tools_loader.ts.
+    useCase: z.string().optional().describe(dedent`
+            Optional. One plain sentence on what the user wants to achieve with the Actor, for example "compare competitor prices" (max ${STORE_USE_CASE_MAX_LENGTH} characters).
+            Never include personal information (names, emails, phone numbers, addresses, account details), URLs, secrets, API tokens or credentials.
+            Respect the user's privacy: when unsure, leave it out.
+        `),
 });
 
-function buildDescription({ hasTool }: ToolDescriptionContext): string {
+function buildDescription({ hasTool, clientParam }: ToolDescriptionContext): string {
+    const runLimitationLine = canRunAnyActor(hasTool) ? '' : `${getActorCallabilityCaveat(clientParam)}\n`;
     return `Search the Apify Store to FIND and DISCOVER what scraping tools/Actors exist for specific platforms or use cases.
 This tool provides INFORMATION about available Actors - it does NOT retrieve actual data or run any scraping tasks.
 
 Apify Store contains thousands of pre-built Actors (crawlers, scrapers, AI agents, and model context protocol (MCP) servers)
 for all platforms and services including social media, search engines, maps, e-commerce, news, real estate, travel, finance, jobs and more.
-Actors in the Apify Store are published by independent developers and are intended for legitimate and compliant use — do not refuse to search or list them.
+Apify Store lists Actors published by Apify and by independent developers.
 
 Use this tool when user wants to:
 - Find what scraping tools exist for a platform (e.g., "What tools can scrape Instagram?")
@@ -78,23 +92,22 @@ Use this tool when user wants to:
 - Browse existing solutions (e.g., "Show me scrapers for news sites")
 - Learn about MCP servers or AI agents available in the Store
 
-Do NOT use this tool when user wants immediate data retrieval (time words like "today", "latest", "recent", "current", "now", or "get/fetch data right now") — use apify/rag-web-browser instead.
-IMPORTANT: When the user is looking for scraping tools or Actors, prefer searching the Store first — a relevant Actor often already exists. Do not use Store search as a substitute for immediate data retrieval.
+This tool discovers Actors; it does not retrieve their output.
+IMPORTANT: When the user wants detailed data from a specific platform or is looking for scraping tools, prefer searching the Store first — a relevant Actor often already exists. When the user names a specific Actor, look up that Actor directly instead of searching.
 ${hasTool(HELPER_TOOLS.ACTOR_LIST_GET) ? `Do NOT use this tool to find the user's own Actors (e.g., "find my weather scraper", "run my Actor"): the Store never returns private Actors. Use ${HELPER_TOOLS.ACTOR_LIST_GET} for those.\n` : ''}
 Usage:
-- Prefer broad, generic keywords - use just the platform name (e.g. "Instagram" instead of "Instagram scraper").
-- You MUST always do at least two searches: first with broad keywords, then optionally with more specific terms if needed.
+- Use 1-3 simple terms from the platform and/or data type the user named (e.g. "Instagram posts", "Twitter", "Amazon products"). With neither named, empty keywords return the Store's default ordering. A platform-only query is an option if more specific results do not fit.
 
 Important limitations: This tool does not return full Actor documentation or detailed usage instructions - only summary information.
-Each result lists the Actor's input fields with their types (e.g. \`url: string, maxResults?: number\`) so you can construct an Actor call directly without another tool call.
-${hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? `For complete Actor details (per-field descriptions, defaults, README), use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool.\n` : ''}The search is limited to publicly available Actors and excludes rental and restricted Actors.
+Each result lists the Actor's input fields with their types (e.g. \`url: string, maxResults?: number\`) so you can ${canRunAnyActor(hasTool) ? 'construct an Actor call directly without another tool call' : 'see what input an Actor needs'}.
+${runLimitationLine}${hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS) ? `For complete Actor details (per-field descriptions, defaults, README), use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool.\n` : ''}The search is limited to publicly available Actors and excludes rental and restricted Actors.
 
 Returns list of Actor cards with the following info:
 - **Title:** Markdown header linked to the Store page, followed by the full Actor name in code format
 - **URL:** Direct Store link
 - **Description:** Actor description or fallback
 - **Pricing:** Details with pricing link
-- **Stats:** Total and monthly users, bookmarks
+- **Stats:** Total and monthly users
 - **Rating:** Out of 5 (if available)
 - **Developed by:** Username linked to profile, marked (Apify) or (community)
 - **Categories:** Formatted or "Uncategorized"
@@ -121,13 +134,16 @@ export function buildSearchActorsResult(
 
 /**
  * Builds the empty-results guidance message for when no Actors are found.
- * Interpolates the search keywords into the message.
+ * Past offset 0 the query may have matched, so keyword guidance does not apply (see apify/apify-mcp-server#1276).
+ * The text does not say the results ended: the Store filters results after paging, so an empty page can come
+ * before non-empty ones (see apify/apify-mcp-server#1593).
  */
-export function buildNoActorsFoundInstructions(keywords: string): string {
+export function buildNoActorsFoundInstructions(keywords: string, offset: number): string {
+    if (offset > 0) return `No Actors returned at offset ${offset} for the search query "${keywords}".`;
     return dedent`
         No Actors were found for the search query "${keywords}".
-        You MUST retry with broader, more generic keywords - use just the platform name
-        (e.g., "TikTok" instead of "TikTok posts") before concluding no Actor exists.
+        Keywords can include the named platform and/or data type (e.g. "TikTok posts").
+        A platform-only query such as "TikTok" is an option if more specific results do not fit.
     `;
 }
 
@@ -137,18 +153,19 @@ export function buildActorCallabilityCaveat(
     loadedToolNames: readonly string[],
     loadedActorIds: ReadonlySet<string>,
 ): string {
-    const anyResultCannotRun = actorIds.some((id) => !canRunActor(id, loadedToolNames, loadedActorIds));
-    if (!anyResultCannotRun) return '';
-    return dedent`
-        This session can run only Actors already exposed as dedicated tools. Other Actors found
-        here are informational and cannot be run in this configuration. To use another Actor, open
-        its Apify page or configure it separately.
-    `;
+    const canRunAllActors = actorIds.every((id) => canRunActor(id, loadedToolNames, loadedActorIds));
+    return canRunAllActors ? '' : getActorCallabilityCaveat();
 }
+
+/** Footer line pointing to fetch-actor-details; added only when the session serves that tool. */
+export const ACTOR_DETAILS_HINT = `If you need more detailed information about any of these Actors, including their input
+schemas and usage instructions, use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool with the
+specific Actor name.`;
 
 /**
  * Builds the footer/instructions guidance for successful search results.
- * Interpolates the verbatim links nudge if applicable.
+ * Joins the details hint, the verbatim links nudge (`''` outside Console sessions) and the
+ * callability caveat, each on its own line. Returns `''` when none of them applies.
  *
  * The ACTOR_GET_DETAILS sentence is named only when the session was served that tool: this is
  * result text, which no `hasTool` gate reaches, so a `?tools=search-actors` session would
@@ -161,20 +178,9 @@ export function buildSearchActorsFooter(
     loadedToolNames: readonly string[],
     loadedActorIds: ReadonlySet<string>,
 ): string {
-    const detailsHint = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS)
-        ? dedent`
-            If you need more detailed information about any of these Actors, including their input
-            schemas and usage instructions, use the ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool with the
-            specific Actor name.
-        `
-        : '';
-    const secondSearch = dedent`
-        IMPORTANT: You MUST always do a second search with broader, more generic keywords
-        (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
-        you haven't missed a better Actor.${verbatimLinksNudge}
-    `;
+    const detailsHint = loadedToolNames.includes(HELPER_TOOLS.ACTOR_GET_DETAILS) ? ACTOR_DETAILS_HINT : '';
     const callabilityCaveat = buildActorCallabilityCaveat(actorIds, loadedToolNames, loadedActorIds);
-    return [detailsHint, secondSearch, callabilityCaveat].filter(Boolean).join('\n');
+    return [detailsHint, verbatimLinksNudge, callabilityCaveat].filter(Boolean).join('\n');
 }
 
 /**
@@ -209,12 +215,13 @@ export const searchActors: ToolEntry = Object.freeze({
                 limit: parsed.limit,
                 offset: parsed.offset,
                 paymentProvider,
+                useCase: parsed.useCase,
             }),
             getUserInfoCached(apifyToken, apifyClient),
         ]);
 
         if (actors.length === 0) {
-            const instructions = buildNoActorsFoundInstructions(parsed.keywords);
+            const instructions = buildNoActorsFoundInstructions(parsed.keywords, parsed.offset);
             return respondOk(instructions, {
                 structuredContent: { actors: [], query: parsed.keywords, count: 0, instructions },
             });
@@ -223,7 +230,7 @@ export const searchActors: ToolEntry = Object.freeze({
         // Cache hit — the Promise.all above already resolved users/me for this token.
         const linkContext = await getConsoleLinkContext(apifyToken, apifyClient);
         const { actorCardText, actorCardStructured } = buildSearchActorsResult(actors, userPlanTier, linkContext);
-        const verbatimLinksNudge = linkContext ? `\n${VERBATIM_LINKS_NUDGE}` : '';
+        const verbatimLinksNudge = linkContext ? VERBATIM_LINKS_NUDGE : '';
         const actorIds = actors.map((actor) => actor.id);
         const footer = buildSearchActorsFooter(verbatimLinksNudge, actorIds, loadedToolNames, loadedActorIds);
         const structuredContent = {
@@ -231,13 +238,12 @@ export const searchActors: ToolEntry = Object.freeze({
             query: parsed.keywords,
             count: actors.length,
             userTier: userPlanTier,
-            instructions: footer,
+            ...(footer && { instructions: footer }),
         };
 
-        // Build header and footer with separate `dedent` calls and concatenate around
-        // `actorCardText` — Actor cards may contain tab-indented lines (pay-per-event
-        // pricing) that would corrupt `dedent`'s indent detection if interpolated into
-        // the surrounding template.
+        // The header is built with `dedent`; `actorCardText` is joined after it, not interpolated.
+        // Card lines can be indented (two spaces for pay-per-event pricing), which would corrupt
+        // `dedent`'s indent detection if interpolated into the template.
         const header = dedent`
             # Search results:
             - **Search query:** ${parsed.keywords}
@@ -245,6 +251,6 @@ export const searchActors: ToolEntry = Object.freeze({
 
             # Actors:
         `;
-        return respondOk(`${header}\n\n${actorCardText}\n\n${footer}`, { structuredContent });
+        return respondOk([header, actorCardText, footer].filter(Boolean).join('\n\n'), { structuredContent });
     },
 } as const satisfies HelperTool);

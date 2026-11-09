@@ -1,4 +1,5 @@
 import { HELPER_TOOLS, HTTP_NOT_FOUND, MAX_INLINE_BYTES } from '../../const.js';
+import { getResourceByIdOrName, isAmbiguousResourceId } from '../../utils/apify_resource_id.js';
 import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
@@ -24,8 +25,63 @@ export async function catchNotFound<T>(promise: Promise<T>): Promise<T | null> {
     }
 }
 
+/**
+ * Runs `fetch` against a storage given by ID, name, or `username~name`, where a name alone means one of
+ * the caller's own (see `getResourceByIdOrName`), and reads a 404 as a miss. Returns the result with the
+ * API-safe id it was found under, or `undefined` when there is no such storage.
+ */
+export async function fetchStorageByIdOrName<T>(
+    idOrName: string,
+    fetch: (safeId: string) => Promise<T | undefined>,
+): Promise<{ result: T; safeId: string } | undefined> {
+    return getResourceByIdOrName(idOrName, async (safeId) => {
+        const result = (await catchNotFound(fetch(safeId))) ?? undefined;
+        return result === undefined ? undefined : { result, safeId };
+    });
+}
+
+/**
+ * The storage's ID, for URLs that do not resolve a name: Console pages, and public record links, which
+ * an anonymous `~name` cannot reach. A hit under an ID-shaped safe id was an ID; any other is read back
+ * once through `get`.
+ */
+export async function resolveStorageId(
+    safeId: string,
+    get: (safeId: string) => Promise<{ id: string } | undefined>,
+): Promise<string> {
+    if (isAmbiguousResourceId(safeId)) return safeId;
+    return (await get(safeId))?.id ?? safeId;
+}
+
+const STORAGE_ARG = {
+    dataset: { noun: 'Dataset', arg: 'datasetId', plural: 'datasets' },
+    keyValueStore: { noun: 'Key-value store', arg: 'keyValueStoreId', plural: 'key-value stores' },
+} as const;
+
+/** The `describe()` text of a storage id argument. */
+export function storageIdArgDescription(kind: keyof typeof STORAGE_ARG): string {
+    const { noun, plural } = STORAGE_ARG[kind];
+    return `${noun} ID, name (resolved against your own ${plural}), or full name as username~name.`;
+}
+
+/** The not-found error for a storage id argument, naming the forms it takes. */
+export function storageNotFoundText(kind: keyof typeof STORAGE_ARG, idOrName: string): string {
+    const { noun, arg, plural } = STORAGE_ARG[kind];
+    return `${noun} '${idOrName}' not found. The ${arg} argument takes an ID, a name (resolved against your own ${plural}), or a full name as username~name.`;
+}
+
 function suggestTool(toolName: string, loadedToolNames: readonly string[]): string | undefined {
     return loadedToolNames.includes(toolName) ? toolName : undefined;
+}
+
+/** `nextStep` when the session was served the sibling tool it names, otherwise `fallback`, which names no tool (see #1296). */
+export function resolveSiblingNextStep(
+    toolName: string,
+    loadedToolNames: readonly string[],
+    nextStep: string,
+    fallback = 'No follow-up step.',
+): string {
+    return suggestTool(toolName, loadedToolNames) ? nextStep : fallback;
 }
 
 /**
@@ -74,7 +130,8 @@ export function buildStorageResponse(params: {
 
 /**
  * {summary, nextStep} for paginated storage listings (datasets, key-value stores).
- * When more items remain, nextStep points at the next page; otherwise at inspecting an entry.
+ * When more items remain, nextStep points at the next page; on an empty last page, at what
+ * `unnamed=true` adds when it is not set; otherwise at inspecting an entry.
  */
 export function buildStorageListSummaryNextStep(params: {
     count: number;
@@ -83,15 +140,26 @@ export function buildStorageListSummaryNextStep(params: {
     noun: string;
     listToolName: string;
     inspectHint: string;
+    /** The API's default `unnamed=false` lists only named storages; Actor runs write to unnamed ones. */
+    isNamedOnly: boolean;
 }): { summary: string; nextStep: string } {
-    const { count, total, offset, noun, listToolName, inspectHint } = params;
-    return {
-        summary: `Listed ${count} of ${total} ${noun}.`,
-        nextStep:
-            offset + count < total
-                ? `Call ${listToolName} again with offset=${offset + count} to fetch the next page.`
-                : inspectHint,
-    };
+    const { count, total, offset, noun, listToolName, inspectHint, isNamedOnly } = params;
+    const summary = `Listed ${count} of ${total} ${isNamedOnly ? 'named ' : ''}${noun}.`;
+    if (offset + count < total) {
+        return {
+            summary,
+            nextStep: `Call ${listToolName} again with offset=${offset + count} to fetch the next page.`,
+        };
+    }
+    if (count === 0) {
+        return {
+            summary,
+            nextStep: isNamedOnly
+                ? `unnamed=true includes the unnamed ${noun} that Actor runs create.`
+                : 'No follow-up step.',
+        };
+    }
+    return { summary, nextStep: inspectHint };
 }
 
 /**
@@ -135,8 +203,10 @@ export function buildKvsKeysSummaryNextStep(params: {
     isTruncated: boolean;
     nextExclusiveStartKey?: string;
     firstKey?: string;
+    /** Active loaded tool set; gates the terminal record and store references (see #1296). */
+    loadedToolNames: readonly string[];
 }): { summary: string; nextStep: string } {
-    const { keyValueStoreId, count, isTruncated, nextExclusiveStartKey, firstKey } = params;
+    const { keyValueStoreId, count, isTruncated, nextExclusiveStartKey, firstKey, loadedToolNames } = params;
     const noun = count === 1 ? 'key' : 'keys';
     const summary = `Listed ${count} ${noun}${isTruncated ? ' (more available)' : ''}.`;
     if (isTruncated && nextExclusiveStartKey) {
@@ -148,8 +218,16 @@ export function buildKvsKeysSummaryNextStep(params: {
     return {
         summary,
         nextStep: firstKey
-            ? `Use ${HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=${keyValueStoreId} and recordKey=${firstKey} to read a value.`
-            : `Use ${HELPER_TOOLS.KEY_VALUE_STORE_GET} with keyValueStoreId=${keyValueStoreId} to inspect the store.`,
+            ? resolveSiblingNextStep(
+                  HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET,
+                  loadedToolNames,
+                  `Use ${HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=${keyValueStoreId} and recordKey=${firstKey} to read a value.`,
+              )
+            : resolveSiblingNextStep(
+                  HELPER_TOOLS.KEY_VALUE_STORE_GET,
+                  loadedToolNames,
+                  `Use ${HELPER_TOOLS.KEY_VALUE_STORE_GET} with keyValueStoreId=${keyValueStoreId} to inspect the store.`,
+              ),
     };
 }
 

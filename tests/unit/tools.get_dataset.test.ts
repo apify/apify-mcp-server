@@ -58,6 +58,31 @@ describe('get-dataset', () => {
         expect(content[1].text).toBe(`${summary}\n${nextStep}`);
     });
 
+    it.each([
+        ['RESTRICTED', 'mock-signing-secret'],
+        ['ANYONE_WITH_ID_CAN_READ', 'mock-signing-secret'],
+        ['RESTRICTED', null],
+    ])('omits the signing key and keeps public URLs for %s access (%s)', async (generalAccess, urlSigningSecretKey) => {
+        const metadata = {
+            ...MOCK_DATASET,
+            generalAccess,
+            itemsPublicUrl: 'https://api.apify.com/v2/datasets/ds-1/items?signature=sig-1',
+        };
+        const result = await (getDataset as HelperTool).call(
+            stubToolCallContext({ datasetId: MOCK_DATASET.id }, stubApifyClient({ ...metadata, urlSigningSecretKey })),
+        );
+        const { content, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
+        const { summary, nextStep, ...data } = structuredContent;
+
+        expectSchemaConformingStructuredContent(result, datasetMetadataOutputSchema);
+        expect(data).toEqual(metadata);
+        expect(JSON.parse(content[0].text)).toEqual(metadata);
+        expect(JSON.stringify(result)).not.toContain('urlSigningSecretKey');
+        expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
+    });
+
     it('steers nextStep away from fetching when the dataset is large', async () => {
         const result = await (getDataset as HelperTool).call(
             stubToolCallContext(
@@ -100,12 +125,28 @@ describe('get-dataset', () => {
         expectSoftFailInvalidInput(result);
         expect(structuredContent).toBeUndefined();
         expect(content[0].text).toContain("Dataset 'missing' not found");
+        expect(content[0].text).toContain('a name (resolved against your own datasets)');
     });
 
     it('rejects empty datasetId via ajv validation', () => {
         const tool = getDataset as HelperTool;
         expect(tool.ajvValidate({ datasetId: '' })).toBe(false);
         expect(tool.ajvValidate({ datasetId: 'ds-1' })).toBe(true);
+    });
+
+    // Regression: #1296 — nextStep named a sibling tool the session was not served.
+    it('falls back without naming get-dataset-items when it is not loaded', async () => {
+        const result = (await (getDataset as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient(MOCK_DATASET), {
+                loadedToolNames: [HELPER_TOOLS.DATASET_GET],
+            }),
+        )) as TextToolResult & { structuredContent: Record<string, unknown> };
+
+        expect(result.structuredContent.nextStep).toBe('No follow-up step.');
+        expect(JSON.stringify([result.content, result.structuredContent])).not.toContain(
+            HELPER_TOOLS.DATASET_GET_ITEMS,
+        );
+        expectSchemaConformingStructuredContent(result, datasetMetadataOutputSchema);
     });
 });
 
@@ -211,5 +252,17 @@ describe('get-dataset fields normalization', () => {
         expect(content[2].text).toBe(
             `Apify Console: https://console.apify.com/storage/datasets/ds-1\n${VERBATIM_LINKS_NUDGE}`,
         );
+    });
+});
+
+describe('get-dataset with a bare dataset name', () => {
+    it("reads the name as one of the caller's own datasets", async () => {
+        const datasetSpy = vi.fn().mockReturnValue({ get: async () => MOCK_DATASET });
+
+        await (getDataset as HelperTool).call(
+            stubToolCallContext({ datasetId: 'eval-ai-items' }, mockApifyClient({ dataset: datasetSpy })),
+        );
+
+        expect(datasetSpy).toHaveBeenCalledWith('~eval-ai-items');
     });
 });

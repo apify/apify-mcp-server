@@ -28,9 +28,9 @@ export function registerCases(suiteName: string, cases: Case[], ctx: Omit<CaseCt
             const skip = (ctx.isDeploymentTestOnly && !c.isDeploymentTest) || (c.skipIf?.(fullCtx) ?? false);
             const runIt = skip ? it.skip : it;
             const runFn = async () => c.run(fullCtx);
-            if (c.retry !== undefined) {
+            if (c.retry !== undefined || c.timeout !== undefined) {
                 // eslint-disable-next-line vitest/valid-title vitest/expect-expect
-                runIt(c.name, { retry: c.retry }, runFn);
+                runIt(c.name, { retry: c.retry, timeout: c.timeout }, runFn);
             } else {
                 // eslint-disable-next-line vitest/valid-title vitest/expect-expect
                 runIt(c.name, runFn);

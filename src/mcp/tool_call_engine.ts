@@ -4,28 +4,57 @@
  */
 
 import type { ServerNotification } from '@modelcontextprotocol/sdk/types.js';
+import type { ErrorObject } from 'ajv';
 import dedent from 'dedent';
 
 import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
-import { ALLOWED_TASK_TOOL_EXECUTION_MODES, FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../const.js';
+import {
+    ALLOWED_TASK_TOOL_EXECUTION_MODES,
+    FAILURE_CATEGORY,
+    HELPER_TOOLS,
+    RAG_WEB_BROWSER,
+    TOOL_STATUS,
+    WEB_FETCH,
+    WEB_SEARCH,
+} from '../const.js';
 import { prepareToolCallContext } from '../payments/helpers.js';
 import type { PaymentMeta, PaymentProvider, RequestHeaders } from '../payments/types.js';
 import { decodeDotPropertyNames } from '../tools/actor_input_schema.js';
-import { legacyToolNameToNew } from '../tools/actor_tool_naming.js';
-import { checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
+import { actorNameToToolName, legacyToolNameToNew } from '../tools/actor_tool_naming.js';
+import {
+    buildDeniedInputsNote,
+    getActorToolPolicy,
+    getDeniedDirectActorInputs,
+    getDirectActorPolicy,
+} from '../tools/actors/actor_tool_contract.js';
+import { buildLegacyMcpSyntaxRejection, checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
 import { withReportProblemNudge } from '../tools/dev/report_problem.js';
-import type { ActorStore, CallDiagnostics, ToolCallTelemetryProperties, ToolEntry, ToolStatus } from '../types.js';
+import type {
+    ActorStore,
+    CallDiagnostics,
+    ToolCallTelemetryProperties,
+    ToolEntry,
+    ToolStatus,
+    ToolTelemetryContext,
+} from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 import { logHttpError } from '../utils/logging.js';
 import { respondOk } from '../utils/mcp.js';
-import { getRequestOriginForClient } from '../utils/mcp_clients.js';
+import { getRequestOriginForClient, resolveStoreSearchTracking } from '../utils/mcp_clients.js';
 import type { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { extractAjvErrorDetails, isMcpError } from '../utils/tool_status.js';
-import { buildActorFields, extractActorId, extractActorName, getToolFullName } from '../utils/tools.js';
+import {
+    buildActorFields,
+    extractActorId,
+    extractActorInterface,
+    extractActorName,
+    getToolFullName,
+} from '../utils/tools.js';
 import type { McpClientContext } from './client_context.js';
+import { addCompatibilityNote, loadReplacedDefaultTool, rewriteRunInputAsServerRequest } from './run_input_rewrite.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
 import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
 import { dispatchToolCall } from './tool_dispatch.js';
@@ -37,6 +66,74 @@ const PROGRESS_TRACKER_INTERNAL_TOOLS = new Set<string>([
     HELPER_TOOLS.ACTOR_BUILD_GET,
     HELPER_TOOLS.ACTOR_BUILD,
 ]);
+
+/** The value or subschema at JSON pointer `path`: `undefined` when it does not exist. */
+function resolveJsonPointer(root: unknown, path: string, isSchema: boolean): unknown {
+    const segments = path
+        .split('/')
+        .slice(1)
+        .map((segment) => segment.replaceAll('~1', '/').replaceAll('~0', '~'));
+    return segments.reduce<unknown>((node, segment) => {
+        if (typeof node !== 'object' || node === null) return undefined;
+        if (!isSchema) return (node as Record<string, unknown>)[segment];
+        const { properties, items } = node as { properties?: Record<string, unknown>; items?: unknown };
+        return properties?.[segment] ?? items;
+    }, root);
+}
+
+/** The JSON type of `value`, named as AJV names types. */
+function getJsonTypeName(value: unknown): string {
+    if (value === null) return 'null';
+    return Array.isArray(value) ? 'array' : typeof value;
+}
+
+/**
+ * The validation failure text: each error with the type received for a type error, then the description of each
+ * failing parameter, so the caller learns what the parameter takes without another lookup.
+ */
+function buildAjvFailureText(errors: ErrorObject[], args: unknown, inputSchema: unknown): string {
+    const parameterPaths = new Set<string>();
+    const failures = errors.map((error) => {
+        const { missingProperty } = error.params as { missingProperty?: string };
+        parameterPaths.add(missingProperty ? `${error.instancePath}/${missingProperty}` : error.instancePath);
+        const received =
+            error.keyword === 'type'
+                ? `, got ${getJsonTypeName(resolveJsonPointer(args, error.instancePath, false))}`
+                : '';
+        const allowedValues = error.keyword === 'enum' ? `: ${JSON.stringify(error.params.allowedValues)}` : '';
+        return `${error.instancePath || 'root'}: ${error.message || 'validation error'}${received}${allowedValues}`;
+    });
+    const descriptions = new Set<string>();
+    for (let path of parameterPaths) {
+        // Dictionary values may have no description; their parent explains the accepted shape.
+        while (path) {
+            const { description } = (resolveJsonPointer(inputSchema, path, true) ?? {}) as { description?: unknown };
+            if (typeof description === 'string') {
+                descriptions.add(`Parameter ${path}: ${description}`);
+                break;
+            }
+            path = path.slice(0, path.lastIndexOf('/'));
+        }
+    }
+    return [`Validation errors: ${failures.join('; ')}.`, ...descriptions].join('\n');
+}
+
+/** The default tools that replaced the default `apify--rag-web-browser` in 0.21.0, with what each does. */
+const RAG_WEB_BROWSER_REPLACEMENTS = [
+    [actorNameToToolName(WEB_SEARCH), 'searches the web'],
+    [actorNameToToolName(WEB_FETCH), 'reads a page by URL'],
+] as const;
+
+/**
+ * For a call to the removed `apify--rag-web-browser` from a client with an old tool list, the served tools that
+ * replaced it; empty when the session serves neither, since served text names no absent tool.
+ */
+function buildReplacedToolText(name: string, tools: Map<string, ToolEntry>): string {
+    if ((legacyToolNameToNew(name) ?? name) !== actorNameToToolName(RAG_WEB_BROWSER)) return '';
+    const replacements = RAG_WEB_BROWSER_REPLACEMENTS.filter(([toolName]) => tools.has(toolName));
+    if (!replacements.length) return '';
+    return `\nTool "${name}" was replaced: ${replacements.map(([toolName, use]) => `${toolName} ${use}`).join(' and ')}.`;
+}
 
 /** A pre-dispatch failure that the shell converts to v1's protocol-error sequence. */
 export type InvalidToolCall = {
@@ -62,6 +159,8 @@ export type PreparedCall = {
     paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined;
     // The shell uses this decoded copy for telemetry.
     decodedArgs: Record<string, unknown>;
+    /** Set when a pre-0.21 tool name or run input was accepted; added to the tool result. */
+    compatibilityNote?: string;
 };
 
 /** Result of the synchronous dispatch tail, including the exact wire payload. */
@@ -77,7 +176,10 @@ export type PreparedCallError = ToolCallOutcome & {
     decodedArgs: Record<string, unknown>;
 };
 
-/** Builds the pre-flight result; standby rejection takes precedence over 402. */
+/**
+ * Builds the pre-flight result; standby rejection takes precedence over 402. The rejection skipped dispatch, which
+ * strips `toolTelemetry` from a tool response, so it is stripped here and its failure detail recorded.
+ */
 export function buildPreflightFailureOutcome(
     standbyRejection: Record<string, unknown> | null,
     paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined,
@@ -88,14 +190,16 @@ export function buildPreflightFailureOutcome(
     callDiagnostics: CallDiagnostics;
     result: Record<string, unknown> | ReturnType<typeof buildPaymentRequiredResponse>;
 } {
+    const { toolTelemetry, ...rejection } = (standbyRejection ?? {}) as { toolTelemetry?: ToolTelemetryContext };
     return {
         toolStatus: TOOL_STATUS.SOFT_FAIL,
         callDiagnostics: {
             failure_category: FAILURE_CATEGORY.INVALID_INPUT,
             ...(standbyRejection ? {} : { failure_http_status: 402 }),
+            ...(toolTelemetry?.failureDetail && { failure_detail: toolTelemetry.failureDetail }),
             ...buildActorFields(actorName, actorId),
         },
-        result: (standbyRejection ?? paymentRequiredResult)!,
+        result: standbyRejection ? rejection : paymentRequiredResult!,
     };
 }
 
@@ -139,6 +243,13 @@ export async function prepareToolCall(params: {
         allowUnauthMode,
     } = params;
     let { args } = params;
+    const requestOrigin = getRequestOriginForClient(clientContext);
+    const storeSearchTracking = telemetryData
+        ? resolveStoreSearchTracking(requestOrigin, meta, params.mcpSessionId)
+        : undefined;
+    if (telemetryData && storeSearchTracking?.traceId) {
+        telemetryData.trace_id = storeSearchTracking.traceId;
+    }
 
     if (!apifyToken && !paymentProvider?.allowsUnauthenticated && !allowUnauthMode) {
         return {
@@ -152,16 +263,38 @@ export async function prepareToolCall(params: {
         };
     }
 
-    const toolEntry = resolveToolEntry(name, tools);
+    let toolEntry = resolveToolEntry(name, tools);
+    const replacedToolText = toolEntry ? '' : buildReplacedToolText(name, tools);
+    try {
+        toolEntry ??= await loadReplacedDefaultTool({
+            name,
+            tools,
+            apifyToken,
+            requestOrigin,
+            mcpSessionId: params.mcpSessionId,
+        });
+    } catch (error) {
+        const outcome = classifyToolCallError(error, {
+            tools,
+            toolName: name,
+            failingToolName: name,
+            actorName: undefined,
+            actorId: undefined,
+            isAborted: Boolean(params.signal?.aborted),
+            mcpSessionId: params.mcpSessionId,
+        });
+        return { ...outcome, resolvedToolName: name, decodedArgs: (args ?? {}) as Record<string, unknown> };
+    }
 
     if (!toolEntry) {
         const availableTools = Array.from(tools.keys());
         return {
-            message: dedent`
+            message:
+                dedent`
                 Tool "${name}" was not found.
                 Available tools: ${availableTools.length > 0 ? availableTools.join(', ') : 'none'}.
                 Please verify the tool name is correct. You can list all available tools using the tools/list request.
-            `,
+            ` + replacedToolText,
             toolStatus: TOOL_STATUS.SOFT_FAIL,
             callDiagnostics: { failure_category: FAILURE_CATEGORY.INVALID_INPUT },
         };
@@ -171,13 +304,17 @@ export async function prepareToolCall(params: {
     const resolvedToolName = getToolFullName(tool);
     if (telemetryData) {
         telemetryData.tool_name = resolvedToolName;
+        const actorInterface = extractActorInterface(tool, args as Record<string, unknown> | undefined);
+        if (actorInterface) telemetryData.actor_interface = actorInterface;
     }
 
     const actorName = extractActorName(tool, args as Record<string, unknown>);
     const actorId = extractActorId(tool);
-    // fetch-actor-details only describes Actors, and only helps if this session serves it.
+    // Actor details describe the original schema; restricted direct tools publish their own in tools/list.
     const schemaHint =
-        tool.type === TOOL_TYPE.ACTOR && tools.has(HELPER_TOOLS.ACTOR_GET_DETAILS)
+        tool.type === TOOL_TYPE.ACTOR &&
+        !getDirectActorPolicy(tool.actorFullName) &&
+        tools.has(HELPER_TOOLS.ACTOR_GET_DETAILS)
             ? `using ${HELPER_TOOLS.ACTOR_GET_DETAILS} tool`
             : 'in tools/list';
 
@@ -205,7 +342,7 @@ export async function prepareToolCall(params: {
         args = decodeDotPropertyNames(args as Record<string, unknown>) as Record<string, unknown>;
         decodedArgs = args as Record<string, unknown>;
 
-        const {
+        let {
             toolArgsWithoutPayment: toolArgs,
             toolArgsRedacted: logSafeArgs,
             apifyClient,
@@ -217,37 +354,71 @@ export async function prepareToolCall(params: {
             apifyToken,
             meta,
             requestHeaders,
-            requestOrigin: getRequestOriginForClient(clientContext),
+            requestOrigin,
         });
+        apifyClient.storeSearchTracking = storeSearchTracking;
 
         log.debug('Validate arguments for tool', {
             toolName: tool.name,
             mcpSessionId: params.mcpSessionId,
             input: logSafeArgs,
         });
-        if (!tool.ajvValidate(toolArgs)) {
-            const errors = tool.ajvValidate.errors || [];
-            const ajvErrorDetails = extractAjvErrorDetails(errors);
-            const errorMessages = errors
-                .map(
-                    (e: { message?: string; instancePath?: string }) =>
-                        `${e.instancePath || 'root'}: ${e.message || 'validation error'}`,
-                )
-                .join('; ');
+        const deniedInputs =
+            tool.type === TOOL_TYPE.ACTOR ? getDeniedDirectActorInputs(tool.actorFullName, toolArgs) : [];
+        if (tool.type === TOOL_TYPE.ACTOR && deniedInputs.length) {
             return {
-                message: dedent`
-                    Invalid arguments for tool "${tool.name}".
-                    Validation errors: ${errorMessages}.
-                    Please check the tool's input schema ${schemaHint} and ensure all required parameters are provided with correct types and values.
-                `,
+                message: `Invalid arguments for tool "${tool.name}": ${buildDeniedInputsNote(tool.actorFullName, deniedInputs)}`,
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
                 callDiagnostics: {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                    ...ajvErrorDetails,
                     ...buildActorFields(actorName, actorId),
                 },
                 resolvedToolName,
                 decodedArgs,
+            };
+        }
+        // Key names only, never values: they show which call shape a rejected client sends. Read before validation,
+        // since AJV removes unknown keys and `toolArgs` can be `decodedArgs` itself (a payment provider may return it).
+        const argKeys = Object.keys(decodedArgs).slice(0, 20).join(',').slice(0, 200);
+        const runInputRewrite = rewriteRunInputAsServerRequest({
+            tool,
+            args: toolArgs,
+            argKeys,
+            mcpSessionId: params.mcpSessionId,
+        });
+        if (runInputRewrite) toolArgs = runInputRewrite.args;
+        const compatibilityNote = [replacedToolText.trim(), runInputRewrite?.note].filter(Boolean).join('\n');
+        if (!tool.ajvValidate(toolArgs)) {
+            const errors = tool.ajvValidate.errors || [];
+            const exampleCall =
+                tool.type === TOOL_TYPE.ACTOR_SERVER
+                    ? getActorToolPolicy(tool.actorFullName)?.serverTool?.exampleCall
+                    : undefined;
+            const ajvErrorDetails = extractAjvErrorDetails(errors);
+            return {
+                message: [
+                    `Invalid arguments for tool "${tool.name}".`,
+                    buildAjvFailureText(errors, toolArgs, tool.inputSchema),
+                    // Only an Actor tool's schema is worth a pointer: it is the Actor's input schema. Another
+                    // tool's schema is already in the client's tools/list.
+                    ...(tool.type === TOOL_TYPE.ACTOR
+                        ? [
+                              `Please check the tool's input schema ${schemaHint} and ensure all required parameters are provided with correct types and values.`,
+                          ]
+                        : []),
+                    ...(replacedToolText ? [replacedToolText.trim()] : []),
+                    ...(runInputRewrite ? [runInputRewrite.note] : exampleCall ? [`Example call: ${exampleCall}`] : []),
+                ].join('\n'),
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+                callDiagnostics: {
+                    failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                    ...ajvErrorDetails,
+                    validation_arg_keys: argKeys,
+                    ...buildActorFields(actorName, actorId),
+                },
+                resolvedToolName,
+                decodedArgs,
+                logFields: { argKeys },
             };
         }
 
@@ -268,19 +439,15 @@ export async function prepareToolCall(params: {
             };
         }
 
-        // Standby Actors need a specific rejection instead of a generic 402 in both modes.
-        const isCallActorTool = tool.name === HELPER_TOOLS.ACTOR_CALL || tool.name === HELPER_TOOLS.ACTOR_CALL_WIDGET;
-        const actorArg = (toolArgs as { actor?: unknown } | undefined)?.actor;
-
         const standbyRejection =
-            paymentProvider && isCallActorTool && typeof actorArg === 'string' && actorArg.length > 0
-                ? await checkPaymentProviderStandbyConflict({
-                      actorName: actorArg,
-                      paymentProvider,
-                      apifyToken,
-                      mcpSessionId: params.mcpSessionId,
-                  })
-                : null;
+            buildLegacyMcpSyntaxRejection(tool.name, toolArgs.actor, Array.from(tools.keys())) ??
+            (await checkPaymentProviderStandbyConflict({
+                tool,
+                args: toolArgs,
+                paymentProvider,
+                apifyToken,
+                mcpSessionId: params.mcpSessionId,
+            }));
 
         return {
             tool,
@@ -292,6 +459,7 @@ export async function prepareToolCall(params: {
             standbyRejection,
             paymentRequiredResult,
             decodedArgs,
+            compatibilityNote: compatibilityNote || undefined,
         };
     } catch (error) {
         // Keep protocol errors as JSON-RPC errors; classify other failures with actor context.
@@ -388,7 +556,10 @@ export async function executeSyncToolCall(
             taskMode: false,
         });
         return {
-            result: nudge(dispatchResult.result, dispatchResult.callDiagnostics),
+            result: nudge(
+                addCompatibilityNote(dispatchResult.result, prepared.compatibilityNote),
+                dispatchResult.callDiagnostics,
+            ),
             toolStatus: dispatchResult.toolStatus,
             callDiagnostics: dispatchResult.callDiagnostics,
         };

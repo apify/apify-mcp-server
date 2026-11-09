@@ -24,7 +24,8 @@ pnpm run evals:mcp-agent --dataset mcp-server-evals-merge --id '^merge/<family>/
 - `--claude-judge` runs the judge on the Agent SDK too (`--judge-model` then takes an Anthropic ID, default `claude-sonnet-5`); with `--subscription --claude-judge` a run needs only `APIFY_TOKEN` + Langfuse keys. Caveat: a Claude judge scoring a Claude agent can be self-lenient — prefer the OpenRouter judge for comparable numbers.
 - `<m>` above is any agent model; pick it off this ladder rather than a default in the examples: `claude-opus-5` (calibration) → `claude-sonnet-5` → `claude-haiku-4-5` (the CLI default, and the sensitive probe). A chained shell command's exit code is the LAST run's — read each log's `📊` line, not the chain status.
 - Known flakes, retry the single item once before diagnosing: `🔥 Never completed (task threw)` (harness/SDK spawn); in remote/sandboxed environments, the agent reading "MCP servers still connecting" and falling back to built-ins (doesn't reproduce locally).
-- Between runs of suites that create named resources: `pnpm run evals:mcp-agent:tasks-fixtures` (adapt per family) deletes leftover `eval-*` resources and reseeds the permanent fixture. Web-target families that create no named state need no fixtures script — say so in the README instead.
+- Between runs of suites that create named resources: `pnpm run evals:mcp-agent:fixtures` deletes `eval-*` leftovers older than 6 h (with `--run-id`, only that run's) and reseeds the permanent fixtures. Web-target families that create no named state need no fixtures — say so in the README instead.
+- After a run of the schedules or tasks family, delete what it created: `pnpm run evals:mcp-agent:fixtures -- --run-id <id>`, with the id the run's summary printed. CI passes `<github.run_id>-<github.run_attempt>` to the run and to its teardown step.
 
 ## Dataset item shape (Langfuse)
 
@@ -32,16 +33,17 @@ pnpm run evals:mcp-agent --dataset mcp-server-evals-merge --id '^merge/<family>/
 {
   "datasetName": "mcp-server-evals-merge",
   "id": "merge/<family>/<tool>-<difficulty>-1",
-  "input": { "query": "<user-language prompt, no tool names>" },
+  "input": { "query": "<user-language prompt, no tool names; a name the case creates ends in -{{uniq}}>" },
   "expectedOutput": "PASS only if <tool> was called with <args> and the final answer states <fact>. FAIL if <specific bad behavior>.",
   "metadata": { "category": "<tool-or-chain>", "kind": "agent", "maxTurns": 10, "tools": ["<family>", "actors"] }
 }
 ```
 
+- `{{uniq}}` in `query` and `expectedOutput` is replaced by the runner with `<runId>-n<runId length>-t<trial>r<attempt>`; put it in both or neither, and keep the static part of the name at 34 characters or fewer (63-char platform cap). Not substituted in `expectedArgs`.
 - `datasetName` is one of the two: `mcp-server-evals-merge` for a `kind: "agent"` case, `mcp-server-evals-pr` for a `kind: "tool-call"` one.
 - `metadata` is strict-validated (`langfuse/dataset.ts`): unknown keys fail the run before LLM spend. Knobs: `category`, `kind`, `expectedTools`, `expectedArgs`, `expectedErrors`, `maxTurns`, `tools`, `failTools`, `mcpToolsOnly`.
 - `category` = tool under test (what `--category` filters); difficulty goes in the id's `<slug>` half.
-- `kind: "agent"` requires `expectedOutput` (multi-turn, judged, `expectedErrors`/`failTools`/`maxTurns` apply); `kind: "tool-call"` requires a non-empty `expectedTools` instead, and rejects `expectedOutput`, `expectedErrors`, `failTools`, and `maxTurns` (turns are fixed at 2). `expectedArgs` (optional, `kind: "tool-call"` only): a flat object, every key deep-equals the captured call's same key, unlisted keys ignored — use it to pin an argument the tool-name check alone would miss (e.g. a resolved vs. guessed Actor slug). Only pin `expectedArgs` when `expectedTools` names a single tool, or when every tool it lists shares the pinned keys with the same expected values — a flat object can't apply differently per tool. `pr/call-actor/rag-web-browser` is the example: `apify/rag-web-browser` resolves to either the generic `call-actor` tool (`{actor, input}`) or the direct `apify--rag-web-browser` tool (`{query, maxResults, ...}`), two incompatible argument shapes, so that item lists both tools in `expectedTools` and carries no `expectedArgs`.
+- `kind: "agent"` requires `expectedOutput` (multi-turn, judged, `expectedErrors`/`failTools`/`maxTurns` apply); `kind: "tool-call"` requires a non-empty `expectedTools` instead, and rejects `expectedOutput`, `expectedErrors`, `failTools`, and `maxTurns` (turns are fixed at 2). `expectedArgs` (optional, `kind: "tool-call"` only): a flat object, every key deep-equals the captured call's same key, unlisted keys ignored — use it to pin an argument the tool-name check alone would miss (e.g. a resolved vs. guessed Actor slug). Only pin `expectedArgs` when `expectedTools` names a single tool, or when every tool it lists shares the pinned keys with the same expected values — a flat object can't apply differently per tool. `pr/call-actor/rag-web-browser` is the example: `apify/rag-web-browser` resolves to either the generic `call-actor` tool (`{actor, input}`) or, when the session selects the Actor, its `apify--rag-web-browser` Server Actor tool (`{method, path, query}`), two incompatible argument shapes, so that item lists both tools in `expectedTools` and carries no `expectedArgs`.
 - A `kind: "agent"` case that provokes an error on purpose sets `expectedErrors: ["<tool-name>", ...]` — the tool(s) allowed to fail on that item; there is no run-wide error-tolerance flag.
 - `mcpToolsOnly: true` on a `kind: "tool-call"` item drops Claude Code's built-ins for that item alone (OR-ed with the run-wide `--mcp-tools-only`) — use it when a case must isolate MCP-vs-MCP tool choice, or when the built-in's own tool-search meta-tool (`ToolSearch`) would otherwise be a false first capture.
 - The id carries its dataset as the first segment: `pr/<tool>/<slug>` (e.g. `pr/search-actors/flight-data-booking-sites`) or `merge/<family>/<slug>` (e.g. `merge/tasks/chain-hard-1`), where the middle segment is the tool or the coarse family (`mcp-agent`, `tasks`, `web-fetch`, `web-selection`), distinct from the fine-grained `metadata.category` above. Filter one family with `--id '^merge/<family>/'`.
@@ -113,7 +115,9 @@ const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
 
 ## Fixtures script pattern
 
-One script per stateful family (`evals/scripts/tasks_fixtures.ts` is the template): delete leftover `eval-*` resources except the permanent fixture, create the fixture if missing, and **reset the fixture's mutable state** every run (an eval agent may have mutated it). Wire as `evals:mcp-agent:<family>-fixtures` in package.json.
+One script for every stateful family, `evals/scripts/fixtures.ts` (`pnpm run evals:mcp-agent:fixtures`): sweep leftovers, then create each permanent fixture if missing and **reset its mutable state** every run (an eval agent may have mutated it). A new stateful family adds its sweep and fixture there.
+
+The sweep: `--run-id <id>` deletes only names with that run's `-<id>-n<id length>-t` token. Without it, the seed sweep deletes `eval-*` schedules and tasks older than `LEFTOVER_MAX_AGE_MS` (6 h). The rule is a pure function in a side-effect-free sibling module (`evals/scripts/sweep.ts`), so a unit test imports it without the CLI's `dotenv` load running.
 
 ## Coverage matrix (definition of done for the dataset)
 

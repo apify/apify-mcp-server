@@ -47,5 +47,7 @@ export interface Case {
     skipIf?: (ctx: CaseCtx) => boolean;
     /** Forwarded to vitest `it(name, { retry }, ...)`. */
     retry?: number;
+    /** Forwarded to vitest `it(name, { timeout }, ...)`, for a case that outlasts the suite's timeout. */
+    timeout?: number;
     run: (ctx: CaseCtx) => Promise<void>;
 }

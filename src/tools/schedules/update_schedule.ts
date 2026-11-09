@@ -5,9 +5,9 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { isAmbiguousResourceId, toSafeResourceId } from '../../utils/apify_resource_id.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { scheduleOutputSchema } from '../structured_output_schemas.js';
-import { isAmbiguousResourceId, toSafeResourceId } from '../tasks/task_helpers.js';
 import {
     buildApiActions,
     buildScheduleResult,

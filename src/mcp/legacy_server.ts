@@ -364,12 +364,9 @@ export class LegacyMcpServer {
         // Handles the request to list tools.
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
             const presentTools = new Set(this.host.tools.keys());
+            const { clientParam } = this.host.options;
             const tools = Array.from(this.host.tools.values()).map((tool) =>
-                getToolPublicFieldOnly(tool, {
-                    mode: this.host.serverMode,
-                    filterWidgetMeta: true,
-                    presentTools,
-                }),
+                getToolPublicFieldOnly(tool, { presentTools, clientParam }),
             );
             return { tools };
         });
@@ -567,16 +564,14 @@ export class LegacyMcpServer {
                             mcpSessionId,
                             actorName,
                             actorId,
-                            clientContext,
-                            clientParam: this.host.options.clientParam,
                             taskStore: this.taskStore,
                             server: this.server,
                             tools: this.host.tools,
                             actorStore,
                             paymentProvider,
-                            telemetryEnabled: this.host.telemetryEnabled,
+                            telemetryData,
+                            userId,
                             telemetryEnv: this.host.telemetryEnv,
-                            transportType: this.host.options.transportType,
                             sendNotification,
                         }).catch((error) =>
                             // Benign task-expiry is handled in-method (see the catch block and

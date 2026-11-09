@@ -12,7 +12,7 @@ import { searchActorsWidget } from '../../src/tools/widgets/search_actors_widget
 import type { ServerModeOption } from '../../src/types.js';
 import { SERVER_MODE } from '../../src/types.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
-import { getActors } from '../../src/utils/tools_loader.js';
+import { getActors, withoutUseCaseField } from '../../src/utils/tools_loader.js';
 import { getRequestHandler } from './helpers/mcp_server.js';
 
 // Stub getActors so tests can produce a non-empty actorTools array without a network
@@ -114,8 +114,8 @@ describe('ActorsMcpServer initialize handler', () => {
 
             // After initialize (apps mode): composed with APPS-mode variants
             // search-actors is mode-independent (data-only); search-actors-widget is the apps-only UI variant auto-added in apps mode.
-            expect(server.tools.get(HELPER_TOOLS.STORE_SEARCH)).toBe(searchActors);
-            expect(server.tools.get(HELPER_TOOLS.STORE_SEARCH_WIDGET)).toBe(searchActorsWidget);
+            expect(server.tools.get(HELPER_TOOLS.STORE_SEARCH)).toBe(withoutUseCaseField(searchActors));
+            expect(server.tools.get(HELPER_TOOLS.STORE_SEARCH_WIDGET)).toBe(withoutUseCaseField(searchActorsWidget));
         },
     );
 
@@ -162,9 +162,9 @@ describe('ActorsMcpServer initialize handler', () => {
 
             await dispatchInitialize(server, makeInitializeRequest(true));
 
-            expect(server.tools.get(HELPER_TOOLS.STORE_SEARCH)).toBe(searchActors);
+            expect(server.tools.get(HELPER_TOOLS.STORE_SEARCH)).toBe(withoutUseCaseField(searchActors));
             expect(server.tools.get(HELPER_TOOLS.ACTOR_CALL)).toBe(callActor);
-            expect(server.tools.get(HELPER_TOOLS.STORE_SEARCH_WIDGET)).toBe(searchActorsWidget);
+            expect(server.tools.get(HELPER_TOOLS.STORE_SEARCH_WIDGET)).toBe(withoutUseCaseField(searchActorsWidget));
         },
     );
 
@@ -180,7 +180,7 @@ describe('ActorsMcpServer initialize handler', () => {
 
             await dispatchInitialize(server, makeInitializeRequest(true));
 
-            expect(server.tools.get(HELPER_TOOLS.STORE_SEARCH_WIDGET)).toBe(searchActorsWidget);
+            expect(server.tools.get(HELPER_TOOLS.STORE_SEARCH_WIDGET)).toBe(withoutUseCaseField(searchActorsWidget));
         },
     );
 });

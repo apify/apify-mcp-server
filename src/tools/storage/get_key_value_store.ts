@@ -9,10 +9,16 @@ import { buildConsoleKeyValueStoreUrl, getConsoleLinkContext } from '../../utils
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { respondUserError } from '../../utils/mcp.js';
 import { keyValueStoreOutputSchema } from '../structured_output_schemas.js';
-import { buildStorageResponse } from './storage_helpers.js';
+import {
+    buildStorageResponse,
+    fetchStorageByIdOrName,
+    resolveSiblingNextStep,
+    storageIdArgDescription,
+    storageNotFoundText,
+} from './storage_helpers.js';
 
 const getKeyValueStoreArgs = z.object({
-    keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name.'),
+    keyValueStoreId: z.string().min(1).describe(storageIdArgDescription('keyValueStore')),
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
@@ -49,19 +55,27 @@ export const getKeyValueStore: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, apifyToken } = toolArgs;
+        const { args, apifyClient: client, apifyToken, loadedToolNames } = toolArgs;
         const parsed = getKeyValueStoreArgs.parse(args);
         const keyValueStoreId = stripQuoteWrappers(parsed.keyValueStoreId);
-        const kvStore = await client.keyValueStore(keyValueStoreId).get();
+        const kvStore = (
+            await fetchStorageByIdOrName(keyValueStoreId, async (safeId) => client.keyValueStore(safeId).get())
+        )?.result;
         if (!kvStore) {
-            return respondUserError(`Key-value store '${keyValueStoreId}' not found.`);
+            return respondUserError(storageNotFoundText('keyValueStore', keyValueStoreId));
         }
         const linkContext = await getConsoleLinkContext(apifyToken, client);
         const bytes = (kvStore.stats as { storageBytes?: number } | undefined)?.storageBytes;
         const summary = `Key-value store '${kvStore.name ?? keyValueStoreId}'${bytes !== undefined ? ` holds ${bytes} bytes` : ''}.`;
-        const nextStep = `Use ${HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET} with keyValueStoreId=${keyValueStoreId} to list keys.`;
+        const nextStep = resolveSiblingNextStep(
+            HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
+            loadedToolNames,
+            `Use ${HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET} with keyValueStoreId=${keyValueStoreId} to list keys.`,
+        );
+        // The URL signing key mints non-expiring links; the *PublicUrl fields expire, so they stay (apify/ai-team#330).
+        const { urlSigningSecretKey, ...metadata } = kvStore;
         return buildStorageResponse({
-            structuredContent: kvStore as unknown as Record<string, unknown>,
+            structuredContent: metadata,
             summary,
             nextStep,
             apifyConsoleUrl: buildConsoleKeyValueStoreUrl(linkContext, kvStore.id),

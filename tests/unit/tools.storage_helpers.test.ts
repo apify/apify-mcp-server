@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import {
     buildDatasetItemsSummaryNextStep,
     buildBinaryRecordDisposition,
+    buildKvsKeysSummaryNextStep,
+    fetchStorageByIdOrName,
     normalizeRecordKey,
+    resolveStorageId,
 } from '../../src/tools/storage/storage_helpers.js';
 
 // `buildStorageNotFound` was deleted in #937 — its six call sites call `respondUserError(text)`
@@ -54,6 +57,24 @@ describe('buildDatasetItemsSummaryNextStep()', () => {
         expect(loaded.nextStep).toBe(unloaded.nextStep);
         expect(loaded.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
         expect(loaded.nextStep).toContain('offset=20');
+    });
+});
+
+// Regression: #1296 — the terminal nextStep named record/store tools the session was not served.
+describe('buildKvsKeysSummaryNextStep()', () => {
+    it.each([
+        ['a nonempty listing', { count: 1, firstKey: 'INPUT' }, HELPER_TOOLS.KEY_VALUE_STORE_RECORD_GET],
+        ['an empty listing', { count: 0 }, HELPER_TOOLS.KEY_VALUE_STORE_GET],
+    ])('falls back on %s when %s is not loaded', (_, extra, sibling) => {
+        const { nextStep } = buildKvsKeysSummaryNextStep({
+            keyValueStoreId: 'kv-1',
+            isTruncated: false,
+            ...extra,
+            loadedToolNames: [HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET],
+        });
+
+        expect(nextStep).toBe('No follow-up step.');
+        expect(nextStep).not.toContain(sibling);
     });
 });
 
@@ -111,5 +132,48 @@ describe('buildBinaryRecordDisposition()', () => {
         const result = buildBinaryRecordDisposition(undefined, Buffer.from('x'));
 
         expect(result).not.toHaveProperty('mimeType');
+    });
+});
+
+describe('fetchStorageByIdOrName()', () => {
+    it('returns the result with the safe id it was found under', async () => {
+        const items = { items: [], total: 0 };
+        const fetch = vi.fn().mockResolvedValue(items);
+
+        expect(await fetchStorageByIdOrName('eval-ai-items', fetch)).toEqual({
+            result: items,
+            safeId: '~eval-ai-items',
+        });
+    });
+
+    // List calls throw on a missing storage, so an ID-shaped name is only retried if the 404 reads as a miss.
+    it("retries an ID-shaped value that 404s as the caller's own name", async () => {
+        const notFound = Object.assign(new Error('Dataset was not found'), { statusCode: 404 });
+        const fetch = vi.fn().mockRejectedValueOnce(notFound).mockResolvedValueOnce({ items: [], total: 0 });
+
+        const found = await fetchStorageByIdOrName('evalAiItems202610', fetch);
+
+        expect(fetch).toHaveBeenNthCalledWith(1, 'evalAiItems202610');
+        expect(found?.safeId).toBe('~evalAiItems202610');
+    });
+
+    it('returns undefined when the storage does not exist', async () => {
+        expect(await fetchStorageByIdOrName('missing', async () => undefined)).toBeUndefined();
+    });
+});
+
+describe('resolveStorageId()', () => {
+    it('returns an ID without reading the storage', async () => {
+        const get = vi.fn();
+
+        expect(await resolveStorageId('WkzbQMuFYuamGv3YF', get)).toBe('WkzbQMuFYuamGv3YF');
+        expect(get).not.toHaveBeenCalled();
+    });
+
+    it('reads the ID of a storage found by name', async () => {
+        const get = vi.fn().mockResolvedValue({ id: 'WkzbQMuFYuamGv3YF' });
+
+        expect(await resolveStorageId('~eval-ai-items', get)).toBe('WkzbQMuFYuamGv3YF');
+        expect(get).toHaveBeenCalledWith('~eval-ai-items');
     });
 });

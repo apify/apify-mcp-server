@@ -41,6 +41,11 @@ function mockPage(items: ReturnType<typeof mockBuild>[], overrides: Record<strin
     return { total: items.length, count: items.length, offset: 0, limit: 10, desc: true, items, ...overrides };
 }
 
+/** What the list endpoint rejects with when no Actor matches. */
+function buildNotFoundError() {
+    return Object.assign(new Error('Actor was not found'), { statusCode: 404 });
+}
+
 const callTool = async (args: Record<string, unknown>, loadedToolNames?: readonly string[]) => {
     const context = stubToolCallContext(args, stubClient);
     if (loadedToolNames) context.loadedToolNames = loadedToolNames;
@@ -154,18 +159,62 @@ describe('get-actor-build-list', () => {
         expect(content[1].text).toMatch(/^Your account has \d+ builds; showing 2 from offset 0\./);
     });
 
-    it('returns a not-found error when the Actor does not exist', async () => {
-        listMock.mockRejectedValue(Object.assign(new Error('Actor was not found'), { statusCode: 404 }));
+    describe('actorId lookup', () => {
+        it('lists the builds of a bare name once, as the name of one of your own Actors', async () => {
+            listMock.mockResolvedValue(mockPage([mockBuild()]));
 
-        const result = await (getActorBuildList as HelperTool).call(
-            stubToolCallContext({ actorId: 'missing' }, stubClient),
+            const { content } = await callTool({ actorId: 'my-actor' });
+
+            expect(actorMock.mock.calls).toEqual([['~my-actor']]);
+            expect(listMock).toHaveBeenCalledTimes(1);
+            expect(content[1].text).toContain('Actor my-actor has 1 build; showing 1 from offset 0.');
+        });
+
+        it('lists the builds of a bare value shaped like an ID as a name when no Actor has that ID', async () => {
+            listMock.mockRejectedValueOnce(buildNotFoundError()).mockResolvedValueOnce(mockPage([mockBuild()]));
+
+            const { structuredContent } = await callTool({ actorId: 'myscraperversion2' });
+
+            expect(actorMock.mock.calls).toEqual([['myscraperversion2'], ['~myscraperversion2']]);
+            expect(structuredContent).toMatchObject({ total: 1, items: [{ id: 'build-1' }] });
+        });
+
+        it('lists an empty page for an ID without retrying it as a name', async () => {
+            listMock.mockResolvedValue(mockPage([]));
+
+            await callTool({ actorId: 'qGXMy0NAkWsIIb9LZ' });
+
+            expect(actorMock.mock.calls).toEqual([['qGXMy0NAkWsIIb9LZ']]);
+        });
+
+        it.each(['qGXMy0NAkWsIIb9LZ', 'john/my-actor', 'john~my-actor'])(
+            'lists the builds of %s once, as given',
+            async (actorId) => {
+                listMock.mockResolvedValue(mockPage([mockBuild()]));
+
+                await callTool({ actorId });
+
+                expect(actorMock.mock.calls).toEqual([[actorId]]);
+            },
         );
-        const { content, structuredContent } = result as TextToolResult & { structuredContent?: unknown };
 
-        expectSoftFailInvalidInput(result);
-        expect(actorMock).toHaveBeenCalledWith('missing');
-        expect(content[0].text).toBe("Actor 'missing' not found.");
-        expect(structuredContent).toBeUndefined();
+        it.each([
+            ['a bare name', 'missing', ['~missing']],
+            ['a bare value shaped like an ID', 'myscraperversion2', ['myscraperversion2', '~myscraperversion2']],
+            ['a full name', 'john/missing', ['john/missing']],
+        ])('returns a not-found error for %s that matches no Actor', async (_, actorId, lookups) => {
+            listMock.mockRejectedValue(buildNotFoundError());
+
+            const result = await (getActorBuildList as HelperTool).call(stubToolCallContext({ actorId }, stubClient));
+            const { content, structuredContent } = result as TextToolResult & { structuredContent?: unknown };
+
+            expectSoftFailInvalidInput(result);
+            expect(actorMock.mock.calls).toEqual(lookups.map((lookup) => [lookup]));
+            expect(content[0].text).toBe(
+                `Actor '${actorId}' not found. The actorId argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.`,
+            );
+            expect(structuredContent).toBeUndefined();
+        });
     });
 
     it('rethrows non-404 errors from the build list', async () => {

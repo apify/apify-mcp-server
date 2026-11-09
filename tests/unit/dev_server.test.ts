@@ -11,7 +11,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import log from '@apify/log';
 
-import { HELPER_TOOLS } from '../../src/const.js';
+import { HELPER_TOOLS, MAX_REQUEST_BODY_BYTES } from '../../src/const.js';
 import {
     createExpressApp,
     extractInitializeMessage,
@@ -20,7 +20,12 @@ import {
 } from '../../src/dev_server.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
 import { getActors } from '../../src/utils/tools_loader.js';
-import { makeArgsRecorderTool, readJsonRpcPayload, STATELESS_PROTOCOL_VERSION } from './helpers/mcp_server.js';
+import {
+    makeArgsRecorderTool,
+    makeRecorderTool,
+    readJsonRpcPayload,
+    STATELESS_PROTOCOL_VERSION,
+} from './helpers/mcp_server.js';
 
 vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
     const actual = await importOriginal<typeof ToolsLoaderModule>();
@@ -98,6 +103,17 @@ describe('isStatelessRequest()', () => {
         await expect(isStatelessRequest(post(body))).resolves.toBe(false);
     });
 
+    it('keeps a claim-less request over the SDK 4 MiB body limit on the stateful path', async () => {
+        const body = {
+            jsonrpc: '2.0',
+            id: 2,
+            method: 'tools/call',
+            params: { name: 'some-tool', arguments: { content: 'x'.repeat(5 * 1024 * 1024) } },
+        };
+
+        await expect(isStatelessRequest(post(body))).resolves.toBe(false);
+    });
+
     it('keeps session operations on the stateful path', async () => {
         // `express.json()` leaves an empty object behind on a body-less request.
         for (const method of ['GET', 'DELETE']) {
@@ -168,7 +184,10 @@ function statelessRequest(
     params: Record<string, unknown> = {},
     meta: Record<string, unknown> = {},
 ): { body: unknown; headers: Record<string, string> } {
-    const headers: Record<string, string> = { 'mcp-method': method };
+    const headers: Record<string, string> = {
+        'mcp-method': method,
+        'mcp-protocol-version': STATELESS_PROTOCOL_VERSION,
+    };
     if (typeof params.name === 'string') headers['mcp-name'] = params.name;
     return {
         body: { jsonrpc: '2.0', id: 1, method, params: { ...params, _meta: { ...ENVELOPE, ...meta } } },
@@ -285,6 +304,67 @@ describe('createExpressApp() era routing', () => {
         });
     });
 
+    it('routes stateful requests by session id', async () => {
+        await withDevServer(async (post, port) => {
+            const init = await post(
+                DEV_URL,
+                {
+                    jsonrpc: '2.0',
+                    id: 1,
+                    method: 'initialize',
+                    params: {
+                        protocolVersion: '2025-06-18',
+                        clientInfo: { name: 'legacy-client', version: '1.0.0' },
+                        capabilities: {},
+                    },
+                },
+                { authorization: 'Bearer dev-token' },
+            );
+            const sessionId = init.headers.get('mcp-session-id') ?? '';
+            const ping = { jsonrpc: '2.0', id: 2, method: 'ping' };
+            const sendSessionRequest = async (method: string, id: string) =>
+                fetch(`http://127.0.0.1:${port}/`, {
+                    method,
+                    headers: { accept: 'text/event-stream', 'mcp-session-id': id },
+                });
+
+            expect((await post(DEV_URL, ping, { 'mcp-session-id': sessionId })).status).toBe(200);
+
+            const unknown = await post(DEV_URL, ping, { 'mcp-session-id': 'unknown' });
+            expect(unknown.status).toBe(404);
+            expect(readJsonRpcPayload(unknown.body).error?.code).toBe(-32001);
+
+            const missing = await post(DEV_URL, ping);
+            expect(missing.status).toBe(400);
+            expect(readJsonRpcPayload(missing.body).error?.code).toBe(-32000);
+
+            expect((await sendSessionRequest('GET', 'unknown')).status).toBe(404);
+            expect((await sendSessionRequest('DELETE', sessionId)).status).toBe(200);
+            expect((await post(DEV_URL, ping, { 'mcp-session-id': sessionId })).status).toBe(404);
+        });
+    });
+
+    it('answers 405 to a sessionless-era GET or DELETE', async () => {
+        await withDevServer(async (_post, port) => {
+            for (const method of ['GET', 'DELETE']) {
+                const response = await fetch(`http://127.0.0.1:${port}/`, {
+                    method,
+                    headers: { 'mcp-protocol-version': STATELESS_PROTOCOL_VERSION },
+                });
+                expect(response.status).toBe(405);
+                expect(response.headers.get('allow')).toBe('POST');
+                expect(readJsonRpcPayload(await response.text()).error?.code).toBe(-32000);
+            }
+
+            // A request that still names a session keeps the stateful handling.
+            const withSession = await fetch(`http://127.0.0.1:${port}/`, {
+                method: 'DELETE',
+                headers: { 'mcp-protocol-version': STATELESS_PROTOCOL_VERSION, 'mcp-session-id': 'unknown' },
+            });
+            expect(withSession.status).toBe(404);
+        });
+    });
+
     it('passes the bearer token to the stateless adapter as auth info', async () => {
         const { tool, received } = makeArgsRecorderTool();
         getActorsMock.mockResolvedValue([tool]);
@@ -373,5 +453,89 @@ describe('createExpressApp() era routing', () => {
             // instructions read the tool set.
             expect(getActorsMock).not.toHaveBeenCalled();
         });
+    });
+
+    it('accepts a 4 MiB tool call body, the size of a 3 MiB version sent as base64', async () => {
+        const { tool, received } = makeRecorderTool('source-tool');
+        getActorsMock.mockResolvedValue([tool]);
+
+        await withDevServer(async (post) => {
+            const { body, headers } = statelessRequest('tools/call', {
+                name: tool.name,
+                arguments: { content: 'x'.repeat(4 * 1024 * 1024) },
+            });
+
+            const response = await post(DEV_URL, body, { ...headers, authorization: 'Bearer dev-token' });
+
+            expect(response.status).toBe(200);
+            expect(received.called).toBe(true);
+        });
+    });
+
+    it('accepts a 2025-era session tool call body over the SDK 4 MiB body limit', async () => {
+        const { tool, received } = makeRecorderTool('source-tool');
+        getActorsMock.mockResolvedValue([tool]);
+
+        await withDevServer(async (post) => {
+            const init = await post(
+                DEV_URL,
+                {
+                    jsonrpc: '2.0',
+                    id: 1,
+                    method: 'initialize',
+                    params: {
+                        protocolVersion: '2025-11-25',
+                        clientInfo: { name: 'legacy-client', version: '1.0.0' },
+                        capabilities: {},
+                    },
+                },
+                { authorization: 'Bearer dev-token' },
+            );
+            const sessionId = init.headers.get('mcp-session-id') ?? '';
+
+            const response = await post(
+                DEV_URL,
+                {
+                    jsonrpc: '2.0',
+                    id: 2,
+                    method: 'tools/call',
+                    params: { name: tool.name, arguments: { content: 'x'.repeat(5 * 1024 * 1024) } },
+                },
+                { 'mcp-session-id': sessionId, 'mcp-protocol-version': '2025-11-25' },
+            );
+
+            expect(response.status).toBe(200);
+            expect(received.called).toBe(true);
+        });
+    });
+
+    it('rejects a body over MAX_REQUEST_BODY_BYTES with 413', async () => {
+        const { tool, received } = makeRecorderTool('source-tool');
+        getActorsMock.mockResolvedValue([tool]);
+
+        await withDevServer(async (post) => {
+            const { body, headers } = statelessRequest('tools/call', {
+                name: tool.name,
+                arguments: { content: 'x'.repeat(MAX_REQUEST_BODY_BYTES) },
+            });
+
+            const response = await post(DEV_URL, body, { ...headers, authorization: 'Bearer dev-token' });
+
+            expect(response.status).toBe(413);
+            expect(received.called).toBe(false);
+        });
+    });
+});
+
+describe('dev server request log', () => {
+    it('logs the method of an incoming request, never its body', async () => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => log);
+        const { body, headers } = statelessRequest('tools/list', { secret: 'secret-keywords' });
+        await withDevServer(async (post) => {
+            await post(DEV_URL, body, { ...headers, authorization: 'Bearer dev-token' });
+        });
+        const logged = JSON.stringify(info.mock.calls);
+        expect(logged).toContain('tools/list');
+        expect(logged).not.toContain('secret-keywords');
     });
 });

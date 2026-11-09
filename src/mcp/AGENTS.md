@@ -1,7 +1,7 @@
 <!-- agents-scope: src/mcp -->
 # src/mcp — MCP protocol core (the npm-published surface)
 
-↑ [src/](../AGENTS.md) · sideways: [`../payments/AGENTS.md`](../payments/AGENTS.md)
+↑ [src/](../AGENTS.md)
 
 The cross-file invariant: this directory is the published `@apify/actors-mcp-server`
 surface — **generic types only**. No Apify-internal infrastructure (Redis, Mongo,
@@ -20,7 +20,7 @@ Two MCP protocol revisions are served, each by its own adapter:
 ## Files
 
 - `server.ts` — `ActorsMcpServer`, the shared facade for tools, server mode, services,
-  widgets, payments, and telemetry. It constructs and delegates v1 work to `LegacyMcpServer`,
+  widgets, and telemetry. It constructs and delegates v1 work to `LegacyMcpServer`,
   and hands the stateless adapter a per-request snapshot via `createRequestSnapshot`.
 - `legacy_server.ts` — package-private v1 SDK adapter for handlers, Tasks, errors,
   notifications, logging, and transport lifecycle. It reads shared state through
@@ -33,14 +33,23 @@ Two MCP protocol revisions are served, each by its own adapter:
 - `errors.ts` — protocol-neutral domain errors mapped by each protocol adapter.
 - `tool_call_engine.ts` — shared `tools/call` orchestration. `prepareToolCall()` handles
   preparation; `executeSyncToolCall()` runs synchronous calls.
-- `client.ts` — `connectMCPClient(url, token)`: transport negotiation.
+- `run_input_rewrite.ts` — temporary: sends Actor run input given to the web-fetch and rag-web-browser Server Actor
+  tools (their pre-0.21 input) as a server request, and serves the removed default `apify--rag-web-browser` in sessions
+  that serve the default tools, without listing it. Each part switches off by emptying its constant
+  (`SERVER_PATHS_FOR_RUN_INPUT`, `REPLACED_DEFAULT_ACTORS`). Delete it and its calls in `tool_call_engine.ts` once its
+  logs stop.
+- `client.ts` — `connectMCPClient(url, options)`: transport negotiation; both transports send the token and the
+  session's request origin (`ApifyClient.requestOrigin`, `APIFY_AI` for the Apify AI client) on every request.
 - `remote_tool_call.ts` — `withRemoteMcpClient()`: connect-call-close round trip for
-  `tool_dispatch.ts` and `call_actor.ts`'s remote tool calls.
+  `tool_dispatch.ts` and the MCP server Actor tools (`runOnActorMcpServer` in `call_actor_mcp_tool.ts`).
 - `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`, `getProxyMCPServerToolName(actorFullName, toolName)`.
-- `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`.
+- `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`; `resolveOnStandbyOrigin()`:
+  resolves a path against the Actor's `standbyUrl` (no `standbyUrl`, no URL) and flags a path that leaves that
+  origin, for `getActorMCPServerURL()` and `send-server-actor-request`.
 - `utils.ts` — `processParamsGetTools()`: turns `?actors=` URL params into tools.
 - `tool_call_error_mapper.ts` — shared tool-call error classification.
-- `tool_dispatch.ts` — neutral dispatch for internal, Actor MCP, and Actor tools.
+- `tool_dispatch.ts` — neutral dispatch for internal, Actor MCP, Actor, and Actor server tools (the last run their
+  `call`, as internal tools do).
 - `tool_call_telemetry.ts` — shared tool-call telemetry preparation and logging.
 - `task_execution.ts` — legacy long-running task execution and status notifications. `tasks/cancel`
   reaches the Actor run through `createTaskCancellationWatcher` (`utils.ts`), which polls the
@@ -104,4 +113,3 @@ Dev server and manual MCP-client (mcpc) testing: see
 ## See also
 
 - [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) — naming / coding standards (do not duplicate).
-- [`../payments/AGENTS.md`](../payments/AGENTS.md) — `CallToolRequest` resolves payment context.

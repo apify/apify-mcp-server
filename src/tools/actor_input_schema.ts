@@ -1,15 +1,13 @@
-import type { ValidateFunction } from 'ajv';
-import type Ajv from 'ajv';
+import { createHash } from 'node:crypto';
 
-import {
-    ACTOR_ENUM_MAX_LENGTH,
-    ACTOR_MAX_DESCRIPTION_LENGTH,
-    RAG_WEB_BROWSER_WHITELISTED_FIELDS,
-    WEB_FETCH,
-    WEB_FETCH_URL_SCHEME_NOTE,
-} from '../const.js';
+import type { ValidateFunction } from 'ajv';
+
+import { LruCache } from '@apify/datastructures';
+
+import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../const.js';
 import { SchemaTooLargeError } from '../errors.js';
 import type { ActorInputSchema, SchemaProperties } from '../types.js';
+import { createAjv, fixZodSchemaRequired } from '../utils/ajv.js';
 import {
     addGlobsProperties,
     addKeyValueProperties,
@@ -28,28 +26,34 @@ type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 // is intentionally uncapped.
 export const MAX_UNTRUSTED_SCHEMA_BYTES = 262_144;
 
-// source https://github.com/ajv-validator/ajv/issues/1413#issuecomment-867064234
-export function fixedAjvCompile(ajvInstance: Ajv, schema: object): ValidateFunction<unknown> {
-    // Skip AJV codegen (synchronous, would freeze the event loop) on an oversized untrusted schema.
-    // Throws SchemaTooLargeError, which callers log as a soft fail (not a server error).
-    if (Buffer.byteLength(JSON.stringify(schema)) > MAX_UNTRUSTED_SCHEMA_BYTES) {
+const UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE = 1000;
+const untrustedValidatorCache = new LruCache<{ validate: ValidateFunction<unknown>; schema: object }>({
+    maxLength: UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE,
+});
+
+/**
+ * Compiles an Actor or proxied-MCP input schema, one validator per schema content.
+ *
+ * Create a fresh Ajv instance per compilation to avoid unbounded memory growth.
+ * Ajv internally caches every compiled schema in a Map that is never evicted.
+ */
+export function compileUntrustedSchema<T extends object>(
+    schema: T,
+): { validate: ValidateFunction<unknown>; schema: T } {
+    const serialized = JSON.stringify(schema);
+    // Ajv codegen is synchronous; an oversized untrusted schema would freeze the event loop.
+    if (Buffer.byteLength(serialized) > MAX_UNTRUSTED_SCHEMA_BYTES) {
         throw new SchemaTooLargeError(MAX_UNTRUSTED_SCHEMA_BYTES);
     }
-    const validate = ajvInstance.compile(schema);
-    ajvInstance.removeSchema(schema);
 
-    // Force reset values that aren't reset with removeSchema
-    /* eslint-disable no-underscore-dangle */
-    /* eslint-disable @typescript-eslint/no-explicit-any */
-    (ajvInstance.scope as any)._values.schema!.delete(schema);
-    (ajvInstance.scope as any)._values.validate!.delete(validate);
-    const schemaIdx = (ajvInstance.scope as any)._scope.schema.indexOf(schema);
-    const validateIdx = (ajvInstance.scope as any)._scope.validate.indexOf(validate);
-    if (schemaIdx !== -1) (ajvInstance.scope as any)._scope.schema.splice(schemaIdx, 1);
-    if (validateIdx !== -1) (ajvInstance.scope as any)._scope.validate.splice(validateIdx, 1);
-    /* eslint-enable @typescript-eslint/no-explicit-any */
-    /* eslint-enable no-underscore-dangle */
-    return validate;
+    const cacheKey = createHash('sha256').update(serialized).digest('base64');
+    // A hit holds a schema with the same content as `schema`, so it is still a T.
+    const cached = untrustedValidatorCache.get(cacheKey) as { validate: ValidateFunction<unknown>; schema: T } | null;
+    if (cached) return cached;
+
+    const compiled = { validate: createAjv().compile(schema), schema };
+    untrustedValidatorCache.add(cacheKey, compiled);
+    return compiled;
 }
 
 /**
@@ -164,7 +168,7 @@ export function markInputPropertiesAsRequired(input: ActorInputSchema): Record<s
 /**
  * Builds the final Actor input schema for MCP tool usage.
  */
-export function buildActorInputSchema(actorFullName: string, input: ActorInputSchema | undefined, isRag: boolean) {
+export function buildActorInputSchema(actorFullName: string, input: ActorInputSchema | undefined) {
     if (!input) {
         return {
             inputSchema: {
@@ -176,8 +180,8 @@ export function buildActorInputSchema(actorFullName: string, input: ActorInputSc
         };
     }
 
-    // Work on a shallow cloned structure (deep clone only if needed later)
-    const working = structuredClone(input);
+    // A required property with a default is optional: the platform fills it in (see apify/apify-mcp-server#1513).
+    const working = fixZodSchemaRequired(structuredClone(input)) as ActorInputSchema;
 
     if (working && typeof working === 'object' && 'properties' in working && working.properties) {
         working.properties = transformActorInputSchemaProperties(working);
@@ -200,44 +204,8 @@ export function buildActorInputSchema(actorFullName: string, input: ActorInputSc
         delete (working as { $schema?: string }).$schema;
     }
 
-    let finalSchema = working;
-    if (isRag) {
-        finalSchema = pruneSchemaPropertiesByWhitelist(finalSchema, RAG_WEB_BROWSER_WHITELISTED_FIELDS);
-    }
-
-    if (actorFullName === WEB_FETCH && finalSchema.properties.url) {
-        finalSchema.properties.url.description += ` ${WEB_FETCH_URL_SCHEME_NOTE}`;
-    }
-
-    finalSchema.$id = getToolSchemaID(actorFullName);
-    return { inputSchema: finalSchema };
-}
-
-/**
- * Returns a shallow-cloned input schema that keeps only whitelisted properties
- * and filters the required array accordingly. All other top-level fields are preserved.
- * If properties are missing, the original input is returned unchanged.
- *
- * This is used specifically for apify/rag-web-browser where we want to expose
- * only a subset of input properties to the MCP tool without redefining the schema.
- */
-export function pruneSchemaPropertiesByWhitelist(
-    input: ActorInputSchema,
-    whitelist: Iterable<string>,
-): ActorInputSchema {
-    if (!input || !input.properties || typeof input.properties !== 'object' || !whitelist) return input;
-
-    const allowed = new Set<string>(Array.from(whitelist));
-    const newProps: Record<string, SchemaProperties> = {};
-    for (const key of Object.keys(input.properties)) {
-        if (allowed.has(key)) newProps[key] = input.properties[key];
-    }
-
-    const cloned: ActorInputSchema = { ...input, properties: newProps };
-    if (Array.isArray(input.required)) {
-        cloned.required = input.required.filter((k) => allowed.has(k));
-    }
-    return cloned;
+    working.$id = getToolSchemaID(actorFullName);
+    return { inputSchema: working };
 }
 
 /**

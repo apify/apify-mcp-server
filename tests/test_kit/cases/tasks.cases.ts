@@ -3,7 +3,6 @@ import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
 import { actorNameToToolName } from '@apify/actors-mcp-server/internals.js';
-import { HELPER_TOOLS } from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
     ACTOR_NORMAL_MODE,
@@ -75,7 +74,7 @@ export const tasksCases: Case[] = [
                         {
                             method: 'tools/call' as const,
                             params: {
-                                name: HELPER_TOOLS.ACTOR_CALL,
+                                name: 'call-actor',
                                 arguments: {
                                     actor: ACTOR_NORMAL_MODE,
                                     step: 'call',
@@ -271,7 +270,7 @@ export const tasksCases: Case[] = [
             try {
                 const stream = client.experimental.tasks.callToolStream(
                     {
-                        name: HELPER_TOOLS.ACTOR_CALL,
+                        name: 'call-actor',
                         arguments: { actor: ACTOR_NORMAL_MODE, input: { firstNumber: 10, secondNumber: 20 } },
                     },
                     CallToolResultSchema,
@@ -322,7 +321,7 @@ export const tasksCases: Case[] = [
             try {
                 const stream = client.experimental.tasks.callToolStream(
                     {
-                        name: HELPER_TOOLS.ACTOR_CALL,
+                        name: 'call-actor',
                         // waitSeconds keeps the run open long enough for the polling interval to
                         // emit at least one statusMessage notification.
                         arguments: {

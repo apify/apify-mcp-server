@@ -18,10 +18,17 @@ import { HELPER_TOOLS, type HelperToolName } from '../const.js';
 import type { ToolEntry } from '../types.js';
 import { SERVER_MODE } from '../types.js';
 import { callActor } from './actors/call_actor.js';
+import { callActorMcpTool } from './actors/call_actor_mcp_tool.js';
 import { deleteActor } from './actors/delete_actor.js';
 import { fetchActorDetails } from './actors/fetch_actor_details.js';
+import { fetchActorMcpToolList } from './actors/fetch_actor_mcp_tool_list.js';
 import { getActorList } from './actors/get_actor_list.js';
 import { searchActors } from './actors/search_actors.js';
+import { sendServerActorRequest } from './actors/send_server_actor_request.js';
+import { apifyApiDetails } from './api/apify_api_details.js';
+import { apifyApiRead } from './api/apify_api_read.js';
+import { apifyApiSearch } from './api/apify_api_search.js';
+import { apifyApiWrite } from './api/apify_api_write.js';
 import { buildActor } from './builds/build_actor.js';
 import { getActorBuild } from './builds/get_actor_build.js';
 import { getActorBuildList } from './builds/get_actor_build_list.js';
@@ -37,7 +44,6 @@ import { createSchedule } from './schedules/create_schedule.js';
 import { deleteSchedule } from './schedules/delete_schedule.js';
 import { getSchedule } from './schedules/get_schedule.js';
 import { updateSchedule } from './schedules/update_schedule.js';
-import { getActorVersion } from './source/get_actor_version.js';
 import { getDataset } from './storage/get_dataset.js';
 import { getDatasetItems } from './storage/get_dataset_items.js';
 import { getDatasetList } from './storage/get_dataset_list.js';
@@ -51,6 +57,11 @@ import { getActorTask } from './tasks/get_actor_task.js';
 import { publishActorTask } from './tasks/publish_actor_task.js';
 import { unpublishActorTask } from './tasks/unpublish_actor_task.js';
 import { updateActorTask } from './tasks/update_actor_task.js';
+import { createActor } from './versions/create_actor.js';
+import { createActorVersion } from './versions/create_actor_version.js';
+import { deleteActorVersion } from './versions/delete_actor_version.js';
+import { getActorVersion } from './versions/get_actor_version.js';
+import { updateActorVersion } from './versions/update_actor_version.js';
 import { callActorWidget } from './widgets/call_actor_widget.js';
 import { fetchActorDetailsWidget } from './widgets/fetch_actor_details_widget.js';
 import { getActorRunWidget } from './widgets/get_actor_run_widget.js';
@@ -58,7 +69,14 @@ import { searchActorsWidget } from './widgets/search_actors_widget.js';
 
 /** Unified tool category definitions — single source of truth. */
 export const toolCategories = {
-    actors: [searchActors, fetchActorDetails, callActor],
+    actors: [
+        searchActors,
+        fetchActorDetails,
+        callActor,
+        fetchActorMcpToolList,
+        callActorMcpTool,
+        sendServerActorRequest,
+    ],
     docs: [searchApifyDocs, fetchApifyDocs],
     runs: [getActorRun, getActorRunList, getActorRunLog, abortActorRun],
     storage: [
@@ -74,7 +92,8 @@ export const toolCategories = {
     tasks: [createActorTask, getActorTask, updateActorTask, publishActorTask, unpublishActorTask],
     schedules: [createSchedule, getSchedule, updateSchedule, deleteSchedule],
     builds: [getActorBuild, getActorBuildLog, getActorBuildList, buildActor],
-    source: [getActorVersion],
+    versions: [getActorVersion, createActor, updateActorVersion, createActorVersion, deleteActorVersion],
+    api: [apifyApiSearch, apifyApiDetails, apifyApiRead, apifyApiWrite],
     dev: [reportProblem],
 } satisfies Record<string, ToolEntry[]>;
 

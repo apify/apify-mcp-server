@@ -151,6 +151,10 @@ describe('buildToolCallErrorResult()', () => {
         expect('userText' in result && result.userText).toContain(
             `Error calling tool "${HELPER_TOOLS.ACTOR_TASK_PUBLISH}":`,
         );
+        expect('userText' in result && result.userText).toContain(
+            'all publication requirements on publish. The error message names the requirement that is not met.',
+        );
+        expect('userText' in result && result.userText).not.toMatch(/retry/i);
     });
 
     it('returns ABORTED toolStatus for an aborted execution error', () => {

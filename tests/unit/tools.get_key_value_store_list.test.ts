@@ -45,7 +45,7 @@ describe('get-key-value-store-list', () => {
         };
 
         expect(structuredContent).toMatchObject(MOCK_LIST);
-        expect(structuredContent.summary).toBe('Listed 2 of 2 key-value stores.');
+        expect(structuredContent.summary).toBe('Listed 2 of 2 named key-value stores.');
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.KEY_VALUE_STORE_GET);
         // content[0] ships the JSON data; content[1] carries the prose summary + nextStep.
         const { summary, nextStep, ...data } = structuredContent;
@@ -61,7 +61,7 @@ describe('get-key-value-store-list', () => {
         );
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
-        expect(structuredContent.summary).toBe('Listed 2 of 30 key-value stores.');
+        expect(structuredContent.summary).toBe('Listed 2 of 30 named key-value stores.');
         expect(structuredContent.nextStep).toBe(
             `Call ${HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET} again with offset=2 to fetch the next page.`,
         );
@@ -105,9 +105,76 @@ describe('get-key-value-store-list', () => {
         expectSchemaConformingStructuredContent(result, storageListOutputSchema);
     });
 
-    it('rejects limit above 10 via ajv validation', () => {
-        const tool = getKeyValueStoreList as HelperTool;
-        expect(tool.ajvValidate({ limit: 11 })).toBe(false);
-        expect(tool.ajvValidate({ limit: 10 })).toBe(true);
+    it('leaves "named" out of the summary with unnamed=true', async () => {
+        const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
+
+        const result = await (getKeyValueStoreList as HelperTool).call(
+            stubToolCallContext({ unnamed: true }, stubApifyClient(listSpy)),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+        expect(structuredContent.summary).toBe('Listed 2 of 2 key-value stores.');
+        expect(structuredContent.nextStep).toBe(
+            `Use ${HELPER_TOOLS.KEY_VALUE_STORE_GET} with a keyValueStoreId from the list to inspect a store.`,
+        );
+    });
+
+    it.each([
+        [
+            false,
+            0,
+            0,
+            'Listed 0 of 0 named key-value stores.',
+            'unnamed=true includes the unnamed key-value stores that Actor runs create.',
+        ],
+        [
+            false,
+            5,
+            20,
+            'Listed 0 of 5 named key-value stores.',
+            'unnamed=true includes the unnamed key-value stores that Actor runs create.',
+        ],
+        [true, 0, 0, 'Listed 0 of 0 key-value stores.', 'No follow-up step.'],
+    ])(
+        'returns the empty-last-page nextStep for unnamed=%s (total=%i, offset=%i)',
+        async (unnamed, total, offset, summary, nextStep) => {
+            const listSpy = vi.fn().mockResolvedValue({ ...MOCK_LIST, total, offset, count: 0, items: [] });
+
+            const result = await (getKeyValueStoreList as HelperTool).call(
+                stubToolCallContext({ unnamed }, stubApifyClient(listSpy)),
+            );
+            const { content, structuredContent } = result as TextToolResult & {
+                structuredContent: Record<string, unknown>;
+            };
+
+            expect(structuredContent.summary).toBe(summary);
+            expect(structuredContent.nextStep).toBe(nextStep);
+            expect(content[1].text).toBe(`${summary}\n${nextStep}`);
+            expectSchemaConformingStructuredContent(result, storageListOutputSchema);
+        },
+    );
+
+    // Regression: #1479 — the API reads limit=0 as no limit and returns up to 1,000 items.
+    it.each([0, -1, 1.5, 11])('rejects limit %s via ajv validation', (limit) => {
+        expect((getKeyValueStoreList as HelperTool).ajvValidate({ limit })).toBe(false);
+    });
+
+    it.each([{ limit: 1 }, { limit: 10 }, {}])('accepts %j via ajv validation', (args) => {
+        expect((getKeyValueStoreList as HelperTool).ajvValidate(args)).toBe(true);
+    });
+
+    // Regression: #1296 — the terminal nextStep named a sibling tool the session was not served.
+    it('falls back on the last page when get-key-value-store is not loaded', async () => {
+        const result = (await (getKeyValueStoreList as HelperTool).call(
+            stubToolCallContext({}, stubApifyClient(vi.fn().mockResolvedValue(MOCK_LIST)), {
+                loadedToolNames: [HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET],
+            }),
+        )) as TextToolResult & { structuredContent: Record<string, unknown> };
+
+        expect(result.structuredContent.nextStep).toBe('No follow-up step.');
+        expect(JSON.stringify([result.content, result.structuredContent])).not.toContain(
+            HELPER_TOOLS.KEY_VALUE_STORE_GET,
+        );
+        expectSchemaConformingStructuredContent(result, storageListOutputSchema);
     });
 });

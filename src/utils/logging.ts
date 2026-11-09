@@ -4,7 +4,6 @@ import { ZodError } from 'zod';
 import log from '@apify/log';
 
 import { SchemaTooLargeError } from '../errors.js';
-import { SKYFIRE_PAY_ID_KEY } from '../payments/const.js';
 import { isActorRunLimitError } from './apify_errors.js';
 
 /**
@@ -61,6 +60,8 @@ const MCP_CLIENT_FAULT_MESSAGES: ReadonlySet<string> = new Set([
     'Parse error: Invalid JSON',
     'Parse error: Invalid JSON-RPC message',
     'Conflict: Only one SSE stream is allowed per session',
+    // A client resumed with Last-Event-ID while its previous stream for that ID is still open (409).
+    'Conflict: Stream already has an active connection',
     'Not connected',
 ]);
 
@@ -129,6 +130,24 @@ function getMcpErrorCode(error: unknown): number | undefined {
 }
 
 /**
+ * Drop request config and bodies, which can carry credentials (apify/ai-team#330).
+ * Keep the original stack and API error type for diagnosis. Bound cause chains like @apify/log does,
+ * and drop object causes that could carry config. Non-Errors have no original stack to preserve.
+ */
+export function toPlainError(error: unknown, causeDepth = 3): Error {
+    if (!(error instanceof Error)) return Object.assign(new Error(String(error)), { stack: undefined });
+    const { code, type } = error as { code?: unknown; type?: unknown };
+    return Object.assign(new Error(error.message), {
+        name: error.name,
+        stack: error.stack,
+        ...(typeof code === 'string' && { code }),
+        ...(typeof type === 'string' && { type }),
+        ...(error.cause instanceof Error && causeDepth > 0 && { cause: toPlainError(error.cause, causeDepth - 1) }),
+        ...(['string', 'number', 'boolean'].includes(typeof error.cause) && { cause: String(error.cause) }),
+    });
+}
+
+/**
  * Logs HTTP or MCP errors at the appropriate level:
  * - Client errors (HTTP < 500, or JSON-RPC client/transient codes) → softFail (no stack).
  * - Zod validation / SchemaTooLarge / Actor run-limit → softFail (untrusted input or billing).
@@ -179,9 +198,8 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
         return;
     }
     if (statusCode !== undefined && statusCode >= 500) {
-        // HTTP server errors (>= 500) - exception with full error (includes stack trace)
-        const errorObj = error instanceof Error ? error : new Error(String(error));
-        log.exception(errorObj, message, { statusCode, ...data });
+        // HTTP server errors (>= 500) - exception with stack trace
+        log.exception(toPlainError(error), message, { statusCode, ...data });
         return;
     }
 
@@ -190,37 +208,11 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
         if (SOFT_MCP_ERROR_CODES.has(mcpErrorCode)) {
             log.softFail(message, { errMessage: softErrMessage, mcpErrorCode, ...data });
         } else {
-            const errorObj = error instanceof Error ? error : new Error(String(error));
-            log.exception(errorObj, message, { mcpErrorCode, ...data });
+            log.exception(toPlainError(error), message, { mcpErrorCode, ...data });
         }
         return;
     }
 
     // No status code available - log as error
-    log.error(message, { error, ...data });
-}
-
-const REDACTED_VALUE = '[REDACTED]';
-
-const isPlainRecord = (value: unknown): value is Record<string, unknown> => {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-};
-
-/**
- * Sanitizes tool call parameters by redacting the skyfire-pay-id.
- * Used for logging to avoid exposing the Skyfire payment token.
- *
- * @param params - The parameters object to sanitize
- * @returns A new object with skyfire-pay-id replaced with '[REDACTED]'
- */
-export function redactSkyfirePayId(params: unknown): unknown {
-    if (!isPlainRecord(params) || !(SKYFIRE_PAY_ID_KEY in params)) {
-        return params;
-    }
-
-    if (params[SKYFIRE_PAY_ID_KEY] === REDACTED_VALUE) {
-        return params;
-    }
-
-    return { ...params, [SKYFIRE_PAY_ID_KEY]: REDACTED_VALUE };
+    log.error(message, { error: toPlainError(error), ...data });
 }

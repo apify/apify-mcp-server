@@ -2,11 +2,10 @@ import { createHash } from 'node:crypto';
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
-import { fixedAjvCompile } from '../tools/actor_input_schema.js';
+import { compileUntrustedSchema } from '../tools/actor_input_schema.js';
 import { parseActorFullName } from '../tools/actor_tool_naming.js';
 import type { ActorMcpTool, ToolEntry } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
-import { ajv } from '../utils/ajv.js';
 import {
     MAX_TOOL_NAME_LENGTH,
     MAX_TOOL_NAME_USERNAME_LENGTH,
@@ -62,7 +61,7 @@ export async function getMCPServerTools(
         tools.some(({ name }) => `${escapedUsername}--${actorName}--${name}`.length > MAX_TOOL_NAME_LENGTH);
 
     return tools.map((tool): ActorMcpTool => {
-        // The shared AJV instance is draft-07 only. A declared `$schema` makes compile throw
+        // AJV here is draft-07 only. A declared `$schema` makes compile throw
         // and drops every tool from this Actor. Copy first so the client object stays intact.
         const inputSchema = { ...tool.inputSchema };
         if ('$schema' in inputSchema) {
@@ -72,12 +71,13 @@ export async function getMCPServerTools(
         return {
             type: TOOL_TYPE.ACTOR_MCP,
             actorId: actorID,
+            actorFullName,
             serverUrl,
             originToolName: tool.name,
             name: getProxyMCPServerToolName(actorFullName, tool.name, shouldCapUsername),
             description: tool.description || '',
             inputSchema,
-            ajvValidate: fixedAjvCompile(ajv, inputSchema),
+            ajvValidate: compileUntrustedSchema(inputSchema).validate,
             annotations: tool.annotations,
         };
     });

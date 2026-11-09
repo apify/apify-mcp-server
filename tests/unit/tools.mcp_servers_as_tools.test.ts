@@ -23,7 +23,7 @@ function makeActorInfo(id: string, webServerMcpPath: string): ActorInfo {
     return {
         webServerMcpPath,
         definition: { id, actorFullName: `user/${id}` },
-        actor: {},
+        actor: { id, standbyUrl: `https://${id}.apify.actor` },
     } as unknown as ActorInfo;
 }
 
@@ -34,16 +34,16 @@ describe('getMCPServersAsTools', () => {
 
     it('skips only the Actor whose webServerMcpPath escapes its standby origin, not the whole batch', async () => {
         const goodTool = { tool: { name: 'good-tool' } } as unknown as ToolEntry;
-        getActorMCPServerURL.mockImplementation(async (realActorId: string) => {
-            if (realActorId === 'evil') throw new Error('resolves outside its standby origin');
-            return `https://${realActorId}.apify.actor/mcp`;
+        getActorMCPServerURL.mockImplementation(async (actor: { id: string }) => {
+            if (actor.id === 'evil') throw new Error('resolves outside its standby origin');
+            return `https://${actor.id}.apify.actor/mcp`;
         });
         connectMCPClient.mockResolvedValue({ close: vi.fn() });
         getMCPServerTools.mockResolvedValue([goodTool]);
 
         const tools = await getMCPServersAsTools(
             [makeActorInfo('evil', '//attacker.com/mcp'), makeActorInfo('good', '/mcp')],
-            'token-123',
+            { token: 'token-123' },
         );
 
         expect(tools).toEqual([goodTool]);
@@ -52,13 +52,11 @@ describe('getMCPServersAsTools', () => {
     });
 
     it('passes the Actor full name to getMCPServerTools', async () => {
-        getActorMCPServerURL.mockImplementation(
-            async (realActorId: string) => `https://${realActorId}.apify.actor/mcp`,
-        );
+        getActorMCPServerURL.mockImplementation(async (actor: { id: string }) => `https://${actor.id}.apify.actor/mcp`);
         connectMCPClient.mockResolvedValue({ close: vi.fn() });
         getMCPServerTools.mockResolvedValue([]);
 
-        await getMCPServersAsTools([makeActorInfo('good', '/mcp')], 'token-123');
+        await getMCPServersAsTools([makeActorInfo('good', '/mcp')], { token: 'token-123' });
 
         expect(getMCPServerTools).toHaveBeenCalledWith(
             'good',

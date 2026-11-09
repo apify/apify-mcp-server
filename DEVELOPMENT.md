@@ -98,7 +98,7 @@ pnpm install        # installs root + src/web (workspace package) in one pass
 
 Widget code lives in `src/web/` (a self-contained React project). Widgets are rendered based on tool output — to add data to a widget, modify the corresponding tool's return value.
 
-> **UI mode:** Widget rendering requires the server to run in UI mode. Use `?ui=true` (e.g., `/mcp?ui=true`) or set `UI_MODE=true`.
+> **UI mode:** Widget rendering requires the server to run in UI mode. Use `?ui=true` (e.g., `http://localhost:3001/?ui=true` for the local dev server, which serves MCP at `/` only) or set `UI_MODE=true`.
 
 See the [OpenAI Apps SDK documentation](https://developers.openai.com/apps-sdk) for background on MCP Apps and widgets.
 
@@ -145,6 +145,8 @@ Restart Claude Code for the change to take effect. This token is picked up by bo
 
 ## Testing
 
+Unit test rules are in the [unit testing guide](./tests/UNIT_TESTING_GUIDE.md); which layer to use is in [tests/AGENTS.md](./tests/AGENTS.md).
+
 | Layer | Command | What it covers |
 |---|---|---|
 | **Unit tests** | `pnpm run test:unit` | Individual modules in isolation — no credentials needed |
@@ -161,15 +163,18 @@ into this repo.
 
 ### Test Actors
 
-Integration tests run against two purpose-built Actors defined in [apify/mcp-server-test-actor](https://github.com/apify/mcp-server-test-actor) and referenced from [`tests/test_kit/helpers.ts`](./tests/test_kit/helpers.ts):
+Integration tests run against three purpose-built Actors defined in [apify/mcp-server-test-actor](https://github.com/apify/mcp-server-test-actor) and referenced from [`tests/test_kit/helpers.ts`](./tests/test_kit/helpers.ts):
 
 | Actor | Constant | Purpose |
 |---|---|---|
 | `apify/normal-mode-test-actor` | `ACTOR_NORMAL_MODE` | A normal Actor that writes dataset and key-value-store output. Exercises `call-actor`, the canonical run response, and the storage tools (`get-dataset-items`, `get-dataset`, `get-key-value-store-*`). |
-| `apify/example-mcp-server` | `ACTOR_EXAMPLE_MCP_SERVER` | A standby MCP-server Actor. Exercises the MCP-in-MCP proxy path, where the server registers the Actor's own MCP tools as sub-tools. |
+| `apify/example-mcp-server` | `ACTOR_EXAMPLE_MCP_SERVER` | A standby MCP-server Actor. Exercises `call-actor-mcp-tool`, `fetch-actor-mcp-tool-list` and the MCP-in-MCP proxy path, where the server registers the Actor's own MCP tools as sub-tools. |
+| `apify/server-actor-test` | `ACTOR_SERVER_ACTOR_TEST` | A single-tenant Server Actor with an API schema (`webServerSchema`) and an input schema, no MCP path. Its HTTP API adds two numbers (`GET`/`POST /add`, the same item as a normal run) and has test endpoints that echo requests and return fixed statuses, content types, sizes, delays and a redirect. Exercises `send-server-actor-request` and the server-interface section of `fetch-actor-details`. |
 
 ### Test structure
 
+- `tests/AGENTS.md` — testing conventions and which test layer to use
+- `tests/UNIT_TESTING_GUIDE.md` — rules for unit tests
 - `tests/unit/` — unit tests for individual modules
 - `tests/integration/` — integration tests for MCP server functionality
   - `tests/integration/suite.ts` — wires the transport dimensions into one shared suite; add new cases to the matching group in `tests/test_kit/cases/*.cases.ts`, not here
@@ -188,7 +193,7 @@ merging the two codebases — it's a non-standard cross-repo dependency injectio
 (each side supplies its own client/environment for the same case logic), accepted
 deliberately for this trade-off.
 
-This package is also used by the hosted server in `apify-mcp-server-internal`. Every integration case is a `Case` object (`{ name, isDeploymentTest, run, ... }`) defined in `tests/test_kit/cases/*.cases.ts` — published behind the package's `./test-kit` export (`vitest` optional peerDependency). This repo's own `suite.ts` runs every case via `registerCases(name, allGroupCases, ctx)`; internal imports the same case arrays via `@apify/actors-mcp-server/test-kit` and calls `registerCases(name, allCases, { ...ctx, isDeploymentTestOnly: true })` against its own live staging/prod deploy — cases with `isDeploymentTest: false` register as `it.skip` there, so nothing needs re-registering by hand.
+This package is also used by the hosted server in `apify-mcp-server-internal`. Every integration case is a `Case` object (`{ name, isDeploymentTest, run, ... }`) defined in `tests/test_kit/cases/*.cases.ts` — published behind the package's `./test-kit` export (consumers install `vitest` themselves; it is deliberately not a peer, see `tests/test_kit/index.ts`). This repo's own `suite.ts` runs every case via `registerCases(name, allGroupCases, ctx)`; internal imports the same case arrays via `@apify/actors-mcp-server/test-kit` and calls `registerCases(name, allCases, { ...ctx, isDeploymentTestOnly: true })` against its own live staging/prod deploy — cases with `isDeploymentTest: false` register as `it.skip` there, so nothing needs re-registering by hand.
 
 Cases that share expensive setup (one seeded Actor run, say) do it via `ctx.getFixture(fixture)` (`Fixture<T> = { key, setup(ctx) }`) instead of a vitest `beforeAll` — `setup` runs at most once per `registerCases` call (once per transport dimension), memoized by `fixture.key`, no matter how many or few of the cases sharing it actually run (e.g. under `isDeploymentTestOnly`). This is what lets `storage.cases.ts`'s 13 cases built on one seeded run stay ordinary, individually eligible-for-`isDeploymentTest` `Case` objects instead of a separate non-flattenable group. See `tests/test_kit/register.ts` and `storage.cases.ts`'s `normalModeRunFixture`.
 
@@ -199,18 +204,18 @@ This is a real execution decision, not a visibility flag: internal's `isDeployme
 **Tests in this repo** cover the package's MCP and library surface. They live in `tests/test_kit/cases/*.cases.ts` (registered through `tests/integration/suite.ts`) and `tests/unit/`:
 
 - MCP protocol — `initialize` handshake, request/response shapes for `tools/*`, `prompts/*`, `resources/*`, `tasks/*`, notification delivery, JSON-RPC error codes.
-- Package logic — tool loader and selectors, widget metadata shape, structured output schemas, prompt registry, built-in tools, `call-actor` `RunResponse` shape, `SkyfirePaymentProvider`, client-name capability detection, `?ui=` server-mode parsing.
+- Package logic — tool loader and selectors, widget metadata shape, structured output schemas, prompt registry, built-in tools, `call-actor` `RunResponse` shape, client-name capability detection, `?ui=` server-mode parsing.
 
 **Tests not in this repo** — anything that only makes sense with the hosted stack:
 
-- IAM auth gate (401, unauth user toolset filter, `?payment=skyfire` bypass), rate limiter, `RedisEventStore` replay via `Last-Event-ID`, user-aware rental Actor filter, non-MCP HTTP routes (`/`, OAuth metadata, server card).
+- IAM auth gate (401, unauth user toolset filter), rate limiter, `RedisEventStore` replay via `Last-Event-ID`, user-aware rental Actor filter, non-MCP HTTP routes (`/`, OAuth metadata, server card).
 - Multi-node coordination — cross-node session continuity and cancellation, failover through the Caddy load balancer.
 
 Those live in `apify-mcp-server-internal`, together with a small **contract smoke suite** that re-asserts our package's behavior survives the hosted server's extra code (auth, rate limiter, Caddy, response handlers). We don't maintain that suite — internal does — but we should know it exists.
 
 #### When your change affects the hosted server
 
-The hosted server wraps this package with auth, rate limiter, Caddy, and response handlers. Any of that can change, drop, or delay something we produce; our tests don't see that wrapping. So if you change something the hosted server consumes — `internals.js` exports, `_meta` shape, `structuredContent`, anything that depends on `clientInfo`, `?ui=` / `?payment=` parsing, the timing of notifications — flag it in the PR. Internal's contract suite likely needs a matching test.
+The hosted server wraps this package with auth, rate limiter, Caddy, and response handlers. Any of that can change, drop, or delay something we produce; our tests don't see that wrapping. So if you change something the hosted server consumes — `internals.js` exports, `_meta` shape, `structuredContent`, anything that depends on `clientInfo`, `?ui=` parsing, the timing of notifications — flag it in the PR. Internal's contract suite likely needs a matching test.
 
 #### Don't delete a public test thinking internal covers it
 
@@ -251,7 +256,7 @@ mcpc --json @stdio tools-call search-actors keywords:="scraper" | jq ‘.content
 
 Run [MCPJam](https://www.mcpjam.com/) with `npx @mcpjam/inspector@latest`.
 
-1. Click **"Add new server"**, enter URL `http://localhost:3001/mcp?ui=true`, select **"No authentication"**
+1. Click **"Add new server"**, enter URL `http://localhost:3001/?ui=true` (the dev server serves MCP at `/`; `/mcp` returns 404), and add an `Authorization: Bearer <your Apify token>` header, since the dev server does not read `APIFY_TOKEN` from its environment
 2. **App Builder** — select a tool, fill arguments, execute, view rendered widget
 3. **Chat** — add an OpenAI/Anthropic/OpenRouter API key to chat with widget rendering inline
 

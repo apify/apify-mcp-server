@@ -1,6 +1,7 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ApifyClient as ApifyClientBase } from 'apify-client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
@@ -17,6 +18,9 @@ import {
     REPORT_PROBLEM_NUDGE,
     reportProblem,
 } from '../../src/tools/dev/report_problem.js';
+import { getActorRunList } from '../../src/tools/runs/get_actor_run_list.js';
+import { getDatasetList } from '../../src/tools/storage/get_dataset_list.js';
+import { getKeyValueStoreList } from '../../src/tools/storage/get_key_value_store_list.js';
 import type { ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
@@ -129,6 +133,7 @@ const BASE_TELEMETRY_KEYS = [
     'tool_response_file_bytes',
     'tool_response_structured_content_bytes',
     'tool_status',
+    'trace_id',
     'transport_type',
 ];
 
@@ -210,13 +215,13 @@ function expectFailureClassTelemetry(
 }
 
 /** Drives a task-mode call, waits for terminal status, and reads back the stored task + result. */
-async function runTaskAndReadBack(server: ActorsMcpServer, tool: ToolEntry) {
+async function runTaskAndReadBack(server: ActorsMcpServer, tool: ToolEntry, meta?: Record<string, unknown>) {
     server.upsertTools([tool]);
     const handler = getRequestHandler(server, 'tools/call');
     const res = (await handler(
         {
             method: 'tools/call',
-            params: { name: tool.name, arguments: {}, _meta: { mcpSessionId: 's1' }, task: { ttl: 60_000 } },
+            params: { name: tool.name, arguments: {}, _meta: { mcpSessionId: 's1', ...meta }, task: { ttl: 60_000 } },
         },
         { signal: { aborted: false }, sendNotification: vi.fn() },
     )) as { task: { taskId: string } };
@@ -275,6 +280,18 @@ describe('CallToolRequestSchema handler', () => {
                 expect('internalToolStatus' in result).toBe(false);
             });
         });
+
+        it('ends a 404 failure with the API message and no generic hint', async () => {
+            await withServer(async (server) => {
+                silenceLogs();
+                const error = Object.assign(new Error('Actor run was not found'), { statusCode: 404 });
+                const result = await runSync(server, makeThrowingTool({ error }));
+                expect(result.isError).toBe(true);
+                expect(result.content).toEqual([
+                    { type: 'text', text: 'Error calling tool "test-throwing-tool": Actor run was not found.' },
+                ]);
+            });
+        });
     });
 
     it('rejects a task-augmented call to a tool without taskSupport before dispatch', async () => {
@@ -328,6 +345,37 @@ describe('CallToolRequestSchema handler', () => {
                 ),
             ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
             expect(received.called).toBe(false);
+        });
+    });
+
+    // Regression: #1479 — the API reads limit=0 as no limit and returns up to 1,000 items.
+    it.each([
+        [HELPER_TOOLS.ACTOR_RUN_LIST_GET, getActorRunList, 'runs'],
+        [HELPER_TOOLS.DATASET_LIST_GET, getDatasetList, 'datasets'],
+        [HELPER_TOOLS.KEY_VALUE_STORE_LIST_GET, getKeyValueStoreList, 'keyValueStores'],
+    ] as const)('rejects an invalid %s limit before any API request', async (name, tool, method) => {
+        await withServer(async (server) => {
+            silenceLogs();
+            server.upsertTools([tool]);
+            vi.spyOn(getLegacyServer(server), 'sendLoggingMessage').mockResolvedValue(undefined);
+            const listSpy = vi.spyOn(ApifyClientBase.prototype, method).mockImplementation(() => {
+                throw new Error('stubbed');
+            });
+            const handler = getRequestHandler(server, 'tools/call');
+            const callWithLimit = async (limit: number) =>
+                handler(
+                    { method: 'tools/call', params: { name, arguments: { limit }, _meta: { mcpSessionId: 's1' } } },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                );
+
+            for (const limit of [0, -1, 1.5]) {
+                await expect(callWithLimit(limit)).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+            }
+            expect(listSpy).not.toHaveBeenCalled();
+
+            // Control: a valid limit reaches the spied client method.
+            await callWithLimit(1);
+            expect(listSpy).toHaveBeenCalled();
         });
     });
 
@@ -629,6 +677,25 @@ describe('executeToolAndUpdateTask()', () => {
         expectClientContextTelemetry(trackSpy.mock.calls[0][2]);
     });
 
+    it('takes the task-call trace_id from the Apify AI thread id', async () => {
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        const apifyAi = { ...INITIALIZE_REQUEST.params, clientInfo: { name: 'apify-ai', version: '1' } };
+        await withServer(
+            async (server) => {
+                const { tool } = makeRecorderTool('task-trace-tool', { taskSupport: 'optional' });
+                await runTaskAndReadBack(server, tool, { 'com.apify/traceId': 'thread-1' });
+                await vi.waitFor(() => expect(trackSpy).toHaveBeenCalled());
+            },
+            {
+                token: undefined,
+                telemetry: { enabled: true },
+                allowUnauthMode: true,
+                initializeRequestData: { ...INITIALIZE_REQUEST, params: apifyAi },
+            },
+        );
+        expect(trackSpy.mock.calls[0][2]).toMatchObject({ mcp_session_id: 's1', trace_id: 'thread-1' });
+    });
+
     it('dispatches an ACTOR_MCP tool run as a task and surfaces a connect failure as a completed error result', async () => {
         // #1063 CLOSED: executeToolAndUpdateTask now dispatches ACTOR_MCP through the shared switch.
         // Stub connectMCPClient to return null — deterministic, no real network attempt — so the
@@ -699,6 +766,26 @@ describe('executeToolAndUpdateTask()', () => {
             expect(texts).not.toContain(REPORT_PROBLEM_INVALID_INPUT_NUDGE);
         });
     });
+
+    it.each([
+        ['an internal failure gets the general sentence', 500, REPORT_PROBLEM_NUDGE],
+        ['a 4xx failure gets the friction sentence', 404, REPORT_PROBLEM_INVALID_INPUT_NUDGE],
+    ])('appends one report-problem sentence to an ACTOR_MCP task failure: %s', async (_label, code, sentence) => {
+        await withServer(async (server) => {
+            silenceLogs();
+            const rejectingClient = {
+                callTool: vi.fn().mockRejectedValue(new McpError(code as ErrorCode, `remote ${code}`)),
+                close: vi.fn().mockResolvedValue(undefined),
+                setNotificationHandler: vi.fn(),
+            } as unknown as Client;
+            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(rejectingClient);
+            server.upsertTools([{ ...reportProblem }]);
+            const { result } = await runTaskAndReadBack(server, makeActorMcpTool());
+            const texts = (result.content as { text: string }[]).map((c) => c.text);
+            expect(texts).toHaveLength(2);
+            expect(texts[1]).toBe(sentence);
+        });
+    });
 });
 
 describe('ACTOR_MCP remote-McpError containment (sync tools/call catch)', () => {
@@ -725,6 +812,24 @@ describe('ACTOR_MCP remote-McpError containment (sync tools/call catch)', () => 
             const result = await runSync(server, makeActorMcpTool());
             expect(result.isError).toBe(true);
             expect((result.content as { text: string }[])[0].text).toContain('Failed to call MCP tool');
+        });
+    });
+
+    it('names the Actor by its full name in the failure text', async () => {
+        await withServer(async (server) => {
+            silenceLogs();
+            vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(
+                stubRejectingClient(new McpError(ErrorCode.InternalError, 'remote boom')),
+            );
+            const tool = {
+                ...makeActorMcpTool(),
+                actorId: 'Iei3c51WbI7eKwgSg',
+                actorFullName: 'apify/example-mcp-server',
+            } as ToolEntry;
+            const result = await runSync(server, tool);
+            const { text } = (result.content as { text: string }[])[0];
+            expect(text).toContain("on Actor 'apify/example-mcp-server'");
+            expect(text).not.toContain('Iei3c51WbI7eKwgSg');
         });
     });
 
@@ -1036,7 +1141,10 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                     .spyOn(callActor, 'checkPaymentProviderStandbyConflict')
                     .mockResolvedValue(standbyResult);
                 const notifySpy = vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
+                const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
+                    hasPaymentProviderStandbyCheck: true,
+                    taskSupport: 'optional',
+                });
                 const res = await callTask(server, tool, { actor: 'apify/some-actor' });
 
                 expect(res.task.status).toBe('completed');
@@ -1062,6 +1170,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 // paymentRequired + missing skyfire-pay-id would also yield paymentRequiredResult.
                 const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
                     paymentRequired: true,
+                    hasPaymentProviderStandbyCheck: true,
                     taskSupport: 'optional',
                 });
                 const res = await callTask(server, tool, { actor: 'apify/some-actor' });
@@ -1105,7 +1214,10 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
                 vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockResolvedValue(standbyResult);
                 vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
+                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
+                    hasPaymentProviderStandbyCheck: true,
+                    taskSupport: 'optional',
+                });
                 await callTask(server, tool, { actor: 'apify/some-actor' });
             },
             {
@@ -1131,7 +1243,10 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
                 vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockResolvedValue(standbyResult);
                 vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
+                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
+                    hasPaymentProviderStandbyCheck: true,
+                    taskSupport: 'optional',
+                });
                 server.upsertTools([tool]);
                 const handler = getRequestHandler(server, 'tools/call');
 
@@ -1243,7 +1358,9 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockRejectedValue(
                     Object.assign(new Error('server error'), { statusCode: 500 }),
                 );
-                const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL);
+                const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
+                    hasPaymentProviderStandbyCheck: true,
+                });
                 server.upsertTools([tool]);
                 const handler = getRequestHandler(server, 'tools/call');
                 const result = await handler(
@@ -1322,7 +1439,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockRejectedValue(
                     Object.assign(new Error('server error'), { statusCode: 500 }),
                 );
-                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL);
+                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { hasPaymentProviderStandbyCheck: true });
                 server.upsertTools([tool]);
                 const handler = getRequestHandler(server, 'tools/call');
                 await handler(

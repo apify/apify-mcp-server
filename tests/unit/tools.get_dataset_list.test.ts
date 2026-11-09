@@ -43,7 +43,7 @@ describe('get-dataset-list', () => {
         };
 
         expect(structuredContent).toMatchObject(MOCK_LIST);
-        expect(structuredContent.summary).toBe('Listed 2 of 2 datasets.');
+        expect(structuredContent.summary).toBe('Listed 2 of 2 named datasets.');
         // Not truncated → nextStep points at inspecting a dataset, not pagination.
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET);
         // content[0] ships the JSON data; content[1] carries the prose summary + nextStep.
@@ -75,7 +75,7 @@ describe('get-dataset-list', () => {
         const result = await (getDatasetList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
-        expect(structuredContent.summary).toBe('Listed 2 of 25 datasets.');
+        expect(structuredContent.summary).toBe('Listed 2 of 25 named datasets.');
         expect(structuredContent.nextStep).toBe(
             `Call ${HELPER_TOOLS.DATASET_LIST_GET} again with offset=2 to fetch the next page.`,
         );
@@ -117,9 +117,74 @@ describe('get-dataset-list', () => {
         expectSchemaConformingStructuredContent(result, storageListOutputSchema);
     });
 
-    it('rejects limit above 20 via ajv validation', () => {
-        const tool = getDatasetList as HelperTool;
-        expect(tool.ajvValidate({ limit: 21 })).toBe(false);
-        expect(tool.ajvValidate({ limit: 20 })).toBe(true);
+    it('leaves "named" out of the summary with unnamed=true', async () => {
+        const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
+
+        const result = await (getDatasetList as HelperTool).call(
+            stubToolCallContext({ unnamed: true }, stubApifyClient(listSpy)),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+        expect(structuredContent.summary).toBe('Listed 2 of 2 datasets.');
+        expect(structuredContent.nextStep).toBe(
+            `Use ${HELPER_TOOLS.DATASET_GET} with a datasetId from the list to inspect a dataset.`,
+        );
+    });
+
+    it.each([
+        [
+            false,
+            0,
+            0,
+            'Listed 0 of 0 named datasets.',
+            'unnamed=true includes the unnamed datasets that Actor runs create.',
+        ],
+        [
+            false,
+            5,
+            20,
+            'Listed 0 of 5 named datasets.',
+            'unnamed=true includes the unnamed datasets that Actor runs create.',
+        ],
+        [true, 0, 0, 'Listed 0 of 0 datasets.', 'No follow-up step.'],
+    ])(
+        'returns the empty-last-page nextStep for unnamed=%s (total=%i, offset=%i)',
+        async (unnamed, total, offset, summary, nextStep) => {
+            const listSpy = vi.fn().mockResolvedValue({ ...MOCK_LIST, total, offset, count: 0, items: [] });
+
+            const result = await (getDatasetList as HelperTool).call(
+                stubToolCallContext({ unnamed }, stubApifyClient(listSpy)),
+            );
+            const { content, structuredContent } = result as TextToolResult & {
+                structuredContent: Record<string, unknown>;
+            };
+
+            expect(structuredContent.summary).toBe(summary);
+            expect(structuredContent.nextStep).toBe(nextStep);
+            expect(content[1].text).toBe(`${summary}\n${nextStep}`);
+            expectSchemaConformingStructuredContent(result, storageListOutputSchema);
+        },
+    );
+
+    // Regression: #1479 — the API reads limit=0 as no limit and returns up to 1,000 items.
+    it.each([0, -1, 1.5, 21])('rejects limit %s via ajv validation', (limit) => {
+        expect((getDatasetList as HelperTool).ajvValidate({ limit })).toBe(false);
+    });
+
+    it.each([{ limit: 1 }, { limit: 20 }, {}])('accepts %j via ajv validation', (args) => {
+        expect((getDatasetList as HelperTool).ajvValidate(args)).toBe(true);
+    });
+
+    // Regression: #1296 — the terminal nextStep named a sibling tool the session was not served.
+    it('falls back on the last page when get-dataset is not loaded', async () => {
+        const result = (await (getDatasetList as HelperTool).call(
+            stubToolCallContext({}, stubApifyClient(vi.fn().mockResolvedValue(MOCK_LIST)), {
+                loadedToolNames: [HELPER_TOOLS.DATASET_LIST_GET],
+            }),
+        )) as TextToolResult & { structuredContent: Record<string, unknown> };
+
+        expect(result.structuredContent.nextStep).toBe('No follow-up step.');
+        expect(JSON.stringify([result.content, result.structuredContent])).not.toContain(HELPER_TOOLS.DATASET_GET);
+        expectSchemaConformingStructuredContent(result, storageListOutputSchema);
     });
 });
