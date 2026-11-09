@@ -22,6 +22,10 @@ Results of that runbook, 2026-08-08 on Sonnet 5: per-run cost/wall/pass table, m
 retry counts, and the confounds to fix before re-running. A dated record — do not edit it after
 the fact; a re-run gets its own file.
 
+### [zod_type_array_handoff.md](./zod_type_array_handoff.md)
+Decision note for the zod 4.6 bump on `chore/bump-vulnerable-deps`: serve the `type` arrays,
+drop the post-processor. Delete when that PR merges.
+
 ## Rules
 
 - A note gets a **deletion trigger** when it is written ("delete when X ships / closes / is

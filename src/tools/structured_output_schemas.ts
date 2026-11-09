@@ -10,8 +10,9 @@ import { ACTOR_TENANCY } from '../types.js';
  * The `type: '...' as const` assertions throughout narrow the string to a literal,
  * which the MCP SDK's schema types require (a plain `string` won't type-check).
  *
- * Some MCP clients refuse a `type` array or a keyword-less `{}` subschema, so nullable
- * and free-form values are spelled with `anyOf` branches of a single `type` each.
+ * Some MCP clients refuse a keyword-less `{}` subschema, so nullable and free-form values list their
+ * types. Zod's `toJSONSchema()` compacts an `anyOf` of bare types into a `type` array; the two forms
+ * are the same JSON Schema constraint and current clients accept both.
  */
 
 /** A string or `null`. Spread it next to a `description`. */
