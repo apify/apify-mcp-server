@@ -610,6 +610,7 @@ function buildSucceededSummaryNextStep(
 
 function buildTimedOutSummaryNextStep(
     runTimeSecs: number,
+    statusMessage: string | null | undefined,
     dataset?: RunDataset,
     keyValueStore?: RunKeyValueStore,
 ): { summary: string; nextStep: string } {
@@ -622,13 +623,13 @@ function buildTimedOutSummaryNextStep(
         const itemCount = dataset?.itemCount ?? 0;
         const fields = dataset?.fields ?? [];
         return {
-            summary: `TIMED-OUT after ${runTimeSecs}s.${kv.summarySuffix}`,
+            summary: `TIMED-OUT after ${runTimeSecs}s.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
             nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch any partial output (${itemCount} ${itemCount === 1 ? 'item' : 'items'} written). Available fields: ${fields.length > 0 ? fields.join(', ') : 'none'}.`,
         };
     }
 
     return {
-        summary: `TIMED-OUT after ${runTimeSecs}s.${kv.summarySuffix}`,
+        summary: `TIMED-OUT after ${runTimeSecs}s.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
         nextStep: `Inspect statusMessage and stats in this response; the run produced no dataset to fetch.`,
     };
 }
@@ -698,7 +699,7 @@ export function buildStatusSummaryNextStep(params: {
                     'Retry only if the user wants another run.',
             };
         case 'TIMED-OUT':
-            return buildTimedOutSummaryNextStep(runTimeSecs, dataset, keyValueStore);
+            return buildTimedOutSummaryNextStep(runTimeSecs, statusMessage, dataset, keyValueStore);
         default:
             return {
                 summary: `${status}. Run ${runId}.`,
