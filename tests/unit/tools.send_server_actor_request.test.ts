@@ -270,6 +270,20 @@ afterAll(async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
+describe('body input schema', () => {
+    // VS Code Copilot rejects the whole tool list when any array schema lacks `items`.
+    it('gives every array an items schema', () => {
+        const arraysWithoutItems: unknown[] = [];
+        const visit = (node: unknown) => {
+            if (!node || typeof node !== 'object') return;
+            if ((node as { type?: unknown }).type === 'array' && !('items' in node)) arraysWithoutItems.push(node);
+            Object.values(node).forEach(visit);
+        };
+        visit(sendServerActorRequest.inputSchema);
+        expect(arraysWithoutItems).toEqual([]);
+    });
+});
+
 describe('sending the request', () => {
     it('sends the token, the request origin and the JSON body as is, once', async () => {
         const received = recordRequests();

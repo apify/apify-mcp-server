@@ -38,7 +38,7 @@ import { actorNameToToolName, resolveActorInterfaces, resolveActorTenancy } from
 import { redactApiCallArgs } from '../api/apify_api_request.js';
 import { API_METHODS, type ApiMethod, isRecord } from '../api/apify_api_spec.js';
 import { parseBaseMimeType } from '../storage/storage_helpers.js';
-import { anyJsonValueSchema, serverActorRequestOutputSchema } from '../structured_output_schemas.js';
+import { anyJsonBodySchema, serverActorRequestOutputSchema } from '../structured_output_schemas.js';
 import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 
@@ -69,7 +69,7 @@ const sendServerActorRequestArgs = z.object({
         .unknown()
         .optional()
         .describe('The JSON request body, sent as application/json. Not allowed with GET.')
-        .meta(anyJsonValueSchema),
+        .meta(anyJsonBodySchema),
 });
 type SendServerActorRequestArgs = z.infer<typeof sendServerActorRequestArgs>;
 
