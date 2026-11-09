@@ -146,11 +146,9 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             itemCount: v.items.length,
             totalItemCount: v.total,
             offset,
+            limit: effectiveLimit,
             fields,
-            hasOnlyEmptyItems: v.items.every(
-                (item) =>
-                    typeof item === 'object' && item !== null && !Array.isArray(item) && Object.keys(item).length === 0,
-            ),
+            hasOnlyEmptyItems: v.items.every((item) => Object.keys(item).length === 0),
             loadedToolNames,
         });
         return buildStorageResponse({ structuredContent, summary, nextStep, apifyConsoleUrl });

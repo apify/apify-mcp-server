@@ -163,46 +163,54 @@ export function buildStorageListSummaryNextStep(params: {
 }
 
 /**
- * Pagination-aware {summary, nextStep}: when more items remain, point at the next page;
- * otherwise point at get-dataset for the field list (structure lives there, not in a heavy schema dump).
- * An offset past the last item and a `fields` projection that returns only empty items are described instead.
+ * {summary, nextStep} guidance for a dataset items page. The counts and offsets are in the structured
+ * content, so the text does not repeat them. More pages remain while `offset + limit < totalItemCount`:
+ * with `clean`, the API pages before it drops empty items, so `itemCount` can fall short of the page size.
+ * An empty page counts as past the end only when its offset is, because `totalItemCount` lags new pushes.
  */
 export function buildDatasetItemsSummaryNextStep(params: {
     datasetId: string;
     itemCount: number;
     totalItemCount: number;
     offset: number;
+    limit: number;
     fields: readonly string[];
     hasOnlyEmptyItems: boolean;
-    /** Active loaded tool set; gates the get-dataset references (see #1007). */
+    /** Active loaded tool set; gates the get-dataset references. */
     loadedToolNames: readonly string[];
 }): { summary: string; nextStep: string } {
-    const { datasetId, itemCount, totalItemCount, offset, fields, hasOnlyEmptyItems, loadedToolNames } = params;
+    const { datasetId, itemCount, totalItemCount, offset, limit, fields, hasOnlyEmptyItems, loadedToolNames } = params;
     if (itemCount === 0 && totalItemCount > 0 && offset >= totalItemCount) {
         return {
-            summary:
-                `Offset ${offset} is past the last item: the dataset has ${totalItemCount} ` +
-                `${totalItemCount === 1 ? 'item' : 'items'} (offsets 0 to ${totalItemCount - 1}).`,
-            nextStep: `${HELPER_TOOLS.DATASET_GET_ITEMS} with offset=0 returns the first page.`,
+            summary: 'No items at this offset: it is past the end of the dataset.',
+            nextStep: `Call ${HELPER_TOOLS.DATASET_GET_ITEMS} with a lower offset.`,
         };
     }
-    let summary = `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}).`;
-    let nextStep = `Call ${HELPER_TOOLS.DATASET_GET_ITEMS} again with offset=${offset + itemCount} to fetch the next page.`;
-    if (offset + itemCount >= totalItemCount) {
-        summary =
-            offset === 0 && itemCount === totalItemCount
-                ? `Fetched all ${itemCount} items.`
-                : `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}); no more pages.`;
-        nextStep = suggestTool(HELPER_TOOLS.DATASET_GET, loadedToolNames)
-            ? `Use ${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} to see the field list if you need the data structure.`
-            : `No more pages. Inspect the returned items directly.`;
+    if (fields.length > 0 && totalItemCount > 0 && hasOnlyEmptyItems) {
+        return {
+            summary: 'None of the returned items has the requested fields.',
+            nextStep: resolveSiblingNextStep(
+                HELPER_TOOLS.DATASET_GET,
+                loadedToolNames,
+                `${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} lists the dataset's fields.`,
+                'An item read without `fields` shows its field names.',
+            ),
+        };
     }
-    if (fields.length === 0 || totalItemCount === 0 || !hasOnlyEmptyItems) return { summary, nextStep };
+    if (offset + limit < totalItemCount) {
+        return {
+            summary: 'Fetched one page; more items remain.',
+            nextStep: `Call ${HELPER_TOOLS.DATASET_GET_ITEMS} again with offset increased by limit to fetch the next page.`,
+        };
+    }
     return {
-        summary: `${summary} None of them has the requested fields (${fields.join(', ')}).`,
-        nextStep: suggestTool(HELPER_TOOLS.DATASET_GET, loadedToolNames)
-            ? `${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} lists the dataset's fields.`
-            : 'An item read without `fields` shows its field names.',
+        summary: 'Fetched the last page; no more items remain.',
+        nextStep: resolveSiblingNextStep(
+            HELPER_TOOLS.DATASET_GET,
+            loadedToolNames,
+            `Use ${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} to see the field list if you need the data structure.`,
+            'Inspect the returned items directly.',
+        ),
     };
 }
 
