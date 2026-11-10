@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.21.6 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Strip slash padding from Actor names ([#1803](https://github.com/apify/apify-mcp-server/pull/1803)) ([74cab9b](https://github.com/apify/apify-mcp-server/commit/74cab9b2f50b3ecc8115e91b974eae420c5f2fb8)) by [@jirispilka](https://github.com/jirispilka), closes [#1798](https://github.com/apify/apify-mcp-server/issues/1798)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.21.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.5) (2026-11-10)
 
 ### 🐛 Bug Fixes
