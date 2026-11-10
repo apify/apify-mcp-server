@@ -9,6 +9,8 @@ All notable changes to this project will be documented in this file.
 
 - List only working dataset field selections ([#1665](https://github.com/apify/apify-mcp-server/pull/1665)) ([df8e37e](https://github.com/apify/apify-mcp-server/commit/df8e37eefae5d881e97263e8cf97fffcc181aa4f)) by [@jirispilka](https://github.com/jirispilka), closes [#1305](https://github.com/apify/apify-mcp-server/issues/1305), [#1656](https://github.com/apify/apify-mcp-server/issues/1656)
 - Explain empty and past-the-end dataset pages ([#1806](https://github.com/apify/apify-mcp-server/pull/1806)) ([446afce](https://github.com/apify/apify-mcp-server/commit/446afceda99c83f5801fee8011bc71960653b419)) by [@jirispilka](https://github.com/jirispilka), closes [#1801](https://github.com/apify/apify-mcp-server/issues/1801)
+- Give the body array schema items for VS Code Copilot ([#1847](https://github.com/apify/apify-mcp-server/pull/1847)) ([3fea68c](https://github.com/apify/apify-mcp-server/commit/3fea68c909b2c37d686c6c645a191e0e9d0f2c36)) by [@jirispilka](https://github.com/jirispilka), closes [#1846](https://github.com/apify/apify-mcp-server/issues/1846)
+- Log failures the stateless Node adapter answers itself ([#1758](https://github.com/apify/apify-mcp-server/pull/1758)) ([8e3ead2](https://github.com/apify/apify-mcp-server/commit/8e3ead201a33008b16400db3bde7bf1c3d3d3220)) by [@jirispilka](https://github.com/jirispilka), closes [#1247](https://github.com/apify/apify-mcp-server/issues/1247)
 
 
 <!-- git-cliff-unreleased-end -->
