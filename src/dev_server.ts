@@ -215,18 +215,28 @@ async function serveStatelessRequest(req: Request, res: Response, taskStore: InM
             (req as Request & { auth?: AuthInfo }).auth = { token: apifyToken, clientId: '', scopes: [] };
         }
         // The factory's throw surfaces from the entry as a 500; swap in the 401 the auth gate owns.
-        await toNodeHandler({
-            ...handler,
-            fetch: async (request, options) => {
-                const response = await handler.fetch(request, options);
-                if (!unauthorized) return response;
-                log.softFail('Apify API token missing on unauthenticated request', { statusCode: 401 });
-                return Response.json(UNAUTHORIZED_RESPONSE_BODY, {
-                    status: 401,
-                    headers: { 'WWW-Authenticate': UNAUTHORIZED_CHALLENGE },
-                });
+        await toNodeHandler(
+            {
+                ...handler,
+                fetch: async (request, options) => {
+                    const response = await handler.fetch(request, options);
+                    if (!unauthorized) return response;
+                    log.softFail('Apify API token missing on unauthenticated request', { statusCode: 401 });
+                    return Response.json(UNAUTHORIZED_RESPONSE_BODY, {
+                        status: 401,
+                        headers: { 'WWW-Authenticate': UNAUTHORIZED_CHALLENGE },
+                    });
+                },
             },
-        })(req, res, req.body);
+            {
+                // The adapter answers a throw with its own 500 and never rethrows, so the route's catch can't log it.
+                onerror: (error) =>
+                    log.exception(toPlainError(error), 'Error in request', {
+                        logMessage: 'Error handling MCP request',
+                        statusCode: 500,
+                    }),
+            },
+        )(req, res, req.body);
     } finally {
         await handler.close();
     }
