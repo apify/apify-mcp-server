@@ -42,10 +42,9 @@ export const cronExpressionSchema = z.string().min(1).max(100);
 
 /**
  * Only the length caps the API enforces. No `pattern`: the server's AJV removes that keyword
- * as a ReDoS mitigation (`utils/ajv.ts`), so a regex here never gates the call — it only fires in the
- * tool body's `parse()`, which throws a raw ZodError that reaches the client as serialised JSON with
- * the pattern in it. The API rejects the same name with a far better message, and the field's
- * `.describe()` text states the rule for the model.
+ * as a ReDoS mitigation (`utils/ajv.ts`), so a regex here would only fire in the tool body's `parse()`.
+ * The API rejects the same name with its own message, and the field's `.describe()` text states the
+ * rule for the model.
  */
 const scheduleNameSchema = z.string().min(3).max(63);
 

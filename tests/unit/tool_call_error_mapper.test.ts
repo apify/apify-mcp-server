@@ -1,6 +1,7 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { ApifyApiError } from 'apify-client';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 import {
     APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK,
@@ -166,6 +167,38 @@ describe('buildToolCallErrorResult()', () => {
         });
 
         expect(result.kind).toBe(TOOL_CALL_ERROR_KIND.EXECUTION);
+        expect(result.toolStatus).toBe(TOOL_STATUS.ABORTED);
+    });
+
+    it('explains a thrown Zod argument failure as invalid input', () => {
+        const schema = z.object({ output: z.object({ serverInterface: z.union([z.boolean(), z.string()]) }) });
+        const { error } = schema.safeParse({ output: { serverInterface: ['GET /add'] } });
+
+        const result = buildToolCallErrorResult(error, {
+            toolName: HELPER_TOOLS.ACTOR_GET_DETAILS,
+            actorName: ACTOR_NAME,
+            actorId: ACTOR_ID,
+            isAborted: false,
+        });
+
+        expect(result).toMatchObject({
+            kind: TOOL_CALL_ERROR_KIND.EXECUTION,
+            toolStatus: TOOL_STATUS.SOFT_FAIL,
+            callDiagnostics: {
+                failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                failure_detail: 'output.serverInterface: expected boolean or string, got array',
+                actor_name: ACTOR_NAME,
+                actor_id: ACTOR_ID,
+            },
+            userText: `Invalid arguments for tool "${HELPER_TOOLS.ACTOR_GET_DETAILS}": output.serverInterface: expected boolean or string, got array.`,
+        });
+    });
+
+    it('keeps ABORTED for an aborted call that failed argument parsing', () => {
+        const { error } = z.object({ actor: z.string() }).safeParse({});
+
+        const result = buildToolCallErrorResult(error, { toolName: TOOL_NAME, isAborted: true });
+
         expect(result.toolStatus).toBe(TOOL_STATUS.ABORTED);
     });
 
