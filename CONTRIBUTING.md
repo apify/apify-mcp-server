@@ -80,12 +80,14 @@ chore: Update dependencies
 ## Pull Request Descriptions
 
 Write for a reviewer who has the diff open: lead with what changes for the user, not with the code. Use the [template](./.github/pull_request_template.md).
-- **Opener** (required): 1–3 sentences on what changes for the user or agent, and why, with the issue link. Write it yourself, or rewrite the agent's draft. Add one line for a decision that needs the reviewer's judgement or a part you're unsure about.
+- **Opener** (required): 1–3 sentences on what changes for the user or agent, and why, with the issue link (`Closes #123`). Write it yourself, or rewrite the agent's draft. Add one line for a decision that needs the reviewer's judgement or a part you're unsure about.
 - **Before / after**: a real tool call with its result text, or a screenshot.
 - **Breaking / unchanged**: state breaking contracts and any impact on apify-mcp-server-internal. Mention unchanged behavior only if a reviewer might reasonably assume it changed.
 - **Proof** (required): one line stating what you tested and the observed result. A focused regression test counts; use `mcpc` when tool behavior warrants it. Put long output in the collapsed block.
 
-Omit any section that doesn't apply. Don't list files, narrate commits or describe the review history. Put agent-written detail in a `<details><summary>` block labelled with the model, effort, and what it did; that label is your AI disclosure. Delete the block if unused.
+Every PR links an issue (see [Before you write code](#before-you-write-code)). A PR without one is a documentation fix or, in exceptional cases, a maintainer change labelled `adhoc` whose opener states the problem.
+
+Omit any section that doesn't apply. Don't list files, narrate commits or describe the review history. Put long agent-written detail in the collapsed `<details>` block; delete it if unused.
 
 ---
 
