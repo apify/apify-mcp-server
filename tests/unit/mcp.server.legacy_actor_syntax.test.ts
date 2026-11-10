@@ -21,9 +21,11 @@ describe('legacy Actor MCP syntax rejection', () => {
         { tool: callActorWidget, paymentProvider: makePaymentProvider('x402'), token: '' },
         { tool: callActor, paymentProvider: makePaymentProvider('x402'), token: 'test-token' },
         { tool: callActorWidget, paymentProvider: makePaymentProvider('x402'), token: 'test-token' },
+        // Normalization strips slash padding before it drops `:tool`, so the check must see the same name.
+        { tool: callActor, actor: 'apify/example-mcp-server:add/' },
     ])(
-        'rejects $tool.name before metadata lookup with $paymentProvider.id and token "$token"',
-        async ({ tool, ...options }) => {
+        'rejects $tool.name with "$actor" before metadata lookup with $paymentProvider.id and token "$token"',
+        async ({ tool, actor = 'apify/example-mcp-server:add', ...options }) => {
             const lookup = vi.spyOn(ApifyClient.prototype, 'actor').mockImplementation(() => {
                 throw new Error('Actor metadata unavailable');
             });
@@ -35,7 +37,7 @@ describe('legacy Actor MCP syntax rejection', () => {
                         method: 'tools/call',
                         params: {
                             name: tool.name,
-                            arguments: { actor: 'apify/example-mcp-server:add', input: {} },
+                            arguments: { actor, input: {} },
                             _meta: { mcpSessionId: 'legacy-syntax' },
                         },
                     },
@@ -52,32 +54,6 @@ describe('legacy Actor MCP syntax rejection', () => {
             }, options);
         },
     );
-
-    // Normalization strips slash padding before it drops `:tool`, so the check must see the same name.
-    it('rejects the syntax with slash padding before metadata lookup', async () => {
-        const lookup = vi.spyOn(ApifyClient.prototype, 'actor').mockImplementation(() => {
-            throw new Error('Actor metadata unavailable');
-        });
-
-        await withServer(async (server) => {
-            server.upsertTools([callActor, callActorMcpTool]);
-            const result = await getRequestHandler(server, 'tools/call')(
-                {
-                    method: 'tools/call',
-                    params: {
-                        name: callActor.name,
-                        arguments: { actor: 'apify/rag-web-browser:add/', input: {} },
-                        _meta: { mcpSessionId: 's1' },
-                    },
-                },
-                { signal: new AbortController().signal, sendNotification: vi.fn() },
-            );
-
-            expect(result.isError).toBe(true);
-            expect(JSON.stringify(result.content)).toContain('no longer supported');
-            expect(lookup).not.toHaveBeenCalled();
-        });
-    });
 
     it('omits an unavailable replacement and gives a configuration remedy', async () => {
         vi.spyOn(ApifyClient.prototype, 'actor').mockImplementation(() => {
