@@ -82,3 +82,80 @@ export function expectArrayWeakEquals(array: unknown[], values: unknown[]): void
         expect(array).toContainEqual(value);
     }
 }
+
+/** The only `SuiteClientOptions` key a shared stdio process may differ in. Any other key gets its own process. */
+const POOLABLE_OPTION_KEY_SET = new Set<string>(['tools']);
+
+/** `Client` methods that hold per-client state. Refused on a shared client because tests run concurrently. */
+const PER_CLIENT_STATE_METHOD_SET = new Set<string>([
+    'setNotificationHandler',
+    'removeNotificationHandler',
+    'setRequestHandler',
+    'removeRequestHandler',
+    'setLoggingLevel',
+    'registerCapabilities',
+]);
+
+function isPoolable(options?: SuiteClientOptions): boolean {
+    if (!options) return true;
+    return Object.entries(options).every(([key, value]) => value === undefined || POOLABLE_OPTION_KEY_SET.has(key));
+}
+
+/** A view of a shared client whose `close()` is a no-op and whose per-client state cannot be changed. */
+function buildSharedClient(client: Client): Client {
+    return new Proxy(client, {
+        get(target, property) {
+            if (property === 'close') return async () => {};
+            if (typeof property === 'string' && PER_CLIENT_STATE_METHOD_SET.has(property)) {
+                return () => {
+                    throw new Error(
+                        `${property}() changes per-client state, but this stdio client is shared with other tests. ` +
+                            'Pass `isolated: true` in the case client options.',
+                    );
+                };
+            }
+            const value = Reflect.get(target, property);
+            // Client methods touch private fields, which resolve only on the real instance.
+            return typeof value === 'function' ? value.bind(target) : value;
+        },
+    });
+}
+
+/**
+ * Share one stdio server process among tests that ask for the same tool list.
+ *
+ * Every stdio client spawns `node dist/stdio.js`, and booting it costs more than a typical test;
+ * the stdio file spawned one process per test and took five times longer than the HTTP files.
+ * The tool list is fixed at boot, so tests that differ in nothing else can share a connected client.
+ * Tests that pass any other option (`actors`, `payment`, `useEnv`, `clientName`, `isolated`, ...)
+ * get their own process, as before.
+ *
+ * `close()` on a shared client is a no-op; call `closeAll()` once the file is done.
+ */
+export function createStdioClientPool(): {
+    createClient: (options?: SuiteClientOptions) => Promise<Client>;
+    closeAll: () => Promise<void>;
+} {
+    const sharedClients = new Map<string, Promise<Client>>();
+
+    const createClient = async (options?: SuiteClientOptions): Promise<Client> => {
+        if (!isPoolable(options)) return createMcpStdioClient(options);
+        const key = JSON.stringify(options?.tools ?? null);
+        let pending = sharedClients.get(key);
+        if (!pending) {
+            pending = createMcpStdioClient(options);
+            sharedClients.set(key, pending);
+            // A failed boot is not cached, so the next test retries.
+            pending.catch(() => sharedClients.delete(key));
+        }
+        return buildSharedClient(await pending);
+    };
+
+    const closeAll = async (): Promise<void> => {
+        const results = await Promise.allSettled(sharedClients.values());
+        sharedClients.clear();
+        await Promise.all(results.map((result) => (result.status === 'fulfilled' ? result.value.close() : undefined)));
+    };
+
+    return { createClient, closeAll };
+}

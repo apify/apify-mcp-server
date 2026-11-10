@@ -17,7 +17,6 @@ import {
     addResourcePickerProperties as addArrayResourcePickerProperties,
 } from '../utils/apify_properties.js';
 import { getToolSchemaID } from './actor_tool_naming.js';
-import { getActorToolPolicy } from './actors/actor_tool_contract.js';
 
 type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 
@@ -28,7 +27,7 @@ type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 export const MAX_UNTRUSTED_SCHEMA_BYTES = 262_144;
 
 const UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE = 1000;
-const untrustedValidatorCache = new LruCache<ValidateFunction<unknown>>({
+const untrustedValidatorCache = new LruCache<{ validate: ValidateFunction<unknown>; schema: object }>({
     maxLength: UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE,
 });
 
@@ -38,7 +37,9 @@ const untrustedValidatorCache = new LruCache<ValidateFunction<unknown>>({
  * Create a fresh Ajv instance per compilation to avoid unbounded memory growth.
  * Ajv internally caches every compiled schema in a Map that is never evicted.
  */
-export function compileUntrustedSchema(schema: object): ValidateFunction<unknown> {
+export function compileUntrustedSchema<T extends object>(
+    schema: T,
+): { validate: ValidateFunction<unknown>; schema: T } {
     const serialized = JSON.stringify(schema);
     // Ajv codegen is synchronous; an oversized untrusted schema would freeze the event loop.
     if (Buffer.byteLength(serialized) > MAX_UNTRUSTED_SCHEMA_BYTES) {
@@ -46,12 +47,13 @@ export function compileUntrustedSchema(schema: object): ValidateFunction<unknown
     }
 
     const cacheKey = createHash('sha256').update(serialized).digest('base64');
-    const cached = untrustedValidatorCache.get(cacheKey);
+    // A hit holds a schema with the same content as `schema`, so it is still a T.
+    const cached = untrustedValidatorCache.get(cacheKey) as { validate: ValidateFunction<unknown>; schema: T } | null;
     if (cached) return cached;
 
-    const validate = createAjv().compile(schema);
-    untrustedValidatorCache.add(cacheKey, validate);
-    return validate;
+    const compiled = { validate: createAjv().compile(schema), schema };
+    untrustedValidatorCache.add(cacheKey, compiled);
+    return compiled;
 }
 
 /**
@@ -202,42 +204,8 @@ export function buildActorInputSchema(actorFullName: string, input: ActorInputSc
         delete (working as { $schema?: string }).$schema;
     }
 
-    const policy = getActorToolPolicy(actorFullName);
-    const finalSchema = policy?.exposedInputs
-        ? pruneSchemaPropertiesByWhitelist(working, policy.exposedInputs)
-        : working;
-    for (const [name, description] of Object.entries(policy?.inputDescriptionSuffixes ?? {})) {
-        if (finalSchema.properties[name]) finalSchema.properties[name].description += ` ${description}`;
-    }
-
-    finalSchema.$id = getToolSchemaID(actorFullName);
-    return { inputSchema: finalSchema };
-}
-
-/**
- * Returns a shallow-cloned input schema that keeps only whitelisted properties
- * and filters the required array accordingly. All other top-level fields are preserved.
- * If properties are missing, the original input is returned unchanged.
- *
- * Exposure policies can offer a subset of Actor inputs without redefining the schema.
- */
-export function pruneSchemaPropertiesByWhitelist(
-    input: ActorInputSchema,
-    whitelist: Iterable<string>,
-): ActorInputSchema {
-    if (!input || !input.properties || typeof input.properties !== 'object' || !whitelist) return input;
-
-    const allowed = new Set<string>(Array.from(whitelist));
-    const newProps: Record<string, SchemaProperties> = {};
-    for (const key of Object.keys(input.properties)) {
-        if (allowed.has(key)) newProps[key] = input.properties[key];
-    }
-
-    const cloned: ActorInputSchema = { ...input, properties: newProps };
-    if (Array.isArray(input.required)) {
-        cloned.required = input.required.filter((k) => allowed.has(k));
-    }
-    return cloned;
+    working.$id = getToolSchemaID(actorFullName);
+    return { inputSchema: working };
 }
 
 /**
