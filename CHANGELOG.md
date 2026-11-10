@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.21.5 - **not yet released**
+## [0.21.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.5) (2026-11-10)
 
 ### 🐛 Bug Fixes
 
@@ -13,7 +12,6 @@ All notable changes to this project will be documented in this file.
 - Log failures the stateless Node adapter answers itself ([#1758](https://github.com/apify/apify-mcp-server/pull/1758)) ([8e3ead2](https://github.com/apify/apify-mcp-server/commit/8e3ead201a33008b16400db3bde7bf1c3d3d3220)) by [@jirispilka](https://github.com/jirispilka), closes [#1247](https://github.com/apify/apify-mcp-server/issues/1247)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.21.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.4) (2026-11-06)
 
 ### 🐛 Bug Fixes
