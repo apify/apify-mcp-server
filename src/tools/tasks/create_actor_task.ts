@@ -39,7 +39,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
     return `Create a saved Actor task: a reusable configuration of a single Actor, adapted for a specific
 use case. A task stores the Actor input and run options such as the build, memory, and timeout, and can be
 run repeatedly from Apify Console, Schedules, or the API, so the user does not have to configure the Actor
-again for every run.
+again for every run.${hasTool(HELPER_TOOLS.ACTOR_TASK_CALL) ? ` Use ${HELPER_TOOLS.ACTOR_TASK_CALL} to run a saved task.` : ''}
 
 Creating a task does not make it public. The public display configuration (\`publicConfig\`) can be set \
 here${hasTool(HELPER_TOOLS.ACTOR_TASK_UPDATE) ? ` or later with ${HELPER_TOOLS.ACTOR_TASK_UPDATE}` : ''}; either \

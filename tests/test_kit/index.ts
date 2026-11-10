@@ -15,6 +15,7 @@ export {
     withClient,
 } from './helpers.js';
 
+export { actorTasksCases } from './cases/actor_tasks.cases.js';
 export { actorsCases } from './cases/actors.cases.js';
 export { appsCases } from './cases/apps.cases.js';
 export { paymentsCases } from './cases/payments.cases.js';
@@ -25,6 +26,7 @@ export { tasksCases } from './cases/tasks.cases.js';
 export { toolsCases } from './cases/tools.cases.js';
 export { versionsCases } from './cases/versions.cases.js';
 
+import { actorTasksCases } from './cases/actor_tasks.cases.js';
 import { actorsCases } from './cases/actors.cases.js';
 import { appsCases } from './cases/apps.cases.js';
 import { paymentsCases } from './cases/payments.cases.js';
@@ -43,6 +45,7 @@ export const allCases: Case[] = [
     ...actorsCases,
     ...appsCases,
     ...tasksCases,
+    ...actorTasksCases,
     ...storageCases,
     ...schedulesCases,
     ...versionsCases,

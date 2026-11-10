@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe } from 'vitest';
 import { ApifyClient } from '../../src/apify_client.js';
 import {
     actorsCases,
+    actorTasksCases,
     appsCases,
     paymentsCases,
     registerCases,
@@ -57,6 +58,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             registerCases('actors', actorsCases, ctx);
             registerCases('apps', appsCases, ctx);
             registerCases('tasks', tasksCases, ctx);
+            registerCases('actor-tasks', actorTasksCases, ctx);
             registerCases('storage', storageCases, ctx);
             registerCases('schedules', schedulesCases, ctx);
             registerCases('versions', versionsCases, ctx);

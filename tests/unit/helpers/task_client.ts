@@ -1,3 +1,5 @@
+import type { ActorRun } from 'apify-client';
+
 import type { InternalToolArgs } from '../../../src/types.js';
 import { mockApifyClient } from './tool_context.js';
 
@@ -16,17 +18,37 @@ export function mockTask(overrides: Record<string, unknown> = {}) {
     };
 }
 
+/** A run as the API returns it from `POST /v2/actor-tasks/{actorTaskId}/runs`. */
+export function mockTaskRun(overrides: Partial<ActorRun> = {}): ActorRun {
+    return {
+        id: 'run-1',
+        actId: 'actor-id-1',
+        actorTaskId: 'task-1',
+        userId: 'user-1',
+        status: 'READY',
+        startedAt: new Date('2026-11-10T10:00:00.000Z'),
+        buildId: 'build-1',
+        defaultDatasetId: 'dataset-1',
+        defaultKeyValueStoreId: 'kvs-1',
+        defaultRequestQueueId: 'queue-1',
+        ...overrides,
+    } as ActorRun;
+}
+
 /** A recorded resource-client method call. */
-export type RecordedCall = { fn: string; taskId?: string; payload?: unknown };
+export type RecordedCall = { fn: string; taskId?: string; payload?: unknown; options?: unknown };
 
 /**
- * Fake ApifyClient covering everything the task tools use: `task().get/update/publish/unpublish()`
- * and `tasks().create()`. Every call is recorded into `calls` so tests can assert which method ran
+ * Fake ApifyClient covering everything the task tools use: `task().get/update/publish/unpublish/start()`
+ * and `tasks().create()`. `start` returns `run`. Every call is recorded into `calls` so tests can assert which method ran
  * and with what payload. `publish`/`unpublish` are the client's own wrappers around an update that
  * sets the virtual `isPublic` field — keeping that payload right is the client's contract, so the
  * tools are only checked for calling the right method.
  */
-export function mockTaskApiClient(task: unknown | ((taskId: string) => unknown)): {
+export function mockTaskApiClient(
+    task: unknown | ((taskId: string) => unknown),
+    run?: ActorRun,
+): {
     apifyClient: InternalToolArgs['apifyClient'];
     calls: RecordedCall[];
 } {
@@ -53,6 +75,10 @@ export function mockTaskApiClient(task: unknown | ((taskId: string) => unknown))
             unpublish: async () => {
                 calls.push({ fn: 'unpublish', taskId });
                 return resolve(taskId);
+            },
+            start: async (payload?: unknown, options?: unknown) => {
+                calls.push({ fn: 'start', taskId, payload, options });
+                return run;
             },
         }),
         tasks: () => ({

@@ -212,7 +212,7 @@ Besides Actor tools, the server provides helper tools for the Apify platform:
 - **Actors:** search Apify Store, list the Actors in your account, view their details, call tools on Actors that run MCP servers, send requests to Server Actors, and delete your own Actors.
 - **Documentation:** search the Apify and Crawlee docs and fetch pages as context.
 - **Runs and storage:** list runs, inspect them, read their logs, and read datasets and key-value stores.
-- **Tasks and schedules:** manage saved Actor tasks and their public landing pages, and schedules that run Actors and tasks automatically.
+- **Tasks and schedules:** manage and run saved Actor tasks and their public landing pages, and schedules that run Actors and tasks automatically.
 - **Builds and versions:** build Actors, read build logs, and create, read, change, copy, and delete versions from files.
 - **Apify API:** search the API reference, inspect an operation, and send requests to read or change data.
 
@@ -221,7 +221,7 @@ Besides Actor tools, the server provides helper tools for the Apify platform:
 Legend for the **Enabled by default** column:
 
 - ✅ In the default tool set.
-- ⚡ Added automatically when `call-actor`, an Actor tool, or `get-actor-run` is loaded, which is true in the default configuration.
+- ⚡ Added automatically when `call-actor`, `call-actor-task`, an Actor tool, or `get-actor-run` is loaded, which is true in the default configuration.
 - ✅¹ Served by default only when telemetry is on and the client name doesn't contain `claude`, `anthropic`, or `local-agent-mode`. Select it explicitly with `tools=report-problem` or `tools=dev` to serve it to any client; telemetry still has to be on.
 
 | Tool name | Category | Description | Enabled by default |
@@ -255,6 +255,7 @@ Legend for the **Enabled by default** column:
 | `create-actor-task` | tasks | Create a saved Actor task (a named, reusable Actor configuration). | |
 | `get-actor-task` | tasks | Get a saved Actor task, its publication state, and its public display configuration. | |
 | `update-actor-task` | tasks | Update a task's input, run options, or public display configuration. | |
+| `call-actor-task` | tasks | Run a saved Actor task, optionally overriding input fields and run options. | |
 | `publish-actor-task` | tasks | Publish a task on its public landing page. | |
 | `unpublish-actor-task` | tasks | Unpublish a task from its public landing page. | |
 | `create-schedule` | schedules | Create a schedule that runs Actors or tasks on a cron expression. | |

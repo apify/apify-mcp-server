@@ -286,10 +286,14 @@ export function getToolsForServerMode(
     // get-actor-run-widget calls get-dataset-items internally for its own preview fetch.
     const hasGetActorRunWidget = resultNames.has(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
 
-    // call-actor, direct Actor tools and get-actor-run are the non-widget run tools; any of them
-    // justifies the full bundle. get-actor-run-widget alone skips get-actor-run (it polls itself);
+    // call-actor, call-actor-task, direct Actor tools and get-actor-run are the non-widget run tools; any
+    // of them justifies the full bundle. get-actor-run-widget alone skips get-actor-run (it polls itself);
     // call-actor-widget alone still gets it.
-    const hasNonWidgetRunTool = resultNames.has(HELPER_TOOLS.ACTOR_CALL) || hasActorTools || hasGetActorRun;
+    const hasNonWidgetRunTool =
+        resultNames.has(HELPER_TOOLS.ACTOR_CALL) ||
+        resultNames.has(HELPER_TOOLS.ACTOR_TASK_CALL) ||
+        hasActorTools ||
+        hasGetActorRun;
     let toolsToInject: readonly ToolEntry[] = [];
     if (hasNonWidgetRunTool) {
         toolsToInject = AUTO_INJECTED_TOOLS;
