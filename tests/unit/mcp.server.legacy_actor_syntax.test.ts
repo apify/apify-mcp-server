@@ -21,9 +21,11 @@ describe('legacy Actor MCP syntax rejection', () => {
         { tool: callActorWidget, paymentProvider: makePaymentProvider('x402'), token: '' },
         { tool: callActor, paymentProvider: makePaymentProvider('x402'), token: 'test-token' },
         { tool: callActorWidget, paymentProvider: makePaymentProvider('x402'), token: 'test-token' },
+        // Normalization strips slash padding before it drops `:tool`, so the check must see the same name.
+        { tool: callActor, actor: 'apify/example-mcp-server:add/' },
     ])(
-        'rejects $tool.name before metadata lookup with $paymentProvider.id and token "$token"',
-        async ({ tool, ...options }) => {
+        'rejects $tool.name with "$actor" before metadata lookup with $paymentProvider.id and token "$token"',
+        async ({ tool, actor = 'apify/example-mcp-server:add', ...options }) => {
             const lookup = vi.spyOn(ApifyClient.prototype, 'actor').mockImplementation(() => {
                 throw new Error('Actor metadata unavailable');
             });
@@ -35,7 +37,7 @@ describe('legacy Actor MCP syntax rejection', () => {
                         method: 'tools/call',
                         params: {
                             name: tool.name,
-                            arguments: { actor: 'apify/example-mcp-server:add', input: {} },
+                            arguments: { actor, input: {} },
                             _meta: { mcpSessionId: 'legacy-syntax' },
                         },
                     },

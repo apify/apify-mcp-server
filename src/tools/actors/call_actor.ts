@@ -51,6 +51,7 @@ import {
     fixActorNameInputAndLog,
     getActorsAsTools,
     MCP_TOOL_NAME_SUFFIX,
+    normalizeActorNameInput,
 } from './actor_tools_factory.js';
 
 // ---------------------------------------------------------------------------
@@ -394,7 +395,7 @@ export function buildLegacyMcpSyntaxRejection(
     loadedToolNames: readonly string[],
 ): ToolResponse | null {
     if (toolName !== HELPER_TOOLS.ACTOR_CALL && toolName !== HELPER_TOOLS.ACTOR_CALL_WIDGET) return null;
-    if (typeof actor !== 'string' || !MCP_TOOL_NAME_SUFFIX.test(actor)) return null;
+    if (typeof actor !== 'string' || !MCP_TOOL_NAME_SUFFIX.test(normalizeActorNameInput(actor))) return null;
     const replacement = loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL)
         ? ` Use ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} with separate actor and tool arguments.`
         : ` MCP tools cannot be called in this configuration. To use them, ${getOwnServerRemedy()}`;
