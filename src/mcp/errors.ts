@@ -17,7 +17,7 @@ export class InvalidParamsError extends Error {
     }
 }
 
-/** A transient/upstream fault (429, 5xx, network or mid-stream drop). */
+/** A server-side fault: transient/upstream (429, 5xx, network or mid-stream drop) or a broken widget build. */
 export class InternalError extends Error {
     override readonly name = 'InternalError';
 

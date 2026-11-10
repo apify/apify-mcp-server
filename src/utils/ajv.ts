@@ -3,20 +3,27 @@ import Ajv from 'ajv';
 
 import type { ValidationInputChange } from '../types.js';
 
-export const ajv = new Ajv({ coerceTypes: 'array', strict: false, removeAdditional: true });
+/**
+ * Ajv with the server's validation policy. One instance per compile, never shared: Ajv caches every compiled
+ * schema in a Map that is never evicted.
+ */
+export function createAjv(): Ajv {
+    const instance = new Ajv({ coerceTypes: 'array', strict: false, removeAdditional: true });
 
-// `pattern`/`patternProperties` compile a RegExp from untrusted Actor / proxied-MCP input schemas;
-// a catastrophic-backtracking pattern freezes the single-threaded event loop (ReDoS). `format` is
-// inert today (ajv-formats is not registered) but would arm the same vector if it ever were. This
-// layer only sanitizes LLM args — the Actor re-validates its real input on the run — so dropping
-// regex enforcement removes the DoS surface with no loss of protection. Consequence for `src/`
-// schemas: a `.regex()` on a Zod field is NOT enforced here. It still reaches `tools/list` and still
-// fires in a tool body's `parse()`, where it throws a raw ZodError at the client instead of a
-// readable error — so rely on the API's own validation rather than adding one. `taskNameSchema`
-// (`tools/tasks/task_helpers.ts`) still carries one and predates this note.
-ajv.removeKeyword('pattern');
-ajv.removeKeyword('patternProperties');
-ajv.removeKeyword('format');
+    // `pattern`/`patternProperties` compile a RegExp from untrusted Actor / proxied-MCP input schemas;
+    // a catastrophic-backtracking pattern freezes the single-threaded event loop (ReDoS). `format` is
+    // inert today (ajv-formats is not registered) but would arm the same vector if it ever were. This
+    // layer only sanitizes LLM args — the Actor re-validates its real input on the run — so dropping
+    // regex enforcement removes the DoS surface with no loss of protection. Consequence for `src/`
+    // schemas: a `.regex()` on a Zod field is NOT enforced here. It still reaches `tools/list` and still
+    // fires in a tool body's `parse()`, where it throws a raw ZodError at the client instead of a
+    // readable error — so rely on the API's own validation rather than adding one. `taskNameSchema`
+    // (`tools/tasks/task_helpers.ts`) still carries one and predates this note.
+    instance.removeKeyword('pattern');
+    instance.removeKeyword('patternProperties');
+    instance.removeKeyword('format');
+    return instance;
+}
 
 /**
  * Removes the `$schema` property and drops fields with real `default` values from `required`.
@@ -54,7 +61,7 @@ export function fixZodSchemaRequired(schema: Record<string, unknown>): Record<st
  * and fixing the required array.
  *
  * **Unknown properties are silently stripped** by the AJV `removeAdditional: true` option
- * (set on the shared `ajv` instance). MCP / LLM clients regularly send extra top-level keys
+ * (set in `createAjv`). MCP / LLM clients regularly send extra top-level keys
  * (client metadata, duplicated hints, transport leftovers) that would otherwise cause validation
  * failures. Stripping them is safer than allowing them through with `additionalProperties: true`,
  * because no downstream code should rely on undeclared properties.
@@ -64,7 +71,7 @@ export function fixZodSchemaRequired(schema: Record<string, unknown>): Record<st
  * so they are never subject to this stripping.
  */
 export function compileSchema(schema: Record<string, unknown>): ValidateFunction {
-    return ajv.compile(fixZodSchemaRequired(schema));
+    return createAjv().compile(fixZodSchemaRequired(schema));
 }
 
 /**

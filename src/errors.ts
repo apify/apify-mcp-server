@@ -11,7 +11,7 @@ export class UserInputError extends Error {
 }
 
 /**
- * Thrown by `fixedAjvCompile` when an untrusted Actor / proxied-MCP input schema exceeds the byte
+ * Thrown by `compileUntrustedSchema` when an untrusted Actor / proxied-MCP input schema exceeds the byte
  * cap that bounds AJV's synchronous codegen. It's a property of the schema, not a server fault, so
  * `logHttpError` logs it as a soft fail and the caller drops just that one tool.
  */

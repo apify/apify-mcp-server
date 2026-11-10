@@ -44,7 +44,7 @@ import {
 import { buildPermissionApprovalTexts } from '../../utils/payment_errors.js';
 import { classifyFailureCategory, extractAjvErrorDetails } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
-import { getOwnServerRemedy, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
+import { findServerTool, getOwnServerRemedy, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
 import { actorRunOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
 import {
@@ -53,7 +53,12 @@ import {
     CALL_ACTOR_WAIT_SECS_DEFAULT,
     fetchActorRunData,
 } from './actor_run_response.js';
-import { fixActorNameInputAndLog, getActorsAsTools, MCP_TOOL_NAME_SUFFIX } from './actor_tools_factory.js';
+import {
+    EMPTY_ACTOR_NAME_MESSAGE,
+    fixActorNameInputAndLog,
+    getActorsAsTools,
+    MCP_TOOL_NAME_SUFFIX,
+} from './actor_tools_factory.js';
 
 // ---------------------------------------------------------------------------
 // Shared call-actor description building blocks
@@ -69,15 +74,15 @@ function buildCallActorServerActorSection({ hasTool }: ToolDescriptionContext): 
 - For one or a few results, ${HELPER_TOOLS.ACTOR_SERVER_REQUEST} returns them in the HTTP response, without a batch run${operations}`;
 }
 
-/** Shared "two ways to run" + USAGE section — identical in both modes. */
+/** Shared "two ways to use an Actor" + USAGE section — identical in both modes. */
 function buildCallActorUsageSection(): string {
-    return `There are two ways to run Actors:
-1. Dedicated Actor tools: These are pre-configured tools, offering a simpler and more direct experience.
-2. Generic call-actor tool (${HELPER_TOOLS.ACTOR_CALL}): Use this when a dedicated tool is not available or when you want to run any Actor dynamically. This tool is especially useful if you do not want to add specific tools or your client does not support dynamic tool registration.
+    return `There are two ways to use an Actor:
+1. Its dedicated tool, when the session has one: a Server Actor's tool sends one HTTP request to its API, an MCP server Actor's tools call its MCP server, and any other Actor's tool starts a run.
+2. The generic ${HELPER_TOOLS.ACTOR_CALL} tool: starts a run of any Actor and stores the results in a dataset.
 
 USAGE:
-- Always use dedicated tools when available
-- Use the generic call-actor tool only if a dedicated tool does not exist for your Actor.`;
+- Prefer the dedicated tool when the session has one for the Actor
+- ${HELPER_TOOLS.ACTOR_CALL} runs an Actor that has no dedicated tool, and batch work whose results belong in a dataset.`;
 }
 
 /** Shared examples section — identical in both modes. */
@@ -144,13 +149,12 @@ export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOL
     const sections: string[] = [
         'Call any Actor from the Apify Store.',
         workflowSection,
-        `MCP server Actors are not run here${hasTool(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL) ? `; ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} calls their MCP tools` : ''}.`,
+        `An MCP server Actor with no input schema is not run here${hasTool(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL) ? `; ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} calls its MCP tools` : ''}.`,
         ...(hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST) ? [buildCallActorServerActorSection(ctx)] : []),
         dedent`
             IMPORTANT:
             - Waits up to waitSecs (default 30s) for completion; returns run status and storage IDs, and with waitSecs > 0 also reports dataset field metadata
             - Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with the datasetId to fetch results; non-terminal runs include a nextStep with polling instructions
-            - Use dedicated Actor tools when available for better experience
         `,
         buildCallActorUsageSection(),
         dedent`
@@ -358,7 +362,8 @@ export async function checkPaymentProviderStandbyConflict(params: {
 }): Promise<Record<string, unknown> | null> {
     const { tool, args, paymentProvider, apifyToken, mcpSessionId } = params;
     if (!paymentProvider || !tool.hasPaymentProviderStandbyCheck) return null;
-    const actorName = args.actor;
+    // A Server Actor's own tool takes no `actor` argument: its Actor is fixed.
+    const actorName = tool.type === TOOL_TYPE.ACTOR_SERVER ? tool.actorFullName : args.actor;
     if (typeof actorName !== 'string' || !actorName) return null;
 
     const normalizedActorName = fixActorNameInputAndLog(actorName, { mcpSessionId });
@@ -379,12 +384,12 @@ export async function checkPaymentProviderStandbyConflict(params: {
     return respondStandbyRejection(error, { mcpSessionId, paymentProviderId: paymentProvider.id });
 }
 
-/** Rejection for an Actor that is an MCP server: its input interface is unused, so a run of it is a mistake. */
-function respondMcpServerActor(actorFullName: string, route: string, loadedToolNames: readonly string[]): ToolResponse {
+/** Rejection for an MCP server Actor with no input schema: there is nothing to run. */
+function respondMcpServerActor(actorFullName: string, loadedToolNames: readonly string[]): ToolResponse {
     const replacement = loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL)
         ? ` Its MCP tools can be called with ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL}.`
         : ` Its MCP tools cannot be called in this configuration. To use them, ${getOwnServerRemedy()}`;
-    return respondUserError(`Actor '${actorFullName}' is an MCP server, which ${route} does not run.${replacement}`, {
+    return respondUserError(`Actor '${actorFullName}' has no input schema to run; it is an MCP server.${replacement}`, {
         detail: 'MCP server Actor',
     });
 }
@@ -502,7 +507,7 @@ export function withValidationInputChange(
 
 /**
  * Performs the pre-execution checks common to both modes: parses args and rejects an Actor that `call-actor`
- * cannot run (a standby Actor with neither an MCP server nor an input schema, or an MCP server).
+ * cannot run (a standby Actor with neither an MCP server nor an input schema, or an MCP server with no input schema).
  *
  * Applies the same `actor` string normalization as `getActorsAsTools` **before** routing so clients cannot pass a
  * clean-enough id for definition fetch but a dirty id to `apifyClient.actor()` (see Mezmo: e.g. trailing `` ` ``
@@ -517,6 +522,7 @@ export async function callActorPreExecute(
     const legacyRejection = buildLegacyMcpSyntaxRejection(options.route, parsedArgs.actor, loadedToolNames);
     if (legacyRejection) return { earlyResponse: legacyRejection };
     const actorName = fixActorNameInputAndLog(parsedArgs.actor, { mcpSessionId, route: options.route });
+    if (!actorName) return { earlyResponse: respondUserError(EMPTY_ACTOR_NAME_MESSAGE) };
 
     // For definition resolution we always use a token-based client; payment provider is only for actual Actor runs.
     // Standby/MCP-server Actors under a third-party payment provider are rejected upstream by
@@ -526,15 +532,16 @@ export async function callActorPreExecute(
 
     if (resolution?.toolMode === ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP) {
         const error = ActorLoadError.serverActorWithoutMcpNotSupported(resolution.actorFullName);
-        if (resolution.interfaces.server && loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)) {
-            error.message += ` Its HTTP API is available through ${HELPER_TOOLS.ACTOR_SERVER_REQUEST}.`;
-        }
+        const serverTool = resolution.interfaces.server
+            ? findServerTool(resolution.actorFullName, loadedToolNames)
+            : undefined;
+        if (serverTool) error.message += ` Its HTTP API is available through ${serverTool}.`;
         return {
             earlyResponse: respondStandbyRejection(error, { mcpSessionId }),
         };
     }
     if (resolution?.toolMode === ACTOR_TOOL_MODE.MCP) {
-        return { earlyResponse: respondMcpServerActor(resolution.actorFullName, options.route, loadedToolNames) };
+        return { earlyResponse: respondMcpServerActor(resolution.actorFullName, loadedToolNames) };
     }
     return { parsed: { ...parsedArgs, actor: actorName } };
 }
@@ -641,6 +648,7 @@ export const callActor: ToolEntry = Object.freeze({
     ajvValidate: callActorAjvValidate,
     paymentRequired: true,
     hasPaymentProviderStandbyCheck: true,
+    actorInterface: 'input',
     annotations: {
         title: 'Call Actor',
         readOnlyHint: false,

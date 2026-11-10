@@ -89,6 +89,7 @@ export const callActorWidget: ToolEntry = Object.freeze({
     ajvValidate: compileSchema(z.toJSONSchema(callActorWidgetArgsSchema)),
     paymentRequired: true,
     hasPaymentProviderStandbyCheck: true,
+    actorInterface: 'input',
     _meta: getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
     annotations: {
         title: 'Call Actor (widget)',
