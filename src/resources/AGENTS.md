@@ -7,8 +7,8 @@ Three files serving the MCP `resources/*` surface:
 
 - `resource_service.ts` — handles `ListResources` / `ListResourceTemplates` / read-resource
   requests. Takes an optional `apifyClient` on read, built by the server from the per-request
-  token (`_meta.apifyToken || options.token`). Token-only by design — no payment headers, so a
-  payment-only session (x402/Skyfire) gets no client and every read fails with `InvalidParamsError`.
+  token (`_meta.apifyToken || options.token`). Token-only by design — a session without a
+  token gets no client, and every read fails with `InvalidParamsError`.
   Routes every http(s) URI to `readApiResource()`, which owns the single origin gate; non-http
   schemes fall through to widgets/usage-guide/fallback. Throws protocol-neutral domain errors
   (`InvalidParamsError`/`InternalError` from `src/mcp/errors.ts`), never `McpError`. The protocol
@@ -39,7 +39,8 @@ tools too. `get-key-value-store-record` builds its inlined-record URI with `buil
 
 `sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through
 `httpClient.axios.request` with `maxContentLength: MAX_INLINE_BYTES`; `readBodyUnderCap()` next to it reads a
-streamed body, `undefined` past the cap (shared with `send-server-actor-request`). `readApiResource()` sends
+streamed body, `undefined` past the cap, over `readBodyToCap()`, which keeps the start for
+`send-server-actor-request`. `readApiResource()` sends
 `{ method: 'GET', responseType: 'stream' }` through `sendApifyApiRequest()`, reads the body, and branches
 on the declared Content-Type: textual base types (text/*, JSON, XML) as `text` with the full
 header, decoded with the declared charset (default utf-8; a charset Node cannot decode falls

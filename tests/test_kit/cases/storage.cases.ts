@@ -118,8 +118,10 @@ export const storageCases: Case[] = [
             const fields = sc?.storages?.datasets?.default?.fields ?? [];
             expect(fields).toEqual(expect.arrayContaining(['firstNumber', 'secondNumber', 'sum']));
 
-            // #911/#894: collapse index-expanded fields to `math.fibonacci`.
-            expect(fields).toEqual(expect.arrayContaining(['math.fibonacci']));
+            // `math.fibonacci` is an array, so only its top-level name `math` is a working selection.
+            expect(fields).toEqual(expect.arrayContaining(['math']));
+            expect(fields).not.toContain('math.fibonacci');
+            expect(sc?.nextStep).toContain('Arrays come whole under their top-level field');
             expect(fields.some((f) => /\.\d+(\.|$)/.test(f))).toBe(false);
             expect(new Set(fields).size).toBe(fields.length);
 
