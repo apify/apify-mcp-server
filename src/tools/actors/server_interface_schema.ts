@@ -1,25 +1,47 @@
-import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
-import type { Actor } from '../../types.js';
-import { ACTOR_TENANCY } from '../../types.js';
-import { wrapJsonText } from '../../utils/encode_text.js';
-import { resolveActorTenancy } from '../actor_tool_naming.js';
-import type { DereferenceContext } from '../api/apify_api_spec.js';
+/**
+ * The operations of a Server Actor's `webServerSchema`, an OpenAPI document as the creator wrote it, read the way
+ * `apify_api_spec.ts` reads the Apify API. No prose and no tool names here.
+ */
+import type { ApiMethod, ApiOperation, ApiParameter, DereferenceContext } from '../api/apify_api_spec.js';
 import {
     API_METHODS,
-    DereferenceBudgetError,
     isRecord,
     parseParameters,
     parseRequestBody,
+    pickJsonMedia,
     resolveLocalRef,
 } from '../api/apify_api_spec.js';
 
-type ServerOperation = { method: string; path: string; operation: Record<string, unknown> };
+/** One method on one path, with the path-level parameters merged into the operation. */
+export type ServerOperation = { method: ApiMethod; path: string; operation: Record<string, unknown> };
+
+/** A body with no JSON media type cannot be sent, so it has no schema. */
+export type OtherRequestBody = { isRequired: boolean; contentTypes: string[] };
+
+/** The `get-apify-api-details` shape. */
+export type ServerOperationDetails = Pick<ApiOperation, 'method' | 'path'> &
+    Partial<Pick<ApiOperation, 'summary' | 'description'>> & {
+        parameters: ApiParameter[];
+        requestBody?: ApiOperation['requestBody'] | OtherRequestBody;
+    };
+
+export type ServerOperationIndexEntry = Pick<ApiOperation, 'method' | 'path'> &
+    Partial<Pick<ApiOperation, 'summary'>> & { requiredInputs: string[] };
+
+/** A path or query parameter, or a top-level property of a JSON request body. */
+export type OperationInput = { name: string; type?: string; isRequired: boolean };
+
+/**
+ * The inputs of one operation. `requestBody.properties` is absent when the body is not JSON or its schema lists no
+ * properties; `isJson` is false for a body the send tool cannot send.
+ */
+export type ServerOperationInputs = {
+    parameters: OperationInput[];
+    requestBody?: { isRequired: boolean; isJson: boolean; contentTypes: string[]; properties?: OperationInput[] };
+};
 
 /** Alias hops followed per parameter; real chains take one or two. */
 const MAX_ALIAS_HOPS = 16;
-
-const MAX_NAMED_OPERATIONS = 5;
-const MAX_NAMED_OPERATIONS_LENGTH = 300;
 
 /** Follows local parameter or request-body aliases, without expanding nested schemas. */
 function resolveRef(node: unknown, spec: unknown): unknown {
@@ -46,8 +68,7 @@ function mergeOperationParameters(pathParameters: unknown, operationParameters: 
     return [...merged.values()];
 }
 
-/** One entry per method on each path, e.g. `paths: { '/search': { get, post } }` → `GET /search`, `POST /search`. */
-function listServerOperations(schema: unknown): ServerOperation[] {
+export function listServerOperations(schema: unknown): ServerOperation[] {
     if (!isRecord(schema) || !isRecord(schema.paths)) return [];
     const operations: ServerOperation[] = [];
     for (const [path, pathItem] of Object.entries(schema.paths)) {
@@ -66,7 +87,17 @@ function listServerOperations(schema: unknown): ServerOperation[] {
     return operations;
 }
 
-/** Required parameter names, then the request body if required, e.g. `['q', 'request body']`. */
+export function formatOperationName({ method, path }: Pick<ServerOperation, 'method' | 'path'>): string {
+    return `${method} ${path}`;
+}
+
+export function findServerOperation(operations: ServerOperation[], selector: string): ServerOperation | undefined {
+    const match = /^\s*([A-Za-z]+)\s+(\S+)\s*$/.exec(selector);
+    if (!match) return undefined;
+    const [, method, path] = match;
+    return operations.find((operation) => operation.method === method.toUpperCase() && operation.path === path);
+}
+
 function listRequiredInputs(operation: Record<string, unknown>, schema: unknown): string[] {
     const names: string[] = [];
     for (const parameter of Array.isArray(operation.parameters) ? operation.parameters : []) {
@@ -80,48 +111,44 @@ function listRequiredInputs(operation: Record<string, unknown>, schema: unknown)
     return names;
 }
 
+export function buildServerOperationIndex(operations: ServerOperation[], schema: unknown): ServerOperationIndexEntry[] {
+    return operations.map(({ method, path, operation }) => ({
+        method,
+        path,
+        ...(typeof operation.summary === 'string' && { summary: operation.summary }),
+        requiredInputs: listRequiredInputs(operation, schema),
+    }));
+}
+
 /**
- * Each operation with its required inputs, e.g.
- * `['GET / (required: query)', 'POST / (required: request body)', 'GET /status']`.
+ * Per operation (`GET /`), the query parameters documented `style: form, explode: false`, which a list fills
+ * comma-joined (`formats=a,b`); OpenAPI's default, `explode: true`, repeats the parameter. Only operations with
+ * such a parameter are listed, so the map is empty when none needs comma joining.
  */
+export function listCommaJoinedQueryParameters(schema: unknown): Record<string, string[]> {
+    const byOperation: Record<string, string[]> = {};
+    for (const { method, path, operation } of listServerOperations(schema)) {
+        const names: string[] = [];
+        for (const parameter of Array.isArray(operation.parameters) ? operation.parameters : []) {
+            const resolved = resolveRef(parameter, schema);
+            if (!isRecord(resolved) || resolved.in !== 'query' || typeof resolved.name !== 'string') continue;
+            if (resolved.explode === false && (resolved.style === undefined || resolved.style === 'form')) {
+                names.push(resolved.name);
+            }
+        }
+        if (names.length > 0) byOperation[formatOperationName({ method, path })] = names;
+    }
+    return byOperation;
+}
+
 export function listDocumentedOperations(schema: unknown): string[] {
-    if (!isRecord(schema)) return [];
-    return listServerOperations(schema).map(({ method, path, operation }) => {
-        const required = listRequiredInputs(operation, schema);
-        return required.length > 0 ? `${method} ${path} (required: ${required.join(', ')})` : `${method} ${path}`;
+    return buildServerOperationIndex(listServerOperations(schema), schema).map((entry) => {
+        const name = formatOperationName(entry);
+        return entry.requiredInputs.length > 0 ? `${name} (required: ${entry.requiredInputs.join(', ')})` : name;
     });
 }
 
-/** E.g. `- GET /search: Search the web. Required: q, request body.` */
-function formatOperationLine({ method, path, operation }: ServerOperation, schema: unknown): string {
-    const required = listRequiredInputs(operation, schema);
-    let text = `- ${method} ${path}`;
-    if (typeof operation.summary === 'string') {
-        text += `: ${operation.summary}`;
-        if (required.length > 0 && !/[.!?]$/.test(operation.summary)) text += '.';
-    }
-    if (required.length > 0) text += ` Required: ${required.join(', ')}.`;
-    return text;
-}
-
-/** One line per operation; over `maxBytes`, the lines that fit, then `… and N more`. */
-function formatOperationIndex(operations: ServerOperation[], schema: unknown, maxBytes: number): string {
-    const lines = operations.map((operation) => formatOperationLine(operation, schema));
-    const index = lines.join('\n');
-    if (Buffer.byteLength(index) <= maxBytes) return index;
-    // Room for the cut line with the largest count it can show.
-    let bytes = Buffer.byteLength(`… and ${lines.length} more`);
-    const kept: string[] = [];
-    for (const line of lines) {
-        bytes += Buffer.byteLength(line) + 1;
-        if (bytes > maxBytes) break;
-        kept.push(line);
-    }
-    return [...kept, `… and ${lines.length - kept.length} more`].join('\n');
-}
-
-/** A request body with no JSON media type: whether it is required and its media types, with no schema. */
-function buildOtherRequestBody(rawRequestBody: unknown, schema: unknown) {
+function buildOtherRequestBody(rawRequestBody: unknown, schema: unknown): OtherRequestBody | undefined {
     const requestBody = resolveRef(rawRequestBody, schema);
     if (!isRecord(requestBody) || !isRecord(requestBody.content)) return undefined;
     const contentTypes = Object.keys(requestBody.content);
@@ -129,13 +156,11 @@ function buildOtherRequestBody(rawRequestBody: unknown, schema: unknown) {
     return { isRequired: requestBody.required === true, contentTypes };
 }
 
-/**
- * One operation in the `get-apify-api-details` shape: local references inlined, examples kept, no responses.
- * The summary and description are left out when the schema has none. Throws `DereferenceBudgetError` when the
- * context's budget runs out.
- * A request body that is not JSON shows its content types instead of a schema.
- */
-function buildServerOperationDetails({ method, path, operation }: ServerOperation, context: DereferenceContext) {
+/** Throws `DereferenceBudgetError` when the context's budget runs out. */
+export function buildServerOperationDetails(
+    { method, path, operation }: ServerOperation,
+    context: DereferenceContext,
+): ServerOperationDetails {
     const requestBody =
         parseRequestBody(operation.requestBody, context) ?? buildOtherRequestBody(operation.requestBody, context.spec);
     return {
@@ -148,122 +173,69 @@ function buildServerOperationDetails({ method, path, operation }: ServerOperatio
     };
 }
 
-/** `render` as fenced JSON; `undefined` when its references expand past `MAX_INLINE_BYTES`. */
-function formatWithinBudget(schema: unknown, render: (context: DereferenceContext) => unknown): string | undefined {
-    const budget = { remainingBytes: MAX_INLINE_BYTES };
-    try {
-        return wrapJsonText(render({ spec: schema, shouldKeepExamples: true, budget }));
-    } catch (error) {
-        // A deep untrusted schema or example can exhaust the stack in JSON.stringify.
-        if (error instanceof DereferenceBudgetError || error instanceof RangeError) return undefined;
-        throw error;
+/** Keep keywords beside an alias's own `$ref`; following the whole chain would discard them. */
+function resolveOneRef(node: unknown, schema: unknown): unknown {
+    return isRecord(node) && typeof node.$ref === 'string' ? resolveLocalRef(schema, node.$ref) : node;
+}
+
+/** E.g. `string`, or `string|null` for a list of types; `undefined` when the schema names no type. */
+function getTypeName(node: unknown, schema: unknown): string | undefined {
+    const resolved = resolveOneRef(node, schema);
+    if (!isRecord(resolved)) return undefined;
+    const types = [resolved.type].flat().filter((type): type is string => typeof type === 'string');
+    return types.length > 0 ? types.join('|') : undefined;
+}
+
+/** Path and query parameters, read as `parseParameters` reads them: a path parameter is required. */
+function listParameterInputs(operation: Record<string, unknown>, schema: unknown): OperationInput[] {
+    const inputs: OperationInput[] = [];
+    for (const parameter of Array.isArray(operation.parameters) ? operation.parameters : []) {
+        const resolved = resolveRef(parameter, schema);
+        if (!isRecord(resolved) || typeof resolved.name !== 'string') continue;
+        if (resolved.in !== 'path' && resolved.in !== 'query') continue;
+        inputs.push({
+            name: resolved.name,
+            type: getTypeName(resolved.schema, schema),
+            isRequired: resolved.in === 'path' || resolved.required === true,
+        });
     }
+    return inputs;
 }
 
-/** E.g. `3 documented operations: GET /add, POST /add, GET /empty`; over the naming limits, the count alone. */
-function formatOperationCount(operations: ServerOperation[]): string {
-    const count = `${operations.length} documented operation${operations.length === 1 ? '' : 's'}`;
-    const names = operations.map(({ method, path }) => `${method} ${path}`).join(', ');
-    const isNamed = operations.length <= MAX_NAMED_OPERATIONS && names.length <= MAX_NAMED_OPERATIONS_LENGTH;
-    return isNamed ? `${count}: ${names}` : count;
+/** The schema of the JSON media type `parseRequestBody` picks; `undefined` when there is none. */
+function getJsonMediaSchema(content: Record<string, unknown>): { schema: unknown } | undefined {
+    const media = pickJsonMedia(content);
+    return isRecord(media) ? { schema: media.schema } : undefined;
 }
 
-/** E.g. `fetch-actor-details with {"actor":"apify/search","output":{"serverInterface":true}}` */
-function formatDetailsCall(actorFullName: string, serverInterface: true | string): string {
-    return `${HELPER_TOOLS.ACTOR_GET_DETAILS} with ${JSON.stringify({ actor: actorFullName, output: { serverInterface } })}`;
+/** The top-level properties of a body schema; `undefined` when it lists none. */
+function listBodyInputs(bodySchema: unknown, schema: unknown): OperationInput[] | undefined {
+    const resolved = resolveOneRef(bodySchema, schema);
+    if (!isRecord(resolved) || !isRecord(resolved.properties)) return undefined;
+    const required = Array.isArray(resolved.required) ? resolved.required : [];
+    const inputs = Object.entries(resolved.properties).map(([name, property]) => ({
+        name,
+        type: getTypeName(property, schema),
+        isRequired: required.includes(name),
+    }));
+    return inputs.length > 0 ? inputs : undefined;
 }
 
-/** `undefined` text: the rendering ran out of its budget, so it would not fit. */
-function checkSize(text: string | undefined, actorFullName: string): { text: string } | { error: string } {
-    if (text !== undefined && Buffer.byteLength(text) <= MAX_INLINE_BYTES) return { text };
+/** An external or unresolved body reference says nothing about the body, so it has no `requestBody`. */
+export function listOperationInputs({ operation }: ServerOperation, schema: unknown): ServerOperationInputs {
+    const parameters = listParameterInputs(operation, schema);
+    const requestBody = resolveRef(operation.requestBody, schema);
+    if (!isRecord(requestBody) || requestBody.$ref !== undefined) return { parameters };
+    const content = isRecord(requestBody.content) ? requestBody.content : {};
+    const json = getJsonMediaSchema(content);
+    const properties = json && listBodyInputs(json.schema, schema);
     return {
-        error: `Actor '${actorFullName}' server-interface output exceeds the ${MAX_INLINE_BYTES}-byte limit and was not returned. A smaller operation may fit.`,
+        parameters,
+        requestBody: {
+            isRequired: requestBody.required === true,
+            isJson: json !== undefined,
+            contentTypes: Object.keys(content),
+            ...(properties && { properties }),
+        },
     };
-}
-
-/**
- * The server-interface text of `fetch-actor-details`, by `output.serverInterface`; none for an Actor without
- * Actor Standby unless asked for. Operations are rendered by `buildServerOperationDetails`, without the schema's
- * responses, components and `servers`.
- * - `false`: one summary line with the tenancy and the operation count, naming the operations while few and short;
- *   none in a session without `send-server-actor-request`.
- * - `true`: every operation in full when the text fits `MAX_INLINE_BYTES`; otherwise one line per operation
- *   (`formatOperationLine`), cut at the limit with `… and N more`.
- * - `"GET /search"`: that one operation in full.
- * The send-tool example becomes the Actor's base URL without the send tool or in agentic payment mode.
- * An unknown selection, or one operation over the byte cap, is an error.
- */
-export function buildServerInterfaceText({
-    actor,
-    actorFullName,
-    schema,
-    serverInterface,
-    loadedToolNames,
-    hasPaymentProvider,
-}: {
-    actor: Pick<Actor, 'actorStandby' | 'standbyUrl'>;
-    actorFullName: string;
-    schema: unknown;
-    serverInterface: boolean | string;
-    loadedToolNames: readonly string[];
-    /** An agentic payment provider (x402, Skyfire) cannot pay for an Actor Server request. */
-    hasPaymentProvider: boolean;
-}): { text?: string } | { error: string } {
-    // The summary helps choose between call-actor and the send tool, so it follows the send tool.
-    if (serverInterface === false && !loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST)) return {};
-    if (actor.actorStandby?.isEnabled !== true) {
-        return { text: serverInterface === false ? undefined : `Actor '${actorFullName}' has no server interface.` };
-    }
-    const tenancy = resolveActorTenancy(actor);
-    const operations = listServerOperations(schema);
-    if (!isRecord(schema) || operations.length === 0) {
-        return { text: `Server interface: enabled, ${tenancy}, undocumented: no API schema. See the README.` };
-    }
-    const listsThem = `${formatDetailsCall(actorFullName, true)} lists them.`;
-    if (serverInterface === false) {
-        return { text: `Server interface: enabled, ${tenancy}, ${formatOperationCount(operations)}. ${listsThem}` };
-    }
-
-    const canSend = !hasPaymentProvider && loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
-    const idleTimeoutSecs = actor.actorStandby?.idleTimeoutSecs;
-    const idleTimeout = idleTimeoutSecs === undefined ? 'its idle timeout' : `its idle timeout of ${idleTimeoutSecs} s`;
-    // What a request costs, by tenancy; a payment provider cannot pay for one.
-    const notice = hasPaymentProvider
-        ? 'Requests to a server interface are not supported in agentic payment mode.'
-        : tenancy === ACTOR_TENANCY.MULTI_TENANT
-          ? `${tenancy}: requests are charged per event and start no run in your account.`
-          : `${tenancy}: the first request starts a run in your account, kept for ${idleTimeout}.`;
-    // The send tool adds the host itself; without it, the base URL is how the user reaches the API.
-    const header = `${notice}\n${canSend ? '' : `Base URL: ${actor.standbyUrl ?? 'not configured'}\n`}`;
-    const send = (lead: string, { method, path }: ServerOperation) =>
-        canSend
-            ? `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends ${lead}: ${JSON.stringify({ actor: actorFullName, method, path })}\n`
-            : '';
-    if (serverInterface === true) {
-        const title = `# Server interface of ${actorFullName}\n${header}${send('a request to one of them', operations[0])}Operations (${operations.length}):\n`;
-        const details = formatWithinBudget(schema, (context) => ({
-            operations: operations.map((operation) => buildServerOperationDetails(operation, context)),
-        }));
-        const full = details && `${title}${details}`;
-        if (full && Buffer.byteLength(full) <= MAX_INLINE_BYTES) return { text: full };
-        const { method, path } = operations[0];
-        const next = `The operations in full exceed the ${MAX_INLINE_BYTES}-byte limit. ${formatDetailsCall(actorFullName, `${method} ${path}`)} returns one operation in full.`;
-        const index = formatOperationIndex(
-            operations,
-            schema,
-            MAX_INLINE_BYTES - Buffer.byteLength(`${title}\n${next}`),
-        );
-        return checkSize(`${title}${index}\n${next}`, actorFullName);
-    }
-
-    const match = /^\s*([A-Za-z]+)\s+(\S+)\s*$/.exec(serverInterface);
-    const selected = operations.find(({ method, path }) => method === match?.[1].toUpperCase() && path === match[2]);
-    if (!selected) {
-        return {
-            error: `Actor '${actorFullName}' has no operation "${serverInterface}". ${formatOperationCount(operations)}. ${listsThem}`,
-        };
-    }
-    const details = formatWithinBudget(schema, (context) => buildServerOperationDetails(selected, context));
-    const title = `# Server interface of ${actorFullName}: ${selected.method} ${selected.path}\n`;
-    return checkSize(details && `${title}${header}${send('this request', selected)}${details}`, actorFullName);
 }

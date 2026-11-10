@@ -428,6 +428,14 @@ describe('apify-api-read', () => {
         expect(readSentUrl()).toBe(`${BASE_URL}/datasets/abc?methods=a&methodName=b`);
     });
 
+    it('sends an array query value as one comma-separated value', async () => {
+        requestMock.mockResolvedValue(mockResponse(200, { data: {} }));
+
+        await callTool(apifyApiRead, { path: 'actor-runs', query: { status: ['FAILED', 'ABORTED'], limit: 5 } });
+
+        expect(readSentUrl()).toBe(`${BASE_URL}/actor-runs?status=FAILED,ABORTED&limit=5`);
+    });
+
     it('sends one GET to the path and returns the body as the API sends it', async () => {
         const body = { data: { total: 1, items: [{ id: 'abc' }] } };
         requestMock.mockResolvedValue(mockResponse(200, body));
@@ -1279,5 +1287,20 @@ describe('apify-api-write', () => {
             });
             expect(args.query.webhooks).not.toBe('[REDACTED]');
         });
+    });
+});
+
+describe.each([
+    { name: HELPER_TOOLS.API_READ, tool: apifyApiRead, args: { path: '/v2/datasets' } },
+    { name: HELPER_TOOLS.API_WRITE, tool: apifyApiWrite, args: { path: '/v2/datasets/abc', method: 'DELETE' } },
+])('$name validates query values without coercing them', ({ tool, args }) => {
+    // Either would be sent as an empty value, such as ?status=.
+    it.each([{ value: null }, { value: [] }])('rejects the query value $value with one anyOf error', ({ value }) => {
+        expect(tool.ajvValidate({ ...args, query: { status: value } })).toBe(false);
+        expect(tool.ajvValidate.errors?.filter((error) => error.keyword === 'anyOf')).toHaveLength(1);
+    });
+
+    it('accepts an array query value', () => {
+        expect(tool.ajvValidate({ ...args, query: { status: ['FAILED', 'ABORTED'] } })).toBe(true);
     });
 });

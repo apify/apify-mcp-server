@@ -22,14 +22,14 @@ directory you're editing.
   envelope) traffic to the stateless adapter, everything else to the stateful flow.
 - `input.ts` — input processing (`processInput`, used by `stdio.ts` and the HTTP URL-param parser in `mcp/utils.ts`).
 - `apify_client.ts` — the Apify API client wrapper; use it rather than calling the
-  API directly. `state.ts` — TTL caches. `const.ts`, `errors.ts`,
+  API directly. Every instance sends through one process-wide keep-alive `ProxyAgent`
+  (`sharedAgent`), so constructing a client per request costs no sockets. `state.ts` — TTL caches. `const.ts`, `errors.ts`,
   `types.ts`, `telemetry.ts`, `instrument.ts`, `server_card.ts` — shared spine.
 
 ## Subdirectories
 
 - [`mcp/AGENTS.md`](mcp/AGENTS.md) — MCP protocol core (the published surface).
 - [`tools/AGENTS.md`](tools/AGENTS.md) — MCP tool implementations.
-- [`payments/AGENTS.md`](payments/AGENTS.md) — Skyfire / x402 payment providers.
 - [`resources/AGENTS.md`](resources/AGENTS.md) — MCP resources + widget registry.
 - [`web/AGENTS.md`](web/AGENTS.md) — widget UI (separate build) + design system.
 - `utils/` — broad helper grab-bag, no single concept (no child doc; grep it).
