@@ -139,7 +139,7 @@ type SimplifiedResult = {
     noteTier: string | null;
 };
 
-const FREE_ACTOR_TEXT = 'This Actor is free to use. You are only charged for Apify platform usage.';
+const FREE_ACTOR_TEXT = 'Runs are charged for Apify platform usage.';
 const UNKNOWN_PRICING_TEXT = 'Pricing information is not available.';
 const EVENTS_UNAVAILABLE_TEXT = 'Pricing information for events is not available.';
 const EVENT_DESCRIPTION_LIMIT = 5;

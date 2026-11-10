@@ -197,13 +197,13 @@ A typical task follows four steps:
 
 The server adds `get-dataset-items`, `get-key-value-store-record`, `get-actor-run`, and `abort-actor-run` whenever `call-actor` or an Actor tool is loaded, so the agent can always read results and check on long runs that outlast the wait.
 
-You can also expose a specific Actor as its own tool, for example `apify/web-search` or `apify/instagram-scraper`. The server builds the tool's parameters from the Actor's input schema, so the agent knows exactly what to pass.
+You can also expose a specific Actor as its own tool, for example `apify/instagram-scraper`. The server builds the tool's parameters from the Actor's input schema, so the agent knows exactly what to pass. A Server Actor with an API schema, such as `apify/web-fetch`, `apify/web-search`, or `apify/rag-web-browser`, gets a tool that sends one HTTP request to its API instead.
 
-**Actors that run their own MCP server.** Some Actors are MCP servers themselves. `fetch-actor-mcp-tool-list` lists their tools, and `call-actor-mcp-tool` calls one. When such an Actor is loaded as a tool source, its tools are exposed under names in the form `username--actor-name--tool-name`. Apify Store also lists MCP-related Actors from independent creators; those are separate products with their own READMEs and pricing.
+**Actors that run their own MCP server.** Some Actors are MCP servers themselves. `fetch-actor-mcp-tool-list` lists their tools, and `call-actor-mcp-tool` calls one. When such an Actor is loaded as a tool source and has no API schema, its tools are exposed under names in the form `username--actor-name--tool-name`; an Actor with an API schema, such as `apify/web-search`, gets its server tool instead, and `call-actor-mcp-tool` reaches its MCP tools. Apify Store also lists MCP-related Actors from independent creators; those are separate products with their own READMEs and pricing.
 
 ## 🛠️ Tools, resources, and prompts
 
-Any [Actor](https://apify.com/store) can be a tool, and agents discover new ones as they work. By default, the server loads the `actors` and `docs` categories, two Actor tools ([RAG Web Browser](https://apify.com/apify/rag-web-browser) and [Web Fetch](https://apify.com/apify/web-fetch)), and `report-problem`. Everything else is opt-in by category or by tool name.
+Any [Actor](https://apify.com/store) can be a tool, and agents discover new ones as they work. By default, the server loads the `actors` and `docs` categories, two Actor tools ([Web Search](https://apify.com/apify/web-search) and [Web Fetch](https://apify.com/apify/web-fetch)), and `report-problem`. Everything else is opt-in by category or by tool name.
 
 ### Helper tools
 
@@ -231,17 +231,18 @@ Legend for the **Enabled by default** column:
 | `call-actor` | actors | Run an Actor and return its run status and storage IDs. Use `fetch-actor-details` first to get the input schema. | ✅ |
 | `fetch-actor-mcp-tool-list` | actors | List the tools of an Actor that runs an MCP server, with their schemas, annotations, and metadata. | ✅ |
 | `call-actor-mcp-tool` | actors | Call one tool on an Actor's MCP server and return its result. | ✅ |
+| `send-server-actor-request` | actors | Send one HTTP request to a Server Actor's API, as documented by its API schema, and return the response. | ✅ |
 | `get-actor-run` | runs | Get details about an Actor run. | ⚡ |
 | `get-dataset-items` | storage | Read items from a dataset, with filtering and pagination. | ⚡ |
 | `get-key-value-store-record` | storage | Get the value stored under a key in a key-value store. | ⚡ |
 | `abort-actor-run` | runs | Abort a running Actor run, optionally gracefully. | ⚡ |
 | `search-apify-docs` | docs | Search the Apify and Crawlee documentation for relevant pages. | ✅ |
 | `fetch-apify-docs` | docs | Fetch the full content of a documentation page by its URL. | ✅ |
-| [`apify--rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see [Choose which tools load](#choose-which-tools-load)) | Search the web and return the content of the top results. | ✅ |
+| [`apify--web-search`](https://apify.com/apify/web-search) | Actor (see [Choose which tools load](#choose-which-tools-load)) | Search the web and return one page of results: titles, URLs, and snippets. | ✅ |
 | [`apify--web-fetch`](https://apify.com/apify/web-fetch) | Actor (see [Choose which tools load](#choose-which-tools-load)) | Fetch a URL and return its content as Markdown, text, HTML, or other formats. | ✅ |
 | `report-problem` | dev | Report a problem with an Apify tool or Actor to the Apify team. | ✅¹ |
+| [`apify--rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see [Choose which tools load](#choose-which-tools-load)) | Search the web and return the content of the top results. | |
 | `get-actor-list` | none (select by name: `tools=get-actor-list`) | List the Actors you own and those shared with you, including private ones. | |
-| `send-server-actor-request` | none (select by name: `tools=send-server-actor-request`) | Send one HTTP request to a Server Actor's API, as documented by its API schema, and return the response. | |
 | `delete-actor` | none (select by name: `tools=delete-actor`) | Delete an Actor from your account permanently. Public Actors must be unpublished first. | |
 | `get-actor-run-list` | runs | List Actor runs, filtered by Actor and status. | |
 | `get-actor-run-log` | runs | Read the log of an Actor run. | |
@@ -311,12 +312,16 @@ https://mcp.apify.com?tools=apify/instagram-scraper
 <details>
 <summary><b>Backward compatibility with older configurations</b></summary>
 
+- `apify/web-search` replaced `apify/rag-web-browser` in the default tools. To keep `apify--rag-web-browser`, add `apify/rag-web-browser` to your `tools` list, or set `tools=actors,docs,apify/rag-web-browser,apify/web-fetch` for the previous default categories and Actors.
 - The `actors` URL parameter and `--actors` flag still work. They're merged into `tools`, so `?actors=apify/web-fetch` equals `?tools=apify/web-fetch`.
 - `enableAddingActors`, `enable-adding-actors`, and `enableActorAutoLoading` were removed and are ignored. Dynamic Actor calls come from `call-actor`, which the default `actors` category includes.
 - The selectors `add-actor`, `experimental`, and `preview` are retired and load nothing. Use `call-actor` or the `actors` category.
 - `get-actor-log` was renamed to `get-actor-run-log`, and the `source` category to `versions`. The old names load nothing.
-- `call-actor` no longer calls tools on MCP server Actors: the `actorName:toolName` form is rejected. Use `call-actor-mcp-tool` with `actor`, `tool`, and `arguments`. A selection that names `call-actor` alone needs `call-actor-mcp-tool` added.
+- `call-actor` no longer calls tools on MCP server Actors: the `actorName:toolName` form is rejected. Use `call-actor-mcp-tool` with `actor`, `tool`, and `arguments`. `call-actor` still starts a run of an MCP server Actor that has an input schema; one without is refused. A selection that names `call-actor` alone needs `call-actor-mcp-tool` added.
 - `fetch-actor-details` no longer lists an MCP server Actor's tools, and `output.mcpTools` is ignored. Use `fetch-actor-mcp-tool-list`, which returns the definitions in `structuredContent.tools`. A selection that names `fetch-actor-details` alone needs `fetch-actor-mcp-tool-list` added.
+- A selected Actor with an API schema (a Server Actor) gets a tool that sends one HTTP request to its API, with `method`, `path`, and `query` arguments, instead of a tool that starts a run. If the Actor is also an MCP server, the selection no longer loads its MCP tools: use `call-actor-mcp-tool`. `call-actor` still starts runs of the Actor when it has an input schema. A selected `apify/rag-web-browser` is served this way too, with `GET /search`.
+- `apify--web-fetch` sends one HTTP request to the Web Fetch Actor's API instead of starting a run, and returns the HTTP response. Its arguments are `method`, `path`, `query` and, for `POST /`, `body`, for example `{"method": "GET", "path": "/", "query": {"url": "https://example.com", "formats": ["markdown", "links"]}}`.
+- `apify--web-search` sends one HTTP request to the Web Search Actor's API instead of starting a run, and returns the HTTP response. Its arguments are `method`, `path`, `query` and, for `POST /`, `body`, for example `{"method": "GET", "path": "/", "query": {"query": "AI agent payment protocols", "maxResults": 5}}`. `call-actor` still starts runs of the Actor, and `call-actor-mcp-tool` calls its `search` MCP tool.
 
 </details>
 
@@ -371,7 +376,7 @@ Follow-ups work too. "Show me the next 10 results from that run" makes the agent
 - `search-actors` returns only free and pay-per-event Actors that pass the platform's agent-safety filters, so rental and pay-per-result Actors don't appear in search. [Full-permission Actors](https://docs.apify.com/actors/running/permissions#full-permission-actors) need your one-time approval; until then, `call-actor` returns an error with an approval link.
 - Some tools work without an Apify account: `search-actors`, `fetch-actor-details`, `search-apify-docs`, `fetch-apify-docs`, `apify-api-search`, and `apify-api-details`. Select only those, for example `https://mcp.apify.com?tools=search-actors`, and the hosted server accepts the connection without a token.
 
-> 🪙 **Agentic payments (experimental).** Agents can pay for Actor runs without an Apify account. [AGI](https://agi.apify.com) sells a prepaid, spend-capped Apify API token for an x402, MPP, or Skyfire payment. The agent then uses it as a normal Bearer token against `mcp.apify.com`, with any Actor. See the [agentic payments documentation](https://docs.apify.com/agents/payments) for supported methods and limits, and [agi.apify.com/AGENTS.md](https://agi.apify.com/AGENTS.md) for protocol details.
+> 🪙 **Agentic payments (experimental).** Agents can pay for Actor runs without an Apify account. [AGI](https://agi.apify.com) sells a prepaid, spend-capped Apify API token for an x402, MPP, or Skyfire payment. The agent then uses it as a normal Bearer token against `mcp.apify.com`, with any Actor that uses limited permissions. See the [agentic payments documentation](https://docs.apify.com/agents/payments) for supported methods and limits, and [agi.apify.com/AGENTS.md](https://agi.apify.com/AGENTS.md) for protocol details.
 
 ## 📡 Telemetry
 
@@ -392,6 +397,7 @@ TELEMETRY_ENABLED=false npx @apify/actors-mcp-server
 
 - **The local server won't start.** Check your Node.js version: the package requires Node.js 22 or later.
 - **Authentication fails.** Reconnect so the client repeats the OAuth flow, or switch to a Bearer token. For the local server, check that `APIFY_TOKEN` is set in the client's server configuration, not only in your shell.
+- **VS Code says the OAuth app is not registered.** Run **Authentication: Remove Dynamic Authentication Providers**, select Apify, and sign in again.
 - **Client features vary.** Any MCP client can connect, but support for dynamic tool lists, OAuth, and MCP Apps differs between clients.
 - **Invalid Actor input.** When `call-actor` fails because of invalid input, the error includes the Actor's input schema so the agent can correct the input and retry.
 
