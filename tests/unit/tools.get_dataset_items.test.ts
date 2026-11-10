@@ -48,6 +48,10 @@ describe('extractDotPrefixes', () => {
     it('extracts the prefix from fields with a trailing dot', () => {
         expect(extractDotPrefixes(['a.', 'b.c'])).toEqual(['a', 'b']);
     });
+
+    it('skips a prefix that is also selected on its own', () => {
+        expect(extractDotPrefixes(['metadata.url', 'metadata', 'crawl.statusCode'])).toEqual(['crawl']);
+    });
 });
 
 const MOCK_ITEMS = [{ first_number: 3, second_number: 4, sum: 7 }];
@@ -148,13 +152,13 @@ describe('get-dataset-items', () => {
             stubToolCallContext(
                 {
                     datasetId: 'ds-1',
-                    fields: 'metadata.url,crawl.statusCode',
+                    fields: 'metadata.url,crawl.statusCode,crawl',
                 },
                 stubApifyClient(listItemsSpy),
             ),
         );
 
-        expect(listItemsSpy).toHaveBeenCalledWith(expect.objectContaining({ flatten: ['metadata', 'crawl'] }));
+        expect(listItemsSpy).toHaveBeenCalledWith(expect.objectContaining({ flatten: ['metadata'] }));
     });
 
     it('rejects empty datasetId via ajv validation', () => {

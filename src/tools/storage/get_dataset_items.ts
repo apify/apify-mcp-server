@@ -13,13 +13,17 @@ import { buildDatasetItemsSummaryNextStep, buildStorageResponse, catchNotFound }
 
 export const DEFAULT_DATASET_ITEMS_LIMIT = 20;
 
-/** Top-level dot prefixes of `fields`. Apify's `flatten` recurses, so the first segment suffices. */
+/**
+ * Top-level prefixes of dotted `fields` to flatten. Apify's `flatten` recurses, so the first
+ * segment suffices. A prefix also selected on its own stays whole: flattening it would remove it.
+ */
 export function extractDotPrefixes(fields: string[]): string[] {
     const prefixes = new Set<string>();
     for (const field of fields) {
         const dotIndex = field.indexOf('.');
-        if (dotIndex > 0) {
-            prefixes.add(field.slice(0, dotIndex));
+        const prefix = field.slice(0, dotIndex);
+        if (dotIndex > 0 && !fields.includes(prefix)) {
+            prefixes.add(prefix);
         }
     }
     return [...prefixes];
