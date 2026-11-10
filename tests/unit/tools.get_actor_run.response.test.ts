@@ -1291,20 +1291,13 @@ describe('buildStatusTemplate', () => {
         expect(t.summary).not.toContain('at least 50 keys');
     });
 
-    it('TIMED-OUT with dataset routes to partial-output nextStep', () => {
-        const t = buildStatusSummaryNextStep({
-            run: makeRun('TIMED-OUT'),
-            dataset: datasetWithItems,
-        });
-        expect(t.nextStep).toContain('partial output (47 items written)');
-    });
-
-    it('TIMED-OUT with fields carries the same fields hint as SUCCEEDED', () => {
+    it('TIMED-OUT with dataset routes to partial-output nextStep with the fields hint', () => {
         const t = buildStatusSummaryNextStep({
             run: makeRun('TIMED-OUT'),
             dataset: datasetWithItems,
             datasetFields: DATASET_FIELDS,
         });
+        expect(t.nextStep).toContain('partial output (47 items written)');
         expect(t.nextStep).toContain('Each listed field path works in fields="..."');
     });
 
@@ -1414,6 +1407,7 @@ describe('fieldsProjectionHint', () => {
     it('states the array rule with placeholder names when a field holds an array', () => {
         const hint = fieldsProjectionHint(['query', 'search/provider', 'results/0/url', 'results/0/siteLinks/0/url']);
         expect(hint).toContain('fields="b" returns every element of b');
+        expect(hint).toContain('Each listed field path works in fields="...". Arrays come whole');
         // Neither the dataset's own names nor an indexed path: agents copy both.
         expect(hint).not.toMatch(/query|search|results|url/);
         expect(hint).not.toMatch(/\.\d+(\.|\b)/);
@@ -1452,23 +1446,17 @@ describe('run response threads the raw field metadata into the hint', () => {
 // `dataset.fields` becomes the list of working `fields` selections.
 // -----------------------------------------------------------------------------
 describe('collapseArrayPaths', () => {
-    it('collapses a path to or through an array to its top-level name and dedupes', () => {
+    it('collapses array paths to the top-level name, keeps object paths, dedupes in first-occurrence order', () => {
         expect(
             collapseArrayPaths([
+                'metadata.url',
                 'latestComments.0.id',
                 'latestComments.1.text',
                 'latestComments.2.owner.username',
                 'metadata.headers.set-cookie.0',
+                'markdown',
             ]),
-        ).toEqual(['latestComments', 'metadata']);
-    });
-
-    it('keeps object paths unchanged and preserves first-occurrence order', () => {
-        expect(collapseArrayPaths(['metadata.url', 'entities.hashtags.0.text', 'markdown'])).toEqual([
-            'metadata.url',
-            'entities',
-            'markdown',
-        ]);
+        ).toEqual(['metadata.url', 'latestComments', 'metadata', 'markdown']);
     });
 
     it('returns [] for empty input', () => {

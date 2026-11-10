@@ -763,7 +763,7 @@ const buildDatasetEntrySchema = () => ({
             type: 'array' as const,
             items: { type: 'string' },
             description:
-                'Field paths that work as a get-dataset-items fields selection (e.g. ["query", "results", "metadata.url"]); a field holding an array appears by its top-level name.',
+                'Paths that work as a fields selection (e.g. ["results", "metadata.url"]); an array field appears by its top-level name.',
         },
     },
     required: ['id'],
@@ -1047,7 +1047,7 @@ export const datasetMetadataOutputSchema = {
             type: 'array' as const,
             items: { type: 'string' },
             description:
-                'Field paths that work as a get-dataset-items fields selection (e.g. ["query", "results", "metadata.url"]); a field holding an array appears by its top-level name.',
+                'Paths that work as a fields selection (e.g. ["results", "metadata.url"]); an array field appears by its top-level name.',
         },
         summary: summaryProperty,
         nextStep: nextStepProperty,
