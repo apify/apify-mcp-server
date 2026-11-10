@@ -1216,6 +1216,8 @@ export const actorsCases: Case[] = [
         // isDeploymentTest: the default web-fetch tool, sent through its server interface, with an array query value.
         name: 'fetches a page with the default web-fetch tool through GET /',
         isDeploymentTest: true,
+        // A live Actor request; an occasional one hangs past the client's 60 s request timeout.
+        retry: 1,
         run: withClient({}, async (client) => {
             const result = await client.callTool({
                 name: 'apify--web-fetch',
