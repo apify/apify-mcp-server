@@ -271,7 +271,7 @@ export function getToolsForServerMode(
     }
 
     /**
-     * Auto-inject run-status and storage tools when call-actor or actor tools are present.
+     * Auto-inject run-status and storage tools when a tool that starts or reads a run is present.
      * Insert them right after call-actor (or appended at the end when call-actor is absent) so the
      * default tool list reads in workflow order: call → get-actor-run → get-dataset-items →
      * get-key-value-store-record → abort-actor-run. If the user explicitly selected these tools

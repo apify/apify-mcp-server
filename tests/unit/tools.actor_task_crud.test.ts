@@ -304,7 +304,7 @@ describe('task tool summaries', () => {
     // Driven off the registry so a task tool added later is covered; it needs an `argsByTool` entry.
     const taskTools = getCategoryTools('default').tasks.map((tool) => [tool.name, tool as HelperTool] as const);
 
-    it.each(taskTools)('%s names no tool, leaving cross-tool guidance to the description', async (name, tool) => {
+    it.each(taskTools)('%s names no tool that may be missing from the session', async (name, tool) => {
         expect(argsByTool[name], `add an \`argsByTool\` entry for ${name}`).toBeDefined();
         const { apifyClient } = mockTaskApiClient(mockTask(), mockTaskRun());
         const result = (await tool.call(stubToolCallContext(argsByTool[name], apifyClient))) as TextToolResult;
