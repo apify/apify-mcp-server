@@ -3,7 +3,7 @@ import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
 import { actorNameToToolName, getCategoryTools } from '@apify/actors-mcp-server/internals.js';
-import { MAX_INLINE_BYTES, MAX_LIMIT_WITH_INPUT_SCHEMA } from '@apify/actors-mcp-server/internals/test-kit.js';
+import { MAX_LIMIT_WITH_INPUT_SCHEMA, MAX_INLINE_BYTES } from '@apify/actors-mcp-server/internals/test-kit.js';
 
 import {
     ACTOR_EXAMPLE_MCP_SERVER,
@@ -1102,30 +1102,29 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        name: 'returns a Server Actor body of exactly the inline limit and rejects one byte more, compressed too',
+        name: 'returns a Server Actor body of exactly the inline limit whole, and the start of one byte more, compressed too',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
-            const exact = await sendServerActorRequest(client, {
-                method: 'GET',
-                path: '/bytes',
-                query: { n: MAX_INLINE_BYTES },
-            });
-            const over = await sendServerActorRequest(client, {
-                method: 'GET',
-                path: '/bytes',
-                query: { n: MAX_INLINE_BYTES + 1 },
-            });
-            const overCompressed = await sendServerActorRequest(client, {
-                method: 'GET',
-                path: '/gzip',
-                query: { n: MAX_INLINE_BYTES + 1 },
-            });
+            for (const path of ['/bytes', '/gzip']) {
+                const exact = await sendServerActorRequest(client, {
+                    method: 'GET',
+                    path,
+                    query: { n: MAX_INLINE_BYTES },
+                });
+                const over = await sendServerActorRequest(client, {
+                    method: 'GET',
+                    path,
+                    query: { n: MAX_INLINE_BYTES + 1 },
+                });
 
-            expect(exact.sc).toMatchObject({ status: 200, bytes: MAX_INLINE_BYTES });
-            expect(over.result.isError).toBe(true);
-            expect(over.text).toContain(`larger than ${MAX_INLINE_BYTES} bytes`);
-            expect(overCompressed.result.isError).toBe(true);
-            expect(overCompressed.text).toContain(`larger than ${MAX_INLINE_BYTES} bytes`);
+                expect(exact.result.isError).not.toBe(true);
+                expect(exact.sc).toMatchObject({ status: 200, bytes: MAX_INLINE_BYTES });
+                expect(exact.sc).not.toHaveProperty('bodyTruncated');
+                expect(over.result.isError).not.toBe(true);
+                expect(over.sc).toMatchObject({ status: 200, bodyTruncated: true });
+                expect((over.sc as { bytes: number }).bytes).toBeLessThanOrEqual(MAX_INLINE_BYTES);
+                expect(over.text).toContain(`${MAX_INLINE_BYTES}-byte limit`);
+            }
         }),
     },
     {
@@ -1171,27 +1170,92 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        name: 'drops a Server Actor response that misses the 120-second deadline',
+        name: 'serves a selected Server Actor as one tool that sends a request to its server interface',
         isDeploymentTest: false,
-        skipIf: skipUnlessStdio,
-        timeout: 150_000,
-        run: withClient({ tools: ['actors'] }, async (client) => {
-            const result = await (client as ClientV1).callTool(
-                {
-                    name: 'send-server-actor-request',
-                    arguments: {
-                        actor: ACTOR_SERVER_ACTOR_TEST,
-                        method: 'GET',
-                        path: '/delay',
-                        query: { ms: 125_000 },
-                    },
-                },
-                CallToolResultSchema,
-                { timeout: 140_000 },
+        run: withClient({ tools: [ACTOR_SERVER_ACTOR_TEST] }, async (client) => {
+            const toolName = actorNameToToolName(ACTOR_SERVER_ACTOR_TEST);
+            const { tools } = await client.listTools();
+            const tool = tools.find((entry) => entry.name === toolName);
+            const properties = (tool?.inputSchema.properties ?? {}) as Record<string, { enum?: string[] }>;
+            expect(Object.keys(properties)).toEqual(['method', 'path', 'query', 'body']);
+            expect(properties.method.enum).toEqual(expect.arrayContaining(['GET', 'POST']));
+            // The full rendering is over 4,096 characters, so the description lists one line per operation.
+            expect(tool?.description).toContain(
+                '- POST /add [asText:boolean] {firstNumber:integer required, secondNumber:integer required}: Add two numbers (JSON body).',
             );
+            expect(tool?.description?.length).toBeLessThanOrEqual(4096);
+            // The session has no fetch-actor-details, so the description names none.
+            expect(tool?.description).not.toContain('fetch-actor-details');
 
-            expect(result.isError).toBe(true);
-            expect((result.content as { text: string }[])[0].text).toContain('within 120 seconds');
+            const result = await client.callTool({
+                name: toolName,
+                arguments: { method: 'GET', path: '/add', query: { firstNumber: 2, secondNumber: 3 } },
+            });
+
+            expect(result.isError).not.toBe(true);
+            validateStructuredOutput(result, tool?.outputSchema, toolName);
+            const sc = (result as { structuredContent?: ServerActorRequestContent }).structuredContent;
+            expect(sc).toMatchObject({ status: 200, interface: 'server', method: 'GET' });
+            expect(JSON.parse(sc!.body)).toMatchObject({ sum: 5 });
+        }),
+    },
+    {
+        name: 'runs a selected Server Actor from its input with call-actor',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['actors', ACTOR_SERVER_ACTOR_TEST] }, async (client) => {
+            const result = await client.callTool({
+                name: 'call-actor',
+                arguments: { actor: ACTOR_SERVER_ACTOR_TEST, input: { firstNumber: 2, secondNumber: 3 } },
+            });
+
+            expect(result.isError).not.toBe(true);
+            expect((result as { structuredContent?: { runId?: string } }).structuredContent?.runId).toBeTruthy();
+        }),
+    },
+    {
+        // isDeploymentTest: the default web-fetch tool, sent through its server interface, with an array query value.
+        name: 'fetches a page with the default web-fetch tool through GET /',
+        isDeploymentTest: true,
+        // A live Actor request; an occasional one hangs past the client's 60 s request timeout.
+        retry: 1,
+        run: withClient({}, async (client) => {
+            const result = await client.callTool({
+                name: 'apify--web-fetch',
+                arguments: {
+                    method: 'GET',
+                    path: '/',
+                    query: { url: 'https://example.com', formats: ['markdown', 'links'] },
+                },
+            });
+
+            expect(result.isError).not.toBe(true);
+            const sc = (result as { structuredContent?: ServerActorRequestContent }).structuredContent;
+            expect(sc?.status).toBe(200);
+            expect(JSON.parse(sc!.body)).toEqual(
+                expect.objectContaining({ markdown: expect.any(String), links: expect.any(Array) }),
+            );
+        }),
+    },
+    {
+        // isDeploymentTest: the default web-search tool, sent through its server interface, with a comma-joined list.
+        name: 'searches the web with the default web-search tool through GET /',
+        isDeploymentTest: true,
+        run: withClient({}, async (client) => {
+            const result = await client.callTool({
+                name: 'apify--web-search',
+                arguments: {
+                    method: 'GET',
+                    path: '/',
+                    query: { query: 'apify', maxResults: 2, allowedDomains: ['apify.com'] },
+                },
+            });
+
+            expect(result.isError).not.toBe(true);
+            const sc = (result as { structuredContent?: ServerActorRequestContent }).structuredContent;
+            expect(sc?.status).toBe(200);
+            const { results } = JSON.parse(sc!.body) as { results: { domain: string }[] };
+            expect(results.length).toBeGreaterThan(0);
+            for (const { domain } of results) expect(domain).toMatch(/(^|\.)apify\.com$/);
         }),
     },
     {

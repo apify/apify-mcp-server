@@ -43,7 +43,7 @@ describe('call_actor_common', () => {
         it('prefers dedicated tools without promoting a web tool example', () => {
             const description = buildCallActorDescription();
 
-            expect(description).toContain('Always use dedicated tools when available');
+            expect(description).toContain('Prefer the dedicated tool when the session has one');
             expect(description).not.toContain('apify--rag-web-browser');
             expect(description).not.toContain(RAG_WEB_BROWSER);
         });
@@ -54,12 +54,14 @@ describe('call_actor_common', () => {
             expect(buildCallActorDescription()).toContain('with waitSecs > 0 also reports dataset field metadata');
         });
 
-        it('says MCP server Actors are not run here, naming call-actor-mcp-tool only when the session has it', () => {
+        it('says an MCP server Actor with no input schema is not run here, naming call-actor-mcp-tool only when the session has it', () => {
             const withMcpTool = buildCallActorDescription();
             const withoutMcpTool = buildCallActorDescription(only(HELPER_TOOLS.ACTOR_GET_DETAILS));
 
-            expect(withMcpTool).toContain(`MCP server Actors are not run here; ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL}`);
-            expect(withoutMcpTool).toContain('MCP server Actors are not run here.');
+            expect(withMcpTool).toContain(
+                `An MCP server Actor with no input schema is not run here; ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL}`,
+            );
+            expect(withoutMcpTool).toContain('An MCP server Actor with no input schema is not run here.');
             expect(withoutMcpTool).not.toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
         });
 

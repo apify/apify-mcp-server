@@ -66,7 +66,9 @@ sentence can block a listing. Every configuration of this server must pass them.
 
 ## Changing tool text
 
-- A change to tool text is a contract change. Say so in the PR, update the unit tests that pin the
-  text, and rerun evals when the string was eval-tuned; note the delta.
+- A change to tool text is a contract change. Say so in the PR and rerun evals when the string was
+  eval-tuned; note the delta. Evals are the check on wording: unit tests assert behavior (a tool
+  named only when served, a policy text replacing the generic one), never a sentence of a
+  description.
 - The pinned-configuration test (`tests/unit/helpers/claude_connector_tools.ts`) keeps its names
   literal, so any growth of that surface fails a test instead of a review.

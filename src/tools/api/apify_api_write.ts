@@ -1,12 +1,13 @@
+import Ajv from 'ajv';
 import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
-import { compileSchema } from '../../utils/ajv.js';
+import { fixZodSchemaRequired } from '../../utils/ajv.js';
 import { respondUserError } from '../../utils/mcp.js';
-import { anyJsonValueSchema, apifyApiCallOutputSchema } from '../structured_output_schemas.js';
+import { anyJsonBodySchema, apifyApiCallOutputSchema } from '../structured_output_schemas.js';
 import { isEndpointBlocked } from './apify_api_blocklist.js';
 import { normalizeApiPath } from './apify_api_path.js';
 import {
@@ -110,10 +111,13 @@ export const apifyApiWrite: ToolEntry = Object.freeze({
     buildDescription,
     // Advertise explicit JSON types without letting AJV coerce the body before parseBody() (#1546).
     inputSchema: z.toJSONSchema(
-        apifyApiWriteArgs.extend({ body: apifyApiWriteArgs.shape.body.meta(anyJsonValueSchema) }),
+        apifyApiWriteArgs.extend({ body: apifyApiWriteArgs.shape.body.meta(anyJsonBodySchema) }),
     ) as ToolInputSchema,
     outputSchema: apifyApiCallOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(apifyApiWriteArgs)),
+    // The shared validator coerces a null query value to "", which is sent as ?name=.
+    ajvValidate: new Ajv({ coerceTypes: false, strict: false, removeAdditional: true }).compile(
+        fixZodSchemaRequired(z.toJSONSchema(apifyApiWriteArgs)),
+    ),
     annotations: {
         title: 'Write Apify API',
         readOnlyHint: false,
