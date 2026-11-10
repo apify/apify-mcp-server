@@ -21,6 +21,8 @@ export interface CaseCtx {
     transport: Transport;
     /** Register only `isDeploymentTest: true` cases. */
     isDeploymentTestOnly?: boolean;
+    /** The suite targets a local Apify platform, which has no Apify Proxy groups (UNBLOCKER, GOOGLE_SERP). */
+    isLocalPlatform?: boolean;
     /** Memoized fixture setup — once per `registerCases` call, keyed by `fixture.key`. */
     getFixture: <T>(fixture: Fixture<T>) => Promise<T>;
     /**

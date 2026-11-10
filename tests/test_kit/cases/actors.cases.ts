@@ -16,6 +16,7 @@ import {
     expectUsageCostMeta,
     findToolByName,
     getToolNames,
+    skipOnLocalPlatform,
     skipUnlessStdio,
     validateStructuredOutput,
     validateStructuredOutputForTool,
@@ -1170,8 +1171,10 @@ export const actorsCases: Case[] = [
         }),
     },
     {
+        // isDeploymentTest: the server-interface path end to end with a test Actor that needs no Apify Proxy,
+        // so it also runs on a local platform, where the web-fetch and web-search cases below are skipped.
         name: 'serves a selected Server Actor as one tool that sends a request to its server interface',
-        isDeploymentTest: false,
+        isDeploymentTest: true,
         run: withClient({ tools: [ACTOR_SERVER_ACTOR_TEST] }, async (client) => {
             const toolName = actorNameToToolName(ACTOR_SERVER_ACTOR_TEST);
             const { tools } = await client.listTools();
@@ -1216,6 +1219,7 @@ export const actorsCases: Case[] = [
         // isDeploymentTest: the default web-fetch tool, sent through its server interface, with an array query value.
         name: 'fetches a page with the default web-fetch tool through GET /',
         isDeploymentTest: true,
+        skipIf: skipOnLocalPlatform,
         run: withClient({}, async (client) => {
             const result = await client.callTool({
                 name: 'apify--web-fetch',
@@ -1238,6 +1242,7 @@ export const actorsCases: Case[] = [
         // isDeploymentTest: the default web-search tool, sent through its server interface, with a comma-joined list.
         name: 'searches the web with the default web-search tool through GET /',
         isDeploymentTest: true,
+        skipIf: skipOnLocalPlatform,
         run: withClient({}, async (client) => {
             const result = await client.callTool({
                 name: 'apify--web-search',

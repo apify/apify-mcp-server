@@ -201,6 +201,8 @@ Marking a case `isDeploymentTest: true` is a one-line edit on its existing defin
 
 This is a real execution decision, not a visibility flag: internal's `isDeploymentTestOnly` `registerCases` call runs as part of its release pipeline — against **staging** when a release PR opens, against **production** when it merges to `master` (real API calls, real Actor runs, billed and user-visible). Mark a case `isDeploymentTest: true` only if it earns that.
 
+Internal also runs the deployment-test cases against a local Apify platform and sets `isLocalPlatform: true` there. A local platform has no Apify Proxy groups (`UNBLOCKER`, `GOOGLE_SERP`), so a case whose Actor needs them takes `skipIf: skipOnLocalPlatform` (the `apify/web-fetch` and `apify/web-search` cases). This repo never sets the flag, so those cases still run here and on internal's staging/prod.
+
 **Tests in this repo** cover the package's MCP and library surface. They live in `tests/test_kit/cases/*.cases.ts` (registered through `tests/integration/suite.ts`) and `tests/unit/`:
 
 - MCP protocol — `initialize` handshake, request/response shapes for `tools/*`, `prompts/*`, `resources/*`, `tasks/*`, notification delivery, JSON-RPC error codes.
