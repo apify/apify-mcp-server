@@ -1,1 +1,6 @@
 /.github/workflows/factory_review.yaml @mtrunkat
+
+# Copy review for text that agents read
+/src/utils/server-instructions/ @jgagne
+/src/utils/pricing_info.ts @jgagne
+/src/utils/apify_errors.ts @jgagne

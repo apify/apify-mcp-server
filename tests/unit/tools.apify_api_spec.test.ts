@@ -158,6 +158,23 @@ describe('parseRequestBody() for a creator schema', () => {
         expect(parseRequestBody(jsonBody(schema), creatorContext({}))?.schema).toEqual(schema);
     });
 
+    it('keeps the keywords next to a reference, overriding those of its target', () => {
+        const spec = {
+            components: { schemas: { Format: { type: 'string', enum: ['TEXT', 'BASE64'], description: 'A format.' } } },
+        };
+        const schema = {
+            type: 'object',
+            properties: { format: { $ref: '#/components/schemas/Format', description: 'Format of the content.' } },
+            additionalProperties: { $ref: '#/components/schemas/Typo', description: 'Anything else.' },
+        };
+
+        expect(parseRequestBody(jsonBody(schema), creatorContext(spec))?.schema).toEqual({
+            type: 'object',
+            properties: { format: { type: 'string', enum: ['TEXT', 'BASE64'], description: 'Format of the content.' } },
+            additionalProperties: { $ref: '#/components/schemas/Typo', description: 'Anything else.' },
+        });
+    });
+
     it('renders a cyclic reference once, then as an empty schema', () => {
         const spec = {
             components: {

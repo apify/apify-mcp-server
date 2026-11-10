@@ -25,8 +25,9 @@ import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunActor, getOwnServerRemedy } from '../actor_tool_naming.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
-import { fixActorNameInputAndLog } from './actor_tools_factory.js';
-import { buildServerInterfaceText } from './server_interface_schema.js';
+import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from './actor_tools_factory.js';
+import type { ServerInterfaceSection } from './server_interface_details.js';
+import { buildServerInterfaceDetails } from './server_interface_details.js';
 
 /**
  * Shared schema for actor details output options.
@@ -54,7 +55,7 @@ export const actorDetailsOutputOptionsSchema = z.object({
         .optional()
         .describe('Include inferred output schema from recent successful runs (TypeScript type).'),
     serverInterface: z.union([z.boolean(), z.string()]).optional().describe(dedent`
-            Server Actor HTTP API. true: every operation with its parameters and request body schema when they fit; otherwise one line per operation.
+            Server Actor HTTP API. true: every operation with its parameters and request body schema when they fit; otherwise an index with one entry per operation.
             "METHOD /path" (e.g. "GET /search"): that one operation in full.
             Each is limited to ${MAX_INLINE_BYTES} UTF-8 bytes.
         `),
@@ -133,7 +134,7 @@ Use 'output' to control returned information:
             : ''
     }
 - Selective: set only the fields you need to true, e.g. output: { inputSchema: true }
-- Common patterns: inputSchema only, description + readme, serverInterface: true (every operation in full when they fit, one line per operation otherwise) or "GET /search" (one operation in full) for Server Actors
+- Common patterns: inputSchema only, description + readme, serverInterface: true (every operation in full when they fit, an index of them otherwise) or "GET /search" (one operation in full) for Server Actors
 
 The 'readme' field returns the summary when available, full README otherwise.
 Use when querying Actor details, documentation, or input requirements.${mcpToolList}
@@ -180,13 +181,13 @@ export function buildActorDetailsTextResponse(options: {
     details: ActorDetailsResult;
     output: ResolvedOutputOptions;
     actorOutputSchema?: Record<string, unknown> | null;
-    serverInterfaceMessage?: string;
+    serverInterface?: ServerInterfaceSection;
     linkContext?: ConsoleLinkContext;
 }): {
     texts: string[];
     structuredContent: Record<string, unknown>;
 } {
-    const { details, output, actorOutputSchema, serverInterfaceMessage, linkContext } = options;
+    const { details, output, actorOutputSchema, serverInterface, linkContext } = options;
 
     const actorUrl =
         buildConsoleActorUrl(linkContext, details.actorInfo.id) ??
@@ -229,7 +230,7 @@ export function buildActorDetailsTextResponse(options: {
         }
     }
 
-    if (serverInterfaceMessage) texts.push(serverInterfaceMessage);
+    if (serverInterface?.text) texts.push(serverInterface.text);
 
     if (linkContext) {
         texts.push(VERBATIM_LINKS_NUDGE);
@@ -240,7 +241,7 @@ export function buildActorDetailsTextResponse(options: {
         readme: resolvedReadme?.content,
         inputSchema: output.inputSchema ? details.inputSchema : undefined,
         outputSchema: output.outputSchema ? (actorOutputSchema ?? {}) : undefined,
-        serverInterface: serverInterfaceMessage,
+        serverInterface: serverInterface?.serverInterface,
     };
 
     return { texts, structuredContent };
@@ -263,6 +264,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
     const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_GET_DETAILS });
+    if (!actorName) return respondUserError(EMPTY_ACTOR_NAME_MESSAGE);
 
     const resolvedOutput = resolveOutputOptions(parsed.output);
     // Skip the /users/me round-trip when pricing isn't rendered (e.g. inputSchema-only requests). In that case
@@ -279,7 +281,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         return buildActorNotFoundResponse(actorName, loadedToolNames);
     }
 
-    const serverInterface = buildServerInterfaceText({
+    const serverInterface = buildServerInterfaceDetails({
         actor: details.actorInfo,
         actorFullName: `${details.actorInfo.username}/${details.actorInfo.name}`,
         schema: details.webServerSchema,
@@ -302,7 +304,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         details,
         output: resolvedOutput,
         actorOutputSchema,
-        serverInterfaceMessage: serverInterface.text,
+        serverInterface,
         linkContext,
     });
 
