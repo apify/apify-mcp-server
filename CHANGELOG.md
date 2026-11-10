@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - List only working dataset field selections ([#1665](https://github.com/apify/apify-mcp-server/pull/1665)) ([df8e37e](https://github.com/apify/apify-mcp-server/commit/df8e37eefae5d881e97263e8cf97fffcc181aa4f)) by [@jirispilka](https://github.com/jirispilka), closes [#1305](https://github.com/apify/apify-mcp-server/issues/1305), [#1656](https://github.com/apify/apify-mcp-server/issues/1656)
+- Explain empty and past-the-end dataset pages ([#1806](https://github.com/apify/apify-mcp-server/pull/1806)) ([446afce](https://github.com/apify/apify-mcp-server/commit/446afceda99c83f5801fee8011bc71960653b419)) by [@jirispilka](https://github.com/jirispilka), closes [#1801](https://github.com/apify/apify-mcp-server/issues/1801)
 
 
 <!-- git-cliff-unreleased-end -->
