@@ -163,33 +163,41 @@ export function buildStorageListSummaryNextStep(params: {
 }
 
 /**
- * Pagination-aware {summary, nextStep}: when more items remain, point at the next page;
- * otherwise point at get-dataset for the field list (structure lives there, not in a heavy schema dump).
+ * {summary, nextStep} guidance for a dataset items page. The counts and offsets are in the structured
+ * content, so the text does not repeat them. More pages remain while `offset + limit < totalItemCount`:
+ * with `clean`, the API pages before it drops empty items, so `itemCount` can fall short of the page size.
+ * An empty page counts as past the end only when its offset is, because `totalItemCount` lags new pushes.
  */
 export function buildDatasetItemsSummaryNextStep(params: {
     datasetId: string;
     itemCount: number;
     totalItemCount: number;
     offset: number;
-    /** Active loaded tool set; gates the terminal get-dataset reference (see #1007). */
+    limit: number;
+    /** Active loaded tool set; gates the terminal get-dataset reference. */
     loadedToolNames: readonly string[];
 }): { summary: string; nextStep: string } {
-    const { datasetId, itemCount, totalItemCount, offset, loadedToolNames } = params;
-    if (offset + itemCount < totalItemCount) {
+    const { datasetId, itemCount, totalItemCount, offset, limit, loadedToolNames } = params;
+    if (itemCount === 0 && totalItemCount > 0 && offset >= totalItemCount) {
         return {
-            summary: `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}).`,
-            nextStep: `Call ${HELPER_TOOLS.DATASET_GET_ITEMS} again with offset=${offset + itemCount} to fetch the next page.`,
+            summary: 'No items at this offset: it is past the end of the dataset.',
+            nextStep: `Call ${HELPER_TOOLS.DATASET_GET_ITEMS} with a lower offset.`,
         };
     }
-    const summary =
-        offset === 0 && itemCount === totalItemCount
-            ? `Fetched all ${itemCount} items.`
-            : `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}); no more pages.`;
+    if (offset + limit < totalItemCount) {
+        return {
+            summary: 'Fetched one page; more items remain.',
+            nextStep: `Call ${HELPER_TOOLS.DATASET_GET_ITEMS} again with offset increased by limit to fetch the next page.`,
+        };
+    }
     return {
-        summary,
-        nextStep: suggestTool(HELPER_TOOLS.DATASET_GET, loadedToolNames)
-            ? `Use ${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} to see the field list if you need the data structure.`
-            : `No more pages. Inspect the returned items directly.`,
+        summary: 'Fetched the last page; no more items remain.',
+        nextStep: resolveSiblingNextStep(
+            HELPER_TOOLS.DATASET_GET,
+            loadedToolNames,
+            `Use ${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} to see the field list if you need the data structure.`,
+            'Inspect the returned items directly.',
+        ),
     };
 }
 
