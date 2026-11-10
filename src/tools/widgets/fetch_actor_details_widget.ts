@@ -7,10 +7,10 @@ import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSche
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { buildActorDetailsForWidget, buildCardOptions, fetchActorDetails } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { respondOk } from '../../utils/mcp.js';
+import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunAnyActor } from '../actor_tool_naming.js';
-import { fixActorNameInputAndLog } from '../actors/actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from '../actors/actor_tools_factory.js';
 import {
     actorDetailsOutputDefaults,
     buildActorNotFoundResponse,
@@ -78,6 +78,7 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
             mcpSessionId,
             route: HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
         });
+        if (!actorName) return respondUserError(EMPTY_ACTOR_NAME_MESSAGE);
 
         const { userPlanTier } = await getUserInfoCached(apifyToken, apifyClient);
         const cardOptions = { ...buildCardOptions(actorDetailsOutputDefaults), userTier: userPlanTier };

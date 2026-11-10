@@ -40,6 +40,10 @@ describe('getServerInstructions()', () => {
         const instructions = getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT);
         expect(instructions).toContain(HELPER_TOOLS.ACTOR_CALL);
         expect(instructions).toContain('Prefer dedicated tools when available');
+        // As in the call-actor description: a dedicated tool does not rule out a requested dataset run.
+        expect(instructions).toContain(
+            'runs an Actor that has no dedicated tool, and batch work whose results belong in a dataset',
+        );
         expect(instructions).not.toContain(RAG_WEB_BROWSER);
         expect(instructions).not.toContain(WEB_FETCH);
     });

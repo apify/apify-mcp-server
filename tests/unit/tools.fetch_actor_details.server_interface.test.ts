@@ -2,17 +2,27 @@ import { describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { buildFetchActorDetailsResult, fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
-import { buildServerInterfaceText } from '../../src/tools/actors/server_interface_schema.js';
+import type { ServerInterfaceDetails } from '../../src/tools/actors/server_interface_details.js';
+import { buildServerInterfaceDetails } from '../../src/tools/actors/server_interface_details.js';
 import type { Actor } from '../../src/types.js';
+import { wrapJsonText } from '../../src/utils/encode_text.js';
 import { mockActor, mockActorBuildClient, mockDefaultBuild } from './helpers/actor_build_client.js';
-import { mockApifyClient, only, stubToolCallContext, textOf } from './helpers/tool_context.js';
+import {
+    expectSchemaConformingStructuredContent,
+    mockApifyClient,
+    only,
+    stubToolCallContext,
+    textOf,
+} from './helpers/tool_context.js';
 
 const ACTOR_FULL_NAME = 'apify/server-actor-test';
-const STANDBY_URL = 'https://server-actor-test.apify.actor';
+const SERVER_URL = 'https://server-actor-test.apify.actor';
 const DETAILS = `${HELPER_TOOLS.ACTOR_GET_DETAILS} with {"actor":"${ACTOR_FULL_NAME}","output":`;
 const SUMMARY = 'Server interface: enabled, single-tenant, 3 documented operations: GET /add, POST /add, GET /empty.';
 const LISTS_THEM = `${DETAILS}{"serverInterface":true}} lists them.`;
 const SIZE_ERROR = `Actor '${ACTOR_FULL_NAME}' server-interface output exceeds the ${MAX_INLINE_BYTES}-byte limit and was not returned. A smaller operation may fit.`;
+const SINGLE_TENANT_NOTICE =
+    'single-tenant: the first request starts a run in your account, kept for its idle timeout of 300 s.\n';
 
 /** The fixture's schema shapes: parameter, request body and response references. */
 const SCHEMA: Record<string, unknown> = {
@@ -51,6 +61,13 @@ const SCHEMA: Record<string, unknown> = {
         responses: { Add: { description: 'The sum.' } },
     },
 };
+
+/** SCHEMA's operations in the index. */
+const SCHEMA_INDEX = [
+    { method: 'GET', path: '/add', summary: 'Add two numbers (query)', requiredInputs: ['firstNumber'] },
+    { method: 'POST', path: '/add', summary: 'Add two numbers (JSON body)', requiredInputs: ['request body'] },
+    { method: 'GET', path: '/empty', summary: 'Return no content', requiredInputs: [] },
+];
 
 const WEB_FETCH = 'apify/web-fetch';
 
@@ -148,7 +165,7 @@ const WEB_FETCH_OPERATIONS = [
 function serverActor(overrides: Partial<Actor> = {}): Pick<Actor, 'actorStandby' | 'standbyUrl'> {
     return {
         actorStandby: { isEnabled: true, tenancy: 'SINGLE_TENANT', idleTimeoutSecs: 300 },
-        standbyUrl: STANDBY_URL,
+        standbyUrl: SERVER_URL,
         ...overrides,
     };
 }
@@ -165,8 +182,8 @@ function withDescriptionOnEmpty(description: string): Record<string, unknown> {
     return { ...SCHEMA, paths: { ...paths, '/empty': { get: { summary: 'Return no content', description } } } };
 }
 
-function build(params: Partial<Parameters<typeof buildServerInterfaceText>[0]> = {}) {
-    return buildServerInterfaceText({
+function build(params: Partial<Parameters<typeof buildServerInterfaceDetails>[0]> = {}) {
+    return buildServerInterfaceDetails({
         actor: serverActor(),
         actorFullName: ACTOR_FULL_NAME,
         schema: SCHEMA,
@@ -177,42 +194,46 @@ function build(params: Partial<Parameters<typeof buildServerInterfaceText>[0]> =
     });
 }
 
-function textOfBuild(params: Partial<Parameters<typeof buildServerInterfaceText>[0]> = {}): string {
+/** The section with both parts present, for the detail tiers. */
+function sectionOf(params: Partial<Parameters<typeof buildServerInterfaceDetails>[0]> = {}): {
+    serverInterface: ServerInterfaceDetails;
+    text: string;
+} {
     const result = build(params);
-    if (!('text' in result) || result.text === undefined) throw new Error(`Expected a text: ${JSON.stringify(result)}`);
-    return result.text;
-}
-
-/** Parses the fenced JSON block a text ends with. */
-function parseJsonBlock(text: string) {
-    expect(text.endsWith('\n```')).toBe(true);
-    return JSON.parse(text.slice(text.indexOf('```json\n') + '```json\n'.length, text.lastIndexOf('\n```')));
+    if ('error' in result || !result.serverInterface || result.text === undefined) {
+        throw new Error(`Expected a section: ${JSON.stringify(result)}`);
+    }
+    return { serverInterface: result.serverInterface, text: result.text };
 }
 
 describe('summarizing a server interface in one line', () => {
     const pathsOf = (paths: string[]) => ({ paths: Object.fromEntries(paths.map((path) => [path, { get: {} }])) });
     const fivePaths = ['/a', '/b', '/c', '/d', '/e'];
     it.each([
-        [SCHEMA, SUMMARY],
-        [pathsOf(['/a']), 'Server interface: enabled, single-tenant, 1 documented operation: GET /a.'],
+        [SCHEMA, 3, SUMMARY],
+        [pathsOf(['/a']), 1, 'Server interface: enabled, single-tenant, 1 documented operation: GET /a.'],
         [
             pathsOf(fivePaths),
+            5,
             'Server interface: enabled, single-tenant, 5 documented operations: GET /a, GET /b, GET /c, GET /d, GET /e.',
         ],
-        [pathsOf([...fivePaths, '/f']), 'Server interface: enabled, single-tenant, 6 documented operations.'],
-        [pathsOf([`/${'a'.repeat(300)}`]), 'Server interface: enabled, single-tenant, 1 documented operation.'],
+        [pathsOf([...fivePaths, '/f']), 6, 'Server interface: enabled, single-tenant, 6 documented operations.'],
+        [pathsOf([`/${'a'.repeat(300)}`]), 1, 'Server interface: enabled, single-tenant, 1 documented operation.'],
     ])(
-        'states the tenancy, the operations by name while few and short, and the call that lists them (%#)',
-        (schema, line) => {
-            expect(build({ schema, serverInterface: false })).toEqual({ text: `${line} ${LISTS_THEM}` });
+        'carries the tenancy and the operation count, naming the operations while few and short (%#)',
+        (schema, operationCount, line) => {
+            expect(build({ schema, serverInterface: false })).toEqual({
+                serverInterface: { tenancy: 'single-tenant', operationCount },
+                text: `${line} ${LISTS_THEM}`,
+            });
         },
     );
 
     it.each([
-        [false, undefined],
-        [true, `Actor '${ACTOR_FULL_NAME}' has no server interface.`],
-    ])('for an Actor without one, with serverInterface %j, is %j', (serverInterface, text) => {
-        expect(build({ serverInterface, actor: { actorStandby: { isEnabled: false } } })).toEqual({ text });
+        [false, {}],
+        [true, { text: `Actor '${ACTOR_FULL_NAME}' has no server interface.` }],
+    ])('for an Actor without one, with serverInterface %j, is %j', (serverInterface, section) => {
+        expect(build({ serverInterface, actor: { actorStandby: { isEnabled: false } } })).toEqual(section);
     });
 
     it.each([
@@ -220,22 +241,36 @@ describe('summarizing a server interface in one line', () => {
         [true, { paths: {} }],
     ])('says the interface is undocumented, with serverInterface %j and schema %j', (serverInterface, schema) => {
         expect(build({ schema, serverInterface })).toEqual({
+            serverInterface: { tenancy: 'single-tenant', operationCount: 0 },
             text: 'Server interface: enabled, single-tenant, undocumented: no API schema. See the README.',
         });
+    });
+
+    it('is left out of a session without the send tool', () => {
+        expect(build({ serverInterface: false, loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS] })).toEqual({});
     });
 });
 
 describe('the operations in full', () => {
-    it('returns the header, the call to send, and every operation in the get-apify-api-details shape', () => {
-        const text = textOfBuild({ actor: MULTI_TENANT_ACTOR, actorFullName: WEB_FETCH, schema: WEB_FETCH_SCHEMA });
+    it('returns the tenancy and every operation in the get-apify-api-details shape, as the object and its JSON', () => {
+        const { serverInterface, text } = sectionOf({
+            actor: MULTI_TENANT_ACTOR,
+            actorFullName: WEB_FETCH,
+            schema: WEB_FETCH_SCHEMA,
+        });
 
-        expect(text.slice(0, text.indexOf('```json'))).toBe(
+        // Multi-tenant: no idle timeout; with the send tool: no base URL.
+        expect(serverInterface).toEqual({
+            tenancy: 'multi-tenant',
+            operationCount: 2,
+            operations: WEB_FETCH_OPERATIONS,
+        });
+        expect(text).toBe(
             `# Server interface of ${WEB_FETCH}\n` +
                 'multi-tenant: requests are charged per event and start no run in your account.\n' +
                 `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends a request to one of them: {"actor":"${WEB_FETCH}","method":"GET","path":"/"}\n` +
-                'Operations (2):\n',
+                wrapJsonText(serverInterface),
         );
-        expect(parseJsonBlock(text)).toEqual({ operations: WEB_FETCH_OPERATIONS });
     });
 
     it('merges path-level parameters, an operation parameter replacing the one with the same name', () => {
@@ -252,7 +287,7 @@ describe('the operations in full', () => {
             components: { parameters: { Query: required('q') } },
         };
 
-        expect(parseJsonBlock(textOfBuild({ schema })).operations[0].parameters).toEqual([
+        expect(sectionOf({ schema }).serverInterface.operations?.[0].parameters).toEqual([
             { name: 'q', in: 'query', isRequired: false, description: 'Search terms.' },
             { name: 'limit', in: 'query', isRequired: false, schema: { type: 'integer' } },
         ]);
@@ -266,58 +301,67 @@ describe('the operations in full', () => {
     ])('shows the content types of a request body that is not JSON, %s', (_label, requestBody, requestBodies) => {
         const schema = { paths: { '/upload': { post: { requestBody } } }, components: { requestBodies } };
 
-        expect(parseJsonBlock(textOfBuild({ schema })).operations[0].requestBody).toEqual({
+        expect(sectionOf({ schema }).serverInterface.operations?.[0].requestBody).toEqual({
             isRequired: true,
             contentTypes: ['multipart/form-data'],
         });
     });
 
     it('says requests are not supported, without the send tool or run cost, in agentic payment mode', () => {
-        const text = textOfBuild({ hasPaymentProvider: true });
+        const { text } = sectionOf({ hasPaymentProvider: true });
 
         expect(text).toContain('Requests to a server interface are not supported in agentic payment mode.\n');
         expect(text).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
         expect(text).not.toContain('starts a run');
     });
 
-    it("gives the Actor's standby URL as the base URL instead of the send tool when the session lacks it", () => {
-        const text = textOfBuild({ loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS] });
+    it("gives the Actor's server interface URL as the base URL instead of the send tool when the session lacks it", () => {
+        const { serverInterface, text } = sectionOf({ loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS] });
 
+        expect(serverInterface.baseUrl).toBe(SERVER_URL);
         expect(text).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
-        expect(text).toContain(`Base URL: ${STANDBY_URL}`);
         expect(text).not.toContain('example-server-actor');
     });
 
-    // At the limit the operations fit in full; one byte over, the text is the index.
+    // At the limit the operations fit in full; one byte over, the section is the index.
     it.each([0, 1])('counts the whole text against the byte limit, %i byte over', (over) => {
-        const fullBytes = Buffer.byteLength(textOfBuild({ schema: withDescriptionOnEmpty('') }));
+        const fullBytes = Buffer.byteLength(sectionOf({ schema: withDescriptionOnEmpty('') }).text);
 
-        const text = textOfBuild({ schema: withDescriptionOnEmpty('a'.repeat(MAX_INLINE_BYTES - fullBytes + over)) });
+        const { serverInterface } = sectionOf({
+            schema: withDescriptionOnEmpty('a'.repeat(MAX_INLINE_BYTES - fullBytes + over)),
+        });
 
-        expect(text.includes('```json')).toBe(over === 0);
-        expect(text.includes('- POST /add')).toBe(over === 1);
+        expect('operations' in serverInterface).toBe(over === 0);
+        expect('operationIndex' in serverInterface).toBe(over === 1);
     });
 
     it('counts UTF-8 bytes, not characters, against the byte limit', () => {
-        const text = textOfBuild({ schema: withDescriptionOnEmpty('漢'.repeat(Math.ceil(MAX_INLINE_BYTES / 3))) });
+        const { serverInterface } = sectionOf({
+            schema: withDescriptionOnEmpty('漢'.repeat(Math.ceil(MAX_INLINE_BYTES / 3))),
+        });
 
-        expect(text).not.toContain('```json');
-        expect(text).toContain('- POST /add');
+        expect(serverInterface.operations).toBeUndefined();
+        expect(serverInterface.operationIndex).toHaveLength(3);
     });
 });
 
 describe('the operation index, when the operations in full exceed the byte limit', () => {
     it('lists each operation with its summary and required inputs, and the call that returns one in full', () => {
-        expect(textOfBuild({ schema: withDescriptionOnEmpty('a'.repeat(MAX_INLINE_BYTES)) })).toBe(
+        const { serverInterface, text } = sectionOf({ schema: withDescriptionOnEmpty('a'.repeat(MAX_INLINE_BYTES)) });
+
+        expect(serverInterface).toEqual({
+            tenancy: 'single-tenant',
+            idleTimeoutSecs: 300,
+            operationCount: 3,
+            operationIndex: SCHEMA_INDEX,
+        });
+        expect(text).toBe(
             `# Server interface of ${ACTOR_FULL_NAME}\n` +
-                'single-tenant: the first request starts a run in your account, kept for its idle timeout of 300 s.\n' +
+                SINGLE_TENANT_NOTICE +
                 `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends a request to one of them: {"actor":"${ACTOR_FULL_NAME}","method":"GET","path":"/add"}\n` +
-                'Operations (3):\n' +
-                '- GET /add: Add two numbers (query). Required: firstNumber.\n' +
-                '- POST /add: Add two numbers (JSON body). Required: request body.\n' +
-                '- GET /empty: Return no content\n' +
                 `The operations in full exceed the ${MAX_INLINE_BYTES}-byte limit. ` +
-                `${DETAILS}{"serverInterface":"GET /add"}} returns one operation in full.`,
+                `${DETAILS}{"serverInterface":"GET /add"}} returns one operation in full.\n` +
+                wrapJsonText(serverInterface),
         );
     });
 
@@ -326,22 +370,16 @@ describe('the operation index, when the operations in full exceed the byte limit
     // Each row: the `get` operation and `components.parameters` under a path-level `Alias` parameter.
     it.each([
         [
-            'keeps one period after a summary that ends with one',
-            { summary: 'Hi.', parameters: [required('q')] },
-            {},
-            ': Hi. Required: q.',
-        ],
-        [
             'reads required inputs through an alias chain and escaped pointer segments',
             {},
             { Alias: { $ref: '#/components/parameters/Search~1query~0' }, 'Search/query~': required('q') },
-            ' Required: q.',
+            { requiredInputs: ['q'] },
         ],
         [
             'replaces an aliased path-level parameter by its operation-level override',
             { summary: 'Search', parameters: [{ name: 'q', in: 'query' }] },
             { Alias: { $ref: '#/components/parameters/Search' }, Search: required('q') },
-            ': Search\n',
+            { summary: 'Search', requiredInputs: [] },
         ],
         [
             'skips circular, missing and external aliases, and a chain over the hop cap',
@@ -357,9 +395,9 @@ describe('the operation index, when the operations in full exceed the byte limit
                 Loop: { $ref: '#/components/parameters/Loop' },
                 ...chain,
             },
-            ' Required: q.\n',
+            { requiredInputs: ['q'] },
         ],
-    ])('%s', (_label, get, parameters, line) => {
+    ])('%s', (_label, get, parameters, entry) => {
         const description = 'a'.repeat(MAX_INLINE_BYTES);
         const schema = {
             paths: {
@@ -368,7 +406,9 @@ describe('the operation index, when the operations in full exceed the byte limit
             components: { parameters },
         };
 
-        expect(textOfBuild({ schema })).toContain(`- GET /search${line}`);
+        expect(sectionOf({ schema }).serverInterface.operationIndex).toEqual([
+            { method: 'GET', path: '/search', ...entry },
+        ]);
     });
 
     it('cuts the index at the byte limit and counts the operations left out', () => {
@@ -377,14 +417,16 @@ describe('the operation index, when the operations in full exceed the byte limit
             Array.from({ length: count }, (_, i) => [`/${String(i).padStart(4, '0')}${'a'.repeat(300)}`, { get: {} }]),
         );
 
-        const text = textOfBuild({ schema: { paths } });
+        const { serverInterface, text } = sectionOf({ schema: { paths } });
 
-        const lines = text.split('\n').filter((line) => line.startsWith('- GET /'));
-        expect(text).toContain(`${lines.at(-1)}\n… and ${count - lines.length} more\n`);
-        expect(text.endsWith('returns one operation in full.')).toBe(true);
-        // No room is left for one more line.
+        const kept = serverInterface.operationIndex!.length;
+        expect(kept).toBeGreaterThan(0);
+        expect(serverInterface.omittedOperationCount).toBe(count - kept);
+        expect(text.endsWith(wrapJsonText(serverInterface))).toBe(true);
+        // No room is left for one more entry; they are all the same size.
+        const entryBytes = Buffer.byteLength(`,${JSON.stringify(serverInterface.operationIndex![0])}`);
         expect(Buffer.byteLength(text)).toBeLessThanOrEqual(MAX_INLINE_BYTES);
-        expect(Buffer.byteLength(text) + Buffer.byteLength(`${lines[0]}\n`)).toBeGreaterThan(MAX_INLINE_BYTES);
+        expect(Buffer.byteLength(text) + entryBytes).toBeGreaterThan(MAX_INLINE_BYTES);
     });
 });
 
@@ -425,9 +467,9 @@ describe.each([
     ['a deeply nested example', nestedBodySchema({ schema: { type: 'object' }, example: deepValue })],
 ])('a schema with %s', (_label, schema) => {
     it('falls back to the index for all operations', () => {
-        expect(textOfBuild({ schema })).toContain(
-            '- POST /nested: Nest. Required: request body.\nThe operations in full',
-        );
+        expect(sectionOf({ schema }).serverInterface.operationIndex).toEqual([
+            { method: 'POST', path: '/nested', summary: 'Nest', requiredInputs: ['request body'] },
+        ]);
     });
 
     it('is a size error for one operation', () => {
@@ -436,31 +478,36 @@ describe.each([
 });
 
 describe('one operation', () => {
-    it('returns the selected operation, of any method case, in full', () => {
-        const text = textOfBuild({
+    it('returns the selected operation, of any method case, in full, with the count of all operations', () => {
+        const { serverInterface, text } = sectionOf({
             actor: MULTI_TENANT_ACTOR,
             actorFullName: WEB_FETCH,
             schema: WEB_FETCH_SCHEMA,
             serverInterface: 'post /',
         });
 
-        expect(text.slice(0, text.indexOf('```json'))).toBe(
+        expect(serverInterface).toEqual({
+            tenancy: 'multi-tenant',
+            operationCount: 2,
+            operations: [WEB_FETCH_OPERATIONS[1]],
+        });
+        expect(text).toBe(
             `# Server interface of ${WEB_FETCH}: POST /\n` +
                 'multi-tenant: requests are charged per event and start no run in your account.\n' +
-                `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends this request: {"actor":"${WEB_FETCH}","method":"POST","path":"/"}\n`,
+                `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends this request: {"actor":"${WEB_FETCH}","method":"POST","path":"/"}\n` +
+                wrapJsonText(serverInterface),
         );
-        expect(parseJsonBlock(text)).toEqual(WEB_FETCH_OPERATIONS[1]);
     });
 
     it('returns an operation when all operations together exceed the byte limit', () => {
-        const text = textOfBuild({
+        const { serverInterface } = sectionOf({
             schema: withDescriptionOnEmpty('a'.repeat(MAX_INLINE_BYTES)),
             serverInterface: 'POST /add',
         });
 
-        expect(parseJsonBlock(text).requestBody.schema).toEqual(
-            (SCHEMA.components as Record<string, Record<string, unknown>>).schemas.AddRequest,
-        );
+        expect(serverInterface.operations?.[0].requestBody).toMatchObject({
+            schema: (SCHEMA.components as Record<string, Record<string, unknown>>).schemas.AddRequest,
+        });
     });
 });
 
@@ -530,22 +577,39 @@ describe('fetching details of a Server Actor', () => {
     };
 
     it.each([
-        [undefined, SUMMARY],
-        [{ inputSchema: true }, SUMMARY],
-        [{ serverInterface: true }, `# Server interface of ${ACTOR_FULL_NAME}\n`],
-    ])('carries the server interface in the text and structuredContent of output %j', async (output, expected) => {
-        const result = await call(output);
+        [undefined, SUMMARY, { tenancy: 'single-tenant', operationCount: 3 }],
+        [{ inputSchema: true }, SUMMARY, { tenancy: 'single-tenant', operationCount: 3 }],
+        [
+            { serverInterface: true },
+            `# Server interface of ${ACTOR_FULL_NAME}\n`,
+            { tenancy: 'single-tenant', idleTimeoutSecs: 300, operationCount: 3, operations: expect.any(Array) },
+        ],
+        [
+            { serverInterface: 'GET /empty' },
+            `# Server interface of ${ACTOR_FULL_NAME}: GET /empty\n`,
+            {
+                tenancy: 'single-tenant',
+                idleTimeoutSecs: 300,
+                operationCount: 3,
+                operations: [{ method: 'GET', path: '/empty', summary: 'Return no content', parameters: [] }],
+            },
+        ],
+    ])(
+        'carries the server interface in the text and, schema-conforming, in structuredContent of output %j',
+        async (output, expectedText, expectedObject) => {
+            const result = await call(output);
 
-        const text = textOf(result.content!.at(-1)!);
-        expect(text).toContain(expected);
-        expect((result.structuredContent as { serverInterface?: string }).serverInterface).toBe(text);
-    });
+            expect(textOf(result.content!.at(-1)!)).toContain(expectedText);
+            expect((result.structuredContent as { serverInterface?: unknown }).serverInterface).toEqual(expectedObject);
+            expectSchemaConformingStructuredContent(result, fetchActorDetails.outputSchema!);
+        },
+    );
 
     it('leaves the summary line out when the session cannot send requests', async () => {
         const result = await call(undefined, { loadedToolNames: [HELPER_TOOLS.ACTOR_CALL] });
 
         expect(JSON.stringify(result.content)).not.toContain('Server interface:');
-        expect((result.structuredContent as { serverInterface?: string }).serverInterface).toBeUndefined();
+        expect((result.structuredContent as { serverInterface?: unknown }).serverInterface).toBeUndefined();
     });
 
     it('returns the selection error for an unknown operation', async () => {
