@@ -10,13 +10,22 @@ import dedent from 'dedent';
 import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
-import { ALLOWED_TASK_TOOL_EXECUTION_MODES, FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../const.js';
+import {
+    ALLOWED_TASK_TOOL_EXECUTION_MODES,
+    FAILURE_CATEGORY,
+    HELPER_TOOLS,
+    RAG_WEB_BROWSER,
+    TOOL_STATUS,
+    WEB_FETCH,
+    WEB_SEARCH,
+} from '../const.js';
 import { prepareToolCallContext } from '../payments/helpers.js';
 import type { PaymentMeta, PaymentProvider, RequestHeaders } from '../payments/types.js';
 import { decodeDotPropertyNames } from '../tools/actor_input_schema.js';
-import { legacyToolNameToNew } from '../tools/actor_tool_naming.js';
+import { actorNameToToolName, legacyToolNameToNew } from '../tools/actor_tool_naming.js';
 import {
     buildDeniedInputsNote,
+    getActorToolPolicy,
     getDeniedDirectActorInputs,
     getDirectActorPolicy,
 } from '../tools/actors/actor_tool_contract.js';
@@ -37,8 +46,15 @@ import { getRequestOriginForClient, resolveStoreSearchTracking } from '../utils/
 import type { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { extractAjvErrorDetails, isMcpError } from '../utils/tool_status.js';
-import { buildActorFields, extractActorId, extractActorName, getToolFullName } from '../utils/tools.js';
+import {
+    buildActorFields,
+    extractActorId,
+    extractActorInterface,
+    extractActorName,
+    getToolFullName,
+} from '../utils/tools.js';
 import type { McpClientContext } from './client_context.js';
+import { addCompatibilityNote, loadReplacedDefaultTool, rewriteRunInputAsServerRequest } from './run_input_rewrite.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
 import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
 import { dispatchToolCall } from './tool_dispatch.js';
@@ -102,6 +118,23 @@ function buildAjvFailureText(errors: ErrorObject[], args: unknown, inputSchema: 
     return [`Validation errors: ${failures.join('; ')}.`, ...descriptions].join('\n');
 }
 
+/** The default tools that replaced the default `apify--rag-web-browser` in 0.21.0, with what each does. */
+const RAG_WEB_BROWSER_REPLACEMENTS = [
+    [actorNameToToolName(WEB_SEARCH), 'searches the web'],
+    [actorNameToToolName(WEB_FETCH), 'reads a page by URL'],
+] as const;
+
+/**
+ * For a call to the removed `apify--rag-web-browser` from a client with an old tool list, the served tools that
+ * replaced it; empty when the session serves neither, since served text names no absent tool.
+ */
+function buildReplacedToolText(name: string, tools: Map<string, ToolEntry>): string {
+    if ((legacyToolNameToNew(name) ?? name) !== actorNameToToolName(RAG_WEB_BROWSER)) return '';
+    const replacements = RAG_WEB_BROWSER_REPLACEMENTS.filter(([toolName]) => tools.has(toolName));
+    if (!replacements.length) return '';
+    return `\nTool "${name}" was replaced: ${replacements.map(([toolName, use]) => `${toolName} ${use}`).join(' and ')}.`;
+}
+
 /** A pre-dispatch failure that the shell converts to v1's protocol-error sequence. */
 export type InvalidToolCall = {
     message: string;
@@ -126,6 +159,8 @@ export type PreparedCall = {
     paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined;
     // The shell uses this decoded copy for telemetry.
     decodedArgs: Record<string, unknown>;
+    /** Set when a pre-0.21 tool name or run input was accepted; added to the tool result. */
+    compatibilityNote?: string;
 };
 
 /** Result of the synchronous dispatch tail, including the exact wire payload. */
@@ -228,16 +263,38 @@ export async function prepareToolCall(params: {
         };
     }
 
-    const toolEntry = resolveToolEntry(name, tools);
+    let toolEntry = resolveToolEntry(name, tools);
+    const replacedToolText = toolEntry ? '' : buildReplacedToolText(name, tools);
+    try {
+        toolEntry ??= await loadReplacedDefaultTool({
+            name,
+            tools,
+            apifyToken,
+            requestOrigin,
+            mcpSessionId: params.mcpSessionId,
+        });
+    } catch (error) {
+        const outcome = classifyToolCallError(error, {
+            tools,
+            toolName: name,
+            failingToolName: name,
+            actorName: undefined,
+            actorId: undefined,
+            isAborted: Boolean(params.signal?.aborted),
+            mcpSessionId: params.mcpSessionId,
+        });
+        return { ...outcome, resolvedToolName: name, decodedArgs: (args ?? {}) as Record<string, unknown> };
+    }
 
     if (!toolEntry) {
         const availableTools = Array.from(tools.keys());
         return {
-            message: dedent`
+            message:
+                dedent`
                 Tool "${name}" was not found.
                 Available tools: ${availableTools.length > 0 ? availableTools.join(', ') : 'none'}.
                 Please verify the tool name is correct. You can list all available tools using the tools/list request.
-            `,
+            ` + replacedToolText,
             toolStatus: TOOL_STATUS.SOFT_FAIL,
             callDiagnostics: { failure_category: FAILURE_CATEGORY.INVALID_INPUT },
         };
@@ -247,6 +304,8 @@ export async function prepareToolCall(params: {
     const resolvedToolName = getToolFullName(tool);
     if (telemetryData) {
         telemetryData.tool_name = resolvedToolName;
+        const actorInterface = extractActorInterface(tool, args as Record<string, unknown> | undefined);
+        if (actorInterface) telemetryData.actor_interface = actorInterface;
     }
 
     const actorName = extractActorName(tool, args as Record<string, unknown>);
@@ -283,7 +342,7 @@ export async function prepareToolCall(params: {
         args = decodeDotPropertyNames(args as Record<string, unknown>) as Record<string, unknown>;
         decodedArgs = args as Record<string, unknown>;
 
-        const {
+        let {
             toolArgsWithoutPayment: toolArgs,
             toolArgsRedacted: logSafeArgs,
             apifyClient,
@@ -318,8 +377,23 @@ export async function prepareToolCall(params: {
                 decodedArgs,
             };
         }
+        // Key names only, never values: they show which call shape a rejected client sends. Read before validation,
+        // since AJV removes unknown keys and `toolArgs` can be `decodedArgs` itself (a payment provider may return it).
+        const argKeys = Object.keys(decodedArgs).slice(0, 20).join(',').slice(0, 200);
+        const runInputRewrite = rewriteRunInputAsServerRequest({
+            tool,
+            args: toolArgs,
+            argKeys,
+            mcpSessionId: params.mcpSessionId,
+        });
+        if (runInputRewrite) toolArgs = runInputRewrite.args;
+        const compatibilityNote = [replacedToolText.trim(), runInputRewrite?.note].filter(Boolean).join('\n');
         if (!tool.ajvValidate(toolArgs)) {
             const errors = tool.ajvValidate.errors || [];
+            const exampleCall =
+                tool.type === TOOL_TYPE.ACTOR_SERVER
+                    ? getActorToolPolicy(tool.actorFullName)?.serverTool?.exampleCall
+                    : undefined;
             const ajvErrorDetails = extractAjvErrorDetails(errors);
             return {
                 message: [
@@ -332,15 +406,19 @@ export async function prepareToolCall(params: {
                               `Please check the tool's input schema ${schemaHint} and ensure all required parameters are provided with correct types and values.`,
                           ]
                         : []),
+                    ...(replacedToolText ? [replacedToolText.trim()] : []),
+                    ...(runInputRewrite ? [runInputRewrite.note] : exampleCall ? [`Example call: ${exampleCall}`] : []),
                 ].join('\n'),
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
                 callDiagnostics: {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
                     ...ajvErrorDetails,
+                    validation_arg_keys: argKeys,
                     ...buildActorFields(actorName, actorId),
                 },
                 resolvedToolName,
                 decodedArgs,
+                logFields: { argKeys },
             };
         }
 
@@ -381,6 +459,7 @@ export async function prepareToolCall(params: {
             standbyRejection,
             paymentRequiredResult,
             decodedArgs,
+            compatibilityNote: compatibilityNote || undefined,
         };
     } catch (error) {
         // Keep protocol errors as JSON-RPC errors; classify other failures with actor context.
@@ -477,7 +556,10 @@ export async function executeSyncToolCall(
             taskMode: false,
         });
         return {
-            result: nudge(dispatchResult.result, dispatchResult.callDiagnostics),
+            result: nudge(
+                addCompatibilityNote(dispatchResult.result, prepared.compatibilityNote),
+                dispatchResult.callDiagnostics,
+            ),
             toolStatus: dispatchResult.toolStatus,
             callDiagnostics: dispatchResult.callDiagnostics,
         };

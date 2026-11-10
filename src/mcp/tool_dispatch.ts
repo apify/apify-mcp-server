@@ -97,9 +97,12 @@ export async function dispatchToolCall(params: {
     );
 
     switch (tool.type) {
-        case TOOL_TYPE.INTERNAL: {
+        // A Server Actor's tool runs `send-server-actor-request`'s execution, like an internal tool.
+        case TOOL_TYPE.INTERNAL:
+        case TOOL_TYPE.ACTOR_SERVER: {
             try {
-                log.info(`Calling internal tool${logContext?.messageSuffix ?? ''}`, {
+                const toolKind = tool.type === TOOL_TYPE.ACTOR_SERVER ? 'Server Actor tool' : 'internal tool';
+                log.info(`Calling ${toolKind}${logContext?.messageSuffix ?? ''}`, {
                     ...logContext?.fields,
                     toolName: tool.name,
                     mcpSessionId,
@@ -205,7 +208,7 @@ export async function dispatchToolCall(params: {
                     }));
                     logHttpError(
                         outcome.error,
-                        `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}'`,
+                        `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorFullName}'`,
                         {
                             actorId: tool.actorId,
                             toolName: tool.originToolName,
@@ -213,7 +216,7 @@ export async function dispatchToolCall(params: {
                         },
                     );
                     result = respondErrorNoTelemetry(
-                        `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}': ${remoteMcpFailureDetail(outcome.error)}`,
+                        `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorFullName}': ${remoteMcpFailureDetail(outcome.error)}`,
                     );
                     break;
                 }
@@ -296,7 +299,7 @@ export async function dispatchToolCall(params: {
         default:
             // Exhaustiveness guard mirroring getToolFullName: a new TOOL_TYPE member makes `tool`
             // non-`never` here and fails `satisfies never` at compile time. Unreachable at runtime —
-            // ToolEntry is a closed 3-way union. Unlike the pre-extraction fall-through (which also
+            // ToolEntry is a closed union. Unlike the pre-extraction fall-through (which also
             // listed available tools, called log.softFail, and sent a logging message before
             // throwing), this just throws with no side effects.
             throw new Error(`Unknown tool type "${(tool satisfies never as ToolEntry).type}"`);
