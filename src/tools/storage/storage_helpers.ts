@@ -174,27 +174,14 @@ export function buildDatasetItemsSummaryNextStep(params: {
     totalItemCount: number;
     offset: number;
     limit: number;
-    fields: readonly string[];
-    hasOnlyEmptyItems: boolean;
-    /** Active loaded tool set; gates the get-dataset references. */
+    /** Active loaded tool set; gates the terminal get-dataset reference. */
     loadedToolNames: readonly string[];
 }): { summary: string; nextStep: string } {
-    const { datasetId, itemCount, totalItemCount, offset, limit, fields, hasOnlyEmptyItems, loadedToolNames } = params;
+    const { datasetId, itemCount, totalItemCount, offset, limit, loadedToolNames } = params;
     if (itemCount === 0 && totalItemCount > 0 && offset >= totalItemCount) {
         return {
             summary: 'No items at this offset: it is past the end of the dataset.',
             nextStep: `Call ${HELPER_TOOLS.DATASET_GET_ITEMS} with a lower offset.`,
-        };
-    }
-    if (fields.length > 0 && totalItemCount > 0 && hasOnlyEmptyItems) {
-        return {
-            summary: 'None of the returned items has the requested fields.',
-            nextStep: resolveSiblingNextStep(
-                HELPER_TOOLS.DATASET_GET,
-                loadedToolNames,
-                `${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} lists the dataset's fields.`,
-                'An item read without `fields` shows its field names.',
-            ),
         };
     }
     if (offset + limit < totalItemCount) {

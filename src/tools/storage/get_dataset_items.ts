@@ -47,23 +47,18 @@ const getDatasetItemsArgs = z.object({
         .min(1)
         .optional()
         .describe(`Maximum number of items to return. Default is ${DEFAULT_DATASET_ITEMS_LIMIT}.`),
-    fields: z
-        .string()
-        .optional()
-        .describe(
-            'Comma-separated list of fields to include in results. ' +
-                'Fields in output are sorted as specified. ' +
-                'Use dot notation for nested objects (e.g. "metadata.url"); the server auto-flattens parent prefixes.',
-        ),
+    fields: z.string().optional().describe(dedent`
+            Comma-separated list of fields to include in results.
+            Fields in output are sorted as specified.
+            Use dot notation for nested objects (e.g. "metadata.url"); the server auto-flattens parent prefixes.
+            Items that have none of the requested fields come back as {}, or are dropped when clean=true.
+        `),
     omit: z.string().optional().describe('Comma-separated list of fields to exclude from results.'),
     desc: z.boolean().optional().describe('If true, results are returned in reverse order (newest to oldest).'),
-    flatten: z
-        .string()
-        .optional()
-        .describe(
-            'Comma-separated list of fields to flatten (e.g. flatten="metadata" turns {"metadata":{"url":"x"}} into {"metadata.url":"x"}). ' +
-                'Normally derived automatically from dot-notation in `fields`; specify only as a diagnostic override.',
-        ),
+    flatten: z.string().optional().describe(dedent`
+            Comma-separated list of fields to flatten (e.g. flatten="metadata" turns {"metadata":{"url":"x"}} into {"metadata.url":"x"}).
+            Normally derived automatically from dot-notation in \`fields\`; specify only as a diagnostic override.
+        `),
 });
 
 /**
@@ -147,8 +142,6 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             totalItemCount: v.total,
             offset,
             limit: effectiveLimit,
-            fields,
-            hasOnlyEmptyItems: v.items.every((item) => Object.keys(item).length === 0),
             loadedToolNames,
         });
         return buildStorageResponse({ structuredContent, summary, nextStep, apifyConsoleUrl });

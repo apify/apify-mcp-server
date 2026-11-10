@@ -221,22 +221,6 @@ describe('get-dataset-items', () => {
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
     });
 
-    async function summarizeProjection(items: Record<string, unknown>[]) {
-        const listItemsSpy = vi.fn().mockResolvedValue({ items, total: 3 });
-        const result = await (getDatasetItems as HelperTool).call(
-            stubToolCallContext(
-                { datasetId: 'DsWkzbQMuFYuam3YF', fields: 'price,rating' },
-                stubApifyClient(listItemsSpy),
-            ),
-        );
-        expect(listItemsSpy).toHaveBeenCalledWith(expect.objectContaining({ fields: ['price', 'rating'] }));
-        return (result as { structuredContent: { summary: string } }).structuredContent.summary;
-    }
-
-    it('reports a projection only when every returned item is empty', async () => {
-        expect(await summarizeProjection([{}, {}, {}])).not.toBe(await summarizeProjection([{ price: 10 }, {}, {}]));
-    });
-
     it('content[0] mirrors the structuredContent data and does not echo the desc input param', async () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext({ datasetId: 'DsWkzbQMuFYuam3YF' }, stubApifyClient()),

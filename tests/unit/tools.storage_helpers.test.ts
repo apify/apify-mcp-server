@@ -21,8 +21,6 @@ function summarizeDatasetItems(overrides: Partial<Parameters<typeof buildDataset
         totalItemCount: 3,
         offset: 0,
         limit: 20,
-        fields: [],
-        hasOnlyEmptyItems: false,
         loadedToolNames: [HELPER_TOOLS.DATASET_GET],
         ...overrides,
     });
@@ -31,11 +29,10 @@ function summarizeDatasetItems(overrides: Partial<Parameters<typeof buildDataset
 const LAST_PAGE = summarizeDatasetItems({});
 const MORE_PAGES = summarizeDatasetItems({ itemCount: 20, totalItemCount: 100 });
 const PAST_THE_END = summarizeDatasetItems({ offset: 100, itemCount: 0 });
-const EMPTY_PROJECTION = summarizeDatasetItems({ fields: ['price'], hasOnlyEmptyItems: true });
 
 describe('dataset items paging guidance', () => {
     it('gives each outcome its own guidance', () => {
-        const outcomes = [LAST_PAGE, MORE_PAGES, PAST_THE_END, EMPTY_PROJECTION];
+        const outcomes = [LAST_PAGE, MORE_PAGES, PAST_THE_END];
 
         expect(new Set(outcomes.map((o) => o.summary)).size).toBe(outcomes.length);
     });
@@ -59,9 +56,7 @@ describe('dataset items paging guidance', () => {
     });
 
     it('treats an empty dataset as the last page', () => {
-        expect(
-            summarizeDatasetItems({ itemCount: 0, totalItemCount: 0, fields: ['price'], hasOnlyEmptyItems: true }),
-        ).toEqual(LAST_PAGE);
+        expect(summarizeDatasetItems({ itemCount: 0, totalItemCount: 0 })).toEqual(LAST_PAGE);
     });
 });
 
@@ -73,40 +68,6 @@ describe('dataset items requested past the last item', () => {
     // The item count lags new pushes, so a page that returned items is not past the end.
     it('treats a page that returned items as fetched when the item count is behind', () => {
         expect(summarizeDatasetItems({ offset: 20, itemCount: 5, totalItemCount: 20 })).toEqual(LAST_PAGE);
-    });
-});
-
-describe('a field projection that matches nothing in the returned items', () => {
-    it('points at get-dataset when the session has it', () => {
-        expect(EMPTY_PROJECTION.nextStep).toContain(`${HELPER_TOOLS.DATASET_GET} with datasetId=ds-1`);
-    });
-
-    it('names no get-dataset when the session lacks it', () => {
-        const { nextStep } = summarizeDatasetItems({ fields: ['price'], hasOnlyEmptyItems: true, loadedToolNames: [] });
-
-        expect(nextStep).not.toContain(HELPER_TOOLS.DATASET_GET);
-    });
-
-    it('takes precedence over the next-page hint', () => {
-        const { summary } = summarizeDatasetItems({
-            fields: ['price'],
-            hasOnlyEmptyItems: true,
-            itemCount: 20,
-            totalItemCount: 100,
-        });
-
-        expect(summary).toBe(EMPTY_PROJECTION.summary);
-    });
-
-    // With clean=true the API drops the empty objects, so the page comes back empty.
-    it('is reported when clean=true dropped every projected item', () => {
-        expect(summarizeDatasetItems({ fields: ['price'], hasOnlyEmptyItems: true, itemCount: 0 })).toEqual(
-            EMPTY_PROJECTION,
-        );
-    });
-
-    it('is not reported when no fields were requested', () => {
-        expect(summarizeDatasetItems({ hasOnlyEmptyItems: true })).toEqual(LAST_PAGE);
     });
 });
 
