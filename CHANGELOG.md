@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Strip slash padding from Actor names ([#1803](https://github.com/apify/apify-mcp-server/pull/1803)) ([74cab9b](https://github.com/apify/apify-mcp-server/commit/74cab9b2f50b3ecc8115e91b974eae420c5f2fb8)) by [@jirispilka](https://github.com/jirispilka), closes [#1798](https://github.com/apify/apify-mcp-server/issues/1798)
+- Explain invalid Zod tool arguments ([#1805](https://github.com/apify/apify-mcp-server/pull/1805)) ([3b6324a](https://github.com/apify/apify-mcp-server/commit/3b6324ac9a75d67f7156e8035095593d864c1b02)) by [@jirispilka](https://github.com/jirispilka), closes [#1800](https://github.com/apify/apify-mcp-server/issues/1800)
 
 
 <!-- git-cliff-unreleased-end -->
