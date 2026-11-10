@@ -1,0 +1,574 @@
+{
+  "$comment": "This file is auto-generated from docs/reference/api/openapi.yaml. Do not edit manually. Run 'make generate-schema' to update.",
+  "$id": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "$ref": "#/definitions/ServerDetail",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "Argument": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PositionalArgument"
+        },
+        {
+          "$ref": "#/definitions/NamedArgument"
+        }
+      ],
+      "description": "Warning: Arguments construct command-line parameters that may contain user-provided input. This creates potential command injection risks if clients execute commands in a shell environment. For example, a malicious argument value like ';rm -rf ~/Development' could execute dangerous commands. Clients should prefer non-shell execution methods (e.g., posix_spawn) when possible to eliminate injection risks entirely. Where not possible, clients should obtain consent from users or agents to run the resolved command before execution."
+    },
+    "Icon": {
+      "description": "An optionally-sized icon that can be displayed in a user interface.",
+      "properties": {
+        "mimeType": {
+          "description": "Optional MIME type override if the source MIME type is missing or generic. Must be one of: image/png, image/jpeg, image/jpg, image/svg+xml, image/webp.",
+          "enum": [
+            "image/png",
+            "image/jpeg",
+            "image/jpg",
+            "image/svg+xml",
+            "image/webp"
+          ],
+          "example": "image/png",
+          "type": "string"
+        },
+        "sizes": {
+          "description": "Optional array of strings that specify sizes at which the icon can be used. Each string should be in WxH format (e.g., '48x48', '96x96') or 'any' for scalable formats like SVG. If not provided, the client should assume that the icon can be used at any size.",
+          "examples": [
+            [
+              "48x48",
+              "96x96"
+            ],
+            [
+              "any"
+            ]
+          ],
+          "items": {
+            "pattern": "^(\\d+x\\d+|any)$",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "src": {
+          "description": "A standard URI pointing to an icon resource. Must be an HTTPS URL. Consumers SHOULD take steps to ensure URLs serving icons are from the same domain as the server or a trusted domain. Consumers SHOULD take appropriate precautions when consuming SVGs as they can contain executable JavaScript.",
+          "example": "https://example.com/icon.png",
+          "format": "uri",
+          "maxLength": 255,
+          "type": "string"
+        },
+        "theme": {
+          "description": "Optional specifier for the theme this icon is designed for. 'light' indicates the icon is designed to be used with a light background, and 'dark' indicates the icon is designed to be used with a dark background. If not provided, the client should assume the icon can be used with any theme.",
+          "enum": [
+            "light",
+            "dark"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "src"
+      ],
+      "type": "object"
+    },
+    "Input": {
+      "properties": {
+        "choices": {
+          "description": "A list of possible values for the input. If provided, the user must select one of these values.",
+          "example": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "default": {
+          "description": "The default value for the input.  This should be a valid value for the input.  If you want to provide input examples or guidance, use the `placeholder` field instead.",
+          "type": "string"
+        },
+        "description": {
+          "description": "A description of the input, which clients can use to provide context to the user.",
+          "type": "string"
+        },
+        "format": {
+          "default": "string",
+          "description": "Specifies the input format. Supported values include `filepath`, which should be interpreted as a file on the user's filesystem.\n\nWhen the input is converted to a string, booleans should be represented by the strings \"true\" and \"false\", and numbers should be represented as decimal values.",
+          "enum": [
+            "string",
+            "number",
+            "boolean",
+            "filepath"
+          ],
+          "type": "string"
+        },
+        "isRequired": {
+          "default": false,
+          "type": "boolean"
+        },
+        "isSecret": {
+          "default": false,
+          "description": "Indicates whether the input is a secret value (e.g., password, token). If true, clients should handle the value securely.",
+          "type": "boolean"
+        },
+        "placeholder": {
+          "description": "A placeholder for the input to be displaying during configuration. This is used to provide examples or guidance about the expected form or content of the input.",
+          "type": "string"
+        },
+        "value": {
+          "description": "The value for the input. If this is not set, the user may be prompted to provide a value. If a value is set, it should not be configurable by end users.\n\nIdentifiers wrapped in `{curly_braces}` will be replaced with the corresponding properties from the input `variables` map. If an identifier in braces is not found in `variables`, or if `variables` is not provided, the `{curly_braces}` substring should remain unchanged.\n",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "InputWithVariables": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/Input"
+        },
+        {
+          "properties": {
+            "variables": {
+              "additionalProperties": {
+                "$ref": "#/definitions/Input"
+              },
+              "description": "A map of variable names to their values. Keys in the input `value` that are wrapped in `{curly_braces}` will be replaced with the corresponding variable values.",
+              "type": "object"
+            }
+          },
+          "type": "object"
+        }
+      ]
+    },
+    "KeyValueInput": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/InputWithVariables"
+        },
+        {
+          "properties": {
+            "name": {
+              "description": "Name of the header or environment variable.",
+              "example": "SOME_VARIABLE",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "LocalTransport": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/StdioTransport"
+        },
+        {
+          "$ref": "#/definitions/StreamableHttpTransport"
+        },
+        {
+          "$ref": "#/definitions/SseTransport"
+        }
+      ],
+      "description": "Transport protocol configuration for local/package context"
+    },
+    "NamedArgument": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/InputWithVariables"
+        },
+        {
+          "properties": {
+            "isRepeated": {
+              "default": false,
+              "description": "Whether the argument can be repeated multiple times.",
+              "type": "boolean"
+            },
+            "name": {
+              "description": "The flag name, including any leading dashes.",
+              "example": "--port",
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "named"
+              ],
+              "example": "named",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "name"
+          ],
+          "type": "object"
+        }
+      ],
+      "description": "A command-line `--flag={value}`."
+    },
+    "Package": {
+      "properties": {
+        "environmentVariables": {
+          "description": "A mapping of environment variables to be set when running the package.",
+          "items": {
+            "$ref": "#/definitions/KeyValueInput"
+          },
+          "type": "array"
+        },
+        "fileSha256": {
+          "description": "SHA-256 hash of the package file for integrity verification. Required for MCPB packages and optional for other package types. Authors are responsible for generating correct SHA-256 hashes when creating server.json. If present, MCP clients must validate the downloaded file matches the hash before running packages to ensure file integrity.",
+          "example": "fe333e598595000ae021bd27117db32ec69af6987f507ba7a63c90638ff633ce",
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "identifier": {
+          "description": "Package identifier - either a package name (for registries) or URL (for direct downloads)",
+          "examples": [
+            "@modelcontextprotocol/server-brave-search",
+            "https://github.com/example/releases/download/v1.0.0/package.mcpb"
+          ],
+          "type": "string"
+        },
+        "packageArguments": {
+          "description": "A list of arguments to be passed to the package's binary.",
+          "items": {
+            "$ref": "#/definitions/Argument"
+          },
+          "type": "array"
+        },
+        "registryBaseUrl": {
+          "description": "Base URL of the package registry",
+          "examples": [
+            "https://registry.npmjs.org",
+            "https://pypi.org",
+            "https://docker.io",
+            "https://api.nuget.org/v3/index.json",
+            "https://github.com",
+            "https://gitlab.com"
+          ],
+          "format": "uri",
+          "type": "string"
+        },
+        "registryType": {
+          "description": "Registry type indicating how to download packages (e.g., 'npm', 'pypi', 'oci', 'nuget', 'mcpb')",
+          "examples": [
+            "npm",
+            "pypi",
+            "oci",
+            "nuget",
+            "mcpb"
+          ],
+          "type": "string"
+        },
+        "runtimeArguments": {
+          "description": "A list of arguments to be passed to the package's runtime command (such as docker or npx). The `runtimeHint` field should be provided when `runtimeArguments` are present.",
+          "items": {
+            "$ref": "#/definitions/Argument"
+          },
+          "type": "array"
+        },
+        "runtimeHint": {
+          "description": "A hint to help clients determine the appropriate runtime for the package. This field should be provided when `runtimeArguments` are present.",
+          "examples": [
+            "npx",
+            "uvx",
+            "docker",
+            "dnx"
+          ],
+          "type": "string"
+        },
+        "transport": {
+          "$ref": "#/definitions/LocalTransport",
+          "description": "Transport protocol configuration for the package"
+        },
+        "version": {
+          "description": "Package version. Must be a specific version. Version ranges are rejected (e.g., '^1.2.3', '~1.2.3', '\u003e=1.2.3', '1.x', '1.*').",
+          "example": "1.0.2",
+          "minLength": 1,
+          "not": {
+            "const": "latest"
+          },
+          "type": "string"
+        }
+      },
+      "required": [
+        "registryType",
+        "identifier",
+        "transport"
+      ],
+      "type": "object"
+    },
+    "PositionalArgument": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/InputWithVariables"
+        },
+        {
+          "anyOf": [
+            {
+              "required": [
+                "valueHint"
+              ]
+            },
+            {
+              "required": [
+                "value"
+              ]
+            }
+          ],
+          "properties": {
+            "isRepeated": {
+              "default": false,
+              "description": "Whether the argument can be repeated multiple times in the command line.",
+              "type": "boolean"
+            },
+            "type": {
+              "enum": [
+                "positional"
+              ],
+              "example": "positional",
+              "type": "string"
+            },
+            "valueHint": {
+              "description": "An identifier for the positional argument. It is not part of the command line. It may be used by client configuration as a label identifying the argument. It is also used to identify the value in transport URL variable substitution.",
+              "example": "file_path",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ],
+      "description": "A positional input is a value inserted verbatim into the command line."
+    },
+    "RemoteTransport": {
+      "allOf": [
+        {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/StreamableHttpTransport"
+            },
+            {
+              "$ref": "#/definitions/SseTransport"
+            }
+          ]
+        },
+        {
+          "properties": {
+            "variables": {
+              "additionalProperties": {
+                "$ref": "#/definitions/Input"
+              },
+              "description": "Configuration variables that can be referenced in URL template {curly_braces}. The key is the variable name, and the value defines the variable properties.",
+              "type": "object"
+            }
+          },
+          "type": "object"
+        }
+      ],
+      "description": "Transport protocol configuration for remote context - extends StreamableHttpTransport or SseTransport with variables"
+    },
+    "Repository": {
+      "description": "Repository metadata for the MCP server source code. Enables users and security experts to inspect the code, improving transparency.",
+      "properties": {
+        "id": {
+          "description": "Repository identifier from the hosting service (e.g., GitHub repo ID). Owned and determined by the source forge. Should remain stable across repository renames and may be used to detect repository resurrection attacks - if a repository is deleted and recreated, the ID should change. For GitHub, use: gh api repos/\u003cowner\u003e/\u003crepo\u003e --jq '.id'",
+          "example": "b94b5f7e-c7c6-d760-2c78-a5e9b8a5b8c9",
+          "type": "string"
+        },
+        "source": {
+          "description": "Repository hosting service identifier. Used by registries to determine validation and API access methods.",
+          "example": "github",
+          "type": "string"
+        },
+        "subfolder": {
+          "description": "Optional relative path from repository root to the server location within a monorepo or nested package structure. Must be a clean relative path.",
+          "example": "src/everything",
+          "type": "string"
+        },
+        "url": {
+          "description": "Repository URL for browsing source code. Should support both web browsing and git clone operations.",
+          "example": "https://github.com/modelcontextprotocol/servers",
+          "format": "uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "source"
+      ],
+      "type": "object"
+    },
+    "ServerDetail": {
+      "description": "Schema for a static representation of an MCP server. Used in various contexts related to discovery, installation, and configuration.",
+      "properties": {
+        "$schema": {
+          "description": "JSON Schema URI for this server.json format",
+          "example": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+          "format": "uri",
+          "type": "string"
+        },
+        "_meta": {
+          "description": "Extension metadata using reverse DNS namespacing for vendor-specific data",
+          "properties": {
+            "io.modelcontextprotocol.registry/publisher-provided": {
+              "additionalProperties": true,
+              "description": "Publisher-provided metadata for downstream registries",
+              "example": {
+                "buildInfo": {
+                  "commit": "abc123def456",
+                  "pipelineId": "build-789",
+                  "timestamp": "2023-12-01T10:30:00Z"
+                },
+                "tool": "publisher-cli",
+                "version": "1.2.3"
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "description": {
+          "description": "Clear human-readable explanation of server functionality. Should focus on capabilities, not implementation details.",
+          "example": "MCP server providing weather data and forecasts via OpenWeatherMap API",
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "icons": {
+          "description": "Optional set of sized icons that the client can display in a user interface. Clients that support rendering icons MUST support at least the following MIME types: image/png and image/jpeg (safe, universal compatibility). Clients SHOULD also support: image/svg+xml (scalable but requires security precautions) and image/webp (modern, efficient format).",
+          "items": {
+            "$ref": "#/definitions/Icon"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "Server name in reverse-DNS format. Must contain exactly one forward slash separating namespace from server name.",
+          "example": "io.github.user/weather",
+          "maxLength": 200,
+          "minLength": 3,
+          "pattern": "^[a-zA-Z0-9.-]+/[a-zA-Z0-9._-]+$",
+          "type": "string"
+        },
+        "packages": {
+          "items": {
+            "$ref": "#/definitions/Package"
+          },
+          "type": "array"
+        },
+        "remotes": {
+          "items": {
+            "$ref": "#/definitions/RemoteTransport"
+          },
+          "type": "array"
+        },
+        "repository": {
+          "$ref": "#/definitions/Repository",
+          "description": "Optional repository metadata for the MCP server source code. Recommended for transparency and security inspection."
+        },
+        "title": {
+          "description": "Optional human-readable title or display name for the MCP server. MCP subregistries or clients MAY choose to use this for display purposes.",
+          "example": "Weather API",
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "description": "Version string for this server. SHOULD follow semantic versioning (e.g., '1.0.2', '2.1.0-alpha'). Equivalent of Implementation.version in MCP specification. Non-semantic versions are allowed but may not sort predictably. Version ranges are rejected (e.g., '^1.2.3', '~1.2.3', '\u003e=1.2.3', '1.x', '1.*').",
+          "example": "1.0.2",
+          "maxLength": 255,
+          "type": "string"
+        },
+        "websiteUrl": {
+          "description": "Optional URL to the server's homepage, documentation, or project website. This provides a central link for users to learn more about the server. Particularly useful when the server has custom installation instructions or setup requirements.",
+          "example": "https://modelcontextprotocol.io/examples",
+          "format": "uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "version"
+      ],
+      "type": "object"
+    },
+    "SseTransport": {
+      "properties": {
+        "headers": {
+          "description": "HTTP headers to include",
+          "items": {
+            "$ref": "#/definitions/KeyValueInput"
+          },
+          "type": "array"
+        },
+        "type": {
+          "description": "Transport type",
+          "enum": [
+            "sse"
+          ],
+          "example": "sse",
+          "type": "string"
+        },
+        "url": {
+          "description": "Server-Sent Events endpoint URL template. Variables in {curly_braces} are resolved based on context: In Package context, they reference argument valueHints, argument names, or environment variable names from the parent Package. In Remote context, they reference variables from the transport's 'variables' object. After variable substitution, this should produce a valid URI.",
+          "example": "https://mcp-fs.example.com/sse",
+          "pattern": "^https?://[^\\s]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "url"
+      ],
+      "type": "object"
+    },
+    "StdioTransport": {
+      "properties": {
+        "type": {
+          "description": "Transport type",
+          "enum": [
+            "stdio"
+          ],
+          "example": "stdio",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    },
+    "StreamableHttpTransport": {
+      "properties": {
+        "headers": {
+          "description": "HTTP headers to include",
+          "items": {
+            "$ref": "#/definitions/KeyValueInput"
+          },
+          "type": "array"
+        },
+        "type": {
+          "description": "Transport type",
+          "enum": [
+            "streamable-http"
+          ],
+          "example": "streamable-http",
+          "type": "string"
+        },
+        "url": {
+          "description": "URL template for the streamable-http transport. Variables in {curly_braces} are resolved based on context: In Package context, they reference argument valueHints, argument names, or environment variable names from the parent Package. In Remote context, they reference variables from the transport's 'variables' object. After variable substitution, this should produce a valid URI.",
+          "example": "https://api.example.com/mcp",
+          "pattern": "^https?://[^\\s]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "url"
+      ],
+      "type": "object"
+    }
+  },
+  "title": "server.json defining a Model Context Protocol (MCP) server"
+}

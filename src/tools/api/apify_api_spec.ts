@@ -43,8 +43,8 @@ export type ApiOperation = {
 
 /**
  * What `dereference()` resolves against. The Apify spec drops examples; an Actor schema keeps them, since the
- * creator's examples show a valid call. `budget` bounds the work on an untrusted schema: it is mutated, and
- * `dereference()` throws `DereferenceBudgetError` when it runs out.
+ * creator's examples show a valid call. `budget` bounds the expansion of an untrusted schema: it is mutated, and
+ * `dereference()` throws `DereferenceBudgetError` when it runs out, or when a schema nests past `MAX_SCHEMA_DEPTH`.
  */
 export type DereferenceContext = {
     spec: unknown;
@@ -55,13 +55,7 @@ export type DereferenceContext = {
 export class DereferenceBudgetError extends Error {}
 
 /** Real schemas nest a few dozen levels; past this, an untrusted schema could overflow the stack. */
-const MAX_BUDGETED_DEPTH = 256;
-
-/** The references being expanded, shared by the whole walk, and the nesting depth of the current node. */
-type DereferenceWalk = { seenRefs: Set<string>; depth: number };
-
-/** Schema keywords that only cost context. `x-*` vendor extensions are dropped by prefix in `dereference()`. */
-const DROPPED_SCHEMA_KEYS: ReadonlySet<string> = new Set(['example', 'examples']);
+const MAX_SCHEMA_DEPTH = 256;
 
 const openApiOperationValidator = z.object({
     operationId: z.string().min(1),
@@ -109,49 +103,61 @@ export function resolveLocalRef(spec: unknown, ref: string): unknown {
 
 /**
  * Resolves local `$ref`s and drops vendor extensions, and examples unless the context keeps them; kept examples
- * are data and stay as written. A reference that does not resolve stays as written. Property names under
- * `properties` are kept as they are, since a property can be named `example`.
+ * are data and stay as written. Keywords next to a `$ref` are kept and override the target's. A reference that
+ * does not resolve stays as written. Property names under `properties` are kept as they are, since a property can
+ * be named `example`.
  */
-function dereference(
-    node: unknown,
-    context: DereferenceContext,
-    walk: DereferenceWalk = { seenRefs: new Set(), depth: 0 },
-): unknown {
-    if (!Array.isArray(node) && !isRecord(node)) return node;
-    if (context.budget && walk.depth >= MAX_BUDGETED_DEPTH) throw new DereferenceBudgetError();
-    const child = { seenRefs: walk.seenRefs, depth: walk.depth + 1 };
-    if (Array.isArray(node)) return node.map((item) => dereference(item, context, child));
-    if (typeof node.$ref === 'string') {
-        const ref = node.$ref;
+function dereference(root: unknown, context: DereferenceContext): unknown {
+    // The references on the path to the current node; meeting one of them again is a cycle.
+    const expandingRefs = new Set<string>();
+
+    function visit(node: unknown, depth: number): unknown {
+        if (!Array.isArray(node) && !isRecord(node)) return node;
+        if (depth >= MAX_SCHEMA_DEPTH) throw new DereferenceBudgetError();
+        if (Array.isArray(node)) return node.map((item) => visit(item, depth + 1));
+        if (typeof node.$ref !== 'string') return visitKeywords(node, depth);
+        const { $ref: ref, ...siblings } = node;
+        const target = expandRef(ref, depth);
+        // OpenAPI 3.1 lets keywords such as `description` sit next to a `$ref` and override the target's.
+        return isRecord(target) ? { ...target, ...visitKeywords(siblings, depth) } : target;
+    }
+
+    function expandRef(ref: string, depth: number): unknown {
         // A reference cycle would recurse forever; a cycle renders as an empty schema.
-        if (walk.seenRefs.has(ref)) return {};
+        if (expandingRefs.has(ref)) return {};
         const target = resolveLocalRef(context.spec, ref);
         if (target === undefined) return { $ref: ref };
         chargeExpansion(target, context);
-        walk.seenRefs.add(ref);
+        expandingRefs.add(ref);
         try {
-            return dereference(target, context, child);
+            return visit(target, depth + 1);
         } finally {
-            walk.seenRefs.delete(ref);
+            expandingRefs.delete(ref);
         }
     }
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(node)) {
-        if (key.startsWith('x-')) continue;
-        if (DROPPED_SCHEMA_KEYS.has(key)) {
-            // A record under `examples` is an OpenAPI examples map; a JSON Schema `examples` is an array.
-            const isExamplesMap = key === 'examples' && isRecord(value);
-            if (context.shouldKeepExamples) result[key] = isExamplesMap ? resolveExamplesMap(value, context) : value;
-            continue;
+
+    function visitKeywords(node: Record<string, unknown>, depth: number): Record<string, unknown> {
+        const result: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(node)) {
+            if (key.startsWith('x-')) continue;
+            if (key === 'example' || key === 'examples') {
+                if (!context.shouldKeepExamples) continue;
+                // A record under `examples` is an OpenAPI examples map; a JSON Schema `examples` is an array.
+                result[key] = key === 'examples' && isRecord(value) ? resolveExamplesMap(value, context) : value;
+                continue;
+            }
+            if (key === 'properties' && isRecord(value)) {
+                result[key] = Object.fromEntries(
+                    Object.entries(value).map(([name, schema]) => [name, visit(schema, depth + 1)]),
+                );
+                continue;
+            }
+            result[key] = visit(value, depth + 1);
         }
-        result[key] =
-            key === 'properties' && isRecord(value)
-                ? Object.fromEntries(
-                      Object.entries(value).map(([name, schema]) => [name, dereference(schema, context, child)]),
-                  )
-                : dereference(value, context, child);
+        return result;
     }
-    return result;
+
+    return visit(root, 0);
 }
 
 /** Charges the size of a reference's target to the budget, if there is one. */
@@ -186,6 +192,11 @@ function resolveExamplesMap(examples: Record<string, unknown>, context: Derefere
 function isJsonMediaType(mediaType: string): boolean {
     const base = mediaType.split(';')[0].trim().toLowerCase();
     return base === 'application/json' || base.endsWith('+json');
+}
+
+/** The JSON media type every body is sent as, else the wildcard type the key-value store record operations declare. */
+export function pickJsonMedia<T>(content: Record<string, T>): T | undefined {
+    return content['application/json'] ?? content[Object.keys(content).find(isJsonMediaType) ?? '*/*'];
 }
 
 /** Lowercase words of a text, splitting camelCase, snake_case, kebab-case, and paths. */
@@ -223,8 +234,7 @@ export function parseRequestBody(rawRequestBody: unknown, context: DereferenceCo
     const parsed = openApiRequestBodyValidator.safeParse(dereference(rawRequestBody, context));
     if (!parsed.success) return undefined;
     const { content, required } = parsed.data;
-    // Every body is sent as JSON; the key-value store record operations declare `*/*`.
-    const media = content['application/json'] ?? content[Object.keys(content).find(isJsonMediaType) ?? '*/*'];
+    const media = pickJsonMedia(content);
     if (!media) return undefined;
     const { schema, example, examples } = media;
     return {

@@ -3,6 +3,11 @@ name: CI (PR)
 on:
     pull_request:
 
+# A new push cancels the previous run of the same PR.
+concurrency:
+    group: pr-${{ github.event.pull_request.number }}
+    cancel-in-progress: true
+
 jobs:
     code_checks:
         name: Code checks

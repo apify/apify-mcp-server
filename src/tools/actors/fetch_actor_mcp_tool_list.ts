@@ -86,6 +86,7 @@ export const fetchActorMcpToolList: ToolEntry = Object.freeze({
     ajvValidate: compileSchema(z.toJSONSchema(fetchActorMcpToolListArgs)),
     // A third-party payment provider cannot pay for a Server Actor run, so such a session is rejected before the call.
     hasPaymentProviderStandbyCheck: true,
+    actorInterface: 'mcp',
     annotations: {
         title: 'Fetch Actor MCP tool list',
         // Each call can start or charge a Server Actor run, so it is neither read-only nor idempotent.
