@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
 import type { RunResponse } from '../../src/tools/actors/actor_run_response.js';
+import { callActorWidget } from '../../src/tools/widgets/call_actor_widget.js';
 import { getActorRunWidget } from '../../src/tools/widgets/get_actor_run_widget.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { mockApifyClient, stubToolCallContext } from './helpers/tool_context.js';
@@ -87,6 +88,27 @@ describe('get-actor-run-widget response', () => {
         expect(meta.ui?.resourceUri).toBe(WIDGET_URIS.ACTOR_RUN);
         expect(meta.ui?.visibility).toEqual(['model', 'app']);
         expect(meta.ui?.csp).toBeDefined();
+    });
+
+    it('carries run-status text, not run-start text, on the tool definition and the response', async () => {
+        const statusText = {
+            'openai/toolInvocation/invoking': 'Checking Actor run...',
+            'openai/toolInvocation/invoked': 'Actor run status loaded',
+        };
+
+        const result = await (getActorRunWidget as HelperTool).call(
+            stubToolCallContext({ runId: 'run-widget-1' }, stubApifyClient()),
+        );
+
+        expect((getActorRunWidget as HelperTool)._meta).toMatchObject(statusText);
+        expect((result as { _meta?: Record<string, unknown> })._meta).toMatchObject(statusText);
+    });
+
+    it('leaves call-actor-widget with its run-start text', () => {
+        expect((callActorWidget as HelperTool)._meta).toMatchObject({
+            'openai/toolInvocation/invoking': 'Running Apify Actor...',
+            'openai/toolInvocation/invoked': 'Actor run started',
+        });
     });
 
     it('declares a strict input schema accepting runId only', () => {

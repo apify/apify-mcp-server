@@ -3,7 +3,9 @@ import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
+import { ACTOR_TIP_CAVEAT } from '../../src/tools/actor_tool_naming.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
+import type { RunResponse } from '../../src/tools/actors/actor_run_response.js';
 import type { ActorExecutionParams } from '../../src/types.js';
 import { mockApifyClient, textOf } from './helpers/tool_context.js';
 
@@ -251,6 +253,30 @@ describe('actorExecutor', () => {
                   }
                 | undefined;
             expect(storages?.datasets?.default?.itemsSchema).toBeUndefined();
+        });
+    });
+
+    describe('tip caveat', () => {
+        it('adds the caveat when canRunTipActor rejects the recommended Actor', async () => {
+            const { params } = buildParams(
+                { query: 'foo' },
+                { actorFullName: 'apify/rag-web-browser', canRunTipActor: () => false },
+            );
+            params.apifyClient = mockApifyClient({
+                ...params.apifyClient,
+                keyValueStore: () => ({
+                    listKeys: async () => ({ items: [{ key: 'TIP' }], count: 1, isTruncated: false }),
+                    getRecord: async () => ({
+                        key: 'TIP',
+                        value: { message: 'Use a different Actor.', recommendedActorId: 'a6Sqhlnt4touIHTub' },
+                    }),
+                }),
+            });
+
+            const result = await actorExecutor.executeActorTool(params);
+
+            const { structuredContent } = result as { structuredContent?: RunResponse };
+            expect(structuredContent?.tip?.caveat).toBe(ACTOR_TIP_CAVEAT);
         });
     });
 

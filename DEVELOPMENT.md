@@ -98,7 +98,7 @@ pnpm install        # installs root + src/web (workspace package) in one pass
 
 Widget code lives in `src/web/` (a self-contained React project). Widgets are rendered based on tool output — to add data to a widget, modify the corresponding tool's return value.
 
-> **UI mode:** Widget rendering requires the server to run in UI mode. Use `?ui=true` (e.g., `/mcp?ui=true`) or set `UI_MODE=true`.
+> **UI mode:** Widget rendering requires the server to run in UI mode. Use `?ui=true` (e.g., `http://localhost:3001/?ui=true` for the local dev server, which serves MCP at `/` only) or set `UI_MODE=true`.
 
 See the [OpenAI Apps SDK documentation](https://developers.openai.com/apps-sdk) for background on MCP Apps and widgets.
 
@@ -168,7 +168,7 @@ Integration tests run against three purpose-built Actors defined in [apify/mcp-s
 | Actor | Constant | Purpose |
 |---|---|---|
 | `apify/normal-mode-test-actor` | `ACTOR_NORMAL_MODE` | A normal Actor that writes dataset and key-value-store output. Exercises `call-actor`, the canonical run response, and the storage tools (`get-dataset-items`, `get-dataset`, `get-key-value-store-*`). |
-| `apify/example-mcp-server` | `ACTOR_EXAMPLE_MCP_SERVER` | A standby MCP-server Actor. Exercises the MCP-in-MCP proxy path, where the server registers the Actor's own MCP tools as sub-tools. |
+| `apify/example-mcp-server` | `ACTOR_EXAMPLE_MCP_SERVER` | A standby MCP-server Actor. Exercises `call-actor-mcp-tool`, `fetch-actor-mcp-tool-list` and the MCP-in-MCP proxy path, where the server registers the Actor's own MCP tools as sub-tools. |
 | `apify/server-actor-test` | `ACTOR_SERVER_ACTOR_TEST` | A single-tenant Server Actor with an API schema (`webServerSchema`) and an input schema, no MCP path. Its HTTP API adds two numbers (`GET`/`POST /add`, the same item as a normal run) and has test endpoints that echo requests and return fixed statuses, content types, sizes, delays and a redirect. Exercises `send-server-actor-request` and the server-interface section of `fetch-actor-details`. |
 
 ### Test structure
@@ -179,7 +179,7 @@ Integration tests run against three purpose-built Actors defined in [apify/mcp-s
 - `tests/integration/` — integration tests for MCP server functionality
   - `tests/integration/suite.ts` — wires the transport dimensions into one shared suite; add new cases to the matching group in `tests/test_kit/cases/*.cases.ts`, not here
   - Other files in this directory set up different transport dimensions (`stdio`, `2025-11-25` streamable HTTP, and `2026-07-28` stateless HTTP driven by the v2 SDK client) that all use `suite.ts`
-- `tests/helpers.ts` — shared test utilities
+- `tests/helpers.ts` — shared test utilities; `createStdioClientPool` shares one stdio server process among tests that differ only in `tools`, because each process boot costs more than a typical test
 - `tests/test_kit/helpers.ts` — shared test constants and assertion helpers, published behind `./test-kit`
 
 ### Test organization across repos
@@ -204,18 +204,18 @@ This is a real execution decision, not a visibility flag: internal's `isDeployme
 **Tests in this repo** cover the package's MCP and library surface. They live in `tests/test_kit/cases/*.cases.ts` (registered through `tests/integration/suite.ts`) and `tests/unit/`:
 
 - MCP protocol — `initialize` handshake, request/response shapes for `tools/*`, `prompts/*`, `resources/*`, `tasks/*`, notification delivery, JSON-RPC error codes.
-- Package logic — tool loader and selectors, widget metadata shape, structured output schemas, prompt registry, built-in tools, `call-actor` `RunResponse` shape, `SkyfirePaymentProvider`, client-name capability detection, `?ui=` server-mode parsing.
+- Package logic — tool loader and selectors, widget metadata shape, structured output schemas, prompt registry, built-in tools, `call-actor` `RunResponse` shape, client-name capability detection, `?ui=` server-mode parsing.
 
 **Tests not in this repo** — anything that only makes sense with the hosted stack:
 
-- IAM auth gate (401, unauth user toolset filter, `?payment=skyfire` bypass), rate limiter, `RedisEventStore` replay via `Last-Event-ID`, user-aware rental Actor filter, non-MCP HTTP routes (`/`, OAuth metadata, server card).
+- IAM auth gate (401, unauth user toolset filter), rate limiter, `RedisEventStore` replay via `Last-Event-ID`, user-aware rental Actor filter, non-MCP HTTP routes (`/`, OAuth metadata, server card).
 - Multi-node coordination — cross-node session continuity and cancellation, failover through the Caddy load balancer.
 
 Those live in `apify-mcp-server-internal`, together with a small **contract smoke suite** that re-asserts our package's behavior survives the hosted server's extra code (auth, rate limiter, Caddy, response handlers). We don't maintain that suite — internal does — but we should know it exists.
 
 #### When your change affects the hosted server
 
-The hosted server wraps this package with auth, rate limiter, Caddy, and response handlers. Any of that can change, drop, or delay something we produce; our tests don't see that wrapping. So if you change something the hosted server consumes — `internals.js` exports, `_meta` shape, `structuredContent`, anything that depends on `clientInfo`, `?ui=` / `?payment=` parsing, the timing of notifications — flag it in the PR. Internal's contract suite likely needs a matching test.
+The hosted server wraps this package with auth, rate limiter, Caddy, and response handlers. Any of that can change, drop, or delay something we produce; our tests don't see that wrapping. So if you change something the hosted server consumes — `internals.js` exports, `_meta` shape, `structuredContent`, anything that depends on `clientInfo`, `?ui=` parsing, the timing of notifications — flag it in the PR. Internal's contract suite likely needs a matching test.
 
 #### Don't delete a public test thinking internal covers it
 
@@ -256,7 +256,7 @@ mcpc --json @stdio tools-call search-actors keywords:="scraper" | jq ‘.content
 
 Run [MCPJam](https://www.mcpjam.com/) with `npx @mcpjam/inspector@latest`.
 
-1. Click **"Add new server"**, enter URL `http://localhost:3001/mcp?ui=true`, select **"No authentication"**
+1. Click **"Add new server"**, enter URL `http://localhost:3001/?ui=true` (the dev server serves MCP at `/`; `/mcp` returns 404), and add an `Authorization: Bearer <your Apify token>` header, since the dev server does not read `APIFY_TOKEN` from its environment
 2. **App Builder** — select a tool, fill arguments, execute, view rendered widget
 3. **Chat** — add an OpenAI/Anthropic/OpenRouter API key to chat with widget rendering inline
 

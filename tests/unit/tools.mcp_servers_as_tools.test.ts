@@ -43,7 +43,7 @@ describe('getMCPServersAsTools', () => {
 
         const tools = await getMCPServersAsTools(
             [makeActorInfo('evil', '//attacker.com/mcp'), makeActorInfo('good', '/mcp')],
-            'token-123',
+            { token: 'token-123' },
         );
 
         expect(tools).toEqual([goodTool]);
@@ -56,7 +56,7 @@ describe('getMCPServersAsTools', () => {
         connectMCPClient.mockResolvedValue({ close: vi.fn() });
         getMCPServerTools.mockResolvedValue([]);
 
-        await getMCPServersAsTools([makeActorInfo('good', '/mcp')], 'token-123');
+        await getMCPServersAsTools([makeActorInfo('good', '/mcp')], { token: 'token-123' });
 
         expect(getMCPServerTools).toHaveBeenCalledWith(
             'good',

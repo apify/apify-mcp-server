@@ -18,8 +18,10 @@ import { HELPER_TOOLS, type HelperToolName } from '../const.js';
 import type { ToolEntry } from '../types.js';
 import { SERVER_MODE } from '../types.js';
 import { callActor } from './actors/call_actor.js';
+import { callActorMcpTool } from './actors/call_actor_mcp_tool.js';
 import { deleteActor } from './actors/delete_actor.js';
 import { fetchActorDetails } from './actors/fetch_actor_details.js';
+import { fetchActorMcpToolList } from './actors/fetch_actor_mcp_tool_list.js';
 import { getActorList } from './actors/get_actor_list.js';
 import { searchActors } from './actors/search_actors.js';
 import { sendServerActorRequest } from './actors/send_server_actor_request.js';
@@ -67,7 +69,14 @@ import { searchActorsWidget } from './widgets/search_actors_widget.js';
 
 /** Unified tool category definitions — single source of truth. */
 export const toolCategories = {
-    actors: [searchActors, fetchActorDetails, callActor],
+    actors: [
+        searchActors,
+        fetchActorDetails,
+        callActor,
+        fetchActorMcpToolList,
+        callActorMcpTool,
+        sendServerActorRequest,
+    ],
     docs: [searchApifyDocs, fetchApifyDocs],
     runs: [getActorRun, getActorRunList, getActorRunLog, abortActorRun],
     storage: [
@@ -118,9 +127,8 @@ export const ALL_WIDGET_TOOLS: readonly ToolEntry[] = [
  * Non-widget tools in no category: never served by default or by a category, only when named in
  * `tools=`, in every mode. Temporary: `get-actor-list` returns to a category once evals cover it.
  * `delete-actor` stays here: it deletes Actors permanently, so a session gets it only by asking for it.
- * `send-server-actor-request` stays here until it is enabled by default (#1620).
  */
-export const UNCATEGORIZED_TOOLS: readonly ToolEntry[] = [getActorList, deleteActor, sendServerActorRequest];
+export const UNCATEGORIZED_TOOLS: readonly ToolEntry[] = [getActorList, deleteActor];
 
 /**
  * Apps-mode auto-pairing: a widget is added iff its base tool is present — see

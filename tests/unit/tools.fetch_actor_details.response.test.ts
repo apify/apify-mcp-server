@@ -52,65 +52,6 @@ const MOCK_DETAILS = {
 } as unknown as ActorDetailsResult;
 
 describe('buildActorDetailsTextResponse()', () => {
-    it('mirrors mcpToolsMessage into structuredContent.mcpTools when output.mcpTools is requested', () => {
-        const mcpToolsMessage = '# Available MCP Tools\nThis Actor is an MCP server with 1 tool.';
-
-        const { texts, structuredContent } = buildActorDetailsTextResponse({
-            details: MOCK_DETAILS,
-            output: {
-                ...actorDetailsOutputDefaults,
-                description: false,
-                stats: false,
-                pricing: false,
-                rating: false,
-                metadata: false,
-                inputSchema: false,
-                readme: false,
-                outputSchema: false,
-                mcpTools: true,
-            },
-            mcpToolsMessage,
-        });
-
-        // Text channel: MCP tools message is the only text emitted.
-        expect(texts).toEqual([mcpToolsMessage]);
-
-        // Structured channel: the same information must be present so that
-        // schema-aware MCP clients (which prefer structuredContent over texts)
-        // do not see an empty `{}` response.
-        expect(structuredContent.mcpTools).toBe(mcpToolsMessage);
-    });
-
-    it('omits structuredContent.mcpTools when output.mcpTools is not requested', () => {
-        const { structuredContent } = buildActorDetailsTextResponse({
-            details: MOCK_DETAILS,
-            output: { ...actorDetailsOutputDefaults, mcpTools: false },
-        });
-
-        expect(structuredContent.mcpTools).toBeUndefined();
-    });
-
-    it('omits structuredContent.mcpTools when output.mcpTools is requested but no message is available', () => {
-        const { texts, structuredContent } = buildActorDetailsTextResponse({
-            details: MOCK_DETAILS,
-            output: {
-                ...actorDetailsOutputDefaults,
-                description: false,
-                stats: false,
-                pricing: false,
-                rating: false,
-                metadata: false,
-                inputSchema: false,
-                readme: false,
-                outputSchema: false,
-                mcpTools: true,
-            },
-        });
-
-        expect(texts).toEqual([]);
-        expect(structuredContent.mcpTools).toBeUndefined();
-    });
-
     describe('with a Console link context', () => {
         const linkContext = {};
         const inputSchemaOnlyOutput = {

@@ -26,7 +26,7 @@ vi.mock('../../src/utils/userid_cache.js', () => ({
 }));
 
 const MOCK_RECORD = { key: 'INPUT', value: { query: 'hello' }, contentType: 'application/json' };
-const MOCK_STORE = { id: 'kv-1', name: 'my-store' };
+const MOCK_STORE = { id: 'KvsWkzbQMuFYuam3Y', name: 'my-store' };
 
 function stubApifyClient(opts: {
     record: unknown;
@@ -57,7 +57,7 @@ describe('get-key-value-store-record', () => {
     it('returns a JSON record plus a terminal summary (no nextStep) in structuredContent', async () => {
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
-                { keyValueStoreId: 'kv-1', recordKey: 'INPUT' },
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'INPUT' },
                 stubApifyClient({ record: MOCK_RECORD }),
             ),
         );
@@ -66,7 +66,7 @@ describe('get-key-value-store-record', () => {
         };
 
         expect(isError).not.toBe(true);
-        expect(structuredContent).toMatchObject({ keyValueStoreId: 'kv-1', ...MOCK_RECORD });
+        expect(structuredContent).toMatchObject({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', ...MOCK_RECORD });
         // {"query":"hello"} serializes to 17 bytes.
         expect(structuredContent.summary).toBe("Read 'INPUT' (contentType=application/json, 17 bytes).");
         // Reading a record is terminal — no nextStep, and content[1] is the summary alone.
@@ -81,14 +81,17 @@ describe('get-key-value-store-record', () => {
     it('returns a text record value in structuredContent', async () => {
         const record = { key: 'note.txt', value: 'hello world\nsecond line', contentType: 'text/plain; charset=utf-8' };
         const result = await (getKeyValueStoreRecord as HelperTool).call(
-            stubToolCallContext({ keyValueStoreId: 'kv-1', recordKey: 'note.txt' }, stubApifyClient({ record })),
+            stubToolCallContext(
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'note.txt' },
+                stubApifyClient({ record }),
+            ),
         );
         const { isError, structuredContent } = result as TextToolResult & {
             structuredContent: Record<string, unknown>;
         };
 
         expect(isError).not.toBe(true);
-        expect(structuredContent).toMatchObject({ keyValueStoreId: 'kv-1', ...record });
+        expect(structuredContent).toMatchObject({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', ...record });
         // 'hello world\nsecond line' is 23 ASCII bytes.
         expect(structuredContent.summary).toBe("Read 'note.txt' (contentType=text/plain; charset=utf-8, 23 bytes).");
     });
@@ -98,20 +101,20 @@ describe('get-key-value-store-record', () => {
         // the value must still be present so the output schema's required `value` is satisfied.
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
-                { keyValueStoreId: 'kv-1', recordKey: 'OUTPUT' },
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'OUTPUT' },
                 stubApifyClient({ record: { key: 'OUTPUT', value: undefined, contentType: 'application/json' } }),
             ),
         );
         expectSchemaConformingStructuredContent(result, keyValueStoreRecordOutputSchema);
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
-        expect(structuredContent).toMatchObject({ keyValueStoreId: 'kv-1', key: 'OUTPUT', value: '' });
+        expect(structuredContent).toMatchObject({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', key: 'OUTPUT', value: '' });
     });
 
     it('returns an image content block for a binary image record', async () => {
         const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]); // PNG magic bytes
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
-                { keyValueStoreId: 'kv-1', recordKey: 'screenshot.png' },
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'screenshot.png' },
                 stubApifyClient({ record: { key: 'screenshot.png', value: bytes, contentType: 'image/png' } }),
             ),
         );
@@ -129,7 +132,7 @@ describe('get-key-value-store-record', () => {
         const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]); // PNG magic bytes
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
-                { keyValueStoreId: 'kv-1', recordKey: 'screenshot.png' },
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'screenshot.png' },
                 stubApifyClient({ record: { key: 'screenshot.png', value: bytes, contentType: 'Image/PNG' } }),
             ),
         );
@@ -147,7 +150,7 @@ describe('get-key-value-store-record', () => {
         const bytes = Buffer.from([0x49, 0x44, 0x33]); // ID3 (MP3) magic bytes
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
-                { keyValueStoreId: 'kv-1', recordKey: 'clip.mp3' },
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'clip.mp3' },
                 stubApifyClient({ record: { key: 'clip.mp3', value: bytes, contentType: 'audio/mpeg' } }),
             ),
         );
@@ -168,7 +171,7 @@ describe('get-key-value-store-record', () => {
         const onGetRecordPublicUrl = vi.fn();
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
-                { keyValueStoreId: 'kv-1', recordKey: 'report.pdf' },
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'report.pdf' },
                 stubApifyClient({
                     record: { key: 'report.pdf', value: bytes, contentType: 'application/pdf' },
                     onGetRecordPublicUrl,
@@ -182,7 +185,7 @@ describe('get-key-value-store-record', () => {
         expect(content[0]).toEqual({
             type: 'resource',
             resource: {
-                uri: 'https://api.apify.com/v2/key-value-stores/kv-1/records/report.pdf',
+                uri: 'https://api.apify.com/v2/key-value-stores/KvsWkzbQMuFYuam3Y/records/report.pdf',
                 blob: bytes.toString('base64'),
                 mimeType: 'application/pdf',
             },
@@ -193,7 +196,7 @@ describe('get-key-value-store-record', () => {
         const bytes = Buffer.from([0x25, 0x50, 0x44, 0x46]);
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
-                { keyValueStoreId: 'kv-1', recordKey: 'report.pdf' },
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'report.pdf' },
                 stubApifyClient({
                     record: { key: 'report.pdf', value: bytes, contentType: 'application/pdf' },
                     baseUrl: 'http://api.internal.example:3333/v2',
@@ -203,7 +206,7 @@ describe('get-key-value-store-record', () => {
         const { content } = result as CallToolResult;
 
         expect((content[0] as { resource: { uri: string } }).resource.uri).toBe(
-            'https://api.apify.com/v2/key-value-stores/kv-1/records/report.pdf',
+            'https://api.apify.com/v2/key-value-stores/KvsWkzbQMuFYuam3Y/records/report.pdf',
         );
     });
 
@@ -211,7 +214,7 @@ describe('get-key-value-store-record', () => {
         const bytes = Buffer.alloc(MAX_INLINE_BYTES + 1);
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
-                { keyValueStoreId: 'kv-1', recordKey: 'big.png' },
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'big.png' },
                 stubApifyClient({ record: { key: 'big.png', value: bytes, contentType: 'image/png' } }),
             ),
         );
@@ -220,7 +223,7 @@ describe('get-key-value-store-record', () => {
         expect(isError).not.toBe(true);
         expect(content[0]).toEqual({
             type: 'resource_link',
-            uri: 'https://api.apify.com/v2/key-value-stores/kv-1/records/big.png?signature=signed',
+            uri: 'https://api.apify.com/v2/key-value-stores/KvsWkzbQMuFYuam3Y/records/big.png?signature=signed',
             name: 'big.png',
             size: MAX_INLINE_BYTES + 1,
             mimeType: 'image/png',
@@ -231,7 +234,7 @@ describe('get-key-value-store-record', () => {
         const bytes = Buffer.alloc(MAX_INLINE_BYTES + 1);
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
-                { keyValueStoreId: 'kv-1', recordKey: 'blob' },
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'blob' },
                 stubApifyClient({ record: { key: 'blob', value: bytes, contentType: undefined } }),
             ),
         );
@@ -240,7 +243,7 @@ describe('get-key-value-store-record', () => {
         expect(isError).not.toBe(true);
         expect(content[0]).toEqual({
             type: 'resource_link',
-            uri: 'https://api.apify.com/v2/key-value-stores/kv-1/records/blob?signature=signed',
+            uri: 'https://api.apify.com/v2/key-value-stores/KvsWkzbQMuFYuam3Y/records/blob?signature=signed',
             name: 'blob',
             size: MAX_INLINE_BYTES + 1,
         });
@@ -249,14 +252,14 @@ describe('get-key-value-store-record', () => {
     it('returns isError "record not found" when getRecord is undefined but the store exists', async () => {
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
-                { keyValueStoreId: 'kv-1', recordKey: 'MISSING' },
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'MISSING' },
                 stubApifyClient({ record: undefined, store: MOCK_STORE }),
             ),
         );
         const { content } = result as TextToolResult;
 
         expectSoftFailInvalidInput(result);
-        expect(content[0].text).toContain("Record 'MISSING' not found in key-value store 'kv-1'");
+        expect(content[0].text).toContain("Record 'MISSING' not found in key-value store 'KvsWkzbQMuFYuam3Y'");
     });
 
     it('returns isError "store not found" when both getRecord and store get are undefined', async () => {
@@ -275,13 +278,13 @@ describe('get-key-value-store-record', () => {
     it('rejects empty keyValueStoreId via ajv validation', () => {
         const tool = getKeyValueStoreRecord as HelperTool;
         expect(tool.ajvValidate({ keyValueStoreId: '', recordKey: 'INPUT' })).toBe(false);
-        expect(tool.ajvValidate({ keyValueStoreId: 'kv-1', recordKey: 'INPUT' })).toBe(true);
+        expect(tool.ajvValidate({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'INPUT' })).toBe(true);
     });
 
     it('rejects empty recordKey via ajv validation', () => {
         const tool = getKeyValueStoreRecord as HelperTool;
-        expect(tool.ajvValidate({ keyValueStoreId: 'kv-1', recordKey: '' })).toBe(false);
-        expect(tool.ajvValidate({ keyValueStoreId: 'kv-1', recordKey: 'INPUT' })).toBe(true);
+        expect(tool.ajvValidate({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: '' })).toBe(false);
+        expect(tool.ajvValidate({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'INPUT' })).toBe(true);
     });
 
     // Binary records return content blocks; the tool still declares an outputSchema, so each branch
@@ -302,13 +305,17 @@ describe('get-key-value-store-record', () => {
             it(`${contentType} (${value.length} bytes)`, async () => {
                 const result = await (getKeyValueStoreRecord as HelperTool).call(
                     stubToolCallContext(
-                        { keyValueStoreId: 'kv-1', recordKey },
+                        { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey },
                         stubApifyClient({ record: { key: recordKey, value, contentType } }),
                     ),
                 );
                 expectSchemaConformingStructuredContent(result, keyValueStoreRecordOutputSchema);
                 const { structuredContent } = result as { structuredContent: Record<string, unknown> };
-                expect(structuredContent).toMatchObject({ keyValueStoreId: 'kv-1', key: recordKey, contentType });
+                expect(structuredContent).toMatchObject({
+                    keyValueStoreId: 'KvsWkzbQMuFYuam3Y',
+                    key: recordKey,
+                    contentType,
+                });
             });
         }
     });
@@ -353,11 +360,14 @@ describe('get-key-value-store-record', () => {
             });
             const result = await client.callTool({
                 name: tool.name,
-                arguments: { keyValueStoreId: 'kv-1', recordKey: 'screenshot.png' },
+                arguments: { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'screenshot.png' },
             });
 
             expect(result.isError).not.toBe(true);
-            expect(result.structuredContent).toMatchObject({ keyValueStoreId: 'kv-1', key: 'screenshot.png' });
+            expect(result.structuredContent).toMatchObject({
+                keyValueStoreId: 'KvsWkzbQMuFYuam3Y',
+                key: 'screenshot.png',
+            });
             expect((result.content as { type: string }[])[0].type).toBe('image');
             await client.close();
         });
@@ -370,11 +380,11 @@ describe('get-key-value-store-record', () => {
             });
             const result = await client.callTool({
                 name: tool.name,
-                arguments: { keyValueStoreId: 'kv-1', recordKey: 'big.png' },
+                arguments: { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'big.png' },
             });
 
             expect(result.isError).not.toBe(true);
-            expect(result.structuredContent).toMatchObject({ keyValueStoreId: 'kv-1', key: 'big.png' });
+            expect(result.structuredContent).toMatchObject({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', key: 'big.png' });
             expect((result.content as { type: string }[])[0].type).toBe('resource_link');
             await client.close();
         });
@@ -398,7 +408,7 @@ describe('get-key-value-store-record', () => {
 
         const result = await (getKeyValueStoreRecord as HelperTool).call({
             ...stubToolCallContext(
-                { keyValueStoreId: 'kv-1', recordKey: 'INPUT' },
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'INPUT' },
                 stubApifyClient({ record: MOCK_RECORD }),
             ),
             apifyToken: 'apify_ui_test',
@@ -408,7 +418,78 @@ describe('get-key-value-store-record', () => {
         // content: [0] data, [1] summary (record reads are terminal — no nextStep), [2] Apify Console link.
         expect(content).toHaveLength(3);
         expect(content[2].text).toBe(
-            `Apify Console: https://console.apify.com/storage/key-value-stores/kv-1\n${VERBATIM_LINKS_NUDGE}`,
+            `Apify Console: https://console.apify.com/storage/key-value-stores/KvsWkzbQMuFYuam3Y\n${VERBATIM_LINKS_NUDGE}`,
+        );
+    });
+});
+
+describe('get-key-value-store-record with a bare store name', () => {
+    const STORE_BY_NAME = { id: 'WkzbQMuFYuamGv3YF', name: 'eval-ai-store' };
+
+    it("reads the name as one of the caller's own stores", async () => {
+        const kvStoreSpy = vi
+            .fn()
+            .mockReturnValue({ getRecord: async () => MOCK_RECORD, get: async () => STORE_BY_NAME });
+
+        await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'eval-ai-store', recordKey: 'INPUT' },
+                mockApifyClient({ keyValueStore: kvStoreSpy }),
+            ),
+        );
+
+        expect(kvStoreSpy).toHaveBeenCalledWith('~eval-ai-store');
+    });
+
+    it('reports a missing record, not a missing store, when the named store exists', async () => {
+        const kvStoreSpy = vi.fn().mockImplementation((id: string) => ({
+            getRecord: async () => undefined,
+            get: async () => (id === '~eval-ai-store' ? STORE_BY_NAME : undefined),
+        }));
+
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'eval-ai-store', recordKey: 'MISSING' },
+                mockApifyClient({ keyValueStore: kvStoreSpy }),
+            ),
+        );
+        const { content } = result as TextToolResult;
+
+        expectSoftFailInvalidInput(result);
+        expect(content[0].text).toContain("Record 'MISSING' not found in key-value store 'eval-ai-store'");
+    });
+
+    it('links Console to the store ID', async () => {
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
+
+        const result = await (getKeyValueStoreRecord as HelperTool).call({
+            ...stubToolCallContext(
+                { keyValueStoreId: 'eval-ai-store', recordKey: 'INPUT' },
+                stubApifyClient({ record: MOCK_RECORD, store: STORE_BY_NAME }),
+            ),
+            apifyToken: 'apify_ui_test',
+        });
+        const { content } = result as TextToolResult;
+
+        expect(content[2].text).toContain('https://console.apify.com/storage/key-value-stores/WkzbQMuFYuamGv3YF');
+    });
+
+    // A public link is opened without a token, so `~name` (the token holder's store) cannot resolve in it.
+    it('signs the public link of an over-limit binary record on the store ID', async () => {
+        const bytes = Buffer.alloc(MAX_INLINE_BYTES + 1);
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'eval-ai-store', recordKey: 'big.png' },
+                stubApifyClient({
+                    record: { key: 'big.png', value: bytes, contentType: 'image/png' },
+                    store: STORE_BY_NAME,
+                }),
+            ),
+        );
+        const { content } = result as CallToolResult;
+
+        expect((content[0] as { uri: string }).uri).toBe(
+            'https://api.apify.com/v2/key-value-stores/WkzbQMuFYuamGv3YF/records/big.png?signature=signed',
         );
     });
 });

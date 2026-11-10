@@ -367,9 +367,15 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      */
     private composeToolsForClient(source: ToolSource, view: ServingContext): ToolEntry[] {
         let tools = getToolsForServerMode(source.input, source.actorTools, view.serverMode);
-        // A payment provider cannot pay for an Actor Server run, so every call would be rejected.
+        // A payment provider cannot pay for an Actor Server or MCP server run, so every call would be rejected.
         if (this.options.paymentProvider) {
-            tools = tools.filter((tool) => tool.name !== HELPER_TOOLS.ACTOR_SERVER_REQUEST);
+            tools = tools.filter(
+                (tool) =>
+                    tool.name !== HELPER_TOOLS.ACTOR_SERVER_REQUEST &&
+                    tool.name !== HELPER_TOOLS.ACTOR_MCP_TOOL_CALL &&
+                    tool.name !== HELPER_TOOLS.ACTOR_MCP_TOOL_LIST &&
+                    tool.type !== TOOL_TYPE.ACTOR_SERVER,
+            );
         }
         const served = this.isReportProblemServable(view, source.input)
             ? tools
@@ -430,12 +436,12 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      */
     public listActorToolNames(): string[] {
         return Array.from(this.tools.values())
-            .filter((tool) => tool.type === TOOL_TYPE.ACTOR)
+            .filter((tool) => tool.type === TOOL_TYPE.ACTOR || tool.type === TOOL_TYPE.ACTOR_SERVER)
             .map((tool) => tool.actorFullName);
     }
 
     /**
-     * Returns the unique Actor IDs registered as MCP servers (e.g., 'apify/example-mcp-server').
+     * Returns the unique Actor IDs registered as MCP servers.
      */
     private listActorMcpServerToolIds(): string[] {
         const ids = Array.from(this.tools.values())

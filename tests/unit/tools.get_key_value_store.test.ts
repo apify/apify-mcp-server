@@ -113,6 +113,7 @@ describe('get-key-value-store', () => {
         expectSoftFailInvalidInput(result);
         expect(structuredContent).toBeUndefined();
         expect(content[0].text).toContain("Key-value store 'missing' not found");
+        expect(content[0].text).toContain('a name (resolved against your own key-value stores)');
     });
 
     it('rejects empty keyValueStoreId via ajv validation', () => {
@@ -150,5 +151,17 @@ describe('get-key-value-store', () => {
             HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET,
         );
         expectSchemaConformingStructuredContent(result, keyValueStoreOutputSchema);
+    });
+});
+
+describe('get-key-value-store with a bare store name', () => {
+    it("reads the name as one of the caller's own stores", async () => {
+        const kvStoreSpy = vi.fn().mockReturnValue({ get: async () => MOCK_STORE });
+
+        await (getKeyValueStore as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: 'eval-ai-store' }, mockApifyClient({ keyValueStore: kvStoreSpy })),
+        );
+
+        expect(kvStoreSpy).toHaveBeenCalledWith('~eval-ai-store');
     });
 });
