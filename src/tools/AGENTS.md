@@ -19,23 +19,26 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   Actor has: `input` (a run tool through its input schema), `mcp` (its MCP server) and `server` (its HTTP API,
   `hasWebServerSchema`). Two routes derive from the set. `resolveActorToolMode` gives a selected Actor's own tool,
   read by tool loading: a server tool if `server`, else MCP tools if `mcp`, else a run tool if `input`, else none
-  (`SERVER_ACTOR_WITHOUT_MCP`). `getActorToolModeFromInterfaces` gives the `call-actor` route, which skips the
-  server interface, so `call-actor` still starts runs of a Server Actor. Actors in `INPUT_INTERFACE_ACTORS`
-  (`../const.ts`: web-fetch, web-search, rag-web-browser) are served as run tools although they declare an MCP
-  path or a server interface, unless their input schema is empty, in which case they get no tool.
+  (`SERVER_ACTOR_WITHOUT_MCP`). `getActorToolModeFromInterfaces` gives the `call-actor` route: a run if `input`, else
+  MCP tools if `mcp`; it skips the server interface, so `call-actor` still starts runs of a Server Actor. The three
+  interfaces are independent: an MCP-server Actor with a non-empty input schema has `input` too.
 - Tool implementations are grouped by domain, each registered through `registry.ts`:
   - `actors/` — search, details, call, the list of the account's Actors (`get-actor-list`), delete
     (`delete_actor.ts`), the actor-tools factory (run tools, proxied MCP tools, and a Server Actor's own tool
     (`getServerActorsAsTools`, type `actor-server`): `send-server-actor-request`'s execution and output with the
     Actor fixed, `method` narrowed to the documented ones, `path` a plain string (no enum: a schema can document
-    thousands of paths), and the operations in the description; an Actor with a server interface and no
-    `webServerToolInfo` is reported as `load-failed`), the direct actor-tool executor (`actor_executor.ts`),
+    thousands of paths), the policy's `serverTool` text and input descriptions (`getActorToolPolicy`) replacing the
+    generic ones, and the operations in the description; an Actor with a server interface and no `webServerToolInfo`
+    is reported as `load-failed`; the default `apify/web-fetch` and `apify/web-search` tools and a selected
+    `apify/rag-web-browser` are served this way), the direct actor-tool executor (`actor_executor.ts`),
     `actor_definition.ts` (fetches and prunes an Actor's definition, `getActorDefinition`, and resolves the build
     the server-interface fields — `webServerMcpPath`, `webServerSchema` — are read from when standby is on,
     `resolveServerInterfaceDefinition`, shared with `fetchActorDetails` in `../utils/actor_details.ts`; the input
     schema and README stay on the default build; `hasWebServerSchemaOperations` detects operations the send tool
     can call in the publisher's schema; `webServerOperations` caches each operation with its required inputs, which
-    the send tool lists after a 400/404/405/422),
+    the send tool lists after a 400/404/405/422, and `webServerCommaJoinedQueryParameters` the query parameters a
+    list fills comma-joined, `explode: false`, per operation, looked up by the path as sent; absent when none
+    need joining; a list fills any other as a repeated parameter, and an empty list nothing),
     `server_interface_schema.ts` (the operations a Server Actor's `webServerSchema` documents, in the
     `get-apify-api-details` shape through the API tools' `dereference`; no prose),
     `server_interface_details.ts` (the server-interface section of `fetch-actor-details`: the
@@ -48,7 +51,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     per definition); `server_interface_schema.ts` reads each operation's inputs for it, `listOperationInputs`),
     `send_server_actor_request.ts` (`send-server-actor-request`: one HTTP request to a Server Actor's API, gated on
     the `server` interface and sent through `sendApifyApiRequest` with raw response
-    bytes, no redirects, the `MAX_INLINE_BYTES` cap after decompression and the `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`
+    bytes, no redirects, the body cut at `MAX_INLINE_BYTES` after decompression (`readBodyToCap`; the
+    start is returned with `bodyTruncated` and a `nextStep`) and the `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC`
     deadline; the path is resolved against the Actor's `standbyUrl` and must keep its origin; query values are
     validated without coercion; text uses the declared charset, UTF-8 by default, and rejects unsupported
     charsets while keeping the HTTP status; refused bodies retain structured request/status metadata with
@@ -60,9 +64,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `fetch_actor_mcp_tool_list.ts` (`fetch-actor-mcp-tool-list`: an uncached `tools/list` through
     `runOnActorMcpServer` that follows `nextCursor` within one `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC` for all pages,
     fails on a failed page and stops after `MAX_TOOL_LIST_PAGES`;
-    `fetch-actor-details` never connects to an MCP server; for an MCP server Actor with Actor Standby on and outside
-    `INPUT_INTERFACE_ACTORS` its `nextStep` names this tool when the session has it, otherwise the own-server
-    remedy; there is no `nextStep` when the session serves the Actor's own tools, and the not-runnable guidance stays
+    `fetch-actor-details` never connects to an MCP server; for an Actor with Actor Standby on and an MCP path its
+    `nextStep` names this tool when the session has it, otherwise the own-server remedy; there is no `nextStep` when the session serves the Actor's own tools, and the not-runnable guidance stays
     only when the session can list the MCP tools but has no tool that calls them),
     `actor_tool_contract.ts` (Actor-specific presentation policies plus direct-tool input restrictions
     and defaults, shared by schema generation, the call engine's denied-input check and execution;
@@ -143,6 +146,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 - **Reference tool names via the `HELPER_TOOLS` `as const` object**, never hardcoded strings
   (exception: the integration suite, `tests/integration/` and the shared `tests/test_kit/` cases and helpers, which hardcode them so a renamed tool fails).
 - Keep a new tool mode-agnostic unless it is genuinely a widget variant.
+- A tool whose arguments carry secrets sets `redactArgs` on its entry (`HelperTool` in `../types.ts`).
+  It runs before AJV validation, so it must accept any shape, must not mutate the arguments, and must
+  be an allowlist: the logged copy keeps the undeclared keys AJV strips only from the tool's copy.
 - Descriptions, result text, annotations and the tool set follow [TOOL_GUIDELINES.md](../../TOOL_GUIDELINES.md); the gating mechanics below implement its "name only what the session has" rule.
 
 **Storage tool description skeleton** (`storage/`, all 8 tools): lead sentence stating what the tool

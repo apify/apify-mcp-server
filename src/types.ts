@@ -85,6 +85,8 @@ export type ActorDefinitionPruned = Pick<
     hasWebServerSchema: boolean;
     /** The schema's operations with their required inputs, e.g. `GET / (required: query)`, for request recovery text. */
     webServerOperations?: string[];
+    /** Per operation (`GET /`), the query parameters a list fills comma-joined; absent when none need joining. */
+    webServerCommaJoinedQueryParameters?: Record<string, string[]>;
     /** What the Actor's own tool is built from when it is served through its server interface. */
     webServerToolInfo?: ServerActorToolInfo;
     pictureUrl?: string; // Optional, URL to the Actor's icon/picture
@@ -501,6 +503,8 @@ export type ToolCallTelemetryProperties = {
     validation_missing_property?: string;
     validation_additional_property?: string;
     validation_error_count?: number;
+    /** Top-level argument key names of a call that failed validation, never values: the call shape a client sends. */
+    validation_arg_keys?: string;
 };
 
 /**
@@ -568,6 +572,7 @@ export type CallDiagnostics = Pick<
     | 'validation_missing_property'
     | 'validation_additional_property'
     | 'validation_error_count'
+    | 'validation_arg_keys'
 >;
 
 /**

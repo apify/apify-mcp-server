@@ -250,12 +250,8 @@ describe('pricingInfoToString (complete mode)', () => {
     });
 
     it('E8: FREE actor', () => {
-        expect(pricingInfoToString(freeActor)).toBe(
-            'This Actor is free to use. You are only charged for Apify platform usage.',
-        );
-        expect(pricingInfoToString(null)).toBe(
-            'This Actor is free to use. You are only charged for Apify platform usage.',
-        );
+        expect(pricingInfoToString(freeActor)).toBe('Runs are charged for Apify platform usage.');
+        expect(pricingInfoToString(null)).toBe('Runs are charged for Apify platform usage.');
     });
 });
 
@@ -447,9 +443,7 @@ describe('pricingInfoToSimplifiedString (simplified mode)', () => {
     });
 
     it('E8: FREE actor', () => {
-        expect(pricingInfoToSimplifiedString(freeActor, 'GOLD')).toBe(
-            'This Actor is free to use. You are only charged for Apify platform usage.',
-        );
+        expect(pricingInfoToSimplifiedString(freeActor, 'GOLD')).toBe('Runs are charged for Apify platform usage.');
     });
     it('omits pricingNote text when PAY_PER_EVENT events resolve to different tiers', () => {
         expect(pricingInfoToSimplifiedString(mixedTierPayPerEvent, 'GOLD')).toBe(

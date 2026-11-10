@@ -20,13 +20,17 @@ import {
 
 export const DEFAULT_DATASET_ITEMS_LIMIT = 20;
 
-/** Top-level dot prefixes of `fields`. Apify's `flatten` recurses, so the first segment suffices. */
+/**
+ * Top-level prefixes of dotted `fields` to flatten. Apify's `flatten` recurses, so the first
+ * segment suffices. A prefix also selected on its own stays whole: flattening it would remove it.
+ */
 export function extractDotPrefixes(fields: string[]): string[] {
     const prefixes = new Set<string>();
     for (const field of fields) {
         const dotIndex = field.indexOf('.');
-        if (dotIndex > 0) {
-            prefixes.add(field.slice(0, dotIndex));
+        const prefix = field.slice(0, dotIndex);
+        if (dotIndex > 0 && !fields.includes(prefix)) {
+            prefixes.add(prefix);
         }
     }
     return [...prefixes];
@@ -47,23 +51,19 @@ const getDatasetItemsArgs = z.object({
         .min(1)
         .optional()
         .describe(`Maximum number of items to return. Default is ${DEFAULT_DATASET_ITEMS_LIMIT}.`),
-    fields: z
-        .string()
-        .optional()
-        .describe(
-            'Comma-separated list of fields to include in results. ' +
-                'Fields in output are sorted as specified. ' +
-                'Use dot notation for nested objects (e.g. "metadata.url"); the server auto-flattens parent prefixes.',
-        ),
+    fields: z.string().optional().describe(dedent`
+            Comma-separated list of fields to include in results.
+            Fields in output are sorted as specified.
+            Use dot notation for nested objects (e.g. "metadata.url"); the server auto-flattens parent prefixes and returns flat keys, unless the parent itself is listed (e.g. "metadata,metadata.url" returns metadata whole).
+            A dotted path to or through an array (e.g. "results.url") returns nothing: select its top-level field (e.g. "results") for every element.
+            Items that have none of the requested fields come back as {}, or are dropped when clean=true.
+        `),
     omit: z.string().optional().describe('Comma-separated list of fields to exclude from results.'),
     desc: z.boolean().optional().describe('If true, results are returned in reverse order (newest to oldest).'),
-    flatten: z
-        .string()
-        .optional()
-        .describe(
-            'Comma-separated list of fields to flatten (e.g. flatten="metadata" turns {"metadata":{"url":"x"}} into {"metadata.url":"x"}). ' +
-                'Normally derived automatically from dot-notation in `fields`; specify only as a diagnostic override.',
-        ),
+    flatten: z.string().optional().describe(dedent`
+            Comma-separated list of fields to flatten (e.g. flatten="metadata" turns {"metadata":{"url":"x"}} into {"metadata.url":"x"}).
+            Normally derived automatically from dot-notation in \`fields\`; specify only as a diagnostic override.
+        `),
 });
 
 /**
@@ -146,6 +146,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             itemCount: v.items.length,
             totalItemCount: v.total,
             offset,
+            limit: effectiveLimit,
             loadedToolNames,
         });
         return buildStorageResponse({ structuredContent, summary, nextStep, apifyConsoleUrl });

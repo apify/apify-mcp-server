@@ -238,12 +238,7 @@ export function buildActorDetailsTextResponse(options: {
 
     // A session that serves the Actor's own MCP tools needs no pointer to them.
     const needsMcpNextStep =
-        !loadedActorIds.has(details.actorInfo.id) &&
-        hasMcpInterface(
-            details.actorInfo,
-            details.webServerMcpPath,
-            `${details.actorInfo.username}/${details.actorInfo.name}`,
-        );
+        !loadedActorIds.has(details.actorInfo.id) && hasMcpInterface(details.actorInfo, details.webServerMcpPath);
     const mcpNextStep = needsMcpNextStep
         ? resolveSiblingNextStep(
               HELPER_TOOLS.ACTOR_MCP_TOOL_LIST,

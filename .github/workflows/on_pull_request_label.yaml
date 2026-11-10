@@ -8,6 +8,10 @@ on:
 jobs:
     wait_for_checks:
         name: Wait for code checks to pass
+        # Only when a downstream job can run: the "beta" label, or a fresh "validated" label.
+        if: |
+            contains(github.event.pull_request.labels.*.name, 'beta') ||
+            (github.event.action == 'labeled' && github.event.label.name == 'validated')
         runs-on: ubuntu-latest
         steps:
             -   name: Wait for existing checks or skip if none

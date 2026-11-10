@@ -7,8 +7,17 @@ import Ajv from 'ajv';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
-import { FAILURE_CATEGORY, HELPER_TOOLS, MAX_INLINE_BYTES, TOOL_STATUS } from '../../src/const.js';
+import {
+    defaults,
+    FAILURE_CATEGORY,
+    HELPER_TOOLS,
+    MAX_INLINE_BYTES,
+    RAG_WEB_BROWSER,
+    TOOL_STATUS,
+    WEB_SEARCH,
+} from '../../src/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { getServerActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import {
     executeSendServerActorRequest,
@@ -81,6 +90,18 @@ async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
             res.writeHead(400, { 'content-type': 'application/json' });
             res.end('{"n": 12345678901234567890, "error": "\\u0074est-token"}');
             return;
+        case '/escaped-token-cut':
+            // An escaped token before a string the limit cuts: the body no longer parses whole.
+            res.writeHead(200, { 'content-type': 'application/json' });
+            res.end(`{"error":"\\u0074est-token","pad":"${'a'.repeat(MAX_INLINE_BYTES)}"}`);
+            return;
+        case '/escaped-token-cut-inside': {
+            // The limit cuts inside the string that carries the escaped token, after it: the last literal is unterminated.
+            const pad = 'a'.repeat(MAX_INLINE_BYTES / 2);
+            res.writeHead(200, { 'content-type': 'application/json' });
+            res.end(`{"pad":"${pad}","error":"\\u0074est-token${'b'.repeat(MAX_INLINE_BYTES)}\\u0074est-token"}`);
+            return;
+        }
         case '/big-error':
             res.writeHead(400, { 'content-type': 'application/json' });
             res.end(JSON.stringify({ error: 'e'.repeat(200_000) }));
@@ -249,6 +270,20 @@ afterAll(async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
+describe('body input schema', () => {
+    // VS Code Copilot rejects the whole tool list when any array schema lacks `items`.
+    it('gives every array an items schema', () => {
+        const arraysWithoutItems: unknown[] = [];
+        const visit = (node: unknown) => {
+            if (!node || typeof node !== 'object') return;
+            if ((node as { type?: unknown }).type === 'array' && !('items' in node)) arraysWithoutItems.push(node);
+            Object.values(node).forEach(visit);
+        };
+        visit(sendServerActorRequest.inputSchema);
+        expect(arraysWithoutItems).toEqual([]);
+    });
+});
+
 describe('sending the request', () => {
     it('sends the token, the request origin and the JSON body as is, once', async () => {
         const received = recordRequests();
@@ -287,10 +322,39 @@ describe('sending the request', () => {
         });
     });
 
+    it('sends an array query value as a repeated parameter, and an empty array as nothing', async () => {
+        const received = recordRequests();
+
+        const result = await dispatchTool({
+            path: '/echo',
+            query: { formats: ['markdown', 'links'], n: [1], none: [] },
+        });
+
+        expect(result.isError).toBe(false);
+        expect(received[0].url).toBe('/echo?formats=markdown&formats=links&n=1');
+    });
+
+    it('joins an array with commas for a parameter the operation documents explode: false, by the path as written', async () => {
+        const received = recordRequests();
+        seedActor('apify/comma-actor', {
+            definition: { webServerCommaJoinedQueryParameters: { 'GET /echo': ['formats'] } },
+        });
+
+        await callTool({ actor: 'apify/comma-actor', path: '/echo', query: { formats: ['a', 'b'], n: [1, 2] } });
+        await callTool({ actor: 'apify/comma-actor', path: '/echo?x=1', query: { formats: ['a', 'b'] } });
+        await callTool({ actor: 'apify/comma-actor', method: 'POST', path: '/echo', query: { formats: ['a', 'b'] } });
+
+        expect(received.map((request) => request.url)).toEqual([
+            '/echo?formats=a%2Cb&n=1&n=2',
+            '/echo?x=1&formats=a%2Cb',
+            '/echo?formats=a&formats=b',
+        ]);
+    });
+
     it.each([
         ['null', null],
-        ['a singleton array', [1]],
         ['an object', { a: 1 }],
+        ['an array with an object', [{ a: 1 }]],
     ])('rejects %s as a query value through dispatch before sending a POST', async (_label, value) => {
         const received = recordRequests();
         const result = await dispatchTool({ query: { deleteAll: value } });
@@ -453,33 +517,36 @@ describe('returning the response', () => {
     });
 
     it.each(['/bytes', '/gzip'])(
-        'returns a %s body of exactly the inline limit, counted after decompression',
+        'returns a %s body of exactly the response limit whole, counted after decompression',
         async (path) => {
             const result = await callTool({ path: `${path}?n=${MAX_INLINE_BYTES}` });
 
             expect(result.isError).toBe(false);
             expect(result.structuredContent).toMatchObject({ bytes: MAX_INLINE_BYTES });
+            expect(result.structuredContent).not.toHaveProperty('bodyTruncated');
+            expect(result.structuredContent).not.toHaveProperty('nextStep');
         },
     );
 
+    // The caller has paid for the response and has no storage to read the rest from, so the start is returned.
     it.each(['/bytes', '/gzip'])(
-        'does not return a %s body over the inline limit, keeps the status, and says the request was sent',
+        'returns the start of a %s body over the response limit, marked as truncated, with the limit as the hint',
         async (path) => {
             const result = await callTool({ path: `${path}?n=${MAX_INLINE_BYTES + 1}` });
 
-            expectSoftFailInvalidInput(result);
-            expect(result.content[0].text).toContain(`larger than ${MAX_INLINE_BYTES} bytes`);
-            expect(result.content[0].text).toContain('The request itself was sent.');
-            expect(result.content[0].text).not.toContain('aaa');
-            expect(result.structuredContent).toMatchObject({
-                status: 200,
-                bodyOmitted: true,
-                reason: expect.stringContaining(`larger than ${MAX_INLINE_BYTES} bytes`),
-            });
-            expect(result.structuredContent).not.toHaveProperty('body');
-            expect(result.structuredContent).not.toHaveProperty('bytes');
-            const validate = new Ajv({ strict: false }).compile(serverActorRequestOutputSchema);
-            expect(validate(result.structuredContent), JSON.stringify(validate.errors)).toBe(true);
+            expect(result.isError).toBe(false);
+            expectSchemaConformingStructuredContent(result, serverActorRequestOutputSchema);
+            const { body, bytes, nextStep } = result.structuredContent as {
+                body: string;
+                bytes: number;
+                nextStep: string;
+            };
+            expect(result.structuredContent).toMatchObject({ status: 200, bodyTruncated: true });
+            expect(bytes).toBeGreaterThan(0);
+            expect(bytes).toBeLessThanOrEqual(MAX_INLINE_BYTES);
+            expect(body).toBe('a'.repeat(bytes));
+            expect(nextStep).toContain(String(MAX_INLINE_BYTES));
+            expect(result.content.at(-1)?.text).toBe(nextStep);
             expect(result.toolTelemetry).toMatchObject({
                 httpStatus: 200,
                 actorTenancy: ACTOR_TENANCY.SINGLE_TENANT,
@@ -542,6 +609,24 @@ describe('returning an Actor Server error', () => {
         expect(errorMessage.length).toBeLessThan(2_000);
         // The text holds the body once, inside the structuredContent JSON; the message copies are capped.
         expect(JSON.stringify(result.content).length).toBeLessThan(210_000);
+    });
+
+    it('masks a token that JSON escapes hide before the limit cuts the body', async () => {
+        const result = await callTool({ path: '/escaped-token-cut' });
+        const { body } = result.structuredContent as { body: string };
+
+        expect(result.structuredContent).toMatchObject({ bodyTruncated: true });
+        expect(body.startsWith('{"error":"[REDACTED]"')).toBe(true);
+        expect(JSON.stringify(result)).not.toContain(TOKEN);
+    });
+
+    it('masks a token that JSON escapes hide in the string the limit cuts', async () => {
+        const result = await callTool({ path: '/escaped-token-cut-inside' });
+        const { body } = result.structuredContent as { body: string };
+
+        expect(result.structuredContent).toMatchObject({ bodyTruncated: true });
+        expect(body).toContain('"error":"[REDACTED]b');
+        expect(JSON.stringify(result)).not.toContain(TOKEN);
     });
 
     it('keeps numbers as sent when it masks a token that JSON escapes hide', async () => {
@@ -879,10 +964,33 @@ describe('reporting an incomplete response', () => {
 
 describe('describing the tool', () => {
     it('names fetch-actor-details in the description only when the session has it', () => {
-        expect(sendServerActorRequest.description).toContain(
-            `${HELPER_TOOLS.ACTOR_GET_DETAILS} with output.serverInterface`,
-        );
+        expect(sendServerActorRequest.description).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
         expect(sendServerActorRequest.buildDescription!(only())).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+    });
+
+    it('does not give a default Actor as its example, since that Actor has its own tool in the default session', () => {
+        // The own tool says to use it instead of this one for that Actor; an example naming it would contradict that.
+        const defaultSession = only(HELPER_TOOLS.ACTOR_GET_DETAILS, ...defaults.actors.map(actorNameToToolName));
+        const description = sendServerActorRequest.buildDescription!(defaultSession);
+
+        for (const actor of defaults.actors) expect(description).not.toContain(actor);
+    });
+
+    it("switches the example off apify/rag-web-browser when the session has that Actor's own tool", () => {
+        const description = sendServerActorRequest.buildDescription!(only(actorNameToToolName(RAG_WEB_BROWSER)));
+
+        expect(description).not.toContain(RAG_WEB_BROWSER);
+        expect(description).toContain(`"actor": "${WEB_SEARCH}"`);
+    });
+
+    it("gives a placeholder example when the session has both web Actors' own tools", () => {
+        const description = sendServerActorRequest.buildDescription!(
+            only(actorNameToToolName(RAG_WEB_BROWSER), actorNameToToolName(WEB_SEARCH)),
+        );
+
+        expect(description).not.toContain(RAG_WEB_BROWSER);
+        expect(description).not.toContain(WEB_SEARCH);
+        expect(description).toContain('"actor": "username/name"');
     });
 });
 

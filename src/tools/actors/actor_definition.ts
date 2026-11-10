@@ -16,7 +16,7 @@ import { getHttpStatusCode } from '../../utils/logging.js';
 import { API_METHODS, isRecord } from '../api/apify_api_spec.js';
 import type { BuildListItem } from '../builds/get_actor_build_list.js';
 import { buildServerActorToolInfo } from './server_interface_details.js';
-import { listDocumentedOperations } from './server_interface_schema.js';
+import { listCommaJoinedQueryParameters, listDocumentedOperations } from './server_interface_schema.js';
 
 const BUILD_NUMBER_PATTERN = /^\d+\.\d+\.\d+$/;
 
@@ -152,6 +152,7 @@ function pruneActorDefinition(
     response: ActorDefinitionWithDesc,
     serverDefinition: ActorDefinitionWithServerInterface | undefined,
 ): ActorDefinitionPruned {
+    const commaJoinedQueryParameters = listCommaJoinedQueryParameters(serverDefinition?.webServerSchema);
     return {
         id: response.id,
         actorFullName: response.actorFullName || '',
@@ -171,6 +172,9 @@ function pruneActorDefinition(
         webServerMcpPath: serverDefinition?.webServerMcpPath,
         hasWebServerSchema: hasWebServerSchemaOperations(serverDefinition?.webServerSchema),
         webServerOperations: listDocumentedOperations(serverDefinition?.webServerSchema),
+        ...(Object.keys(commaJoinedQueryParameters).length > 0 && {
+            webServerCommaJoinedQueryParameters: commaJoinedQueryParameters,
+        }),
         webServerToolInfo: buildServerActorToolInfo(serverDefinition?.webServerSchema, response.actorFullName || ''),
         pictureUrl: 'pictureUrl' in response ? (response.pictureUrl as string | undefined) : undefined,
     };
