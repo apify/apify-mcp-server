@@ -131,14 +131,8 @@ export const APIFY_AI_CLIENT_NAME = 'apify-ai';
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
 export const WEB_FETCH = 'apify/web-fetch';
 export const WEB_SEARCH = 'apify/web-search';
-/**
- * Actors served through the input interface (a run per call) although they declare `webServerMcpPath` or a server
- * interface. Hand-wired for selected Apify Actors so the served tool does not change when the Actor's other
- * interfaces do. `apify/rag-web-browser` is a default tool with a server interface.
- */
-export const INPUT_INTERFACE_ACTORS: ReadonlySet<string> = new Set([WEB_SEARCH, WEB_FETCH, RAG_WEB_BROWSER]);
 export const defaults = {
-    actors: [RAG_WEB_BROWSER, WEB_FETCH],
+    actors: [WEB_SEARCH, WEB_FETCH],
 };
 
 /** API rejects `includeInputSchema=true` above this; mirrors apify-core `MAX_LIMIT_WITH_INPUT_SCHEMA`. */
@@ -259,7 +253,6 @@ export const API_PUBLIC_BASE_URL_STAGING = 'https://api-securitybyobscurity.apif
 /** Staging MCP host; `getApifyAPIPublicBaseUrl` and `getConsoleBaseUrl` pick the staging origins when running on it. */
 export const STAGING_MCP_HOSTNAME = 'mcp-securitybyobscurity.apify.com';
 export const APIFY_FAVICON_URL = `${APIFY_STORE_URL}/favicon.ico`;
-export const APIFY_LOGO_URL = `${APIFY_STORE_URL}/apple-icon.png`;
 export const APIFY_MCP_URL = 'https://mcp.apify.com';
 export const APIFY_DOCS_MCP_URL = 'https://docs.apify.com/integrations/mcp';
 

@@ -741,7 +741,8 @@ const buildDatasetEntrySchema = () => ({
         fields: {
             type: 'array' as const,
             items: { type: 'string' },
-            description: 'Dataset field paths in dot notation (e.g. ["metadata.url"])',
+            description:
+                'Paths that work as a fields selection (e.g. ["results", "metadata.url"]); an array field appears by its top-level name.',
         },
     },
     required: ['id'],
@@ -863,7 +864,7 @@ export const actorRunOutputSchema = {
  * Returns a per-tool clone of {@link actorRunOutputSchema} with `storages.datasets.default.itemsSchema`
  * declared as a JSON Schema describing each dataset row, inferred from historical successful runs.
  *
- * Used for direct actor tools (e.g. `apify--rag-web-browser`) where the target Actor is known
+ * Used for direct actor tools (e.g. `apify--instagram-scraper`) where the target Actor is known
  * at `tools/list` time, so the LLM can plan field projection before calling the tool. The same
  * shape is injected into `structuredContent.storages.datasets.default.itemsSchema` by the direct
  * actor executors so the declared schema matches the runtime response.
@@ -1024,7 +1025,8 @@ export const datasetMetadataOutputSchema = {
         fields: {
             type: 'array' as const,
             items: { type: 'string' },
-            description: 'Field paths in dot notation (e.g. ["metadata.url"])',
+            description:
+                'Paths that work as a fields selection (e.g. ["results", "metadata.url"]); an array field appears by its top-level name.',
         },
         summary: summaryProperty,
         nextStep: nextStepProperty,
@@ -1363,11 +1365,17 @@ export const serverActorRequestOutputSchema = {
         contentType: { type: 'string', description: 'Content-Type of the response; absent when it had none' },
         body: {
             type: 'string',
-            description: 'Response body as text; empty when the response had none; absent when omitted',
+            description:
+                'Response body as text; empty when the response had none; its start when truncated; absent when omitted',
         },
         bytes: {
             type: 'integer',
-            description: 'Response body size in bytes, after decompression; absent when over the limit',
+            description: 'Size of the body received in bytes, after decompression',
+        },
+        bodyTruncated: {
+            type: 'boolean',
+            const: true,
+            description: 'The response body is longer than the limit; body holds its start',
         },
         bodyOmitted: {
             type: 'boolean',

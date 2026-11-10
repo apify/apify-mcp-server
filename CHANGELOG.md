@@ -2,20 +2,57 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.20.2 - **not yet released**
+## [0.21.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.4) (2026-11-06)
+
+### 🐛 Bug Fixes
+
+- Serve the removed apify--rag-web-browser in default sessions ([#1844](https://github.com/apify/apify-mcp-server/pull/1844)) ([c3a93a6](https://github.com/apify/apify-mcp-server/commit/c3a93a62ed6b474060f0246fed589cc2f8ec3d17)) by [@jirispilka](https://github.com/jirispilka)
+
+
+## [0.21.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.3) (2026-11-06)
+
+### 🐛 Bug Fixes
+
+- Add icon, title and website to server.json ([#1835](https://github.com/apify/apify-mcp-server/pull/1835)) ([21f6c12](https://github.com/apify/apify-mcp-server/commit/21f6c1247b61e0acce5a9916857cd3061d922d82)) by [@jancurn](https://github.com/jancurn)
+- Accept pre-0.21 input for web-fetch and rag-web-browser ([#1841](https://github.com/apify/apify-mcp-server/pull/1841)) ([97d54db](https://github.com/apify/apify-mcp-server/commit/97d54db1f347de2b3eed79c3739bbf13c9c2671f)) by [@jirispilka](https://github.com/jirispilka), closes [#346](https://github.com/apify/apify-mcp-server/issues/346)
+
+
+## [0.21.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.2) (2026-11-05)
+
+### 🚀 Features
+
+- Log argument key names of rejected tool calls ([#1840](https://github.com/apify/apify-mcp-server/pull/1840)) ([d343cf2](https://github.com/apify/apify-mcp-server/commit/d343cf2e803456c514a412945a4c43c97d5b3275)) by [@jirispilka](https://github.com/jirispilka), closes [#1815](https://github.com/apify/apify-mcp-server/issues/1815)
+
+
+## [0.21.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.1) (2026-11-05)
+
+### 🐛 Bug Fixes
+
+- Help clients with a pre-0.21 tool list recover ([#1838](https://github.com/apify/apify-mcp-server/pull/1838)) ([5760efb](https://github.com/apify/apify-mcp-server/commit/5760efb1319c955d5311091e5fba198d695b66ef)) by [@jirispilka](https://github.com/jirispilka), closes [#1815](https://github.com/apify/apify-mcp-server/issues/1815), [#1836](https://github.com/apify/apify-mcp-server/issues/1836)
+
+
+## [0.21.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.0) (2026-11-05)
 
 ### 🚀 Features
 
 - Enable send-server-actor-request by default ([#1745](https://github.com/apify/apify-mcp-server/pull/1745)) ([3a2c855](https://github.com/apify/apify-mcp-server/commit/3a2c855b2362ba73fbde64cd523e1a98d83fd883)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#1702](https://github.com/apify/apify-mcp-server/issues/1702)
+- [**breaking**] Serve a selected Server Actor through its server interface ([#1747](https://github.com/apify/apify-mcp-server/pull/1747)) ([b1bef99](https://github.com/apify/apify-mcp-server/commit/b1bef99b281ef367493d6bd73306697c9f6d1318)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#1689](https://github.com/apify/apify-mcp-server/issues/1689)
+- [**breaking**] Serve the default web-fetch tool through its server interface ([#1810](https://github.com/apify/apify-mcp-server/pull/1810)) ([496a385](https://github.com/apify/apify-mcp-server/commit/496a385ca011a0c5fd8d0b3add9318aa65d8d312)) by [@jirispilka](https://github.com/jirispilka), closes [#1647](https://github.com/apify/apify-mcp-server/issues/1647), [#1808](https://github.com/apify/apify-mcp-server/issues/1808)
+- [**breaking**] Make apify&#x2F;web-search a default tool via its server interface ([#1820](https://github.com/apify/apify-mcp-server/pull/1820)) ([db7cf71](https://github.com/apify/apify-mcp-server/commit/db7cf715d92a637a5a968012642b6d9eff8ac2e7)) by [@jirispilka](https://github.com/jirispilka), closes [#1653](https://github.com/apify/apify-mcp-server/issues/1653), [#1725](https://github.com/apify/apify-mcp-server/issues/1725), [#1809](https://github.com/apify/apify-mcp-server/issues/1809)
 
 ### 🐛 Bug Fixes
 
-- Compile untrusted schemas on a fresh Ajv instance and cache validators by content ([#1786](https://github.com/apify/apify-mcp-server/pull/1786)) ([ce708a0](https://github.com/apify/apify-mcp-server/commit/ce708a01f3f0b9cef322f8a01274f37bf8e41757)) by [@jirispilka](https://github.com/jirispilka), closes [#905](https://github.com/apify/apify-mcp-server/issues/905)
 - Keep the keywords next to a $ref when dereferencing ([#1783](https://github.com/apify/apify-mcp-server/pull/1783)) ([174ecf8](https://github.com/apify/apify-mcp-server/commit/174ecf8cc96d1c4f0f9b10e6a91ec9f5eb22905d)) by [@jirispilka](https://github.com/jirispilka)
+- Reject Actor names that normalize to empty ([#1802](https://github.com/apify/apify-mcp-server/pull/1802)) ([2337062](https://github.com/apify/apify-mcp-server/commit/233706221b9ea163c43fc5ac5d27edb3f2312e45)) by [@jirispilka](https://github.com/jirispilka), closes [#1797](https://github.com/apify/apify-mcp-server/issues/1797)
+- Describe platform charges for free-priced Actors ([#1807](https://github.com/apify/apify-mcp-server/pull/1807)) ([c86c99f](https://github.com/apify/apify-mcp-server/commit/c86c99f9df799398845c87d2917d30d33ff8b15c)) by [@jirispilka](https://github.com/jirispilka), closes [#1794](https://github.com/apify/apify-mcp-server/issues/1794)
+- Rewrite apify--web-fetch and apify--web-search tool text ([#1823](https://github.com/apify/apify-mcp-server/pull/1823)) ([1ba9c37](https://github.com/apify/apify-mcp-server/commit/1ba9c37a131765a614fa0f8450c463f2186e8c09)) by [@jirispilka](https://github.com/jirispilka), closes [#1815](https://github.com/apify/apify-mcp-server/issues/1815), [#1822](https://github.com/apify/apify-mcp-server/issues/1822)
+- Reject null query values and send arrays comma-separated ([#1750](https://github.com/apify/apify-mcp-server/pull/1750)) ([46000a7](https://github.com/apify/apify-mcp-server/commit/46000a70fd7c6bcc00270ca995ceb856914ac276)) by [@jirispilka](https://github.com/jirispilka), closes [#1716](https://github.com/apify/apify-mcp-server/issues/1716)
+
+### ⚡ Performance
+
+- Share each Actor tool&#x27;s built input schema across sessions ([#1787](https://github.com/apify/apify-mcp-server/pull/1787)) ([126ce60](https://github.com/apify/apify-mcp-server/commit/126ce606a852291e71d4a298570935e14ed2aa8b)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.20.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.20.1) (2026-11-03)
 
 ### 🚀 Features
