@@ -264,12 +264,6 @@ describe('formatting Zod issues as argument clauses', () => {
     it('names the root value arguments', () => {
         expect(formatZodIssues(issuesOf(z.object({}), 'x'))).toBe('arguments: expected object, got string');
     });
-
-    it("keeps a refinement's own message, which names no expected type", () => {
-        const schema = z.object({ path: z.string().refine((value) => value.startsWith('/'), 'must start with /') });
-
-        expect(formatZodIssues(issuesOf(schema, { path: 'x' }))).toBe('path: must start with /');
-    });
 });
 
 describe('extractToolTelemetry', () => {

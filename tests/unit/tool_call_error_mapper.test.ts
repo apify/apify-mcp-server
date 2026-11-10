@@ -186,6 +186,7 @@ describe('buildToolCallErrorResult()', () => {
             toolStatus: TOOL_STATUS.SOFT_FAIL,
             callDiagnostics: {
                 failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                failure_detail: 'output.serverInterface: expected boolean or string, got array',
                 actor_name: ACTOR_NAME,
                 actor_id: ACTOR_ID,
             },
