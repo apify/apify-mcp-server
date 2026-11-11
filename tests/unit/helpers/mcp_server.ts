@@ -122,12 +122,6 @@ export type StatelessProbe = {
         params?: Record<string, unknown>,
         options?: StatelessCallOptions,
     ) => Promise<StatelessResponse>;
-    /** Same request as `call`, returning its JSON-RPC ID and the raw `Response` with the body unread. */
-    fetch: (
-        method: string,
-        params?: Record<string, unknown>,
-        options?: StatelessCallOptions,
-    ) => Promise<{ requestId: number; response: Response }>;
     /** The per-request `Server` the adapter builds, for assertions on registration and capabilities. */
     buildServer: () => StatelessServer;
 };
@@ -153,12 +147,12 @@ export function readJsonRpcPayload(body: string): Omit<StatelessResponse, 'statu
     return { ...(payload.result && { result: payload.result }), ...(payload.error && { error: payload.error }) };
 }
 
-async function fetchStatelessMethod(
+async function callStatelessMethod(
     handler: McpHttpHandler,
     method: string,
     params: Record<string, unknown> = {},
     options: StatelessCallOptions = {},
-): Promise<{ requestId: number; response: Response }> {
+): Promise<StatelessResponse> {
     const { name = 'test-client', version = '1.0.0', supportsUi = false } = options.client ?? {};
     nextStatelessRequestId += 1;
     const body = {
@@ -191,7 +185,7 @@ async function fetchStatelessMethod(
         new Request('http://localhost/mcp', { method: 'POST', headers, body: JSON.stringify(body) }),
         options.authInfo ? { authInfo: options.authInfo } : undefined,
     );
-    return { requestId: body.id, response };
+    return { status: response.status, ...readJsonRpcPayload(await response.text()) };
 }
 
 /**
@@ -208,12 +202,7 @@ export async function withStatelessServer<T>(
         try {
             return await run({
                 server,
-                call: async (method, params, callOptions) => {
-                    const { response } = await fetchStatelessMethod(handler, method, params, callOptions);
-                    return { status: response.status, ...readJsonRpcPayload(await response.text()) };
-                },
-                fetch: async (method, params, callOptions) =>
-                    await fetchStatelessMethod(handler, method, params, callOptions),
+                call: (method, params, callOptions) => callStatelessMethod(handler, method, params, callOptions),
                 buildServer: () => createStatelessServer(server),
             });
         } finally {
