@@ -13,6 +13,8 @@ import {
     getApifyErrorType,
     isActorRunLimitError,
     isCannotPublishTaskError,
+    isPlatformFeatureDisabledError,
+    PLATFORM_FEATURE_DISABLED_MESSAGE,
 } from './apify_errors.js';
 import { wrapJsonText } from './encode_text.js';
 import { getHttpStatusCode } from './logging.js';
@@ -317,6 +319,10 @@ export function getToolCallErrorUserText(toolName: string, error: unknown): stri
             'requirements on publish. The error message names the requirement that is not met. If `datasetView` is invalid, ' +
             'ask the user for its key; no tool can list dataset views.'
         );
+    }
+    // A billing block arrives as 403, but the generic 403 hint ("may be private") would blame access.
+    if (isPlatformFeatureDisabledError(error)) {
+        return `Error calling tool "${toolName}": ${msg}. ${PLATFORM_FEATURE_DISABLED_MESSAGE}`;
     }
     // With an HTTP status, the API's message says what failed; the generic hint adds nothing and can
     // blame valid input (#1561).
