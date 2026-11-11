@@ -6,7 +6,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { AxiosError } from 'axios';
+import { AxiosError, AxiosHeaders } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
@@ -50,7 +50,7 @@ function overLimitAbort({ contentType }: OverLimitRecord): AxiosError {
  * interceptors already parsed by Content-Type, a missing record is a resolved 404, `overLimit` the abort.
  */
 function stubApifyClient(opts: {
-    record?: unknown;
+    record?: { key: string; value: unknown; contentType?: string };
     overLimit?: OverLimitRecord;
     store?: unknown;
     onGetRecordPublicUrl?: () => void;
@@ -58,8 +58,7 @@ function stubApifyClient(opts: {
     /** Egress base URL of the SDK client (ends with `/v2`); `url` is built on it, as apify-client does. */
     baseUrl?: string;
 }): InternalToolArgs['apifyClient'] {
-    const { overLimit, store, onGetRecordPublicUrl, onRequest, baseUrl = 'https://api.apify.com/v2' } = opts;
-    const record = opts.record as { value: unknown; contentType?: string } | undefined;
+    const { record, overLimit, store, onGetRecordPublicUrl, onRequest, baseUrl = 'https://api.apify.com/v2' } = opts;
     return mockApifyClient({
         keyValueStore: (id: string) => ({
             url: `${baseUrl}/key-value-stores/${id}`,
@@ -335,6 +334,29 @@ describe('get-key-value-store-record', () => {
                 stubToolCallContext({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'INPUT' }, client),
             ),
         ).rejects.toMatchObject({ statusCode: 403, message: 'Insufficient permissions' });
+    });
+
+    // The request config carries the token in its Authorization header.
+    it('throws a failed request without its request config', async () => {
+        const client = mockApifyClient({
+            keyValueStore: (id: string) => ({ url: `https://api.apify.com/v2/key-value-stores/${id}` }),
+            httpClient: {
+                axios: {
+                    request: async () => {
+                        throw new AxiosError('socket hang up', 'ECONNRESET', {
+                            headers: new AxiosHeaders({ Authorization: 'Bearer test-token' }),
+                        });
+                    },
+                },
+            },
+        });
+
+        const call = (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'INPUT' }, client),
+        );
+
+        await expect(call).rejects.toMatchObject({ message: 'socket hang up' });
+        await expect(call).rejects.not.toHaveProperty('config');
     });
 
     it('returns isError "record not found" when the record is missing but the store exists', async () => {
@@ -627,7 +649,11 @@ describe('get-key-value-store-record with a record far over the size limit', () 
             );
             const { content } = result as CallToolResult;
 
-            expect(content[0]).toMatchObject({ type: 'resource_link', name: 'export.zip' });
+            expect(content[0]).toMatchObject({
+                type: 'resource_link',
+                name: 'export.zip',
+                mimeType: 'application/zip',
+            });
             // Socket buffers hold some bytes past the limit; a full read would send all of them.
             expect(sentBytes).toBeLessThan(RECORD_BYTES / 4);
         } finally {

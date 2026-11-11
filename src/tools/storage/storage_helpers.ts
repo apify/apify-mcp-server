@@ -286,8 +286,8 @@ function readAbortedResponseContentType(error: unknown): string | undefined {
 /**
  * Reads a key-value store record without holding more than `MAX_INLINE_BYTES` of it: a record is as large
  * as its writer made it, and `getRecord()` buffers it whole. Over the limit the download stops and the
- * result has only the Content-Type, not the size: axios drops `Content-Encoding` once it decompresses, so
- * `Content-Length` cannot be told from a compressed length. `undefined` on a 404, as `getRecord()` returns.
+ * result has only the Content-Type, not the size: a compressed record's `Content-Length` is its compressed
+ * size. `undefined` on a 404, as `getRecord()` returns.
  */
 export async function fetchRecordUnderCap(
     client: ApifyClient,
