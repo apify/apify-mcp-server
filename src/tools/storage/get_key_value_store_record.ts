@@ -90,7 +90,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
         const consoleLinkContent = buildConsoleLinkContent(apifyConsoleUrl);
         if (record.isOverLimit) {
             // The download stopped at the limit, whatever the type: a record that large would blow up the
-            // context window, and holding it whole the server's memory. Return a link instead.
+            // context window, and holding it whole the server's memory.
             const summary = `Record '${recordKey}'${contentType ? ` (contentType=${contentType})` : ''} is over the ${MAX_INLINE_BYTES}-byte limit, so a link to it is returned instead of its value.`;
             // The link is opened without a token, so it addresses the store by ID, not by `~name`.
             const uri = await client.keyValueStore(await getStoreId()).getRecordPublicUrl(recordKey);
