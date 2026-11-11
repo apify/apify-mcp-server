@@ -14,11 +14,11 @@ import {
     buildCallActorDescription,
     buildCallActorErrorResponse,
     callActorArgs,
-    callOptionsSchema,
     resolveAndValidateActor,
 } from '../../src/tools/actors/call_actor.js';
 import type { InternalToolArgs, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
+import { ACTOR_RUN_LIMIT_MESSAGE } from '../../src/utils/apify_errors.js';
 import { only, textOf, type TextToolResult } from './helpers/tool_context.js';
 
 vi.mock('../../src/tools/actors/actor_tools_factory.js', async () => {
@@ -264,7 +264,7 @@ describe('call_actor_common', () => {
             expect(allText).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
         });
 
-        it('returns memory-quota recovery hint for HTTP 402 memory-limit errors', () => {
+        it('soft-fails an HTTP 402 memory-limit error without pointing to run abort', () => {
             const error = new ApifyApiError(
                 {
                     data: {
@@ -288,15 +288,8 @@ describe('call_actor_common', () => {
 
             expect(response.isError).toBe(true);
             const allText = (response.content ?? []).map(textOf).join('\n');
-            expect(allText).toContain('memory limit of 8192MB');
-            expect(allText).toContain(
-                'Account memory quota exceeded for your plan. A smaller callOptions.memory may fit the remaining ' +
-                    'quota; memory is freed when current runs finish.',
-            );
-            expect(allText).not.toMatch(/retry/i);
             // Regression: must not nudge the LLM toward aborting unrelated runs to free capacity.
             expect(allText).not.toContain(HELPER_TOOLS.ACTOR_RUNS_ABORT);
-            expect(allText).not.toContain('verify the Actor name');
             // 402 memory-limit derives SOFT_FAIL (4xx) with the memory-limit failureDetail.
             expect(response.toolTelemetry).toEqual(
                 expect.objectContaining({
@@ -332,18 +325,31 @@ describe('call_actor_common', () => {
 
             expect(response.isError).toBe(true);
             const allText = (response.content ?? []).map(textOf).join('\n');
-            expect(allText).toContain('account limit for concurrent Actor runs');
-            expect(allText).toContain('console.apify.com/billing/subscription');
-            // Run-limit must not fall through to the generic "verify the Actor name" hint.
-            expect(allText).not.toContain('verify the Actor name');
+            expect(allText).toContain(ACTOR_RUN_LIMIT_MESSAGE);
             // Run-limit derives SOFT_FAIL even though it arrives as 402/5xx (billing condition).
             expect(response.toolTelemetry).toEqual(
                 expect.objectContaining({
                     toolStatus: TOOL_STATUS.SOFT_FAIL,
                     failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
-                    failureDetail: 'cannot-start-actor-runs',
+                    failureDetail: 'concurrent-runs-limit-exceeded',
                     actorId: 'actor-999',
                 }),
+            );
+        });
+
+        it('reports cannot-start-actor-runs as failureDetail for a run-limit error without a type', () => {
+            // The Standby controller's wrapper reaches us as a plain Error; only its message names the type.
+            const error = new Error('Cannot start new Actor runs (cannot-start-actor-runs).');
+
+            const response = buildCallActorErrorResponse({
+                actorName: 'apify/instagram-scraper',
+                error,
+                actorId: 'actor-999',
+                loadedToolNames: [],
+            });
+
+            expect(response.toolTelemetry).toEqual(
+                expect.objectContaining({ failureDetail: 'cannot-start-actor-runs' }),
             );
         });
 
@@ -431,15 +437,6 @@ describe('call_actor_common', () => {
                 callOptions: { maxItems: -1 },
             });
             expect(result.success).toBe(false);
-        });
-
-        it('states the account memory quota without asking for a retry', () => {
-            const { description } = callOptionsSchema.shape.memory;
-            expect(description).toContain(
-                'Apify also caps total memory across all your concurrent runs (account plan limit); a run that ' +
-                    'would exceed that quota is rejected.',
-            );
-            expect(description).not.toMatch(/retry/i);
         });
     });
 

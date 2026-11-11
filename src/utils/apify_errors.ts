@@ -24,7 +24,7 @@ export function isPermissionApprovalError(error: unknown): error is ApifyApiErro
     return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED;
 }
 
-/** True when an Actor run is rejected because the account memory quota is exceeded. */
+/** True when an Actor run is rejected because it would exceed the account memory limit. */
 export function isMemoryQuotaError(error: unknown): error is ApifyApiError {
     return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED;
 }
@@ -66,8 +66,8 @@ export function isActorRunLimitError(error: unknown): boolean {
 
 /** User-facing message shown when an Actor run is rejected for hitting the concurrent-run limit. */
 export const ACTOR_RUN_LIMIT_MESSAGE =
-    'You have reached your account limit for concurrent Actor runs. ' +
-    'Wait for running Actors to finish, or upgrade your plan at https://console.apify.com/billing/subscription.';
+    'The account has reached its limit of concurrent Actor runs. ' +
+    'Wait for a run to finish, or ask the user to upgrade the plan at https://console.apify.com/billing/subscription';
 
 /**
  * True when the MCP server may not have answered: the connection closed, the request timed out, the network failed,
