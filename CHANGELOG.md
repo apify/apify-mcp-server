@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.21.6 - **not yet released**
 
+### 🚀 Features
+
+- Identify MCP server Actors in Actor details ([#1804](https://github.com/apify/apify-mcp-server/pull/1804)) ([808e78b](https://github.com/apify/apify-mcp-server/commit/808e78b6bdfa462bae10767eaefaeb3f07ad66ff)) by [@jirispilka](https://github.com/jirispilka), closes [#1799](https://github.com/apify/apify-mcp-server/issues/1799)
+
 ### 🐛 Bug Fixes
 
 - Strip slash padding from Actor names ([#1803](https://github.com/apify/apify-mcp-server/pull/1803)) ([74cab9b](https://github.com/apify/apify-mcp-server/commit/74cab9b2f50b3ecc8115e91b974eae420c5f2fb8)) by [@jirispilka](https://github.com/jirispilka), closes [#1798](https://github.com/apify/apify-mcp-server/issues/1798)
