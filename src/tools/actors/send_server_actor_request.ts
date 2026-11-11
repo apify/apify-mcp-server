@@ -597,7 +597,8 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
         : '';
     const example = EXAMPLE_ACTORS.find(({ actor }) => !hasTool(actorNameToToolName(actor))) ?? PLACEHOLDER_EXAMPLE;
     return dedent`
-        Send one HTTP request to an Actor Server: the HTTP API of a Server Actor, documented in its API schema (OpenAPI) and README.${details}
+        Send one HTTP request to an Actor Server, the live HTTP API of a Server Actor.
+        The Actor's API schema (OpenAPI) and README document it.${details}
         Give the method, the path, and optionally query parameters and a JSON body; the Actor Server's host and your Apify API token are added for you.
         Only an Actor with an Actor Server and an API schema takes requests here; the Actor accepts or rejects the method and path.
         A request to a single-tenant Actor Server can start a run of the Actor in your account, kept until its idle timeout; a multi-tenant Actor Server charges per event.

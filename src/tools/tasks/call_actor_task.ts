@@ -65,7 +65,7 @@ function redactCallActorTaskArgs(args: Record<string, unknown>): Record<string, 
 }
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
-    return `Run a saved Actor task: starts a run of the task's Actor with the task's stored input and run options.
+    return `Run an Actor with the preset input and run options of a saved Actor task.
 Fields given in \`input\` or \`callOptions\` override only those fields for this run; the task itself is not changed.
 Waits up to waitSecs (default 30s) for completion; returns run status and storage IDs, never the output rows.
 ${hasTool(HELPER_TOOLS.DATASET_GET_ITEMS) ? `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with the datasetId to fetch results.\n` : ''}
