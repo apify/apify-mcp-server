@@ -1,9 +1,15 @@
-import { HELPER_TOOLS, HTTP_NOT_FOUND, MAX_INLINE_BYTES } from '../../const.js';
+import { ApifyApiError } from 'apify-client';
+import { isAxiosError } from 'axios';
+
+import type { ApifyClient } from '../../apify_client.js';
+import { isMaxContentLengthAbort, sendApifyApiRequest } from '../../apify_client.js';
+import { HELPER_TOOLS, HTTP_NOT_FOUND } from '../../const.js';
 import { getResourceByIdOrName, isAmbiguousResourceId } from '../../utils/apify_resource_id.js';
 import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
-import { getHttpStatusCode } from '../../utils/logging.js';
+import { getHttpStatusCode, toPlainError } from '../../utils/logging.js';
 import { respondOk } from '../../utils/mcp.js';
+import { isRecord } from '../api/apify_api_spec.js';
 
 /**
  * Wrap a storage SDK promise to convert a 404 rejection into null.
@@ -253,16 +259,6 @@ export function normalizeRecordKey(key: string): string {
 }
 
 /**
- * How to surface a binary key-value-store record value: inline as base64 below
- * `MAX_INLINE_BYTES`, otherwise link out (inlining a multi-MB blob would blow up the
- * client's context). `mimeType` is the Content-Type with parameters stripped and lowercased
- * (`Image/PNG; charset=…` → `image/png`), or `undefined` when no Content-Type was declared.
- */
-export type BinaryRecordDisposition =
-    | { kind: 'inline'; mimeType?: string; base64: string }
-    | { kind: 'linkOut'; mimeType?: string; bytes: number };
-
-/**
  * Base MIME type of a Content-Type header: parameters stripped, lowercased
  * (`Image/PNG; charset=…` → `image/png`), `undefined` when no header was declared.
  * Shared by the get-key-value-store-record tool and the API-resource proxy.
@@ -272,14 +268,47 @@ export function parseBaseMimeType(contentType: string | undefined): string | und
 }
 
 /**
- * Build the transport disposition for a binary record value: normalize the MIME type, decide
- * inline-vs-link-out at the byte threshold, base64-encode when inlining. It does NOT mint the
- * link-out URL — the caller handles `linkOut` by minting its own URL via async calls.
+ * A record read by `fetchRecordUnderCap`: the value as apify-client parses it (JSON -> object, text/xml ->
+ * string, else -> Buffer, empty -> `undefined`), or `isOverLimit` when the body passed `MAX_INLINE_BYTES`.
  */
-export function buildBinaryRecordDisposition(contentType: string | undefined, value: Buffer): BinaryRecordDisposition {
-    const mimeType = parseBaseMimeType(contentType);
-    if (value.length > MAX_INLINE_BYTES) {
-        return { kind: 'linkOut', ...(mimeType !== undefined && { mimeType }), bytes: value.length };
+export type FetchedRecord =
+    | { isOverLimit: false; value: unknown; contentType?: string }
+    | { isOverLimit: true; contentType?: string };
+
+/** The Content-Type of a response axios aborted mid-body; Node's request object keeps the response it got. */
+function readAbortedResponseContentType(error: unknown): string | undefined {
+    const request: unknown = isAxiosError(error) ? error.request : undefined;
+    const headers = isRecord(request) && isRecord(request.res) ? request.res.headers : undefined;
+    const contentType = isRecord(headers) ? headers['content-type'] : undefined;
+    return typeof contentType === 'string' ? contentType : undefined;
+}
+
+/**
+ * Reads a key-value store record without holding more than `MAX_INLINE_BYTES` of it: a record is as large
+ * as its writer made it, and `getRecord()` buffers it whole. Over the limit the download stops and the
+ * result has only the Content-Type, not the size: axios drops `Content-Encoding` once it decompresses, so
+ * `Content-Length` cannot be told from a compressed length. `undefined` on a 404, as `getRecord()` returns.
+ */
+export async function fetchRecordUnderCap(
+    client: ApifyClient,
+    safeId: string,
+    recordKey: string,
+): Promise<FetchedRecord | undefined> {
+    let response: Awaited<ReturnType<typeof sendApifyApiRequest>>;
+    try {
+        response = await sendApifyApiRequest(client, {
+            url: `${client.keyValueStore(safeId).url}/records/${recordKey}`,
+            method: 'GET',
+            // As `getRecord()` sends.
+            params: { attachment: 'true' },
+        });
+    } catch (error) {
+        if (!isMaxContentLengthAbort(error)) throw toPlainError(error);
+        const contentType = readAbortedResponseContentType(error);
+        return { isOverLimit: true, ...(contentType && { contentType }) };
     }
-    return { kind: 'inline', ...(mimeType !== undefined && { mimeType }), base64: value.toString('base64') };
+    if (response.status === HTTP_NOT_FOUND) return undefined;
+    if (response.status >= 300) throw new ApifyApiError(response, 1);
+    const contentType = response.headers['content-type'];
+    return { isOverLimit: false, value: response.data, ...(typeof contentType === 'string' && { contentType }) };
 }
