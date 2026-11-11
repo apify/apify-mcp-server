@@ -246,24 +246,6 @@ describe('get-key-value-store-record', () => {
         );
     });
 
-    it('returns a resource_link instead of inlining a binary record over the size limit', async () => {
-        const result = await (getKeyValueStoreRecord as HelperTool).call(
-            stubToolCallContext(
-                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'big.png' },
-                stubApifyClient({ overLimit: { contentType: 'image/png' } }),
-            ),
-        );
-        const { content, isError } = result as CallToolResult;
-
-        expect(isError).not.toBe(true);
-        expect(content[0]).toEqual({
-            type: 'resource_link',
-            uri: 'https://api.apify.com/v2/key-value-stores/KvsWkzbQMuFYuam3Y/records/big.png?signature=signed',
-            name: 'big.png',
-            mimeType: 'image/png',
-        });
-    });
-
     it('returns a resource_link without mimeType when the record has no Content-Type', async () => {
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
@@ -291,7 +273,12 @@ describe('get-key-value-store-record', () => {
         const { content, isError, structuredContent } = result as CallToolResult;
 
         expect(isError).not.toBe(true);
-        expect(content[0]).toMatchObject({ type: 'resource_link', mimeType: 'text/markdown' });
+        expect(content[0]).toEqual({
+            type: 'resource_link',
+            uri: 'https://api.apify.com/v2/key-value-stores/KvsWkzbQMuFYuam3Y/records/page.md?signature=signed',
+            name: 'page.md',
+            mimeType: 'text/markdown',
+        });
         expect(structuredContent?.value).toBe(`<text/markdown, over ${MAX_INLINE_BYTES} bytes>`);
         expect(structuredContent?.summary).toContain(`over the ${MAX_INLINE_BYTES}-byte limit`);
     });

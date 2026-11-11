@@ -93,7 +93,7 @@ export function resolveSiblingNextStep(
 /**
  * The "Apify Console: <url>" line plus the verbatim-links nudge, or `undefined` when there is no
  * link (non-Console session). Single source for both the text-channel suffix in `buildStorageResponse`
- * and the standalone content item in `buildConsoleLinkContent` (binary KV records).
+ * and the standalone content item in `buildConsoleLinkContent` (binary and over-limit KV records).
  */
 export function apifyConsoleLinkText(apifyConsoleUrl: string | undefined): string | undefined {
     return apifyConsoleUrl ? `Apify Console: ${apifyConsoleUrl}\n${VERBATIM_LINKS_NUDGE}` : undefined;
@@ -102,7 +102,7 @@ export function apifyConsoleLinkText(apifyConsoleUrl: string | undefined): strin
 /**
  * Optional extra text content item carrying the storage's personalized Console link
  * (Console UI token sessions only). Spread into a tool's `content` array — used by the
- * binary key-value-store-record path, which bypasses `buildStorageResponse`.
+ * key-value-store-record paths for binary and over-limit records, which bypass `buildStorageResponse`.
  */
 export function buildConsoleLinkContent(apifyConsoleUrl: string | undefined): { type: 'text'; text: string }[] {
     const text = apifyConsoleLinkText(apifyConsoleUrl);
