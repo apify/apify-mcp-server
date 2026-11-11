@@ -3,6 +3,7 @@ import { z } from 'zod';
 import log from '@apify/log';
 
 import { HELPER_TOOLS } from '../../const.js';
+import { REDACTED } from '../../resources/api_resources.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -10,6 +11,7 @@ import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { respondAborted, respondUserError } from '../../utils/mcp.js';
 import { abortRunOnSignal, buildStartRunResponse, fetchActorRunData } from '../actors/actor_run_response.js';
 import { callActorArgs, callOptionsSchema } from '../actors/call_actor.js';
+import { isRecord } from '../api/apify_api_spec.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
 import { actorRunOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
 import { getTaskByIdOrName } from './task_helpers.js';
@@ -33,6 +35,34 @@ const callActorTaskArgs = z.object({
             "Optional run config overriding the task's saved run options: memory (MB), timeout (s), build, maxItems (pay-per-result cap), maxTotalChargeUsd (pay-per-event cap).",
         ),
 });
+
+/** `keys` of `record` that are set, each a string, number, or boolean as is and any other value as `REDACTED`. */
+function pickLoggedValues(record: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+    return Object.fromEntries(
+        keys.flatMap((key) => {
+            const value = record[key];
+            if (value === undefined) return [];
+            return [[key, ['string', 'number', 'boolean'].includes(typeof value) ? value : REDACTED]];
+        }),
+    );
+}
+
+/**
+ * The logged copy of the arguments (`redactArgs`), built as an allowlist. `input` is logged as `REDACTED`: it can
+ * hold secrets, such as an API key the task's Actor takes.
+ */
+function redactCallActorTaskArgs(args: Record<string, unknown>): Record<string, unknown> {
+    const { input, callOptions } = args;
+    return {
+        ...pickLoggedValues(args, ['taskId', 'waitSecs']),
+        ...(callOptions !== undefined && {
+            callOptions: isRecord(callOptions)
+                ? pickLoggedValues(callOptions, callOptionsSchema.keyof().options)
+                : REDACTED,
+        }),
+        ...(input !== undefined && { input: REDACTED }),
+    };
+}
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
     return `Run a saved Actor task: starts a run of the task's Actor with the task's stored input and run options.
@@ -60,6 +90,7 @@ export const callActorTask: ToolEntry = Object.freeze({
     inputSchema: z.toJSONSchema(callActorTaskArgs) as ToolInputSchema,
     outputSchema: actorRunOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(callActorTaskArgs)),
+    redactArgs: redactCallActorTaskArgs,
     annotations: {
         title: 'Call Actor task',
         readOnlyHint: false,

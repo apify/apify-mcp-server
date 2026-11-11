@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { prepareToolCallContext } from '../../src/payments/helpers.js';
+import { REDACTED } from '../../src/resources/api_resources.js';
 import { actorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { callActorTask } from '../../src/tools/tasks/call_actor_task.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -149,5 +151,32 @@ describe('call-actor-task returns the run', () => {
         })) as CallResult;
 
         expect(result.structuredContent).toMatchObject({ runId: 'run-1', status: 'SUCCEEDED' });
+    });
+});
+
+describe('call-actor-task keeps the input override out of the logs', () => {
+    it('logs the allowlisted arguments with input withheld and unknown keys dropped', () => {
+        const args = {
+            taskId: 'my-task',
+            waitSecs: 0,
+            callOptions: { memory: 1024, build: 'beta' },
+            input: { apiKey: 'secret-input-value' },
+            extra: 'secret-extra-value',
+        };
+        const { toolArgsRedacted, toolArgsWithoutPayment } = prepareToolCallContext({
+            provider: undefined,
+            tool: callActorTask,
+            args,
+            apifyToken: 'test-token',
+        });
+
+        expect(toolArgsRedacted).toEqual({
+            taskId: 'my-task',
+            waitSecs: 0,
+            callOptions: { memory: 1024, build: 'beta' },
+            input: REDACTED,
+        });
+        // The tool still receives every argument.
+        expect(toolArgsWithoutPayment).toEqual(args);
     });
 });
