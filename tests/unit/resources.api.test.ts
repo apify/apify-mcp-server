@@ -215,6 +215,10 @@ describe('readApiResource()', () => {
         [`${API}/v2/datasets/ds-1?method=DELETE`, METHOD_PARAM_REFUSAL],
         [`${API}/v2/datasets/ds-1?%6Dethod=DELETE`, METHOD_PARAM_REFUSAL],
         [`${API}/v2/acts/apify~hello-world/run-sync`, SYNC_RUN_REFUSAL],
+        [`${API}//v2/acts/apify~hello-world/run-sync`, SYNC_RUN_REFUSAL],
+        [`${API}///v2/acts/apify~hello-world/run-sync`, SYNC_RUN_REFUSAL],
+        [`${API}/%76%32/acts/apify~hello-world/run-sync`, SYNC_RUN_REFUSAL],
+        [`${API}/v%32/acts/apify~hello-world/run-sync`, SYNC_RUN_REFUSAL],
         [`${API}/v2/actor-tasks/abc/run-sync-get-dataset-items`, SYNC_RUN_REFUSAL],
     ])('throws InvalidParams without a request for %s, as the API tools refuse it', async (uri, refusal) => {
         const { request, captured } = requestReturning(streamOf('{}'), 'application/json');
