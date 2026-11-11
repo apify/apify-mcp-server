@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.21.6 - **not yet released**
+## [0.21.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.6) (2026-11-11)
 
 ### 🚀 Features
 
@@ -18,7 +17,6 @@ All notable changes to this project will be documented in this file.
 - Skip the Actor cache for caller-relative names ([#1871](https://github.com/apify/apify-mcp-server/pull/1871)) ([eeec027](https://github.com/apify/apify-mcp-server/commit/eeec027dba76a92797a3b2d41bd8c3cbaa532ee3)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.21.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.5) (2026-11-10)
 
 ### 🐛 Bug Fixes
