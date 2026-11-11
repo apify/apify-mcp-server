@@ -15,6 +15,7 @@ import {
     formatScheduleState,
     getScheduleByIdOrName,
     MAX_ACTIONS_PER_TYPE,
+    redactScheduleToolArgs,
     scheduleActionSchema,
     scheduleFieldsSchema,
     type ScheduleTimezone,
@@ -70,6 +71,7 @@ export const updateSchedule: ToolEntry = Object.freeze({
     inputSchema: z.toJSONSchema(updateScheduleArgs) as ToolInputSchema,
     outputSchema: scheduleOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(updateScheduleArgs)),
+    redactArgs: (args: Record<string, unknown>) => redactScheduleToolArgs(args, Object.keys(updateScheduleArgs.shape)),
     annotations: {
         title: 'Update schedule',
         readOnlyHint: false,

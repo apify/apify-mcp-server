@@ -9,8 +9,10 @@ import {
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
+import { maskLoggedValues, pickLoggedValues, REDACTED } from '../../resources/api_resources.js';
 import { getResourceByIdOrName } from '../../utils/apify_resource_id.js';
 import { toIsoString } from '../actors/actor_run_response.js';
+import { isRecord } from '../api/apify_api_spec.js';
 import { anyJsonObjectSchema } from '../structured_output_schemas.js';
 import { getTaskByIdOrName } from '../tasks/task_helpers.js';
 
@@ -92,6 +94,28 @@ export const scheduleActionSchema = z.object({
     restartOnError: z.boolean().optional().describe('Actor actions only: restart the run when it fails.'),
 });
 export type ScheduleActionInput = z.infer<typeof scheduleActionSchema>;
+
+/**
+ * The logged copy of a schedule tool's arguments (`redactArgs`), built as an allowlist of `keys` and each action's
+ * declared keys, with the action's run input as `REDACTED`: it can hold passwords, API keys, or cookies.
+ */
+export function redactScheduleToolArgs(
+    args: Record<string, unknown>,
+    keys: readonly string[],
+): Record<string, unknown> {
+    const { actions } = args;
+    const redactAction = (action: unknown) =>
+        isRecord(action)
+            ? {
+                  ...pickLoggedValues(action, Object.keys(scheduleActionSchema.shape)),
+                  ...maskLoggedValues(action, ['input']),
+              }
+            : REDACTED;
+    return {
+        ...pickLoggedValues(args, keys),
+        ...(actions !== undefined && { actions: Array.isArray(actions) ? actions.map(redactAction) : REDACTED }),
+    };
+}
 
 /** Every schedule field the tools write, all optional; the create tool tightens `cronExpression` and `isEnabled`. */
 export const scheduleFieldsSchema = z.object({

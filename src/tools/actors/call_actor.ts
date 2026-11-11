@@ -13,6 +13,7 @@ import {
 } from '../../const.js';
 import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
 import type { PaymentProvider } from '../../payments/types.js';
+import { maskLoggedValues, pickLoggedValues, REDACTED } from '../../resources/api_resources.js';
 import type { ApifyToken, InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ACTOR_TOOL_MODE, ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorDefinitionCached, getActorToolResolutionCached } from '../../utils/actor.js';
@@ -38,6 +39,7 @@ import { buildPermissionApprovalTexts } from '../../utils/payment_errors.js';
 import { classifyFailureCategory, extractAjvErrorDetails } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
 import { findServerTool, getOwnServerRemedy, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
+import { isRecord } from '../api/apify_api_spec.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
 import { actorRunOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
 import {
@@ -329,6 +331,26 @@ export const callActorArgs = z.object({
 
 export const callActorInputSchema = z.toJSONSchema(callActorArgs) as ToolInputSchema;
 export const callActorAjvValidate = compileSchema({ ...z.toJSONSchema(callActorArgs), additionalProperties: true });
+
+/**
+ * The logged copy of a call's arguments (`redactArgs`), built as an allowlist of `keys` and the declared
+ * `callOptions`, with the Actor input as `REDACTED`: it can hold passwords, API keys, or cookies.
+ */
+export function redactCallActorArgs(
+    args: Record<string, unknown>,
+    keys: readonly string[] = Object.keys(callActorArgs.shape),
+): Record<string, unknown> {
+    const { callOptions } = args;
+    return {
+        ...pickLoggedValues(args, keys),
+        ...maskLoggedValues(args, ['input']),
+        ...(callOptions !== undefined && {
+            callOptions: isRecord(callOptions)
+                ? pickLoggedValues(callOptions, Object.keys(callOptionsSchema.shape))
+                : REDACTED,
+        }),
+    };
+}
 
 /**
  * Parsed call-actor arguments.
@@ -630,6 +652,7 @@ export const callActor: ToolEntry = Object.freeze({
     paymentRequired: true,
     hasPaymentProviderStandbyCheck: true,
     actorInterface: 'input',
+    redactArgs: (args: Record<string, unknown>) => redactCallActorArgs(args),
     annotations: {
         title: 'Call Actor',
         readOnlyHint: false,

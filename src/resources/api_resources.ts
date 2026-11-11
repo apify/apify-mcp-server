@@ -23,6 +23,22 @@ const TEXT_MIME_TYPE = 'text/plain';
 
 export const REDACTED = '[REDACTED]';
 
+/** `keys` of `record` that are set: a string, number, or boolean as is, any other value as `REDACTED`. */
+export function pickLoggedValues(record: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+    return Object.fromEntries(
+        keys.flatMap((key) => {
+            const value = record[key];
+            if (value === undefined) return [];
+            return [[key, ['string', 'number', 'boolean'].includes(typeof value) ? value : REDACTED]];
+        }),
+    );
+}
+
+/** `keys` of `record` that are set, each as `REDACTED`. */
+export function maskLoggedValues(record: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+    return Object.fromEntries(keys.filter((key) => record[key] !== undefined).map((key) => [key, REDACTED]));
+}
+
 /** Textual base MIME types (returned as `text`); everything else becomes a base64 `blob`. */
 export function isTextualMimeType(baseMimeType: string | undefined): boolean {
     if (!baseMimeType) return false;
