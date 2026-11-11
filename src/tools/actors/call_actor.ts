@@ -19,6 +19,7 @@ import { getActorDefinitionCached, getActorToolResolutionCached } from '../../ut
 import { compileSchema } from '../../utils/ajv.js';
 import {
     ACTOR_RUN_LIMIT_MESSAGE,
+    getApifyErrorType,
     isActorInputValidationError,
     isActorRunLimitError,
     isMemoryQuotaError,
@@ -241,7 +242,7 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         return respondServerError(
             [
                 `Failed to call Actor '${actorName}': ${errMsg}`,
-                `Account memory quota exceeded for your plan. A smaller callOptions.memory may fit the remaining quota; memory is freed when current runs finish.`,
+                `This run would exceed the account memory limit. A smaller callOptions.memory may fit the remaining quota. Memory frees up when runs and builds finish.`,
             ],
             { error, detail: APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED, actorId },
         );
@@ -250,7 +251,7 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
     if (isActorRunLimitError(error)) {
         return respondServerError([`Failed to call Actor '${actorName}': ${errMsg}`, ACTOR_RUN_LIMIT_MESSAGE], {
             error,
-            detail: APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS,
+            detail: getApifyErrorType(error) ?? APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS,
             actorId,
         });
     }
@@ -280,7 +281,7 @@ export const callOptionsSchema = z.object({
         .max(32768, 'Memory cannot exceed 32 GB (32768 MB)')
         .optional().describe(dedent`
             Memory per run in MB. Power of 2 from 128 to 32768.
-            Apify also caps total memory across all your concurrent runs (account plan limit); a run that would exceed that quota is rejected.
+            The account memory limit covers all running Actor runs and builds; a run that would exceed it is rejected.
         `),
     timeout: z.number().min(0, 'Timeout must be 0 or greater').optional().describe(dedent`
             Maximum runtime for the Actor in seconds. After this time elapses, the Actor will be automatically terminated.
