@@ -189,7 +189,7 @@ ${renderedBlocks.map((block, index) => (index > 0 && block.startsWith('###') ? `
 ## Actor tasks
 - An Actor task is a saved, reusable configuration of an Actor. It stores the Actor input and run options such as the build, memory, and timeout.
 - Tasks are useful for repeated or scheduled jobs, because the user does not have to configure the Actor again for every run.
-${hasTaskCall ? '- Running a task uses its stored input and run options; input given for a run overrides only those fields.\n' : ''}${taskPrivacyLine}${taskPublishLines}`
+${hasTaskCall ? `- \`${HELPER_TOOLS.ACTOR_TASK_CALL}\` runs a saved task with its stored input and run options; fields given in \`input\` override only those fields.\n` : ''}${taskPrivacyLine}${taskPublishLines}`
             : '';
 
     const hasScheduleCreate = hasTool(HELPER_TOOLS.SCHEDULE_CREATE);
