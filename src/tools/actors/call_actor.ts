@@ -336,10 +336,7 @@ export const callActorAjvValidate = compileSchema({ ...z.toJSONSchema(callActorA
  * The logged copy of a call's arguments (`redactArgs`), built as an allowlist of `keys` and the declared
  * `callOptions`, with the Actor input as `REDACTED`: it can hold passwords, API keys, or cookies.
  */
-export function redactCallActorArgs(
-    args: Record<string, unknown>,
-    keys: readonly string[] = Object.keys(callActorArgs.shape),
-): Record<string, unknown> {
+export function redactCallActorArgs(args: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
     const { callOptions } = args;
     return {
         ...pickLoggedValues(args, keys),
@@ -652,7 +649,7 @@ export const callActor: ToolEntry = Object.freeze({
     paymentRequired: true,
     hasPaymentProviderStandbyCheck: true,
     actorInterface: 'input',
-    redactArgs: (args: Record<string, unknown>) => redactCallActorArgs(args),
+    redactArgs: (args: Record<string, unknown>) => redactCallActorArgs(args, Object.keys(callActorArgs.shape)),
     annotations: {
         title: 'Call Actor',
         readOnlyHint: false,

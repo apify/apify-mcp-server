@@ -3,6 +3,8 @@ import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
+import log from '@apify/log';
+
 import { ACTOR_TIP_CAVEAT } from '../../src/tools/actor_tool_naming.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import type { RunResponse } from '../../src/tools/actors/actor_run_response.js';
@@ -290,6 +292,20 @@ describe('actorExecutor', () => {
 
             expect(result).toBeNull();
             expect(spies.startInput).toBeUndefined();
+        });
+
+        it('keeps the Actor input out of the abort log', async () => {
+            const infoSpy = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+            const controller = new AbortController();
+            controller.abort();
+            const { params } = buildParams({ password: 'synthetic-secret-4f2a' }, { abortSignal: controller.signal });
+
+            await actorExecutor.executeActorTool(params);
+            const loggedCalls = JSON.stringify(infoSpy.mock.calls);
+            infoSpy.mockRestore();
+
+            expect(loggedCalls).not.toBe('[]');
+            expect(loggedCalls).not.toContain('synthetic-secret-4f2a');
         });
     });
 });
