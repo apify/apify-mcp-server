@@ -13,6 +13,8 @@ All notable changes to this project will be documented in this file.
 
 - Strip slash padding from Actor names ([#1803](https://github.com/apify/apify-mcp-server/pull/1803)) ([74cab9b](https://github.com/apify/apify-mcp-server/commit/74cab9b2f50b3ecc8115e91b974eae420c5f2fb8)) by [@jirispilka](https://github.com/jirispilka), closes [#1798](https://github.com/apify/apify-mcp-server/issues/1798)
 - Explain invalid Zod tool arguments ([#1805](https://github.com/apify/apify-mcp-server/pull/1805)) ([3b6324a](https://github.com/apify/apify-mcp-server/commit/3b6324ac9a75d67f7156e8035095593d864c1b02)) by [@jirispilka](https://github.com/jirispilka), closes [#1800](https://github.com/apify/apify-mcp-server/issues/1800)
+- Recognize Actor memory and concurrent-run limit errors ([#1776](https://github.com/apify/apify-mcp-server/pull/1776)) ([42980c5](https://github.com/apify/apify-mcp-server/commit/42980c5ca9a0c1a702878f55bd1d1a510476b05c)) by [@jirispilka](https://github.com/jirispilka), closes [#1592](https://github.com/apify/apify-mcp-server/issues/1592)
+- Refuse a doubled or escaped &#x2F;v2 prefix in the API blocklist ([#1751](https://github.com/apify/apify-mcp-server/pull/1751)) ([15904da](https://github.com/apify/apify-mcp-server/commit/15904da9f24a03d8fc459ea134c4965c00fc4f4f)) by [@jirispilka](https://github.com/jirispilka), closes [#1604](https://github.com/apify/apify-mcp-server/issues/1604)
 
 
 <!-- git-cliff-unreleased-end -->
