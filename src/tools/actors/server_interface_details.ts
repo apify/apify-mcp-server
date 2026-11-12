@@ -1,7 +1,8 @@
 /**
- * The server-interface section of `fetch-actor-details`, built as the `structuredContent` object first and the
- * text from it (a header plus the object as fenced JSON), so the two cannot drift. Also the operations of a
- * selected Server Actor's own tool description (`buildServerActorToolInfo`).
+ * The server-interface section of `fetch-actor-details`: the `structuredContent` object, and a text that says how to
+ * use it (title, cost notice, send example, why operations were cut). The object reaches text-only clients through
+ * the response's JSON mirror, so the text does not repeat it. Also the operations of a selected Server Actor's own
+ * tool description (`buildServerActorToolInfo`).
  */
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
 import type { Actor, ActorTenancy, ServerActorToolInfo } from '../../types.js';
@@ -114,12 +115,16 @@ function fitOperationIndex(
     return render(low);
 }
 
-/** An `undefined` section ran out of its rendering budget, so it would not fit either. */
+/**
+ * The header and the operations JSON count against the limit together, as the response carries both. An `undefined`
+ * `json` ran out of its rendering budget, so it would not fit either.
+ */
 function checkSize(
-    section: ServerInterfaceSection | undefined,
+    section: ServerInterfaceSection,
+    json: string | undefined,
     actorFullName: string,
 ): ServerInterfaceSection | { error: string } {
-    if (section?.text !== undefined && Buffer.byteLength(section.text) <= MAX_INLINE_BYTES) return section;
+    if (json !== undefined && Buffer.byteLength(`${section.text}${json}`) <= MAX_INLINE_BYTES) return section;
     return {
         error: `Actor '${actorFullName}' server-interface output exceeds the ${MAX_INLINE_BYTES}-byte limit and was not returned. A smaller operation may fit.`,
     };
@@ -185,9 +190,8 @@ function buildOperationsSection(
         ...facts,
         operations: operations.map((operation) => buildServerOperationDetails(operation, context)),
     }));
-    if (full) {
-        const text = `${header}${full.json}`;
-        if (Buffer.byteLength(text) <= MAX_INLINE_BYTES) return { serverInterface: full.value, text };
+    if (full && Buffer.byteLength(`${header}${full.json}`) <= MAX_INLINE_BYTES) {
+        return { serverInterface: full.value, text: header };
     }
     const next = `The operations in full exceed the ${MAX_INLINE_BYTES}-byte limit. ${formatDetailsCall(actorFullName, formatOperationName(operations[0]))} returns one operation in full.\n`;
     const index = fitOperationIndex(
@@ -195,7 +199,7 @@ function buildOperationsSection(
         buildServerOperationIndex(operations, schema),
         MAX_INLINE_BYTES - Buffer.byteLength(`${header}${next}`),
     );
-    return checkSize({ serverInterface: index.value, text: `${header}${next}${index.json}` }, actorFullName);
+    return checkSize({ serverInterface: index.value, text: `${header}${next}` }, index.json, actorFullName);
 }
 
 function buildOperationSection(
@@ -211,7 +215,7 @@ function buildOperationSection(
         ...facts,
         operations: [buildServerOperationDetails(operation, context)],
     }));
-    return checkSize(one && { serverInterface: one.value, text: `${header}${one.json}` }, actorFullName);
+    return checkSize({ serverInterface: one?.value, text: header }, one?.json, actorFullName);
 }
 
 /** The section by `output.serverInterface`: a summary line, every operation or the index, or one operation. */
