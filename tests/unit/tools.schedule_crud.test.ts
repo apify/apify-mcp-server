@@ -320,9 +320,8 @@ describe('update-schedule', () => {
         expect(sentActions(calls.at(-1)!)).toHaveLength(20);
     });
 
-    it('leaves name validation to the API instead of throwing a ZodError at the client', async () => {
-        // The server's AJV strips the `pattern` keyword, so a regex here would not gate the
-        // call — it would only throw inside the tool body and reach the client as serialised JSON.
+    it('leaves name validation to the API', async () => {
+        // The server's AJV strips the `pattern` keyword, so a regex here would only fire inside the tool body.
         const { apifyClient, calls } = mockScheduleApiClient(mockSchedule());
         await run(
             createSchedule,

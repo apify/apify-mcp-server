@@ -13,6 +13,7 @@ import { ACTOR_TENANCY } from '../types.js';
  * Some MCP clients refuse a keyword-less `{}` subschema, so nullable and free-form values list their
  * types. Zod's `toJSONSchema()` compacts an `anyOf` of bare types into a `type` array; the two forms
  * are the same JSON Schema constraint and current clients accept both.
+ * An array in a tool input schema needs `items`: VS Code Copilot rejects every request otherwise.
  */
 
 /** A string or `null`. Spread it next to a `description`. */
@@ -23,6 +24,23 @@ export const anyJsonValueSchema = {
     anyOf: [
         { type: 'object' },
         { type: 'array' },
+        { type: 'string' },
+        { type: 'number' },
+        { type: 'boolean' },
+        { type: 'null' },
+    ],
+};
+
+/**
+ * Any JSON value as a tool's `body` argument. Valid only at `properties.body` of an input schema.
+ *
+ * Array items reference `body` itself, so arrays nest to any depth. VS Code Copilot rejects an array
+ * without `items`; the MCP Inspector flags `items: true` as an error and `items: {}` as untyped.
+ */
+export const anyJsonBodySchema = {
+    anyOf: [
+        { type: 'object' },
+        { type: 'array', items: { $ref: '#/properties/body' } },
         { type: 'string' },
         { type: 'number' },
         { type: 'boolean' },
@@ -1323,6 +1341,7 @@ export const actorDetailsOutputSchema = {
         inputSchema: { type: 'object' as const, description: 'Actor input schema.' },
         outputSchema: { type: 'object' as const, description: 'Output schema inferred from successful runs.' },
         serverInterface: serverInterfaceDetailsSchema,
+        nextStep: nextStepProperty,
     },
 };
 
