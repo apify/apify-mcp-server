@@ -6,8 +6,16 @@ import Ajv from 'ajv';
  * schema in a Map that is never evicted.
  */
 export function createAjv(): Ajv {
-    // `logger: false`: on a failed compilation Ajv writes the whole generated validator source to the console.
-    const instance = new Ajv({ coerceTypes: 'array', strict: false, removeAdditional: true, logger: false });
+    const instance = new Ajv({
+        coerceTypes: 'array',
+        strict: false,
+        removeAdditional: true,
+        // On a failed compilation Ajv writes the whole generated validator source to the console.
+        logger: false,
+        // The optimization pass only shortens the generated code, and its time grows with the square of
+        // the schema size: without it a schema with 1,000 properties compiles about four times faster.
+        code: { optimize: false },
+    });
 
     // `pattern`/`patternProperties` compile a RegExp from untrusted Actor / proxied-MCP input schemas;
     // a catastrophic-backtracking pattern freezes the single-threaded event loop (ReDoS). `format` is

@@ -152,6 +152,13 @@ describe('createAjv — console output', () => {
     });
 });
 
+describe('createAjv — code generation', () => {
+    it('skips the code optimization pass, whose time grows faster than the schema', () => {
+        // Ajv stores `optimize: false` as zero passes.
+        expect(createAjv().opts.code.optimize).toBe(0);
+    });
+});
+
 describe('createAjv — Actor input schemas', () => {
     it('strips extra properties when schema has additionalProperties: false', () => {
         const validate = createAjv().compile({

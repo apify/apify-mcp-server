@@ -27,12 +27,38 @@ type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 export const MAX_UNTRUSTED_SCHEMA_BYTES = 262_144;
 
 /**
- * Bytes alone do not bound the compile time: Ajv generates code per subschema, and the time grows faster
- * than their count. Of the 2,419 most popular public Actors (2026-11), the largest input schema has 452
- * subschemas and compiles in 0.1 to 0.2 s, and the next largest has 217. A schema at this limit compiles
- * in 0.2 to 0.3 s.
+ * Ajv validates the sibling subschemas of a schema (properties, tuple items, `allOf` members) one inside
+ * another, so the generated function nests as deep as the longest chain of siblings along one path. Node.js 24
+ * cannot run a function nested deeper than about 1,300 blocks ("Maximum call stack size exceeded"): the
+ * schema compiles and every validation fails. The widest input schema of a public Actor in the Apify Store
+ * (2026-10) has 446 properties.
  */
-export const MAX_UNTRUSTED_SUBSCHEMAS = 500;
+export const MAX_UNTRUSTED_SUBSCHEMA_CHAIN_LENGTH = 1000;
+
+/**
+ * Bytes alone do not bound the compile time, which grows with the number of subschemas. A generous backstop:
+ * the largest input schema of a public Actor in the Apify Store (2026-10) has 784 subschemas.
+ */
+export const MAX_UNTRUSTED_SUBSCHEMAS = 2000;
+
+/**
+ * Ajv checks that the values of an `enum` are unique by comparing each pair of them. The longest `enum`
+ * of a public Actor in the Apify Store (2026-10) has 1,158 values.
+ */
+export const MAX_UNTRUSTED_ENUM_VALUES = 3000;
+
+/** Keywords whose value is data: an object inside it is not a subschema, whatever it looks like. */
+const DATA_KEYWORDS = new Set(['default', 'prefill', 'enum', 'example', 'examples', 'const']);
+/** Keywords whose value maps a name to a subschema, so its keys are not keywords. */
+const SUBSCHEMA_MAP_KEYWORDS = new Set([
+    'properties',
+    'patternProperties',
+    'dependencies',
+    'dependentSchemas',
+    'definitions',
+    '$defs',
+]);
+const SUBSCHEMA_LIST_KEYWORDS = new Set(['allOf', 'anyOf', 'oneOf', 'items', 'prefixItems']);
 
 const UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE = 1000;
 // A failed compilation costs as much as a successful one, so the cache remembers its error too.
@@ -42,18 +68,51 @@ const untrustedValidatorCache = new LruCache<
     maxLength: UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE,
 });
 
-/** Counts the objects and booleans in a schema; Ajv generates code for each one that is a subschema. */
-function countSubschemas(schema: object): number {
-    let subschemaCount = 0;
-    const pendingValues: unknown[] = [schema];
-    while (pendingValues.length > 0) {
-        const value = pendingValues.pop();
-        if (typeof value === 'boolean') subschemaCount++;
-        if (typeof value !== 'object' || value === null) continue;
-        if (!Array.isArray(value)) subschemaCount++;
-        for (const child of Object.values(value)) pendingValues.push(child);
+const isSubschema = (value: unknown): boolean =>
+    typeof value === 'boolean' || (typeof value === 'object' && value !== null && !Array.isArray(value));
+
+/** The subschemas directly inside a schema; `default`, `enum` and other data values hold none. */
+function getChildSubschemas(schema: object): unknown[] {
+    const childSubschemas: unknown[] = [];
+    for (const [keyword, value] of Object.entries(schema)) {
+        if (DATA_KEYWORDS.has(keyword) || typeof value !== 'object' || value === null) continue;
+
+        if (SUBSCHEMA_MAP_KEYWORDS.has(keyword) || (SUBSCHEMA_LIST_KEYWORDS.has(keyword) && Array.isArray(value))) {
+            for (const member of Object.values(value)) {
+                if (isSubschema(member)) childSubschemas.push(member);
+            }
+        } else if (!Array.isArray(value)) {
+            childSubschemas.push(value);
+        }
     }
-    return subschemaCount;
+    return childSubschemas;
+}
+
+/** Throws SchemaTooLargeError on a schema over one of the subschema or enum limits. */
+function validateSchemaSize(schema: object): void {
+    let subschemaCount = 0;
+    // `chainLength` is the number of sibling subschemas on the path from the root down to the subschema.
+    const pendingSubschemas: { subschema: unknown; chainLength: number }[] = [{ subschema: schema, chainLength: 0 }];
+    for (let pending = pendingSubschemas.pop(); pending !== undefined; pending = pendingSubschemas.pop()) {
+        subschemaCount++;
+        if (subschemaCount > MAX_UNTRUSTED_SUBSCHEMAS) {
+            throw new SchemaTooLargeError(MAX_UNTRUSTED_SUBSCHEMAS, 'subschemas');
+        }
+        const { subschema, chainLength } = pending;
+        if (typeof subschema !== 'object' || subschema === null) continue;
+
+        if ('enum' in subschema && Array.isArray(subschema.enum) && subschema.enum.length > MAX_UNTRUSTED_ENUM_VALUES) {
+            throw new SchemaTooLargeError(MAX_UNTRUSTED_ENUM_VALUES, 'enum values');
+        }
+        const childSubschemas = getChildSubschemas(subschema);
+        const childChainLength = chainLength + childSubschemas.length;
+        if (childChainLength > MAX_UNTRUSTED_SUBSCHEMA_CHAIN_LENGTH) {
+            throw new SchemaTooLargeError(MAX_UNTRUSTED_SUBSCHEMA_CHAIN_LENGTH, 'chained subschemas');
+        }
+        for (const childSubschema of childSubschemas) {
+            pendingSubschemas.push({ subschema: childSubschema, chainLength: childChainLength });
+        }
+    }
 }
 
 /**
@@ -68,11 +127,9 @@ export function compileUntrustedSchema<T extends object>(
     const serialized = JSON.stringify(schema);
     // Ajv codegen is synchronous; an oversized untrusted schema would freeze the event loop.
     if (Buffer.byteLength(serialized) > MAX_UNTRUSTED_SCHEMA_BYTES) {
-        throw new SchemaTooLargeError(MAX_UNTRUSTED_SCHEMA_BYTES, 'byte');
+        throw new SchemaTooLargeError(MAX_UNTRUSTED_SCHEMA_BYTES, 'bytes');
     }
-    if (countSubschemas(schema) > MAX_UNTRUSTED_SUBSCHEMAS) {
-        throw new SchemaTooLargeError(MAX_UNTRUSTED_SUBSCHEMAS, 'subschema');
-    }
+    validateSchemaSize(schema);
 
     const cacheKey = createHash('sha256').update(serialized).digest('base64');
     const cached = untrustedValidatorCache.get(cacheKey);

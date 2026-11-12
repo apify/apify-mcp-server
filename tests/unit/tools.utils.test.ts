@@ -10,7 +10,9 @@ import {
     compileUntrustedSchema,
     inferArrayItemsTypeIfMissing,
     inferArrayItemType,
+    MAX_UNTRUSTED_ENUM_VALUES,
     MAX_UNTRUSTED_SCHEMA_BYTES,
+    MAX_UNTRUSTED_SUBSCHEMA_CHAIN_LENGTH,
     MAX_UNTRUSTED_SUBSCHEMAS,
     markInputPropertiesAsRequired,
     shortenProperties,
@@ -68,28 +70,87 @@ describe('compileUntrustedSchema', () => {
         expect(() => compileUntrustedSchema(huge)).toThrow(SchemaTooLargeError);
     });
 
-    // The schema root and its `properties` map are objects too, so they take two of the counted subschemas.
-    const schemaWithSubschemas = (count: number) => ({
+    const schemaWithProperties = (count: number) => ({
         type: 'object',
         properties: Object.fromEntries(
-            Array.from({ length: count - 2 }, (_, index) => [`field${index}`, { type: 'string' }]),
+            Array.from({ length: count }, (_, index) => [`field${index}`, { type: 'string' }]),
         ),
     });
 
-    it('compiles a schema with as many subschemas as the limit', () => {
-        const { validate } = compileUntrustedSchema(schemaWithSubschemas(MAX_UNTRUSTED_SUBSCHEMAS));
+    it('compiles a schema with as many properties as the chain limit, and its validator runs', () => {
+        const { validate } = compileUntrustedSchema(schemaWithProperties(MAX_UNTRUSTED_SUBSCHEMA_CHAIN_LENGTH));
         expect(validate({ field0: 'https://example.com' })).toBe(true);
     });
 
-    it('throws SchemaTooLargeError on a schema with more subschemas than the limit', () => {
+    it('throws SchemaTooLargeError on a schema with more properties than the chain limit', () => {
+        expect(() => compileUntrustedSchema(schemaWithProperties(MAX_UNTRUSTED_SUBSCHEMA_CHAIN_LENGTH + 1))).toThrow(
+            SchemaTooLargeError,
+        );
+    });
+
+    it('adds the siblings of nested properties, tuple items and schema lists to one chain', () => {
+        const third = Math.ceil(MAX_UNTRUSTED_SUBSCHEMA_CHAIN_LENGTH / 3);
+        const strings = Array.from({ length: third }, () => ({ type: 'string' }));
+        const schema = {
+            type: 'object',
+            properties: { rows: { type: 'array', items: [...strings.slice(1), { anyOf: [...strings, true] }] } },
+            allOf: strings,
+        };
+        expect(() => compileUntrustedSchema(schema)).toThrow(SchemaTooLargeError);
+    });
+
+    it('compiles a schema with as many subschemas as the limit when no chain is over its limit', () => {
+        const groups = Object.fromEntries(
+            Array.from({ length: 4 }, (_, index) => [`group${index}`, schemaWithProperties(400)]),
+        );
+        // The root, the four groups and their properties are 1 + 4 * 401 subschemas.
+        const schemaWithSubschemas = (count: number) => ({
+            type: 'object',
+            properties: { ...groups, ...schemaWithProperties(count - 1 - 4 * 401).properties },
+        });
+
+        const { validate } = compileUntrustedSchema(schemaWithSubschemas(MAX_UNTRUSTED_SUBSCHEMAS));
+        expect(validate({ group0: { field0: 'https://example.com' } })).toBe(true);
         expect(() => compileUntrustedSchema(schemaWithSubschemas(MAX_UNTRUSTED_SUBSCHEMAS + 1))).toThrow(
             SchemaTooLargeError,
         );
     });
 
-    it('counts a boolean schema as a subschema', () => {
-        const schema = { ...schemaWithSubschemas(MAX_UNTRUSTED_SUBSCHEMAS), additionalProperties: false };
+    it('does not count objects inside default, prefill, enum, examples and const values', () => {
+        const records = Array.from({ length: MAX_UNTRUSTED_SUBSCHEMAS }, (_, index) => ({ id: index, active: true }));
+        const { validate } = compileUntrustedSchema({
+            type: 'object',
+            properties: {
+                startUrls: { type: 'array', default: records, prefill: records, examples: records },
+                mode: { enum: records, const: records[0], example: records },
+            },
+        });
+        expect(validate({ startUrls: [], mode: records[0] })).toBe(true);
+    });
+
+    it('counts the schema of a property that is named like a data keyword', () => {
+        const schema = {
+            type: 'object',
+            properties: { default: schemaWithProperties(MAX_UNTRUSTED_SUBSCHEMA_CHAIN_LENGTH) },
+        };
         expect(() => compileUntrustedSchema(schema)).toThrow(SchemaTooLargeError);
+    });
+
+    const schemaWithEnumValues = (count: number) => ({
+        type: 'object',
+        properties: { country: { type: 'string', enum: Array.from({ length: count }, (_, index) => `C${index}`) } },
+    });
+
+    it('compiles an enum with as many values as the limit', () => {
+        const { validate } = compileUntrustedSchema(schemaWithEnumValues(MAX_UNTRUSTED_ENUM_VALUES));
+        expect(validate({ country: 'C0' })).toBe(true);
+        expect(validate({ country: 'unknown' })).toBe(false);
+    });
+
+    it('throws SchemaTooLargeError on an enum with more values than the limit', () => {
+        expect(() => compileUntrustedSchema(schemaWithEnumValues(MAX_UNTRUSTED_ENUM_VALUES + 1))).toThrow(
+            SchemaTooLargeError,
+        );
     });
 
     it('remembers a schema that fails to compile', () => {

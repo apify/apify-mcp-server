@@ -11,18 +11,18 @@ export class UserInputError extends Error {
 }
 
 /**
- * Thrown by `compileUntrustedSchema` when an untrusted Actor / proxied-MCP input schema exceeds the byte
- * or subschema cap that bounds AJV's synchronous codegen. It's a property of the schema, not a server
- * fault, so `logHttpError` logs it as a soft fail and the caller drops just that one tool.
+ * Thrown by `compileUntrustedSchema` when an untrusted Actor / proxied-MCP input schema exceeds a cap
+ * (bytes, subschemas, enum values) that bounds AJV's synchronous codegen. It's a property of the schema,
+ * not a server fault, so `logHttpError` logs it as a soft fail and the caller drops just that one tool.
  */
 export class SchemaTooLargeError extends Error {
     override readonly name = 'SchemaTooLargeError';
 
     constructor(
         public readonly limit: number,
-        unit: 'byte' | 'subschema',
+        unit: 'bytes' | 'subschemas' | 'chained subschemas' | 'enum values',
     ) {
-        super(`Input schema exceeds ${limit}-${unit} safety limit`);
+        super(`Input schema exceeds the safety limit of ${limit} ${unit}`);
     }
 }
 
