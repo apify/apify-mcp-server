@@ -80,6 +80,8 @@ const ReadmeWrapper = styled.div`
         display: flex;
         flex-direction: column;
         gap: ${theme.space.space8};
+        /* README HTML is laid out, clipped and stacked within this box, including fixed-position elements */
+        contain: paint;
     }
     /* TODO: this is an exception from the design system, let's figure out how to not do overrides */
     .${README_CLASSNAMES.MARKDOWN} {
