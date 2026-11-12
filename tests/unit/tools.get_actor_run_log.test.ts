@@ -107,6 +107,15 @@ describe('get-actor-run-log', () => {
         expectSchemaConformingStructuredContent(result, getActorRunLogToolOutputSchema);
     });
 
+    it('returns the log only as the JSON mirror of structuredContent', async () => {
+        getMock.mockResolvedValue(numberedLog(20));
+
+        const result = await callTool({ runId: 'run-1', lines: 10 });
+
+        expect(result.content).toHaveLength(1);
+        expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+    });
+
     it('returns conforming structuredContent for an empty log', async () => {
         getMock.mockResolvedValue('');
 

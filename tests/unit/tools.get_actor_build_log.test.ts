@@ -90,6 +90,15 @@ describe('get-actor-build-log', () => {
         expectSchemaConformingStructuredContent(result, getActorBuildLogToolOutputSchema);
     });
 
+    it('returns the log only as the JSON mirror of structuredContent', async () => {
+        getMock.mockResolvedValue(numberedLog(20));
+
+        const result = await callTool({ buildId: 'build-1', lines: 10 });
+
+        expect(result.content).toHaveLength(1);
+        expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+    });
+
     it('returns conforming structuredContent for an empty log', async () => {
         getMock.mockResolvedValue('');
 

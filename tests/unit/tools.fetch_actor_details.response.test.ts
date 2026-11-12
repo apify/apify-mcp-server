@@ -185,6 +185,39 @@ describe('buildFetchActorDetailsResult()', () => {
         await expect(callWithToken('apify_api_test')).rejects.toMatchObject({ statusCode: 401 });
     });
 
+    it('returns the details only as the JSON mirror of structuredContent', async () => {
+        const result = await buildFetchActorDetailsResult(
+            stubToolCallContext(
+                { actor: 'apify/example-mcp-server', output: { inputSchema: true } },
+                mockApifyClient(),
+                { loadedToolNames: [HELPER_TOOLS.ACTOR_CALL] },
+            ),
+        );
+        const content = (result.content ?? []).map(textOf);
+
+        expect(content).toHaveLength(1);
+        expect(JSON.parse(content[0])).toEqual(result.structuredContent);
+    });
+
+    it('keeps only the links nudge and the not-runnable guidance after the mirror', async () => {
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
+        const result = await buildFetchActorDetailsResult({
+            ...stubToolCallContext(
+                { actor: 'apify/example-mcp-server', output: { inputSchema: true } },
+                mockApifyClient(),
+                { loadedToolNames: [] },
+            ),
+            apifyToken: 'apify_ui_test',
+        });
+        const content = (result.content ?? []).map(textOf);
+
+        expect(JSON.parse(content[0])).toEqual(result.structuredContent);
+        expect(content.slice(1)).toEqual([
+            VERBATIM_LINKS_NUDGE,
+            buildActorNotRunnableGuidance(MOCK_DETAILS.actorInfo.id, [], new Set()),
+        ]);
+    });
+
     it('appends not-runnable guidance when neither call-actor nor a dedicated tool is loaded', async () => {
         const result = await buildFetchActorDetailsResult(
             stubToolCallContext(
