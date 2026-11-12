@@ -295,7 +295,8 @@ export function formatActorToStructuredCard(
         fullName: data.actorFullName,
         pictureUrl: data.pictureUrl,
         developer: data.developer,
-        description: data.description,
+        // The fallback text would contradict a description that came in a shape the card does not know.
+        description: extraFields && 'description' in extraFields ? '' : data.description,
         categories: data.categories,
         pricing,
         stats: data.stats,

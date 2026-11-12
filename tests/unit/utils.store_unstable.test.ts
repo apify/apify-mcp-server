@@ -175,6 +175,15 @@ describe('free-form /unstable/store items', () => {
         expect(card.match(new RegExp(`\\*\\*${field}:\\*\\*`, 'gi'))).toHaveLength(1);
     });
 
+    // `description` is required in the structured card; the fallback text would contradict `extraFields.description`.
+    it('leaves the structured description empty when the description comes in an unknown shape', () => {
+        const mapped = mapUnstableStoreItem({ ...UNSTABLE_STORE_ITEM, description: { short: 'Scrape posts.' } });
+
+        const structured = formatActorToStructuredCard(mapped);
+        expect(structured.description).toBe('');
+        expect(structured.extraFields).toEqual({ description: { short: 'Scrape posts.' } });
+    });
+
     // An empty value would show as a label with nothing after it.
     it.each([
         { kind: 'null', value: null },
