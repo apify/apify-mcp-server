@@ -49,15 +49,15 @@ async function sendServerActorRequest(client: SuiteClient, args: Record<string, 
 }
 
 type ActorDetailsMirror = {
-    actorInfo?: { description?: string; stats?: unknown; developer?: { username?: string } };
+    actorInfo?: { description?: string; stats?: unknown; pricing?: unknown; developer?: { username?: string } };
     readme?: string;
     inputSchema?: unknown;
 };
 
 /**
  * The `output` sections a `fetch-actor-details` result carries, read as a text-only client reads it: from the JSON
- * mirror in `content[0]`. The card keeps excluded sections empty (no description, stats or developer). Pricing and
- * rating are not reported: excluded pricing reads like a free Actor's, and the fixture Actor has no reviews.
+ * mirror in `content[0]`. The card keeps excluded sections empty (no description, stats, pricing or developer).
+ * Rating is not reported: the fixture Actor has no reviews, so the card has no rating either way.
  */
 function getActorDetailsSections(result: unknown) {
     const { actorInfo, readme, inputSchema } = JSON.parse(
@@ -67,6 +67,7 @@ function getActorDetailsSections(result: unknown) {
         card: actorInfo !== undefined,
         description: Boolean(actorInfo?.description),
         stats: actorInfo?.stats !== undefined,
+        pricing: actorInfo?.pricing !== undefined,
         metadata: Boolean(actorInfo?.developer?.username),
         readme: readme !== undefined,
         inputSchema: inputSchema !== undefined,
@@ -456,7 +457,12 @@ export const actorsCases: Case[] = [
             });
 
             // Should contain actor info (pricing is part of actor card) but NOT readme or schema
-            expect(getActorDetailsSections(result)).toMatchObject({ card: true, readme: false, inputSchema: false });
+            expect(getActorDetailsSections(result)).toMatchObject({
+                card: true,
+                pricing: true,
+                readme: false,
+                inputSchema: false,
+            });
 
             // Validate structured output
             validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
@@ -583,6 +589,7 @@ export const actorsCases: Case[] = [
             // Should include the actor card, but NOT other sections
             expect(getActorDetailsSections(pricingOnlyResult)).toEqual({
                 card: true,
+                pricing: true,
                 description: false,
                 stats: false,
                 metadata: false,
@@ -610,6 +617,7 @@ export const actorsCases: Case[] = [
             // Should include the actor card, but NOT other sections
             expect(getActorDetailsSections(ratingOnlyResult)).toEqual({
                 card: true,
+                pricing: false,
                 description: false,
                 stats: false,
                 metadata: false,
@@ -637,6 +645,7 @@ export const actorsCases: Case[] = [
             // Should include the developer, but NOT other sections
             expect(getActorDetailsSections(metadataOnlyResult)).toEqual({
                 card: true,
+                pricing: false,
                 description: false,
                 stats: false,
                 metadata: true,
@@ -664,6 +673,7 @@ export const actorsCases: Case[] = [
             // Should include metadata; should NOT include: description, stats, readme, input-schema
             expect(getActorDetailsSections(combinationResult)).toEqual({
                 card: true,
+                pricing: true,
                 description: false,
                 stats: false,
                 metadata: true,
@@ -697,6 +707,7 @@ export const actorsCases: Case[] = [
 
                 expect(getActorDetailsSections(result), `output=${field}`).toEqual({
                     card: cardFields.includes(field),
+                    pricing: field === 'pricing',
                     description: field === 'description',
                     stats: field === 'stats',
                     metadata: field === 'metadata',
@@ -728,6 +739,7 @@ export const actorsCases: Case[] = [
             // Should include all actor card sections, but NOT readme or input-schema
             expect(getActorDetailsSections(allCardSectionsResult)).toEqual({
                 card: true,
+                pricing: true,
                 description: true,
                 stats: true,
                 metadata: true,
