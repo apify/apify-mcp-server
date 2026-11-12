@@ -387,7 +387,8 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     /**
      * Whether report-problem may be served against `view`. Never without telemetry (submissions
      * would vanish into the void) and never before a client context exists — on a stateful
-     * connection the initialize flush re-adds it once the handshake supplies one.
+     * connection the initialize flush re-adds it once the handshake supplies one. Never in a
+     * payment-provider session, which has no Apify token to attribute a report to.
      *
      * Explicit selection ({@link isReportProblemExplicitlySelected}) bypasses the blocklist only.
      *
@@ -396,7 +397,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      * policy.
      */
     private isReportProblemServable(view: ServingContext, input: Input): boolean {
-        if (!this.telemetryEnabled || view.clientContext == null) return false;
+        if (!this.telemetryEnabled || view.clientContext == null || this.options.paymentProvider) return false;
         return isReportProblemExplicitlySelected(input) || !isReportProblemBlockedForClient(view.clientContext);
     }
 
