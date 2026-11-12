@@ -76,8 +76,8 @@ describe('search-actors-widget response', () => {
         expect(structuredContent.widgetActors!.length).toBe(structuredContent.actors.length);
         expect(structuredContent.widgetActors![0]).toStrictEqual(formatActorForWidget(MOCK_STORE_ACTOR, 'FREE'));
 
-        expect(content).toHaveLength(1);
-        const { text } = content[0];
+        expect(content).toHaveLength(2);
+        const { text } = content[1];
         expect(text).toContain('An interactive widget has been rendered');
         expect(text).toContain('do NOT print or summarize the Actor list');
 
@@ -116,8 +116,8 @@ describe('search-actors-widget response', () => {
         expect(structuredContent.actors).toEqual([]);
         expect(structuredContent.count).toBe(0);
         expect(structuredContent.widgetActors).toEqual([]);
-        expect(content).toHaveLength(1);
-        expect(content[0].text).toBe(NO_ACTORS_FOUND_TEXT);
+        expect(content).toHaveLength(2);
+        expect(content[1].text).toBe(NO_ACTORS_FOUND_TEXT);
         expect(_meta).toBeUndefined();
     });
 
@@ -150,6 +150,7 @@ describe('search-actors-widget response', () => {
         };
         expect(structuredContent).toEqual({ actors: [], query: SEARCH_KEYWORDS, count: 0, widgetActors: [] });
         expect(content).toEqual([
+            { type: 'text', text: JSON.stringify(structuredContent) },
             { type: 'text', text: `No Actors returned at offset 1 for the search query "${SEARCH_KEYWORDS}".` },
         ]);
         expect(_meta).toBeUndefined();

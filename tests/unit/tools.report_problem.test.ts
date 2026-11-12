@@ -29,7 +29,7 @@ describe('reportProblem', () => {
             const { content, isError } = result as TextToolResult;
 
             expect(isError).toBe(false);
-            expect(content[0].text).toContain('Problem reported');
+            expect(content[1].text).toContain('Problem reported');
         });
 
         it('mirrors structuredContent as JSON in the first text block', async () => {

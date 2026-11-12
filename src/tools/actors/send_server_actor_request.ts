@@ -445,7 +445,7 @@ function buildResponse(
         ...(errorMessage && { errorMessage }),
         ...(nextStep && { nextStep }),
     };
-    const texts = [JSON.stringify(data), summary];
+    const texts = [JSON.stringify(structuredContent), summary];
     if (errorMessage) texts.push(`Actor Server error: ${errorMessage}`);
     if (nextStep) texts.push(nextStep);
     if (status < 400) return respondOk(texts, { structuredContent });

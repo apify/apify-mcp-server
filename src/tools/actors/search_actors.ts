@@ -222,9 +222,8 @@ export const searchActors: ToolEntry = Object.freeze({
 
         if (actors.length === 0) {
             const instructions = buildNoActorsFoundInstructions(parsed.keywords, parsed.offset);
-            return respondOk(instructions, {
-                structuredContent: { actors: [], query: parsed.keywords, count: 0, instructions },
-            });
+            const structuredContent = { actors: [], query: parsed.keywords, count: 0, instructions };
+            return respondOk([JSON.stringify(structuredContent), instructions], { structuredContent });
         }
 
         // Cache hit — the Promise.all above already resolved users/me for this token.
@@ -251,6 +250,9 @@ export const searchActors: ToolEntry = Object.freeze({
 
             # Actors:
         `;
-        return respondOk([header, actorCardText, footer].filter(Boolean).join('\n\n'), { structuredContent });
+        return respondOk(
+            [JSON.stringify(structuredContent), [header, actorCardText, footer].filter(Boolean).join('\n\n')],
+            { structuredContent },
+        );
     },
 } as const satisfies HelperTool);

@@ -103,7 +103,7 @@ You can also try using more specific or alternative keywords related to your sea
                 count: 0,
                 instructions,
             };
-            return respondOk(instructions, { structuredContent });
+            return respondOk([JSON.stringify(structuredContent), instructions], { structuredContent });
         }
 
         const instructions = `You can use the Apify docs fetch tool to retrieve the full content of a document by its URL. ${PLATFORM_DOCS_PREFERENCE}`;
@@ -129,6 +129,6 @@ ${results
             instructions,
         };
         // We put the instructions at the end so that they are more likely to be acknowledged by the LLM
-        return respondOk([textResult, instructions], { structuredContent });
+        return respondOk([JSON.stringify(structuredContent), textResult, instructions], { structuredContent });
     },
 } as const);

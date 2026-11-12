@@ -42,7 +42,8 @@ function buildToolListResponse(tools: Tool[]): ToolResponse {
         (tool) =>
             `${tool.name}: ${tool.description || 'No description.'}\nInput schema: ${JSON.stringify(tool.inputSchema)}`,
     );
-    return respondOk([count, ...texts], { structuredContent: { tools } });
+    const structuredContent = { tools };
+    return respondOk([JSON.stringify(structuredContent), count, ...texts], { structuredContent });
 }
 
 export async function executeFetchActorMcpToolList(toolArgs: InternalToolArgs): Promise<ToolResponse> {
