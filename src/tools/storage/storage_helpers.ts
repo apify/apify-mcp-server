@@ -108,7 +108,8 @@ export function buildConsoleLinkContent(apifyConsoleUrl: string | undefined): { 
  * `structuredContent` carries the data plus `summary` (and `nextStep` unless terminal).
  * `nextStep` is omitted for terminal responses (e.g. get-key-value-store-record).
  *
- * `content[0]` is the JSON-stringified `structuredContent`; `content[1]` carries `summary`/`nextStep`
+ * `content[0]` is the returned `structuredContent` (with `summary`/`nextStep`) as JSON, as the MCP spec
+ * recommends for backwards compatibility; `content[1]` carries `summary`/`nextStep`
  * as plain text. `structuredContent` is the lossless source of truth — programmatic consumers read
  * it, not `content[]`.
  */
@@ -123,7 +124,7 @@ export function buildStorageResponse(params: {
     const full = { ...structuredContent, summary, ...(nextStep !== undefined && { nextStep }) };
     const summaryText = nextStep !== undefined ? `${summary}\n${nextStep}` : summary;
     const consoleLinkText = apifyConsoleLinkText(apifyConsoleUrl);
-    return respondOk([JSON.stringify(structuredContent), summaryText, ...(consoleLinkText ? [consoleLinkText] : [])], {
+    return respondOk([JSON.stringify(full), summaryText, ...(consoleLinkText ? [consoleLinkText] : [])], {
         structuredContent: full,
     });
 }
