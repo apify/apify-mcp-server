@@ -48,6 +48,31 @@ async function sendServerActorRequest(client: SuiteClient, args: Record<string, 
     };
 }
 
+type ActorDetailsMirror = {
+    actorInfo?: { description?: string; stats?: unknown; developer?: { username?: string } };
+    readme?: string;
+    inputSchema?: unknown;
+};
+
+/**
+ * The `output` sections a `fetch-actor-details` result carries, read as a text-only client reads it: from the JSON
+ * mirror in `content[0]`. The card keeps excluded sections empty (no description, stats or developer). Pricing and
+ * rating are not reported: excluded pricing reads like a free Actor's, and the fixture Actor has no reviews.
+ */
+function getActorDetailsSections(result: unknown) {
+    const { actorInfo, readme, inputSchema } = JSON.parse(
+        (result as { content: { text: string }[] }).content[0].text,
+    ) as ActorDetailsMirror;
+    return {
+        card: actorInfo !== undefined,
+        description: Boolean(actorInfo?.description),
+        stats: actorInfo?.stats !== undefined,
+        metadata: Boolean(actorInfo?.developer?.username),
+        readme: readme !== undefined,
+        inputSchema: inputSchema !== undefined,
+    };
+}
+
 /** Actor tools: search, details, call-actor, get-actor-run. */
 export const actorsCases: Case[] = [
     {
@@ -318,10 +343,8 @@ export const actorsCases: Case[] = [
                 },
             });
 
-            const content = result.content as { text: string }[];
             // Should contain schema but NOT readme or actor card
-            expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
-            expect(content.some((item) => item.text.includes('README'))).toBe(false);
+            expect(getActorDetailsSections(result)).toMatchObject({ inputSchema: true, readme: false, card: false });
         }),
     },
     {
@@ -344,10 +367,13 @@ export const actorsCases: Case[] = [
                 },
             });
 
-            const content = result.content as { text: string }[];
             // Should contain actor info but NOT readme or schema
-            expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
-            expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
+            expect(getActorDetailsSections(result)).toMatchObject({
+                description: true,
+                stats: true,
+                readme: false,
+                inputSchema: false,
+            });
         }),
     },
     {
@@ -429,11 +455,8 @@ export const actorsCases: Case[] = [
                 },
             });
 
-            const content = result.content as { text: string }[];
             // Should contain actor info (pricing is part of actor card) but NOT readme or schema
-            expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
-            expect(content.some((item) => item.text.includes('README'))).toBe(false);
-            expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
+            expect(getActorDetailsSections(result)).toMatchObject({ card: true, readme: false, inputSchema: false });
 
             // Validate structured output
             validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
@@ -459,11 +482,8 @@ export const actorsCases: Case[] = [
                 },
             });
 
-            const content = result.content as { text: string }[];
-            // Should contain readme text but NOT actor info card or input schema
-            expect(content.length).toBeGreaterThan(0);
-            expect(content.some((item) => item.text.includes('Actor information'))).toBe(false);
-            expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
+            // Should contain readme but NOT actor info card or input schema
+            expect(getActorDetailsSections(result)).toMatchObject({ readme: true, card: false, inputSchema: false });
 
             // Validate structured output
             validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
@@ -478,14 +498,8 @@ export const actorsCases: Case[] = [
                 arguments: { actor: ACTOR_NORMAL_MODE, output: { description: true, readme: true, inputSchema: true } },
             });
 
-            expect(result.content).toBeDefined();
-            const content = result.content as { text: string }[];
-            const allText = content.map((item) => item.text).join('\n');
-
-            // Text should contain actor card, README section (summary or full fallback), and input schema
-            expect(allText).toContain('Actor information');
-            expect(allText).toMatch(/# README summary|# README/);
-            expect(allText).toContain('Input schema');
+            // The text mirror should carry the actor card, README (summary or full fallback), and input schema
+            expect(getActorDetailsSections(result)).toMatchObject({ card: true, readme: true, inputSchema: true });
 
             expectReadmeInStructuredContent(result, ACTOR_NORMAL_MODE);
 
@@ -506,10 +520,8 @@ export const actorsCases: Case[] = [
                 arguments: { actor: ACTOR_NORMAL_MODE },
             });
 
-            const content = result.content as { text: string }[];
             // Should contain all default sections (description, stats, pricing, rating, metadata, readme, inputSchema)
-            expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
-            expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
+            expect(getActorDetailsSections(result)).toMatchObject({ card: true, inputSchema: true });
         }),
     },
     {
@@ -532,11 +544,8 @@ export const actorsCases: Case[] = [
                 },
             });
 
-            const content = result.content as { text: string }[];
-
-            // Should contain all sections in text
-            expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
-            expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
+            // Should contain all sections in the text mirror
+            expect(getActorDetailsSections(result)).toMatchObject({ card: true, inputSchema: true });
 
             // Validate structured output exists and has all fields
             const resultWithStructured = result as {
@@ -571,19 +580,15 @@ export const actorsCases: Case[] = [
                 },
             });
 
-            const pricingContent = pricingOnlyResult.content as { text: string }[];
-            const pricingText = pricingContent.map((item) => item.text).join('\n');
-            // Should include actor card header and pricing
-            expect(pricingText).toContain('Actor information');
-            expect(pricingText).toContain('Pricing');
-            // Should NOT include other sections
-            expect(pricingText).not.toContain('Description:');
-            expect(pricingText).not.toContain('Stats:');
-            expect(pricingText).not.toContain('Rating:');
-            expect(pricingText).not.toContain('Developed by:');
-            expect(pricingText).not.toContain('Categories:');
-            expect(pricingText).not.toContain('Last modified:');
-            expect(pricingText).not.toContain('README');
+            // Should include the actor card, but NOT other sections
+            expect(getActorDetailsSections(pricingOnlyResult)).toEqual({
+                card: true,
+                description: false,
+                stats: false,
+                metadata: false,
+                readme: false,
+                inputSchema: false,
+            });
 
             // Test 2: Only rating
             const ratingOnlyResult = await client.callTool({
@@ -602,20 +607,15 @@ export const actorsCases: Case[] = [
                 },
             });
 
-            const ratingContent = ratingOnlyResult.content as { text: string }[];
-            const ratingText = ratingContent.map((item) => item.text).join('\n');
-            // Should include actor card header and rating
-            expect(ratingText).toContain('Actor information');
-            // TODO: re-enable once apify/normal-mode-test-actor has reviews; Rating: is omitted when review count is 0
-            // expect(ratingText).toContain('Rating:');
-            // Should NOT include other sections
-            expect(ratingText).not.toContain('Description:');
-            expect(ratingText).not.toContain('Stats:');
-            expect(ratingText).not.toContain('Pricing');
-            expect(ratingText).not.toContain('Developed by:');
-            expect(ratingText).not.toContain('Categories:');
-            expect(ratingText).not.toContain('Last modified:');
-            expect(ratingText).not.toContain('README');
+            // Should include the actor card, but NOT other sections
+            expect(getActorDetailsSections(ratingOnlyResult)).toEqual({
+                card: true,
+                description: false,
+                stats: false,
+                metadata: false,
+                readme: false,
+                inputSchema: false,
+            });
 
             // Test 3: Only metadata (should include developer, categories, last modified, deprecation status)
             const metadataOnlyResult = await client.callTool({
@@ -634,18 +634,15 @@ export const actorsCases: Case[] = [
                 },
             });
 
-            const metadataContent = metadataOnlyResult.content as { text: string }[];
-            const metadataText = metadataContent.map((item) => item.text).join('\n');
-            // Should include developer, categories, and last modified date
-            expect(metadataText).toContain('Developed by:');
-            expect(metadataText).toContain('Categories:');
-            expect(metadataText).toContain('Last modified:');
-            // Should NOT include other sections
-            expect(metadataText).not.toContain('Description:');
-            expect(metadataText).not.toContain('Stats:');
-            expect(metadataText).not.toContain('Pricing');
-            expect(metadataText).not.toContain('Rating:');
-            expect(metadataText).not.toContain('README');
+            // Should include the developer, but NOT other sections
+            expect(getActorDetailsSections(metadataOnlyResult)).toEqual({
+                card: true,
+                description: false,
+                stats: false,
+                metadata: true,
+                readme: false,
+                inputSchema: false,
+            });
 
             // Test 4: Combination - pricing + rating + metadata (should exclude description, stats, readme, input-schema)
             const combinationResult = await client.callTool({
@@ -664,20 +661,15 @@ export const actorsCases: Case[] = [
                 },
             });
 
-            const combinationContent = combinationResult.content as { text: string }[];
-            const combinationText = combinationContent.map((item) => item.text).join('\n');
-            // Should include: pricing, rating, metadata (developer, categories, last modified)
-            expect(combinationText).toContain('Pricing');
-            // TODO: re-enable once apify/normal-mode-test-actor has reviews; Rating: is omitted when review count is 0
-            // expect(combinationText).toContain('Rating:');
-            expect(combinationText).toContain('Developed by:');
-            expect(combinationText).toContain('Categories:');
-            expect(combinationText).toContain('Last modified:');
-            // Should NOT include: description, stats, readme, input-schema
-            expect(combinationText).not.toContain('Description:');
-            expect(combinationText).not.toContain('Stats:');
-            expect(combinationText).not.toContain('README');
-            expect(combinationText).not.toContain('Input schema');
+            // Should include metadata; should NOT include: description, stats, readme, input-schema
+            expect(getActorDetailsSections(combinationResult)).toEqual({
+                card: true,
+                description: false,
+                stats: false,
+                metadata: true,
+                readme: false,
+                inputSchema: false,
+            });
 
             // Validate structured output for all test cases
             validateStructuredOutputForTool(pricingOnlyResult, 'fetch-actor-details', 'default');
@@ -690,128 +682,27 @@ export const actorsCases: Case[] = [
         name: 'should dynamically test all output options and verify section presence/absence',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {
-            // Define all output options with their expected markers in text
-            const outputOptions = [
-                {
-                    name: 'description',
-                    field: 'description',
-                    markers: ['Description:'],
-                    notMarkers: [
-                        'Developed by:',
-                        'Categories:',
-                        'Stats:',
-                        'Pricing',
-                        'Rating:',
-                        'Last modified:',
-                        'README',
-                        'Input schema',
-                    ],
-                },
-                {
-                    name: 'stats',
-                    field: 'stats',
-                    markers: ['Stats:', 'total users', 'monthly users'],
-                    notMarkers: [
-                        'Developed by:',
-                        'Categories:',
-                        'Description:',
-                        'Pricing',
-                        'Rating:',
-                        'Last modified:',
-                        'README',
-                        'Input schema',
-                    ],
-                },
-                {
-                    name: 'pricing',
-                    field: 'pricing',
-                    markers: ['Pricing'],
-                    notMarkers: [
-                        'Developed by:',
-                        'Categories:',
-                        'Description:',
-                        'Stats:',
-                        'Rating:',
-                        'Last modified:',
-                        'README',
-                        'Input schema',
-                    ],
-                },
-                {
-                    name: 'rating',
-                    field: 'rating',
-                    // TODO: restore markers to ['Rating:', 'out of 5'] once apify/normal-mode-test-actor has reviews;
-                    // Rating: is omitted when review count is 0
-                    markers: [],
-                    notMarkers: [
-                        'Developed by:',
-                        'Categories:',
-                        'Description:',
-                        'Stats:',
-                        'Pricing',
-                        'Last modified:',
-                        'README',
-                        'Input schema',
-                    ],
-                },
-                {
-                    name: 'metadata',
-                    field: 'metadata',
-                    markers: ['Developed by:', 'Categories:', 'Last modified:'],
-                    notMarkers: ['Description:', 'Stats:', 'Pricing', 'Rating:', 'README', 'Input schema'],
-                },
-                {
-                    name: 'input-schema',
-                    field: 'inputSchema',
-                    markers: ['Input schema', '```json'],
-                    notMarkers: [
-                        'Developed by:',
-                        'Description:',
-                        'Stats:',
-                        'Pricing',
-                        'Rating:',
-                        'Last modified:',
-                        'README',
-                    ],
-                },
-                {
-                    name: 'readme',
-                    field: 'readme',
-                    markers: [],
-                    notMarkers: ['Input schema'],
-                },
-            ] as const;
+            const fields = ['description', 'stats', 'pricing', 'rating', 'metadata', 'inputSchema', 'readme'] as const;
+            const cardFields: readonly string[] = ['description', 'stats', 'pricing', 'rating', 'metadata'];
 
-            // Test each output option individually
-            for (const option of outputOptions) {
+            // Test each output option individually: only its own section is returned
+            for (const field of fields) {
                 const result = await client.callTool({
                     name: 'fetch-actor-details',
                     arguments: {
                         actor: ACTOR_NORMAL_MODE,
-                        output: {
-                            description: option.field === 'description',
-                            stats: option.field === 'stats',
-                            pricing: option.field === 'pricing',
-                            rating: option.field === 'rating',
-                            metadata: option.field === 'metadata',
-                            inputSchema: option.field === 'inputSchema',
-                            readme: option.field === 'readme',
-                        },
+                        output: Object.fromEntries(fields.map((other) => [other, other === field])),
                     },
                 });
 
-                const content = result.content as { text: string }[];
-                const text = content.map((item) => item.text).join('\n');
-
-                // Verify expected markers are present
-                for (const marker of option.markers) {
-                    expect(text, `output=${option.name} should contain "${marker}"`).toContain(marker);
-                }
-
-                // Verify unwanted markers are absent
-                for (const notMarker of option.notMarkers) {
-                    expect(text, `output=${option.name} should NOT contain "${notMarker}"`).not.toContain(notMarker);
-                }
+                expect(getActorDetailsSections(result), `output=${field}`).toEqual({
+                    card: cardFields.includes(field),
+                    description: field === 'description',
+                    stats: field === 'stats',
+                    metadata: field === 'metadata',
+                    readme: field === 'readme',
+                    inputSchema: field === 'inputSchema',
+                });
 
                 // Validate structured output
                 validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
@@ -834,22 +725,15 @@ export const actorsCases: Case[] = [
                 },
             });
 
-            const allCardContent = allCardSectionsResult.content as { text: string }[];
-            const allCardText = allCardContent.map((item) => item.text).join('\n');
-
-            // Should include all actor card sections
-            expect(allCardText).toContain('Description:');
-            expect(allCardText).toContain('Stats:');
-            expect(allCardText).toContain('Pricing');
-            // TODO: re-enable once apify/normal-mode-test-actor has reviews; Rating: is omitted when review count is 0
-            // expect(allCardText).toContain('Rating:');
-            expect(allCardText).toContain('Developed by:');
-            expect(allCardText).toContain('Categories:');
-            expect(allCardText).toContain('Last modified:');
-
-            // Should NOT include readme or input-schema
-            expect(allCardText).not.toContain('README');
-            expect(allCardText).not.toContain('Input schema');
+            // Should include all actor card sections, but NOT readme or input-schema
+            expect(getActorDetailsSections(allCardSectionsResult)).toEqual({
+                card: true,
+                description: true,
+                stats: true,
+                metadata: true,
+                readme: false,
+                inputSchema: false,
+            });
 
             validateStructuredOutputForTool(allCardSectionsResult, 'fetch-actor-details', 'default');
         }),
