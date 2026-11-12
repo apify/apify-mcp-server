@@ -189,27 +189,24 @@ describe('free-form /unstable/store items', () => {
 describe('the /unstable/store request', () => {
     const API_BASE_URL = 'https://api.apify.com/v2';
 
-    it('includes the input schemas and current pricing, continues from the cursor and sends the tracking', () => {
+    // The endpoint decides how many Actors it returns, so MCP sends no `limit` and no paging.
+    it('includes the input schemas and current pricing and sends the tracking, without limit or paging', () => {
         const url = buildUnstableStoreSearchUrl(API_BASE_URL, {
             search: 'instagram',
-            limit: 5,
-            cursor: 'recomm-1',
             tracking: { useCase: 'compare prices', traceId: 'trace-1' },
         });
 
         expect(url.pathname).toBe('/unstable/store');
         expect(Object.fromEntries(url.searchParams)).toEqual({
             search: 'instagram',
-            limit: '5',
             include: 'inputSchema,currentPricingInfo',
-            recommId: 'recomm-1',
             _useCase: 'compare prices',
             _traceId: 'trace-1',
         });
     });
 
     it('browses without a search when the keywords are empty, and forwards the agentic filter', () => {
-        const url = buildUnstableStoreSearchUrl(API_BASE_URL, { search: '', limit: 5, allowsAgenticUsers: true });
+        const url = buildUnstableStoreSearchUrl(API_BASE_URL, { search: '', allowsAgenticUsers: true });
 
         expect(url.searchParams.has('search')).toBe(false);
         expect(url.searchParams.get('allowsAgenticUsers')).toBe('true');
@@ -222,46 +219,26 @@ describe('the /unstable/store request', () => {
             .spyOn(apifyClient.httpClient.axios, 'request')
             .mockResolvedValueOnce({ status: 200, data: { data: { items: [], count: 0, limit: 5 } } });
 
-        await searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient, limit: 5 });
+        await searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient });
 
         const url = requestedUrl(request);
         expect(`${url.origin}${url.pathname}`).toBe('https://api.staging.example/proxy/unstable/store');
     });
 });
 
-describe('paging /unstable/store by cursor', () => {
-    const page = (items: UnstableStoreItem[], recommId?: string) => ({
+describe('reading the /unstable/store response', () => {
+    // Core sends a `recommId` on every page; MCP reads one page and drops it.
+    const page = (items: UnstableStoreItem[]) => ({
         status: 200,
-        data: { data: { items, count: items.length, limit: 5, ...(recommId && { recommId }) } },
+        data: { data: { items, count: items.length, limit: 5, recommId: 'recomm-1' } },
     });
 
-    it('returns the recommId as nextCursor and sends it back for the next page', async () => {
-        const { request, apifyClient } = mockUnstableStoreClient(
-            page([UNSTABLE_STORE_ITEM], 'recomm-1'),
-            page([{ ...UNSTABLE_STORE_ITEM, id: 'second-page-actor' }], 'recomm-2'),
-        );
+    it('returns the mapped Actors of the one page', async () => {
+        const { apifyClient } = mockUnstableStoreClient(page([UNSTABLE_STORE_ITEM]));
 
-        const first = await searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient, limit: 5 });
-        const next = await searchActorsViaUnstableEndpoint({
-            search: 'instagram',
-            apifyClient,
-            limit: 5,
-            cursor: first.nextCursor,
-        });
-
-        expect(first.nextCursor).toBe('recomm-1');
-        expect(requestedUrl(request, 1).searchParams.get('recommId')).toBe('recomm-1');
-        expect(next.actors.map((actor) => actor.id)).toEqual(['second-page-actor']);
-        expect(next.nextCursor).toBe('recomm-2');
-    });
-
-    it('keeps the cursor on an empty page, which does not end the results', async () => {
-        const { apifyClient } = mockUnstableStoreClient(page([], 'recomm-1'));
-
-        expect(await searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient, limit: 5 })).toEqual({
-            actors: [],
-            nextCursor: 'recomm-1',
-        });
+        expect(await searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient })).toEqual([
+            mapUnstableStoreItem(UNSTABLE_STORE_ITEM),
+        ]);
     });
 
     it('throws the API message with the HTTP status on an error response', async () => {
@@ -270,16 +247,14 @@ describe('paging /unstable/store by cursor', () => {
             data: {
                 error: {
                     type: 'schema-validation-failed',
-                    message: "Schema validation failed: Parameter 'recommId' is invalid.",
+                    message: "Schema validation failed: Parameter 'search' is invalid.",
                 },
             },
         });
 
-        await expect(
-            searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient, limit: 5 }),
-        ).rejects.toMatchObject({
+        await expect(searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient })).rejects.toMatchObject({
             statusCode: 400,
-            message: "Schema validation failed: Parameter 'recommId' is invalid.",
+            message: "Schema validation failed: Parameter 'search' is invalid.",
         });
     });
 
@@ -287,18 +262,18 @@ describe('paging /unstable/store by cursor', () => {
     it('retries a 503', async () => {
         const { apifyClient } = mockUnstableStoreClient(
             { status: 503, data: { error: { type: 'service-unavailable', message: 'Service unavailable.' } } },
-            page([UNSTABLE_STORE_ITEM], 'recomm-1'),
+            page([UNSTABLE_STORE_ITEM]),
         );
 
-        const result = await searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient, limit: 5 });
+        const actors = await searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient });
 
-        expect(result.nextCursor).toBe('recomm-1');
+        expect(actors).toHaveLength(1);
     });
 
     it('throws a server-side error when the response does not match the contract', async () => {
         const { apifyClient } = mockUnstableStoreClient({ status: 200, data: { data: { items: [{ id: 1 }] } } });
 
-        const error = await searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient, limit: 5 }).catch(
+        const error = await searchActorsViaUnstableEndpoint({ search: 'instagram', apifyClient }).catch(
             (caught: unknown) => caught,
         );
         expect(error).toBeInstanceOf(Error);
@@ -313,7 +288,7 @@ describe('searchAgentSafeActors data source', () => {
         vi.resetModules();
     });
 
-    it('uses /unstable/store when APIFY_STORE_UNSTABLE_ENDPOINT is on, ignoring the offset', async () => {
+    it('uses /unstable/store when APIFY_STORE_UNSTABLE_ENDPOINT is on, ignoring the limit and offset', async () => {
         vi.stubEnv('APIFY_STORE_UNSTABLE_ENDPOINT', 'true');
         vi.resetModules();
         // The flag is read once, when the module loads.
@@ -324,7 +299,7 @@ describe('searchAgentSafeActors data source', () => {
         });
         const store = vi.spyOn(apifyClient, 'store');
 
-        const result = await searchWithFlag({
+        const actors = await searchWithFlag({
             keywords: 'instagram',
             apifyClient,
             limit: 5,
@@ -333,9 +308,10 @@ describe('searchAgentSafeActors data source', () => {
         });
 
         expect(store).not.toHaveBeenCalled();
+        expect(requestedUrl(request).searchParams.has('limit')).toBe(false);
         expect(requestedUrl(request).searchParams.has('offset')).toBe(false);
         expect(requestedUrl(request).searchParams.get('_useCase')).toBe('compare prices');
-        expect(result.nextCursor).toBe('recomm-1');
+        expect(actors).toHaveLength(1);
     });
 });
 
@@ -355,57 +331,32 @@ describe('search-actors served from /unstable/store', () => {
         return { searchActors, searchActorsWidget, stubToolCallContext };
     };
 
-    const mockClientAnswering = (items: UnstableStoreItem[], recommId: string) => {
-        const { request, apifyClient } = mockUnstableStoreClient({
+    it('takes no limit or offset in either tool', async () => {
+        const { searchActors, searchActorsWidget } = await loadToolsWithFlag();
+        // A client that still sends them must not fail the strict widget schema.
+        const widgetInput: Record<string, unknown> = { keywords: 'instagram', limit: 5, offset: 20 };
+
+        expect(Object.keys(searchActors.inputSchema.properties ?? {})).toEqual(['keywords', 'useCase']);
+        expect(Object.keys(searchActorsWidget.inputSchema.properties ?? {})).toEqual(['keywords', 'useCase']);
+        expect((searchActorsWidget as HelperTool).ajvValidate(widgetInput)).toBe(true);
+        expect(widgetInput).toEqual({ keywords: 'instagram' });
+    });
+
+    // With one page, an empty one means the keywords matched nothing.
+    it('suggests other keywords when the page is empty', async () => {
+        const { searchActors, stubToolCallContext } = await loadToolsWithFlag();
+        const { apifyClient } = mockUnstableStoreClient({
             status: 200,
-            data: { data: { items, count: items.length, limit: 5, recommId } },
+            data: { data: { items: [], count: 0, limit: 5, recommId: 'recomm-1' } },
         });
         vi.spyOn(apifyClient, 'user').mockReturnValue({
             get: async () => ({ id: 'user-1', plan: { tier: 'FREE' } }),
         } as unknown as ReturnType<ApifyClient['user']>);
-        return { request, apifyClient };
-    };
-
-    type SearchResult = { structuredContent: { nextCursor?: string }; content: { text: string }[] };
-
-    it('takes a cursor and returns the next one', async () => {
-        const { searchActors, stubToolCallContext } = await loadToolsWithFlag();
-        const { request, apifyClient } = mockClientAnswering([UNSTABLE_STORE_ITEM], 'recomm-2');
 
         const result = (await (searchActors as HelperTool).call(
-            stubToolCallContext({ keywords: 'instagram', limit: 5, cursor: 'recomm-1' }, apifyClient),
-        )) as SearchResult;
+            stubToolCallContext({ keywords: 'instagram' }, apifyClient),
+        )) as { content: { text: string }[] };
 
-        expect(searchActors.inputSchema.properties).toHaveProperty('cursor');
-        expect(requestedUrl(request).searchParams.get('recommId')).toBe('recomm-1');
-        expect(result.structuredContent.nextCursor).toBe('recomm-2');
-        expect(result.content[0].text).toContain('recomm-2');
-    });
-
-    // The store drops Actors after ranking, so later pages can still have results.
-    it('returns the next cursor on an empty page instead of suggesting other keywords', async () => {
-        const { searchActors, stubToolCallContext } = await loadToolsWithFlag();
-        const { apifyClient } = mockClientAnswering([], 'recomm-2');
-
-        const result = (await (searchActors as HelperTool).call(
-            stubToolCallContext({ keywords: 'instagram', limit: 5 }, apifyClient),
-        )) as SearchResult;
-        const text = result.content.map((part) => part.text).join('\n');
-
-        expect(result.structuredContent.nextCursor).toBe('recomm-2');
-        expect(text).toContain('recomm-2');
-        expect(text).not.toContain('Keywords can include');
-    });
-
-    it('returns the next cursor on an empty widget page', async () => {
-        const { searchActorsWidget, stubToolCallContext } = await loadToolsWithFlag();
-        const { apifyClient } = mockClientAnswering([], 'recomm-2');
-
-        const result = (await (searchActorsWidget as HelperTool).call(
-            stubToolCallContext({ keywords: 'instagram', limit: 5 }, apifyClient),
-        )) as SearchResult;
-
-        expect(result.structuredContent.nextCursor).toBe('recomm-2');
-        expect(result.content.map((part) => part.text).join('\n')).toContain('recomm-2');
+        expect(result.content[0].text).toContain('Keywords can include');
     });
 });

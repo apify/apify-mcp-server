@@ -131,7 +131,7 @@ The MCP server listens on port `3001`. The HTTP server implementation is in `src
 
 ### Store search through `/unstable/store`
 
-`APIFY_STORE_UNSTABLE_ENDPOINT=true` (or `1`) routes `search-actors` and `search-actors-widget` through apify-core's `GET /unstable/store` instead of `GET /v2/store`. The endpoint ranks with Recombee and pages by cursor, so with the flag on the tools take a `cursor` argument, return `nextCursor`, and ignore `offset`. The flag is read once per process; with it off, the tools are unchanged. The mapping to the Actor card lives in `src/utils/store_unstable.ts`.
+`APIFY_STORE_UNSTABLE_ENDPOINT=true` (or `1`) routes `search-actors` and `search-actors-widget` through apify-core's `GET /unstable/store` instead of `GET /v2/store`. The endpoint ranks with Recombee. With the flag on, the tools take no `limit` or `offset` and return the one page the endpoint sizes; they do not page. The flag is read once per process; with it off, the tools are unchanged. The mapping to the Actor card lives in `src/utils/store_unstable.ts`.
 
 ### Configuring APIFY_TOKEN for Claude Code
 

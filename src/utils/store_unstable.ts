@@ -56,7 +56,6 @@ const unstableStorePageSchema = z.object({
         items: z.array(unstableStoreItemSchema),
         count: z.number(),
         limit: z.number(),
-        recommId: z.string().optional(),
     }),
 });
 
@@ -65,17 +64,9 @@ export type UnstableStoreItem = z.infer<typeof unstableStoreItemSchema>;
 export type UnstableStoreSearchOptions = {
     search: string;
     apifyClient: ApifyClient;
-    limit: number;
-    cursor?: string;
     allowsAgenticUsers?: boolean;
     /** Sent as `_traceId` and `_useCase`. */
     tracking?: ApifyClient['storeSearchTracking'];
-};
-
-export type UnstableStoreSearchPage = {
-    actors: ActorStoreList[];
-    /** Absent when the store failed to rank the page. */
-    nextCursor?: string;
 };
 
 /** `apiBaseUrl` is the client's `baseUrl` (`<origin>/v2`), so the request goes where `/v2/store` goes. */
@@ -85,10 +76,8 @@ export function buildUnstableStoreSearchUrl(
 ): URL {
     const url = new URL(apiBaseUrl.replace(/\/v2$/, '/unstable/store'));
     if (options.search) url.searchParams.set('search', options.search);
-    url.searchParams.set('limit', String(options.limit));
     // Core reads Mongo only for what `include` asks for; without `currentPricingInfo` PPE Actors come without prices.
     url.searchParams.set('include', 'inputSchema,currentPricingInfo');
-    if (options.cursor) url.searchParams.set('recommId', options.cursor);
     if (options.allowsAgenticUsers !== undefined) {
         url.searchParams.set('allowsAgenticUsers', String(options.allowsAgenticUsers));
     }
@@ -145,9 +134,10 @@ export function mapUnstableStoreItem(item: UnstableStoreItem): ActorStoreList {
     return mapped;
 }
 
-export async function searchActorsViaUnstableEndpoint(
-    options: UnstableStoreSearchOptions,
-): Promise<UnstableStoreSearchPage> {
+/**
+ * One page, sized by the endpoint: MCP sends no `limit` and does not page, so the `recommId` it returns is not used.
+ */
+export async function searchActorsViaUnstableEndpoint(options: UnstableStoreSearchOptions): Promise<ActorStoreList[]> {
     const { apifyClient, ...query } = options;
     // `httpClient.call()` retries 429, 5xx and network errors, as `/v2/store` does through `store().list()`,
     // and throws the API error with its status, like `store().list()`.
@@ -162,10 +152,5 @@ export async function searchActorsViaUnstableEndpoint(
         log.error('Store search: GET /unstable/store returned an unexpected response', { issues: parsed.error.issues });
         throw new Error('Store search failed: the store returned an unexpected response.');
     }
-    const page = parsed.data.data;
-    return {
-        actors: page.items.map(mapUnstableStoreItem),
-        // An empty page does not end the results: the store drops Actors after ranking.
-        ...(page.recommId ? { nextCursor: page.recommId } : {}),
-    };
+    return parsed.data.data.items.map(mapUnstableStoreItem);
 }
