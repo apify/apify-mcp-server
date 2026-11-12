@@ -232,6 +232,17 @@ describe('readApiResource()', () => {
         expect(captured.url).toBe('');
     });
 
+    it('throws InvalidParams without a request for a path outside /v2/', async () => {
+        const { request, captured } = requestReturning(streamOf('{}'), 'application/json');
+        const uri = `${API}/v2/../x`;
+
+        const error = await expectReadError(readApiResource(uri, stubApifyClient({ request })));
+
+        expect(error).toBeInstanceOf(InvalidParamsError);
+        expect(error.data).toEqual({ uri });
+        expect(captured.url).toBe('');
+    });
+
     it('requests the full URL as a stream capped at MAX_INLINE_BYTES', async () => {
         // The size cap is enforced by axios itself mid-consumption (streamed responses are wrapped in a
         // byte-counting generator since axios 1.16), so the contract under test is the request config.
@@ -418,6 +429,26 @@ describe('readApiResource()', () => {
         const { request } = requestReturning(abortingStream(), 'application/octet-stream');
 
         const result = await readApiResource(uri, stubApifyClient({ request, recordPublicUrlThrows: true }));
+
+        expect(firstContent(result).text).toContain(uri);
+    });
+
+    it('falls back to the API URL when the record key is not a platform key', async () => {
+        const uri = `${API}/v2/key-value-stores/a1B2c3D4e5F6g7H8i/records/a%2Fb`;
+        const { request: readRecord } = requestReturning(abortingStream(), 'application/octet-stream');
+        const client = new ApifyClient({ token: 'test-token', baseUrl: API });
+        // The record read overflows; a store read, if any, finds the store.
+        vi.spyOn(client.httpClient.axios, 'request').mockImplementation((async (config: RequestConfig) =>
+            config.url.includes('/records/')
+                ? readRecord(config)
+                : {
+                      data: { data: { id: 'a1B2c3D4e5F6g7H8i' } },
+                      headers: {},
+                      status: 200,
+                      statusText: 'OK',
+                  }) as never);
+
+        const result = await readApiResource(uri, client);
 
         expect(firstContent(result).text).toContain(uri);
     });
