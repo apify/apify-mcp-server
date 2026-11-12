@@ -60,8 +60,11 @@ export async function getMCPServerTools(
         escapedUsername !== null &&
         tools.some(({ name }) => `${escapedUsername}--${actorName}--${name}`.length > MAX_TOOL_NAME_LENGTH);
 
-    return tools.map(
-        (tool): ActorMcpTool => ({
+    const entries: ActorMcpTool[] = [];
+    for (const tool of tools) {
+        // Yield between compiles so a server's tool list cannot hold the event loop for all its compiles at once.
+        await new Promise((resolve) => setImmediate(resolve));
+        entries.push({
             type: TOOL_TYPE.ACTOR_MCP,
             actorId: actorID,
             actorFullName,
@@ -72,6 +75,7 @@ export async function getMCPServerTools(
             inputSchema: tool.inputSchema,
             ajvValidate: compileUntrustedSchema(tool.inputSchema).validate,
             annotations: tool.annotations,
-        }),
-    );
+        });
+    }
+    return entries;
 }

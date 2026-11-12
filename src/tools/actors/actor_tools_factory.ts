@@ -186,6 +186,8 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
             ACTOR_MAX_MEMORY_MBYTES,
         );
 
+        // Yield between compiles so a list of Actors cannot hold the event loop for all their compiles at once.
+        await new Promise((resolve) => setImmediate(resolve));
         let compiled;
         try {
             // Unknown properties are silently stripped by AJV's removeAdditional option.
