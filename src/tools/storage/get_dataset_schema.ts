@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -9,6 +9,7 @@ import { stripQuoteWrappers } from '../../utils/generic.js';
 import { respondServerError, respondUserError } from '../../utils/mcp.js';
 import { generateSchemaFromItems } from '../../utils/schema_generation.js';
 import { datasetSchemaOutputSchema } from '../structured_output_schemas.js';
+import { readDatasetItems } from './dataset_items_read.js';
 import {
     buildStorageResponse,
     fetchStorageByIdOrName,
@@ -17,9 +18,21 @@ import {
     storageNotFoundText,
 } from './storage_helpers.js';
 
+/** Largest sample the schema is inferred from; the sample is also cut at `MAX_INLINE_BYTES`. */
+export const DATASET_SCHEMA_MAX_LIMIT = 1000;
+
 const getDatasetSchemaArgs = z.object({
     datasetId: z.string().min(1).describe(storageIdArgDescription('dataset')),
-    limit: z.number().describe('Maximum number of items to use for schema generation. Default is 5.').default(5),
+    // min(1): the API reads limit=0 as "no limit".
+    limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(DATASET_SCHEMA_MAX_LIMIT)
+        .describe(
+            `Maximum number of items to use for schema generation. Default is 5. Maximum is ${DATASET_SCHEMA_MAX_LIMIT}. Fewer are used when the items pass ${MAX_INLINE_BYTES} bytes.`,
+        )
+        .default(5),
     clean: z
         .boolean()
         .describe('If true, uses only non-empty items and skips hidden fields (starting with #). Default is true.')
@@ -69,18 +82,29 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, loadedToolNames } = toolArgs;
+        const { args, apifyClient: client, loadedToolNames, signal } = toolArgs;
         const parsed = getDatasetSchemaArgs.parse(args);
         const datasetId = stripQuoteWrappers(parsed.datasetId);
 
         const datasetResponse = (
             await fetchStorageByIdOrName(datasetId, async (safeId) =>
-                client.dataset(safeId).listItems({ clean: parsed.clean, limit: parsed.limit }),
+                readDatasetItems(client, safeId, { clean: parsed.clean, limit: parsed.limit }, signal),
             )
         )?.result;
 
         if (!datasetResponse) {
             return respondUserError(storageNotFoundText('dataset', datasetId));
+        }
+        if (datasetResponse.isCut && datasetResponse.items.length === 0) {
+            const fieldList = resolveSiblingNextStep(
+                HELPER_TOOLS.DATASET_GET,
+                loadedToolNames,
+                ` ${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} lists the dataset's fields.`,
+                '',
+            );
+            return respondUserError(
+                `The first item of dataset '${datasetId}' is larger than ${MAX_INLINE_BYTES} bytes on its own, so no schema is inferred.${fieldList}`,
+            );
         }
 
         const datasetItems = datasetResponse.items;
@@ -116,7 +140,10 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
         }
 
         const fieldCount = Object.keys(schema.items.properties ?? {}).length;
-        const summary = `Schema inferred from ${datasetItems.length} ${datasetItems.length === 1 ? 'item' : 'items'}, ${fieldCount} ${fieldCount === 1 ? 'field' : 'fields'}.`;
+        const cutNote = datasetResponse.isCut
+            ? ` The next item would pass the ${MAX_INLINE_BYTES}-byte response limit, so the sample stops there.`
+            : '';
+        const summary = `Schema inferred from ${datasetItems.length} ${datasetItems.length === 1 ? 'item' : 'items'}, ${fieldCount} ${fieldCount === 1 ? 'field' : 'fields'}.${cutNote}`;
         const nextStep = resolveSiblingNextStep(
             HELPER_TOOLS.DATASET_GET_ITEMS,
             loadedToolNames,
