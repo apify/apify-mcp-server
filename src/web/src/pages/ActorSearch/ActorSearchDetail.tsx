@@ -80,8 +80,12 @@ const ReadmeWrapper = styled.div`
         display: flex;
         flex-direction: column;
         gap: ${theme.space.space8};
-        /* README HTML is laid out, clipped and stacked within this box, including fixed-position elements */
+        /* README HTML is clipped and stacked within this box, and positioned elements use it as their containing block.
+           Over-wide content scrolls horizontally; the padding keeps focus outlines at the edges visible. */
         contain: paint;
+        overflow-x: auto;
+        padding: ${theme.space.space4};
+        margin: calc(-1 * ${theme.space.space4});
     }
     /* TODO: this is an exception from the design system, let's figure out how to not do overrides */
     .${README_CLASSNAMES.MARKDOWN} {
