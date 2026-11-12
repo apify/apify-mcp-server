@@ -11,6 +11,8 @@ import {
     inferArrayItemsTypeIfMissing,
     inferArrayItemType,
     MAX_UNTRUSTED_SCHEMA_BYTES,
+    MAX_UNTRUSTED_SCHEMA_DEPTH,
+    MAX_UNTRUSTED_SCHEMA_NODES,
     markInputPropertiesAsRequired,
     shortenProperties,
     transformActorInputSchemaProperties,
@@ -23,6 +25,7 @@ import { fetchActorMcpToolList } from '../../src/tools/actors/fetch_actor_mcp_to
 import { sendServerActorRequest } from '../../src/tools/actors/send_server_actor_request.js';
 import type { ActorInputSchema, SchemaProperties, ToolBase, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
+import { createAjv } from '../../src/utils/ajv.js';
 import {
     extractActorInterface,
     extractActorName,
@@ -65,6 +68,196 @@ describe('compileUntrustedSchema', () => {
         const huge = { type: 'object', properties };
         expect(JSON.stringify(huge).length).toBeGreaterThan(MAX_UNTRUSTED_SCHEMA_BYTES);
         expect(() => compileUntrustedSchema(huge)).toThrow(SchemaTooLargeError);
+    });
+
+    const stringProperties = (count: number) =>
+        Object.fromEntries(Array.from({ length: count }, (_, i) => [`field${i}`, { type: 'string' }]));
+    // Fits the node bound once, not twice.
+    const overHalfOfNodeBound = MAX_UNTRUSTED_SCHEMA_NODES / 2 + 10;
+
+    it('throws SchemaTooLargeError on a schema under the byte cap with too many nodes', () => {
+        const schema = { type: 'object', properties: stringProperties(MAX_UNTRUSTED_SCHEMA_NODES) };
+        expect(JSON.stringify(schema).length).toBeLessThan(MAX_UNTRUSTED_SCHEMA_BYTES);
+        expect(() => compileUntrustedSchema(schema)).toThrow(SchemaTooLargeError);
+    });
+
+    const names = (count: number) => Array.from({ length: count }, (_, i) => `field${i}`);
+
+    it.each([
+        ['objects under a data keyword', { default: { properties: stringProperties(MAX_UNTRUSTED_SCHEMA_NODES) } }],
+        [
+            'subschemas under dependencies',
+            { dependencies: { url: { properties: stringProperties(MAX_UNTRUSTED_SCHEMA_NODES) } } },
+        ],
+        [
+            'property lists under dependencies',
+            {
+                dependencies: Object.fromEntries(
+                    Array.from({ length: MAX_UNTRUSTED_SCHEMA_NODES }, (_, i) => [`field${i}`, ['url']]),
+                ),
+            },
+        ],
+        [
+            'object values of an enum',
+            { enum: Array.from({ length: MAX_UNTRUSTED_SCHEMA_NODES }, (_, i) => ({ id: i })) },
+        ],
+        [
+            'boolean subschemas',
+            {
+                properties: Object.fromEntries(
+                    Array.from({ length: MAX_UNTRUSTED_SCHEMA_NODES }, (_, i) => [`field${i}`, false]),
+                ),
+            },
+        ],
+    ])('counts %s toward the node bound', (_label, schema) => {
+        expect(() => compileUntrustedSchema({ type: 'object', ...schema })).toThrow(SchemaTooLargeError);
+    });
+
+    it.each([
+        ['one long dependencies list', { dependencies: { url: names(800) } }],
+        ['required lists that compile inline', { allOf: Array.from({ length: 20 }, () => ({ required: names(199) })) }],
+        ['an enum of thousands of values', { properties: { countryCode: { enum: names(4000) } } }],
+    ])('weights %s by its compile cost', (_label, schema) => {
+        expect(() => compileUntrustedSchema({ type: 'object', ...schema })).toThrow(SchemaTooLargeError);
+    });
+
+    it('accepts a long required list, which compiles to a loop', () => {
+        expect(() => compileUntrustedSchema({ type: 'object', required: names(5000) })).not.toThrow();
+    });
+
+    it('accepts an Actor input schema with several selects of hundreds of values', () => {
+        const select = (count: number) => ({ type: 'string', enum: names(count) });
+        const schema = {
+            type: 'object',
+            properties: {
+                ...stringProperties(60),
+                countryCode: select(249),
+                searchLanguage: select(150),
+                languageCode: select(150),
+                currency: select(150),
+                countries: { type: 'array', items: select(249) },
+            },
+        };
+        expect(() => compileUntrustedSchema(schema)).not.toThrow();
+    });
+
+    it('adds up the weights of different constructs', () => {
+        const schema = {
+            type: 'object',
+            properties: stringProperties(overHalfOfNodeBound),
+            dependencies: { field0: names(600) },
+        };
+        expect(() => compileUntrustedSchema(schema)).toThrow(SchemaTooLargeError);
+    });
+
+    it('counts a $ref target again at every use', () => {
+        const address = { type: 'object', properties: stringProperties(50) };
+        const properties = Object.fromEntries(
+            Array.from({ length: 25 }, (_, i) => [`address${i}`, { $ref: '#/definitions/address' }]),
+        );
+        expect(() => compileUntrustedSchema({ type: 'object', definitions: { address }, properties })).toThrow(
+            SchemaTooLargeError,
+        );
+    });
+
+    it('counts a $ref target again, wherever it sits', () => {
+        const schema = {
+            type: 'object',
+            default: { type: 'object', properties: stringProperties(overHalfOfNodeBound) },
+            properties: { url: { $ref: '#/default' } },
+        };
+        expect(() => compileUntrustedSchema(schema)).toThrow(SchemaTooLargeError);
+    });
+
+    it.each([
+        ['a reference that is not a local pointer', {}, 'https://example.com/schema.json'],
+        [
+            'any reference when a nested $id changes how it resolves',
+            { nested: { $id: 'nested' } },
+            '#/properties/field0',
+        ],
+    ])('counts the whole schema again for %s', (_label, extraProperties, ref) => {
+        const schema = {
+            type: 'object',
+            properties: { ...stringProperties(overHalfOfNodeBound), ...extraProperties, url: { $ref: ref } },
+        };
+        expect(() => compileUntrustedSchema(schema)).toThrow(SchemaTooLargeError);
+    });
+
+    it('validates, coerces and reports errors like the server validation policy, $ref siblings included', () => {
+        const schema = () => ({
+            type: 'object',
+            definitions: { text: { type: 'string' }, node: { type: 'object', properties: { next: { $ref: '#' } } } },
+            properties: {
+                mode: { $ref: '#/definitions/text', enum: ['1', '2'] },
+                query: { $ref: '#/definitions/text', minLength: 3 },
+                tree: { $ref: '#/definitions/node' },
+            },
+        });
+        const reference = createAjv().compile(schema());
+        const { validate } = compileUntrustedSchema(schema());
+        const getOutcome = (validator: typeof validate, input: unknown) => {
+            const data = structuredClone(input);
+            const isValid = validator(data);
+            const errors = validator.errors?.map(({ keyword, instancePath, params, message }) => ({
+                keyword,
+                instancePath,
+                params,
+                message,
+            }));
+            return { isValid, errors, data };
+        };
+
+        for (const input of [
+            { mode: 1 },
+            { mode: 7 },
+            { query: 12 },
+            { query: null },
+            { tree: { next: { mode: 2 } } },
+        ]) {
+            expect(getOutcome(validate, input)).toEqual(getOutcome(reference, input));
+        }
+    });
+
+    it('throws SchemaTooLargeError on a schema nested deeper than the depth bound', () => {
+        let schema: object = { type: 'string' };
+        for (let i = 0; i < MAX_UNTRUSTED_SCHEMA_DEPTH; i++) schema = { type: 'array', items: schema };
+        expect(() => compileUntrustedSchema(schema)).toThrow(SchemaTooLargeError);
+    });
+
+    it('rethrows the cached error for a schema that failed to compile', () => {
+        const schema = () => ({ type: 'object', properties: { url: { $ref: '#/definitions/missing' } } });
+        const getCompileError = () => {
+            try {
+                compileUntrustedSchema(schema());
+            } catch (error) {
+                return error;
+            }
+            return undefined;
+        };
+        const first = getCompileError();
+        expect(first).toBeInstanceOf(Error);
+        expect(getCompileError()).toBe(first);
+    });
+
+    it('does not cache a stack overflow, which depends on the stack depth of the call', () => {
+        let hasOverflowed = false;
+        // `toJSON` keeps the content hash stable; the getter overflows on the first compile only.
+        const schema = {
+            toJSON: () => ({ type: 'object', properties: { url: { type: 'string' } }, title: 'Stack depth' }),
+            type: 'object',
+            title: 'Stack depth',
+            get properties() {
+                if (!hasOverflowed) {
+                    hasOverflowed = true;
+                    throw new RangeError('Maximum call stack size exceeded');
+                }
+                return { url: { type: 'string' } };
+            },
+        };
+
+        expect(() => compileUntrustedSchema(schema)).toThrow(RangeError);
+        expect(compileUntrustedSchema(schema).validate({ url: 'https://example.com' })).toBe(true);
     });
 });
 

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { MAX_UNTRUSTED_SCHEMA_NODES } from '../../src/tools/actor_input_schema.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import type { ActorInfo, SchemaProperties } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
@@ -70,6 +72,18 @@ describe('getNormalActorsAsTools()', () => {
             expect(second.inputSchema).not.toBe(first.inputSchema);
             expect(second.ajvValidate).not.toBe(first.ajvValidate);
         });
+    });
+
+    it('skips an Actor whose input schema exceeds the compile limit and serves the rest', async () => {
+        const inputProperties = Object.fromEntries(
+            Array.from({ length: MAX_UNTRUSTED_SCHEMA_NODES }, (_, i) => [`keyword${i}`, { type: 'string' as const }]),
+        );
+        const tools = await getNormalActorsAsTools([
+            createMockActorInfo('apify/oversized-input-schema', { inputProperties }),
+            createMockActorInfo('apify/rag-web-browser'),
+        ]);
+
+        expect(tools.map((tool) => tool.name)).toEqual([actorNameToToolName('apify/rag-web-browser')]);
     });
 
     describe('input validation', () => {

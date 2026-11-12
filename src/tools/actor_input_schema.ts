@@ -25,11 +25,104 @@ type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 // untrusted callers (actor_tools_factory, mcp/proxy) reach AJV through here; trusted compileSchema()
 // is intentionally uncapped.
 export const MAX_UNTRUSTED_SCHEMA_BYTES = 262_144;
+// Bytes do not bound AJV's work; the schema's nodes do. Every subschema AJV compiles is an object or a boolean
+// somewhere in the schema, so each object, array and boolean counts as a node wherever it sits. A `$ref` target
+// counts again at every use, since AJV may inline a copy there. Lists of names and values add their own weight
+// (see `getListWeight`).
+export const MAX_UNTRUSTED_SCHEMA_NODES = 1000;
+// Bounds AJV's recursion over nested subschemas.
+export const MAX_UNTRUSTED_SCHEMA_DEPTH = 64;
+// Skip the generated-code optimization pass, and keep AJV from printing generated code to the console when a
+// compile fails; callers log the failure.
+const UNTRUSTED_AJV_OPTIONS = { code: { optimize: false }, logger: false } as const;
+// Mirrors AJV's default `loopRequired` and must change with it: a shorter `required` list compiles to one expression.
+const AJV_LOOP_REQUIRED = 200;
 
 const UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE = 1000;
-const untrustedValidatorCache = new LruCache<{ validate: ValidateFunction<unknown>; schema: object }>({
+// A failed compile is cached too, so the same schema does not cost the full compile on every load.
+const untrustedValidatorCache = new LruCache<
+    { validate: ValidateFunction<unknown>; schema: object } | { error: unknown }
+>({
     maxLength: UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE,
 });
+
+/**
+ * Weight of a list, in nodes, beyond the node itself. A property-name list compiles to one expression whose
+ * cost grows with the square of its length: a `dependencies` list always, a `required` list below AJV's loop
+ * length. Above it, `required` compiles to a loop. AJV's check of the schema compares `enum` values pairwise.
+ */
+function getListWeight(list: unknown[], key: string, parentKey: string): number {
+    const { length } = list;
+    if (parentKey === 'dependencies' || parentKey === 'dependentRequired') return length ** 2 / 600;
+    if (key === 'required') return length < AJV_LOOP_REQUIRED ? length ** 2 / 600 : length / 100;
+    if (key === 'enum') return length / 10 + length ** 2 / 20_000;
+    return 0;
+}
+
+/** Resolves a `#` or `#/json/pointer` reference within `root`; `undefined` for any other reference. */
+function resolveLocalRef(root: unknown, ref: string): unknown {
+    if (ref !== '#' && !ref.startsWith('#/')) return undefined;
+    let node = root;
+    for (const segment of ref.split('/').slice(1)) {
+        if (typeof node !== 'object' || node === null) return undefined;
+        let key: string;
+        try {
+            key = decodeURIComponent(segment).replace(/~1/g, '/').replace(/~0/g, '~');
+        } catch {
+            return undefined;
+        }
+        if (!Object.hasOwn(node, key)) return undefined;
+        node = (node as Record<string, unknown>)[key];
+    }
+    return node;
+}
+
+type ScannedNode = { node: object; key: string; parentKey: string; parent?: ScannedNode; depth: number; size: number };
+
+/**
+ * Throws `SchemaTooLargeError` when compiling `schema` would exceed the node or depth bound. A reference whose
+ * target cannot be found here (another form, or a nested `$id` that changes how it resolves) counts as the
+ * whole schema.
+ */
+function validateSchemaCompileSize(schema: object): void {
+    const scanned: ScannedNode[] = [];
+    const refs: string[] = [];
+    let hasNestedId = false;
+    const pending: ScannedNode[] = [{ node: schema, key: '', parentKey: '', depth: 1, size: 0 }];
+    while (pending.length > 0) {
+        const entry = pending.pop()!;
+        if (entry.depth > MAX_UNTRUSTED_SCHEMA_DEPTH)
+            throw new SchemaTooLargeError(MAX_UNTRUSTED_SCHEMA_DEPTH, 'level');
+        scanned.push(entry);
+        const { node, key, depth } = entry;
+        entry.size = 1;
+        if (Array.isArray(node)) {
+            entry.size += getListWeight(node, key, entry.parentKey);
+        } else {
+            if ('$ref' in node && typeof node.$ref === 'string') refs.push(node.$ref);
+            if (node !== schema && '$id' in node) hasNestedId = true;
+        }
+        for (const [childKey, child] of Object.entries(node)) {
+            if (typeof child === 'boolean') entry.size++;
+            if (typeof child !== 'object' || child === null) continue;
+            pending.push({ node: child, key: childKey, parentKey: key, parent: entry, depth: depth + 1, size: 0 });
+        }
+    }
+    // A node is scanned after its parent, so in reverse every subtree is complete before it is added upward.
+    const subtreeSizes = new Map<unknown, number>();
+    for (const entry of scanned.reverse()) {
+        subtreeSizes.set(entry.node, entry.size);
+        if (entry.parent) entry.parent.size += entry.size;
+    }
+    const documentSize = subtreeSizes.get(schema)!;
+    let size = documentSize;
+    for (const ref of refs) {
+        if (size > MAX_UNTRUSTED_SCHEMA_NODES) break;
+        const target = hasNestedId ? undefined : resolveLocalRef(schema, ref);
+        size += typeof target === 'boolean' ? 1 : (subtreeSizes.get(target) ?? documentSize);
+    }
+    if (size > MAX_UNTRUSTED_SCHEMA_NODES) throw new SchemaTooLargeError(MAX_UNTRUSTED_SCHEMA_NODES, 'node');
+}
 
 /**
  * Compiles an Actor or proxied-MCP input schema, one validator per schema content.
@@ -48,12 +141,23 @@ export function compileUntrustedSchema<T extends object>(
 
     const cacheKey = createHash('sha256').update(serialized).digest('base64');
     // A hit holds a schema with the same content as `schema`, so it is still a T.
-    const cached = untrustedValidatorCache.get(cacheKey) as { validate: ValidateFunction<unknown>; schema: T } | null;
+    const cached = untrustedValidatorCache.get(cacheKey) as
+        | { validate: ValidateFunction<unknown>; schema: T }
+        | { error: unknown }
+        | null;
+    if (cached && 'error' in cached) throw cached.error;
     if (cached) return cached;
 
-    const compiled = { validate: createAjv().compile(schema), schema };
-    untrustedValidatorCache.add(cacheKey, compiled);
-    return compiled;
+    try {
+        validateSchemaCompileSize(schema);
+        const compiled = { validate: createAjv(UNTRUSTED_AJV_OPTIONS).compile(schema), schema };
+        untrustedValidatorCache.add(cacheKey, compiled);
+        return compiled;
+    } catch (error) {
+        // A stack overflow depends on the caller's stack depth, so the same schema may compile on a later call.
+        if (!(error instanceof RangeError)) untrustedValidatorCache.add(cacheKey, { error });
+        throw error;
+    }
 }
 
 /**
