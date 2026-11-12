@@ -24,6 +24,7 @@ import { logHttpError } from '../../utils/logging.js';
 import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 import { cleanEmptyProperties } from '../../utils/schema_generation.js';
+import { formatInlineActorText } from '../actor_input_schema.js';
 import { DEFAULT_DATASET_ITEMS_LIMIT } from '../storage/get_dataset_items.js';
 
 /** Reserved key-value store key some Actors use to advertise advisory guidance about the run. */
@@ -479,11 +480,12 @@ function pollHint(runId: string): string {
  * Render an upstream `statusMessage` as a clearly-attributed suffix (` Actor status: "..."`).
  * Attribution prevents readers from mistaking the upstream message (which can be stale relative
  * to elapsed time) for our own narrative; the trailing period is stripped so the surrounding
- * template's period doesn't produce `..`.
+ * template's period doesn't produce `..`. The message is printed on one line, with its double
+ * quotes as single quotes so it stays inside the quotes.
  */
 function statusMessageLine(statusMessage: string | null | undefined): string {
     if (!statusMessage) return '';
-    const trimmed = stripTrailingChars(statusMessage.trim(), '.');
+    const trimmed = stripTrailingChars(formatInlineActorText(statusMessage).trim(), '.').replaceAll('"', "'");
     if (!trimmed) return '';
     return ` Actor status: "${trimmed}".`;
 }

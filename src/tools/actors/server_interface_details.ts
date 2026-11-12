@@ -7,6 +7,7 @@ import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
 import type { Actor, ActorTenancy, ServerActorToolInfo } from '../../types.js';
 import { ACTOR_TENANCY } from '../../types.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
+import { joinActorTextLines } from '../actor_input_schema.js';
 import { resolveActorTenancy } from '../actor_tool_naming.js';
 import type { DereferenceContext } from '../api/apify_api_spec.js';
 import { API_METHODS, DereferenceBudgetError } from '../api/apify_api_spec.js';
@@ -287,7 +288,7 @@ function formatInputs(inputs: OperationInput[]): string {
  * E.g. `- GET /search [q:string required, limit:integer]: Search the web.`, or
  * `- POST / {url:string required, formats:array}: Fetch a URL.` for a JSON body. A JSON body that lists no
  * properties reads `{request body}`, with `required` when it is. A body the tool cannot send, such as a form, reads
- * `{application/x-www-form-urlencoded body: not supported}`.
+ * `{application/x-www-form-urlencoded body: not supported}`. The line holds no line break (`joinActorTextLines`).
  */
 function formatOperationLine(
     { method, path, operation }: ServerOperation,
@@ -305,7 +306,7 @@ function formatOperationLine(
     }
     const { summary } = operation;
     if (typeof summary === 'string' && summary) text += `: ${summary}${/[.!?]$/.test(summary) ? '' : '.'}`;
-    return text;
+    return joinActorTextLines(text);
 }
 
 /**

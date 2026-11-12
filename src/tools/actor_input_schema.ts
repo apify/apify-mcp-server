@@ -276,17 +276,43 @@ function getEnumIfFits(enumList: string[]): string[] | undefined {
 }
 
 /** Cut at the last complete sentence in the cap, or the last complete word if there is none. */
-function shortenDescription(description: string): string {
-    const truncated = description.slice(0, ACTOR_MAX_DESCRIPTION_LENGTH);
+function cutDescription(description: string): string {
+    // Never ends on the first half of a surrogate pair.
+    const truncated = description.slice(0, ACTOR_MAX_DESCRIPTION_LENGTH).replace(/[\uD800-\uDBFF]$/, '');
     const remainder = description.slice(ACTOR_MAX_DESCRIPTION_LENGTH);
     const sentenceEnd =
         [...truncated.matchAll(/[.!?](?=\s)/g)].at(-1)?.index ??
         (/[.!?]$/.test(truncated) && /^\s/.test(remainder) ? truncated.length - 1 : undefined);
-    const shortened =
-        sentenceEnd === undefined
-            ? `${/^\s/.test(remainder) ? truncated.trimEnd() : truncated.replace(/\s+\S*$/, '')}…`
-            : truncated.slice(0, sentenceEnd + 1);
-    return `${shortened}\n\n[Description truncated]`;
+    return sentenceEnd === undefined
+        ? `${/^\s/.test(remainder) ? truncated.trimEnd() : truncated.replace(/\s+\S*$/, '')}…`
+        : truncated.slice(0, sentenceEnd + 1);
+}
+
+function shortenDescription(description: string): string {
+    return `${cutDescription(description)}\n\n[Description truncated]`;
+}
+
+const LINE_BREAK_REGEX = /[\n\r\v\f\u0085\u2028\u2029]/;
+
+/** Each whitespace run that holds a line break becomes one space; other whitespace stays as it is. */
+export function joinActorTextLines(text: string): string {
+    return text.replace(/[\s\u0085]+/g, (run) => (LINE_BREAK_REGEX.test(run) ? ' ' : run));
+}
+
+/**
+ * Actor text printed within a line of a tool description or result: on one line (`joinActorTextLines`), and text
+ * over `ACTOR_MAX_DESCRIPTION_LENGTH` cut as input property descriptions are, ending with `…`.
+ * A missing text is returned as is.
+ */
+export function formatInlineActorText(text: string): string;
+export function formatInlineActorText(text: string | undefined): string | undefined;
+export function formatInlineActorText(text: string | undefined): string | undefined {
+    // Typed as optional, but API data can also hold null here.
+    if (typeof text !== 'string') return text;
+    const inline = joinActorTextLines(text);
+    if (inline.length <= ACTOR_MAX_DESCRIPTION_LENGTH) return inline;
+    const cut = cutDescription(inline);
+    return cut.endsWith('…') ? cut : `${cut}…`;
 }
 
 function applyEnumLimit(holder: { enum?: string[] }, descriptionHost: SchemaProperties, rawEnum: string[]): void {

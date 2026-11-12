@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
+import { ACTOR_MAX_DESCRIPTION_LENGTH } from '../../src/const.js';
+import { getNormalActorsAsTools, getServerActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import type { ActorInfo, SchemaProperties } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
 
@@ -47,6 +48,11 @@ async function getAnnotations(actorInfo: ActorInfo) {
 }
 
 const LIMITED = { actorPermissionLevel: 'LIMITED_PERMISSIONS' };
+
+/** The line of a tool description that holds the Actor description. */
+function getDescriptionLine(description: string | undefined): string {
+    return description?.split('\n').find((line) => line.startsWith('Actor description: ')) ?? '';
+}
 
 describe('getNormalActorsAsTools()', () => {
     describe('input schema and validator are shared across sessions', () => {
@@ -152,6 +158,26 @@ describe('getNormalActorsAsTools()', () => {
             expect(tool.ajvValidate({ url: 'https://example.com', waitUntil: 'load', proxy: 'not-an-object' })).toBe(
                 false,
             );
+        });
+    });
+
+    describe('Actor description in the tool description', () => {
+        it('prints a multi-line Actor description on one line', async () => {
+            const actorInfo = createMockActorInfo('apify/website-content-crawler');
+            actorInfo.definition.description = 'Crawls websites.\n\nExtracts text content.';
+
+            const [tool] = await getNormalActorsAsTools([actorInfo]);
+
+            expect(getDescriptionLine(tool.description)).toContain('Crawls websites. Extracts text content.');
+        });
+
+        it('cuts an Actor description over the cap', async () => {
+            const actorInfo = createMockActorInfo('apify/website-content-crawler');
+            actorInfo.definition.description = 'x '.repeat(ACTOR_MAX_DESCRIPTION_LENGTH);
+
+            const [tool] = await getNormalActorsAsTools([actorInfo]);
+
+            expect(getDescriptionLine(tool.description).length).toBeLessThan(ACTOR_MAX_DESCRIPTION_LENGTH + 50);
         });
     });
 
@@ -265,5 +291,24 @@ describe('getNormalActorsAsTools()', () => {
                 expect(await getAnnotations(info)).toMatchObject({ readOnlyHint: false, destructiveHint: true });
             }
         });
+    });
+});
+
+describe('getServerActorsAsTools()', () => {
+    it('prints a multi-line Actor description on one line', () => {
+        const actorInfo = createMockActorInfo('apify/server-actor-test');
+        actorInfo.definition.description = 'Serves an HTTP API.\n\nReturns JSON.';
+        actorInfo.definition.webServerToolInfo = {
+            methods: ['GET'],
+            hasRequestBody: false,
+            operationLines: [],
+            operationCount: 0,
+            detailsHint: '',
+            listHint: '',
+        };
+
+        const [tool] = getServerActorsAsTools([actorInfo]);
+
+        expect(getDescriptionLine(tool.description)).toContain('Serves an HTTP API. Returns JSON.');
     });
 });

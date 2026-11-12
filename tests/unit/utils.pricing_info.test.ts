@@ -118,6 +118,20 @@ const singleTierPayPerEvent = {
     },
 } as unknown as PricingInfo;
 
+// An event whose title and description span several lines.
+const multiLineEventPayPerEvent = {
+    pricingModel: ACTOR_PRICING_MODEL.PAY_PER_EVENT,
+    pricingPerEvent: {
+        actorChargeEvents: {
+            scraped: {
+                eventTitle: 'Scraped\nplace',
+                eventDescription: 'A Google Maps place\n\nscraped',
+                eventPriceUsd: 0.004,
+            },
+        },
+    },
+} as unknown as PricingInfo;
+
 // E5/E6: PRICE_PER_DATASET_ITEM with multi-tier pricing.
 const multiTierDatasetItem = {
     pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
@@ -252,6 +266,18 @@ describe('pricingInfoToString (complete mode)', () => {
     it('E8: FREE actor', () => {
         expect(pricingInfoToString(freeActor)).toBe('Runs are charged for Apify platform usage.');
         expect(pricingInfoToString(null)).toBe('Runs are charged for Apify platform usage.');
+    });
+
+    it('prints the unit name on the line of the price', () => {
+        expect(pricingInfoToString({ ...multiTierDatasetItem, unitName: 'page\nresult' } as PricingInfo)).toBe(
+            'This Actor has tiered pricing per 1000 page results: FREE: $5, BRONZE: $4, GOLD: $2.',
+        );
+    });
+
+    it('prints the title and description of an event on its line', () => {
+        expect(pricingInfoToString(multiLineEventPayPerEvent)).toBe(
+            'This Actor is paid per event:\n' + '  - **Scraped place**: A Google Maps place scraped ($0.004 per event)',
+        );
     });
 });
 
@@ -461,5 +487,30 @@ describe('pricingInfoToSimplifiedString (simplified mode)', () => {
                 '  - **Add-on: Search video sorting**: $0.0013 per event\n' +
                 `  - **Actor start**: $0.001 per event\n${EVENT_DESCRIPTIONS_OMITTED_NOTE}`,
         );
+    });
+
+    it('prints the unit name on the line of the price', () => {
+        const info = { ...multiTierDatasetItem, unitName: 'page\nresult' } as PricingInfo;
+
+        expect(pricingInfoToSimplifiedString(info, 'FREE')).toMatch(/^This Actor costs \$5 per 1000 page results\./);
+    });
+
+    it('prints the title and description of an event on its line', () => {
+        expect(pricingInfoToSimplifiedString(multiLineEventPayPerEvent, 'FREE')).toBe(
+            'This Actor is paid per event:\n' + '  - **Scraped place**: A Google Maps place scraped ($0.004 per event)',
+        );
+    });
+
+    it('prints the title of an event on its line when event descriptions are omitted', () => {
+        const { pricingPerEvent } = longPayPerEvent as unknown as {
+            pricingPerEvent: { actorChargeEvents: Record<string, object> };
+        };
+        const events = pricingPerEvent.actorChargeEvents;
+        const info = {
+            ...longPayPerEvent,
+            pricingPerEvent: { actorChargeEvents: { ...events, a: { ...events.a, eventTitle: 'Re\nsult' } } },
+        } as unknown as PricingInfo;
+
+        expect(pricingInfoToSimplifiedString(info, 'FREE')).toContain('\n  - **Re sult**: $0.0037 per event\n');
     });
 });

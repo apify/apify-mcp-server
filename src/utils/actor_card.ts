@@ -1,4 +1,5 @@
 import { APIFY_STORE_URL, MAX_INPUT_FIELDS_IN_ACTOR_CARD, OFFICIAL_APIFY_USERNAMES } from '../const.js';
+import { formatInlineActorText } from '../tools/actor_input_schema.js';
 import type { Actor, ActorCardOptions, ActorStoreInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
 import { buildConsoleActorUrl } from './console_link.js';
 import {
@@ -188,12 +189,12 @@ export function formatActorToActorCard(
     const userTier = options.userTier ?? 'FREE';
 
     const markdownLines = [
-        `## [${data.title}](${data.actorUrl}) (\`${data.actorFullName}\`)`,
+        `## [${formatInlineActorText(data.title)}](${data.actorUrl}) (\`${data.actorFullName}\`)`,
         `- **URL:** ${data.actorUrl}`,
     ];
 
     if (options.includeDescription) {
-        markdownLines.push(`- **Description:** ${data.description}`);
+        markdownLines.push(`- **Description:** ${formatInlineActorText(data.description)}`);
     }
 
     if (options.includePricing) {
