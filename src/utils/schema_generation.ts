@@ -77,11 +77,17 @@ export function cleanEmptyProperties(obj: unknown): unknown {
     return Object.keys(cleaned).length > 0 ? cleaned : undefined;
 }
 
+/** `local@domain` with no whitespace, and a dot inside the domain with characters on both sides of it. */
+function isEmail(s: string): boolean {
+    const dotIndex = s.indexOf('.', s.indexOf('@') + 2);
+    return /^[^\s@]+@[^\s@]+$/.test(s) && dotIndex !== -1 && dotIndex < s.length - 1;
+}
+
 const FORMAT_DETECTORS: [string, (s: string) => boolean][] = [
     ['date-time', (s) => /^\d{4}-\d{2}-\d{2}[Tt ]\d{2}:\d{2}:\d{2}(\.\d+)?([Zz]|[+-]\d{2}:\d{2})?$/.test(s)],
     ['date', (s) => /^\d{4}-\d{2}-\d{2}$/.test(s)],
     ['uuid', (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)],
-    ['email', (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)],
+    ['email', isEmail],
     ['uri', (s) => /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/\S+$/.test(s)],
 ];
 
