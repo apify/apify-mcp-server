@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../../src/const.js';
+import {
+    ACTOR_ENUM_MAX_LENGTH,
+    ACTOR_MAX_DESCRIPTION_LENGTH,
+    RESOURCE_ID_OR_NAME_MAX_LENGTH,
+} from '../../src/const.js';
 import { SchemaTooLargeError } from '../../src/errors.js';
 import {
     buildActorInputSchema,
@@ -1138,6 +1142,12 @@ describe('extractActorName', () => {
     it('strips :toolName suffix from call-actor args', () => {
         const tool = { type: TOOL_TYPE.INTERNAL, name: 'call-actor' } as unknown as ToolEntry;
         expect(extractActorName(tool, { actor: 'apify/example-mcp-server:add' })).toBe('apify/example-mcp-server');
+    });
+
+    // The args are read before validation.
+    it('returns undefined for an actor arg longer than the argument limit', () => {
+        const tool = { type: TOOL_TYPE.INTERNAL, name: 'call-actor' } as unknown as ToolEntry;
+        expect(extractActorName(tool, { actor: 'a'.repeat(RESOURCE_ID_OR_NAME_MAX_LENGTH + 1) })).toBeUndefined();
     });
 
     it('returns undefined for internal tools without actor arg', () => {

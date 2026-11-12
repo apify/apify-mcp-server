@@ -74,4 +74,21 @@ describe('fixActorNameInput', () => {
             'https://apify.com/apify/rag-web-browser',
         );
     });
+
+    it('drops the suffix from the first colon after the last slash', () => {
+        expect(fixActorNameInput('apify/example-mcp-server:add:extra')).toBe('apify/example-mcp-server');
+    });
+});
+
+// Linear time takes well under a millisecond here; the bound only catches time that grows faster than the length.
+describe('Actor name normalization runs in linear time', () => {
+    it.each([
+        ['colon run before a slash', `${':'.repeat(100_000)}/a`],
+        ['quote run inside the name', `a${'`'.repeat(100_000)}a`],
+    ])('normalizes a 100,000-character %s within a second', (_, actorName) => {
+        const startedAt = performance.now();
+        fixActorNameInput(actorName);
+
+        expect(performance.now() - startedAt).toBeLessThan(1000);
+    });
 });

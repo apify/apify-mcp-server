@@ -102,6 +102,11 @@ async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
             res.end(`{"pad":"${pad}","error":"\\u0074est-token${'b'.repeat(MAX_INLINE_BYTES)}\\u0074est-token"}`);
             return;
         }
+        case '/backslash-run-cut':
+            // The limit cuts the string after a long run of escaped backslashes.
+            res.writeHead(200, { 'content-type': 'application/json' });
+            res.end(`{"pad":"${'\\\\'.repeat(50_000)}${'a'.repeat(MAX_INLINE_BYTES)}"}`);
+            return;
         case '/big-error':
             res.writeHead(400, { 'content-type': 'application/json' });
             res.end(JSON.stringify({ error: 'e'.repeat(200_000) }));
@@ -627,6 +632,15 @@ describe('returning an Actor Server error', () => {
         expect(result.structuredContent).toMatchObject({ bodyTruncated: true });
         expect(body).toContain('"error":"[REDACTED]b');
         expect(JSON.stringify(result)).not.toContain(TOKEN);
+    });
+
+    // Linear time takes a few milliseconds here; the bound only catches time that grows faster than the length.
+    it('checks a cut string with a 100,000-character backslash run within a second', async () => {
+        const startedAt = performance.now();
+        const result = await callTool({ path: '/backslash-run-cut' });
+
+        expect(performance.now() - startedAt).toBeLessThan(1000);
+        expect(result.structuredContent).toMatchObject({ bodyTruncated: true });
     });
 
     it('keeps numbers as sent when it masks a token that JSON escapes hide', async () => {

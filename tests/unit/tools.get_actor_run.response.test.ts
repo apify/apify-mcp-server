@@ -1,7 +1,7 @@
 import type { ActorRun } from 'apify-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { HELPER_TOOLS, KV_KEYS_LIMIT, TIP_MESSAGE_LIMIT } from '../../src/const.js';
+import { ACTOR_MAX_DESCRIPTION_LENGTH, HELPER_TOOLS, KV_KEYS_LIMIT, TIP_MESSAGE_LIMIT } from '../../src/const.js';
 import { ACTOR_TIP_CAVEAT } from '../../src/tools/actor_tool_naming.js';
 import {
     buildStartRunResponse,
@@ -1366,6 +1366,18 @@ describe('buildStatusTemplate', () => {
             run: makeRun('RUNNING', 'Crawling "news"\n\npage 2 of 10.'),
         });
         expect(t.summary).toMatch(/ Actor status: "Crawling 'news' page 2 of 10"\.$/);
+    });
+
+    // Linear time takes well under a millisecond here; the bound only catches time that grows faster than the length.
+    it('renders a 100,000-character statusMessage with a period run inside it within a second', () => {
+        const statusMessage = `${'.'.repeat(100_000)}done`;
+
+        const startedAt = performance.now();
+        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING', statusMessage) });
+
+        expect(performance.now() - startedAt).toBeLessThan(1000);
+        // The message is printed within the length cap, cut where the cap falls and ending with an ellipsis.
+        expect(t.summary).toContain(`Actor status: "${'.'.repeat(ACTOR_MAX_DESCRIPTION_LENGTH)}…"`);
     });
 
     it('RUNNING without statusMessage falls back to In progress (no Actor status attribution)', () => {

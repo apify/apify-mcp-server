@@ -19,6 +19,7 @@ import {
     buildConsoleRunUrl,
     VERBATIM_LINKS_NUDGE,
 } from '../../utils/console_link.js';
+import { stripTrailingChars } from '../../utils/generic.js';
 import { logHttpError } from '../../utils/logging.js';
 import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
@@ -484,7 +485,7 @@ function pollHint(runId: string): string {
  */
 function statusMessageLine(statusMessage: string | null | undefined): string {
     if (!statusMessage) return '';
-    const trimmed = formatInlineActorText(statusMessage).trim().replace(/\.+$/, '').replaceAll('"', "'");
+    const trimmed = stripTrailingChars(formatInlineActorText(statusMessage).trim(), '.').replaceAll('"', "'");
     if (!trimmed) return '';
     return ` Actor status: "${trimmed}".`;
 }

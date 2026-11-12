@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { HELPER_TOOLS } from '../../src/const.js';
-import { callActor } from '../../src/tools/actors/call_actor.js';
+import { buildLegacyMcpSyntaxRejection, callActor } from '../../src/tools/actors/call_actor.js';
 import { callActorMcpTool } from '../../src/tools/actors/call_actor_mcp_tool.js';
 import { callActorWidget } from '../../src/tools/widgets/call_actor_widget.js';
 import { getRequestHandler, makePaymentProvider, withServer } from './helpers/mcp_server.js';
@@ -77,5 +77,15 @@ describe('legacy Actor MCP syntax rejection', () => {
             expect(JSON.stringify(result.content)).not.toContain(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
             expect(JSON.stringify(result.content)).toContain('configuration');
         });
+    });
+});
+
+describe('legacy Actor MCP syntax detection runs in linear time', () => {
+    // Linear time takes well under a millisecond here; the bound only catches time that grows faster than the length.
+    it('checks a 100,000-character Actor name with a colon run before a slash within a second', () => {
+        const startedAt = performance.now();
+
+        expect(buildLegacyMcpSyntaxRejection(HELPER_TOOLS.ACTOR_CALL, `${':'.repeat(100_000)}/a`, [])).toBeNull();
+        expect(performance.now() - startedAt).toBeLessThan(1000);
     });
 });

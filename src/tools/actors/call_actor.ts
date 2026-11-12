@@ -10,6 +10,7 @@ import {
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
     FAILURE_CATEGORY,
     HELPER_TOOLS,
+    RESOURCE_ID_OR_NAME_MAX_LENGTH,
 } from '../../const.js';
 import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
 import type { PaymentProvider } from '../../payments/types.js';
@@ -51,7 +52,7 @@ import {
     EMPTY_ACTOR_NAME_MESSAGE,
     fixActorNameInputAndLog,
     getActorsAsTools,
-    MCP_TOOL_NAME_SUFFIX,
+    getMcpToolNameSuffixIndex,
     normalizeActorNameInput,
 } from './actor_tools_factory.js';
 
@@ -307,6 +308,7 @@ export const callOptionsSchema = z.object({
 export const callActorArgs = z.object({
     actor: z
         .string()
+        .max(RESOURCE_ID_OR_NAME_MAX_LENGTH)
         .describe(
             'The Actor to call: its ID, or its name in the "username/name" form (e.g., "apify/rag-web-browser").',
         ),
@@ -396,7 +398,7 @@ export function buildLegacyMcpSyntaxRejection(
     loadedToolNames: readonly string[],
 ): ToolResponse | null {
     if (toolName !== HELPER_TOOLS.ACTOR_CALL && toolName !== HELPER_TOOLS.ACTOR_CALL_WIDGET) return null;
-    if (typeof actor !== 'string' || !MCP_TOOL_NAME_SUFFIX.test(normalizeActorNameInput(actor))) return null;
+    if (typeof actor !== 'string' || getMcpToolNameSuffixIndex(normalizeActorNameInput(actor)) === -1) return null;
     const replacement = loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL)
         ? ` Use ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} with separate actor and tool arguments.`
         : ` MCP tools cannot be called in this configuration. To use them, ${getOwnServerRemedy()}`;

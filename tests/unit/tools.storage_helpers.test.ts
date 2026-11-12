@@ -104,6 +104,15 @@ describe('normalizeRecordKey()', () => {
     it('trims surrounding whitespace', () => {
         expect(normalizeRecordKey('  INPUT  ')).toBe('INPUT');
     });
+
+    // Linear time takes well under a millisecond here; the bound only catches time that grows faster than the length.
+    it('normalizes a 100,000-character key with a quote run inside it within a second', () => {
+        const key = `a${'"'.repeat(100_000)}a`;
+
+        const startedAt = performance.now();
+        expect(normalizeRecordKey(key)).toBe(key);
+        expect(performance.now() - startedAt).toBeLessThan(1000);
+    });
 });
 
 describe('buildBinaryRecordDisposition()', () => {
