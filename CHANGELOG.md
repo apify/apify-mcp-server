@@ -2,15 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.21.7 - **not yet released**
+## [0.21.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.7) (2026-11-12)
 
 ### 🐛 Bug Fixes
 
 - Hash the MCP session ID in telemetry and Store search tracking ([#1876](https://github.com/apify/apify-mcp-server/pull/1876)) ([6d7243b](https://github.com/apify/apify-mcp-server/commit/6d7243b27413f9eab91c94faea3bb36010de6a10)) by [@vojtechj-apify](https://github.com/vojtechj-apify)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.21.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.6) (2026-11-12)
 
 
