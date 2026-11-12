@@ -202,9 +202,13 @@ afterAll(async () => {
 
 afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
 });
 
 beforeEach(() => {
+    // A loopback standby URL is accepted only with a local API, as in local development.
+    vi.stubEnv('APIFY_API_BASE_URL', 'http://localhost:3333');
+    vi.stubEnv('APIFY_IS_AT_HOME', '');
     requestHeaders = [];
     remoteCalls = [];
     listCursors = [];
@@ -358,6 +362,17 @@ describe('call-actor-mcp-tool', () => {
 
         expect(result.isError).toBe(true);
         expect(JSON.stringify(result.content)).toContain('Failed to connect to MCP server');
+    });
+
+    it('connects to nothing when the standby URL is outside the platform standby domain', async () => {
+        // With the platform API, the local server's loopback standby URL is not on the standby domain.
+        vi.stubEnv('APIFY_API_BASE_URL', 'https://api.apify.com');
+
+        const result = await execute(executeCallActorMcpTool, { tool: 'add' });
+
+        expect(result.isError).toBe(true);
+        expect(JSON.stringify(result.content)).toContain('not on the platform standby domain');
+        expect(requestHeaders).toHaveLength(0);
     });
 
     it('reports a JSON-RPC error from the remote server as a failed call of that tool', async () => {

@@ -1,5 +1,5 @@
 import type { ActorDefinition } from 'apify-client';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../src/mcp/actors.js';
 import { MCP_STREAMABLE_ENDPOINT } from '../../src/mcp/const.js';
@@ -114,12 +114,77 @@ describe('getActorMCPServerURL', () => {
 
     // The API omits `standbyUrl` when Actor Standby is off; a guessed host would carry the caller's token elsewhere.
     it('throws a configuration error instead of inventing a host when the Actor has no standby URL', async () => {
-        await expect(getActorMCPServerURL({ id: 'abc123' }, '/mcp')).rejects.toThrow(/standby URL/);
+        await expect(getActorMCPServerURL({ id: 'abc123' }, '/mcp')).rejects.toThrow(/no valid standby URL/);
     });
 
     it('throws a configuration error for an unparsable standby URL', async () => {
         await expect(getActorMCPServerURL({ id: 'abc123', standbyUrl: 'not a url' }, '/mcp')).rejects.toThrow(
             /standby URL/,
         );
+    });
+});
+
+describe('accepts a standby URL only on the platform standby domain', () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    describe('with the platform API', () => {
+        beforeEach(() => vi.stubEnv('APIFY_API_BASE_URL', 'https://api.apify.com'));
+
+        it.each(['https://acme--mcp-server.apify.actor', 'https://acme--mcp-server.eu.apify.actor'])(
+            'accepts an https subdomain of the standby domain: %s',
+            async (standbyUrl) => {
+                await expect(getActorMCPServerURL({ id: 'abc123', standbyUrl }, '/mcp')).resolves.toBe(
+                    `${standbyUrl}/mcp`,
+                );
+            },
+        );
+
+        it.each([
+            ['another host', 'https://acme.example.com'],
+            ['the bare standby domain', 'https://apify.actor'],
+            ['a host that only ends with the domain name', 'https://xapify.actor'],
+            ['the domain as a label of another host', 'https://acme.apify.actor.example'],
+            ['a trailing dot', 'https://acme.apify.actor.'],
+            ['a non-ASCII lookalike', 'https://acme.apify.аctor'],
+            ['plain http', 'http://acme.apify.actor'],
+            ['an explicit port', 'https://acme.apify.actor:8443'],
+            ['credentials', 'https://user:pass@acme.apify.actor'],
+            ['a loopback host', 'http://127.0.0.1:8003'],
+        ])('refuses %s', async (_case, standbyUrl) => {
+            await expect(getActorMCPServerURL({ id: 'abc123', standbyUrl }, '/mcp')).rejects.toThrow(
+                /Actor abc123 .*not on the platform standby domain/,
+            );
+        });
+    });
+
+    describe('with a local API', () => {
+        beforeEach(() => {
+            vi.stubEnv('APIFY_API_BASE_URL', 'http://localhost:3333');
+            vi.stubEnv('APIFY_IS_AT_HOME', '');
+        });
+
+        it.each(['http://127.0.0.1:8003', 'http://acme--mcp-server.localhost:8003', 'http://[::1]:8003'])(
+            'accepts a loopback host: %s',
+            async (standbyUrl) => {
+                await expect(getActorMCPServerURL({ id: 'abc123', standbyUrl }, '/mcp')).resolves.toBe(
+                    `${standbyUrl}/mcp`,
+                );
+            },
+        );
+
+        it('refuses plain http on another host', async () => {
+            await expect(
+                getActorMCPServerURL({ id: 'abc123', standbyUrl: 'http://acme.example.com' }, '/mcp'),
+            ).rejects.toThrow(/standby domain/);
+        });
+
+        // On the platform, the configured API is the platform API whatever APIFY_API_BASE_URL says.
+        it('refuses a loopback host when running on the platform', async () => {
+            vi.stubEnv('APIFY_IS_AT_HOME', '1');
+
+            await expect(
+                getActorMCPServerURL({ id: 'abc123', standbyUrl: 'http://127.0.0.1:8003' }, '/mcp'),
+            ).rejects.toThrow(/standby domain/);
+        });
     });
 });

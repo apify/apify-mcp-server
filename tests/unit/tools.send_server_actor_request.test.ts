@@ -4,7 +4,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { gzipSync } from 'node:zlib';
 
 import Ajv from 'ajv';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import {
@@ -264,6 +264,14 @@ beforeAll(async () => {
     standbyUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     seedActor(SERVER_ACTOR);
 });
+
+// A loopback standby URL is accepted only with a local API, as in local development.
+beforeEach(() => {
+    vi.stubEnv('APIFY_API_BASE_URL', 'http://localhost:3333');
+    vi.stubEnv('APIFY_IS_AT_HOME', '');
+});
+
+afterEach(() => vi.unstubAllEnvs());
 
 afterAll(async () => {
     server.closeAllConnections();
@@ -867,7 +875,21 @@ describe('rejecting a call before sending', () => {
         const result = await callTool({ actor: 'apify/no-standby-url', path: '/echo' });
 
         expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain('has no valid Actor Server URL');
         expect(result.toolTelemetry).toMatchObject({ toolStatus: TOOL_STATUS.FAILED });
+        expect(received).toHaveLength(0);
+    });
+
+    it('sends nothing to a standby URL outside the platform standby domain', async () => {
+        const received = recordRequests();
+        // With the platform API, the local server's loopback standby URL is not on the standby domain.
+        vi.stubEnv('APIFY_API_BASE_URL', 'https://api.apify.com');
+
+        const result = await callTool({ path: '/echo' });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain(`Actor '${SERVER_ACTOR}'`);
+        expect(result.content[0].text).toContain('not on the platform standby domain');
         expect(received).toHaveLength(0);
     });
 
