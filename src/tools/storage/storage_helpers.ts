@@ -1,7 +1,7 @@
 import { HELPER_TOOLS, HTTP_NOT_FOUND, MAX_INLINE_BYTES } from '../../const.js';
 import { getResourceByIdOrName, isAmbiguousResourceId } from '../../utils/apify_resource_id.js';
 import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
-import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
+import { QUOTE_WRAPPER_CHARS, stripEdgeChars } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
 import { respondOk } from '../../utils/mcp.js';
 
@@ -247,9 +247,8 @@ export function buildKvsKeysSummaryNextStep(params: {
  * allow `'` as a valid character (`/^[a-zA-Z0-9!\-_.'()]{1,256}$/`), so
  * stripping it could corrupt a real key.
  */
-const NORMALIZE_RECORD_KEY_REGEX = new RegExp(`^[${QUOTE_WRAPPER_CHARS}]+|[${QUOTE_WRAPPER_CHARS}]+$`, 'g');
 export function normalizeRecordKey(key: string): string {
-    return key.trim().replace(NORMALIZE_RECORD_KEY_REGEX, '').trim();
+    return stripEdgeChars(key.trim(), QUOTE_WRAPPER_CHARS).trim();
 }
 
 /**

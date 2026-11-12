@@ -74,9 +74,20 @@ export const QUOTE_WRAPPER_CHARS = '`"“”‘’';
  * `` ` ``, `'`, `"` or smart quotes — handles matched pairs, unpaired leakage,
  * and nested wrappers (`` `"id"` ``) uniformly.
  */
-const STRIP_QUOTE_WRAPPERS_REGEX = new RegExp(`^[${QUOTE_WRAPPER_CHARS}']+|[${QUOTE_WRAPPER_CHARS}']+$`, 'g');
 export function stripQuoteWrappers(s: string): string {
-    return s.trim().replace(STRIP_QUOTE_WRAPPERS_REGEX, '').trim();
+    return stripEdgeChars(s.trim(), `${QUOTE_WRAPPER_CHARS}'`).trim();
+}
+
+/**
+ * Removes the leading and trailing runs of `chars` from `s`. An index scan rather than `^[…]+|[…]+$`, so the time
+ * stays linear in the length of `s` (see apify/apify-mcp-server-internal#973).
+ */
+export function stripEdgeChars(s: string, chars: string): string {
+    let start = 0;
+    let end = s.length;
+    while (start < end && chars.includes(s[start])) start++;
+    while (end > start && chars.includes(s[end - 1])) end--;
+    return s.slice(start, end);
 }
 
 /** Best-effort byte size of a value for summaries. */
