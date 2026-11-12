@@ -3,12 +3,13 @@ import type { ActorRunPricingInfo } from 'apify-client';
 import { z } from 'zod';
 
 import log from '@apify/log';
+import { parseBooleanOrNull } from '@apify/utilities';
 
 import type { ApifyClient } from '../apify_client.js';
 import type { ActorStoreList } from '../types.js';
 
 // Read once at import, so the tool schema and the routing always agree.
-export const IS_UNSTABLE_STORE_SEARCH_ENABLED = ['true', '1'].includes(process.env.APIFY_STORE_UNSTABLE_ENDPOINT ?? '');
+export const IS_UNSTABLE_STORE_SEARCH_ENABLED = parseBooleanOrNull(process.env.APIFY_STORE_UNSTABLE_ENDPOINT) ?? false;
 
 /**
  * The base fields every item has. The rest is apify-core's to change: a field the card knows is
@@ -52,13 +53,7 @@ const isKnownStoreField = (key: string): key is keyof typeof knownStoreFieldSche
 
 const BASE_STORE_FIELDS: ReadonlySet<string> = new Set(Object.keys(unstableStoreItemSchema.shape));
 
-const unstableStorePageSchema = z.object({
-    data: z.object({
-        items: z.array(unstableStoreItemSchema),
-        count: z.number(),
-        limit: z.number(),
-    }),
-});
+const unstableStorePageSchema = z.object({ data: z.object({ items: z.array(unstableStoreItemSchema) }) });
 
 export type UnstableStoreItem = z.infer<typeof unstableStoreItemSchema>;
 
