@@ -16,11 +16,9 @@ import {
     buildCardOptions,
     fetchActorDetails as fetchActorDetailsFromApi,
     resolveReadmeContent,
-    typeObjectToString,
 } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildConsoleActorUrl, getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
-import { wrapJsonText } from '../../utils/encode_text.js';
+import { getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunActor, getOwnServerRemedy, hasMcpInterface } from '../actor_tool_naming.js';
@@ -201,7 +199,11 @@ function buildMcpServerNextStep(
     return `This Actor is an MCP server. Its MCP tools cannot be listed or called in this configuration. ${remedy}`;
 }
 
-/** Build text and structured response for actor details. */
+/**
+ * Build the structured response for actor details, plus the texts that carry what `structuredContent`
+ * does not (notices and guidance). The data itself reaches text-only clients through the JSON mirror,
+ * so it is not repeated as prose.
+ */
 export function buildActorDetailsTextResponse(options: {
     details: ActorDetailsResult;
     output: ResolvedOutputOptions;
@@ -215,50 +217,21 @@ export function buildActorDetailsTextResponse(options: {
 } {
     const { details, output, actorOutputSchema, serverInterface, linkContext, nextStep } = options;
 
-    const actorUrl =
-        buildConsoleActorUrl(linkContext, details.actorInfo.id) ??
-        `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
-
     const texts: string[] = [];
 
     const needsCard = output.description || output.stats || output.pricing || output.rating || output.metadata;
-
-    if (needsCard) {
-        texts.push(`# Actor information\n${details.actorCard}`);
-    }
-
     const resolvedReadme = output.readme ? resolveReadmeContent(details) : undefined;
-    if (resolvedReadme) {
-        texts.push(`${resolvedReadme.heading}\n${resolvedReadme.content}`);
+
+    // An empty `outputSchema` alone does not say why, so the reason stays as text.
+    if (output.outputSchema && !(actorOutputSchema && Object.keys(actorOutputSchema).length > 0)) {
+        texts.push(dedent`
+            # Output Schema
+            No output schema available. The Actor may not have recent successful runs, or the output structure could not be determined.
+        `);
     }
 
-    if (output.inputSchema) {
-        // Console has no /input sub-page — link to the Actor detail page instead.
-        const inputSchemaUrl = linkContext ? actorUrl : `${actorUrl}/input`;
-        texts.push(`# [Input schema](${inputSchemaUrl})\n${wrapJsonText(details.inputSchema)}`);
-    }
-
-    if (output.outputSchema) {
-        if (actorOutputSchema && Object.keys(actorOutputSchema).length > 0) {
-            const typeString = typeObjectToString(actorOutputSchema);
-            texts.push(dedent`
-                # Output Schema (TypeScript)
-                Inferred from recent successful runs:
-                \`\`\`typescript
-                type ActorOutput = ${typeString}
-                \`\`\`
-            `);
-        } else {
-            texts.push(dedent`
-                # Output Schema
-                No output schema available. The Actor may not have recent successful runs, or the output structure could not be determined.
-            `);
-        }
-    }
-
+    // Besides the operations, the text says how to call them and why a section is cut or absent.
     if (serverInterface?.text) texts.push(serverInterface.text);
-
-    if (nextStep) texts.push(nextStep);
 
     if (linkContext) {
         texts.push(VERBATIM_LINKS_NUDGE);
@@ -329,8 +302,8 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
 
     const nextStep = buildMcpServerNextStep(details, loadedToolNames, loadedActorIds);
 
-    // NOTE: Data duplication between texts and structuredContent is intentional and required.
-    // Some MCP clients only read text content, while others only read structured content.
+    // Some MCP clients only read text content, while others only read structured content. The JSON
+    // mirror in content[0] serves the first; repeating the data as prose would double the response.
     const { texts, structuredContent } = buildActorDetailsTextResponse({
         details,
         output: resolvedOutput,
@@ -346,7 +319,7 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         : buildActorNotRunnableGuidance(details.actorInfo.id, loadedToolNames, loadedActorIds);
     if (runnableGuidance) texts.push(runnableGuidance);
 
-    return respondOk(texts, { structuredContent });
+    return respondOk([JSON.stringify(structuredContent), ...texts], { structuredContent });
 }
 
 /**

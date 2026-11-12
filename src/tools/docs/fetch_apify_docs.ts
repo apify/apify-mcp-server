@@ -137,8 +137,8 @@ You can find documentation URLs using the ${HELPER_TOOLS.DOCS_SEARCH} tool.`,
             }
         }
 
-        return respondOk(`Fetched content from ${url}:\n\n${markdown}`, {
-            structuredContent: { url, content: markdown },
-        });
+        // The page goes out once, as the JSON mirror; a second plain-markdown copy would double the response.
+        const structuredContent = { url, content: markdown };
+        return respondOk(JSON.stringify(structuredContent), { structuredContent });
     },
 } as const);

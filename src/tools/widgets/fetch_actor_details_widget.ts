@@ -109,6 +109,8 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
         const runnableGuidance = buildActorNotRunnableGuidance(details.actorInfo.id, loadedToolNames, loadedActorIds);
         if (runnableGuidance) texts.push(runnableGuidance);
 
+        // No JSON mirror of structuredContent here, unlike other tools: the details (28-51 KB) are for the
+        // widget UI, and the model gets only this short pointer.
         return respondOk(texts, {
             structuredContent,
             // Response-level meta; only returned in apps mode (this handler is apps-only).

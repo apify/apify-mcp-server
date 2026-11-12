@@ -64,29 +64,15 @@ describe('buildActorDetailsTextResponse()', () => {
             readme: false,
         };
 
-        it('links the input schema to the Console Actor detail page (Console has no /input sub-page)', () => {
-            const { texts } = buildActorDetailsTextResponse({
+        it('keeps the input schema out of the texts, as it is in structuredContent', () => {
+            const { texts, structuredContent } = buildActorDetailsTextResponse({
                 details: MOCK_DETAILS,
                 output: inputSchemaOnlyOutput,
                 linkContext,
             });
 
-            expect(texts[0]).toContain('# [Input schema](https://console.apify.com/actors/actor-id-1)');
-            expect(texts[0]).not.toContain('/input)');
-        });
-
-        // Byte-identity guard for #937: the embedded ```json fence (formerly hand-rolled via
-        // ['```json', JSON.stringify(...), '```'].join('\n')) now comes from wrapJsonText — the
-        // exact same bytes. The fence must stay embedded in the text element, not become respondJson.
-        it('embeds the input schema in an unchanged ```json fence (R5)', () => {
-            const { texts } = buildActorDetailsTextResponse({
-                details: MOCK_DETAILS,
-                output: inputSchemaOnlyOutput,
-                linkContext,
-            });
-            expect(texts[0]).toBe(
-                `# [Input schema](https://console.apify.com/actors/actor-id-1)\n\`\`\`json\n${JSON.stringify(MOCK_DETAILS.inputSchema)}\n\`\`\``,
-            );
+            expect(structuredContent.inputSchema).toEqual(MOCK_DETAILS.inputSchema);
+            expect(texts).toEqual([VERBATIM_LINKS_NUDGE]);
         });
 
         it('appends the verbatim-links nudge as the last text', () => {
@@ -99,14 +85,13 @@ describe('buildActorDetailsTextResponse()', () => {
             expect(texts.at(-1)).toBe(VERBATIM_LINKS_NUDGE);
         });
 
-        it('keeps the public /input link and omits the nudge without a link context', () => {
+        it('omits the nudge without a link context', () => {
             const { texts } = buildActorDetailsTextResponse({
                 details: MOCK_DETAILS,
                 output: inputSchemaOnlyOutput,
             });
 
-            expect(texts[0]).toContain('# [Input schema](https://apify.com/apify/example-mcp-server/input)');
-            expect(texts.at(-1)).not.toBe(VERBATIM_LINKS_NUDGE);
+            expect(texts).toEqual([]);
         });
     });
 });
@@ -136,7 +121,9 @@ describe('buildFetchActorDetailsResult()', () => {
         const { content } = await callWithToken('apify_api_test');
 
         expect(getUserInfoCached).not.toHaveBeenCalled();
-        expect(content[0].text).toContain('https://apify.com/apify/example-mcp-server/input');
+        // No link context, so the card formatters keep the public apify.com links.
+        expect(vi.mocked(fetchActorDetails).mock.calls[0][2]?.cardOptions?.linkContext).toBeUndefined();
+        expect(content.at(-1)?.text).not.toBe(VERBATIM_LINKS_NUDGE);
     });
 
     it('performs the lookup for Console UI tokens and mints Console links', async () => {
@@ -149,7 +136,6 @@ describe('buildFetchActorDetailsResult()', () => {
         expect(vi.mocked(fetchActorDetails).mock.calls[0][2]?.cardOptions).toMatchObject({
             linkContext: {},
         });
-        expect(content[0].text).toContain('# [Input schema](https://console.apify.com/actors/actor-id-1)');
         expect(content.at(-1)?.text).toBe(VERBATIM_LINKS_NUDGE);
     });
 
