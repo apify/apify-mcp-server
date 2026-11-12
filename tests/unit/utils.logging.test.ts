@@ -91,7 +91,7 @@ describe('logHttpError', () => {
         const exception = vi.spyOn(log, 'exception').mockImplementation(() => log);
         const error = vi.spyOn(log, 'error').mockImplementation(() => log);
 
-        logHttpError(new SchemaTooLargeError(MAX_UNTRUSTED_SCHEMA_BYTES), 'Failed to compile schema');
+        logHttpError(new SchemaTooLargeError(MAX_UNTRUSTED_SCHEMA_BYTES, 'byte'), 'Failed to compile schema');
 
         expect(softFail).toHaveBeenCalledTimes(1);
         expect(exception).not.toHaveBeenCalled();

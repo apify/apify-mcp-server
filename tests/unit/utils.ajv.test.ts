@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { compileSchema, createAjv, fixZodSchemaRequired } from '../../src/utils/ajv.js';
 
@@ -136,6 +136,19 @@ describe('createAjv — regex keywords disabled (ReDoS guard)', () => {
             properties: { email: { type: 'string', format: 'email' } },
         });
         expect(validate({ email: 'not-an-email' })).toBe(true);
+    });
+});
+
+describe('createAjv — console output', () => {
+    it('keeps Ajv diagnostics off the console', () => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        try {
+            // Ajv reports a failed compilation this way, with the whole generated validator source.
+            createAjv().logger.error('Error compiling schema, function code:', 'validator source');
+            expect(consoleError).not.toHaveBeenCalled();
+        } finally {
+            consoleError.mockRestore();
+        }
     });
 });
 

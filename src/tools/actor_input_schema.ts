@@ -26,10 +26,35 @@ type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 // is intentionally uncapped.
 export const MAX_UNTRUSTED_SCHEMA_BYTES = 262_144;
 
+/**
+ * Bytes alone do not bound the compile time: Ajv generates code per subschema, and the time grows faster
+ * than their count. Of the 2,419 most popular public Actors (2026-11), the largest input schema has 452
+ * subschemas and compiles in 0.1 to 0.2 s, and the next largest has 217. A schema at this limit compiles
+ * in 0.2 to 0.3 s.
+ */
+export const MAX_UNTRUSTED_SUBSCHEMAS = 500;
+
 const UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE = 1000;
-const untrustedValidatorCache = new LruCache<{ validate: ValidateFunction<unknown>; schema: object }>({
+// A failed compilation costs as much as a successful one, so the cache remembers its error too.
+const untrustedValidatorCache = new LruCache<
+    { validate: ValidateFunction<unknown>; schema: object } | { compileError: unknown }
+>({
     maxLength: UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE,
 });
+
+/** Counts the objects and booleans in a schema; Ajv generates code for each one that is a subschema. */
+function countSubschemas(schema: object): number {
+    let subschemaCount = 0;
+    const pendingValues: unknown[] = [schema];
+    while (pendingValues.length > 0) {
+        const value = pendingValues.pop();
+        if (typeof value === 'boolean') subschemaCount++;
+        if (typeof value !== 'object' || value === null) continue;
+        if (!Array.isArray(value)) subschemaCount++;
+        for (const child of Object.values(value)) pendingValues.push(child);
+    }
+    return subschemaCount;
+}
 
 /**
  * Compiles an Actor or proxied-MCP input schema, one validator per schema content.
@@ -43,17 +68,26 @@ export function compileUntrustedSchema<T extends object>(
     const serialized = JSON.stringify(schema);
     // Ajv codegen is synchronous; an oversized untrusted schema would freeze the event loop.
     if (Buffer.byteLength(serialized) > MAX_UNTRUSTED_SCHEMA_BYTES) {
-        throw new SchemaTooLargeError(MAX_UNTRUSTED_SCHEMA_BYTES);
+        throw new SchemaTooLargeError(MAX_UNTRUSTED_SCHEMA_BYTES, 'byte');
+    }
+    if (countSubschemas(schema) > MAX_UNTRUSTED_SUBSCHEMAS) {
+        throw new SchemaTooLargeError(MAX_UNTRUSTED_SUBSCHEMAS, 'subschema');
     }
 
     const cacheKey = createHash('sha256').update(serialized).digest('base64');
+    const cached = untrustedValidatorCache.get(cacheKey);
+    if (cached && 'compileError' in cached) throw cached.compileError;
     // A hit holds a schema with the same content as `schema`, so it is still a T.
-    const cached = untrustedValidatorCache.get(cacheKey) as { validate: ValidateFunction<unknown>; schema: T } | null;
-    if (cached) return cached;
+    if (cached) return cached as { validate: ValidateFunction<unknown>; schema: T };
 
-    const compiled = { validate: createAjv().compile(schema), schema };
-    untrustedValidatorCache.add(cacheKey, compiled);
-    return compiled;
+    try {
+        const compiled = { validate: createAjv().compile(schema), schema };
+        untrustedValidatorCache.add(cacheKey, compiled);
+        return compiled;
+    } catch (compileError) {
+        untrustedValidatorCache.add(cacheKey, { compileError });
+        throw compileError;
+    }
 }
 
 /**

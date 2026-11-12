@@ -11,6 +11,7 @@ import {
     inferArrayItemsTypeIfMissing,
     inferArrayItemType,
     MAX_UNTRUSTED_SCHEMA_BYTES,
+    MAX_UNTRUSTED_SUBSCHEMAS,
     markInputPropertiesAsRequired,
     shortenProperties,
     transformActorInputSchemaProperties,
@@ -65,6 +66,47 @@ describe('compileUntrustedSchema', () => {
         const huge = { type: 'object', properties };
         expect(JSON.stringify(huge).length).toBeGreaterThan(MAX_UNTRUSTED_SCHEMA_BYTES);
         expect(() => compileUntrustedSchema(huge)).toThrow(SchemaTooLargeError);
+    });
+
+    // The schema root and its `properties` map are objects too, so they take two of the counted subschemas.
+    const schemaWithSubschemas = (count: number) => ({
+        type: 'object',
+        properties: Object.fromEntries(
+            Array.from({ length: count - 2 }, (_, index) => [`field${index}`, { type: 'string' }]),
+        ),
+    });
+
+    it('compiles a schema with as many subschemas as the limit', () => {
+        const { validate } = compileUntrustedSchema(schemaWithSubschemas(MAX_UNTRUSTED_SUBSCHEMAS));
+        expect(validate({ field0: 'https://example.com' })).toBe(true);
+    });
+
+    it('throws SchemaTooLargeError on a schema with more subschemas than the limit', () => {
+        expect(() => compileUntrustedSchema(schemaWithSubschemas(MAX_UNTRUSTED_SUBSCHEMAS + 1))).toThrow(
+            SchemaTooLargeError,
+        );
+    });
+
+    it('counts a boolean schema as a subschema', () => {
+        const schema = { ...schemaWithSubschemas(MAX_UNTRUSTED_SUBSCHEMAS), additionalProperties: false };
+        expect(() => compileUntrustedSchema(schema)).toThrow(SchemaTooLargeError);
+    });
+
+    it('remembers a schema that fails to compile', () => {
+        const schema = () => ({ type: 'object', properties: { url: { $ref: '#/definitions/missing' } } });
+        const compileError = () => {
+            try {
+                compileUntrustedSchema(schema());
+            } catch (error) {
+                return error;
+            }
+            return undefined;
+        };
+
+        const firstError = compileError();
+        expect(firstError).toBeInstanceOf(Error);
+        // The same error object means the second call did not compile again.
+        expect(compileError()).toBe(firstError);
     });
 });
 

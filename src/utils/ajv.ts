@@ -6,7 +6,8 @@ import Ajv from 'ajv';
  * schema in a Map that is never evicted.
  */
 export function createAjv(): Ajv {
-    const instance = new Ajv({ coerceTypes: 'array', strict: false, removeAdditional: true });
+    // `logger: false`: on a failed compilation Ajv writes the whole generated validator source to the console.
+    const instance = new Ajv({ coerceTypes: 'array', strict: false, removeAdditional: true, logger: false });
 
     // `pattern`/`patternProperties` compile a RegExp from untrusted Actor / proxied-MCP input schemas;
     // a catastrophic-backtracking pattern freezes the single-threaded event loop (ReDoS). `format` is
