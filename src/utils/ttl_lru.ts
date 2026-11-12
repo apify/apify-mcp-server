@@ -1,10 +1,4 @@
-import { LruCache } from '@apify/datastructures';
-
-/**
- * Every key is stored with this prefix, so any string, including names of `Object.prototype` properties
- * such as `__proto__`, is a key of its own in `LruCache`'s plain-object store.
- */
-const KEY_PREFIX = 'key:';
+import { LruCache } from './lru.js';
 
 /**
  * LRU cache with TTL: entries expire after a set time and are checked (and evicted if expired)
@@ -34,9 +28,7 @@ export class TTLLRUCache<T> {
         this.cache = new LruCache<{
             value: T;
             expiresAt: number;
-        }>({
-            maxLength,
-        });
+        }>(maxLength);
     }
 
     /**
@@ -45,11 +37,7 @@ export class TTLLRUCache<T> {
      * @param value Value to store
      */
     set(key: string, value: T) {
-        const cacheKey = KEY_PREFIX + key;
-        if (this.cache.get(cacheKey)) {
-            this.cache.remove(cacheKey);
-        }
-        this.cache.add(cacheKey, {
+        this.cache.set(key, {
             value,
             expiresAt: Date.now() + this.ttlMillis,
         });
@@ -61,12 +49,11 @@ export class TTLLRUCache<T> {
      * @returns The value if present and not expired, otherwise null
      */
     get(key: string): T | null {
-        const cacheKey = KEY_PREFIX + key;
-        const entry = this.cache.get(cacheKey);
+        const entry = this.cache.get(key);
         if (entry && entry.expiresAt > Date.now()) {
             return entry.value;
         }
-        this.cache.remove(cacheKey);
+        this.cache.delete(key);
         return null;
     }
 }
