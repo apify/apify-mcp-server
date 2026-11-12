@@ -240,7 +240,7 @@ export function buildActorDetailsTextResponse(options: {
 
     const structuredContent: Record<string, unknown> = {
         actorInfo: needsCard ? details.actorCardStructured : undefined,
-        readme: resolvedReadme?.content,
+        readme: resolvedReadme,
         inputSchema: output.inputSchema ? details.inputSchema : undefined,
         outputSchema: output.outputSchema ? (actorOutputSchema ?? {}) : undefined,
         serverInterface: serverInterface?.serverInterface,

@@ -48,12 +48,12 @@ describe('resolveReadmeContent()', () => {
             readme: '# Full',
             readmeSummary: 'Short summary.',
         });
-        expect(result).toEqual({ content: 'Short summary.', heading: '# README summary' });
+        expect(result).toBe('Short summary.');
     });
 
     it('falls back to the full readme when there is no summary', () => {
         const result = resolveReadmeContent({ actorInfo: OTHER_ACTOR, readme: '# Full' });
-        expect(result).toEqual({ content: '# Full', heading: '# README' });
+        expect(result).toBe('# Full');
     });
 
     it('always returns the full readme for apify/code-runtime, even with a summary present', () => {
@@ -62,19 +62,13 @@ describe('resolveReadmeContent()', () => {
             readme: '# Full',
             readmeSummary: 'Short summary.',
         });
-        expect(result).toEqual({ content: '# Full', heading: '# README' });
+        expect(result).toBe('# Full');
     });
 
     it('ignores a blank summary the same way for a regular Actor or code-runtime', () => {
-        expect(resolveReadmeContent({ actorInfo: OTHER_ACTOR, readme: '# Full', readmeSummary: '   ' })).toEqual({
-            content: '# Full',
-            heading: '# README',
-        });
-        expect(resolveReadmeContent({ actorInfo: CODE_RUNTIME_ACTOR, readme: '# Full', readmeSummary: '   ' })).toEqual(
-            {
-                content: '# Full',
-                heading: '# README',
-            },
+        expect(resolveReadmeContent({ actorInfo: OTHER_ACTOR, readme: '# Full', readmeSummary: '   ' })).toBe('# Full');
+        expect(resolveReadmeContent({ actorInfo: CODE_RUNTIME_ACTOR, readme: '# Full', readmeSummary: '   ' })).toBe(
+            '# Full',
         );
     });
 });
