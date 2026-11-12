@@ -11,7 +11,7 @@ import type {
     ToolStatus,
     TransportType,
 } from '../types.js';
-import { computeToolResponseBytes } from '../utils/mcp.js';
+import { computeToolResponseBytes, hashSessionId } from '../utils/mcp.js';
 import { getRequestOriginForClient } from '../utils/mcp_clients.js';
 import { deriveResourceIds } from '../utils/tool_status.js';
 import { getUserInfoCached } from '../utils/userid_cache.js';
@@ -66,7 +66,7 @@ export async function prepareTelemetryData(
         mcp_client_version: clientContext?.clientInfo?.version || '',
         mcp_protocol_version: clientContext?.protocolVersion || '',
         mcp_client_capabilities: clientContext?.capabilities || null,
-        mcp_session_id: mcpSessionId || '',
+        mcp_session_id: mcpSessionId ? hashSessionId(mcpSessionId) : '',
         transport_type: transportType || '',
         mcp_url_client: clientParam || '',
         ...(paymentProvider && { payment_provider: paymentProvider.id }),
