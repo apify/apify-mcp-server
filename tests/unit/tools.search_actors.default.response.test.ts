@@ -13,7 +13,13 @@ import {
 import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockApifyClient, mockUserInfo, only, stubToolCallContext } from './helpers/tool_context.js';
+import {
+    mockApifyClient,
+    mockUserInfo,
+    only,
+    stubToolCallContext,
+    type TextToolResult,
+} from './helpers/tool_context.js';
 import { MOCK_STORE_ACTOR, NO_ACTORS_FOUND_TEXT, SEARCH_KEYWORDS } from './tools.search_actors.fixtures.js';
 
 /**
@@ -185,6 +191,19 @@ describe('search-actors without widget (searchActors)', () => {
 
         expect(content).toHaveLength(1);
         expect(content[0].text).toBe(NO_ACTORS_FOUND_TEXT);
+    });
+
+    it.each([
+        ['results', [MOCK_STORE_ACTOR]],
+        ['no results', []],
+    ])('mirrors structuredContent as JSON in the first text block (%s)', async (_, actors) => {
+        vi.mocked(searchAgentSafeActors).mockResolvedValue(actors);
+
+        const result = (await (searchActors as HelperTool).call(
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient()),
+        )) as TextToolResult;
+
+        expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
     });
 
     it('describes an empty page at a later offset without saying the results ended', async () => {

@@ -415,6 +415,12 @@ describe('fetch-actor-mcp-tool-list', () => {
         ]);
     });
 
+    it('mirrors structuredContent as JSON in the first text block', async () => {
+        const result = await dispatch(fetchActorMcpToolList, { actor: MCP_ACTOR });
+
+        expect(JSON.parse((result.content as { text: string }[])[0].text)).toEqual(result.structuredContent);
+    });
+
     it('fails the listing when a page fails, without a partial list', async () => {
         seedActor('apify/broken-pages-mcp-server', { definition: { webServerMcpPath: '/mcp-broken-pages' } });
 

@@ -555,6 +555,17 @@ describe('returning the response', () => {
     );
 });
 
+describe('mirroring structuredContent', () => {
+    it.each([
+        ['a success', '/echo'],
+        ['an Actor Server error', '/fetch'],
+    ])('puts the whole structuredContent as JSON in the first text block for %s', async (_, path) => {
+        const result = await callTool({ path });
+
+        expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+    });
+});
+
 describe('returning an Actor Server error', () => {
     it('passes an Actor error body through as an error, with the session token masked', async () => {
         const result = await callTool({ path: '/status/404' });
