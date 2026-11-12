@@ -90,6 +90,13 @@ export function stripEdgeChars(s: string, chars: string): string {
     return s.slice(start, end);
 }
 
+/** Removes the trailing run of `chars` from `s`, with an index scan so the time stays linear in the length of `s`. */
+export function stripTrailingChars(s: string, chars: string): string {
+    let end = s.length;
+    while (end > 0 && chars.includes(s[end - 1])) end--;
+    return s.slice(0, end);
+}
+
 /** Best-effort byte size of a value for summaries. */
 export function computeValueBytes(value: unknown): number | undefined {
     if (Buffer.isBuffer(value)) return value.length;

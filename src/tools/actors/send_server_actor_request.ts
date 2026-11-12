@@ -32,6 +32,7 @@ import type {
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
 import { fixZodSchemaRequired } from '../../utils/ajv.js';
+import { stripTrailingChars } from '../../utils/generic.js';
 import { toPlainError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondServerError, respondUserError } from '../../utils/mcp.js';
@@ -285,7 +286,7 @@ function parseStringLiteral(literal: string): string | undefined {
 /** `literal` without an escape the cut split (`\\`, `\\u12`), which no closing quote could complete. */
 function dropCutEscape(literal: string): string {
     const withoutUnicode = literal.replace(/\\u[0-9a-fA-F]{0,3}$/, '');
-    const trailingBackslashes = /\\*$/.exec(withoutUnicode)?.[0].length ?? 0;
+    const trailingBackslashes = withoutUnicode.length - stripTrailingChars(withoutUnicode, '\\').length;
     return trailingBackslashes % 2 === 1 ? withoutUnicode.slice(0, -1) : withoutUnicode;
 }
 
