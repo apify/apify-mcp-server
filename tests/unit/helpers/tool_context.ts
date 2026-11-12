@@ -77,7 +77,7 @@ export function apiErrorResponse(status: number, type: string, message: string) 
  * instance, without retries. `dataset` adds methods to `client.dataset(id)`, such as `get`.
  */
 export function mockDatasetItemsClient(
-    request: (config: { url: string; params: Record<string, unknown>; maxContentLength: number }) => unknown,
+    request: (config: { url: string; params: Record<string, unknown>; responseType: string }) => unknown,
     dataset: Record<string, unknown> = {},
 ): ApifyClient {
     return mockApifyClient({

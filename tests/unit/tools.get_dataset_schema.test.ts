@@ -57,7 +57,7 @@ describe('get-dataset-schema', () => {
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
     });
 
-    it('requests the default sample (limit=5, clean=true) in one request capped at the inline limit', async () => {
+    it('requests the default sample (limit=5, clean=true) in one streamed request', async () => {
         const requestSpy = vi.fn().mockResolvedValue(datasetItemsResponse(MOCK_ITEMS, 2));
 
         await (getDatasetSchema as HelperTool).call(
@@ -68,7 +68,7 @@ describe('get-dataset-schema', () => {
         expect(requestSpy).toHaveBeenCalledWith(
             expect.objectContaining({
                 params: { clean: true, limit: 5 },
-                maxContentLength: MAX_INLINE_BYTES,
+                responseType: 'stream',
             }),
         );
     });
@@ -219,6 +219,8 @@ describe('get-dataset-schema over the response size limit', () => {
             text: 'x'.repeat(20_000),
         }));
         server.serve('~crawl', [{ items: pages }]);
+        // The first item ends just inside the size limit; the second one passes it.
+        server.serve('~nearly', [{ items: [{ t: 'a'.repeat(MAX_INLINE_BYTES - 100) }, { t: 'b'.repeat(40_000) }] }]);
         server.serve('~big', [{ items: [{ text: 'x'.repeat(MAX_INLINE_BYTES) }, { n: 2 }] }]);
     });
     afterAll(async () => server.close());
@@ -235,6 +237,18 @@ describe('get-dataset-schema over the response size limit', () => {
         expect(Number(used)).toBeGreaterThan(0);
         expect(Number(used)).toBeLessThan(20);
         expect(structuredContent.summary).toContain(`${MAX_INLINE_BYTES}`);
+    });
+
+    it('infers the schema from a first item that ends inside the limit when the next one passes it', async () => {
+        const result = await (getDatasetSchema as HelperTool).call(
+            stubToolCallContext({ datasetId: 'nearly' }, server.client),
+        );
+        const { isError, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
+
+        expect(isError).not.toBe(true);
+        expect(structuredContent.summary).toMatch(/^Schema inferred from 1 item, 1 field\. /);
     });
 
     it.each([

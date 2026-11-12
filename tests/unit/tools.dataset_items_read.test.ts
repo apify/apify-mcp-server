@@ -1,11 +1,9 @@
 import { ApifyApiError } from 'apify-client';
-import { AxiosError } from 'axios';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { MAX_INLINE_BYTES } from '../../src/const.js';
 import { findWholeElementsEnd, readDatasetItems } from '../../src/tools/storage/dataset_items_read.js';
 import { type DatasetItemsServer, startDatasetItemsServer } from './helpers/dataset_items_server.js';
-import { datasetItemsResponse, mockDatasetItemsClient } from './helpers/tool_context.js';
 
 /** The whole items of a cut JSON array, as the reader parses them. */
 function wholeItemsOf(prefix: Buffer): unknown[] {
@@ -105,18 +103,39 @@ describe('readDatasetItems', () => {
         });
     });
 
-    it('reads a page as whole when only its closing bracket passed the size limit', async () => {
-        const client = mockDatasetItemsClient(async () => ({
-            ...datasetItemsResponse([], 1),
-            data: (async function* body() {
-                yield Buffer.from('[{"n":1}');
-                throw new AxiosError(`maxContentLength size of ${MAX_INLINE_BYTES} exceeded`, 'ERR_BAD_RESPONSE');
-            })(),
-        }));
+    it.each([
+        { name: 'ends inside the limit', firstEnd: MAX_INLINE_BYTES - 100, wholeCount: 1 },
+        { name: 'ends at the last byte of the limit', firstEnd: MAX_INLINE_BYTES, wholeCount: 1 },
+        { name: 'ends one byte past the limit', firstEnd: MAX_INLINE_BYTES + 1, wholeCount: 0 },
+    ])('keeps a first item that $name when a second item follows', async ({ name, firstEnd, wholeCount }) => {
+        const id = `first-${name.replaceAll(' ', '-')}`;
+        // `[` plus `{"t":"…"}`: the first item's last byte is at `firstEnd`.
+        const first = { t: 'a'.repeat(firstEnd - 9) };
+        server.serve(id, [{ items: [first, { t: 'b'.repeat(40_000) }] }]);
 
-        expect(await readDatasetItems(client, 'ds', { limit: 1 })).toEqual({
-            items: [{ n: 1 }],
-            total: 1,
+        const page = await readDatasetItems(server.client, id, { limit: 2 });
+
+        expect(page).toEqual({ items: [first].slice(0, wholeCount), total: 2, isCut: true });
+    });
+
+    it('reads a page as whole when only its closing bracket passes the limit and it holds every item asked for', async () => {
+        const item = { t: 'a'.repeat(MAX_INLINE_BYTES - 9) };
+        server.serve('limit-reached', [{ items: [item], total: 5 }]);
+
+        expect(await readDatasetItems(server.client, 'limit-reached', { limit: 1 })).toEqual({
+            items: [item],
+            total: 5,
+            isCut: false,
+        });
+    });
+
+    it('reads a page as whole when only its closing bracket passes the limit and it ends the dataset', async () => {
+        const item = { t: 'a'.repeat(MAX_INLINE_BYTES - 9) };
+        server.serve('dataset-end', [{ items: [item], total: 4 }]);
+
+        expect(await readDatasetItems(server.client, 'dataset-end', { offset: 3, limit: 5 })).toEqual({
+            items: [item],
+            total: 4,
             isCut: false,
         });
     });

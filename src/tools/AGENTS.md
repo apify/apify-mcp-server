@@ -79,10 +79,12 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   - `runs/` — get/abort runs, run logs, run list.
   - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`. `get-dataset-items` and
     `get-dataset-schema` read items through `readDatasetItems` (`dataset_items_read.ts`): the request
-    `listItems` sends, through `sendApifyApiRequest`, with the body streamed only up to `MAX_INLINE_BYTES`
-    (`readBodyToCap`) and retried as apify-client's `call()` retries (429, 5xx, network failures, an unparseable
-    body; the client's `maxRetries` and backoff; never after an abort). A body cut at the limit keeps its whole
-    top-level items (`findWholeElementsEnd`, one pass over the bytes). `get-dataset-items` returns them with
+    `listItems` sends, through the client's axios instance, with exactly the first `MAX_INLINE_BYTES` of the
+    body read (`readBodyPrefix` keeps the crossing chunk up to the limit and stops the stream there) and retried as
+    apify-client's `call()` retries (429, 5xx, network failures, an unparseable body; the client's `maxRetries`
+    and backoff; never after an abort). A body cut at the limit keeps its whole top-level items
+    (`findWholeElementsEnd`, one pass over the bytes); a page cut only at its closing bracket that holds `limit`
+    items or reaches `total` is whole. `get-dataset-items` returns them with
     `nextOffset` (`offset` plus the items returned; under `clean=true` the API's offset also counts the skipped
     empty items, so the next page can repeat items but skips none); the schema is inferred from them. When no
     item fits, both tools return an error: `get-dataset-items` with a token-gated download URL built from the

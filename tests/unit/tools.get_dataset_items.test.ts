@@ -235,7 +235,7 @@ describe('get-dataset-items', () => {
 });
 
 describe('get-dataset-items response size', () => {
-    it('reads the items in one request capped at the inline limit', async () => {
+    it('reads the items in one streamed request', async () => {
         const requestSpy = vi.fn().mockResolvedValue(datasetItemsResponse(MOCK_ITEMS, 1));
 
         await (getDatasetItems as HelperTool).call(
@@ -246,7 +246,7 @@ describe('get-dataset-items response size', () => {
         expect(requestSpy).toHaveBeenCalledWith(
             expect.objectContaining({
                 method: 'GET',
-                maxContentLength: MAX_INLINE_BYTES,
+                responseType: 'stream',
                 params: expect.objectContaining({ limit: 5 }),
             }),
         );
@@ -263,6 +263,8 @@ describe('get-dataset-items over the response size limit', () => {
             text: 'x'.repeat(20_000),
         }));
         server.serve('~crawl', [{ items: pages }]);
+        // The first item ends just inside the size limit; the second one passes it.
+        server.serve('~nearly', [{ items: [{ t: 'a'.repeat(MAX_INLINE_BYTES - 100) }, { t: 'b'.repeat(40_000) }] }]);
         const firstTooLarge = [{ items: [{ text: 'x'.repeat(MAX_INLINE_BYTES) }, { n: 2 }] }];
         for (const id of ['DsWkzbQMuFYuam3YF', 'user~big', '~big']) server.serve(id, firstTooLarge);
     });
@@ -289,6 +291,12 @@ describe('get-dataset-items over the response size limit', () => {
         expect(nextStep).toContain(`offset=${data.itemCount}`);
         expect(JSON.parse(content[0].text)).toEqual(data);
         expect(content[1].text).toBe(`${summary}\n${nextStep}`);
+    });
+
+    it('returns a first item that ends inside the limit when the next one passes it', async () => {
+        const { structuredContent } = await call({ datasetId: 'nearly' });
+
+        expect(structuredContent).toMatchObject({ itemCount: 1, nextOffset: 1, totalItemCount: 2 });
     });
 
     it.each([

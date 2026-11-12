@@ -6,7 +6,7 @@ import type { AxiosResponse } from 'axios';
 import { isAxiosError, isCancel } from 'axios';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { readBodyToCap, sendApifyApiRequest } from '../../apify_client.js';
+import { MAX_INLINE_BYTES } from '../../const.js';
 
 /**
  * A page of dataset items. `isCut` when the body passed `MAX_INLINE_BYTES`: `items` then holds the whole
@@ -83,6 +83,24 @@ function toApiError(response: AxiosResponse<unknown>, body: Buffer, attempt: num
     return new ApifyApiError({ ...response, data } as AxiosResponse, attempt);
 }
 
+/**
+ * The first `MAX_INLINE_BYTES` of a streamed body, `isTruncated` when more followed. Reading stops there: the
+ * chunk that crosses the limit is kept up to it and leaving the loop destroys the stream.
+ */
+async function readBodyPrefix(stream: AsyncIterable<Buffer>): Promise<{ body: Buffer; isTruncated: boolean }> {
+    const chunks: Buffer[] = [];
+    let bytes = 0;
+    for await (const chunk of stream) {
+        if (bytes + chunk.length > MAX_INLINE_BYTES) {
+            chunks.push(chunk.subarray(0, MAX_INLINE_BYTES - bytes));
+            return { body: Buffer.concat(chunks), isTruncated: true };
+        }
+        chunks.push(chunk);
+        bytes += chunk.length;
+    }
+    return { body: Buffer.concat(chunks), isTruncated: false };
+}
+
 /** One request; the body is read up to `MAX_INLINE_BYTES`. */
 async function readDatasetItemsOnce(
     client: ApifyClient,
@@ -91,14 +109,15 @@ async function readDatasetItemsOnce(
     attempt: number,
     signal?: AbortSignal,
 ): Promise<DatasetItemsPage> {
-    const response = await sendApifyApiRequest(client, {
+    // One attempt through the client's axios instance, which adds the token and headers; `readBodyPrefix` caps the body.
+    const response = await client.httpClient.axios.request<AsyncIterable<Buffer>>({
         url,
         method: 'GET',
         params: options,
         responseType: 'stream',
         signal,
     });
-    const { body, isTruncated } = await readBodyToCap(response);
+    const { body, isTruncated } = await readBodyPrefix(response.data);
     if (response.status >= 300) throw toApiError(response, body, attempt);
     const total = Number(response.headers['x-apify-pagination-total']);
     if (!isTruncated) {
@@ -110,8 +129,10 @@ async function readDatasetItemsOnce(
         end < 0
             ? []
             : (parseJsonBody(`${body.subarray(0, end).toString('utf8')}]`, response) as Record<string, unknown>[]);
-    // Only the closing bracket may have passed the limit: the page then holds every item asked for.
-    const isComplete = options.limit !== undefined && items.length >= options.limit;
+    // When only the closing bracket passed the limit, the page holds every item asked for or reaches the end of
+    // the dataset; `total` counts the items before `clean` skips any, as `offset` does.
+    const isComplete =
+        (options.limit !== undefined && items.length >= options.limit) || (options.offset ?? 0) + items.length >= total;
     return { items, total, isCut: !isComplete };
 }
 
