@@ -30,7 +30,7 @@ import {
 import { getActorDefinitionCached } from '../../utils/actor.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { logHttpError } from '../../utils/logging.js';
-import { buildActorInputSchema, compileUntrustedSchema } from '../actor_input_schema.js';
+import { buildActorInputSchema, compileUntrustedSchema, formatInlineActorText } from '../actor_input_schema.js';
 import {
     actorNameToToolName,
     getActorToolModeFromInterfaces,
@@ -176,7 +176,7 @@ export async function getNormalActorsAsTools(
         // Names call-actor only when the session actually has it.
         const buildDescription = ({ hasTool }: ToolDescriptionContext): string => {
             let description = `This tool calls the Actor "${actorFullName}" and retrieves its output results.
-${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this specific Actor.\n` : ''}Actor description: ${actorDescription}`;
+${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this specific Actor.\n` : ''}Actor description: ${formatInlineActorText(actorDescription)}`;
             if (contractDescription) description += `\n\n${contractDescription}`;
             return description;
         };
@@ -268,7 +268,7 @@ export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
             const { hasTool } = context;
             const about =
                 policy?.buildDescription?.(context) ??
-                `This tool sends one HTTP request to the server interface of the Actor "${actorFullName}" and returns the response.\nActor description: ${description}`;
+                `This tool sends one HTTP request to the server interface of the Actor "${actorFullName}" and returns the response.\nActor description: ${formatInlineActorText(description)}`;
             const preferThisTool = hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST)
                 ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_SERVER_REQUEST}" if user requests this specific Actor.`
                 : undefined;

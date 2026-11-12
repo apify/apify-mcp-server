@@ -8,6 +8,7 @@ import {
     decodeDotPropertyNames,
     encodeDotPropertyNames,
     compileUntrustedSchema,
+    formatInlineActorText,
     inferArrayItemsTypeIfMissing,
     inferArrayItemType,
     MAX_UNTRUSTED_SCHEMA_BYTES,
@@ -370,6 +371,47 @@ describe('markInputPropertiesAsRequired', () => {
 
         // Check that no properties were modified
         expect(result).toEqual(input.properties);
+    });
+});
+
+describe('Actor text printed inline', () => {
+    it.each([
+        ['line feeds', 'First line.\n\n  Second line.\r\nThird line.'],
+        ['line separators', 'First line.\u2028Second line.\u2029Third line.'],
+        ['next-line characters', 'First line.\u0085Second line.\u0085 \u0085Third line.'],
+    ])('joins lines split by %s with single spaces', (_, text) => {
+        expect(formatInlineActorText(text)).toBe('First line. Second line. Third line.');
+    });
+
+    it('keeps a one-line text within the cap unchanged', () => {
+        const text = 'Scrapes  product pages\tfrom e-shops.';
+
+        expect(formatInlineActorText(text)).toBe(text);
+    });
+
+    it('cuts a text over the cap at the last complete sentence and ends it with an ellipsis', () => {
+        const text = `Complete sentence. ${'x'.repeat(ACTOR_MAX_DESCRIPTION_LENGTH)}`;
+
+        expect(formatInlineActorText(text)).toBe('Complete sentence.…');
+    });
+
+    it('does not end a cut text with half of a character', () => {
+        const text = `${'x'.repeat(ACTOR_MAX_DESCRIPTION_LENGTH - 1)}😀 more`;
+
+        expect(formatInlineActorText(text)).toBe(`${'x'.repeat(ACTOR_MAX_DESCRIPTION_LENGTH - 1)}…`);
+    });
+});
+
+// Linear time takes a few milliseconds here; the bound only catches time that grows faster than the length.
+describe('Actor text printed inline runs in linear time', () => {
+    it.each([
+        ['space run', `${' '.repeat(100_000)}x`],
+        ['tab run', `${'\t'.repeat(100_000)}x`],
+    ])('formats a 100,000-character %s within a second', (_, text) => {
+        const startedAt = performance.now();
+        formatInlineActorText(text);
+
+        expect(performance.now() - startedAt).toBeLessThan(1000);
     });
 });
 

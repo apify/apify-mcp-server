@@ -1361,6 +1361,13 @@ describe('buildStatusTemplate', () => {
         expect(t.summary).not.toMatch(/\.\./);
     });
 
+    it('RUNNING prints a multi-line statusMessage with double quotes on one line inside the quotes', () => {
+        const t = buildStatusSummaryNextStep({
+            run: makeRun('RUNNING', 'Crawling "news"\n\npage 2 of 10.'),
+        });
+        expect(t.summary).toMatch(/ Actor status: "Crawling 'news' page 2 of 10"\.$/);
+    });
+
     it('RUNNING without statusMessage falls back to In progress (no Actor status attribution)', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING') });
         expect(t.summary).toContain('In progress.');

@@ -652,6 +652,14 @@ describe('the operations in a Server Actor tool description', () => {
         expect(info.hasRequestBody).toBe(false);
     });
 
+    it('print each operation on one line', () => {
+        const info = infoOf({
+            paths: { '/search': { get: { summary: 'Search the web.\n\nReturns results.' } } },
+        });
+
+        expect(info.operationLines).toEqual(['- GET /search: Search the web. Returns results.']);
+    });
+
     it('keep only what can fit the description limit', () => {
         const count = 1000;
 

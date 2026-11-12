@@ -57,6 +57,7 @@ import type {
 } from 'apify-client';
 
 import { ACTOR_PRICING_MODEL } from '../const.js';
+import { formatInlineActorText } from '../tools/actor_input_schema.js';
 
 type TieredEventPrice = {
     tieredEventPriceUsd: number;
@@ -232,7 +233,7 @@ export function pricingInfoToString(pricingInfo: PricingInfo | null): string {
 }
 
 function formatDatasetItemComplete(info: DatasetItemLike): string {
-    const unitLabel = info.unitName ? `${info.unitName}s` : 'results';
+    const unitLabel = info.unitName ? `${formatInlineActorText(info.unitName)}s` : 'results';
     const tierEntries = info.tieredPricing ? Object.entries(info.tieredPricing) : [];
 
     if (tierEntries.length > 1) {
@@ -267,7 +268,7 @@ function formatPayPerEventComplete(
 
     const eventLines = Object.values(pricingPerEvent.actorChargeEvents).map((event) => {
         const detail = formatCompleteEventDetail(event);
-        return `  - **${event.eventTitle}**: ${event.eventDescription ?? ''} (${detail})`;
+        return `  - **${formatInlineActorText(event.eventTitle)}**: ${formatInlineActorText(event.eventDescription ?? '')} (${detail})`;
     });
 
     return `This Actor is paid per event:\n${eventLines.join('\n')}`;
@@ -360,7 +361,7 @@ export function pricingInfoToSimplifiedString(pricingInfo: PricingInfo | null, u
 }
 
 function formatDatasetItemSimplified(info: DatasetItemLike, userTier: PricingTier): string {
-    const unitLabel = info.unitName ? `${info.unitName}s` : 'results';
+    const unitLabel = info.unitName ? `${formatInlineActorText(info.unitName)}s` : 'results';
     if (hasTiers(info.tieredPricing)) {
         const { tier, value } = resolveTier(info.tieredPricing, userTier);
         const base = `This Actor costs $${value.tieredPricePerUnitUsd * 1000} per 1000 ${unitLabel}.`;
@@ -407,8 +408,8 @@ function formatPayPerEventSimplified(
         }
 
         const detail = typeof price === 'number' ? `$${price} per event` : 'No price info';
-        if (omitDescriptions) return `  - **${event.eventTitle}**: ${detail}`;
-        return `  - **${event.eventTitle}**: ${event.eventDescription ?? ''} (${detail})`;
+        if (omitDescriptions) return `  - **${formatInlineActorText(event.eventTitle)}**: ${detail}`;
+        return `  - **${formatInlineActorText(event.eventTitle)}**: ${formatInlineActorText(event.eventDescription ?? '')} (${detail})`;
     });
 
     const body = `This Actor is paid per event:\n${eventLines.join('\n')}`;

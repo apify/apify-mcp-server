@@ -1,7 +1,7 @@
 import type { Actor } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
-import { MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../../src/const.js';
+import { ACTOR_MAX_DESCRIPTION_LENGTH, MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../../src/const.js';
 import type { ActorStoreInputSchema, ActorStoreList } from '../../src/types.js';
 import { formatActorToActorCard, formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 
@@ -331,6 +331,39 @@ describe('formatActorToActorCard', () => {
             expect(result).toContain('- **Rating:**');
             expect(result).not.toContain('- **Developed by:**');
             expect(result).not.toContain('- **Pricing');
+        });
+    });
+
+    describe('Actor title and description on one line', () => {
+        it('prints a multi-line title and description each on its own line of the card', () => {
+            const actor = {
+                ...mockActor,
+                title: 'RAG Web Browser\nBeta',
+                description: 'Web browser for AI agents.\n\nWorks with RAG pipelines.',
+            } as unknown as Actor;
+
+            const lines = formatActorToActorCard(actor).split('\n');
+
+            expect(lines[0]).toMatch(/^## \[RAG Web Browser Beta\]\(/);
+            expect(lines).toContain('- **Description:** Web browser for AI agents. Works with RAG pipelines.');
+        });
+
+        it('cuts a description over the cap', () => {
+            const actor = { ...mockActor, description: 'x '.repeat(ACTOR_MAX_DESCRIPTION_LENGTH) } as unknown as Actor;
+
+            const line = formatActorToActorCard(actor)
+                .split('\n')
+                .find((cardLine) => cardLine.startsWith('- **Description:** '));
+
+            expect(line?.length).toBeLessThan(ACTOR_MAX_DESCRIPTION_LENGTH + 50);
+        });
+
+        it('keeps the description as given in the structured card', () => {
+            const description = 'Web browser for AI agents.\n\nWorks with RAG pipelines.';
+
+            const result = formatActorToStructuredCard({ ...mockActor, description } as unknown as Actor);
+
+            expect(result.description).toBe(description);
         });
     });
 });
