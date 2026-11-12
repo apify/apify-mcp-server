@@ -1,5 +1,6 @@
-import { createServer, type IncomingMessage, type Server as HttpServer } from 'node:http';
+import { createServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { gzipSync } from 'node:zlib';
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -16,11 +17,15 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import log from '@apify/log';
+
 import { ApifyClient, REQUEST_ORIGIN } from '../../src/apify_client.js';
 import { APIFY_AI_CLIENT_NAME, FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import { connectMCPClient } from '../../src/mcp/client.js';
-import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../src/mcp/const.js';
+import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, MAX_ACTOR_MCP_RESPONSE_BYTES } from '../../src/mcp/const.js';
 import { actorDefinitionCache } from '../../src/state.js';
+import * as telemetry from '../../src/telemetry.js';
+import { getMCPServersAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import {
     callActorMcpTool,
     executeCallActorMcpTool,
@@ -32,9 +37,10 @@ import {
     MAX_TOOL_LIST_PAGES,
 } from '../../src/tools/actors/fetch_actor_mcp_tool_list.js';
 import type { Actor, ActorDefinitionPruned, HelperTool, ToolEntry, ToolTelemetryContext } from '../../src/types.js';
-import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../src/types.js';
+import { ALL_TOOLS_PRESENT, SERVER_MODE, TOOL_TYPE } from '../../src/types.js';
+import { compileSchema } from '../../src/utils/ajv.js';
 import { mockActor } from './helpers/actor_build_client.js';
-import { getRequestHandler, makePaymentProvider, withServer } from './helpers/mcp_server.js';
+import { getRequestHandler, getTaskStore, makePaymentProvider, withServer } from './helpers/mcp_server.js';
 import { expectSoftFailInvalidInput, mockApifyClient, only, stubToolCallContext } from './helpers/tool_context.js';
 
 const TOKEN = 'test-token';
@@ -100,13 +106,23 @@ function waitForAbort(signal: AbortSignal): Promise<{ content: []; tools: [] }> 
 /**
  * The Actor's MCP server, by path: `/mcp` serves `REMOTE_RESULTS` and `REMOTE_TOOL_PAGES` (an unknown tool or
  * cursor is a JSON-RPC error), `/mcp-broken-pages` fails the second page, `/mcp-endless` never runs out of
- * cursors, and `/mcp-slow` answers only once the request is cancelled.
+ * cursors, and `/mcp-slow` answers only once the request is cancelled. `/mcp-large` (`/mcp-large-json` with a JSON
+ * response body) answers every call and listing with a text over `MAX_ACTOR_MCP_RESPONSE_BYTES`, `/mcp-large-pages`
+ * lists pages of a quarter of that, and `/mcp-large-init` sends instructions over it in its `initialize` result.
  */
 function createRemoteServer(path: string | undefined): Server {
-    const server = new Server({ name: 'example-mcp-server', version: '1.0.0' }, { capabilities: { tools: {} } });
+    const server = new Server(
+        { name: 'example-mcp-server', version: '1.0.0' },
+        {
+            capabilities: { tools: {} },
+            ...(path === '/mcp-large-init' && { instructions: 'x'.repeat(MAX_ACTOR_MCP_RESPONSE_BYTES) }),
+        },
+    );
+    const isLarge = path === '/mcp-large' || path === '/mcp-large-json';
     server.setRequestHandler(CallToolRequestSchema, async ({ params }, extra) => {
         remoteCalls.push({ name: params.name, arguments: params.arguments });
         if (path === '/mcp-slow') return waitForAbort(extra.signal);
+        if (isLarge) return { content: [{ type: 'text', text: 'x'.repeat(MAX_ACTOR_MCP_RESPONSE_BYTES) }] };
         const result = REMOTE_RESULTS[params.name];
         if (!result) throw new McpError(ErrorCode.InvalidParams, `Tool ${params.name} not found`);
         return result;
@@ -115,6 +131,20 @@ function createRemoteServer(path: string | undefined): Server {
         listCursors.push(params?.cursor);
         if (path === '/mcp-slow') return waitForAbort(extra.signal);
         if (path === '/mcp-endless') return { tools: [], nextCursor: 'more' };
+        if (isLarge)
+            return {
+                tools: [
+                    {
+                        name: 'add',
+                        description: 'x'.repeat(MAX_ACTOR_MCP_RESPONSE_BYTES),
+                        inputSchema: { type: 'object' },
+                    },
+                ],
+            };
+        if (path === '/mcp-large-pages') {
+            const description = 'x'.repeat(MAX_ACTOR_MCP_RESPONSE_BYTES / 4);
+            return { tools: [{ name: 'add', description, inputSchema: { type: 'object' } }], nextCursor: 'more' };
+        }
         if (params?.cursor === undefined) return { tools: REMOTE_TOOL_PAGES[0], nextCursor: 'page-2' };
         if (params.cursor === 'page-2' && path === '/mcp') return { tools: REMOTE_TOOL_PAGES[1] };
         throw new McpError(ErrorCode.InvalidParams, `Invalid cursor ${params.cursor}`);
@@ -186,7 +216,10 @@ beforeAll(async () => {
         const path = req.url?.split('?')[0];
         requestHeaders.push(req.headers);
         const remote = createRemoteServer(path);
-        const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+        const transport = new StreamableHTTPServerTransport({
+            sessionIdGenerator: undefined,
+            enableJsonResponse: path === '/mcp-large-json',
+        });
         res.on('close', () => void remote.close());
         void remote.connect(transport).then(async () => transport.handleRequest(req, res));
     });
@@ -373,6 +406,19 @@ describe('call-actor-mcp-tool', () => {
         });
     });
 
+    it.each([
+        ['an event stream', '/mcp-large'],
+        ['a JSON body', '/mcp-large-json'],
+    ])('fails the call when the result in %s is over the byte limit', async (_label, webServerMcpPath) => {
+        seedActor('apify/large-mcp-server', { definition: { webServerMcpPath } });
+
+        const result = await execute(executeCallActorMcpTool, { tool: 'add', actor: 'apify/large-mcp-server' });
+
+        expect(result.isError).toBe(true);
+        expect(result).not.toHaveProperty('structuredContent');
+        expect(JSON.stringify(result.content)).toContain(`${MAX_ACTOR_MCP_RESPONSE_BYTES}-byte limit`);
+    });
+
     it('rejects a tool name longer than the MCP limit without connecting', async () => {
         await expect(
             execute(executeCallActorMcpTool, { tool: 'a'.repeat(MCP_TOOL_NAME_MAX_LENGTH + 1) }),
@@ -433,6 +479,26 @@ describe('fetch-actor-mcp-tool-list', () => {
         expect(result.isError).toBe(true);
         expect(JSON.stringify(result.content)).toContain(`more than ${MAX_TOOL_LIST_PAGES} pages`);
         expect(listCursors).toHaveLength(MAX_TOOL_LIST_PAGES);
+    });
+
+    it('fails the listing when a page is over the byte limit, without a partial list', async () => {
+        seedActor('apify/large-mcp-server', { definition: { webServerMcpPath: '/mcp-large' } });
+
+        const result = await execute(executeFetchActorMcpToolList, { actor: 'apify/large-mcp-server' });
+
+        expect(result.isError).toBe(true);
+        expect(result).not.toHaveProperty('structuredContent');
+        expect(JSON.stringify(result.content)).toContain(`${MAX_ACTOR_MCP_RESPONSE_BYTES}-byte limit`);
+    });
+
+    it('counts every page of the listing toward the byte limit', async () => {
+        seedActor('apify/large-pages-mcp-server', { definition: { webServerMcpPath: '/mcp-large-pages' } });
+
+        const result = await execute(executeFetchActorMcpToolList, { actor: 'apify/large-pages-mcp-server' });
+
+        expect(result.isError).toBe(true);
+        expect(JSON.stringify(result.content)).toContain(`${MAX_ACTOR_MCP_RESPONSE_BYTES}-byte limit`);
+        expect(listCursors).toHaveLength(4);
     });
 
     it('gives the tools/list pages one external tool-call timeout and fails without partial results once it runs out', async () => {
@@ -546,6 +612,247 @@ describe('MCP connection headers', () => {
         expect(seen.map(({ method }) => method)).toEqual(['POST', 'GET']);
         for (const { headers } of seen) {
             expect(headers).toMatchObject({ authorization: `Bearer ${TOKEN}`, 'x-apify-request-origin': 'APIFY_AI' });
+        }
+    });
+});
+
+/** A proxied tool for the `add` tool of the Actor's MCP server at `/mcp-large`, which can also run as a task. */
+function makeLargeProxiedTool(): ToolEntry {
+    return {
+        type: TOOL_TYPE.ACTOR_MCP,
+        name: 'apify--example-mcp-server--add',
+        description: 'Adds two numbers.',
+        inputSchema: { type: 'object', properties: {} },
+        ajvValidate: compileSchema({ type: 'object', properties: {} }),
+        originToolName: 'add',
+        actorId: 'example-mcp-server-id',
+        actorFullName: MCP_ACTOR,
+        serverUrl: `${standbyUrl}/mcp-large`,
+        execution: { taskSupport: 'optional' },
+    } as ToolEntry;
+}
+
+/** Spies on the log levels a failure can take, keeping the test output quiet. */
+function spyOnFailureLogs() {
+    return {
+        softFail: vi.spyOn(log, 'softFail').mockImplementation(() => undefined),
+        exception: vi.spyOn(log, 'exception').mockImplementation(() => undefined),
+        error: vi.spyOn(log, 'error').mockImplementation(() => undefined),
+    };
+}
+
+function expectLoggedAsSoftFail(logs: ReturnType<typeof spyOnFailureLogs>): void {
+    expect(logs.softFail).toHaveBeenCalled();
+    expect(logs.exception).not.toHaveBeenCalled();
+    expect(logs.error).not.toHaveBeenCalled();
+}
+
+describe('proxied Actor MCP tool', () => {
+    it('fails the call when the remote result is over the byte limit', async () => {
+        const result = await dispatch(makeLargeProxiedTool(), {});
+
+        expect(result.isError).toBe(true);
+        expect(JSON.stringify(result.content)).toContain(`${MAX_ACTOR_MCP_RESPONSE_BYTES}-byte limit`);
+    });
+});
+
+describe('a response over the byte limit is a soft failure of the remote Actor', () => {
+    it.each([
+        { tool: callActorMcpTool, run: executeCallActorMcpTool, args: { tool: 'add' } },
+        { tool: fetchActorMcpToolList, run: executeFetchActorMcpToolList, args: {} },
+    ])('in $tool.name', async ({ run, args }) => {
+        seedActor('apify/large-mcp-server', { definition: { webServerMcpPath: '/mcp-large' } });
+        const logs = spyOnFailureLogs();
+
+        const result = await execute(run, { ...args, actor: 'apify/large-mcp-server' });
+
+        expect(result.toolTelemetry).toMatchObject({
+            toolStatus: TOOL_STATUS.SOFT_FAIL,
+            failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
+        });
+        expectLoggedAsSoftFail(logs);
+    });
+
+    it.each([
+        ['a call', {}],
+        ['a task', { task: { ttl: 60_000 } }],
+    ])('in a proxied tool run as %s', async (_label, taskParams) => {
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => undefined);
+        const logs = spyOnFailureLogs();
+        const tool = makeLargeProxiedTool();
+
+        await withServer(
+            async (server) => {
+                server.upsertTools([tool]);
+                const response = await getRequestHandler(server, 'tools/call')(
+                    {
+                        method: 'tools/call',
+                        params: { name: tool.name, arguments: {}, _meta: { mcpSessionId: 's1' }, ...taskParams },
+                    },
+                    { signal: new AbortController().signal, sendNotification: vi.fn() },
+                );
+                if ('task' in taskParams) {
+                    const { taskId } = (response as { task: { taskId: string } }).task;
+                    await vi.waitFor(async () =>
+                        expect((await getTaskStore(server).getTask(taskId))?.status).toBe('completed'),
+                    );
+                }
+                await vi.waitFor(() => expect(trackSpy).toHaveBeenCalledTimes(1));
+            },
+            // No token, so telemetry needs no user lookup.
+            { token: undefined, telemetry: { enabled: true }, allowUnauthMode: true },
+        );
+
+        expect(trackSpy.mock.calls[0][2]).toMatchObject({
+            tool_status: TOOL_STATUS.SOFT_FAIL,
+            failure_category: FAILURE_CATEGORY.INTERNAL_ERROR,
+        });
+        expectLoggedAsSoftFail(logs);
+    });
+
+    it('in loading the tools of an MCP server Actor, which drops only that Actor', async () => {
+        seedActor('apify/large-mcp-server', { definition: { webServerMcpPath: '/mcp-large' } });
+        const { definition, info } = actorDefinitionCache.get('apify/large-mcp-server')!;
+        const logs = spyOnFailureLogs();
+
+        const tools = await getMCPServersAsTools([{ webServerMcpPath: '/mcp-large', definition, actor: info }], {
+            token: TOKEN,
+        });
+
+        expect(tools).toEqual([]);
+        expectLoggedAsSoftFail(logs);
+    });
+});
+
+/**
+ * A streamable HTTP MCP server written out by hand, for responses the SDK server does not send: it answers
+ * `initialize`, accepts notifications, and hands each `tools/call` and GET to the given handler.
+ */
+async function withRawMcpServer(
+    handlers: { onToolsCall: (res: ServerResponse, id: unknown) => void; onGet?: (res: ServerResponse) => void },
+    run: (url: string) => Promise<void>,
+): Promise<void> {
+    const server = createServer((req, res) => {
+        if (req.method === 'GET') {
+            if (handlers.onGet) handlers.onGet(res);
+            else res.writeHead(405).end();
+            return;
+        }
+        let body = '';
+        req.on('data', (chunk) => {
+            body += chunk;
+        });
+        req.on('end', () => {
+            const message = JSON.parse(body) as { id?: unknown; method: string };
+            if (message.id === undefined) {
+                res.writeHead(202).end();
+                return;
+            }
+            if (message.method === 'tools/call') {
+                handlers.onToolsCall(res, message.id);
+                return;
+            }
+            const result = {
+                protocolVersion: '2025-06-18',
+                capabilities: { tools: {} },
+                serverInfo: { name: 'example-mcp-server', version: '1.0.0' },
+            };
+            res.writeHead(200, { 'content-type': 'application/json' }).end(
+                JSON.stringify({ jsonrpc: '2.0', id: message.id, result }),
+            );
+        });
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    try {
+        await run(`http://127.0.0.1:${(server.address() as AddressInfo).port}/mcp`);
+    } finally {
+        server.closeAllConnections();
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+}
+
+async function callAddTool(url: string): Promise<void> {
+    const client = await connectMCPClient(url, { token: TOKEN });
+    try {
+        await client?.callTool({ name: 'add', arguments: {} });
+    } finally {
+        await client?.close();
+    }
+}
+
+describe('MCP response byte limit on the connection', () => {
+    it('counts the bytes of a compressed body after decompression', async () => {
+        await withRawMcpServer(
+            {
+                onToolsCall: (res, id) => {
+                    const result = { content: [{ type: 'text', text: 'x'.repeat(MAX_ACTOR_MCP_RESPONSE_BYTES) }] };
+                    res.writeHead(200, { 'content-type': 'application/json', 'content-encoding': 'gzip' });
+                    res.end(gzipSync(JSON.stringify({ jsonrpc: '2.0', id, result })));
+                },
+            },
+            async (url) => {
+                await expect(callAddTool(url)).rejects.toThrow(`${MAX_ACTOR_MCP_RESPONSE_BYTES}-byte limit`);
+            },
+        );
+    });
+
+    it('counts the GET event stream toward the limit of a call in flight', async () => {
+        await withRawMcpServer(
+            {
+                // The call is answered on an event stream that stays open and sends nothing.
+                onToolsCall: (res) => {
+                    res.writeHead(200, { 'content-type': 'text/event-stream' });
+                },
+                onGet: (res) => {
+                    res.writeHead(200, { 'content-type': 'text/event-stream' });
+                    res.write(`data: ${'x'.repeat(MAX_ACTOR_MCP_RESPONSE_BYTES)}`);
+                },
+            },
+            async (url) => {
+                await expect(callAddTool(url)).rejects.toThrow(`${MAX_ACTOR_MCP_RESPONSE_BYTES}-byte limit`);
+            },
+        );
+    });
+
+    it('fails the connection when the initialize result is over the limit, without the SSE fallback', async () => {
+        await expect(connectMCPClient(`${standbyUrl}/mcp-large-init`, { token: TOKEN })).rejects.toThrow(
+            `${MAX_ACTOR_MCP_RESPONSE_BYTES}-byte limit`,
+        );
+    });
+
+    it('fails the SSE transport when its event stream passes the limit, and closes the stream', async () => {
+        let isStreamClosed = false;
+        let sendOnStream: ((chunk: string) => void) | undefined;
+        const legacy = createServer((req, res) => {
+            if (req.method === 'GET') {
+                res.writeHead(200, { 'content-type': 'text/event-stream' });
+                res.on('close', () => {
+                    isStreamClosed = true;
+                });
+                res.write('event: endpoint\ndata: /messages\n\n');
+                sendOnStream = (chunk) => res.write(chunk);
+                return;
+            }
+            if (req.url === '/messages') {
+                res.writeHead(202).end();
+                // The answer to initialize: one event that never ends.
+                sendOnStream?.(`data: ${'x'.repeat(MAX_ACTOR_MCP_RESPONSE_BYTES)}`);
+                return;
+            }
+            // Streamable HTTP is not served, so the client falls back to SSE.
+            res.writeHead(404).end();
+        });
+        await new Promise<void>((resolve) => legacy.listen(0, '127.0.0.1', resolve));
+
+        try {
+            const url = `http://127.0.0.1:${(legacy.address() as AddressInfo).port}/mcp`;
+            await expect(connectMCPClient(url, { token: TOKEN })).rejects.toThrow(
+                `${MAX_ACTOR_MCP_RESPONSE_BYTES}-byte limit`,
+            );
+            await vi.waitFor(() => expect(isStreamClosed).toBe(true));
+        } finally {
+            legacy.closeAllConnections();
+            await new Promise<void>((resolve) => legacy.close(() => resolve()));
         }
     });
 });

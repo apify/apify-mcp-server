@@ -1,3 +1,7 @@
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+
+import { MAX_ACTOR_MCP_RESPONSE_BYTES } from './mcp/const.js';
+
 export class TimeoutError extends Error {
     override readonly name = 'TimeoutError';
 }
@@ -20,6 +24,19 @@ export class SchemaTooLargeError extends Error {
 
     constructor(public readonly limitBytes: number) {
         super(`Input schema exceeds ${limitBytes}-byte safety limit`);
+    }
+}
+
+/**
+ * The responses of one connection to an Actor's MCP server passed `MAX_ACTOR_MCP_RESPONSE_BYTES`. It is the
+ * remote Actor's response, not a server fault, so it logs as a soft fail and records a soft-fail status.
+ */
+export class McpResponseTooLargeError extends McpError {
+    constructor() {
+        super(
+            ErrorCode.InternalError,
+            `The response of the Actor's MCP server is over the ${MAX_ACTOR_MCP_RESPONSE_BYTES}-byte limit, so it was not read`,
+        );
     }
 }
 
