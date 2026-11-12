@@ -465,7 +465,9 @@ export type ToolCallTelemetryProperties = {
     mcp_client_version: string;
     mcp_protocol_version: string;
     mcp_client_capabilities: Record<string, unknown> | null;
+    /** `hashSessionId` of the MCP session ID, never the ID itself; empty without a session. */
     mcp_session_id: string;
+    /** Apify AI's thread id, else the same value as `mcp_session_id`. */
     trace_id?: string;
     transport_type: string;
     /** Raw `?client=` URL query-param value, when the connecting request carried one. */

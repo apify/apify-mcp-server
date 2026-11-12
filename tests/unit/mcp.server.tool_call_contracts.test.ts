@@ -25,6 +25,7 @@ import type { ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
 import * as logging from '../../src/utils/logging.js';
+import { hashSessionId } from '../../src/utils/mcp.js';
 import {
     getLegacyServer,
     getRequestHandler,
@@ -693,7 +694,10 @@ describe('executeToolAndUpdateTask()', () => {
                 initializeRequestData: { ...INITIALIZE_REQUEST, params: apifyAi },
             },
         );
-        expect(trackSpy.mock.calls[0][2]).toMatchObject({ mcp_session_id: 's1', trace_id: 'thread-1' });
+        expect(trackSpy.mock.calls[0][2]).toMatchObject({
+            mcp_session_id: hashSessionId('s1'),
+            trace_id: 'thread-1',
+        });
     });
 
     it('dispatches an ACTOR_MCP tool run as a task and surfaces a connect failure as a completed error result', async () => {
