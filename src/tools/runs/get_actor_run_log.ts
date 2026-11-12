@@ -1,9 +1,10 @@
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { readLogTail, sliceLogTail } from '../../utils/log_tail.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { getActorRunLogToolOutputSchema } from '../structured_output_schemas.js';
 
@@ -11,8 +12,12 @@ const GetRunLogArgs = z.object({
     runId: z.string().describe('The ID of the Actor run.'),
     lines: z
         .number()
+        .int()
+        .min(0)
         .max(50)
-        .describe('Output the last NUM lines, instead of the last 10. Pass 0 to return the entire log.')
+        .describe(
+            `Output the last NUM lines, instead of the last 10. Pass 0 to return the entire log, up to its last ${MAX_INLINE_BYTES} bytes.`,
+        )
         .default(10),
 });
 
@@ -45,18 +50,16 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client } = toolArgs;
+        const { args, apifyClient: client, signal } = toolArgs;
         const parsed = GetRunLogArgs.parse(args);
-        const v = await client.run(parsed.runId).log().get();
+        const tail = await readLogTail(client, client.run(parsed.runId).log().url, signal);
         // The log endpoint 404s only when the run itself is missing; an existing run with no
         // output yet returns an empty string. So `undefined` here means "run not found" — do not
         // coalesce it back to '' (#1193).
-        if (v === undefined) {
+        if (tail === undefined) {
             return respondUserError(`Run with ID '${parsed.runId}' not found.`);
         }
-        // Logs from the API end with a newline; drop it so the tail slice counts only content lines.
-        const lines = v.replace(/\n$/, '').split('\n');
-        const text = lines.slice(-parsed.lines).join('\n');
-        return respondOk(text, { structuredContent: { log: text } });
+        const { text, note } = sliceLogTail(tail, parsed.lines);
+        return respondOk(note ? [text, note] : text, { structuredContent: { log: text } });
     },
 } as const);
