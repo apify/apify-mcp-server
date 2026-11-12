@@ -1,6 +1,7 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { ApifyApiError } from 'apify-client';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 import {
     APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK,
@@ -10,6 +11,7 @@ import {
 } from '../../src/const.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from '../../src/mcp/tool_call_error_mapper.js';
 import type { CallDiagnostics } from '../../src/types.js';
+import { ACTOR_RUN_LIMIT_MESSAGE } from '../../src/utils/apify_errors.js';
 import { getToolCallErrorUserText } from '../../src/utils/mcp.js';
 import {
     makePaymentRequiredError,
@@ -157,6 +159,27 @@ describe('buildToolCallErrorResult()', () => {
         expect('userText' in result && result.userText).not.toMatch(/retry/i);
     });
 
+    it('maps a concurrent-run limit 402 to the run-limit message, not a payment request', () => {
+        const error = Object.assign(new Error('You will exceed your limit of 25 concurrent Actor runs.'), {
+            statusCode: 402,
+            type: 'concurrent-runs-limit-exceeded',
+        });
+        const result = buildToolCallErrorResult(error, {
+            toolName: TOOL_NAME,
+            actorName: ACTOR_NAME,
+            actorId: ACTOR_ID,
+            isAborted: false,
+        });
+
+        expect(result.kind).toBe(TOOL_CALL_ERROR_KIND.EXECUTION);
+        expect(result.toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
+        expect(result.callDiagnostics).toMatchObject({
+            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+            failure_http_status: 402,
+        });
+        expect('userText' in result && result.userText).toContain(ACTOR_RUN_LIMIT_MESSAGE);
+    });
+
     it('returns ABORTED toolStatus for an aborted execution error', () => {
         const result = buildToolCallErrorResult(new Error('boom'), {
             toolName: TOOL_NAME,
@@ -166,6 +189,38 @@ describe('buildToolCallErrorResult()', () => {
         });
 
         expect(result.kind).toBe(TOOL_CALL_ERROR_KIND.EXECUTION);
+        expect(result.toolStatus).toBe(TOOL_STATUS.ABORTED);
+    });
+
+    it('explains a thrown Zod argument failure as invalid input', () => {
+        const schema = z.object({ output: z.object({ serverInterface: z.union([z.boolean(), z.string()]) }) });
+        const { error } = schema.safeParse({ output: { serverInterface: ['GET /add'] } });
+
+        const result = buildToolCallErrorResult(error, {
+            toolName: HELPER_TOOLS.ACTOR_GET_DETAILS,
+            actorName: ACTOR_NAME,
+            actorId: ACTOR_ID,
+            isAborted: false,
+        });
+
+        expect(result).toMatchObject({
+            kind: TOOL_CALL_ERROR_KIND.EXECUTION,
+            toolStatus: TOOL_STATUS.SOFT_FAIL,
+            callDiagnostics: {
+                failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                failure_detail: 'output.serverInterface: expected boolean or string, got array',
+                actor_name: ACTOR_NAME,
+                actor_id: ACTOR_ID,
+            },
+            userText: `Invalid arguments for tool "${HELPER_TOOLS.ACTOR_GET_DETAILS}": output.serverInterface: expected boolean or string, got array.`,
+        });
+    });
+
+    it('keeps ABORTED for an aborted call that failed argument parsing', () => {
+        const { error } = z.object({ actor: z.string() }).safeParse({});
+
+        const result = buildToolCallErrorResult(error, { toolName: TOOL_NAME, isAborted: true });
+
         expect(result.toolStatus).toBe(TOOL_STATUS.ABORTED);
     });
 

@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.21.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.6) (2026-11-11)
+
+### 🚀 Features
+
+- Identify MCP server Actors in Actor details ([#1804](https://github.com/apify/apify-mcp-server/pull/1804)) ([808e78b](https://github.com/apify/apify-mcp-server/commit/808e78b6bdfa462bae10767eaefaeb3f07ad66ff)) by [@jirispilka](https://github.com/jirispilka), closes [#1799](https://github.com/apify/apify-mcp-server/issues/1799)
+
+### 🐛 Bug Fixes
+
+- Strip slash padding from Actor names ([#1803](https://github.com/apify/apify-mcp-server/pull/1803)) ([74cab9b](https://github.com/apify/apify-mcp-server/commit/74cab9b2f50b3ecc8115e91b974eae420c5f2fb8)) by [@jirispilka](https://github.com/jirispilka), closes [#1798](https://github.com/apify/apify-mcp-server/issues/1798)
+- Explain invalid Zod tool arguments ([#1805](https://github.com/apify/apify-mcp-server/pull/1805)) ([3b6324a](https://github.com/apify/apify-mcp-server/commit/3b6324ac9a75d67f7156e8035095593d864c1b02)) by [@jirispilka](https://github.com/jirispilka), closes [#1800](https://github.com/apify/apify-mcp-server/issues/1800)
+- Recognize Actor memory and concurrent-run limit errors ([#1776](https://github.com/apify/apify-mcp-server/pull/1776)) ([42980c5](https://github.com/apify/apify-mcp-server/commit/42980c5ca9a0c1a702878f55bd1d1a510476b05c)) by [@jirispilka](https://github.com/jirispilka), closes [#1592](https://github.com/apify/apify-mcp-server/issues/1592)
+- Refuse a doubled or escaped &#x2F;v2 prefix in the API blocklist ([#1751](https://github.com/apify/apify-mcp-server/pull/1751)) ([15904da](https://github.com/apify/apify-mcp-server/commit/15904da9f24a03d8fc459ea134c4965c00fc4f4f)) by [@jirispilka](https://github.com/jirispilka), closes [#1604](https://github.com/apify/apify-mcp-server/issues/1604)
+- Skip the Actor cache for caller-relative names ([#1871](https://github.com/apify/apify-mcp-server/pull/1871)) ([eeec027](https://github.com/apify/apify-mcp-server/commit/eeec027dba76a92797a3b2d41bd8c3cbaa532ee3)) by [@jirispilka](https://github.com/jirispilka)
+
+
+## [0.21.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.5) (2026-11-10)
+
+### 🐛 Bug Fixes
+
+- List only working dataset field selections ([#1665](https://github.com/apify/apify-mcp-server/pull/1665)) ([df8e37e](https://github.com/apify/apify-mcp-server/commit/df8e37eefae5d881e97263e8cf97fffcc181aa4f)) by [@jirispilka](https://github.com/jirispilka), closes [#1305](https://github.com/apify/apify-mcp-server/issues/1305), [#1656](https://github.com/apify/apify-mcp-server/issues/1656)
+- Explain empty and past-the-end dataset pages ([#1806](https://github.com/apify/apify-mcp-server/pull/1806)) ([446afce](https://github.com/apify/apify-mcp-server/commit/446afceda99c83f5801fee8011bc71960653b419)) by [@jirispilka](https://github.com/jirispilka), closes [#1801](https://github.com/apify/apify-mcp-server/issues/1801)
+- Give the body array schema items for VS Code Copilot ([#1847](https://github.com/apify/apify-mcp-server/pull/1847)) ([3fea68c](https://github.com/apify/apify-mcp-server/commit/3fea68c909b2c37d686c6c645a191e0e9d0f2c36)) by [@jirispilka](https://github.com/jirispilka), closes [#1846](https://github.com/apify/apify-mcp-server/issues/1846)
+- Log failures the stateless Node adapter answers itself ([#1758](https://github.com/apify/apify-mcp-server/pull/1758)) ([8e3ead2](https://github.com/apify/apify-mcp-server/commit/8e3ead201a33008b16400db3bde7bf1c3d3d3220)) by [@jirispilka](https://github.com/jirispilka), closes [#1247](https://github.com/apify/apify-mcp-server/issues/1247)
+
+
+## [0.21.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.4) (2026-11-06)
+
+### 🐛 Bug Fixes
+
+- Serve the removed apify--rag-web-browser in default sessions ([#1844](https://github.com/apify/apify-mcp-server/pull/1844)) ([c3a93a6](https://github.com/apify/apify-mcp-server/commit/c3a93a62ed6b474060f0246fed589cc2f8ec3d17)) by [@jirispilka](https://github.com/jirispilka)
+
+
+## [0.21.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.3) (2026-11-06)
+
+### 🐛 Bug Fixes
+
+- Add icon, title and website to server.json ([#1835](https://github.com/apify/apify-mcp-server/pull/1835)) ([21f6c12](https://github.com/apify/apify-mcp-server/commit/21f6c1247b61e0acce5a9916857cd3061d922d82)) by [@jancurn](https://github.com/jancurn)
+- Accept pre-0.21 input for web-fetch and rag-web-browser ([#1841](https://github.com/apify/apify-mcp-server/pull/1841)) ([97d54db](https://github.com/apify/apify-mcp-server/commit/97d54db1f347de2b3eed79c3739bbf13c9c2671f)) by [@jirispilka](https://github.com/jirispilka), closes [#346](https://github.com/apify/apify-mcp-server/issues/346)
+
+
+## [0.21.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.2) (2026-11-05)
+
+### 🚀 Features
+
+- Log argument key names of rejected tool calls ([#1840](https://github.com/apify/apify-mcp-server/pull/1840)) ([d343cf2](https://github.com/apify/apify-mcp-server/commit/d343cf2e803456c514a412945a4c43c97d5b3275)) by [@jirispilka](https://github.com/jirispilka), closes [#1815](https://github.com/apify/apify-mcp-server/issues/1815)
+
+
+## [0.21.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.1) (2026-11-05)
+
+### 🐛 Bug Fixes
+
+- Help clients with a pre-0.21 tool list recover ([#1838](https://github.com/apify/apify-mcp-server/pull/1838)) ([5760efb](https://github.com/apify/apify-mcp-server/commit/5760efb1319c955d5311091e5fba198d695b66ef)) by [@jirispilka](https://github.com/jirispilka), closes [#1815](https://github.com/apify/apify-mcp-server/issues/1815), [#1836](https://github.com/apify/apify-mcp-server/issues/1836)
+
+
 ## [0.21.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.0) (2026-11-05)
 
 ### 🚀 Features

@@ -503,6 +503,8 @@ export type ToolCallTelemetryProperties = {
     validation_missing_property?: string;
     validation_additional_property?: string;
     validation_error_count?: number;
+    /** Top-level argument key names of a call that failed validation, never values: the call shape a client sends. */
+    validation_arg_keys?: string;
 };
 
 /**
@@ -570,6 +572,7 @@ export type CallDiagnostics = Pick<
     | 'validation_missing_property'
     | 'validation_additional_property'
     | 'validation_error_count'
+    | 'validation_arg_keys'
 >;
 
 /**

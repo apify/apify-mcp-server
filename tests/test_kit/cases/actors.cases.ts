@@ -1170,30 +1170,6 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        name: 'drops a Server Actor response that misses the 120-second deadline',
-        isDeploymentTest: false,
-        skipIf: skipUnlessStdio,
-        timeout: 150_000,
-        run: withClient({ tools: ['actors'] }, async (client) => {
-            const result = await (client as ClientV1).callTool(
-                {
-                    name: 'send-server-actor-request',
-                    arguments: {
-                        actor: ACTOR_SERVER_ACTOR_TEST,
-                        method: 'GET',
-                        path: '/delay',
-                        query: { ms: 125_000 },
-                    },
-                },
-                CallToolResultSchema,
-                { timeout: 140_000 },
-            );
-
-            expect(result.isError).toBe(true);
-            expect((result.content as { text: string }[])[0].text).toContain('within 120 seconds');
-        }),
-    },
-    {
         name: 'serves a selected Server Actor as one tool that sends a request to its server interface',
         isDeploymentTest: false,
         run: withClient({ tools: [ACTOR_SERVER_ACTOR_TEST] }, async (client) => {
@@ -1240,6 +1216,8 @@ export const actorsCases: Case[] = [
         // isDeploymentTest: the default web-fetch tool, sent through its server interface, with an array query value.
         name: 'fetches a page with the default web-fetch tool through GET /',
         isDeploymentTest: true,
+        // A live Actor request; an occasional one hangs past the client's 60 s request timeout.
+        retry: 1,
         run: withClient({}, async (client) => {
             const result = await client.callTool({
                 name: 'apify--web-fetch',

@@ -14,9 +14,8 @@ export function createAjv(): Ajv {
     // layer only sanitizes LLM args — the Actor re-validates its real input on the run — so dropping
     // regex enforcement removes the DoS surface with no loss of protection. Consequence for `src/`
     // schemas: a `.regex()` on a Zod field is NOT enforced here. It still reaches `tools/list` and still
-    // fires in a tool body's `parse()`, where it throws a raw ZodError at the client instead of a
-    // readable error — so rely on the API's own validation rather than adding one. `taskNameSchema`
-    // (`tools/tasks/task_helpers.ts`) still carries one and predates this note.
+    // fires in a tool body's `parse()`, which the server reports as invalid arguments. `taskNameSchema`
+    // (`tools/tasks/task_helpers.ts`) carries one.
     instance.removeKeyword('pattern');
     instance.removeKeyword('patternProperties');
     instance.removeKeyword('format');

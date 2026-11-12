@@ -94,12 +94,7 @@ export type RunDataset = {
      * GET response does not return it (only the dataset-list endpoint does), so it is normally absent.
      */
     inflatedBytes?: number;
-    /**
-     * Dot-notation field paths. Pure-numeric segments (array indices) are stripped and the
-     * list is deduped at build time, so callers receive a flat unique projection-valid list
-     * rather than the inflated `entities.hashtags.0.text`, `entities.hashtags.1.text`, ...
-     * shape Apify returns for array-heavy datasets.
-     */
+    /** Dot-notation paths that work as a `fields` selection; a field holding an array appears by its top-level name. */
     fields?: string[];
     /**
      * JSON Schema fragment for each dataset row. Populated only by direct actor tools (where
@@ -170,38 +165,33 @@ export type FetchActorRunResult = {
 // -----------------------------------------------------------------------------
 
 /**
- * Apify expands array indices in dataset fields (e.g. `entities.hashtags.0.text`,
- * `entities.hashtags.1.text`, ... `entities.hashtags.14.text`), so deeply-nested or
- * array-heavy schemas balloon into hundreds of redundant paths. Strip pure-numeric
- * segments and dedupe; the resulting paths stay valid projections for `fields="..."`.
+ * Apify expands array indices in dataset fields (`entities.hashtags.0.text`, ...
+ * `entities.hashtags.14.text`), so array-heavy schemas balloon into hundreds of paths. A path to
+ * or through an array also selects nothing: `get-dataset-items` flattens a dotted path's
+ * top-level field and the API's flatten recurses into arrays, so no such key exists. Only the
+ * top-level name selects an array, and listing nothing else keeps agents from copying a dead path.
  *
  * Exported for direct unit testing of edge cases (empty input, all-numeric paths) —
  * production callers go through `normalizeDatasetFields`.
  */
-export function collapseArrayIndices(fields: string[]): string[] {
-    const seen = new Set<string>();
-    const result: string[] = [];
-    for (const field of fields) {
-        const collapsed = field
-            .split('.')
-            .filter((segment) => !/^\d+$/.test(segment))
-            .join('.');
-        if (collapsed && !seen.has(collapsed)) {
-            seen.add(collapsed);
-            result.push(collapsed);
-        }
-    }
-    return result;
+export function collapseArrayPaths(fields: string[]): string[] {
+    const collapsed = fields.map((field) => {
+        const segments = field.split('.');
+        const indexAt = segments.findIndex((segment) => /^\d+$/.test(segment));
+        if (indexAt === -1) return field;
+        return indexAt > 0 ? segments[0] : '';
+    });
+    return [...new Set(collapsed.filter(Boolean))];
 }
 
 /**
  * Canonical normalization for an Apify-returned `dataset.fields` array: translate
- * slash-notation to dot-notation AND collapse expanded array indices. Used at every
+ * slash-notation to dot-notation and collapse array paths. Used at every
  * MCP tool boundary that surfaces dataset field metadata (`buildRunDataset` for
  * `call-actor` / `get-actor-run`, and `get-dataset` for the raw API passthrough).
  */
 export function normalizeDatasetFields(fields: string[]): string[] {
-    return collapseArrayIndices(fields.map((f) => f.replace(/\//g, '.')));
+    return collapseArrayPaths(fields.map((f) => f.replace(/\//g, '.')));
 }
 
 export function toIsoString(value: Date | string | undefined | null): string | undefined {
@@ -536,9 +526,21 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
     return { hasKv: true, kvId, keys, keyCountLabel, summarySuffix: ` Key-value store has ${keyCountLabel}.` };
 }
 
-function fieldsProjectionHint(fields: string[] | undefined): string {
-    if (!fields || fields.length === 0) return '';
-    return ` Available fields (dot notation): ${fields.join(', ')} — pass via fields="..." to project.`;
+/**
+ * Structured output already carries the field list. The array rule uses placeholder names: agents
+ * copy the dataset's own paths (`results.url`) or bare inner names (`url`) into `fields` and get
+ * nothing. Never show an indexed path (`results.0.url`): evals showed weak models copy it and
+ * report one element as the whole result.
+ */
+export function fieldsProjectionHint(fields: string[] | undefined): string {
+    if (!fields?.length) return '';
+    const listClause = ' Each listed field path works in fields="...".';
+    const hasArray = fields.some((field) => field.split('/').some((segment) => /^\d+$/.test(segment)));
+    if (!hasArray) return listClause;
+    return (
+        `${listClause} Arrays come whole under their top-level field: for items shaped { a, b: [{ c }] },` +
+        ' fields="b" returns every element of b, while fields="b.c" and fields="c" return nothing.'
+    );
 }
 
 /**
@@ -559,6 +561,7 @@ function buildSucceededSummaryNextStep(
     dataset?: RunDataset,
     keyValueStore?: RunKeyValueStore,
     datasetMetadataFetched = true,
+    datasetFields?: string[],
 ): { summary: string; nextStep: string } {
     const itemCount = dataset?.itemCount;
     const datasetId = dataset?.id;
@@ -570,7 +573,7 @@ function buildSucceededSummaryNextStep(
         const fields = dataset?.fields ?? [];
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. ${itemCount} ${itemCount === 1 ? 'item' : 'items'}; ${fields.length} fields available.${kv.summarySuffix}`,
-            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items (${itemCount} total).${datasetSizeNextStepHint(dataset?.inflatedBytes)}${fieldsProjectionHint(fields)}`,
+            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items (${itemCount} total).${datasetSizeNextStepHint(dataset?.inflatedBytes)}${fieldsProjectionHint(datasetFields)}`,
         };
     }
 
@@ -591,7 +594,7 @@ function buildSucceededSummaryNextStep(
     if (itemCount === 0 && datasetId) {
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. Dataset item count reads 0 - counts can lag right after a run finishes.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
-            nextStep: `Fetch ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) before concluding the run produced no output.${fieldsProjectionHint(dataset?.fields)}`,
+            nextStep: `Fetch ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) before concluding the run produced no output.${fieldsProjectionHint(datasetFields)}`,
         };
     }
 
@@ -612,6 +615,7 @@ function buildTimedOutSummaryNextStep(
     runTimeSecs: number,
     dataset?: RunDataset,
     keyValueStore?: RunKeyValueStore,
+    datasetFields?: string[],
 ): { summary: string; nextStep: string } {
     const datasetId = dataset?.id;
     const kv = summarizeKv(keyValueStore);
@@ -620,10 +624,9 @@ function buildTimedOutSummaryNextStep(
     // surfaced as the primary follow-up — partial output is the diagnostic signal here.
     if (datasetId) {
         const itemCount = dataset?.itemCount ?? 0;
-        const fields = dataset?.fields ?? [];
         return {
             summary: `TIMED-OUT after ${runTimeSecs}s.${kv.summarySuffix}`,
-            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch any partial output (${itemCount} ${itemCount === 1 ? 'item' : 'items'} written). Available fields: ${fields.length > 0 ? fields.join(', ') : 'none'}.`,
+            nextStep: `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch any partial output (${itemCount} ${itemCount === 1 ? 'item' : 'items'} written).${fieldsProjectionHint(datasetFields)}`,
         };
     }
 
@@ -646,8 +649,10 @@ export function buildStatusSummaryNextStep(params: {
     dataset?: RunDataset;
     keyValueStore?: RunKeyValueStore;
     datasetMetadataFetched?: boolean;
+    /** Raw metadata `fields`: the hint needs the array indices that `dataset.fields` drops. */
+    datasetFields?: string[];
 }): { summary: string; nextStep: string } {
-    const { run, dataset, keyValueStore, datasetMetadataFetched = true } = params;
+    const { run, dataset, keyValueStore, datasetMetadataFetched = true, datasetFields } = params;
     const { id: runId, status, statusMessage } = run;
     // The platform usually populates stats.runTimeSecs on terminal runs, but not always (e.g.
     // ABORTED before stats flushed). Fall back to `elapsedSecs(run)` so summaries don't render
@@ -682,6 +687,7 @@ export function buildStatusSummaryNextStep(params: {
                 dataset,
                 keyValueStore,
                 datasetMetadataFetched,
+                datasetFields,
             );
         case 'FAILED':
             return {
@@ -698,7 +704,7 @@ export function buildStatusSummaryNextStep(params: {
                     'Retry only if the user wants another run.',
             };
         case 'TIMED-OUT':
-            return buildTimedOutSummaryNextStep(runTimeSecs, dataset, keyValueStore);
+            return buildTimedOutSummaryNextStep(runTimeSecs, dataset, keyValueStore, datasetFields);
         default:
             return {
                 summary: `${status}. Run ${runId}.`,
@@ -952,9 +958,11 @@ export async function fetchActorRunData(params: {
     const datasetIds = buildStorageAliasIds(run.storageIds?.datasets, run.defaultDatasetId ?? undefined);
     const kvIds = buildStorageAliasIds(run.storageIds?.keyValueStores, run.defaultKeyValueStoreId ?? undefined);
 
+    let defaultDatasetFields: string[] | undefined;
     const [datasets, keyValueStores] = await Promise.all([
         buildStorageEntriesFromIds(datasetIds, async (id) => {
             const meta = await fetchDatasetMeta(client, id, mcpSessionId);
+            if (id === datasetIds.default) defaultDatasetFields = meta?.fields;
             let itemCount = meta?.itemCount;
             if (isSucceeded && itemCount === 0) {
                 itemCount = await fetchDatasetItemCountWithLagFallback(client, id, waitSecs, abortSignal);
@@ -972,6 +980,7 @@ export async function fetchActorRunData(params: {
         run,
         dataset: datasets?.default,
         keyValueStore: keyValueStores?.default,
+        datasetFields: defaultDatasetFields,
     });
 
     const defaultKv = keyValueStores?.default;

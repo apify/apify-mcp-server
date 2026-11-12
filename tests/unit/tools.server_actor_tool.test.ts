@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
+import { defaults, HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH, WEB_SEARCH } from '../../src/const.js';
 import { ACTOR_LOAD_ERROR_KIND } from '../../src/errors.js';
+import type { InvalidToolCall, PreparedCall } from '../../src/mcp/tool_call_engine.js';
+import { prepareToolCall } from '../../src/mcp/tool_call_engine.js';
 import { actorDefinitionCache } from '../../src/state.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { getActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
@@ -15,6 +17,7 @@ import { listCommaJoinedQueryParameters } from '../../src/tools/actors/server_in
 import { serverActorRequestOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { Actor, ServerActorToolInfo, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
+import { resolveToolNamesFromInput } from '../../src/utils/tools_loader.js';
 import { mockActor, mockActorBuildClient, mockDefaultBuild } from './helpers/actor_build_client.js';
 import { makePaymentProvider } from './helpers/mcp_server.js';
 import { only } from './helpers/tool_context.js';
@@ -884,5 +887,62 @@ describe('the default apify/web-search tool', () => {
         expect(listCommaJoinedQueryParameters(WEB_SEARCH_LIVE_SCHEMA)).toEqual({
             'GET /': ['allowedDomains', 'blockedDomains'],
         });
+    });
+});
+
+// Clients with a pre-0.21 tool list still call the default tool that apify--web-search replaced.
+describe('a call to the removed default apify--rag-web-browser', () => {
+    const callRagWebBrowser = async (
+        sessionActors: string[],
+        args: Record<string, unknown> = { query: 'apify', maxResults: 3 },
+        // The engine reads only the names of a default session's other tools.
+        internalTools = [...resolveToolNamesFromInput({})].map((toolName) => ({ name: toolName }) as ToolEntry),
+    ) => {
+        const [username, name] = RAG_WEB_BROWSER.split('/');
+        // Caches the public rag-web-browser definition, so the engine loads the tool without the Apify API.
+        await loadTools(SCHEMA, { actor: { username, name, isPublic: true } });
+        const sessionTools = await Promise.all(
+            sessionActors.map(async (actorName) => {
+                const [actorUsername, actorShortName] = actorName.split('/');
+                return loadServerTool(SCHEMA, { username: actorUsername, name: actorShortName });
+            }),
+        );
+        return prepareToolCall({
+            tools: new Map([...internalTools, ...sessionTools].map((tool) => [tool.name, tool])),
+            apifyToken: 'fake-token',
+            name: actorNameToToolName(RAG_WEB_BROWSER),
+            args,
+            meta: undefined,
+            requestHeaders: undefined,
+            isTaskRequest: false,
+            mcpSessionId: 's1',
+            telemetryData: null,
+            clientContext: undefined,
+        });
+    };
+
+    it('runs rag-web-browser with the run input sent as GET /search in a default session', async () => {
+        const prepared = (await callRagWebBrowser(defaults.actors)) as PreparedCall;
+
+        expect(prepared.tool.name).toBe(actorNameToToolName(RAG_WEB_BROWSER));
+        expect(prepared.toolArgs).toEqual({ method: 'GET', path: '/search', query: { query: 'apify', maxResults: 3 } });
+        expect(prepared.compatibilityNote).toContain(actorNameToToolName(WEB_SEARCH));
+    });
+
+    it('keeps the example call when the arguments fail validation', async () => {
+        const result = (await callRagWebBrowser(defaults.actors, { waitSecs: 10 })) as InvalidToolCall;
+
+        expect(result.message).toContain(`Invalid arguments for tool "${actorNameToToolName(RAG_WEB_BROWSER)}"`);
+        expect(result.message).toContain('Example call: {"method":"GET","path":"/search"');
+        expect(result.message).toContain(actorNameToToolName(WEB_SEARCH));
+    });
+
+    // A session whose tools were chosen without the defaults never had rag-web-browser.
+    it('is not found in a session that selected only apify/web-search', async () => {
+        const result = await callRagWebBrowser([WEB_SEARCH], undefined, []);
+
+        expect((result as InvalidToolCall).message).toContain(
+            `Tool "${actorNameToToolName(RAG_WEB_BROWSER)}" was not found`,
+        );
     });
 });

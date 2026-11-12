@@ -15,6 +15,8 @@ export interface SuiteClientOptions {
     actors?: string[];
     tools?: (ToolCategory | string)[];
     useEnv?: boolean; // stdio only
+    /** stdio only: never share the server process with other tests (needed for per-client state such as notification handlers or the logging level). */
+    isolated?: boolean;
     clientName?: string;
     telemetry?: {
         enabled?: boolean; // default false

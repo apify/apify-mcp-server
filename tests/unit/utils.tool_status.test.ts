@@ -1,6 +1,7 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { ActorRun } from 'apify-client';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from '../../src/mcp/tool_call_error_mapper.js';
@@ -12,6 +13,7 @@ import {
     deriveResourceIds,
     extractAjvErrorDetails,
     extractToolTelemetry,
+    formatZodIssues,
     getToolStatusFromError,
 } from '../../src/utils/tool_status.js';
 
@@ -219,6 +221,48 @@ describe('extractAjvErrorDetails', () => {
         expect(extractAjvErrorDetails(null)).toEqual({});
         expect(extractAjvErrorDetails(undefined)).toEqual({});
         expect(extractAjvErrorDetails([])).toEqual({});
+    });
+});
+
+describe('formatting Zod issues as argument clauses', () => {
+    // Real Zod errors: the formatter reads Zod's issue shape and its default "received <type>" text.
+    function issuesOf(schema: z.ZodType, input: unknown) {
+        return schema.safeParse(input).error!.issues;
+    }
+
+    it('lists the union branch types at a nested array path with the received type', () => {
+        const schema = z.object({ items: z.array(z.union([z.boolean(), z.string()])) });
+
+        expect(formatZodIssues(issuesOf(schema, { items: [true, 5] }))).toBe(
+            'items.1: expected boolean or string, got number',
+        );
+    });
+
+    it('does not describe an object union using the types of its invalid child fields', () => {
+        const schema = z.object({
+            output: z.union([z.object({ name: z.string() }), z.object({ count: z.number() })]),
+        });
+        const issues = issuesOf(schema, { output: { name: 1, count: 'invalid' } });
+
+        expect(formatZodIssues(issues)).toBe(`output: ${issues[0].message}`);
+    });
+
+    it('reports a missing required argument as received undefined', () => {
+        expect(formatZodIssues(issuesOf(z.object({ actor: z.string() }), {}))).toBe(
+            'actor: expected string, got undefined',
+        );
+    });
+
+    it('joins one clause per issue with a semicolon', () => {
+        const schema = z.object({ actor: z.string(), limit: z.number() });
+
+        expect(formatZodIssues(issuesOf(schema, { actor: 1, limit: 'x' }))).toBe(
+            'actor: expected string, got number; limit: expected number, got string',
+        );
+    });
+
+    it('names the root value arguments', () => {
+        expect(formatZodIssues(issuesOf(z.object({}), 'x'))).toBe('arguments: expected object, got string');
     });
 });
 

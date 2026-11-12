@@ -2,7 +2,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
 
-import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
+import {
+    FAILURE_CATEGORY,
+    HELPER_TOOLS,
+    RAG_WEB_BROWSER,
+    TOOL_STATUS,
+    WEB_FETCH,
+    WEB_SEARCH,
+} from '../../src/const.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { InvalidToolCall, PreparedCall } from '../../src/mcp/tool_call_engine.js';
 import {
@@ -11,6 +18,7 @@ import {
     executeSyncToolCall,
     prepareToolCall,
 } from '../../src/mcp/tool_call_engine.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
 import { sendServerActorRequest } from '../../src/tools/actors/send_server_actor_request.js';
 import {
@@ -97,6 +105,27 @@ describe('prepareToolCall()', () => {
             expect(invalid.message).toContain('was not found');
             expect(telemetryData.trace_id).toBe('s1');
         });
+    });
+
+    // Clients that cached the tool list before 0.21.0 still call the removed default tool.
+    it('names the served tool that replaced the removed rag-web-browser tool, and no unserved one', async () => {
+        const webFetchTool = actorNameToToolName(WEB_FETCH);
+        const result = await prepareToolCall({
+            tools: new Map([[webFetchTool, makeRecorderTool(webFetchTool).tool]]),
+            apifyToken: 'fake-token',
+            name: actorNameToToolName(RAG_WEB_BROWSER),
+            args: { query: 'AI news' },
+            meta: undefined,
+            requestHeaders: undefined,
+            isTaskRequest: false,
+            mcpSessionId: 's1',
+            telemetryData: null,
+            clientContext: undefined,
+        });
+        const { message } = result as InvalidToolCall;
+
+        expect(message).toContain(`was replaced: ${webFetchTool} `);
+        expect(message).not.toContain(actorNameToToolName(WEB_SEARCH));
     });
 
     it('returns InvalidToolCall for missing arguments', async () => {

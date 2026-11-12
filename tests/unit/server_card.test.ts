@@ -1,9 +1,10 @@
 import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
+import Ajv from 'ajv';
 import { describe, expect, it } from 'vitest';
 
-import { APIFY_DOCS_MCP_URL, APIFY_LOGO_URL, APIFY_MCP_URL, SERVER_NAME, SERVER_TITLE } from '../../src/const.js';
+import { APIFY_MCP_URL, SERVER_NAME, SERVER_TITLE } from '../../src/const.js';
 import { getServerCard, getServerInfo } from '../../src/server_card.js';
-import type { ServerCardRemote, ServerCardRepository } from '../../src/types.js';
+import type { ServerCard, ServerCardRemote, ServerCardRepository } from '../../src/types.js';
 import { readJsonFile } from '../../src/utils/generic.js';
 import { getPackageVersion } from '../../src/utils/version.js';
 
@@ -11,15 +12,27 @@ const serverJson = readJsonFile<{
     $schema: string;
     name: string;
     description: string;
+    title: string;
+    websiteUrl: string;
     repository: ServerCardRepository;
+    icons: ServerCard['icons'];
     remotes: ServerCardRemote[];
 }>(import.meta.url, '../../server.json');
 
-/** Registry schema constraint on `name`: reverse-DNS with exactly one forward slash. */
-const REGISTRY_NAME_PATTERN = /^[a-zA-Z0-9.-]+\/[a-zA-Z0-9._-]+$/;
+/**
+ * Offline copy of the MCP Registry schema `server.json` declares in `$schema`. Dated registry
+ * schemas are never edited, so the copy only needs replacing when `$schema` moves to a new date.
+ */
+const registrySchema = readJsonFile<{ $id: string }>(import.meta.url, './fixtures/server.schema.2025-12-11.json');
 
-/** Registry schema constraint on `description`. */
-const REGISTRY_DESCRIPTION_MAX_LENGTH = 100;
+/** Returns the registry schema violations in `data`, empty when it conforms. */
+function getRegistrySchemaErrors(data: unknown) {
+    // `strict: false` because the schema uses OpenAPI's `example` keyword. Formats such as `uri` stay
+    // unchecked: ajv-formats is not a dependency.
+    const validate = new Ajv({ strict: false, validateFormats: false }).compile(registrySchema);
+    validate(data);
+    return validate.errors ?? [];
+}
 
 /**
  * The tools a default session serves, minus the client-gated `report-problem`. Pinned as a
@@ -62,37 +75,26 @@ describe('getServerCard()', () => {
             expect(card.version).toBe(getPackageVersion());
         });
 
-        it('keeps description within the registry length limit', () => {
-            const card = getServerCard();
-
-            expect(card.description.length).toBeLessThanOrEqual(REGISTRY_DESCRIPTION_MAX_LENGTH);
-        });
-
-        it('uses a name matching the registry reverse-DNS pattern', () => {
-            const card = getServerCard();
-
-            expect(card.name).toMatch(REGISTRY_NAME_PATTERN);
-        });
-
-        it('sources repository and remotes from server.json', () => {
+        it('sources repository, icons and remotes from server.json', () => {
             const card = getServerCard();
 
             expect(card.repository).toEqual(serverJson.repository);
+            expect(card.icons).toEqual(serverJson.icons);
             expect(card.remotes).toEqual(serverJson.remotes);
         });
 
-        it('exposes title, websiteUrl and serverUrl', () => {
+        it('sources title and websiteUrl from server.json', () => {
             const card = getServerCard();
 
-            expect(card.title).toBe(SERVER_TITLE);
-            expect(card.websiteUrl).toBe(APIFY_DOCS_MCP_URL);
+            expect(card.title).toBe(serverJson.title);
+            expect(card.websiteUrl).toBe(serverJson.websiteUrl);
             expect(card.serverUrl).toBe(APIFY_MCP_URL);
         });
 
-        it('uses an icon with a registry-permitted mime type', () => {
+        it('includes a PNG icon, which every icon-rendering client must support', () => {
             const card = getServerCard();
 
-            expect(card.icons).toEqual([{ src: APIFY_LOGO_URL, mimeType: 'image/png', sizes: ['180x180'] }]);
+            expect(card.icons.some((icon) => icon.mimeType === 'image/png')).toBe(true);
         });
     });
 
@@ -165,10 +167,28 @@ describe('getServerInfo()', () => {
         const info = getServerInfo();
 
         expect(info.name).toBe(SERVER_NAME);
-        expect(info.title).toBe(SERVER_TITLE);
+        expect(info.title).toBe(serverJson.title);
         expect(info.version).toBe(getPackageVersion());
         expect(info.description).toBe(serverJson.description);
-        expect(info.websiteUrl).toBe(APIFY_DOCS_MCP_URL);
-        expect(info.icons).toEqual([{ src: APIFY_LOGO_URL, mimeType: 'image/png', sizes: ['180x180'] }]);
+        expect(info.websiteUrl).toBe(serverJson.websiteUrl);
+        expect(info.icons).toEqual(serverJson.icons);
+    });
+});
+
+describe('MCP Registry schema conformance', () => {
+    it('declares the registry schema version the offline copy pins', () => {
+        expect(serverJson.$schema).toBe(registrySchema.$id);
+    });
+
+    it('accepts server.json', () => {
+        expect(getRegistrySchemaErrors(serverJson)).toEqual([]);
+    });
+
+    it('accepts the server card', () => {
+        expect(getRegistrySchemaErrors(getServerCard())).toEqual([]);
+    });
+
+    it('rejects a name that is not reverse-DNS', () => {
+        expect(getRegistrySchemaErrors({ ...serverJson, name: 'apify-mcp-server' })).not.toEqual([]);
     });
 });

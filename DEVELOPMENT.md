@@ -179,7 +179,7 @@ Integration tests run against three purpose-built Actors defined in [apify/mcp-s
 - `tests/integration/` — integration tests for MCP server functionality
   - `tests/integration/suite.ts` — wires the transport dimensions into one shared suite; add new cases to the matching group in `tests/test_kit/cases/*.cases.ts`, not here
   - Other files in this directory set up different transport dimensions (`stdio`, `2025-11-25` streamable HTTP, and `2026-07-28` stateless HTTP driven by the v2 SDK client) that all use `suite.ts`
-- `tests/helpers.ts` — shared test utilities
+- `tests/helpers.ts` — shared test utilities; `createStdioClientPool` shares one stdio server process among tests that differ only in `tools`, because each process boot costs more than a typical test
 - `tests/test_kit/helpers.ts` — shared test constants and assertion helpers, published behind `./test-kit`
 
 ### Test organization across repos
@@ -204,18 +204,18 @@ This is a real execution decision, not a visibility flag: internal's `isDeployme
 **Tests in this repo** cover the package's MCP and library surface. They live in `tests/test_kit/cases/*.cases.ts` (registered through `tests/integration/suite.ts`) and `tests/unit/`:
 
 - MCP protocol — `initialize` handshake, request/response shapes for `tools/*`, `prompts/*`, `resources/*`, `tasks/*`, notification delivery, JSON-RPC error codes.
-- Package logic — tool loader and selectors, widget metadata shape, structured output schemas, prompt registry, built-in tools, `call-actor` `RunResponse` shape, `SkyfirePaymentProvider`, client-name capability detection, `?ui=` server-mode parsing.
+- Package logic — tool loader and selectors, widget metadata shape, structured output schemas, prompt registry, built-in tools, `call-actor` `RunResponse` shape, client-name capability detection, `?ui=` server-mode parsing.
 
 **Tests not in this repo** — anything that only makes sense with the hosted stack:
 
-- IAM auth gate (401, unauth user toolset filter, `?payment=skyfire` bypass), rate limiter, `RedisEventStore` replay via `Last-Event-ID`, user-aware rental Actor filter, non-MCP HTTP routes (`/`, OAuth metadata, server card).
+- IAM auth gate (401, unauth user toolset filter), rate limiter, `RedisEventStore` replay via `Last-Event-ID`, user-aware rental Actor filter, non-MCP HTTP routes (`/`, OAuth metadata, server card).
 - Multi-node coordination — cross-node session continuity and cancellation, failover through the Caddy load balancer.
 
 Those live in `apify-mcp-server-internal`, together with a small **contract smoke suite** that re-asserts our package's behavior survives the hosted server's extra code (auth, rate limiter, Caddy, response handlers). We don't maintain that suite — internal does — but we should know it exists.
 
 #### When your change affects the hosted server
 
-The hosted server wraps this package with auth, rate limiter, Caddy, and response handlers. Any of that can change, drop, or delay something we produce; our tests don't see that wrapping. So if you change something the hosted server consumes — `internals.js` exports, `_meta` shape, `structuredContent`, anything that depends on `clientInfo`, `?ui=` / `?payment=` parsing, the timing of notifications — flag it in the PR. Internal's contract suite likely needs a matching test.
+The hosted server wraps this package with auth, rate limiter, Caddy, and response handlers. Any of that can change, drop, or delay something we produce; our tests don't see that wrapping. So if you change something the hosted server consumes — `internals.js` exports, `_meta` shape, `structuredContent`, anything that depends on `clientInfo`, `?ui=` parsing, the timing of notifications — flag it in the PR. Internal's contract suite likely needs a matching test.
 
 #### Don't delete a public test thinking internal covers it
 

@@ -10,8 +10,10 @@ import { ACTOR_TENANCY } from '../types.js';
  * The `type: '...' as const` assertions throughout narrow the string to a literal,
  * which the MCP SDK's schema types require (a plain `string` won't type-check).
  *
- * Some MCP clients refuse a `type` array or a keyword-less `{}` subschema, so nullable
- * and free-form values are spelled with `anyOf` branches of a single `type` each.
+ * Some MCP clients refuse a keyword-less `{}` subschema, so nullable and free-form values list their
+ * types. Zod's `toJSONSchema()` compacts an `anyOf` of bare types into a `type` array; the two forms
+ * are the same JSON Schema constraint and current clients accept both.
+ * An array in a tool input schema needs `items`: VS Code Copilot rejects every request otherwise.
  */
 
 /** A string or `null`. Spread it next to a `description`. */
@@ -22,6 +24,23 @@ export const anyJsonValueSchema = {
     anyOf: [
         { type: 'object' },
         { type: 'array' },
+        { type: 'string' },
+        { type: 'number' },
+        { type: 'boolean' },
+        { type: 'null' },
+    ],
+};
+
+/**
+ * Any JSON value as a tool's `body` argument. Valid only at `properties.body` of an input schema.
+ *
+ * Array items reference `body` itself, so arrays nest to any depth. VS Code Copilot rejects an array
+ * without `items`; the MCP Inspector flags `items: true` as an error and `items: {}` as untyped.
+ */
+export const anyJsonBodySchema = {
+    anyOf: [
+        { type: 'object' },
+        { type: 'array', items: { $ref: '#/properties/body' } },
         { type: 'string' },
         { type: 'number' },
         { type: 'boolean' },
@@ -741,7 +760,8 @@ const buildDatasetEntrySchema = () => ({
         fields: {
             type: 'array' as const,
             items: { type: 'string' },
-            description: 'Dataset field paths in dot notation (e.g. ["metadata.url"])',
+            description:
+                'Paths that work as a fields selection (e.g. ["results", "metadata.url"]); an array field appears by its top-level name.',
         },
     },
     required: ['id'],
@@ -1024,7 +1044,8 @@ export const datasetMetadataOutputSchema = {
         fields: {
             type: 'array' as const,
             items: { type: 'string' },
-            description: 'Field paths in dot notation (e.g. ["metadata.url"])',
+            description:
+                'Paths that work as a fields selection (e.g. ["results", "metadata.url"]); an array field appears by its top-level name.',
         },
         summary: summaryProperty,
         nextStep: nextStepProperty,
@@ -1320,6 +1341,7 @@ export const actorDetailsOutputSchema = {
         inputSchema: { type: 'object' as const, description: 'Actor input schema.' },
         outputSchema: { type: 'object' as const, description: 'Output schema inferred from successful runs.' },
         serverInterface: serverInterfaceDetailsSchema,
+        nextStep: nextStepProperty,
     },
 };
 
