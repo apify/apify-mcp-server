@@ -83,8 +83,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     body read (`readBodyPrefix` keeps the crossing chunk up to the limit and stops the stream there) and retried as
     apify-client's `call()` retries (429, 5xx, network failures, an unparseable body; the client's `maxRetries`
     and backoff; never after an abort). A body cut at the limit keeps its whole top-level items
-    (`findWholeElementsEnd`, one pass over the bytes); a page cut only at its closing bracket that holds `limit`
-    items or reaches `total` is whole. `get-dataset-items` returns them with
+    (`findWholeElementsEnd`, one pass over the bytes); a cut page is whole only when nothing but whitespace
+    follows its last whole item in the prefix (a comma there means another item follows) and it holds `limit`
+    items or reaches `total`. `get-dataset-items` returns them with
     `nextOffset` (`offset` plus the items returned; under `clean=true` the API's offset also counts the skipped
     empty items, so the next page can repeat items but skips none); the schema is inferred from them. When no
     item fits, both tools return an error: `get-dataset-items` with a token-gated download URL built from the

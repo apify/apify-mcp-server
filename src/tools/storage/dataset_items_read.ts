@@ -129,10 +129,14 @@ async function readDatasetItemsOnce(
         end < 0
             ? []
             : (parseJsonBody(`${body.subarray(0, end).toString('utf8')}]`, response) as Record<string, unknown>[]);
-    // When only the closing bracket passed the limit, the page holds every item asked for or reaches the end of
-    // the dataset; `total` counts the items before `clean` skips any, as `offset` does.
+    // Whole only when nothing but whitespace follows the last whole item in the prefix (a comma means another
+    // item follows), and the page holds every item asked for or reaches the end of the dataset; `total` counts
+    // the items before `clean` skips any, as `offset` does.
+    const isOnlyBracketCut = end >= 0 && /^[ \t\n\r]*$/.test(body.subarray(end).toString('latin1'));
     const isComplete =
-        (options.limit !== undefined && items.length >= options.limit) || (options.offset ?? 0) + items.length >= total;
+        isOnlyBracketCut &&
+        ((options.limit !== undefined && items.length >= options.limit) ||
+            (options.offset ?? 0) + items.length >= total);
     return { items, total, isCut: !isComplete };
 }
 

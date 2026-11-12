@@ -140,6 +140,17 @@ describe('readDatasetItems', () => {
         });
     });
 
+    it('reads a page as cut when another item follows the last whole one, whatever the total says', async () => {
+        // The total header can lag the items that exist; the comma after the last whole item shows one follows.
+        server.serve('lagging-total', [{ items: pageItems(20), total: 25 }]);
+
+        const page = await readDatasetItems(server.client, 'lagging-total', { offset: 20, limit: 20 });
+
+        expect(page.isCut).toBe(true);
+        expect(page.items.length).toBeGreaterThan(0);
+        expect(page.items.length).toBeLessThan(20);
+    });
+
     it.each([
         { name: 'a rate limit', first: { status: 429, body: '{"error":{"type":"rate-limit-exceeded"}}' } },
         { name: 'a server error', first: { status: 500, body: '{"error":{"type":"internal-error"}}' } },
