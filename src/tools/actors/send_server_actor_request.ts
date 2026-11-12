@@ -12,6 +12,7 @@ import {
     HTTP_UNAUTHORIZED,
     MAX_INLINE_BYTES,
     RAG_WEB_BROWSER,
+    RESOURCE_ID_OR_NAME_MAX_LENGTH,
     WEB_SEARCH,
 } from '../../const.js';
 import { getActorMCPServerPath, resolveOnStandbyOrigin } from '../../mcp/actors.js';
@@ -52,6 +53,7 @@ const sendServerActorRequestArgs = z.object({
     actor: z
         .string()
         .min(1)
+        .max(RESOURCE_ID_OR_NAME_MAX_LENGTH)
         .describe('The Actor: its ID, or its name in the "username/name" form, such as "apify/web-fetch".'),
     method: z
         .enum(API_METHODS)

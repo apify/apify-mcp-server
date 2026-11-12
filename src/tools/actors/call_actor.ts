@@ -10,6 +10,7 @@ import {
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
     FAILURE_CATEGORY,
     HELPER_TOOLS,
+    RESOURCE_ID_OR_NAME_MAX_LENGTH,
 } from '../../const.js';
 import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
 import type { PaymentProvider } from '../../payments/types.js';
@@ -307,6 +308,7 @@ export const callOptionsSchema = z.object({
 export const callActorArgs = z.object({
     actor: z
         .string()
+        .max(RESOURCE_ID_OR_NAME_MAX_LENGTH)
         .describe(
             'The Actor to call: its ID, or its name in the "username/name" form (e.g., "apify/rag-web-browser").',
         ),

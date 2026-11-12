@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
@@ -31,6 +31,7 @@ const fetchActorDetailsWidgetArgsSchema = z
         actor: z
             .string()
             .min(1)
+            .max(RESOURCE_ID_OR_NAME_MAX_LENGTH)
             .describe('Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".'),
     })
     .strict();

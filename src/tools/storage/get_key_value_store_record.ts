@@ -3,7 +3,7 @@ import dedent from 'dedent';
 import { z } from 'zod';
 
 import { getApifyAPIPublicBaseUrl } from '../../apify_client.js';
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, KEY_VALUE_STORE_KEY_MAX_LENGTH, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
 import { buildUrlOnOrigin } from '../../resources/api_resources.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
@@ -24,8 +24,12 @@ import {
 } from './storage_helpers.js';
 
 const getKeyValueStoreRecordArgs = z.object({
-    keyValueStoreId: z.string().min(1).describe(storageIdArgDescription('keyValueStore')),
-    recordKey: z.string().min(1).describe('Key of the record to retrieve.'),
+    keyValueStoreId: z
+        .string()
+        .min(1)
+        .max(RESOURCE_ID_OR_NAME_MAX_LENGTH)
+        .describe(storageIdArgDescription('keyValueStore')),
+    recordKey: z.string().min(1).max(KEY_VALUE_STORE_KEY_MAX_LENGTH).describe('Key of the record to retrieve.'),
 });
 
 /**
