@@ -23,6 +23,10 @@ const numberedLog = (count: number) => Array.from({ length: count }, (_, i) => `
 const callTool = async (args: Record<string, unknown>) =>
     (await (getActorBuildLog as HelperTool).call(stubToolCallContext(args, stubClient))) as TextToolResult;
 
+// The log as the tool returns it: in structuredContent, mirrored as JSON in content[0].
+const callForLog = async (args: Record<string, unknown>) =>
+    ((await callTool(args)).structuredContent as { log: string }).log;
+
 describe('get-actor-build-log', () => {
     it('has the expected tool name', () => {
         expect(getActorBuildLog.name).toBe(HELPER_TOOLS.ACTOR_BUILD_LOG);
@@ -31,33 +35,33 @@ describe('get-actor-build-log', () => {
     it('returns exactly the requested number of trailing lines', async () => {
         getMock.mockResolvedValue(numberedLog(20));
 
-        const { content } = await callTool({ buildId: 'build-1', lines: 3 });
+        const log = await callForLog({ buildId: 'build-1', lines: 3 });
 
         expect(buildMock).toHaveBeenCalledWith('build-1');
-        expect(content[0].text.split('\n')).toEqual(['line 18', 'line 19', 'line 20']);
+        expect(log.split('\n')).toEqual(['line 18', 'line 19', 'line 20']);
     });
 
     it('returns a single line when one line is requested', async () => {
         getMock.mockResolvedValue(numberedLog(20));
 
-        const { content } = await callTool({ buildId: 'build-1', lines: 1 });
+        const log = await callForLog({ buildId: 'build-1', lines: 1 });
 
-        expect(content[0].text).toBe('line 20');
+        expect(log).toBe('line 20');
     });
 
     it('returns exactly the default 10 lines when lines is omitted', async () => {
         getMock.mockResolvedValue(numberedLog(50));
 
-        const { content } = await callTool({ buildId: 'build-1' });
+        const log = await callForLog({ buildId: 'build-1' });
 
-        expect(content[0].text.split('\n')).toHaveLength(10);
+        expect(log.split('\n')).toHaveLength(10);
     });
 
     it('returns the entire log when lines is 0', async () => {
         getMock.mockResolvedValue(numberedLog(50));
 
-        const { content } = await callTool({ buildId: 'build-1', lines: 0 });
-        const returned = content[0].text.split('\n');
+        const log = await callForLog({ buildId: 'build-1', lines: 0 });
+        const returned = log.split('\n');
 
         expect(returned).toHaveLength(50);
         expect(returned[0]).toBe('line 1');
@@ -67,27 +71,36 @@ describe('get-actor-build-log', () => {
     it('returns only content lines when the log ends with a newline', async () => {
         getMock.mockResolvedValue(`${numberedLog(20)}\n`);
 
-        const { content } = await callTool({ buildId: 'build-1', lines: 3 });
+        const log = await callForLog({ buildId: 'build-1', lines: 3 });
 
-        expect(content[0].text.split('\n')).toEqual(['line 18', 'line 19', 'line 20']);
+        expect(log.split('\n')).toEqual(['line 18', 'line 19', 'line 20']);
     });
 
     it('returns the whole log when it is shorter than the requested number of lines', async () => {
         getMock.mockResolvedValue(numberedLog(3));
 
-        const { content } = await callTool({ buildId: 'build-1', lines: 10 });
+        const log = await callForLog({ buildId: 'build-1', lines: 10 });
 
-        expect(content[0].text).toBe('line 1\nline 2\nline 3');
+        expect(log).toBe('line 1\nline 2\nline 3');
     });
 
-    it('mirrors the log text in structuredContent and declares an outputSchema', async () => {
+    it('returns the requested lines in structuredContent and declares an outputSchema', async () => {
         getMock.mockResolvedValue(numberedLog(20));
 
         const result = await callTool({ buildId: 'build-1', lines: 10 });
 
-        expect(result.structuredContent).toEqual({ log: result.content[0].text });
+        expect(result.structuredContent).toEqual({ log: numberedLog(20).split('\n').slice(-10).join('\n') });
         expect((getActorBuildLog as HelperTool).outputSchema).toBe(getActorBuildLogToolOutputSchema);
         expectSchemaConformingStructuredContent(result, getActorBuildLogToolOutputSchema);
+    });
+
+    it('returns the log only as the JSON mirror of structuredContent', async () => {
+        getMock.mockResolvedValue(numberedLog(20));
+
+        const result = await callTool({ buildId: 'build-1', lines: 10 });
+
+        expect(result.content).toHaveLength(1);
+        expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
     });
 
     it('returns conforming structuredContent for an empty log', async () => {
@@ -95,7 +108,7 @@ describe('get-actor-build-log', () => {
 
         const result = await callTool({ buildId: 'build-1', lines: 10 });
 
-        expect(result.content[0].text).toBe('');
+        expect(result.content[0].text).toBe(JSON.stringify({ log: '' }));
         expect(result.structuredContent).toEqual({ log: '' });
         expectSchemaConformingStructuredContent(result, getActorBuildLogToolOutputSchema);
     });

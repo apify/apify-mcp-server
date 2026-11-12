@@ -129,8 +129,8 @@ export const toolsCases: Case[] = [
             expect(result.isError).not.toBe(true);
             const content = result.content as { text: string }[];
             expect(content.length).toBeGreaterThan(0);
-            // Verify the response contains the URL we fetched
-            expect(content[0].text).toContain('Fetched content from');
+            // content[0] mirrors structuredContent, which names the URL we fetched
+            expect(JSON.parse(content[0].text)).toMatchObject({ url: crawleeDocsUrl });
         }),
     },
     {

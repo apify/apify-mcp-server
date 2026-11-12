@@ -252,7 +252,7 @@ describe('summarizing a server interface in one line', () => {
 });
 
 describe('the operations in full', () => {
-    it('returns the tenancy and every operation in the get-apify-api-details shape, as the object and its JSON', () => {
+    it('returns the tenancy and every operation in the get-apify-api-details shape, with a header on how to send', () => {
         const { serverInterface, text } = sectionOf({
             actor: MULTI_TENANT_ACTOR,
             actorFullName: WEB_FETCH,
@@ -268,8 +268,7 @@ describe('the operations in full', () => {
         expect(text).toBe(
             `# Server interface of ${WEB_FETCH}\n` +
                 'multi-tenant: requests are charged per event and start no run in your account.\n' +
-                `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends a request to one of them: {"actor":"${WEB_FETCH}","method":"GET","path":"/"}\n` +
-                wrapJsonText(serverInterface),
+                `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends a request to one of them: {"actor":"${WEB_FETCH}","method":"GET","path":"/"}\n`,
         );
     });
 
@@ -324,8 +323,9 @@ describe('the operations in full', () => {
     });
 
     // At the limit the operations fit in full; one byte over, the section is the index.
-    it.each([0, 1])('counts the whole text against the byte limit, %i byte over', (over) => {
-        const fullBytes = Buffer.byteLength(sectionOf({ schema: withDescriptionOnEmpty('') }).text);
+    it.each([0, 1])('counts the header and the operations JSON against the byte limit, %i byte over', (over) => {
+        const empty = sectionOf({ schema: withDescriptionOnEmpty('') });
+        const fullBytes = Buffer.byteLength(`${empty.text}${wrapJsonText(empty.serverInterface)}`);
 
         const { serverInterface } = sectionOf({
             schema: withDescriptionOnEmpty('a'.repeat(MAX_INLINE_BYTES - fullBytes + over)),
@@ -360,8 +360,7 @@ describe('the operation index, when the operations in full exceed the byte limit
                 SINGLE_TENANT_NOTICE +
                 `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends a request to one of them: {"actor":"${ACTOR_FULL_NAME}","method":"GET","path":"/add"}\n` +
                 `The operations in full exceed the ${MAX_INLINE_BYTES}-byte limit. ` +
-                `${DETAILS}{"serverInterface":"GET /add"}} returns one operation in full.\n` +
-                wrapJsonText(serverInterface),
+                `${DETAILS}{"serverInterface":"GET /add"}} returns one operation in full.\n`,
         );
     });
 
@@ -422,11 +421,11 @@ describe('the operation index, when the operations in full exceed the byte limit
         const kept = serverInterface.operationIndex!.length;
         expect(kept).toBeGreaterThan(0);
         expect(serverInterface.omittedOperationCount).toBe(count - kept);
-        expect(text.endsWith(wrapJsonText(serverInterface))).toBe(true);
         // No room is left for one more entry; they are all the same size.
+        const renderedBytes = Buffer.byteLength(`${text}${wrapJsonText(serverInterface)}`);
         const entryBytes = Buffer.byteLength(`,${JSON.stringify(serverInterface.operationIndex![0])}`);
-        expect(Buffer.byteLength(text)).toBeLessThanOrEqual(MAX_INLINE_BYTES);
-        expect(Buffer.byteLength(text) + entryBytes).toBeGreaterThan(MAX_INLINE_BYTES);
+        expect(renderedBytes).toBeLessThanOrEqual(MAX_INLINE_BYTES);
+        expect(renderedBytes + entryBytes).toBeGreaterThan(MAX_INLINE_BYTES);
     });
 });
 
@@ -494,8 +493,7 @@ describe('one operation', () => {
         expect(text).toBe(
             `# Server interface of ${WEB_FETCH}: POST /\n` +
                 'multi-tenant: requests are charged per event and start no run in your account.\n' +
-                `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends this request: {"actor":"${WEB_FETCH}","method":"POST","path":"/"}\n` +
-                wrapJsonText(serverInterface),
+                `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends this request: {"actor":"${WEB_FETCH}","method":"POST","path":"/"}\n`,
         );
     });
 
@@ -602,6 +600,18 @@ describe('fetching details of a Server Actor', () => {
             expect(textOf(result.content!.at(-1)!)).toContain(expectedText);
             expect((result.structuredContent as { serverInterface?: unknown }).serverInterface).toEqual(expectedObject);
             expectSchemaConformingStructuredContent(result, fetchActorDetails.outputSchema!);
+        },
+    );
+
+    // The operations already reach text-only clients in the JSON mirror; the text adds only how to use them.
+    it.each([{ serverInterface: true }, { serverInterface: 'GET /empty' }])(
+        'returns the operations once, in the JSON mirror, for output %j',
+        async (output) => {
+            const result = await call(output);
+            const [mirror, ...texts] = (result.content ?? []).map(textOf);
+
+            expect(JSON.parse(mirror)).toEqual(result.structuredContent);
+            expect(texts.some((text) => text.includes('"operations"'))).toBe(false);
         },
     );
 
