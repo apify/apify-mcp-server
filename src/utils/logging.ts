@@ -3,7 +3,7 @@ import { ZodError } from 'zod';
 
 import log from '@apify/log';
 
-import { SchemaTooLargeError } from '../errors.js';
+import { McpResponseTooLargeError, SchemaTooLargeError } from '../errors.js';
 import { isActorRunLimitError } from './apify_errors.js';
 
 /**
@@ -170,8 +170,8 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
         return;
     }
 
-    // Oversized untrusted input schema — a property of the Actor's schema, not a server fault.
-    if (error instanceof SchemaTooLargeError) {
+    // Oversized untrusted input schema or Actor MCP response — a property of the Actor, not a server fault.
+    if (error instanceof SchemaTooLargeError || error instanceof McpResponseTooLargeError) {
         log.softFail(message, { errMessage: softErrMessage, ...data });
         return;
     }

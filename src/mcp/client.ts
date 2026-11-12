@@ -5,12 +5,60 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import log from '@apify/log';
 
 import { REQUEST_ORIGIN, REQUEST_ORIGIN_HEADER } from '../apify_client.js';
-import { TimeoutError } from '../errors.js';
+import { McpResponseTooLargeError, TimeoutError } from '../errors.js';
 import { getHttpStatusCode, sanitizeMezmoMessage } from '../utils/logging.js';
-import { ACTORIZED_MCP_CONNECTION_TIMEOUT_MSEC } from './const.js';
+import { ACTORIZED_MCP_CONNECTION_TIMEOUT_MSEC, MAX_ACTOR_MCP_RESPONSE_BYTES } from './const.js';
 import { getMCPServerID } from './proxy.js';
 
 export type McpConnectionOptions = { token: string; requestOrigin?: REQUEST_ORIGIN };
+
+/** What one connection reads: `fetch` for its transport, and `signal`, aborted once the bodies pass the limit. */
+type ResponseLimit = {
+    fetch: (input: Request | URL | string, init?: RequestInit) => Promise<Response>;
+    signal: AbortSignal;
+};
+
+/**
+ * Counts the body bytes of every response on one connection, over both transport attempts, and stops reading at
+ * `MAX_ACTOR_MCP_RESPONSE_BYTES`: the body is cancelled and fails with an `McpResponseTooLargeError`, and `signal` is
+ * aborted with it.
+ */
+function createResponseLimit(): ResponseLimit {
+    const controller = new AbortController();
+    let bytesRead = 0;
+    const limitBody = (body: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> => {
+        const reader = body.getReader();
+        return new ReadableStream({
+            async pull(streamController) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    streamController.close();
+                    return;
+                }
+                bytesRead += value.byteLength;
+                if (bytesRead <= MAX_ACTOR_MCP_RESPONSE_BYTES) {
+                    streamController.enqueue(value);
+                    return;
+                }
+                if (!controller.signal.aborted) controller.abort(new McpResponseTooLargeError());
+                streamController.error(controller.signal.reason);
+                await reader.cancel(controller.signal.reason);
+            },
+            async cancel(reason) {
+                await reader.cancel(reason);
+            },
+        });
+    };
+    return {
+        signal: controller.signal,
+        fetch: async (input, init) => {
+            const response = await fetch(input, init);
+            if (!response.body) return response;
+            const { status, statusText, headers } = response;
+            return new Response(limitBody(response.body), { status, statusText, headers });
+        },
+    };
+}
 
 /**
  * Creates and connects a ModelContextProtocol client.
@@ -21,9 +69,11 @@ export async function connectMCPClient(
     options: McpConnectionOptions,
     mcpSessionId?: string,
 ): Promise<Client | null> {
+    const responseLimit = createResponseLimit();
     try {
-        return await createMCPStreamableClient(url, options);
+        return await createMCPStreamableClient(url, options, responseLimit);
     } catch (error) {
+        if (error instanceof McpResponseTooLargeError) throw error;
         // If streamable HTTP transport fails on not timeout error, continue with SSE transport
         if (error instanceof TimeoutError) {
             log.warning('Connection to MCP server using streamable HTTP transport timed out', { url, mcpSessionId });
@@ -39,8 +89,9 @@ export async function connectMCPClient(
     }
 
     try {
-        return await createMCPSSEClient(url, options);
+        return await createMCPSSEClient(url, options, responseLimit);
     } catch (error) {
+        if (error instanceof McpResponseTooLargeError) throw error;
         if (error instanceof TimeoutError) {
             log.warning('Connection to MCP server using SSE transport timed out', { url, mcpSessionId });
             return null;
@@ -71,11 +122,18 @@ async function withTimeout<T>(millis: number, promise: Promise<T>): Promise<T> {
 async function connectWithTransport(
     url: string,
     transport: SSEClientTransport | StreamableHTTPClientTransport,
+    responseLimit: ResponseLimit,
 ): Promise<Client> {
     const client = new Client({
         name: getMCPServerID(url),
         version: '1.0.0',
     });
+    // A response that arrives on an event stream fails only the stream, so the limit's signal fails the request too.
+    const request = client.request.bind(client);
+    client.request = async (req, resultSchema, options) => {
+        const signal = options?.signal ? AbortSignal.any([options.signal, responseLimit.signal]) : responseLimit.signal;
+        return await request(req, resultSchema, { ...options, signal });
+    };
     await withTimeout(ACTORIZED_MCP_CONNECTION_TIMEOUT_MSEC, client.connect(transport));
     return client;
 }
@@ -88,8 +146,13 @@ function buildMCPRequestHeaders({ token, requestOrigin }: McpConnectionOptions):
 /**
  * Creates and connects a ModelContextProtocol client using the SSE transport.
  */
-async function createMCPSSEClient(url: string, options: McpConnectionOptions): Promise<Client> {
+async function createMCPSSEClient(
+    url: string,
+    options: McpConnectionOptions,
+    responseLimit: ResponseLimit,
+): Promise<Client> {
     const transport = new SSEClientTransport(new URL(url), {
+        fetch: responseLimit.fetch,
         requestInit: {
             headers: buildMCPRequestHeaders(options),
         },
@@ -102,24 +165,29 @@ async function createMCPSSEClient(url: string, options: McpConnectionOptions): P
                 for (const [name, value] of Object.entries(buildMCPRequestHeaders(options))) {
                     headers.set(name, value);
                 }
-                return fetch(input, { ...init, headers });
+                return responseLimit.fetch(input, { ...init, headers });
             },
             // We have to cast to "any" to use it, since it's non-standard
         } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
     });
 
-    return await connectWithTransport(url, transport);
+    return await connectWithTransport(url, transport, responseLimit);
 }
 
 /**
  * Creates and connects a ModelContextProtocol client using the streamable HTTP transport.
  */
-async function createMCPStreamableClient(url: string, options: McpConnectionOptions): Promise<Client> {
+async function createMCPStreamableClient(
+    url: string,
+    options: McpConnectionOptions,
+    responseLimit: ResponseLimit,
+): Promise<Client> {
     const transport = new StreamableHTTPClientTransport(new URL(url), {
+        fetch: responseLimit.fetch,
         requestInit: {
             headers: buildMCPRequestHeaders(options),
         },
     });
 
-    return await connectWithTransport(url, transport);
+    return await connectWithTransport(url, transport, responseLimit);
 }

@@ -3,6 +3,7 @@ import type { ErrorObject } from 'ajv';
 import type { ZodError } from 'zod';
 
 import { FAILURE_CATEGORY, HTTP_FORBIDDEN, HTTP_NOT_FOUND, HTTP_UNAUTHORIZED, TOOL_STATUS } from '../const.js';
+import { McpResponseTooLargeError } from '../errors.js';
 import type { RunResponse } from '../tools/actors/actor_run_response.js';
 import type {
     AjvErrorDetails,
@@ -89,6 +90,11 @@ export function getToolStatusFromError(error: unknown, isAborted: boolean): Tool
 
     // MCP InvalidParams errors are also user errors
     if (error instanceof McpError && error.code === ErrorCode.InvalidParams) {
+        return TOOL_STATUS.SOFT_FAIL;
+    }
+
+    // Recorded like a proxied Actor MCP tool's own error: a soft fail with the internal-error category.
+    if (error instanceof McpResponseTooLargeError) {
         return TOOL_STATUS.SOFT_FAIL;
     }
 
