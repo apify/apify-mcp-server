@@ -4,7 +4,7 @@ TypeScript, ES modules. Runs in two modes: **stdio** (local CLI clients, `stdio.
 
 **Before implementing**: work from an issue that is assigned or explicitly agreed. An open issue is not an invitation — many are stale or unrefined, and the fix isn't settled. If nobody asked for this change, open an issue instead of a PR (docs fixes excepted). Disclose AI use in the PR. See [CONTRIBUTING.md](./CONTRIBUTING.md#before-you-write-code).
 
-### Communication style — MANDATORY
+### Communication style
 
 **This applies to ALL written output: code comments, commit messages, PR descriptions, issue specs**
 
@@ -55,7 +55,7 @@ After `pnpm run build`, run `mcpc` (no args) to check sessions: if `@stdio` (def
 
 ## External dependencies
 
-**IMPORTANT**: This package (`@apify/actors-mcp-server`) is used in the private `apify-mcp-server-internal` repository for the hosted server.
+This package (`@apify/actors-mcp-server`) is used in the private `apify-mcp-server-internal` repository for the hosted server.
 Changes here may affect that server.
 Breaking changes must be coordinated; check whether updates are needed in `apify-mcp-server-internal` before submitting a PR.
 
@@ -80,7 +80,7 @@ Breaking changes must be coordinated; check whether updates are needed in `apify
 - **Reference tool names via the `HELPER_TOOLS` `as const` object**, not hardcoded strings. Exception: the integration suite (`tests/integration/` and the shared `tests/test_kit/` cases and helpers) uses hardcoded strings, so a renamed tool fails it.
 - **Apps vs default mode**: only `*-widget` tools differ between modes. All non-widget tools (`call-actor`, `get-actor-run`, direct actor tools, `search-actors`, `fetch-actor-details`) share a single implementation across modes.
 - Per-directory detail lives in the child `AGENTS.md` files (see Child docs below).
-- Always follow the latest [MCP spec](https://modelcontextprotocol.io/specification/2025-11-25) and [MCP Apps spec](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx).
+- Follow the MCP spec of each served revision ([2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25), [2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28)) and the [MCP Apps spec](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx).
 
 ## Tool guidelines
 
