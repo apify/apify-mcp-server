@@ -42,6 +42,50 @@ export function mockApifyClient(methods: Record<string, unknown> = {}): ApifyCli
     return methods as unknown as ApifyClient;
 }
 
+/** A streamed response body that can be read more than once, as a stub response may be. */
+function streamedBody(value: unknown): AsyncIterable<Buffer> {
+    return {
+        async *[Symbol.asyncIterator]() {
+            yield Buffer.from(JSON.stringify(value));
+        },
+    };
+}
+
+/** A dataset items page as the API sends it: the items as the streamed body, the total in a header. */
+export function datasetItemsResponse(items: unknown[], total: number) {
+    return {
+        status: 200,
+        statusText: 'OK',
+        data: streamedBody(items),
+        headers: { 'content-type': 'application/json; charset=utf-8', 'x-apify-pagination-total': String(total) },
+        config: { method: 'get', url: 'https://api.apify.com/v2/datasets/ds/items' },
+    };
+}
+
+/** An Apify API error response, which the client's axios instance resolves rather than throws. */
+export function apiErrorResponse(status: number, type: string, message: string) {
+    return {
+        ...datasetItemsResponse([], 0),
+        status,
+        statusText: 'Error',
+        data: streamedBody({ error: { type, message } }),
+    };
+}
+
+/**
+ * Stub client for the dataset items request the storage tools send through the client's own axios
+ * instance, without retries. `dataset` adds methods to `client.dataset(id)`, such as `get`.
+ */
+export function mockDatasetItemsClient(
+    request: (config: { url: string; params: Record<string, unknown>; maxContentLength: number }) => unknown,
+    dataset: Record<string, unknown> = {},
+): ApifyClient {
+    return mockApifyClient({
+        dataset: (id: string) => ({ url: `https://api.apify.com/v2/datasets/${id}`, ...dataset }),
+        httpClient: { axios: { request }, maxRetries: 0, minDelayBetweenRetriesMillis: 0 },
+    });
+}
+
 /** Minimal `InternalToolArgs` stub for unit tests. Defaults to every helper tool loaded, no Actor tools. */
 export function stubToolCallContext(
     args: Record<string, unknown>,

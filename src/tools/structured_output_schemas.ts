@@ -1023,6 +1023,11 @@ export const datasetItemsOutputSchema = {
         totalItemCount: { type: 'number', description: 'Total items in dataset' },
         offset: { type: 'number', description: 'Offset used for pagination' },
         limit: { type: 'number', description: 'Limit used for pagination' },
+        nextOffset: {
+            type: 'number',
+            description:
+                'Present only when fewer items than the limit are returned because the next one would pass the response size limit: the offset to continue from',
+        },
         summary: summaryProperty,
         nextStep: nextStepProperty,
     },

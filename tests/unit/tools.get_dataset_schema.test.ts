@@ -1,15 +1,18 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
-import { getDatasetSchema } from '../../src/tools/storage/get_dataset_schema.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, MAX_INLINE_BYTES, TOOL_STATUS } from '../../src/const.js';
+import { DATASET_SCHEMA_MAX_LIMIT, getDatasetSchema } from '../../src/tools/storage/get_dataset_schema.js';
 import { datasetSchemaOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import type * as SchemaGenModule from '../../src/utils/schema_generation.js';
 import { generateSchemaFromItems } from '../../src/utils/schema_generation.js';
+import { type DatasetItemsServer, startDatasetItemsServer } from './helpers/dataset_items_server.js';
 import {
+    apiErrorResponse,
+    datasetItemsResponse,
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
-    mockApifyClient,
+    mockDatasetItemsClient,
     stubToolCallContext,
     type TextToolResult,
     type ToolTelemetrySnapshot,
@@ -28,22 +31,8 @@ const MOCK_ITEMS = [
     { title: 'b', count: 2 },
 ];
 
-function stubApifyClient(listItemsResponse: unknown): InternalToolArgs['apifyClient'] {
-    return mockApifyClient({
-        dataset: (_id: string) => ({
-            listItems: async () => listItemsResponse,
-        }),
-    });
-}
-
-function stubApifyClientThrowing(err: unknown): InternalToolArgs['apifyClient'] {
-    return mockApifyClient({
-        dataset: (_id: string) => ({
-            listItems: async () => {
-                throw err;
-            },
-        }),
-    });
+function stubApifyClient(page: { items: unknown[]; total: number }): InternalToolArgs['apifyClient'] {
+    return mockDatasetItemsClient(async () => datasetItemsResponse(page.items, page.total));
 }
 
 describe('get-dataset-schema', () => {
@@ -68,15 +57,30 @@ describe('get-dataset-schema', () => {
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
     });
 
-    it('applies defaults (limit=5, clean=true) to listItems when no params given', async () => {
-        const listItemsSpy = vi.fn().mockResolvedValue({ items: MOCK_ITEMS, total: 2 });
-        const client = mockApifyClient({
-            dataset: (_id: string) => ({ listItems: listItemsSpy }),
-        });
+    it('requests the default sample (limit=5, clean=true) in one request capped at the inline limit', async () => {
+        const requestSpy = vi.fn().mockResolvedValue(datasetItemsResponse(MOCK_ITEMS, 2));
 
-        await (getDatasetSchema as HelperTool).call(stubToolCallContext({ datasetId: 'ds-1' }, client));
+        await (getDatasetSchema as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1' }, mockDatasetItemsClient(requestSpy)),
+        );
 
-        expect(listItemsSpy).toHaveBeenCalledWith({ clean: true, limit: 5 });
+        expect(requestSpy).toHaveBeenCalledOnce();
+        expect(requestSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                params: { clean: true, limit: 5 },
+                maxContentLength: MAX_INLINE_BYTES,
+            }),
+        );
+    });
+
+    it('accepts an integer limit from 1 to the maximum sample size', () => {
+        const tool = getDatasetSchema as HelperTool;
+        for (const limit of [0, 1.5, DATASET_SCHEMA_MAX_LIMIT + 1]) {
+            expect(tool.ajvValidate({ datasetId: 'ds-1', limit })).toBe(false);
+        }
+        for (const limit of [1, DATASET_SCHEMA_MAX_LIMIT]) {
+            expect(tool.ajvValidate({ datasetId: 'ds-1', limit })).toBe(true);
+        }
     });
 
     it('returns a schema-conforming structured response when the dataset has no items', async () => {
@@ -129,10 +133,12 @@ describe('get-dataset-schema', () => {
         expect(structuredContent.nextStep).not.toContain('clean=false');
     });
 
-    it('returns isError with a not-found message when listItems throws 404', async () => {
-        const notFound = Object.assign(new Error('Dataset was not found'), { statusCode: 404 });
+    it('returns isError with a not-found message when the API responds 404', async () => {
+        const client = mockDatasetItemsClient(async () =>
+            apiErrorResponse(404, 'record-not-found', 'Dataset was not found'),
+        );
         const result = await (getDatasetSchema as HelperTool).call(
-            stubToolCallContext({ datasetId: 'missing' }, stubApifyClientThrowing(notFound)),
+            stubToolCallContext({ datasetId: 'missing' }, client),
         );
         const { content, structuredContent } = result as TextToolResult & { structuredContent?: unknown };
 
@@ -141,13 +147,13 @@ describe('get-dataset-schema', () => {
         expect(content[0].text).toContain("Dataset 'missing' not found");
     });
 
-    it('rethrows non-404 errors from listItems', async () => {
-        const serverError = Object.assign(new Error('Internal server error'), { statusCode: 500 });
+    it('throws a non-404 API error response', async () => {
+        const client = mockDatasetItemsClient(async () =>
+            apiErrorResponse(500, 'internal-error', 'Internal server error'),
+        );
         await expect(
-            (getDatasetSchema as HelperTool).call(
-                stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClientThrowing(serverError)),
-            ),
-        ).rejects.toBe(serverError);
+            (getDatasetSchema as HelperTool).call(stubToolCallContext({ datasetId: 'ds-1' }, client)),
+        ).rejects.toMatchObject({ statusCode: 500, message: 'Internal server error' });
     });
 
     it('returns isError when schema generation fails (generator returns null)', async () => {
@@ -204,14 +210,58 @@ describe('get-dataset-schema nextStep gating', () => {
     });
 });
 
+describe('get-dataset-schema over the response size limit', () => {
+    let server: DatasetItemsServer;
+    beforeAll(async () => {
+        server = await startDatasetItemsServer();
+        const pages = Array.from({ length: 30 }, (_, n) => ({
+            url: `https://example.com/${n}`,
+            text: 'x'.repeat(20_000),
+        }));
+        server.serve('~crawl', [{ items: pages }]);
+        server.serve('~big', [{ items: [{ text: 'x'.repeat(MAX_INLINE_BYTES) }, { n: 2 }] }]);
+    });
+    afterAll(async () => server.close());
+
+    it('infers the schema from the whole items that fit and says the sample stops there', async () => {
+        const result = await (getDatasetSchema as HelperTool).call(
+            stubToolCallContext({ datasetId: 'crawl', limit: 20 }, server.client),
+        );
+        const { structuredContent } = result as TextToolResult & { structuredContent: Record<string, unknown> };
+
+        expectSchemaConformingStructuredContent(result, datasetSchemaOutputSchema);
+        expect(structuredContent.schema).toMatchObject({ items: { properties: { url: {}, text: {} } } });
+        const [, used] = /^Schema inferred from (\d+) items/.exec(structuredContent.summary as string) ?? [];
+        expect(Number(used)).toBeGreaterThan(0);
+        expect(Number(used)).toBeLessThan(20);
+        expect(structuredContent.summary).toContain(`${MAX_INLINE_BYTES}`);
+    });
+
+    it.each([
+        { name: 'names get-dataset for the field list', loaded: Object.values(HELPER_TOOLS), named: true },
+        { name: 'names no sibling it was not served', loaded: [HELPER_TOOLS.DATASET_SCHEMA_GET], named: false },
+    ])('when the first item alone is too large, returns an error that $name', async ({ loaded, named }) => {
+        const result = await (getDatasetSchema as HelperTool).call(
+            stubToolCallContext({ datasetId: 'big' }, server.client, { loadedToolNames: loaded }),
+        );
+        const { text } = (result as TextToolResult).content[0];
+
+        expectSoftFailInvalidInput(result);
+        expect(text).toContain(`${MAX_INLINE_BYTES} bytes`);
+        expect(text.includes(`${HELPER_TOOLS.DATASET_GET} `)).toBe(named);
+    });
+});
+
 describe('get-dataset-schema with a bare dataset name', () => {
     it("reads the name as one of the caller's own datasets", async () => {
-        const datasetSpy = vi.fn().mockReturnValue({ listItems: async () => ({ items: MOCK_ITEMS, total: 2 }) });
+        const requestSpy = vi.fn().mockResolvedValue(datasetItemsResponse(MOCK_ITEMS, 2));
 
         await (getDatasetSchema as HelperTool).call(
-            stubToolCallContext({ datasetId: 'eval-ai-items' }, mockApifyClient({ dataset: datasetSpy })),
+            stubToolCallContext({ datasetId: 'eval-ai-items' }, mockDatasetItemsClient(requestSpy)),
         );
 
-        expect(datasetSpy).toHaveBeenCalledWith('~eval-ai-items');
+        expect(requestSpy).toHaveBeenCalledWith(
+            expect.objectContaining({ url: 'https://api.apify.com/v2/datasets/~eval-ai-items/items' }),
+        );
     });
 });

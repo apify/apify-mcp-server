@@ -77,7 +77,17 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     action) pair, never inline dataset items or KV bodies — except the reserved `TIP` key,
     inlined as `tip` on terminal RAG Web Browser runs only.
   - `runs/` — get/abort runs, run logs, run list.
-  - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`.
+  - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`. `get-dataset-items` and
+    `get-dataset-schema` read items through `readDatasetItems` (`dataset_items_read.ts`): the request
+    `listItems` sends, through `sendApifyApiRequest`, with the body streamed only up to `MAX_INLINE_BYTES`
+    (`readBodyToCap`) and retried as apify-client's `call()` retries (429, 5xx, network failures, an unparseable
+    body; the client's `maxRetries` and backoff; never after an abort). A body cut at the limit keeps its whole
+    top-level items (`findWholeElementsEnd`, one pass over the bytes). `get-dataset-items` returns them with
+    `nextOffset` (`offset` plus the items returned; under `clean=true` the API's offset also counts the skipped
+    empty items, so the next page can repeat items but skips none); the schema is inferred from them. When no
+    item fits, both tools return an error: `get-dataset-items` with a token-gated download URL built from the
+    client's dataset URL on the public origin, `get-dataset-schema` naming `get-dataset`'s field list when
+    served. The schema sample `limit` is 1 to `DATASET_SCHEMA_MAX_LIMIT` (1,000).
   - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public
     landing page (`task_helpers.ts` holds the shared task response shape and the publication call).
   - `schedules/` — schedule create/get/update/delete for Actors and tasks; `schedule_helpers.ts`
