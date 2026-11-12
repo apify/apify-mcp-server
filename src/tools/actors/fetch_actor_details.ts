@@ -51,7 +51,7 @@ export const actorDetailsOutputOptionsSchema = z.object({
     outputSchema: z
         .boolean()
         .optional()
-        .describe('Include inferred output schema from recent successful runs (TypeScript type).'),
+        .describe('Include inferred output schema from recent successful runs (field names mapped to their types).'),
     serverInterface: z.union([z.boolean(), z.string()]).optional().describe(dedent`
             Server Actor HTTP API. true: every operation with its parameters and request body schema when they fit; otherwise an index with one entry per operation.
             "METHOD /path" (e.g. "GET /search"): that one operation in full.
@@ -233,7 +233,8 @@ export function buildActorDetailsTextResponse(options: {
     // Besides the operations, the text says how to call them and why a section is cut or absent.
     if (serverInterface?.text) texts.push(serverInterface.text);
 
-    if (linkContext) {
+    // Console links come only from the Actor card; without it there is no URL to keep verbatim.
+    if (linkContext && needsCard) {
         texts.push(VERBATIM_LINKS_NUDGE);
     }
 

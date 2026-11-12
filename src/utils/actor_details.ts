@@ -21,30 +21,6 @@ import type { PricingTier } from './pricing_info.js';
 const ACTOR_DETAILS_PICTURE_SEARCH_LIMIT = 5;
 
 /**
- * Convert a type object to TypeScript-like string representation.
- * Used for human-readable text output.
- *
- * Example:
- * Input:  { first_number: "number", tags: ["string"], user: { name: "string" } }
- * Output: "{ first_number: number, tags: string[], user: { name: string } }"
- *
- * Values that are not string / object / array are skipped (not rendered) at every nesting level.
- */
-export function typeObjectToString(obj: Record<string, unknown>): string {
-    const pairs = Object.entries(obj)
-        .filter(([, v]) => Array.isArray(v) || (v !== null && typeof v === 'object') || typeof v === 'string')
-        .map(([k, v]) => `${k}: ${typeValueToString(v)}`);
-    return `{ ${pairs.join(', ')} }`;
-}
-
-function typeValueToString(value: unknown): string {
-    if (Array.isArray(value)) return `${typeValueToString(value[0])}[]`;
-    if (value !== null && typeof value === 'object') return typeObjectToString(value as Record<string, unknown>);
-    if (typeof value === 'string') return value;
-    return 'unknown';
-}
-
-/**
  * Resolve README content with fallback: prefer readmeSummary, fall back to full readme.
  * Returns the content string and appropriate heading for text output.
  *

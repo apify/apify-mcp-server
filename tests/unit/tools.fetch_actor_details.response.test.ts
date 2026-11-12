@@ -64,21 +64,21 @@ describe('buildActorDetailsTextResponse()', () => {
             readme: false,
         };
 
-        it('keeps the input schema out of the texts, as it is in structuredContent', () => {
-            const { texts, structuredContent } = buildActorDetailsTextResponse({
+        // Console links come only from the Actor card; without it the response has no URL to keep verbatim.
+        it('returns no text for an input-schema-only result, which carries no URL', () => {
+            const { texts } = buildActorDetailsTextResponse({
                 details: MOCK_DETAILS,
                 output: inputSchemaOnlyOutput,
                 linkContext,
             });
 
-            expect(structuredContent.inputSchema).toEqual(MOCK_DETAILS.inputSchema);
-            expect(texts).toEqual([VERBATIM_LINKS_NUDGE]);
+            expect(texts).toEqual([]);
         });
 
-        it('appends the verbatim-links nudge as the last text', () => {
+        it('appends the verbatim-links nudge as the last text when the Actor card is returned', () => {
             const { texts } = buildActorDetailsTextResponse({
                 details: MOCK_DETAILS,
-                output: inputSchemaOnlyOutput,
+                output: { ...inputSchemaOnlyOutput, metadata: true },
                 linkContext,
             });
 
@@ -88,7 +88,7 @@ describe('buildActorDetailsTextResponse()', () => {
         it('omits the nudge without a link context', () => {
             const { texts } = buildActorDetailsTextResponse({
                 details: MOCK_DETAILS,
-                output: inputSchemaOnlyOutput,
+                output: { ...inputSchemaOnlyOutput, metadata: true },
             });
 
             expect(texts).toEqual([]);
@@ -136,7 +136,8 @@ describe('buildFetchActorDetailsResult()', () => {
         expect(vi.mocked(fetchActorDetails).mock.calls[0][2]?.cardOptions).toMatchObject({
             linkContext: {},
         });
-        expect(content.at(-1)?.text).toBe(VERBATIM_LINKS_NUDGE);
+        // Input schema only: no card, so no Console URL in the result to keep verbatim.
+        expect(content.at(-1)?.text).not.toBe(VERBATIM_LINKS_NUDGE);
     });
 
     // The direct buildActorNotFoundResponse() tests below cannot see whether this function
@@ -189,7 +190,7 @@ describe('buildFetchActorDetailsResult()', () => {
         vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
         const result = await buildFetchActorDetailsResult({
             ...stubToolCallContext(
-                { actor: 'apify/example-mcp-server', output: { inputSchema: true } },
+                { actor: 'apify/example-mcp-server', output: { metadata: true } },
                 mockApifyClient(),
                 { loadedToolNames: [] },
             ),
