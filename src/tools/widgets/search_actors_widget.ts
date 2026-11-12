@@ -17,7 +17,7 @@ import {
     buildNoActorsFoundInstructions,
     buildSearchActorsResult,
     searchActorsBaseArgsSchema,
-    searchActorsPagingSchema,
+    searchActorsPublishedArgsSchema,
 } from '../actors/search_actors.js';
 import { actorSearchWidgetOutputSchema } from '../structured_output_schemas.js';
 
@@ -54,9 +54,9 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
     title: 'Search Actors (widget)',
     description: buildDescription(ALL_TOOLS_PRESENT),
     buildDescription,
-    inputSchema: z.toJSONSchema(searchActorsWidgetArgsSchema) as ToolInputSchema,
+    inputSchema: z.toJSONSchema(searchActorsPublishedArgsSchema.strict()) as ToolInputSchema,
     outputSchema: actorSearchWidgetOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(searchActorsWidgetArgsSchema)),
+    ajvValidate: compileSchema(z.toJSONSchema(searchActorsPublishedArgsSchema.strict())),
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS)?.meta,
     },
@@ -70,16 +70,14 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyClient, paymentProvider, loadedToolNames, loadedActorIds } = toolArgs;
         const parsed = searchActorsWidgetArgsSchema.parse(args);
-        // Not in the schema when the store search runs on `/unstable/store`, which ignores them.
-        const { limit, offset } = searchActorsPagingSchema.parse(parsed);
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
         const [actors, { userPlanTier }] = await Promise.all([
             searchAgentSafeActors({
                 keywords: parsed.keywords,
                 apifyClient,
-                limit,
-                offset,
+                limit: parsed.limit,
+                offset: parsed.offset,
                 paymentProvider,
                 useCase: parsed.useCase,
             }),
@@ -89,7 +87,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
         if (actors.length === 0) {
             // Honor the widget tool's declared outputSchema: widgetActors is required, so
             // emit an empty array rather than dropping the field.
-            const instructions = buildNoActorsFoundInstructions(parsed.keywords, offset);
+            const instructions = buildNoActorsFoundInstructions(parsed.keywords, parsed.offset);
             return respondOk(instructions, {
                 structuredContent: {
                     actors: [],

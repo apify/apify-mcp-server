@@ -24,25 +24,6 @@ import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunActor, canRunAnyActor, getActorCallabilityCaveat } from '../actor_tool_naming.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 
-/** The `/v2/store` paging args; read through it, so the call gets their defaults when the schema leaves them out. */
-export const searchActorsPagingSchema = z.object({
-    limit: z
-        .number()
-        .int()
-        .min(1)
-        .max(MAX_LIMIT_WITH_INPUT_SCHEMA)
-        .default(5)
-        .describe(`The maximum number of Actors to return (max = ${MAX_LIMIT_WITH_INPUT_SCHEMA}, default = 5).`),
-    offset: z
-        .number()
-        .int()
-        .min(0)
-        .default(0)
-        .describe(
-            'The number of elements to skip from the start (default = 0). Has no effect when keywords are set: every offset returns the first results.',
-        ),
-});
-
 /**
  * Shared schema for search-actors arguments. Used by both the default and
  * widget variants — the widget variant calls `.strict()` on it.
@@ -74,8 +55,21 @@ export const searchActorsBaseArgsSchema = z.object({
             ❌ "top popular actors", "best scrapers", "trending" — ranking words aren't Actor keywords; pass "" instead
             ❌ "scraper", "extractor", "web crawler" — bare task words aren't Actor keywords; pass "" instead
         `),
-    // `/unstable/store` decides how many Actors it returns, so the tool takes no paging args then.
-    ...(!IS_UNSTABLE_STORE_SEARCH_ENABLED && searchActorsPagingSchema.shape),
+    limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(MAX_LIMIT_WITH_INPUT_SCHEMA)
+        .default(5)
+        .describe(`The maximum number of Actors to return (max = ${MAX_LIMIT_WITH_INPUT_SCHEMA}, default = 5).`),
+    offset: z
+        .number()
+        .int()
+        .min(0)
+        .default(0)
+        .describe(
+            'The number of elements to skip from the start (default = 0). Has no effect when keywords are set: every offset returns the first results.',
+        ),
     // Withheld from Anthropic clients: `withoutUseCaseField` in utils/tools_loader.ts.
     useCase: z.string().optional().describe(dedent`
             Optional. One plain sentence on what the user wants to achieve with the Actor, for example "compare competitor prices" (max ${STORE_USE_CASE_MAX_LENGTH} characters).
@@ -83,6 +77,14 @@ export const searchActorsBaseArgsSchema = z.object({
             Respect the user's privacy: when unsure, leave it out.
         `),
 });
+
+/**
+ * The args the search tools publish. `/unstable/store` decides how many Actors it returns, so with it they publish
+ * no `limit` or `offset`: AJV strips them from a call, and the call parses their defaults, which it ignores.
+ */
+export const searchActorsPublishedArgsSchema = IS_UNSTABLE_STORE_SEARCH_ENABLED
+    ? searchActorsBaseArgsSchema.omit({ limit: true, offset: true })
+    : searchActorsBaseArgsSchema;
 
 function buildDescription({ hasTool, clientParam }: ToolDescriptionContext): string {
     const runLimitationLine = canRunAnyActor(hasTool) ? '' : `${getActorCallabilityCaveat(clientParam)}\n`;
@@ -200,9 +202,9 @@ export const searchActors: ToolEntry = Object.freeze({
     title: 'Search Actors',
     description: buildDescription(ALL_TOOLS_PRESENT),
     buildDescription,
-    inputSchema: z.toJSONSchema(searchActorsBaseArgsSchema) as ToolInputSchema,
+    inputSchema: z.toJSONSchema(searchActorsPublishedArgsSchema) as ToolInputSchema,
     outputSchema: actorSearchOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(searchActorsBaseArgsSchema)),
+    ajvValidate: compileSchema(z.toJSONSchema(searchActorsPublishedArgsSchema)),
     annotations: {
         title: 'Search Actors',
         readOnlyHint: true,
@@ -213,16 +215,14 @@ export const searchActors: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyClient, paymentProvider, loadedToolNames, loadedActorIds } = toolArgs;
         const parsed = searchActorsBaseArgsSchema.parse(args);
-        // Not in the schema when the store search runs on `/unstable/store`, which ignores them.
-        const { limit, offset } = searchActorsPagingSchema.parse(parsed);
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
         const [actors, { userPlanTier }] = await Promise.all([
             searchAgentSafeActors({
                 keywords: parsed.keywords,
                 apifyClient,
-                limit,
-                offset,
+                limit: parsed.limit,
+                offset: parsed.offset,
                 paymentProvider,
                 useCase: parsed.useCase,
             }),
@@ -230,7 +230,7 @@ export const searchActors: ToolEntry = Object.freeze({
         ]);
 
         if (actors.length === 0) {
-            const instructions = buildNoActorsFoundInstructions(parsed.keywords, offset);
+            const instructions = buildNoActorsFoundInstructions(parsed.keywords, parsed.offset);
             return respondOk(instructions, {
                 structuredContent: { actors: [], query: parsed.keywords, count: 0, instructions },
             });

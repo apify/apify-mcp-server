@@ -33,6 +33,7 @@ const knownStoreFieldSchemas = {
     stats: z.strictObject({
         totalUsers: z.number().optional(),
         totalUsers30Days: z.number().optional(),
+        // Accepted so `stats` still parses; the card has no line for it.
         bookmarkCount: z.number().optional(),
     }),
     rating: z.strictObject({ average: z.number().optional(), reviewCount: z.number().optional() }),
@@ -110,7 +111,6 @@ export function mapUnstableStoreItem(item: UnstableStoreItem): ActorStoreList {
     const stats: ActorStoreList['stats'] = {
         ...(known.stats?.totalUsers !== undefined && { totalUsers: known.stats.totalUsers }),
         ...(known.stats?.totalUsers30Days !== undefined && { totalUsers30Days: known.stats.totalUsers30Days }),
-        ...(known.stats?.bookmarkCount !== undefined && { bookmarkCount: known.stats.bookmarkCount }),
     };
     const mapped: ActorStoreList & { modifiedAt?: Date } = {
         id: item.id,
@@ -124,7 +124,6 @@ export function mapUnstableStoreItem(item: UnstableStoreItem): ActorStoreList {
         ...(known.modifiedAt !== undefined && { modifiedAt: new Date(known.modifiedAt) }),
         currentPricingInfo: item.currentPricingInfo,
         stats,
-        ...(known.stats?.bookmarkCount !== undefined && { bookmarkCount: known.stats.bookmarkCount }),
         ...(known.rating?.average !== undefined && { actorReviewRating: known.rating.average }),
         ...(known.rating?.reviewCount !== undefined && { actorReviewCount: known.rating.reviewCount }),
         categories: known.categories,

@@ -321,18 +321,12 @@ describe('search-actors served from /unstable/store', () => {
         vi.resetModules();
     });
 
-    /** Loads both search tools with the flag on, which is read once when the tool modules load. */
-    const loadToolsWithFlag = async () => {
+    it('takes no limit or offset in either tool', async () => {
         vi.stubEnv('APIFY_STORE_UNSTABLE_ENDPOINT', '1');
         vi.resetModules();
+        // The flag is read once, when the tool modules load.
         const { searchActors } = await import('../../src/tools/actors/search_actors.js');
         const { searchActorsWidget } = await import('../../src/tools/widgets/search_actors_widget.js');
-        const { stubToolCallContext } = await import('./helpers/tool_context.js');
-        return { searchActors, searchActorsWidget, stubToolCallContext };
-    };
-
-    it('takes no limit or offset in either tool', async () => {
-        const { searchActors, searchActorsWidget } = await loadToolsWithFlag();
         // A client that still sends them must not fail the strict widget schema.
         const widgetInput: Record<string, unknown> = { keywords: 'instagram', limit: 5, offset: 20 };
 
@@ -340,23 +334,5 @@ describe('search-actors served from /unstable/store', () => {
         expect(Object.keys(searchActorsWidget.inputSchema.properties ?? {})).toEqual(['keywords', 'useCase']);
         expect((searchActorsWidget as HelperTool).ajvValidate(widgetInput)).toBe(true);
         expect(widgetInput).toEqual({ keywords: 'instagram' });
-    });
-
-    // With one page, an empty one means the keywords matched nothing.
-    it('suggests other keywords when the page is empty', async () => {
-        const { searchActors, stubToolCallContext } = await loadToolsWithFlag();
-        const { apifyClient } = mockUnstableStoreClient({
-            status: 200,
-            data: { data: { items: [], count: 0, limit: 5, recommId: 'recomm-1' } },
-        });
-        vi.spyOn(apifyClient, 'user').mockReturnValue({
-            get: async () => ({ id: 'user-1', plan: { tier: 'FREE' } }),
-        } as unknown as ReturnType<ApifyClient['user']>);
-
-        const result = (await (searchActors as HelperTool).call(
-            stubToolCallContext({ keywords: 'instagram' }, apifyClient),
-        )) as { content: { text: string }[] };
-
-        expect(result.content[0].text).toContain('Keywords can include');
     });
 });

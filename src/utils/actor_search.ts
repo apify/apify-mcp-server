@@ -54,7 +54,7 @@ export async function searchActorsByKeywords(options: SearchActorsByKeywordsOpti
 /**
  * Store search used by the `search-actors` tools (plain and widget), on `/unstable/store` when
  * `APIFY_STORE_UNSTABLE_ENDPOINT` is on.
- * Always requests input schemas, so on `/v2/store` `limit` must stay within `MAX_LIMIT_WITH_INPUT_SCHEMA` (the tool's arg schema enforces it).
+ * Always requests input schemas, so `limit` must stay within `MAX_LIMIT_WITH_INPUT_SCHEMA` (the tool's arg schema enforces it).
  * With a payment provider, returns only Actors that allow agentic users.
  */
 export async function searchAgentSafeActors(options: SearchAgentSafeActorsOptions): Promise<ActorStoreList[]> {
