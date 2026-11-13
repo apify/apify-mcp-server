@@ -15,12 +15,7 @@ import { readJsonFile } from './utils/generic.js';
 import { getToolsForServerMode } from './utils/tools_loader.js';
 import { getPackageVersion } from './utils/version.js';
 
-/**
- * The registry-shaped half of the server card lives in `server.json`, which is already the
- * source of truth for registry publishing and is version-bumped by the release workflow.
- * Reading it here keeps the card from drifting out of sync with what we publish.
- */
-const serverJson = readJsonFile<{
+type ServerJson = {
     $schema: string;
     name: string;
     title: string;
@@ -29,17 +24,34 @@ const serverJson = readJsonFile<{
     repository: ServerCardRepository;
     icons: ServerCard['icons'];
     remotes: ServerCardRemote[];
-}>(import.meta.url, '../server.json');
+};
+
+/**
+ * The registry-shaped half of the server card lives in `server.json`, which is already the
+ * source of truth for registry publishing and is version-bumped by the release workflow.
+ * Reading it here keeps the card from drifting out of sync with what we publish.
+ *
+ * Undefined when the file can't be read: a broken install (truncated npx cache, files from two
+ * releases) must not stop the stdio server at import time.
+ */
+const serverJson = ((): ServerJson | undefined => {
+    try {
+        return readJsonFile<ServerJson>(import.meta.url, '../server.json');
+    } catch {
+        return undefined;
+    }
+})();
 
 /** Returns the `serverInfo` (MCP `Implementation`) advertised in the initialize response. */
 export function getServerInfo(): Implementation {
     return {
         name: SERVER_NAME,
-        title: serverJson.title,
+        title: serverJson?.title ?? SERVER_TITLE,
         version: getPackageVersion()!,
-        description: serverJson.description,
-        websiteUrl: serverJson.websiteUrl,
-        icons: [...serverJson.icons],
+        description: serverJson?.description,
+        websiteUrl: serverJson?.websiteUrl,
+        // An older server.json (before 0.21.3) has no icons.
+        icons: Array.isArray(serverJson?.icons) ? [...serverJson.icons] : undefined,
     };
 }
 
@@ -61,6 +73,8 @@ function getServerCardTools(): ServerCardTool[] {
 
 /** Returns the MCP server card object. See {@link ServerCard} for why it is a hybrid shape. */
 export function getServerCard(): ServerCard {
+    // Only the hosted server serves the card, from its own complete install.
+    if (!serverJson) throw new Error('server.json could not be read');
     return {
         $schema: serverJson.$schema,
 
