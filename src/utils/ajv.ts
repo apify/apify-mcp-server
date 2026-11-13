@@ -2,11 +2,21 @@ import type { ValidateFunction } from 'ajv';
 import Ajv from 'ajv';
 
 /**
+ * Once the generated code is handed over, Ajv starts the code of a schema that has an `$id` with a comment that
+ * names the code after it. The name is not needed, and the engine keeps named code longer.
+ */
+const CODE_NAME_COMMENT = /\/\*# sourceURL=[\s\S]*?\*\//;
+
+const hasSchemaId = (schema: unknown): boolean =>
+    typeof schema === 'object' && schema !== null && '$id' in schema && typeof schema.$id === 'string';
+
+/**
  * Ajv with the server's validation policy. One instance per compile, never shared: Ajv caches every compiled
  * schema in a Map that is never evicted.
  *
  * `checkCode` receives the code of every validator function Ajv generates, before the function is created; what
- * it throws fails the compilation.
+ * it throws fails the compilation. The code has no text of an `$id` in it: see `CODE_NAME_COMMENT`, which relies
+ * on `compileUntrustedSchema` refusing an `$id` that holds the end of a comment.
  */
 export function createAjv(checkCode?: (code: string) => void): Ajv {
     const instance = new Ajv({
@@ -19,9 +29,10 @@ export function createAjv(checkCode?: (code: string) => void): Ajv {
         // the schema size: without it a schema with 1,000 properties compiles about four times faster.
         code: {
             optimize: false,
-            process: (code) => {
-                checkCode?.(code);
-                return code;
+            process: (code, schemaEnv) => {
+                const unnamedCode = hasSchemaId(schemaEnv?.schema) ? code.replace(CODE_NAME_COMMENT, '') : code;
+                checkCode?.(unnamedCode);
+                return unnamedCode;
             },
         },
     });

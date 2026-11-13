@@ -128,6 +128,49 @@ describe('compileUntrustedSchema and the validator Ajv generates', () => {
         ).toBe(true);
     });
 
+    describe('a schema with an `$id`', () => {
+        const withId = ($id: string) => ({ ...schemaFor('apify/facebook-posts-scraper'), $id });
+
+        it('hands over validator code without the `$id` in it', () => {
+            const codes: string[] = [];
+            vi.mocked(createAjv).mockImplementationOnce((checkCode) =>
+                createRealAjv((code) => {
+                    codes.push(code);
+                    checkCode?.(code);
+                }),
+            );
+
+            const { validate } = compileUntrustedSchema(withId('https://example.com/schemas/facebook-posts.json'));
+
+            expect(validate({ startUrls: ['https://example.com'] })).toBe(true);
+            expect(validate({ startUrls: [{}] })).toBe(false);
+            expect(codes.length).toBeGreaterThan(0);
+            expect(codes.join('')).not.toContain('facebook-posts.json');
+            expect(codes.join('')).not.toContain('sourceURL');
+        });
+
+        it.each([
+            ['at the root', withId('https://example.com/*/posts.json')],
+            ['in a nested schema', { type: 'object', properties: { post: withId('posts*/') } }],
+            ['with an escaped character before it', withId('https://example.com/"posts"/*/')],
+        ])('refuses an `$id` that holds the end of a comment %s, before Ajv generates any code', (_name, schema) => {
+            vi.mocked(createAjv).mockClear();
+
+            expect(() => compileUntrustedSchema(schema)).toThrow(/`\$id` that is not supported/);
+            expect(createAjv).not.toHaveBeenCalled();
+        });
+
+        it('loads an `$id` with the same characters apart, and the same text outside an `$id`', () => {
+            const schema = {
+                ...withId('https://example.com/schemas/a*b/c.json'),
+                description: 'Matches **/*.json files',
+                properties: { glob: { type: 'string', default: '**/*.js', description: 'The "$id":"x*/" of a file' } },
+            };
+
+            expect(compileUntrustedSchema(schema).validate({ glob: 'src/**/*.ts' })).toBe(true);
+        });
+    });
+
     it('throws SchemaTooLargeError when the generated code is over the limit', () => {
         addValidatorCodeOnce(MAX_UNTRUSTED_VALIDATOR_CODE_BYTES);
 

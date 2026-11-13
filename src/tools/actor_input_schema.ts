@@ -70,6 +70,9 @@ export const MAX_UNTRUSTED_VALIDATOR_NESTING_OUTSIDE_PROPERTIES = 800;
  */
 export const MAX_UNTRUSTED_SAME_VALUE_SCHEMAS = 1000;
 
+/** In serialized JSON: an `$id` key at any depth whose string value holds the end of a comment. */
+const ID_WITH_COMMENT_END = /"\$id":"(?:[^"\\]|\\.)*?\*\//;
+
 /** Keywords whose value is data: an object inside it is not a subschema, whatever it looks like. */
 const DATA_KEYWORDS = new Set(['default', 'prefill', 'enum', 'example', 'examples', 'const']);
 /** Keywords whose value maps a name to a subschema, so its keys are not keywords. */
@@ -628,6 +631,8 @@ function compileIntoCache(
         }
     };
     try {
+        // Ajv writes an `$id` into a comment of the code it generates, so it may not hold the end of a comment.
+        if (ID_WITH_COMMENT_END.test(serialized)) throw new Error('Input schema has an `$id` that is not supported');
         // A validator of such a schema would answer with a promise; the server validates synchronously.
         if ('$async' in schema && schema.$async) throw new Error('Input schema uses `$async`, which is not supported');
         // In serialized JSON only a key is a string followed by a colon.
