@@ -1,7 +1,12 @@
 /** ApifyClient: request-origin header + baseUrl override + the client-facing API origin. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ApifyClient, getApifyAPIPublicBaseUrl, REQUEST_ORIGIN } from '../../src/apify_client.js';
+import {
+    ApifyClient,
+    getApifyAPIPublicBaseUrl,
+    REQUEST_ORIGIN,
+    runWithForwardedApiHeaders,
+} from '../../src/apify_client.js';
 import { STAGING_MCP_HOSTNAME } from '../../src/const.js';
 
 const { capturedOptions } = vi.hoisted(() => ({ capturedOptions: [] as unknown[] }));
@@ -21,12 +26,15 @@ type CapturedClientOptions = {
     publicBaseUrl: string;
 };
 
-/** Builds a client and runs its request interceptor to get the headers sent with every request. */
-function buildStaticHeaders(options: ConstructorParameters<typeof ApifyClient>[0]): Record<string, string> {
+/** Builds a client and runs its request interceptor to get the headers sent with a request to `url`. */
+function buildStaticHeaders(
+    options: ConstructorParameters<typeof ApifyClient>[0],
+    url = 'https://api.apify.com/v2/users/me',
+): Record<string, string> {
     capturedOptions.length = 0;
     void new ApifyClient(options);
     const passed = capturedOptions[0] as CapturedClientOptions;
-    return passed.requestInterceptors[0]({ url: 'https://api.apify.com/v2/users/me', headers: {} }).headers;
+    return passed.requestInterceptors[0]({ url, headers: {} }).headers;
 }
 
 /** baseUrl passed to the underlying apify-client. */
@@ -56,6 +64,23 @@ describe('ApifyClient', () => {
         });
         expect(headers['skyfire-pay-id']).toBe('jwt-token-123');
         expect(headers['X-Apify-Request-Origin']).toBe('APIFY_AI');
+    });
+
+    it('sends forwarded headers only inside runWithForwardedApiHeaders', () => {
+        const forwarded = { 'x-apify-admin-ip-proof': 'proof' };
+        // The request goes to the client's API origin, whatever APIFY_API_BASE_URL is.
+        const options = { token: 'test-token', baseUrl: 'https://api.apify.com' };
+        const inside = runWithForwardedApiHeaders(forwarded, () => buildStaticHeaders(options));
+        expect(inside['x-apify-admin-ip-proof']).toBe('proof');
+        expect(buildStaticHeaders(options)['x-apify-admin-ip-proof']).toBeUndefined();
+    });
+
+    it('keeps forwarded headers off a request to an Actor server', () => {
+        // The client also sends requests to an Actor's standby origin, which is not the API.
+        const headers = runWithForwardedApiHeaders({ 'x-apify-admin-ip-proof': 'proof' }, () =>
+            buildStaticHeaders({ token: 'test-token' }, 'https://apify--web-fetch.apify.actor/fetch'),
+        );
+        expect(headers['x-apify-admin-ip-proof']).toBeUndefined();
     });
 
     it('explicit baseUrl wins over env default', () => {

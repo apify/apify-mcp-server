@@ -2,7 +2,7 @@
  This file provides essential internal functions for Apify MCP servers, serving as an internal library.
 */
 
-import { ApifyClient } from './apify_client.js';
+import { ApifyClient, runWithForwardedApiHeaders } from './apify_client.js';
 import { defaults, HELPER_TOOLS, type HelperToolName } from './const.js';
 import { processParamsGetTools } from './mcp/utils.js';
 import { resolvePaymentProvider } from './payments/index.js';
@@ -40,6 +40,7 @@ export {
     unauthEnabledTools,
     parseQueryParamList,
     resolvePaymentProvider,
+    runWithForwardedApiHeaders,
     type PaymentProvider,
 };
 
