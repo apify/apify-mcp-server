@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.21.5",
+  "version": "0.21.11",
   "type": "module",
   "description": "Apify MCP Server",
   "mcpName": "com.apify/apify-mcp-server",
@@ -26,6 +26,7 @@
     "./manifest.json": "./manifest.json"
   },
   "peerDependencies": {
+    "@apify/log": "^2.5.16",
     "@modelcontextprotocol/client": "2.3.1"
   },
   "peerDependenciesMeta": {
@@ -59,29 +60,28 @@
     "model context protocol"
   ],
   "dependencies": {
-    "@apify/datastructures": "^2.0.3",
-    "@apify/log": "^2.5.16",
     "@apify/utilities": "^2.25.1",
     "@modelcontextprotocol/ext-apps": "^1.1.2",
-    "@modelcontextprotocol/node": "2.1.1",
+    "@modelcontextprotocol/node": "2.1.2",
     "@modelcontextprotocol/sdk": "1.32.1",
     "@modelcontextprotocol/server": "2.3.1",
     "@segment/analytics-node": "^2.3.0",
-    "@sentry/node": "^10.38.0",
+    "@sentry/node": "^10.78.0",
     "ajv": "^8.17.1",
     "algoliasearch": "^5.31.0",
     "apify-client": "^2.25.0",
-    "axios": "^1.16.0",
+    "axios": "^1.21.0",
     "dedent": "^1.7.2",
     "dotenv": "^17.4.1",
-    "express": "^4.21.2",
+    "express": "^4.22.3",
     "proxy-agent": "^6.5.0",
     "yargs": "^17.7.2",
-    "zod": "^4.1.13"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.206",
-    "@apify/mcpc": "^0.7.0",
+    "@apify/log": "^2.5.16",
+    "@apify/mcpc": "^0.8.0",
     "@apify/oxlint-config": "^0.2.10",
     "@apify/tsconfig": "^0.1.2",
     "@langfuse/client": "5.9.1",
@@ -91,18 +91,18 @@
     "@modelcontextprotocol/conformance": "0.2.0-alpha.9",
     "@opentelemetry/api": "1.9.1",
     "@opentelemetry/sdk-node": "0.220.0",
-    "@sentry/cli": "^3.2.0",
+    "@sentry/cli": "^3.8.2",
     "@types/express": "^4.0.0",
     "@types/yargs": "^17.0.33",
     "@types/yargs-parser": "^21.0.3",
     "eventsource": "^3.0.2",
-    "openai": "^6.10.0",
+    "openai": "^6.49.0",
     "oxfmt": "0.51.0",
     "oxlint": "^1.64.0",
     "oxlint-tsgolint": "0.22.1",
     "tsx": "^4.20.6",
     "typescript": "^5.3.3",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.12"
   },
   "scripts": {
     "start": "tsx src/dev_server.ts",

@@ -11,6 +11,14 @@ export class UserInputError extends Error {
 }
 
 /**
+ * Thrown by `ApifyClient` (`apify_client.ts`) instead of sending a request with an invalid identifier, record key or
+ * request path. The 400 status makes callers handle it as they handle the API's own rejection of bad input.
+ */
+export class InvalidRequestPathError extends UserInputError {
+    readonly statusCode = 400;
+}
+
+/**
  * Thrown by `compileUntrustedSchema` when an untrusted Actor / proxied-MCP input schema exceeds the byte
  * cap that bounds AJV's synchronous codegen. It's a property of the schema, not a server fault, so
  * `logHttpError` logs it as a soft fail and the caller drops just that one tool.

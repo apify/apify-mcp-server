@@ -1,5 +1,6 @@
 import type { REQUEST_ORIGIN } from '../apify_client.js';
 import { ApifyClient } from '../apify_client.js';
+import { maskLoggedValues } from '../resources/api_resources.js';
 import type { ApifyToken, ToolEntry } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 import { buildPaymentRequiredResponse, registerPaymentRequiredInterceptor } from '../utils/payment_errors.js';
@@ -26,7 +27,8 @@ export type PrepareToolCallContextResult = {
  * This helper centralizes all payment processing:
  * 1. Validates payment credentials (for tools with `paymentRequired: true`)
  * 2. Strips payment fields from args (for clean ajv validation and Actor input)
- * 3. Redacts sensitive fields for logging: the tool's own `redactArgs`, then the payment fields
+ * 3. Redacts sensitive fields for logging: the tool's own `redactArgs` (every value for an Actor or Actor MCP tool),
+ *    then the payment fields
  * 4. Creates an ApifyClient with payment headers or standard token
  *
  * Call this BEFORE AJV validation so `toolArgsWithoutPayment` can be validated
@@ -48,10 +50,12 @@ export function prepareToolCallContext(input: {
     requestOrigin?: REQUEST_ORIGIN;
 }): PrepareToolCallContextResult {
     const { provider, tool, args, apifyToken, meta, requestHeaders, requestOrigin } = input;
+    // A direct Actor tool's arguments are the Actor input, and a proxied MCP tool's are the remote tool's: either can
+    // hold credentials, so only their key names are logged.
     const toolRedactedArgs =
-        (tool.type === TOOL_TYPE.INTERNAL || tool.type === TOOL_TYPE.ACTOR_SERVER) && tool.redactArgs
-            ? tool.redactArgs(args)
-            : args;
+        tool.type === TOOL_TYPE.ACTOR || tool.type === TOOL_TYPE.ACTOR_MCP
+            ? maskLoggedValues(args, Object.keys(args))
+            : (tool.redactArgs?.(args) ?? args);
 
     if (!provider) {
         const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin });

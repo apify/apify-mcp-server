@@ -1,11 +1,31 @@
-import type { ApifyClientOptions } from 'apify-client';
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+import type {
+    ActorClient,
+    ApifyClientOptions,
+    BuildClient,
+    DatasetClient,
+    KeyValueClientGetRecordOptions,
+    KeyValueStoreClient,
+    LogClient,
+    RequestQueueClient,
+    RequestQueueUserOptions,
+    RunClient,
+    ScheduleClient,
+    TaskClient,
+    UserClient,
+    WebhookClient,
+    WebhookDispatchClient,
+} from 'apify-client';
 import { ApifyClient as _ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { isAxiosError } from 'axios';
 import { ProxyAgent } from 'proxy-agent';
 
 import { API_PUBLIC_BASE_URL, API_PUBLIC_BASE_URL_STAGING, MAX_INLINE_BYTES, STAGING_MCP_HOSTNAME } from './const.js';
+import { InvalidRequestPathError } from './errors.js';
 import type { PaymentHeaders } from './payments/types.js';
+import { assertValidRecordKey, assertValidResourceId } from './utils/apify_resource_id.js';
 
 // Appended to the client's User-Agent via apify-client's userAgentSuffix option.
 const USER_AGENT_ORIGIN = 'Origin/mcp-server';
@@ -33,6 +53,95 @@ const FREE_SOCKET_TIMEOUT_MILLIS = 15_000;
  * when idle. A `ProxyAgent`, like apify-client's own, so `HTTPS_PROXY` and `NO_PROXY` keep working.
  */
 const sharedAgent = new ProxyAgent({ keepAlive: true, timeout: FREE_SOCKET_TIMEOUT_MILLIS, scheduling: 'lifo' });
+
+/** An absolute URL as written, before a URL parser resolves it: its path, then its query and fragment. */
+const RAW_URL_REGEX = /^[a-z][a-z\d+.-]*:\/\/[^/?#\\]*([^?#]*)(.*)$/is;
+
+/**
+ * Set on the config by `sendApifyApiRequest`, whose callers pass a URL with its query string in it. Every other request
+ * comes from apify-client, which puts the query in `params`, so its URL may hold no `?` or `#`.
+ */
+const URL_QUERY_ALLOWED_KEY = 'isUrlQueryAllowed';
+
+type InterceptedRequestConfig = { url?: string; baseURL?: string; [URL_QUERY_ALLOWED_KEY]?: boolean };
+
+/** The URL axios sends to: `url`, joined to `baseURL` unless absolute or protocol-relative, as axios joins them. */
+function resolveRequestUrl({ url, baseURL }: InterceptedRequestConfig): string | undefined {
+    if (url === undefined || !baseURL || /^([a-z][a-z\d+.-]*:)?\/\//i.test(url)) return url;
+    return `${baseURL.replace(/\/+$/, '')}/${url.replace(/^\/+/, '')}`;
+}
+
+/**
+ * Throws unless the request goes to the URL as written: an absolute URL whose path a URL parser leaves unchanged (no
+ * dot segment, also percent-encoded, no backslash, tab or newline, no character it percent-encodes) and, outside
+ * `sendApifyApiRequest`, with no query or fragment. apify-client puts IDs and record keys into the path as given.
+ */
+function assertRequestUrlAsWritten(config: InterceptedRequestConfig): void {
+    const url = resolveRequestUrl(config);
+    const match = url !== undefined && URL.canParse(url) ? RAW_URL_REGEX.exec(url) : null;
+    if (!url || !match) throw new InvalidRequestPathError(`The request URL ${url} is not a valid absolute URL.`);
+    const [, rawPath, queryAndFragment] = match;
+    if (queryAndFragment && !config[URL_QUERY_ALLOWED_KEY]) {
+        throw new InvalidRequestPathError(
+            `The request path ${rawPath}${queryAndFragment} is not valid: a resource ID or record key cannot contain "?" or "#".`,
+        );
+    }
+    if ((rawPath || '/') !== new URL(url).pathname) {
+        throw new InvalidRequestPathError(
+            `The request path ${rawPath} is not valid: it has a "." or ".." segment, a backslash, or a character a URL path cannot hold unencoded.`,
+        );
+    }
+}
+
+/** `store` with each record method checking its key first; apify-client writes the key unencoded. */
+function withRecordKeyChecks(store: KeyValueStoreClient): KeyValueStoreClient {
+    const { getRecord, recordExists, setRecord, deleteRecord, getRecordPublicUrl } = store;
+    return Object.assign(store, {
+        getRecord: async (key: string, options: KeyValueClientGetRecordOptions = {}) =>
+            getRecord.call(store, assertValidRecordKey(key), options),
+        recordExists: async (key: string) => recordExists.call(store, assertValidRecordKey(key)),
+        setRecord: async (...[record, options]: Parameters<KeyValueStoreClient['setRecord']>) =>
+            setRecord.call(store, { ...record, key: assertValidRecordKey(record.key) }, options),
+        deleteRecord: async (key: string) => deleteRecord.call(store, assertValidRecordKey(key)),
+        getRecordPublicUrl: async (key: string) => getRecordPublicUrl.call(store, assertValidRecordKey(key)),
+    });
+}
+
+/** `run` whose default key-value store checks record keys (`withRecordKeyChecks`). */
+function withRunStoreChecks(run: RunClient): RunClient {
+    const { keyValueStore } = run;
+    return Object.assign(run, { keyValueStore: () => withRecordKeyChecks(keyValueStore.call(run)) });
+}
+
+/** `client` whose last run is wrapped by `withRunStoreChecks`. */
+function withLastRunStoreChecks<Client extends ActorClient | TaskClient>(client: Client): Client {
+    const { lastRun } = client;
+    return Object.assign(client, {
+        lastRun: (...args: Parameters<Client['lastRun']>) => withRunStoreChecks(lastRun.apply(client, args)),
+    });
+}
+
+const forwardedHeadersStorage = new AsyncLocalStorage<Record<string, string>>();
+
+/**
+ * Runs `fn` so that every Apify API request made from it, including background work it starts, carries `headers`.
+ * A host uses it to forward headers that came with the token, such as the Console's admin IP proof.
+ * A request the client sends to another origin, such as an Actor's server, does not carry them.
+ */
+export function runWithForwardedApiHeaders<T>(headers: Record<string, string>, fn: () => T): T {
+    return forwardedHeadersStorage.run(headers, fn);
+}
+
+/** The headers of the `runWithForwardedApiHeaders` call the request is made in, when it goes to the API origin. */
+function getForwardedApiHeaders(
+    config: InterceptedRequestConfig,
+    apiBaseUrl: string,
+): Record<string, string> | undefined {
+    const headers = forwardedHeadersStorage.getStore();
+    const url = resolveRequestUrl(config);
+    if (!headers || !url) return undefined;
+    return new URL(url).origin === new URL(apiBaseUrl).origin ? headers : undefined;
+}
 
 type ExtendedApifyClientOptions = Omit<ApifyClientOptions, 'token'> & {
     token?: string | null | undefined;
@@ -87,25 +196,81 @@ export class ApifyClient extends _ApifyClient {
             ...paymentHeaders,
         };
 
+        // Explicit baseUrl wins over env default.
+        const baseUrl = clientOptions.baseUrl ?? getApifyAPIBaseUrl();
+
         super({
             // token null case is handled, we can assert type here
             ...(clientOptions as ApifyClientOptions),
-            // Explicit baseUrl wins over env default.
-            baseUrl: clientOptions.baseUrl ?? getApifyAPIBaseUrl(),
+            baseUrl,
             // Signed storage links (`getRecordPublicUrl`) are handed to clients, so they take the client-facing origin.
             publicBaseUrl: clientOptions.publicBaseUrl ?? getApifyAPIPublicBaseUrl(),
             userAgentSuffix: USER_AGENT_ORIGIN,
             // Per-request agents win over the instance defaults apify-client sets on first use.
             requestInterceptors: [
-                (config) => ({
-                    ...config,
-                    httpAgent: sharedAgent,
-                    httpsAgent: sharedAgent,
-                    headers: { ...config.headers, ...staticHeaders },
-                }),
+                (config) => {
+                    assertRequestUrlAsWritten(config);
+                    return {
+                        ...config,
+                        httpAgent: sharedAgent,
+                        httpsAgent: sharedAgent,
+                        headers: { ...config.headers, ...getForwardedApiHeaders(config, baseUrl), ...staticHeaders },
+                    };
+                },
             ],
         });
         this.requestOrigin = staticHeaders[REQUEST_ORIGIN_HEADER];
+    }
+
+    // apify-client writes these IDs into the request path unencoded; each is checked once here, for every caller.
+    override actor(id: string): ActorClient {
+        return withLastRunStoreChecks(super.actor(assertValidResourceId(id, 'Actor')));
+    }
+
+    override build(id: string): BuildClient {
+        return super.build(assertValidResourceId(id, 'build'));
+    }
+
+    override dataset<Data extends Record<string | number, unknown> = Record<string | number, unknown>>(
+        id: string,
+    ): DatasetClient<Data> {
+        return super.dataset<Data>(assertValidResourceId(id, 'dataset'));
+    }
+
+    override keyValueStore(id: string): KeyValueStoreClient {
+        return withRecordKeyChecks(super.keyValueStore(assertValidResourceId(id, 'key-value store')));
+    }
+
+    override log(buildOrRunId: string): LogClient {
+        return super.log(assertValidResourceId(buildOrRunId, 'build or run'));
+    }
+
+    override requestQueue(id: string, options?: RequestQueueUserOptions): RequestQueueClient {
+        return super.requestQueue(assertValidResourceId(id, 'request queue'), options);
+    }
+
+    override run(id: string): RunClient {
+        return withRunStoreChecks(super.run(assertValidResourceId(id, 'run')));
+    }
+
+    override task(id: string): TaskClient {
+        return withLastRunStoreChecks(super.task(assertValidResourceId(id, 'task')));
+    }
+
+    override schedule(id: string): ScheduleClient {
+        return super.schedule(assertValidResourceId(id, 'schedule'));
+    }
+
+    override user(id?: string): UserClient {
+        return super.user(id === undefined ? id : assertValidResourceId(id, 'user'));
+    }
+
+    override webhook(id: string): WebhookClient {
+        return super.webhook(assertValidResourceId(id, 'webhook'));
+    }
+
+    override webhookDispatch(id: string): WebhookDispatchClient {
+        return super.webhookDispatch(assertValidResourceId(id, 'webhook dispatch'));
     }
 }
 
@@ -125,7 +290,12 @@ export async function sendApifyApiRequest(
         'url' | 'method' | 'params' | 'data' | 'headers' | 'responseType' | 'signal' | 'maxRedirects'
     >,
 ): Promise<AxiosResponse<unknown>> {
-    return apifyClient.httpClient.axios.request<unknown>({ ...config, maxContentLength: MAX_INLINE_BYTES });
+    return apifyClient.httpClient.axios.request<unknown>({
+        ...config,
+        maxContentLength: MAX_INLINE_BYTES,
+        // Callers pass the query in the URL; checked before the call, see above.
+        [URL_QUERY_ALLOWED_KEY]: true,
+    } as AxiosRequestConfig);
 }
 
 /** The mid-consumption abort axios raises when a body crosses `maxContentLength`. */
