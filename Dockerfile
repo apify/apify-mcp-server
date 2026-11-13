@@ -34,8 +34,10 @@ WORKDIR /app
 # - `--legacy` opts out of pnpm v10+'s `inject-workspace-packages` requirement; the
 #   server doesn't depend on any workspace package at runtime, so the legacy path is
 #   the correct one (see ERR_PNPM_DEPLOY_NONINJECTED_WORKSPACE).
+# - `--node-linker=hoisted` installs the server's own peer dependencies (`@apify/log`):
+#   here the server is the app, and the default isolated layout leaves them out.
 COPY --from=builder /app /build
-RUN cd /build && pnpm deploy --legacy --filter "@apify/actors-mcp-server" --prod /app && rm -rf /build
+RUN cd /build && pnpm deploy --legacy --filter "@apify/actors-mcp-server" --prod --node-linker=hoisted /app && rm -rf /build
 COPY --from=builder /app/dist ./dist
 # server_card.ts reads server.json at load (resolved as dist/../server.json).
 COPY server.json ./
