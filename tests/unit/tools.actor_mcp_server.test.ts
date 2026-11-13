@@ -100,13 +100,15 @@ function waitForAbort(signal: AbortSignal): Promise<{ content: []; tools: [] }> 
 /**
  * The Actor's MCP server, by path: `/mcp` serves `REMOTE_RESULTS` and `REMOTE_TOOL_PAGES` (an unknown tool or
  * cursor is a JSON-RPC error), `/mcp-broken-pages` fails the second page, `/mcp-endless` never runs out of
- * cursors, and `/mcp-slow` answers only once the request is cancelled.
+ * cursors, `/mcp-slow` answers only once the request is cancelled, and `/mcp-unknown-tool` rejects every tool
+ * name with an internal error.
  */
 function createRemoteServer(path: string | undefined): Server {
     const server = new Server({ name: 'example-mcp-server', version: '1.0.0' }, { capabilities: { tools: {} } });
     server.setRequestHandler(CallToolRequestSchema, async ({ params }, extra) => {
         remoteCalls.push({ name: params.name, arguments: params.arguments });
         if (path === '/mcp-slow') return waitForAbort(extra.signal);
+        if (path === '/mcp-unknown-tool') throw new McpError(ErrorCode.InternalError, `Unknown tool: ${params.name}`);
         const result = REMOTE_RESULTS[params.name];
         if (!result) throw new McpError(ErrorCode.InvalidParams, `Tool ${params.name} not found`);
         return result;
@@ -372,6 +374,48 @@ describe('call-actor-mcp-tool', () => {
             failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
         });
     });
+
+    it.each([true, false])('suggests listing remote tools only when served (loaded=%s)', async (isToolListLoaded) => {
+        vi.spyOn(Client.prototype, 'callTool').mockRejectedValueOnce(
+            new McpError(ErrorCode.InternalError, 'Unknown tool: fetch-actor-details'),
+        );
+        const context = stubToolCallContext(
+            { actor: MCP_ACTOR, tool: 'fetch-actor-details' },
+            new ApifyClient({ token: TOKEN }),
+            { loadedToolNames: isToolListLoaded ? [HELPER_TOOLS.ACTOR_MCP_TOOL_LIST] : [] },
+        );
+
+        const result = await executeCallActorMcpTool(context);
+
+        expectSoftFailInvalidInput(result);
+        const text = JSON.stringify(result.content);
+        expect(text.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST)).toBe(isToolListLoaded);
+    });
+
+    it('returns a user error when the remote server throws the unknown tool rejection as an McpError', async () => {
+        // The SDK client prefixes the message of a thrown McpError a second time.
+        seedActor('apify/strict-mcp-server', { definition: { webServerMcpPath: '/mcp-unknown-tool' } });
+
+        const result = await execute(executeCallActorMcpTool, { tool: 'add', actor: 'apify/strict-mcp-server' });
+
+        expectSoftFailInvalidInput(result);
+    });
+
+    it.each(['Backend failed with unknown tool: add', 'Unknown tool: backend-search'])(
+        'preserves a remote failure that does not reject the requested tool: %s',
+        async (message) => {
+            vi.spyOn(Client.prototype, 'callTool').mockRejectedValueOnce(
+                new McpError(ErrorCode.InternalError, message),
+            );
+
+            const result = await execute(executeCallActorMcpTool, { tool: 'add' });
+
+            expect(result.toolTelemetry).toMatchObject({
+                toolStatus: TOOL_STATUS.FAILED,
+                failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
+            });
+        },
+    );
 
     it('rejects a tool name longer than the MCP limit without connecting', async () => {
         await expect(
