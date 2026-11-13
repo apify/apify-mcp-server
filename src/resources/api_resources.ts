@@ -239,6 +239,10 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
         loadedToolNames: [],
     });
     if (refusal) throw new InvalidParamsError(`Failed to read ${uri}: ${refusal}`, { uri });
+    // `pathname` has its dot segments resolved, so the check applies to the path the request goes to.
+    if (!pathname.startsWith('/v2/')) {
+        throw new InvalidParamsError(`Failed to read ${uri}: only paths under /v2/ are readable.`, { uri });
+    }
 
     let response: { data: unknown; headers: Record<string, unknown>; status: number; statusText: string };
     try {

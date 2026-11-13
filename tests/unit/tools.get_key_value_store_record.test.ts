@@ -5,7 +5,9 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 
+import { ApifyClient } from '../../src/apify_client.js';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
+import { InvalidRequestPathError } from '../../src/errors.js';
 import { getKeyValueStoreRecord } from '../../src/tools/storage/get_key_value_store_record.js';
 import { keyValueStoreRecordOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -491,5 +493,22 @@ describe('get-key-value-store-record with a bare store name', () => {
         expect((content[0] as { uri: string }).uri).toBe(
             'https://api.apify.com/v2/key-value-stores/WkzbQMuFYuamGv3YF/records/big.png?signature=signed',
         );
+    });
+});
+
+describe('get-key-value-store-record with an invalid key or store name', () => {
+    it.each([
+        ['key', { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'OUTPUT?x=1' }, '"OUTPUT?x=1"'],
+        ['store name', { keyValueStoreId: 'a?x=1', recordKey: 'OUTPUT' }, '"a?x=1"'],
+    ])('sends no request and fails with an input error that names the %s as given', async (_label, args, named) => {
+        const client = new ApifyClient({ token: 'test-token', baseUrl: 'https://api.apify.com', maxRetries: 0 });
+        const adapter = vi.fn();
+        client.httpClient.axios.defaults.adapter = adapter;
+
+        const call = (getKeyValueStoreRecord as HelperTool).call(stubToolCallContext(args, client));
+
+        await expect(call).rejects.toThrow(InvalidRequestPathError);
+        await expect(call).rejects.toThrow(named);
+        expect(adapter).not.toHaveBeenCalled();
     });
 });

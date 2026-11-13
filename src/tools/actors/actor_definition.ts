@@ -28,16 +28,17 @@ const BUILD_NUMBER_PATTERN = /^\d+\.\d+\.\d+$/;
  * @param {string} actorIdOrName - Actor ID or Actor full name.
  * @param {ApifyClient} apifyClient - The Apify client instance.
  * @param {number} limit - Truncate the README to this limit.
- * @returns {Promise<ActorDefinitionWithInfo | null>} - null when the Actor is not found (API 404 or 400) or its
- * default build has no definition. Other API failures, including 401 and 403, are thrown; the caller logs them.
+ * @returns {Promise<ActorDefinitionWithInfo | null>} - null when the Actor is not found (API 404 or 400, or a name
+ * the client refuses) or its default build has no definition. Other API failures, including 401 and 403, are thrown;
+ * the caller logs them.
  */
 export async function getActorDefinition(
     actorIdOrName: string,
     apifyClient: ApifyClient,
     limit: number = ACTOR_README_MAX_LENGTH,
 ): Promise<ActorDefinitionWithInfo | null> {
-    const actorClient = apifyClient.actor(actorIdOrName);
     try {
+        const actorClient = apifyClient.actor(actorIdOrName);
         const actor = await actorClient.get();
         if (!actor) {
             return null;
