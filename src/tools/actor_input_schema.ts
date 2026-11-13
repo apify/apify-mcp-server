@@ -27,11 +27,12 @@ type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 export const MAX_UNTRUSTED_SCHEMA_BYTES = 262_144;
 
 /**
- * Bytes alone do not bound the compile time, which grows with the number of subschemas Ajv generates code for;
- * a schema that a `$ref` points to counts again at every place Ajv compiles it. A generous backstop: the
- * largest input schema of a public Actor in the Apify Store (2026-10) has 784 subschemas.
+ * The compile time and the memory of a validator grow with the code Ajv generates for it, not with the bytes of
+ * its schema. The code is estimated from the schema before Ajv runs and measured when Ajv has generated it;
+ * neither may exceed this. A generous backstop: the validator of the largest input schema of a public Actor in
+ * the Apify Store (2026-10) is estimated at 2.9 MB and measures 1.3 MB.
  */
-export const MAX_UNTRUSTED_SUBSCHEMAS = 2000;
+export const MAX_UNTRUSTED_VALIDATOR_CODE_BYTES = 6_291_456;
 
 /**
  * The generated validator builds the path of a failing value from every level above it, so its size grows
@@ -45,6 +46,21 @@ export const MAX_UNTRUSTED_SUBSCHEMA_DEPTH = 32;
  * of a public Actor in the Apify Store (2026-10) has 1,158 values.
  */
 export const MAX_UNTRUSTED_ENUM_VALUES = 3000;
+
+/**
+ * A generated validator checks the properties of an object one inside another, and a JavaScript engine can
+ * only compile code that nests so deep; how deep depends on the Node.js version. This limit is below what
+ * Node.js 22, 24 and 26 compile, so a schema loads on all of them or on none. The validator of the widest input
+ * schema of a public Actor in the Apify Store (2026-10) nests 457 deep.
+ */
+export const MAX_UNTRUSTED_VALIDATOR_NESTING = 800;
+
+/**
+ * A schema can apply several references to one and the same value, and the schemas they point to can do so
+ * again; this limits how many referenced schemas one value is checked against in all. The input schemas of
+ * public Actors in the Apify Store (2026-10) do not use references this way.
+ */
+export const MAX_UNTRUSTED_SAME_VALUE_SCHEMAS = 1000;
 
 /** Keywords whose value is data: an object inside it is not a subschema, whatever it looks like. */
 const DATA_KEYWORDS = new Set(['default', 'prefill', 'enum', 'example', 'examples', 'const']);
@@ -60,6 +76,26 @@ const SUBSCHEMA_MAP_KEYWORDS = new Set([
 /** Keywords whose subschemas Ajv compiles where they are referenced, not where they stand. */
 const DEFINITION_KEYWORDS = new Set(['definitions', '$defs']);
 const SUBSCHEMA_LIST_KEYWORDS = new Set(['allOf', 'anyOf', 'oneOf', 'items', 'prefixItems']);
+/** Keywords whose subschemas check the same value as the schema they stand in. */
+const SAME_VALUE_KEYWORDS = ['allOf', 'anyOf', 'oneOf', 'not', 'if', 'then', 'else', 'dependencies'];
+/** The keywords Ajv generates code for, read from Ajv so that the list follows its version. */
+const CODE_KEYWORDS = new Set(createAjv().RULES.rules.flatMap((group) => group.rules.map((rule) => rule.keyword)));
+
+/** At most this much code checks one keyword and reports its error, without the paths in the error. */
+const KEYWORD_CODE_BYTES = 1024;
+/** The same for a keyword whose value is a number, a boolean or a string, except `type` with its conversions. */
+const SCALAR_KEYWORD_CODE_BYTES = 512;
+/** At most this much code stands for one listed value: a required name, a type, a property name, an enum value. */
+const LISTED_VALUE_CODE_BYTES = 256;
+/** Ajv checks a longer `required` or `enum` list in a loop instead of writing every value into the code. */
+const LISTED_VALUES_IN_CODE = 200;
+/**
+ * Ajv joins the checks of the listed values into one expression, one value at a time, so a long list counts
+ * for more than its length: the cube of the length, divided by this, is added to its code.
+ */
+const LISTED_VALUES_JOIN_DIVISOR = 512;
+/** The code that adds an array index or a property name unknown until run time to a path. */
+const PATH_STEP_CODE_BYTES = 64;
 
 /**
  * V8 may drop a compiled function that was not called for a while and compile it again on its next call, from
@@ -68,17 +104,80 @@ const SUBSCHEMA_LIST_KEYWORDS = new Set(['allOf', 'anyOf', 'oneOf', 'items', 'pr
 const VALIDATOR_CHECK_STACK_FRAMES = 200;
 
 const UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE = 1000;
+/**
+ * V8 keeps the code of every cached validator and several times as much memory for what it compiled from it.
+ * The validators of 1,000 typical public Actors have about 44 MB of code together.
+ */
+const UNTRUSTED_VALIDATOR_CACHE_MAX_CODE_BYTES = 64 * 1024 * 1024;
 // A failed compilation costs as much as a successful one, so the cache remembers its error too.
 const untrustedValidatorCache = new LruCache<
     { validate: ValidateFunction<unknown>; schema: object } | { compileError: unknown }
 >({
     maxLength: UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE,
 });
+/** The code of the validators added to the cache since it was last emptied; never less than what it holds. */
+let cachedValidatorCodeBytes = 0;
 
 const isSubschema = (value: unknown): boolean =>
     typeof value === 'boolean' || (typeof value === 'object' && value !== null && !Array.isArray(value));
 
-type ChildSubschema = { subschema: unknown; isCompiled: boolean };
+/**
+ * The code one step of a path adds to every error reported below it: the error holds the path of its value,
+ * where Ajv writes a name as a JSON string, and the path of its keyword, where the name is a URI fragment.
+ * Without a `name` the step is an array index or a property name unknown until run time.
+ */
+function getPathStepCodeBytes(keyword: string, name?: string): number {
+    if (name === undefined) return 2 * keyword.length + PATH_STEP_CODE_BYTES;
+    const escapedName = name.replace(/[~/]/g, '~0');
+    let fragmentBytes;
+    try {
+        fragmentBytes = encodeURIComponent(escapedName).length;
+    } catch {
+        // A name with half of a surrogate pair has no URI form, and Ajv fails to compile its schema.
+        fragmentBytes = 0;
+    }
+    return 2 * keyword.length + JSON.stringify(escapedName).length + fragmentBytes + 4;
+}
+
+/**
+ * An upper estimate of the code Ajv generates for the keywords of one subschema, without its subschemas:
+ * each keyword reports an error that holds `pathCodeBytes` of paths, and each listed value is written out.
+ */
+function estimateCodeBytes(subschema: unknown, pathCodeBytes: number): number {
+    if (subschema === false) return SCALAR_KEYWORD_CODE_BYTES + pathCodeBytes;
+    if (typeof subschema !== 'object' || subschema === null) return 0;
+    let codeBytes = 0;
+    const addListedValues = (count: number): void => {
+        codeBytes += count * LISTED_VALUE_CODE_BYTES + count ** 3 / LISTED_VALUES_JOIN_DIVISOR;
+    };
+    for (const [keyword, value] of Object.entries(subschema)) {
+        if (!CODE_KEYWORDS.has(keyword)) continue;
+
+        if (typeof value !== 'object' || value === null) {
+            codeBytes += (keyword === 'type' ? KEYWORD_CODE_BYTES : SCALAR_KEYWORD_CODE_BYTES) + pathCodeBytes;
+            continue;
+        }
+        // The code reads a list or an object from the schema, by the path of its keyword, up to twice.
+        codeBytes += KEYWORD_CODE_BYTES + 3 * pathCodeBytes;
+        if (Array.isArray(value)) {
+            addListedValues(Math.min(value.length, LISTED_VALUES_IN_CODE));
+        } else if (keyword === 'properties' || keyword === 'dependencies') {
+            const members = Object.values(value);
+            codeBytes += members.length * LISTED_VALUE_CODE_BYTES;
+            for (const member of members) {
+                // The names a property depends on are checked, and reported, apart from the other properties,
+                // and Ajv has no loop for them.
+                if (Array.isArray(member)) {
+                    codeBytes += KEYWORD_CODE_BYTES + 3 * pathCodeBytes;
+                    addListedValues(member.length);
+                }
+            }
+        }
+    }
+    return codeBytes;
+}
+
+type ChildSubschema = { subschema: unknown; isCompiled: boolean; pathStepCodeBytes: number };
 
 /** The subschemas directly inside a schema; `default`, `enum` and other data values hold none. */
 function getChildSubschemas(schema: object): ChildSubschema[] {
@@ -88,11 +187,16 @@ function getChildSubschemas(schema: object): ChildSubschema[] {
 
         const isCompiled = !DEFINITION_KEYWORDS.has(keyword);
         if (SUBSCHEMA_MAP_KEYWORDS.has(keyword) || (SUBSCHEMA_LIST_KEYWORDS.has(keyword) && Array.isArray(value))) {
-            for (const member of Object.values(value)) {
-                if (isSubschema(member)) childSubschemas.push({ subschema: member, isCompiled });
+            for (const [name, member] of Object.entries(value)) {
+                if (!isSubschema(member)) continue;
+                childSubschemas.push({
+                    subschema: member,
+                    isCompiled,
+                    pathStepCodeBytes: getPathStepCodeBytes(keyword, name),
+                });
             }
         } else if (!Array.isArray(value)) {
-            childSubschemas.push({ subschema: value, isCompiled });
+            childSubschemas.push({ subschema: value, isCompiled, pathStepCodeBytes: getPathStepCodeBytes(keyword) });
         }
     }
     return childSubschemas;
@@ -102,44 +206,69 @@ function getChildSubschemas(schema: object): ChildSubschema[] {
 type SchemaReferences = {
     /** Objects with a `$ref` somewhere inside. Ajv compiles such a schema once; it copies any other one. */
     referenceHolders: Set<object>;
+    /** The value of every `$ref` keyword. */
+    references: Set<string>;
     /** A nested `$id` can change what any reference points to. */
     hasNestedId: boolean;
     /**
-     * How many times the references can make Ajv compile the whole schema at most, wherever they point: each
-     * can start one more compilation, and each compilation can copy any part of the schema in at each reference.
+     * The validator code and the schema copies at most, wherever the references point: each reference can start
+     * one more compilation, and each compilation can copy any part of the schema in at each reference.
      */
+    worstCaseCodeBytes: number;
     worstCaseCopies: number;
-    /** Objects and booleans in the schema: no part of it has more subschemas. */
-    valueCount: number;
 };
 
 function findSchemaReferences(schema: object): SchemaReferences {
     const referenceHolders = new Set<object>();
+    const references = new Set<string>();
     const parents = new Map<object, object>();
+    const pathCodeBytes = new Map<object, number>([[schema, 0]]);
+    const values: object[] = [];
     let hasNestedId = false;
-    let valueCount = 0;
+    let falseSubschemaCount = 0;
     let referenceCount = 0;
+    let longestPathCodeBytes = 0;
     const pendingValues: object[] = [schema];
     for (let value = pendingValues.pop(); value !== undefined; value = pendingValues.pop()) {
-        valueCount++;
+        values.push(value);
+        const valuePathCodeBytes = pathCodeBytes.get(value) ?? 0;
+        longestPathCodeBytes = Math.max(longestPathCodeBytes, valuePathCodeBytes);
         if (value !== schema && '$id' in value && typeof value.$id === 'string') hasNestedId = true;
         if ('$ref' in value) {
             referenceCount++;
+            if (typeof value.$ref === 'string') {
+                references.add(value.$ref);
+                longestPathCodeBytes = Math.max(
+                    longestPathCodeBytes,
+                    valuePathCodeBytes + getPathStepCodeBytes('$ref', value.$ref),
+                );
+            }
             for (let holder: object | undefined = value; holder && !referenceHolders.has(holder); ) {
                 referenceHolders.add(holder);
                 holder = parents.get(holder);
             }
         }
-        for (const member of Object.values(value)) {
+        for (const [name, member] of Object.entries(value)) {
             if (typeof member === 'object' && member !== null) {
                 parents.set(member, value);
+                pathCodeBytes.set(member, valuePathCodeBytes + getPathStepCodeBytes('', name));
                 pendingValues.push(member);
-            } else if (typeof member === 'boolean') {
-                valueCount++;
+            } else if (member === false) {
+                falseSubschemaCount++;
             }
         }
     }
-    return { referenceHolders, hasNestedId, worstCaseCopies: (1 + referenceCount) ** 2, valueCount };
+    // A copied schema reports its errors with the path to its reference in front of its own.
+    let codeBytes = estimateCodeBytes(false, 2 * longestPathCodeBytes) * falseSubschemaCount;
+    for (const value of values) codeBytes += estimateCodeBytes(value, 2 * longestPathCodeBytes);
+    const worstCaseCopies = (1 + referenceCount) ** 2;
+    return {
+        referenceHolders,
+        references,
+        hasNestedId,
+        worstCaseCodeBytes: codeBytes * worstCaseCopies,
+        worstCaseCopies,
+    };
 }
 
 /** The value a `#/...` reference points to, found the way Ajv finds it. */
@@ -147,7 +276,13 @@ function getReferencedValue(schema: object, reference: string): unknown {
     let value: unknown = schema;
     for (const segment of reference.slice(2).split('/')) {
         if (typeof value !== 'object' || value === null) return undefined;
-        const key = decodeURIComponent(segment).replace(/~1/g, '/').replace(/~0/g, '~');
+        let key;
+        try {
+            key = decodeURIComponent(segment).replace(/~1/g, '/').replace(/~0/g, '~');
+        } catch {
+            // Not a URI fragment; Ajv fails to compile such a reference.
+            return undefined;
+        }
         value = (value as Record<string, unknown>)[key];
     }
     return value;
@@ -186,10 +321,10 @@ function getSchemasCompiledForReference(
 }
 
 /**
- * Throws SchemaTooLargeError on a schema over the byte, the subschema, the nesting or the enum limit. The bytes
- * and the subschemas are counted as Ajv compiles them: a referenced schema counts at each place it is compiled.
+ * Throws SchemaTooLargeError on a schema over the byte, the validator code, the nesting or the enum limit. The
+ * bytes and the code are counted as Ajv compiles them: a referenced schema counts at each place it is compiled.
  */
-function validateSchemaSize(schema: object, serialized: string): void {
+function validateSchemaSize(schema: object, serialized: string, schemaReferences: SchemaReferences | undefined): void {
     let schemaBytes = Buffer.byteLength(serialized);
     const addSchemaBytes = (bytes: number): void => {
         schemaBytes += bytes;
@@ -198,29 +333,34 @@ function validateSchemaSize(schema: object, serialized: string): void {
         }
     };
     addSchemaBytes(0);
-    // In serialized JSON only a key is a string followed by a colon.
-    let references = serialized.includes('"$ref":') ? findSchemaReferences(schema) : undefined;
+    let references = schemaReferences;
     const compiledReferences = new Set<string>();
     const referencedSchemaBytes = new Map<unknown, number>();
-    let subschemaCount = 0;
-    // `isCompiled` is false inside a definition: Ajv compiles it where it is referenced, not where it stands.
-    const pendingSubschemas: (ChildSubschema & { depth: number })[] = [
-        { subschema: schema, depth: 0, isCompiled: true },
-    ];
-    for (let pending = pendingSubschemas.pop(); pending !== undefined; pending = pendingSubschemas.pop()) {
-        const { subschema, depth, isCompiled } = pending;
-        if (isCompiled) subschemaCount++;
-        if (subschemaCount > MAX_UNTRUSTED_SUBSCHEMAS) {
-            throw new SchemaTooLargeError(MAX_UNTRUSTED_SUBSCHEMAS, 'subschemas');
+    let validatorCodeBytes = 0;
+    const addValidatorCodeBytes = (bytes: number): void => {
+        validatorCodeBytes += bytes;
+        if (validatorCodeBytes > MAX_UNTRUSTED_VALIDATOR_CODE_BYTES) {
+            throw new SchemaTooLargeError(MAX_UNTRUSTED_VALIDATOR_CODE_BYTES, 'bytes of validator code');
         }
+    };
+    // `isCompiled` is false inside a definition: Ajv compiles it where it is referenced, not where it stands.
+    const pendingSubschemas: (Omit<ChildSubschema, 'pathStepCodeBytes'> & { depth: number; pathCodeBytes: number })[] =
+        [{ subschema: schema, depth: 0, pathCodeBytes: 0, isCompiled: true }];
+    for (let pending = pendingSubschemas.pop(); pending !== undefined; pending = pendingSubschemas.pop()) {
+        const { subschema, depth, pathCodeBytes, isCompiled } = pending;
+        if (isCompiled) addValidatorCodeBytes(estimateCodeBytes(subschema, pathCodeBytes));
         if (isCompiled && depth > MAX_UNTRUSTED_SUBSCHEMA_DEPTH) {
             throw new SchemaTooLargeError(MAX_UNTRUSTED_SUBSCHEMA_DEPTH, 'nested levels');
         }
         if (typeof subschema !== 'object' || subschema === null) continue;
 
         // Ajv checks the schema itself too, definitions included, so this limit holds for all of it.
-        if ('enum' in subschema && Array.isArray(subschema.enum) && subschema.enum.length > MAX_UNTRUSTED_ENUM_VALUES) {
-            throw new SchemaTooLargeError(MAX_UNTRUSTED_ENUM_VALUES, 'enum values');
+        if ('enum' in subschema && Array.isArray(subschema.enum)) {
+            if (subschema.enum.length > MAX_UNTRUSTED_ENUM_VALUES) {
+                throw new SchemaTooLargeError(MAX_UNTRUSTED_ENUM_VALUES, 'enum values');
+            }
+            // Comparing the pairs of values takes time like compiling code does: about half a byte for a pair.
+            addValidatorCodeBytes(subschema.enum.length ** 2 / 2);
         }
         if (references && isCompiled && '$ref' in subschema && typeof subschema.$ref === 'string') {
             const referencedSchemas = getSchemasCompiledForReference(
@@ -231,36 +371,133 @@ function validateSchemaSize(schema: object, serialized: string): void {
             );
             if (referencedSchemas === undefined) {
                 // The schema has to fit with the worst case for its references, which are not followed any more.
-                if (references.valueCount * references.worstCaseCopies > MAX_UNTRUSTED_SUBSCHEMAS) {
-                    throw new SchemaTooLargeError(MAX_UNTRUSTED_SUBSCHEMAS, 'subschemas');
+                if (references.worstCaseCodeBytes > MAX_UNTRUSTED_VALIDATOR_CODE_BYTES) {
+                    throw new SchemaTooLargeError(MAX_UNTRUSTED_VALIDATOR_CODE_BYTES, 'bytes of validator code');
                 }
                 addSchemaBytes(schemaBytes * (references.worstCaseCopies - 1));
                 references = undefined;
             }
-            // A referenced schema takes the place of its reference.
+            // A referenced schema takes the place of its reference, and reports the reference in its errors.
             for (const referencedSchema of referencedSchemas ?? []) {
                 const bytes =
                     referencedSchemaBytes.get(referencedSchema) ??
                     Buffer.byteLength(JSON.stringify(referencedSchema) ?? '');
                 referencedSchemaBytes.set(referencedSchema, bytes);
                 addSchemaBytes(bytes);
-                pendingSubschemas.push({ subschema: referencedSchema, depth, isCompiled: true });
+                pendingSubschemas.push({
+                    subschema: referencedSchema,
+                    depth,
+                    pathCodeBytes: pathCodeBytes + getPathStepCodeBytes('$ref', subschema.$ref),
+                    isCompiled: true,
+                });
             }
         }
         for (const child of getChildSubschemas(subschema)) {
-            pendingSubschemas.push({ ...child, depth: depth + 1, isCompiled: isCompiled && child.isCompiled });
+            pendingSubschemas.push({
+                subschema: child.subschema,
+                depth: depth + 1,
+                pathCodeBytes: pathCodeBytes + child.pathStepCodeBytes,
+                isCompiled: isCompiled && child.isCompiled,
+            });
         }
     }
+}
+
+/** The `$ref` values a schema applies to the value it checks itself, not to a property or an item of it. */
+function getSameValueReferences(schema: object): string[] {
+    const references: string[] = [];
+    const pendingSubschemas: unknown[] = [schema];
+    while (pendingSubschemas.length > 0) {
+        const subschema = pendingSubschemas.pop();
+        if (typeof subschema !== 'object' || subschema === null) continue;
+
+        const keywords = subschema as Record<string, unknown>;
+        if (typeof keywords.$ref === 'string') references.push(keywords.$ref);
+        for (const keyword of SAME_VALUE_KEYWORDS) {
+            const value = keywords[keyword];
+            if (keyword === 'dependencies' || Array.isArray(value))
+                pendingSubschemas.push(...Object.values(value ?? {}));
+            else pendingSubschemas.push(value);
+        }
+    }
+    return references;
+}
+
+/**
+ * Follows the references a schema applies to one and the same value, such as the members of an `allOf`.
+ * Throws an Error when they lead back to where they started: such a schema describes no value. Throws
+ * SchemaTooLargeError when one value is checked against more referenced schemas than the limit.
+ * A schema that refers to itself for a property or for the items of an array, like a tree, moves into the data
+ * and is fine.
+ */
+function assertReferencesEnd(schema: object, { references, hasNestedId }: SchemaReferences): void {
+    // A nested `$id` can change what any reference points to; such a schema is left to Ajv.
+    if (hasNestedId) return;
+    // The referenced schemas one value is checked against in a schema; `undefined` while they are being counted.
+    const sameValueSchemaCounts = new Map<unknown, number | undefined>();
+    // Starts at the whole schema and at every schema a reference points to.
+    const pendingSchemas = [{ references: ['#', ...references], nextIndex: 0, target: undefined as unknown, count: 0 }];
+    for (let pending = pendingSchemas.at(-1); pending !== undefined; pending = pendingSchemas.at(-1)) {
+        const reference = pending.references[pending.nextIndex++];
+        if (reference === undefined) {
+            sameValueSchemaCounts.set(pending.target, pending.count);
+            pendingSchemas.pop();
+            const referrer = pendingSchemas.at(-1);
+            // The starting points are not one value.
+            if (referrer && referrer.target !== undefined) referrer.count += 1 + pending.count;
+            if (pending.count > MAX_UNTRUSTED_SAME_VALUE_SCHEMAS) {
+                throw new SchemaTooLargeError(MAX_UNTRUSTED_SAME_VALUE_SCHEMAS, 'referenced schemas for one value');
+            }
+            continue;
+        }
+        let target: unknown;
+        if (reference === '#' || reference === '#/') target = schema;
+        else if (reference.startsWith('#/')) target = getReferencedValue(schema, reference);
+        if (typeof target !== 'object' || target === null) continue;
+
+        if (!sameValueSchemaCounts.has(target)) {
+            sameValueSchemaCounts.set(target, undefined);
+            pendingSchemas.push({ references: getSameValueReferences(target), nextIndex: 0, target, count: 0 });
+            continue;
+        }
+        const count = sameValueSchemaCounts.get(target);
+        if (count === undefined) {
+            throw new Error('Input schema has a reference that leads back to itself without reading any input');
+        }
+        if (pending.target !== undefined) pending.count += 1 + count;
+    }
+}
+
+/** How deep the brackets of a piece of generated code nest; brackets inside its string literals do not count. */
+function getCodeNesting(code: string): number {
+    let nesting = 0;
+    let deepestNesting = 0;
+    for (let index = 0; index < code.length; index++) {
+        const character = code[index];
+        if (character === '"') {
+            // Ajv writes every string as a JSON string.
+            for (index++; index < code.length && code[index] !== '"'; index++) if (code[index] === '\\') index++;
+        } else if (character === '{' || character === '(' || character === '[') {
+            deepestNesting = Math.max(deepestNesting, ++nesting);
+        } else if (character === '}' || character === ')' || character === ']') {
+            nesting--;
+        }
+    }
+    return deepestNesting;
 }
 
 /** Calls `run` from `frames` calls deeper in the stack. */
 const callFromDeeperStack = (frames: number, run: () => void): void =>
     frames > 0 ? callFromDeeperStack(frames - 1, run) : run();
 
+/** Defined once, so that a waiting promise keeps no validator alive. */
+const ignoreRejection = (): void => undefined;
+
 /**
  * Throws a RangeError when a compiled validator cannot run. Ajv validates the subschemas of a schema one inside
  * another, V8 compiles a function on its first call, and it cannot compile one whose blocks nest too deep
- * ("Maximum call stack size exceeded"): without this check such a schema compiles and every validation fails.
+ * ("Maximum call stack size exceeded"). The nesting limit keeps every schema away from that; this is the last
+ * line of defence, for an engine that can compile less than the ones the limit was measured on.
  * A schema Ajv did not copy in at its `$ref` has a validator function of its own.
  */
 function assertValidatorRuns(validate: ValidateFunction<unknown>): void {
@@ -270,8 +507,10 @@ function assertValidatorRuns(validate: ValidateFunction<unknown>): void {
     }
     callFromDeeperStack(VALIDATOR_CHECK_STACK_FRAMES, () => {
         for (const validator of validators) {
+            if (typeof validator !== 'function') continue;
             // An `$async` schema returns a promise that rejects on invalid data.
-            if (typeof validator === 'function') Promise.resolve(validator({})).catch(() => undefined);
+            const result: unknown = validator({});
+            if (result instanceof Promise) result.catch(ignoreRejection);
         }
     });
 }
@@ -286,8 +525,11 @@ export function compileUntrustedSchema<T extends object>(
     schema: T,
 ): { validate: ValidateFunction<unknown>; schema: T } {
     const serialized = JSON.stringify(schema);
+    // In serialized JSON only a key is a string followed by a colon.
+    const references = serialized.includes('"$ref":') ? findSchemaReferences(schema) : undefined;
     // Ajv codegen is synchronous; an oversized untrusted schema would freeze the event loop.
-    validateSchemaSize(schema, serialized);
+    validateSchemaSize(schema, serialized, references);
+    if (references) assertReferencesEnd(schema, references);
 
     const cacheKey = createHash('sha256').update(serialized).digest('base64');
     const cached = untrustedValidatorCache.get(cacheKey);
@@ -295,17 +537,46 @@ export function compileUntrustedSchema<T extends object>(
     // A hit holds a schema with the same content as `schema`, so it is still a T.
     if (cached) return cached as { validate: ValidateFunction<unknown>; schema: T };
 
+    let codeBytes = 0;
+    // Ajv hands over the code of each validator function before V8 parses it.
+    const checkCode = (code: string): void => {
+        codeBytes += code.length;
+        if (codeBytes > MAX_UNTRUSTED_VALIDATOR_CODE_BYTES) {
+            throw new SchemaTooLargeError(MAX_UNTRUSTED_VALIDATOR_CODE_BYTES, 'bytes of validator code');
+        }
+        if (getCodeNesting(code) > MAX_UNTRUSTED_VALIDATOR_NESTING) {
+            throw new SchemaTooLargeError(MAX_UNTRUSTED_VALIDATOR_NESTING, 'nested blocks of validator code');
+        }
+    };
     try {
-        const compiled = { validate: createAjv().compile(schema), schema };
+        const compiled = { validate: createAjv(checkCode).compile(schema), schema };
         assertValidatorRuns(compiled.validate);
-        untrustedValidatorCache.add(cacheKey, compiled);
+        addToValidatorCache(cacheKey, compiled, codeBytes);
         return compiled;
     } catch (error) {
-        // Ajv and V8 both run out of stack on a schema that nests too deep.
-        const compileError = error instanceof RangeError ? new SchemaTooLargeError() : error;
-        untrustedValidatorCache.add(cacheKey, { compileError });
-        throw compileError;
+        // Ajv and V8 both run out of stack on a schema that nests too deep. How deep depends on the Node.js
+        // version and on the stack of this call, so that answer is not kept; every other one follows from the schema.
+        if (error instanceof RangeError) throw new SchemaTooLargeError();
+        // Until its stack is read, an error keeps what the functions on its stack worked with: here the code Ajv
+        // had generated. Reading it leaves only the text.
+        if (error instanceof Error) void error.stack;
+        addToValidatorCache(cacheKey, { compileError: error }, 0);
+        throw error;
     }
+}
+
+/** Empties the cache first when the code of its validators would exceed what the process can hold. */
+function addToValidatorCache(
+    cacheKey: string,
+    entry: { validate: ValidateFunction<unknown>; schema: object } | { compileError: unknown },
+    codeBytes: number,
+): void {
+    if (cachedValidatorCodeBytes + codeBytes > UNTRUSTED_VALIDATOR_CACHE_MAX_CODE_BYTES) {
+        untrustedValidatorCache.clear();
+        cachedValidatorCodeBytes = 0;
+    }
+    cachedValidatorCodeBytes += codeBytes;
+    untrustedValidatorCache.add(cacheKey, entry);
 }
 
 /**

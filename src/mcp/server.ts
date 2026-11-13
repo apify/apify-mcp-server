@@ -51,6 +51,11 @@ import type { LegacyMcpServerHost } from './legacy_server.js';
 import type { StatelessMcpServerHost, StatelessRequestSnapshot } from './stateless_server.js';
 import { parseInputParamsFromUrl } from './utils.js';
 
+/** The notices about left-out tools sent with one `tools/list`; one more sentence counts the rest. */
+const MAX_SENT_TOOL_LOAD_NOTICES = 5;
+/** The distinct notices a session keeps until its client lists the tools. */
+const MAX_PENDING_TOOL_LOAD_NOTICES = 100;
+
 /** An actor-tool fetch retained with the exact input it was fetched for, so it can be re-composed. */
 type ToolSource = { input: Input; actorTools: ToolEntry[] };
 
@@ -159,9 +164,11 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     private readonly toolSources = new Map<string, ToolSource>();
     /**
      * One sentence for each tool a load left out because its input schema cannot be compiled, kept until the
-     * client lists the tools. A set, so a repeated load does not repeat a notice.
+     * client lists the tools. A set, so a repeated load does not repeat a notice; it holds at most
+     * `MAX_PENDING_TOOL_LOAD_NOTICES`, and `uncountedToolLoadNotices` counts the ones that did not fit.
      */
     private readonly pendingToolLoadNotices = new Set<string>();
+    private uncountedToolLoadNotices = 0;
 
     // Telemetry configuration (resolved from options and env vars, see setupTelemetry)
     public readonly telemetryEnabled: boolean;
@@ -484,13 +491,25 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     private readonly addToolLoadNotice = (notice: string): void => {
-        this.pendingToolLoadNotices.add(notice);
+        if (this.pendingToolLoadNotices.has(notice)) return;
+        if (this.pendingToolLoadNotices.size < MAX_PENDING_TOOL_LOAD_NOTICES) this.pendingToolLoadNotices.add(notice);
+        else this.uncountedToolLoadNotices++;
     };
 
-    /** Hands over the notices about tools the loads left out. Each notice is handed over once. */
+    /**
+     * Hands over the notices about tools the loads left out: the first `MAX_SENT_TOOL_LOAD_NOTICES` and one
+     * sentence with the number of the others. Each notice is handed over once.
+     */
     public takeToolLoadNotices(): string[] {
-        const notices = [...this.pendingToolLoadNotices];
+        const notices = [...this.pendingToolLoadNotices].slice(0, MAX_SENT_TOOL_LOAD_NOTICES);
+        const otherCount = this.pendingToolLoadNotices.size - notices.length + this.uncountedToolLoadNotices;
+        if (otherCount > 0) {
+            notices.push(
+                `${otherCount} more ${otherCount === 1 ? 'tool was' : 'tools were'} not loaded because of the input schema.`,
+            );
+        }
         this.pendingToolLoadNotices.clear();
+        this.uncountedToolLoadNotices = 0;
         return notices;
     }
 

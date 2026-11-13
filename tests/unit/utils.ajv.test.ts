@@ -159,6 +159,26 @@ describe('createAjv — code generation', () => {
     });
 });
 
+describe('createAjv — generated code', () => {
+    it('hands the code of a validator to `checkCode` before the validator exists', () => {
+        const checkCode = vi.fn();
+        createAjv(checkCode).compile({ type: 'object', properties: { memoryMbytes: { type: 'integer' } } });
+
+        expect(checkCode).toHaveBeenCalledWith(expect.stringContaining('memoryMbytes'));
+    });
+
+    it('fails the compilation with what `checkCode` throws', () => {
+        const refusal = new Error('too much code');
+        const checkCode = (code: string) => {
+            if (code.includes('memoryMbytes')) throw refusal;
+        };
+
+        expect(() => createAjv(checkCode).compile({ properties: { memoryMbytes: { type: 'integer' } } })).toThrow(
+            refusal,
+        );
+    });
+});
+
 describe('createAjv — Actor input schemas', () => {
     it('strips extra properties when schema has additionalProperties: false', () => {
         const validate = createAjv().compile({

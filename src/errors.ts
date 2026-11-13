@@ -12,8 +12,8 @@ export class UserInputError extends Error {
 
 /**
  * Thrown by `compileUntrustedSchema` when an untrusted Actor / proxied-MCP input schema exceeds a cap
- * (bytes, subschemas, nested levels, enum values) that bounds AJV's synchronous codegen, or nests too deep for its validator
- * to run (no `limit` then). It's a property of the schema, not a server fault, so `logHttpError` logs it as a
+ * (bytes, validator code, nested levels, enum values) that bounds AJV's synchronous codegen, or nests too deep for
+ * its validator to run (no `limit` then). It's a property of the schema, not a server fault, so `logHttpError` logs it as a
  * soft fail and the caller drops just that one tool.
  */
 export class SchemaTooLargeError extends Error {
@@ -21,7 +21,13 @@ export class SchemaTooLargeError extends Error {
 
     constructor(
         public readonly limit?: number,
-        unit?: 'bytes' | 'subschemas' | 'nested levels' | 'enum values',
+        unit?:
+            | 'bytes'
+            | 'bytes of validator code'
+            | 'nested levels'
+            | 'enum values'
+            | 'nested blocks of validator code'
+            | 'referenced schemas for one value',
     ) {
         super(
             limit === undefined
@@ -29,6 +35,21 @@ export class SchemaTooLargeError extends Error {
                 : `Input schema exceeds the safety limit of ${limit} ${unit}`,
         );
     }
+}
+
+/** The longest Actor or tool name shown in a message: a tool name of a proxied MCP server has no limit of its own. */
+const DISPLAYED_NAME_MAX_LENGTH = 64;
+
+/**
+ * A name that comes from outside, as plain text for one line of a message: without control and formatting
+ * characters, line breaks included, and cut to a fixed length.
+ */
+function toDisplayedName(name: string): string {
+    const characters = [
+        ...name.slice(0, 2 * DISPLAYED_NAME_MAX_LENGTH).replace(/[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/gu, ''),
+    ];
+    const isCut = characters.length > DISPLAYED_NAME_MAX_LENGTH || name.length > 2 * DISPLAYED_NAME_MAX_LENGTH;
+    return `${characters.slice(0, DISPLAYED_NAME_MAX_LENGTH).join('')}${isCut ? '…' : ''}`;
 }
 
 export const ACTOR_LOAD_ERROR_KIND = {
@@ -89,9 +110,13 @@ export class ActorLoadError extends Error {
         );
     }
 
-    /** `toolName` is the tool of an MCP server Actor; without it the Actor's own tool was left out. */
+    /**
+     * `toolName` is the tool of an MCP server Actor; without it the Actor's own tool was left out. The MCP server
+     * chooses its tool names, so the message shows both names shortened and without control characters.
+     */
     static inputSchemaNotLoaded(actorName: string, compileError: unknown, toolName?: string): ActorLoadError {
-        const subject = toolName ? `Tool "${toolName}" of Actor "${actorName}"` : `Actor "${actorName}"`;
+        const actor = `Actor "${toDisplayedName(actorName)}"`;
+        const subject = toolName === undefined ? actor : `Tool "${toDisplayedName(toolName)}" of ${actor}`;
         const reason = compileError instanceof SchemaTooLargeError ? 'too large' : 'not valid';
         return new ActorLoadError(
             ACTOR_LOAD_ERROR_KIND.INPUT_SCHEMA_NOT_LOADED,

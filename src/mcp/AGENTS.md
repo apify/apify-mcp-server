@@ -61,7 +61,9 @@ Two MCP protocol revisions are served, each by its own adapter:
 
 - **A tool left out of a load is reported once.** A load that drops a tool because its input schema cannot be
   compiled records one sentence on the facade (`takeToolLoadNotices()`); the legacy `tools/list` handler sends it
-  as a `warning` `notifications/message` with the response. The stateless adapter declares no `logging` and sends
+  as a `warning` `notifications/message` with the response. One `tools/list` sends the first five and one
+  sentence that counts the rest; the names in a sentence are shortened and have no control characters, because
+  an MCP server Actor chooses its tool names. The stateless adapter declares no `logging` and sends
   none; `call-actor` answers with the same sentence for such an Actor.
 - **Facade → adapter, one direction only.** `ActorsMcpServer` (facade) constructs and delegates
   to `LegacyMcpServer`; `createStatelessServer` builds the stateless adapter per request from the

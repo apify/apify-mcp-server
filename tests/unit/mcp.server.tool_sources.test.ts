@@ -147,6 +147,37 @@ describe('telling the client about tools left out of a load', () => {
         });
     });
 
+    it('sends the first notices and one sentence counting the others', async () => {
+        const notices = Array.from({ length: 8 }, (_, index) => NOTICE.replace('search', `search-${index}`));
+        vi.mocked(getActors).mockImplementationOnce(async (_input, _apifyClient, options) => {
+            for (const notice of notices) options?.onToolNotLoaded?.(notice);
+            return [];
+        });
+        const server = makeServer();
+        await load(server, { actors: ['apify/example-mcp-server'] });
+        const sendNotification = vi.fn().mockResolvedValue(undefined);
+
+        await listTools(server, sendNotification);
+
+        const sent = sendNotification.mock.calls.map(([notification]) => notification.params.data);
+        expect(sent).toEqual([...notices.slice(0, 5), '3 more tools were not loaded because of the input schema.']);
+    });
+
+    it('keeps a fixed number of notices and only counts the ones over it', async () => {
+        vi.mocked(getActors).mockImplementationOnce(async (_input, _apifyClient, options) => {
+            // Reported twice: a kept notice is not repeated, and one over the number is counted each time.
+            for (let index = 0; index < 500; index++) options?.onToolNotLoaded?.(`${NOTICE} ${index % 250}`);
+            return [];
+        });
+        const server = makeServer();
+        await load(server, { actors: ['apify/example-mcp-server'] });
+
+        const notices = server.takeToolLoadNotices();
+
+        expect(notices).toHaveLength(6);
+        expect(notices.at(-1)).toBe('395 more tools were not loaded because of the input schema.');
+    });
+
     it('sends nothing when the client asked for errors only', async () => {
         const server = await loadWithNotice();
         const sendNotification = vi.fn().mockResolvedValue(undefined);

@@ -4,8 +4,11 @@ import Ajv from 'ajv';
 /**
  * Ajv with the server's validation policy. One instance per compile, never shared: Ajv caches every compiled
  * schema in a Map that is never evicted.
+ *
+ * `checkCode` receives the code of every validator function Ajv generates, before the function is created; what
+ * it throws fails the compilation.
  */
-export function createAjv(): Ajv {
+export function createAjv(checkCode?: (code: string) => void): Ajv {
     const instance = new Ajv({
         coerceTypes: 'array',
         strict: false,
@@ -14,7 +17,13 @@ export function createAjv(): Ajv {
         logger: false,
         // The optimization pass only shortens the generated code, and its time grows with the square of
         // the schema size: without it a schema with 1,000 properties compiles about four times faster.
-        code: { optimize: false },
+        code: {
+            optimize: false,
+            process: (code) => {
+                checkCode?.(code);
+                return code;
+            },
+        },
     });
 
     // `pattern`/`patternProperties` compile a RegExp from untrusted Actor / proxied-MCP input schemas;
