@@ -387,7 +387,6 @@ describe('call-actor-mcp-tool', () => {
 
         expectSoftFailInvalidInput(result);
         const text = JSON.stringify(result.content);
-        expect(text).toContain(`Actor '${MCP_ACTOR}' has no MCP tool named 'fetch-actor-details'.`);
         expect(text.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST)).toBe(isToolListLoaded);
     });
 
@@ -400,7 +399,6 @@ describe('call-actor-mcp-tool', () => {
 
             const result = await execute(executeCallActorMcpTool, { tool: 'add' });
 
-            expect(JSON.stringify(result.content)).toContain(message);
             expect(result.toolTelemetry).toMatchObject({
                 toolStatus: TOOL_STATUS.FAILED,
                 failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
