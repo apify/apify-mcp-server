@@ -15,6 +15,15 @@ describe('buildMarkdownUrl', () => {
     ])('%s → %s', (input, expected) => {
         expect(buildMarkdownUrl(input)).toBe(expected);
     });
+
+    // Linear time takes well under a millisecond here; the bound only catches time that grows faster than the length.
+    it('builds the URL for a 100,000-character path with a slash run inside it within a second', () => {
+        const path = `${'/'.repeat(100_000)}a`;
+
+        const startedAt = performance.now();
+        expect(buildMarkdownUrl(`https://docs.apify.com${path}`)).toBe(`https://docs.apify.com${path}.md`);
+        expect(performance.now() - startedAt).toBeLessThan(1000);
+    });
 });
 
 describe('isAllowedDocsUrl', () => {

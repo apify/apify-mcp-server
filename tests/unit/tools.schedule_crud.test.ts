@@ -230,6 +230,16 @@ describe('create-schedule', () => {
 });
 
 describe('update-schedule', () => {
+    it('is annotated as destructive because it replaces stored fields and actions', () => {
+        expect(updateSchedule.annotations).toEqual({
+            title: 'Update schedule',
+            readOnlyHint: false,
+            destructiveHint: true,
+            idempotentHint: true,
+            openWorldHint: false,
+        });
+    });
+
     it('sends only the provided fields and skips the pre-read for a plain name', async () => {
         const { apifyClient, calls } = mockScheduleApiClient(mockSchedule({ isEnabled: false, nextRunAt: null }));
         const result = await run(updateSchedule, { scheduleId: 'insta-daily', isEnabled: false }, apifyClient);
@@ -320,9 +330,8 @@ describe('update-schedule', () => {
         expect(sentActions(calls.at(-1)!)).toHaveLength(20);
     });
 
-    it('leaves name validation to the API instead of throwing a ZodError at the client', async () => {
-        // The server's AJV strips the `pattern` keyword, so a regex here would not gate the
-        // call — it would only throw inside the tool body and reach the client as serialised JSON.
+    it('leaves name validation to the API', async () => {
+        // The server's AJV strips the `pattern` keyword, so a regex here would only fire inside the tool body.
         const { apifyClient, calls } = mockScheduleApiClient(mockSchedule());
         await run(
             createSchedule,

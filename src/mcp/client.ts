@@ -80,6 +80,13 @@ async function connectWithTransport(
     return client;
 }
 
+/**
+ * The URL is checked against the Actor's standby origin before connecting, so a redirect that leaves that origin is
+ * not followed: it would send requests to a host nobody checked. This is the SDK default, set here so that an SDK
+ * change cannot drop it.
+ */
+const REDIRECT_POLICY = 'same-origin';
+
 /** Headers on every request to an Actor's MCP server; the request origin is the one the session's API calls carry. */
 function buildMCPRequestHeaders({ token, requestOrigin }: McpConnectionOptions): Record<string, string> {
     return { authorization: `Bearer ${token}`, [REQUEST_ORIGIN_HEADER]: requestOrigin ?? REQUEST_ORIGIN.MCP };
@@ -90,6 +97,7 @@ function buildMCPRequestHeaders({ token, requestOrigin }: McpConnectionOptions):
  */
 async function createMCPSSEClient(url: string, options: McpConnectionOptions): Promise<Client> {
     const transport = new SSEClientTransport(new URL(url), {
+        redirectPolicy: REDIRECT_POLICY,
         requestInit: {
             headers: buildMCPRequestHeaders(options),
         },
@@ -116,6 +124,7 @@ async function createMCPSSEClient(url: string, options: McpConnectionOptions): P
  */
 async function createMCPStreamableClient(url: string, options: McpConnectionOptions): Promise<Client> {
     const transport = new StreamableHTTPClientTransport(new URL(url), {
+        redirectPolicy: REDIRECT_POLICY,
         requestInit: {
             headers: buildMCPRequestHeaders(options),
         },

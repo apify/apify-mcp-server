@@ -12,6 +12,7 @@ import {
     HTTP_UNAUTHORIZED,
     MAX_INLINE_BYTES,
     RAG_WEB_BROWSER,
+    RESOURCE_ID_OR_NAME_MAX_LENGTH,
     WEB_SEARCH,
 } from '../../const.js';
 import { getActorMCPServerPath, resolveOnStandbyOrigin } from '../../mcp/actors.js';
@@ -31,6 +32,7 @@ import type {
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
 import { fixZodSchemaRequired } from '../../utils/ajv.js';
+import { stripTrailingChars } from '../../utils/generic.js';
 import { toPlainError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondOk, respondServerError, respondUserError } from '../../utils/mcp.js';
@@ -38,8 +40,8 @@ import { actorNameToToolName, resolveActorInterfaces, resolveActorTenancy } from
 import { redactApiCallArgs } from '../api/apify_api_request.js';
 import { API_METHODS, type ApiMethod, isRecord } from '../api/apify_api_spec.js';
 import { parseBaseMimeType } from '../storage/storage_helpers.js';
-import { anyJsonValueSchema, serverActorRequestOutputSchema } from '../structured_output_schemas.js';
-import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from './actor_tools_factory.js';
+import { anyJsonBodySchema, serverActorRequestOutputSchema } from '../structured_output_schemas.js';
+import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInput } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 
 const queryValue = z.union([z.string(), z.number(), z.boolean()]);
@@ -52,6 +54,7 @@ const sendServerActorRequestArgs = z.object({
     actor: z
         .string()
         .min(1)
+        .max(RESOURCE_ID_OR_NAME_MAX_LENGTH)
         .describe('The Actor: its ID, or its name in the "username/name" form, such as "apify/web-fetch".'),
     method: z
         .enum(API_METHODS)
@@ -69,7 +72,7 @@ const sendServerActorRequestArgs = z.object({
         .unknown()
         .optional()
         .describe('The JSON request body, sent as application/json. Not allowed with GET.')
-        .meta(anyJsonValueSchema),
+        .meta(anyJsonBodySchema),
 });
 type SendServerActorRequestArgs = z.infer<typeof sendServerActorRequestArgs>;
 
@@ -283,23 +286,49 @@ function parseStringLiteral(literal: string): string | undefined {
 /** `literal` without an escape the cut split (`\\`, `\\u12`), which no closing quote could complete. */
 function dropCutEscape(literal: string): string {
     const withoutUnicode = literal.replace(/\\u[0-9a-fA-F]{0,3}$/, '');
-    const trailingBackslashes = /\\*$/.exec(withoutUnicode)?.[0].length ?? 0;
+    const trailingBackslashes = withoutUnicode.length - stripTrailingChars(withoutUnicode, '\\').length;
     return trailingBackslashes % 2 === 1 ? withoutUnicode.slice(0, -1) : withoutUnicode;
 }
 
-/** Masks the token in each JSON string literal of `text`, complete or cut off at its end. */
+/** A backslash before one of these escapes nothing, so it ends no string literal. */
+const LINE_TERMINATORS = new Set(['\n', '\r', '\u2028', '\u2029']);
+
+/** `literal` with the token masked in its value; as is when it holds no token or is not a string literal. */
+function maskStringLiteral(literal: string, token: string, isComplete: boolean): string {
+    if (isComplete) {
+        const value = parseStringLiteral(literal);
+        return value?.includes(token) ? JSON.stringify(value.replaceAll(token, REDACTED)) : literal;
+    }
+    const value = parseStringLiteral(`${dropCutEscape(literal)}"`);
+    return value?.includes(token) ? JSON.stringify(value.replaceAll(token, REDACTED)).slice(0, -1) : literal;
+}
+
+/**
+ * Masks the token in each JSON string literal of `text`, complete or cut off at its end, in one pass. A literal runs
+ * from a quote to the next quote no backslash escapes; one that reaches the end of `text` is cut off. A backslash
+ * before a line terminator ends no literal: the text up to it is kept as is, and the scan goes on after it.
+ */
 function maskJsonStringLiterals(text: string, token: string): string {
-    return text.replace(
-        /("(?:[^"\\]|\\.)*")|("(?:[^"\\]|\\.)*\\?$)/g,
-        (match: string, complete: string | undefined, unterminated: string | undefined) => {
-            if (complete !== undefined) {
-                const value = parseStringLiteral(complete);
-                return value?.includes(token) ? JSON.stringify(value.replaceAll(token, REDACTED)) : match;
-            }
-            const value = parseStringLiteral(`${dropCutEscape(unterminated ?? '')}"`);
-            return value?.includes(token) ? JSON.stringify(value.replaceAll(token, REDACTED)).slice(0, -1) : match;
-        },
-    );
+    let result = '';
+    let copiedUpTo = 0;
+    let start = text.indexOf('"');
+    while (start !== -1) {
+        let end = start + 1;
+        while (end < text.length && text[end] !== '"') {
+            if (text[end] === '\\' && end + 1 < text.length && LINE_TERMINATORS.has(text[end + 1])) break;
+            end += text[end] === '\\' ? 2 : 1;
+        }
+        if (end < text.length && text[end] === '\\') {
+            start = text.indexOf('"', end + 2);
+            continue;
+        }
+        const isComplete = end < text.length;
+        const literalEnd = isComplete ? end + 1 : text.length;
+        result += text.slice(copiedUpTo, start) + maskStringLiteral(text.slice(start, literalEnd), token, isComplete);
+        copiedUpTo = literalEnd;
+        start = text.indexOf('"', literalEnd);
+    }
+    return result + text.slice(copiedUpTo);
 }
 
 /** The `nextStep` of a response whose body was cut at `MAX_INLINE_BYTES`. Reading stops at the chunk that crosses the limit, so `bytes` is a little under it. */
@@ -473,7 +502,7 @@ export async function executeSendServerActorRequest(
     toolArgs: InternalToolArgs,
     { timeoutMillis = EXTERNAL_TOOL_CALL_TIMEOUT_MSEC }: { timeoutMillis?: number } = {},
 ): Promise<ToolResponse> {
-    const { apifyToken, apifyClient, mcpSessionId, loadedToolNames, signal } = toolArgs;
+    const { apifyToken, apifyClient, loadedToolNames, signal } = toolArgs;
     const args = sendServerActorRequestArgs.parse(toolArgs.args);
     if (!apifyToken) {
         return respondUserError('An Apify API token is required to send requests to an Actor Server.', {
@@ -486,7 +515,7 @@ export async function executeSendServerActorRequest(
         return respondUserError('A GET request cannot have a body. Send the data in query instead.');
     }
 
-    const actorName = fixActorNameInputAndLog(args.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_SERVER_REQUEST });
+    const actorName = fixActorNameInput(args.actor);
     if (!actorName) return respondUserError(EMPTY_ACTOR_NAME_MESSAGE);
     const cached = await getActorDefinitionCached(actorName, apifyClient);
     if (!cached) return buildActorNotFoundResponse(actorName, loadedToolNames);

@@ -21,6 +21,7 @@ describe('isMcpClientFaultMessage', () => {
             'Parse error: Invalid JSON-RPC message',
             'Conflict: Only one SSE stream is allowed per session',
             'Conflict: Stream already has an active connection',
+            'Invalid event ID format',
             'Not connected',
         ]) {
             expect(isMcpClientFaultMessage(message)).toBe(true);

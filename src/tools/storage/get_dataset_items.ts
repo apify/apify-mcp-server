@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -37,7 +37,7 @@ export function extractDotPrefixes(fields: string[]): string[] {
 }
 
 const getDatasetItemsArgs = z.object({
-    datasetId: z.string().min(1).describe(storageIdArgDescription('dataset')),
+    datasetId: z.string().min(1).max(RESOURCE_ID_OR_NAME_MAX_LENGTH).describe(storageIdArgDescription('dataset')),
     clean: z
         .boolean()
         .optional()
@@ -51,24 +51,19 @@ const getDatasetItemsArgs = z.object({
         .min(1)
         .optional()
         .describe(`Maximum number of items to return. Default is ${DEFAULT_DATASET_ITEMS_LIMIT}.`),
-    fields: z
-        .string()
-        .optional()
-        .describe(
-            'Comma-separated list of fields to include in results. ' +
-                'Fields in output are sorted as specified. ' +
-                'Use dot notation for nested objects (e.g. "metadata.url"); the server auto-flattens parent prefixes and returns flat keys, unless the parent itself is listed (e.g. "metadata,metadata.url" returns metadata whole). ' +
-                'A dotted path to or through an array (e.g. "results.url") returns nothing: select its top-level field (e.g. "results") for every element.',
-        ),
+    fields: z.string().optional().describe(dedent`
+            Comma-separated list of fields to include in results.
+            Fields in output are sorted as specified.
+            Use dot notation for nested objects (e.g. "metadata.url"); the server auto-flattens parent prefixes and returns flat keys, unless the parent itself is listed (e.g. "metadata,metadata.url" returns metadata whole).
+            A dotted path to or through an array (e.g. "results.url") returns nothing: select its top-level field (e.g. "results") for every element.
+            Items that have none of the requested fields come back as {}, or are dropped when clean=true.
+        `),
     omit: z.string().optional().describe('Comma-separated list of fields to exclude from results.'),
     desc: z.boolean().optional().describe('If true, results are returned in reverse order (newest to oldest).'),
-    flatten: z
-        .string()
-        .optional()
-        .describe(
-            'Comma-separated list of fields to flatten (e.g. flatten="metadata" turns {"metadata":{"url":"x"}} into {"metadata.url":"x"}). ' +
-                'Normally derived automatically from dot-notation in `fields`; specify only as a diagnostic override.',
-        ),
+    flatten: z.string().optional().describe(dedent`
+            Comma-separated list of fields to flatten (e.g. flatten="metadata" turns {"metadata":{"url":"x"}} into {"metadata.url":"x"}).
+            Normally derived automatically from dot-notation in \`fields\`; specify only as a diagnostic override.
+        `),
 });
 
 /**
@@ -151,6 +146,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             itemCount: v.items.length,
             totalItemCount: v.total,
             offset,
+            limit: effectiveLimit,
             loadedToolNames,
         });
         return buildStorageResponse({ structuredContent, summary, nextStep, apifyConsoleUrl });
