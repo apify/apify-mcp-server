@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import type {
     ActorClient,
     ApifyClientOptions,
@@ -119,6 +121,16 @@ function withLastRunStoreChecks<Client extends ActorClient | TaskClient>(client:
     });
 }
 
+const forwardedHeadersStorage = new AsyncLocalStorage<Record<string, string>>();
+
+/**
+ * Runs `fn` so that every Apify API request made from it, including background work it starts, carries `headers`.
+ * A host uses it to forward headers that came with the token, such as the Console's admin IP proof.
+ */
+export function runWithForwardedApiHeaders<T>(headers: Record<string, string>, fn: () => T): T {
+    return forwardedHeadersStorage.run(headers, fn);
+}
+
 type ExtendedApifyClientOptions = Omit<ApifyClientOptions, 'token'> & {
     token?: string | null | undefined;
     /** Payment headers to forward on outbound API requests (from PaymentProvider.getPaymentHeaders) */
@@ -188,7 +200,7 @@ export class ApifyClient extends _ApifyClient {
                         ...config,
                         httpAgent: sharedAgent,
                         httpsAgent: sharedAgent,
-                        headers: { ...config.headers, ...staticHeaders },
+                        headers: { ...config.headers, ...forwardedHeadersStorage.getStore(), ...staticHeaders },
                     };
                 },
             ],

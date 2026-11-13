@@ -1,7 +1,12 @@
 /** ApifyClient: request-origin header + baseUrl override + the client-facing API origin. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ApifyClient, getApifyAPIPublicBaseUrl, REQUEST_ORIGIN } from '../../src/apify_client.js';
+import {
+    ApifyClient,
+    getApifyAPIPublicBaseUrl,
+    REQUEST_ORIGIN,
+    runWithForwardedApiHeaders,
+} from '../../src/apify_client.js';
 import { STAGING_MCP_HOSTNAME } from '../../src/const.js';
 
 const { capturedOptions } = vi.hoisted(() => ({ capturedOptions: [] as unknown[] }));
@@ -56,6 +61,13 @@ describe('ApifyClient', () => {
         });
         expect(headers['skyfire-pay-id']).toBe('jwt-token-123');
         expect(headers['X-Apify-Request-Origin']).toBe('APIFY_AI');
+    });
+
+    it('sends forwarded headers only inside runWithForwardedApiHeaders', () => {
+        const forwarded = { 'x-apify-admin-ip-proof': 'proof' };
+        const inside = runWithForwardedApiHeaders(forwarded, () => buildStaticHeaders({ token: 'test-token' }));
+        expect(inside['x-apify-admin-ip-proof']).toBe('proof');
+        expect(buildStaticHeaders({ token: 'test-token' })['x-apify-admin-ip-proof']).toBeUndefined();
     });
 
     it('explicit baseUrl wins over env default', () => {
