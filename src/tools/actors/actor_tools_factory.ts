@@ -388,7 +388,7 @@ export function getMcpToolNameSuffixIndex(actorName: string): number {
 export function fixActorNameInput(actorName: string): string {
     const normalized = normalizeActorNameInput(actorName);
     const suffixIndex = getMcpToolNameSuffixIndex(normalized);
-    return suffixIndex === -1 ? normalized : normalized.slice(0, suffixIndex);
+    return suffixIndex === -1 ? normalized : normalized.slice(0, suffixIndex).trimEnd();
 }
 
 /** {@link fixActorNameInput} without dropping the `:toolName` suffix, so the legacy-syntax check sees the same name. */
