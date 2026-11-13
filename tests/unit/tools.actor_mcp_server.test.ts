@@ -373,22 +373,40 @@ describe('call-actor-mcp-tool', () => {
         });
     });
 
-    it('returns a user error when the remote server answers an unknown tool name with an internal error', async () => {
+    it.each([true, false])('suggests listing remote tools only when served (loaded=%s)', async (isToolListLoaded) => {
         vi.spyOn(Client.prototype, 'callTool').mockRejectedValueOnce(
             new McpError(ErrorCode.InternalError, 'Unknown tool: fetch-actor-details'),
         );
-
-        const result = await execute(executeCallActorMcpTool, { tool: 'fetch-actor-details' });
-
-        expect(result.isError).toBe(true);
-        expect(JSON.stringify(result.content)).toContain(
-            `Actor '${MCP_ACTOR}' has no MCP tool named 'fetch-actor-details'.`,
+        const context = stubToolCallContext(
+            { actor: MCP_ACTOR, tool: 'fetch-actor-details' },
+            new ApifyClient({ token: TOKEN }),
+            { loadedToolNames: isToolListLoaded ? [HELPER_TOOLS.ACTOR_MCP_TOOL_LIST] : [] },
         );
-        expect(result.toolTelemetry).toMatchObject({
-            toolStatus: TOOL_STATUS.SOFT_FAIL,
-            failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
-        });
+
+        const result = await executeCallActorMcpTool(context);
+
+        expectSoftFailInvalidInput(result);
+        const text = JSON.stringify(result.content);
+        expect(text).toContain(`Actor '${MCP_ACTOR}' has no MCP tool named 'fetch-actor-details'.`);
+        expect(text.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST)).toBe(isToolListLoaded);
     });
+
+    it.each(['Backend failed with unknown tool: add', 'Unknown tool: backend-search'])(
+        'preserves a remote failure that does not reject the requested tool: %s',
+        async (message) => {
+            vi.spyOn(Client.prototype, 'callTool').mockRejectedValueOnce(
+                new McpError(ErrorCode.InternalError, message),
+            );
+
+            const result = await execute(executeCallActorMcpTool, { tool: 'add' });
+
+            expect(JSON.stringify(result.content)).toContain(message);
+            expect(result.toolTelemetry).toMatchObject({
+                toolStatus: TOOL_STATUS.FAILED,
+                failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
+            });
+        },
+    );
 
     it('rejects a tool name longer than the MCP limit without connecting', async () => {
         await expect(
