@@ -28,6 +28,7 @@ import {
     TOOL_TYPE,
 } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
+import { isValidResourceId } from '../../utils/apify_resource_id.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildActorInputSchema, compileUntrustedSchema } from '../actor_input_schema.js';
@@ -364,42 +365,43 @@ export async function getMCPServersAsTools(
     return actorToolsArrays.flat();
 }
 
-/**
- * Fixes an Actor name input from LLM and logs at INFO when the input differed from the fixed version.
- * Single entry point for fix+log — avoids duplicating the pattern at every call site.
- */
-export function fixActorNameInputAndLog(actorName: string, extra?: Record<string, unknown>): string {
-    const fixed = fixActorNameInput(actorName);
-    if (fixed !== actorName) {
-        log.info(
-            'Actor name input required normalization before lookup (quotes, spacing, slash padding, or a tool name)',
-            {
-                actorNameInput: actorName,
-                actorNameFixed: fixed,
-                ...extra,
-            },
-        );
-    }
-    return fixed;
-}
-
 export const EMPTY_ACTOR_NAME_MESSAGE =
     '"actor" must not be empty. Give the Actor ID or its name in the "username/name" form.';
 
-/** The `:toolName` of the removed `actorName:toolName` form; a URL's `scheme://` is not one. */
-export const MCP_TOOL_NAME_SUFFIX = /:[^/]*$/;
+/**
+ * Where the `:toolName` of the removed `actorName:toolName` form starts: the first colon after the last slash, so a
+ * URL's `scheme://` is not one. -1 when there is none. Index lookups rather than `/:[^/]*$/`, so the time stays
+ * linear in the length of the name (see apify/apify-mcp-server-internal#973).
+ */
+export function getMcpToolNameSuffixIndex(actorName: string): number {
+    return actorName.indexOf(':', actorName.lastIndexOf('/') + 1);
+}
 
 /**
  * Fixes Actor name strings (`username/name`) before cache + Apify API lookup.
  *
- * LLMs often wrap values in markdown quotes or smart quotes and insert spaces around `/`.
+ * LLMs often wrap values in markdown quotes or smart quotes, insert spaces around `/`, and pad the name with `/`.
  * The Apify API treats those as distinct strings → avoidable 404 SOFT_FAIL. This only trims
- * and strips common wrappers / spacing noise; valid names pass through unchanged.
+ * and strips common wrappers / spacing / slash padding noise; valid names pass through unchanged.
  * It also drops the `:toolName` of the removed `actorName:toolName` form, since a name never contains a colon.
  */
 export function fixActorNameInput(actorName: string): string {
-    const s = stripQuoteWrappers(actorName).replace(/\s*\/\s*/g, '/');
-    return s.replace(/\s+/g, ' ').trim().replace(MCP_TOOL_NAME_SUFFIX, '');
+    const normalized = normalizeActorNameInput(actorName);
+    const suffixIndex = getMcpToolNameSuffixIndex(normalized);
+    return suffixIndex === -1 ? normalized : normalized.slice(0, suffixIndex).trimEnd();
+}
+
+/** {@link fixActorNameInput} without dropping the `:toolName` suffix, so the legacy-syntax check sees the same name. */
+export function normalizeActorNameInput(actorName: string): string {
+    const s = stripQuoteWrappers(actorName)
+        .replace(/\s+/g, ' ')
+        .replace(/ ?\/ ?/g, '/');
+    return (
+        s
+            .trim()
+            // The lookbehind starts a trailing match only at the start of a slash run, so long runs stay linear.
+            .replace(/^\/+|(?<!\/)\/+$/g, '')
+    );
 }
 
 /**
@@ -443,7 +445,7 @@ export async function getActorsAsTools(
 ): Promise<ActorsAsToolsResult> {
     const { mcpSessionId, actorStore, paymentProvider, isDirectTool = true } = options ?? {};
     log.debug('Fetching Actors as tools', {
-        actorNames: actorIdsOrNames,
+        actorCount: actorIdsOrNames.length,
         mcpSessionId,
         paymentProviderId: paymentProvider?.id,
     });
@@ -452,7 +454,18 @@ export async function getActorsAsTools(
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
-            const actorName = fixActorNameInputAndLog(actorIdOrName, { mcpSessionId });
+            const actorName = fixActorNameInput(actorIdOrName);
+            // A name of any other shape is not an Actor name but whatever the caller sent, a pasted `Authorization`
+            // header included, so it is neither looked up nor logged.
+            if (!isValidResourceId(actorName)) {
+                log.softFail('Actor name is not valid', {
+                    mcpSessionId,
+                    statusCode: 400,
+                    failureCategory: 'INVALID_INPUT',
+                });
+                errors.push(ActorLoadError.notFound(actorIdOrName));
+                return null;
+            }
 
             let actorDefinitionWithInfo: ActorDefinitionWithInfo | null;
             try {
@@ -460,7 +473,6 @@ export async function getActorsAsTools(
             } catch (error) {
                 logHttpError(error, 'Failed to fetch Actor definition', {
                     actorName,
-                    ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
                     mcpSessionId,
                 });
                 errors.push(ActorLoadError.loadFailed(actorIdOrName));
@@ -470,7 +482,6 @@ export async function getActorsAsTools(
             if (!actorDefinitionWithInfo) {
                 log.softFail('Actor not found or definition is not available', {
                     actorName,
-                    ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
                     mcpSessionId,
                     statusCode: 404,
                     failureCategory: 'INVALID_INPUT',

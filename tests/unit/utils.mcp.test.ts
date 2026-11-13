@@ -1,14 +1,17 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ApifyApiError } from 'apify-client';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
 import type { HelperTool } from '../../src/types.js';
+import { ACTOR_RUN_LIMIT_MESSAGE } from '../../src/utils/apify_errors.js';
 import { wrapJsonText } from '../../src/utils/encode_text.js';
 import {
     computeToolResponseBytes,
     getHttpErrorHint,
     getToolCallErrorUserText,
+    hashSessionId,
     injectMcpSessionId,
     respondAborted,
     respondErrorNoTelemetry,
@@ -20,6 +23,13 @@ import {
     type ToolResponse,
 } from '../../src/utils/mcp.js';
 import { textOf } from './helpers/tool_context.js';
+
+describe('session reference in telemetry', () => {
+    it('is the first 12 hex chars of the sha256 of the session ID, as the hosted server logs it', () => {
+        // `printf %s <id> | sha256sum | cut -c1-12`; apify-mcp-server-internal logs the same value.
+        expect(hashSessionId('2eb04213-1ac4-4f9f-885a-fb26eccde798')).toBe('878cc3a272d6');
+    });
+});
 
 describe('injectMcpSessionId()', () => {
     it('returns a new params object with _meta.mcpSessionId when params is undefined', () => {
@@ -170,6 +180,15 @@ describe('respondServerError()', () => {
         });
     });
 
+    // A malformed upstream MCP response also throws a Zod error; that is a server failure, not bad arguments.
+    it('derives FAILED + INTERNAL_ERROR for a Zod error from an upstream response', () => {
+        const { error } = z.object({ tools: z.array(z.object({ name: z.string() })) }).safeParse({ tools: [{}] });
+        expect(respondServerError('x', { error }).toolTelemetry).toMatchObject({
+            toolStatus: TOOL_STATUS.FAILED,
+            failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
+        });
+    });
+
     it('derives SOFT_FAIL + INVALID_INPUT for a 404 error', () => {
         const error = Object.assign(new Error('Not found'), { statusCode: 404 });
         expect(respondServerError('x', { error }).toolTelemetry).toMatchObject({
@@ -257,9 +276,7 @@ describe('getToolCallErrorUserText()', () => {
     it('returns the concurrent-run-limit hint when a direct Actor tool hits the limit', () => {
         const error = Object.assign(new Error('Cannot start new Actor runs.'), { type: 'cannot-start-actor-runs' });
         const text = getToolCallErrorUserText('apify/instagram-scraper', error);
-        expect(text).toContain('account limit for concurrent Actor runs');
-        expect(text).toContain('console.apify.com/billing/subscription');
-        expect(text).not.toContain('Verify the tool name');
+        expect(text).toContain(ACTOR_RUN_LIMIT_MESSAGE);
     });
 
     it('sources the 401 hint from getHttpErrorHint', () => {

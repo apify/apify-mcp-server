@@ -22,7 +22,7 @@ import type {
     ValidationInputChange,
 } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
-import { logHttpError, sanitizeMezmoMessage } from '../utils/logging.js';
+import { logHttpError, sanitizeMezmoMessage, toPlainError } from '../utils/logging.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { buildActorFields } from '../utils/tools.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
@@ -407,7 +407,7 @@ export async function executeToolAndUpdateTask(params: {
                         failureCategory: callDiagnostics.failure_category,
                         failureHttpStatus: callDiagnostics.failure_http_status,
                         actorName: callDiagnostics.actor_name,
-                        error,
+                        error: toPlainError(error),
                     });
                 }
                 const { userText } = errorResult;

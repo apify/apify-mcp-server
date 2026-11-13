@@ -2,6 +2,7 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { ApifyClient as ApifyClientBase } from 'apify-client';
+import { AxiosError } from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
@@ -26,6 +27,7 @@ import type { ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
 import * as logging from '../../src/utils/logging.js';
+import { hashSessionId } from '../../src/utils/mcp.js';
 import {
     getLegacyServer,
     getRequestHandler,
@@ -679,6 +681,32 @@ describe('executeToolAndUpdateTask()', () => {
         expectClientContextTelemetry(trackSpy.mock.calls[0][2]);
     });
 
+    it('logs a failed Apify API request without its headers or body', async () => {
+        const client = new ApifyClientBase({ token: 'test-token', maxRetries: 0 });
+        // axios rejects a connection failure with the request config attached.
+        client.httpClient.axios.defaults.adapter = async (config) => {
+            throw new AxiosError('read ECONNRESET', 'ECONNRESET', config);
+        };
+        const error = await client
+            .actor('apify/rag-web-browser')
+            .start({ query: 'input-value' })
+            .catch((e: unknown) => e);
+        const consoleSpies = [
+            vi.spyOn(console, 'log').mockImplementation(() => {}),
+            vi.spyOn(console, 'error').mockImplementation(() => {}),
+        ];
+
+        await withServer(async (server) => {
+            const { task } = await runTaskAndReadBack(server, makeThrowingTool({ error, taskSupport: 'optional' }));
+            expect(task.status).toBe('failed');
+        });
+
+        const logOutput = consoleSpies.flatMap((spy) => spy.mock.calls.flat()).join('\n');
+        expect(logOutput).toContain('read ECONNRESET');
+        expect(logOutput).not.toContain('test-token');
+        expect(logOutput).not.toContain('input-value');
+    });
+
     it('keeps the Actor input change in task-call telemetry', async () => {
         const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
         vi.spyOn(actorExecutor, 'executeActorTool').mockResolvedValue({
@@ -728,7 +756,10 @@ describe('executeToolAndUpdateTask()', () => {
                 initializeRequestData: { ...INITIALIZE_REQUEST, params: apifyAi },
             },
         );
-        expect(trackSpy.mock.calls[0][2]).toMatchObject({ mcp_session_id: 's1', trace_id: 'thread-1' });
+        expect(trackSpy.mock.calls[0][2]).toMatchObject({
+            mcp_session_id: hashSessionId('s1'),
+            trace_id: 'thread-1',
+        });
     });
 
     it('dispatches an ACTOR_MCP tool run as a task and surfaces a connect failure as a completed error result', async () => {

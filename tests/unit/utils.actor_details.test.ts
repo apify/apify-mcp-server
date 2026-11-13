@@ -241,6 +241,7 @@ describe('fetchActorDetails() reads the server interface from the standby build'
         version: '2.0',
         readme: '# Standby build README',
         input: { type: 'object', properties: { url: { type: 'string' } } },
+        webServerMcpPath: '/mcp',
         webServerSchema: SEARCH_SCHEMA,
     };
 
@@ -254,6 +255,7 @@ describe('fetchActorDetails() reads the server interface from the standby build'
         const result = await fetchActorDetails(apifyClient, 'acme/mcp-server');
 
         expect(result).toMatchObject({
+            webServerMcpPath: '/mcp',
             webServerSchema: SEARCH_SCHEMA,
             inputSchema: DEFAULT_INPUT,
             readme: '# Default build README',
@@ -271,6 +273,7 @@ describe('fetchActorDetails() reads the server interface from the standby build'
 
         expect(result).toMatchObject({ inputSchema: DEFAULT_INPUT, readme: '# Default build README' });
         expect(result?.webServerSchema).toBeUndefined();
+        expect(result?.webServerMcpPath).toBeUndefined();
     });
 
     it('propagates a 403 from the standby build read instead of reporting not-found', async () => {

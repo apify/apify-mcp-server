@@ -1,6 +1,7 @@
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
 import type { CallDiagnostics, ToolStatus } from '../types.js';
 import { isPermissionApprovalError } from '../utils/apify_errors.js';
+import { isZodValidationError } from '../utils/logging.js';
 import type { ToolResponse } from '../utils/mcp.js';
 import { getToolCallErrorUserText } from '../utils/mcp.js';
 import {
@@ -8,7 +9,7 @@ import {
     buildPermissionApprovalResponse,
     isX402PaymentRequiredError,
 } from '../utils/payment_errors.js';
-import { buildExecutionDiagnostics } from '../utils/tool_status.js';
+import { buildExecutionDiagnostics, formatZodIssues } from '../utils/tool_status.js';
 import { buildActorFields } from '../utils/tools.js';
 
 /** Inputs the mapper can't derive itself — they differ per caller. */
@@ -84,6 +85,20 @@ export function buildToolCallErrorResult(error: unknown, params: ToolCallErrorPa
     }
 
     const { toolStatus, callDiagnostics } = buildExecutionDiagnostics({ error, isAborted, actorName, actorId });
+    // Only argument parsing throws Zod errors this far; tools catch upstream response validation errors themselves.
+    if (isZodValidationError(error)) {
+        const issueText = formatZodIssues(error.issues);
+        return {
+            kind: TOOL_CALL_ERROR_KIND.EXECUTION,
+            toolStatus: isAborted ? TOOL_STATUS.ABORTED : TOOL_STATUS.SOFT_FAIL,
+            callDiagnostics: {
+                ...callDiagnostics,
+                failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                failure_detail: issueText.slice(0, 200),
+            },
+            userText: `Invalid arguments for tool "${toolName}": ${issueText}.`,
+        };
+    }
     return {
         kind: TOOL_CALL_ERROR_KIND.EXECUTION,
         toolStatus,

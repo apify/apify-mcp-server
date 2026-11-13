@@ -64,7 +64,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `fetch_actor_mcp_tool_list.ts` (`fetch-actor-mcp-tool-list`: an uncached `tools/list` through
     `runOnActorMcpServer` that follows `nextCursor` within one `EXTERNAL_TOOL_CALL_TIMEOUT_MSEC` for all pages,
     fails on a failed page and stops after `MAX_TOOL_LIST_PAGES`;
-    `fetch-actor-details` never connects to an MCP server),
+    `fetch-actor-details` never connects to an MCP server; for an Actor with Actor Standby on and an MCP path whose
+    own tools the session does not serve, its `nextStep` names this tool when the session has it, otherwise
+    `call-actor-mcp-tool` when it has that, adds the own-server remedy when the session lacks `call-actor-mcp-tool`,
+    and replaces the not-runnable guidance),
     `actor_tool_contract.ts` (Actor-specific presentation policies plus direct-tool input restrictions
     and defaults, shared by schema generation, the call engine's denied-input check and execution;
     generic calls skip direct-only restrictions and defaults), and
@@ -73,8 +76,12 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     and wait-timeout modes: storage IDs plus a `summary` (past) / `nextStep` (one primary
     action) pair, never inline dataset items or KV bodies — except the reserved `TIP` key,
     inlined as `tip` on terminal RAG Web Browser runs only.
-  - `runs/` — get/abort runs, run logs, run list.
+  - `runs/` — get/abort runs, run logs, run list. The run and build log tools read the log through
+    `readLogTail` (`../utils/log_tail.ts`), which streams it and keeps only its last `MAX_INLINE_BYTES`.
   - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`.
+    `get-key-value-store-record` reads a record through `fetchRecordUnderCap` (`sendApifyApiRequest`), not
+    `getRecord()`, which buffers a record of any size whole: over `MAX_INLINE_BYTES` the download stops and
+    the tool returns a link, whatever the content type.
   - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public
     landing page (`task_helpers.ts` holds the shared task response shape and the publication call).
   - `schedules/` — schedule create/get/update/delete for Actors and tasks; `schedule_helpers.ts`
@@ -147,6 +154,11 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 - A tool whose arguments carry secrets sets `redactArgs` on its entry (`HelperTool` in `../types.ts`).
   It runs before AJV validation, so it must accept any shape, must not mutate the arguments, and must
   be an allowlist: the logged copy keeps the undeclared keys AJV strips only from the tool's copy.
+  Actor input counts as a secret: `call-actor`, its widget, the task and schedule tools and `call-actor-mcp-tool`
+  log only its key names, each value as `REDACTED`, through `pickLoggedValues` and `maskLoggedInputs` in
+  `../resources/api_resources.ts`.
+  A direct Actor tool or a proxied Actor MCP tool has no `redactArgs`: `prepareToolCallContext`
+  (`../payments/helpers.ts`) logs its argument names only, each value as `REDACTED`.
 - Descriptions, result text, annotations and the tool set follow [TOOL_GUIDELINES.md](../../TOOL_GUIDELINES.md); the gating mechanics below implement its "name only what the session has" rule.
 
 **Storage tool description skeleton** (`storage/`, all 8 tools): lead sentence stating what the tool

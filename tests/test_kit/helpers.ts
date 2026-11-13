@@ -85,6 +85,11 @@ export function skipOnStatefulEra(ctx: CaseCtx): boolean {
     return !skipUnlessStatefulEra(ctx);
 }
 
+/** Skip on a local Apify platform, for a case whose Actor needs Apify Proxy groups it lacks. */
+export function skipOnLocalPlatform(ctx: CaseCtx): boolean {
+    return ctx.isLocalPlatform === true;
+}
+
 export function getToolNames(tools: { tools: { name: string }[] }): string[] {
     return tools.tools.map((tool) => tool.name);
 }

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
+import { InvalidRequestPathError } from '../../src/errors.js';
 import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
 import { API_BLOCK_RULES } from '../../src/tools/api/apify_api_blocklist.js';
 import { apifyApiDetails } from '../../src/tools/api/apify_api_details.js';
@@ -370,6 +371,16 @@ describe('apify-api-read', () => {
         expect(requestMock).not.toHaveBeenCalled();
     });
 
+    it('returns a path the client refuses as an input error', async () => {
+        const refusal = new InvalidRequestPathError('The request path /v2/users/./me is not valid.');
+        requestMock.mockRejectedValue(refusal);
+
+        const result = await callTool(apifyApiRead, { path: 'users/./me' });
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toBe(refusal.message);
+    });
+
     it("refuses a GET to a task's synchronous run endpoint without a request or naming call-actor", async () => {
         const result = await callTool(apifyApiRead, { path: 'actor-tasks/john~my-task/run-sync' });
 
@@ -451,6 +462,7 @@ describe('apify-api-read', () => {
             method: 'GET',
             params: { format: 'json', limit: 1 },
             maxContentLength: MAX_INLINE_BYTES,
+            isUrlQueryAllowed: true,
             signal: expect.any(AbortSignal),
         });
         expectSchemaConformingStructuredContent(result, apifyApiCallOutputSchema);
@@ -866,7 +878,12 @@ describe('apify-api-read', () => {
 });
 
 describe('apify-api-write', () => {
-    const REQUEST_BASE = { params: undefined, maxContentLength: MAX_INLINE_BYTES, signal: expect.any(AbortSignal) };
+    const REQUEST_BASE = {
+        params: undefined,
+        maxContentLength: MAX_INLINE_BYTES,
+        isUrlQueryAllowed: true,
+        signal: expect.any(AbortSignal),
+    };
 
     it('is annotated as destructive and open-world, since it starts runs and creates webhooks to any URL', () => {
         expect(apifyApiWrite.annotations).toMatchObject({

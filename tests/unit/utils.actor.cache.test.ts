@@ -107,6 +107,58 @@ describe('getActorDefinitionCached — tenant isolation', () => {
     });
 });
 
+describe('getActorDefinitionCached — caller-relative names', () => {
+    // The platform resolves `~name` to the caller's own Actor, so one string names a different Actor per token.
+    it('does not serve a cached public Actor for a "~name" lookup', async () => {
+        const cached = seedCache('~website-scraper', true, 'owner-9');
+        const callersOwn = {
+            definition: {},
+            info: { isPublic: false, userId: 'caller-9' },
+        } as unknown as ActorDefinitionWithInfo;
+        getActorDefinitionMock.mockResolvedValue(callersOwn);
+
+        const result = await getActorDefinitionCached('~website-scraper', client);
+
+        expect(result).toBe(callersOwn);
+        expect(result).not.toBe(cached);
+        expect(getActorDefinitionMock).toHaveBeenCalledWith('~website-scraper', client);
+    });
+
+    // apify-client sends `/name` as `~name`.
+    it('does not cache the Actor fetched for a "/name" lookup', async () => {
+        getActorDefinitionMock.mockResolvedValue({
+            definition: {},
+            info: { isPublic: true, userId: 'owner-10' },
+        } as unknown as ActorDefinitionWithInfo);
+
+        await getActorDefinitionCached('/price-tracker', client);
+
+        expect(actorDefinitionCache.get('/price-tracker')).toBeNull();
+    });
+});
+
+describe('getActorDefinitionCached — names that are object keys', () => {
+    it.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty'])(
+        'looks up %s like any other name and keeps serving cached Actors',
+        async (name) => {
+            const ownNamesBefore = Object.getOwnPropertyNames(Object.prototype);
+            try {
+                const cached = seedCache(`acme/public-${name}`, true, 'owner-11');
+                getActorDefinitionMock.mockResolvedValue(null);
+
+                await expect(getActorDefinitionCached(name, client)).resolves.toBeNull();
+                expect(getActorDefinitionMock).toHaveBeenCalledWith(name, client);
+                await expect(getActorDefinitionCached(`acme/public-${name}`, client)).resolves.toBe(cached);
+                expect(Object.getOwnPropertyNames(Object.prototype)).toEqual(ownNamesBefore);
+            } finally {
+                for (const key of Object.getOwnPropertyNames(Object.prototype)) {
+                    if (!ownNamesBefore.includes(key)) delete (Object.prototype as Record<string, unknown>)[key];
+                }
+            }
+        },
+    );
+});
+
 describe('getActorToolResolutionCached()', () => {
     it('classifies a cached MCP server Actor without resolving its MCP URL, so a path off its origin does not throw', async () => {
         seedCache('acme/mcp-public', true, 'owner-6', {
