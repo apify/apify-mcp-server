@@ -170,6 +170,7 @@ ${renderedBlocks.map((block, index) => (index > 0 && block.startsWith('###') ? `
     const hasTaskCreate = hasTool(HELPER_TOOLS.ACTOR_TASK_CREATE);
     const hasTaskUpdate = hasTool(HELPER_TOOLS.ACTOR_TASK_UPDATE);
     const hasTaskPublish = hasTool(HELPER_TOOLS.ACTOR_TASK_PUBLISH);
+    const hasTaskCall = hasTool(HELPER_TOOLS.ACTOR_TASK_CALL);
     const taskPrivacyLine =
         hasTaskCreate || hasTaskUpdate ? '- Creating or updating a task does not make it public.\n' : '';
     const taskPublishLines = hasTaskPublish
@@ -181,13 +182,14 @@ ${renderedBlocks.map((block, index) => (index > 0 && block.startsWith('###') ? `
         hasTaskCreate ||
         hasTaskUpdate ||
         hasTaskPublish ||
+        hasTaskCall ||
         hasTool(HELPER_TOOLS.ACTOR_TASK_GET) ||
         hasTool(HELPER_TOOLS.ACTOR_TASK_UNPUBLISH)
             ? `
 ## Actor tasks
 - An Actor task is a saved, reusable configuration of an Actor. It stores the Actor input and run options such as the build, memory, and timeout.
 - Tasks are useful for repeated or scheduled jobs, because the user does not have to configure the Actor again for every run.
-${taskPrivacyLine}${taskPublishLines}`
+${hasTaskCall ? `- \`${HELPER_TOOLS.ACTOR_TASK_CALL}\` runs a saved task with its stored input and run options; fields given in \`input\` override only those fields.\n` : ''}${taskPrivacyLine}${taskPublishLines}`
             : '';
 
     const hasScheduleCreate = hasTool(HELPER_TOOLS.SCHEDULE_CREATE);

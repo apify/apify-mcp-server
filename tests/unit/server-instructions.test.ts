@@ -229,6 +229,7 @@ describe('getServerInstructions()', () => {
                     '## Actor tasks',
                     '- An Actor task is a saved, reusable configuration of an Actor. It stores the Actor input and run options such as the build, memory, and timeout.',
                     '- Tasks are useful for repeated or scheduled jobs, because the user does not have to configure the Actor again for every run.',
+                    '- `call-actor-task` runs a saved task with its stored input and run options; fields given in `input` override only those fields.',
                     '- Creating or updating a task does not make it public.',
                     "- Publishing a task creates a public landing page for one specific use case. The page shows what the task does, the selected input values, and the expected output. Published tasks appear in the Actor's Examples tab, where users, search engines, and AI agents can discover them, which can help people understand the Actor and increase its runs.",
                     '- Publish only tasks that represent a useful, reliable, and specific use case. Not every saved task needs to be public.',
@@ -252,18 +253,20 @@ describe('getServerInstructions()', () => {
 
     describe('"## Actor tasks" section', () => {
         it.each([
-            [HELPER_TOOLS.ACTOR_TASK_CREATE, true, false],
-            [HELPER_TOOLS.ACTOR_TASK_GET, false, false],
-            [HELPER_TOOLS.ACTOR_TASK_UPDATE, true, false],
-            [HELPER_TOOLS.ACTOR_TASK_PUBLISH, false, true],
-            [HELPER_TOOLS.ACTOR_TASK_UNPUBLISH, false, false],
-        ] as const)('gates task guidance with %s alone', (toolName, hasPrivacy, hasPublish) => {
+            [HELPER_TOOLS.ACTOR_TASK_CREATE, true, false, false],
+            [HELPER_TOOLS.ACTOR_TASK_GET, false, false, false],
+            [HELPER_TOOLS.ACTOR_TASK_UPDATE, true, false, false],
+            [HELPER_TOOLS.ACTOR_TASK_CALL, false, false, true],
+            [HELPER_TOOLS.ACTOR_TASK_PUBLISH, false, true, false],
+            [HELPER_TOOLS.ACTOR_TASK_UNPUBLISH, false, false, false],
+        ] as const)('gates task guidance with %s alone', (toolName, hasPrivacy, hasPublish, hasRun) => {
             const section = sectionOf(getServerInstructions(SERVER_MODE.DEFAULT, only(toolName)), '## Actor tasks');
             expect(section).toContain('- An Actor task is a saved, reusable configuration of an Actor.');
             expect(section).toContain('Tasks are useful for repeated or scheduled jobs');
             expect(section.includes('Creating or updating a task')).toBe(hasPrivacy);
             expect(section.includes('Publishing a task')).toBe(hasPublish);
             expect(section.includes('Publish only tasks')).toBe(hasPublish);
+            expect(section.includes(`\`${HELPER_TOOLS.ACTOR_TASK_CALL}\` runs a saved task`)).toBe(hasRun);
         });
     });
 
@@ -284,14 +287,30 @@ describe('getServerInstructions()', () => {
         });
     });
 
+    /** Whether `text` names `toolName` as a whole name, so `call-actor` is not found inside `call-actor-task`. */
+    const namesTool = (text: string, toolName: string): boolean =>
+        new RegExp(`(?<![\\w-])${toolName}(?![\\w-])`).test(text);
+
     // Group-level gating must not expose names of individual tools that may be absent.
-    it.each(['## Actor tasks', '## Schedules'])('names no tool in %s', (heading) => {
-        const block = sectionOf(getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT), heading);
+    it('names no tool in ## Schedules', () => {
+        const block = sectionOf(getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT), '## Schedules');
         expect(block).not.toBe('');
         for (const toolName of Object.values(HELPER_TOOLS)) {
             expect(block).not.toContain(toolName);
         }
     });
+
+    it.each(Object.values(HELPER_TOOLS).filter((toolName) => toolName.includes('-actor-task')))(
+        'names in ## Actor tasks only call-actor-task, and only when it is served (%s alone)',
+        (servedToolName) => {
+            const block = sectionOf(getServerInstructions(SERVER_MODE.DEFAULT, only(servedToolName)), '## Actor tasks');
+            expect(block).not.toBe('');
+            for (const toolName of Object.values(HELPER_TOOLS)) {
+                const isNameable = toolName === HELPER_TOOLS.ACTOR_TASK_CALL && toolName === servedToolName;
+                expect(namesTool(block, toolName), toolName).toBe(isNameable);
+            }
+        },
+    );
 
     it('separates the read-only task and schedule sections with blank lines', () => {
         const instructions = getServerInstructions(

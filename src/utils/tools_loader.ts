@@ -271,7 +271,7 @@ export function getToolsForServerMode(
     }
 
     /**
-     * Auto-inject run-status and storage tools when call-actor or actor tools are present.
+     * Auto-inject run-status and storage tools when a tool that starts or reads a run is present.
      * Insert them right after call-actor (or appended at the end when call-actor is absent) so the
      * default tool list reads in workflow order: call → get-actor-run → get-dataset-items →
      * get-key-value-store-record → abort-actor-run. If the user explicitly selected these tools
@@ -286,10 +286,14 @@ export function getToolsForServerMode(
     // get-actor-run-widget calls get-dataset-items internally for its own preview fetch.
     const hasGetActorRunWidget = resultNames.has(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
 
-    // call-actor, direct Actor tools and get-actor-run are the non-widget run tools; any of them
-    // justifies the full bundle. get-actor-run-widget alone skips get-actor-run (it polls itself);
+    // call-actor, call-actor-task, direct Actor tools and get-actor-run are the non-widget run tools; any
+    // of them justifies the full bundle. get-actor-run-widget alone skips get-actor-run (it polls itself);
     // call-actor-widget alone still gets it.
-    const hasNonWidgetRunTool = resultNames.has(HELPER_TOOLS.ACTOR_CALL) || hasActorTools || hasGetActorRun;
+    const hasNonWidgetRunTool =
+        resultNames.has(HELPER_TOOLS.ACTOR_CALL) ||
+        resultNames.has(HELPER_TOOLS.ACTOR_TASK_CALL) ||
+        hasActorTools ||
+        hasGetActorRun;
     let toolsToInject: readonly ToolEntry[] = [];
     if (hasNonWidgetRunTool) {
         toolsToInject = AUTO_INJECTED_TOOLS;

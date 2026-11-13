@@ -59,7 +59,7 @@ function buildDescription({ hasTool }: ToolDescriptionContext): string {
             : []),
     ].join('\n');
     return dedent`
-        Render an interactive UI element (widget) that displays live Actor run progress for the user.
+        Run an Actor and render a widget with its live run progress for the user.
 
         Use this tool ONLY when the user explicitly wants to see run progress visually
         (e.g., "run apify/rag-web-browser and show progress", "start this Actor with a progress view").

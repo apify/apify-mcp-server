@@ -82,8 +82,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `get-key-value-store-record` reads a record through `fetchRecordUnderCap` (`sendApifyApiRequest`), not
     `getRecord()`, which buffers a record of any size whole: over `MAX_INLINE_BYTES` the download stops and
     the tool returns a link, whatever the content type.
-  - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public
-    landing page (`task_helpers.ts` holds the shared task response shape and the publication call).
+  - `tasks/` — Actor task create/get/update, run (`call-actor-task`, the `call-actor` run response for a
+    saved task), plus publish/unpublish of the task's public landing page (`task_helpers.ts` holds the
+    shared task response shape and the publication call).
   - `schedules/` — schedule create/get/update/delete for Actors and tasks; `schedule_helpers.ts`
     converts the flat action shape to the API shape and back, and reuses `getTaskByIdOrName` from
     `tasks/task_helpers.ts`.
@@ -187,10 +188,11 @@ gate: `InternalToolArgs.loadedToolNames`. A `nextStep` that names a sibling tool
 `resolveSiblingNextStep` in `storage/storage_helpers.ts`. Name a tool there only through that gate,
 or when it is the calling tool itself (the "call it again with the
 next offset" pagination hint); otherwise leave the cross-tool guidance to the gated description.
-An `AUTO_INJECTED_TOOLS` member is no exception — the injection is conditional on `call-actor`, an
-Actor tool, or `get-actor-run` being loaded, so a session that loaded only `abort-actor-run` gets
-none of them. The task and schedule tools name no tool, enforced by
-`tests/unit/tools.actor_task_crud.test.ts` and `tests/unit/tools.schedule_crud.test.ts`; result text
+An `AUTO_INJECTED_TOOLS` member is no exception — the injection is conditional on `call-actor`,
+`call-actor-task`, an Actor tool, or `get-actor-run` being loaded, so a session that loaded only
+`abort-actor-run` gets none of them. The task and schedule tools name no tool, enforced by
+`tests/unit/tools.actor_task_crud.test.ts` and `tests/unit/tools.schedule_crud.test.ts`, except that
+`call-actor-task` names the run tools it auto-injects, as `call-actor` does; result text
 elsewhere predates the gate, and `suggestTool` is the pattern to fix it with. Grep
 `HELPER_TOOLS` outside `buildDescription` for the current set rather than trusting a list here.
 
