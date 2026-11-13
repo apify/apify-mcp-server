@@ -1,6 +1,6 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolResultSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -150,18 +150,37 @@ export async function runOnActorMcpServer(
     }
 }
 
+/**
+ * True when the remote server rejected the tool name. Servers that throw a plain error from their handler
+ * answer with an internal error (-32603) rather than invalid params, so only the message tells.
+ */
+function isUnknownRemoteToolError(error: unknown): boolean {
+    return error instanceof McpError && /\bunknown tool\b/i.test(error.message);
+}
+
 export async function executeCallActorMcpTool(toolArgs: InternalToolArgs): Promise<ToolResponse> {
     const parsed = callActorMcpToolArgs.parse(toolArgs.args);
     return runOnActorMcpServer(toolArgs, {
         actor: parsed.actor,
         operation: `call MCP tool '${parsed.tool}'`,
         run: async (client) => {
+            let remoteResult: Awaited<ReturnType<Client['callTool']>>;
+            try {
+                remoteResult = await client.callTool(
+                    { name: parsed.tool, arguments: parsed.arguments ?? {} },
+                    CallToolResultSchema,
+                    { timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, signal: toolArgs.signal },
+                );
+            } catch (error) {
+                if (!isUnknownRemoteToolError(error)) throw error;
+                // A wrong tool name is the caller's to fix, e.g. one of this server's own tool names.
+                const hint = toolArgs.loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST)
+                    ? ` List its tools with ${HELPER_TOOLS.ACTOR_MCP_TOOL_LIST}.`
+                    : '';
+                return respondUserError(`Actor '${parsed.actor}' has no MCP tool named '${parsed.tool}'.${hint}`);
+            }
             // `toolTelemetry` is this server's internal channel, so a remote result must not set it.
-            const { toolTelemetry: _remoteTelemetry, ...result } = await client.callTool(
-                { name: parsed.tool, arguments: parsed.arguments ?? {} },
-                CallToolResultSchema,
-                { timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, signal: toolArgs.signal },
-            );
+            const { toolTelemetry: _remoteTelemetry, ...result } = remoteResult;
             const response = respondRaw(result as CallToolResult);
             if (!result.isError) return response;
             // The remote reports no cause, so this is recorded like a proxied Actor MCP tool's error.

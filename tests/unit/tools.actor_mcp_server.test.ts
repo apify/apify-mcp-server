@@ -373,6 +373,23 @@ describe('call-actor-mcp-tool', () => {
         });
     });
 
+    it('returns a user error when the remote server answers an unknown tool name with an internal error', async () => {
+        vi.spyOn(Client.prototype, 'callTool').mockRejectedValueOnce(
+            new McpError(ErrorCode.InternalError, 'Unknown tool: fetch-actor-details'),
+        );
+
+        const result = await execute(executeCallActorMcpTool, { tool: 'fetch-actor-details' });
+
+        expect(result.isError).toBe(true);
+        expect(JSON.stringify(result.content)).toContain(
+            `Actor '${MCP_ACTOR}' has no MCP tool named 'fetch-actor-details'.`,
+        );
+        expect(result.toolTelemetry).toMatchObject({
+            toolStatus: TOOL_STATUS.SOFT_FAIL,
+            failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+        });
+    });
+
     it('rejects a tool name longer than the MCP limit without connecting', async () => {
         await expect(
             execute(executeCallActorMcpTool, { tool: 'a'.repeat(MCP_TOOL_NAME_MAX_LENGTH + 1) }),
