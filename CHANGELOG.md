@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.21.10 - **not yet released**
+## [0.21.10](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.10) (2026-11-13)
 
 ### 🐛 Bug Fixes
 
@@ -13,7 +12,6 @@ All notable changes to this project will be documented in this file.
 - Cap search-apify-docs queries at 150 characters ([#1905](https://github.com/apify/apify-mcp-server/pull/1905)) ([33468bc](https://github.com/apify/apify-mcp-server/commit/33468bc00bcb194abd23a726db8e700b2cd3a8e0)) by [@jirispilka](https://github.com/jirispilka), closes [#1903](https://github.com/apify/apify-mcp-server/issues/1903)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.21.9](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.9) (2026-11-13)
 
 ### 🚀 Features
