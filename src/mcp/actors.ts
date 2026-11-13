@@ -32,27 +32,27 @@ export function getActorMCPServerPath(actorDefinition: ActorDefinition | ActorDe
     return null;
 }
 
-/** The platform's standby domain: the platform serves Actor Standby on https subdomains of it. */
-const PLATFORM_STANDBY_DOMAIN = 'apify.actor';
+/** The platform serves Server Actors on https subdomains of this domain. */
+const SERVER_ACTOR_DOMAIN = 'apify.actor';
 
 function isLoopbackHost(hostname: string): boolean {
     return hostname === 'localhost' || hostname.endsWith('.localhost') || ['127.0.0.1', '[::1]'].includes(hostname);
 }
 
 /**
- * Whether requests carrying the caller's token may go to `standby`: an https subdomain of the platform standby
+ * Whether requests carrying the caller's token may go to `serverUrl`: an https subdomain of the Server Actor
  * domain on the default port, or, only when the configured API is itself on a loopback host (local development),
  * a loopback host. Credentials in the URL are refused.
  */
-function isAllowedStandbyUrl(standby: URL): boolean {
-    if (standby.username || standby.password) return false;
-    if (standby.protocol === 'https:' && !standby.port && standby.hostname.endsWith(`.${PLATFORM_STANDBY_DOMAIN}`)) {
+function isAllowedServerActorUrl(serverUrl: URL): boolean {
+    if (serverUrl.username || serverUrl.password) return false;
+    if (serverUrl.protocol === 'https:' && !serverUrl.port && serverUrl.hostname.endsWith(`.${SERVER_ACTOR_DOMAIN}`)) {
         return true;
     }
     const apiBaseUrl = getApifyAPIBaseUrl();
     return (
-        ['http:', 'https:'].includes(standby.protocol) &&
-        isLoopbackHost(standby.hostname) &&
+        ['http:', 'https:'].includes(serverUrl.protocol) &&
+        isLoopbackHost(serverUrl.hostname) &&
         URL.canParse(apiBaseUrl) &&
         isLoopbackHost(new URL(apiBaseUrl).hostname)
     );
@@ -64,7 +64,7 @@ function isAllowedStandbyUrl(standby: URL): boolean {
  * `path` is publisher-controlled, and the caller's Apify token goes to whatever host the result names. A crafted
  * path (`@host/...`, `.host/...`, `//host/...`, `https://host/...`) could point the token at a third-party host,
  * so `url` is null when the path leaves the standby origin or does not parse. Returns null when the Actor has no
- * valid standby URL, or one that `isAllowedStandbyUrl` refuses; don't build a fallback hostname from the Actor
+ * valid standby URL, or one that `isAllowedServerActorUrl` refuses; don't build a fallback hostname from the Actor
  * ID: the platform never assigned it.
  */
 export function resolveOnStandbyOrigin(
@@ -75,9 +75,9 @@ export function resolveOnStandbyOrigin(
     // Compare origins produced by the same parser; a raw-string comparison would miss case and default-port
     // differences.
     const standby = new URL(actor.standbyUrl);
-    if (!isAllowedStandbyUrl(standby)) {
-        log.warning('Standby URL is not on the platform standby domain; nothing is sent to it', {
-            standbyOrigin: standby.origin,
+    if (!isAllowedServerActorUrl(standby)) {
+        log.warning('Server Actor URL is outside the Server Actor domain; nothing is sent to it', {
+            serverActorOrigin: standby.origin,
         });
         return null;
     }

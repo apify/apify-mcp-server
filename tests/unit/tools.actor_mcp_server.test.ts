@@ -206,7 +206,7 @@ afterEach(() => {
 });
 
 beforeEach(() => {
-    // A loopback standby URL is accepted only with a local API, as in local development.
+    // A loopback Server Actor URL is accepted only with a local API, as in local development.
     vi.stubEnv('APIFY_API_BASE_URL', 'http://localhost:3333');
     vi.stubEnv('APIFY_IS_AT_HOME', '');
     requestHeaders = [];
@@ -364,8 +364,8 @@ describe('call-actor-mcp-tool', () => {
         expect(JSON.stringify(result.content)).toContain('Failed to connect to MCP server');
     });
 
-    it('connects to nothing when the standby URL is outside the platform standby domain', async () => {
-        // With the platform API, the local server's loopback standby URL is not on the standby domain.
+    it('connects to nothing when the Server Actor URL is outside the Server Actor domain', async () => {
+        // With the platform API, the local server's loopback URL is outside the Server Actor domain.
         vi.stubEnv('APIFY_API_BASE_URL', 'https://api.apify.com');
 
         const result = await execute(executeCallActorMcpTool, { tool: 'add' });

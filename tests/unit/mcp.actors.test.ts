@@ -124,14 +124,14 @@ describe('getActorMCPServerURL', () => {
     });
 });
 
-describe('accepts a standby URL only on the platform standby domain', () => {
+describe('accepts a Server Actor URL only on the Server Actor domain', () => {
     afterEach(() => vi.unstubAllEnvs());
 
     describe('with the platform API', () => {
         beforeEach(() => vi.stubEnv('APIFY_API_BASE_URL', 'https://api.apify.com'));
 
         it.each(['https://acme--mcp-server.apify.actor', 'https://acme--mcp-server.eu.apify.actor'])(
-            'accepts an https subdomain of the standby domain: %s',
+            'accepts an https subdomain of the Server Actor domain: %s',
             async (standbyUrl) => {
                 await expect(getActorMCPServerURL({ id: 'abc123', standbyUrl }, '/mcp')).resolves.toBe(
                     `${standbyUrl}/mcp`,
@@ -141,7 +141,7 @@ describe('accepts a standby URL only on the platform standby domain', () => {
 
         it.each([
             ['another host', 'https://acme.example.com'],
-            ['the bare standby domain', 'https://apify.actor'],
+            ['the bare Server Actor domain', 'https://apify.actor'],
             ['a host that only ends with the domain name', 'https://xapify.actor'],
             ['the domain as a label of another host', 'https://acme.apify.actor.example'],
             ['a trailing dot', 'https://acme.apify.actor.'],
