@@ -18,7 +18,7 @@
 # not the server's.
 server:
     # --- Not applicable: the scenario drives the reference fixture server's own tools, resources
-    # or prompts by name, which this server does not and will not expose. ---
+    # or prompts by name, which this server does not expose; it serves no prompts yet. ---
 
     # Needs fixture tool `test_simple_text`.
     - tools-call-simple-text
@@ -66,6 +66,8 @@ server:
     # No `completion/complete` handler and no completions capability, so the request is
     # method-not-found.
     - completion-complete
+    # No prompts and no prompts capability, so `prompts/list` is method-not-found.
+    - prompts-list
     # No `resources/subscribe` handler and the declared `resources` capability sets no `subscribe`,
     # so the request is method-not-found.
     - resources-subscribe
