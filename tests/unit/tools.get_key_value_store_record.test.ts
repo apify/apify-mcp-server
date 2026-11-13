@@ -421,6 +421,26 @@ describe('get-key-value-store-record', () => {
         });
     });
 
+    // Text-only clients get the descriptor from the JSON mirror; the binary block follows it.
+    it.each([
+        ['an image', { record: { value: Buffer.from([0x89, 0x50, 0x4e, 0x47]), contentType: 'image/png' } }, 'image'],
+        ['audio', { record: { value: Buffer.from([0x49, 0x44, 0x33]), contentType: 'audio/mpeg' } }, 'audio'],
+        [
+            'another binary type',
+            { record: { value: Buffer.from([0x25, 0x50, 0x44, 0x46]), contentType: 'application/pdf' } },
+            'resource',
+        ],
+        ['a record over the size limit', { overLimit: { contentType: 'image/png' } }, 'resource_link'],
+    ])('mirrors structuredContent as JSON before the binary block for %s', async (_, stub, blockType) => {
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'file' }, stubApifyClient(stub)),
+        );
+        const { content, structuredContent } = result as CallToolResult;
+
+        expect(JSON.parse((content[0] as { text: string }).text)).toEqual(structuredContent);
+        expect(content[1].type).toBe(blockType);
+    });
+
     // OFFICIAL SDK client — the "pedantic client".
     // On listTools() it compiles a validator from the tool's outputSchema; on callTool() it throws
     // McpError if the result carries no structuredContent (or it fails the schema).
