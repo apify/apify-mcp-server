@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
 import type {
     ConsoleLinkContext,
     HelperTool,
@@ -108,6 +108,7 @@ export const fetchActorDetailsToolArgsSchema = z.object({
     actor: z
         .string()
         .min(1)
+        .max(RESOURCE_ID_OR_NAME_MAX_LENGTH)
         .describe(`Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".`),
     output: actorDetailsOutputOptionsSchema
         .optional()

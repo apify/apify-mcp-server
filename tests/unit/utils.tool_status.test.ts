@@ -3,7 +3,7 @@ import type { ActorRun } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
+import { FAILURE_CATEGORY, RESOURCE_ID_OR_NAME_MAX_LENGTH, TOOL_STATUS } from '../../src/const.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from '../../src/mcp/tool_call_error_mapper.js';
 import { buildStartRunResponse } from '../../src/tools/actors/actor_run_response.js';
 import {
@@ -361,6 +361,13 @@ describe('deriveResourceIds', () => {
     it('covers not-found / text responses via args (no structuredContent)', () => {
         expect(deriveResourceIds({ datasetId: 'ds1' }, { isError: true })).toEqual({ dataset_id: 'ds1' });
         expect(deriveResourceIds({ runId: 'run1' }, { content: [] })).toEqual({ run_id: 'run1' });
+    });
+
+    // The args reach telemetry even when validation rejected them.
+    it('skips an arg-derived id longer than the argument limit', () => {
+        const tooLong = 'a'.repeat(RESOURCE_ID_OR_NAME_MAX_LENGTH + 1);
+
+        expect(deriveResourceIds({ datasetId: tooLong, keyValueStoreId: tooLong, runId: tooLong }, {})).toEqual({});
     });
 
     it('returns nothing for a tool with no resource args or run output', () => {
