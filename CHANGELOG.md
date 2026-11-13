@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.21.10 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Log &quot;Invalid event ID format&quot; as a client fault ([#1906](https://github.com/apify/apify-mcp-server/pull/1906)) ([55e4966](https://github.com/apify/apify-mcp-server/commit/55e4966f66deb607b0a81ea64ce28ed0a54f5ae7)) by [@jirispilka](https://github.com/jirispilka), closes [#1904](https://github.com/apify/apify-mcp-server/issues/1904)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.21.9](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.9) (2026-11-13)
 
 ### 🚀 Features
