@@ -33,6 +33,9 @@ export type LogServer = {
     close: () => Promise<void>;
 };
 
+/** `count` lines, 'line 1' to 'line N', without a final newline. */
+export const numberedLog = (count: number) => Array.from({ length: count }, (_, i) => `line ${i + 1}`).join('\n');
+
 export async function startLogServer(): Promise<LogServer> {
     const routes = new Map<
         string,

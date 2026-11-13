@@ -1,19 +1,13 @@
 import { ApifyApiError } from 'apify-client';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
 import { MAX_INLINE_BYTES } from '../../src/const.js';
 import { ERROR_BODY_MAX_BYTES, readLogTail, sliceLogTail, TailBuffer } from '../../src/utils/log_tail.js';
-import { type LogServer, startLogServer } from './helpers/log_server.js';
+import { startLogServer } from './helpers/log_server.js';
 
-let logServer: LogServer;
+const logServer = await startLogServer();
 
-beforeAll(async () => {
-    logServer = await startLogServer();
-});
-
-afterAll(async () => {
-    await logServer.close();
-});
+afterAll(async () => logServer.close());
 
 const logUrl = (id: string) => logServer.client.run(id).log().url;
 
@@ -68,34 +62,29 @@ describe('TailBuffer keeps the end of a stream', () => {
 });
 
 describe('sliceLogTail', () => {
+    const whole = { isTruncated: false, startsMidLine: false };
     const cut = { isTruncated: true, startsMidLine: false };
+    const bytesNote = `${MAX_INLINE_BYTES} bytes`;
 
-    it('returns the requested trailing lines without a note when the log was not cut', () => {
-        expect(sliceLogTail({ text: 'a\nb\nc\n', isTruncated: false, startsMidLine: false }, 2)).toEqual({
-            text: 'b\nc',
+    // `note` is a part of the expected note; undefined expects no note.
+    it.each([
+        ['returns the requested trailing lines without a note when the log was not cut', 'a\nb\nc\n', whole, 2, 'b\nc'],
+        ['adds no note when the requested lines all fit in the window', 'a\nb\nc', cut, 2, 'b\nc'],
+        ['notes the cut when fewer lines than requested are in the window', 'a\nb', cut, 5, 'a\nb', bytesNote],
+        ['notes the cut for lines 0', 'a\nb', cut, 0, 'a\nb', bytesNote],
+        [
+            'notes the cut when the returned text includes a line cut at its start',
+            'long line end',
+            { isTruncated: true, startsMidLine: true },
+            1,
+            'long line end',
+            'mid-line',
+        ],
+    ])('%s', (_name, text, flags, lines, shown, note?: string) => {
+        expect(sliceLogTail({ text, ...flags }, lines)).toEqual({
+            text: shown,
+            note: note && expect.stringContaining(note),
         });
-    });
-
-    it('adds no note when the requested lines all fit in the window', () => {
-        expect(sliceLogTail({ text: 'a\nb\nc', ...cut }, 2)).toEqual({ text: 'b\nc' });
-    });
-
-    it('notes the cut when fewer lines than requested are in the window', () => {
-        const { text, note } = sliceLogTail({ text: 'a\nb', ...cut }, 5);
-
-        expect(text).toBe('a\nb');
-        expect(note).toContain(`${MAX_INLINE_BYTES} bytes`);
-    });
-
-    it('notes the cut for lines 0', () => {
-        expect(sliceLogTail({ text: 'a\nb', ...cut }, 0).note).toBeDefined();
-    });
-
-    it('notes the cut when the returned text includes a line cut at its start', () => {
-        const { text, note } = sliceLogTail({ text: 'long line end', isTruncated: true, startsMidLine: true }, 1);
-
-        expect(text).toBe('long line end');
-        expect(note).toContain('mid-line');
     });
 });
 

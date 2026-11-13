@@ -3,6 +3,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { isAxiosError, isCancel } from 'axios';
+import { z } from 'zod';
 
 import type { ApifyClient } from '../apify_client.js';
 import { HTTP_NOT_FOUND, MAX_INLINE_BYTES } from '../const.js';
@@ -26,6 +27,17 @@ const STREAM_NETWORK_ERROR_CODES: ReadonlySet<string | undefined> = new Set([
 ]);
 
 const NEWLINE = 0x0a;
+
+/** The `lines` argument of the run and build log tools. */
+export const logLinesSchema = z
+    .number()
+    .int()
+    .min(0)
+    .max(50)
+    .describe(
+        `Output the last NUM lines, instead of the last 10. Pass 0 to return the entire log, up to its last ${MAX_INLINE_BYTES} bytes.`,
+    )
+    .default(10);
 
 /** The end of a log: `isTruncated` when earlier bytes were dropped, `startsMidLine` when `text` begins inside a line. */
 export type LogTail = { text: string; isTruncated: boolean; startsMidLine: boolean };

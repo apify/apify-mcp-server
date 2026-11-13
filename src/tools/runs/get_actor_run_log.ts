@@ -1,24 +1,16 @@
 import { z } from 'zod';
 
-import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
+import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { readLogTail, sliceLogTail } from '../../utils/log_tail.js';
+import { logLinesSchema, readLogTail, sliceLogTail } from '../../utils/log_tail.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { getActorRunLogToolOutputSchema } from '../structured_output_schemas.js';
 
 const GetRunLogArgs = z.object({
     runId: z.string().describe('The ID of the Actor run.'),
-    lines: z
-        .number()
-        .int()
-        .min(0)
-        .max(50)
-        .describe(
-            `Output the last NUM lines, instead of the last 10. Pass 0 to return the entire log, up to its last ${MAX_INLINE_BYTES} bytes.`,
-        )
-        .default(10),
+    lines: logLinesSchema,
 });
 
 /**

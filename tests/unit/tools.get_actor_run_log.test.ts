@@ -1,11 +1,11 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { getActorRun } from '../../src/tools/runs/get_actor_run.js';
 import { getActorRunLog } from '../../src/tools/runs/get_actor_run_log.js';
 import { getActorRunLogToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool } from '../../src/types.js';
-import { type LogServer, startLogServer } from './helpers/log_server.js';
+import { numberedLog, startLogServer } from './helpers/log_server.js';
 import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
@@ -13,17 +13,9 @@ import {
     type TextToolResult,
 } from './helpers/tool_context.js';
 
-let logServer: LogServer;
+const logServer = await startLogServer();
 
-beforeAll(async () => {
-    logServer = await startLogServer();
-});
-
-afterAll(async () => {
-    await logServer.close();
-});
-
-const numberedLog = (count: number) => Array.from({ length: count }, (_, i) => `line ${i + 1}`).join('\n');
+afterAll(async () => logServer.close());
 
 /** Calls the tool on a run whose log is `log`. */
 const callTool = async (log: string, args: Record<string, unknown> = {}) =>
