@@ -15,14 +15,18 @@ export function isValidResourceId(id: string): boolean {
     return RESOURCE_ID_SEGMENT_REGEX.test(segment) && segment !== '.' && segment !== '..';
 }
 
-/** Returns `id`, or throws `InvalidRequestPathError` when `isValidResourceId` rejects it. */
+/**
+ * Returns `id` without surrounding whitespace, which a caller may add and a URL never carries, or throws
+ * `InvalidRequestPathError` when `isValidResourceId` rejects the rest.
+ */
 export function assertValidResourceId(id: string, resource: string): string {
-    if (!isValidResourceId(id)) {
+    const trimmed = id.trim();
+    if (!isValidResourceId(trimmed)) {
         throw new InvalidRequestPathError(
             `Invalid ${resource} ID or name "${id}": use an ID, a name, or "username/name"; these contain only letters, digits, "-", "_", "." and "~".`,
         );
     }
-    return id;
+    return trimmed;
 }
 
 /** Record keys the platform stores: `KEY_VALUE_STORE_KEY_REGEX` in `@apify/consts`. */

@@ -56,6 +56,24 @@ describe('resource identifiers', () => {
     });
 
     it.each([
+        ['a trailing newline', async (client: ApifyClient) => client.run('a1B2c3D4e5F6g7H8i\n').get()],
+        ['surrounding spaces', async (client: ApifyClient) => client.run('  a1B2c3D4e5F6g7H8i ').get()],
+    ])('sends an identifier with %s without the whitespace', async (_label, call) => {
+        const { client, urls } = buildRecordingClient();
+
+        await call(client);
+
+        expect(urls).toEqual([`${API}/v2/actor-runs/a1B2c3D4e5F6g7H8i`]);
+    });
+
+    it('refuses an identifier with whitespace inside it', async () => {
+        const { client, urls } = buildRecordingClient();
+
+        await expect(async () => client.run('a1B2c3D4 e5F6g7H8i').get()).rejects.toMatchObject({ statusCode: 400 });
+        expect(urls).toEqual([]);
+    });
+
+    it.each([
         ['a second slash', async (client: ApifyClient) => client.actor('a/b/c').get()],
         ['a dot segment', async (client: ApifyClient) => client.run('..').get()],
         ['a query character', async (client: ApifyClient) => client.dataset('a?x=1').listItems()],
