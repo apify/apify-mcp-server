@@ -10,7 +10,7 @@ import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunAnyActor } from '../actor_tool_naming.js';
-import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from '../actors/actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInput } from '../actors/actor_tools_factory.js';
 import {
     actorDetailsOutputDefaults,
     buildActorNotFoundResponse,
@@ -73,12 +73,9 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { apifyToken, apifyClient, actorStore, mcpSessionId, loadedToolNames, loadedActorIds } = toolArgs;
+        const { apifyToken, apifyClient, actorStore, loadedToolNames, loadedActorIds } = toolArgs;
         const parsed = fetchActorDetailsWidgetArgsSchema.parse(toolArgs.args);
-        const actorName = fixActorNameInputAndLog(parsed.actor, {
-            mcpSessionId,
-            route: HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
-        });
+        const actorName = fixActorNameInput(parsed.actor);
         if (!actorName) return respondUserError(EMPTY_ACTOR_NAME_MESSAGE);
 
         const { userPlanTier } = await getUserInfoCached(apifyToken, apifyClient);

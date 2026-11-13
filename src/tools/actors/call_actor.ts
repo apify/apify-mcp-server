@@ -52,7 +52,7 @@ import {
 } from './actor_run_response.js';
 import {
     EMPTY_ACTOR_NAME_MESSAGE,
-    fixActorNameInputAndLog,
+    fixActorNameInput,
     getActorsAsTools,
     getMcpToolNameSuffixIndex,
     normalizeActorNameInput,
@@ -382,7 +382,7 @@ export async function checkPaymentProviderStandbyConflict(params: {
     const actorName = tool.type === TOOL_TYPE.ACTOR_SERVER ? tool.actorFullName : args.actor;
     if (typeof actorName !== 'string' || !actorName) return null;
 
-    const normalizedActorName = fixActorNameInputAndLog(actorName, { mcpSessionId });
+    const normalizedActorName = fixActorNameInput(actorName);
 
     // Token-based client — payment headers are only relevant for actual Actor runs.
     const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
@@ -527,7 +527,7 @@ export async function callActorPreExecute(
     const parsedArgs = callActorArgs.parse(args);
     const legacyRejection = buildLegacyMcpSyntaxRejection(options.route, parsedArgs.actor, loadedToolNames);
     if (legacyRejection) return { earlyResponse: legacyRejection };
-    const actorName = fixActorNameInputAndLog(parsedArgs.actor, { mcpSessionId, route: options.route });
+    const actorName = fixActorNameInput(parsedArgs.actor);
     if (!actorName) return { earlyResponse: respondUserError(EMPTY_ACTOR_NAME_MESSAGE) };
 
     // For definition resolution we always use a token-based client; payment provider is only for actual Actor runs.

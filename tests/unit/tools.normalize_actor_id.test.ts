@@ -75,6 +75,10 @@ describe('fixActorNameInput', () => {
         );
     });
 
+    it('trims whitespace before dropping the tool suffix', () => {
+        expect(fixActorNameInput('apify/rag-web-browser :tool')).toBe('apify/rag-web-browser');
+    });
+
     it('drops the suffix from the first colon after the last slash', () => {
         expect(fixActorNameInput('apify/example-mcp-server:add:extra')).toBe('apify/example-mcp-server');
     });
