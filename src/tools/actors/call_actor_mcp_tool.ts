@@ -4,7 +4,7 @@ import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, RESOURCE_ID_OR_NAME_MAX_LENGTH, TOOL_STATUS } from '../../const.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import { withRemoteMcpClient } from '../../mcp/remote_tool_call.js';
@@ -31,7 +31,11 @@ import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 export const MCP_TOOL_NAME_MAX_LENGTH = 128;
 
 const callActorMcpToolArgs = z.object({
-    actor: z.string().min(1).describe('The MCP server Actor: its ID, or its name in the "username/name" form.'),
+    actor: z
+        .string()
+        .min(1)
+        .max(RESOURCE_ID_OR_NAME_MAX_LENGTH)
+        .describe('The MCP server Actor: its ID, or its name in the "username/name" form.'),
     tool: z.string().min(1).max(MCP_TOOL_NAME_MAX_LENGTH).describe("The name of the tool on the Actor's MCP server."),
     arguments: anyJsonObjectSchema
         .optional()

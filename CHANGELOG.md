@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.21.8](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.8) (2026-11-13)
+
+### 🐛 Bug Fixes
+
+- Keep request details out of failure logs ([#1877](https://github.com/apify/apify-mcp-server/pull/1877)) ([0deb532](https://github.com/apify/apify-mcp-server/commit/0deb532cbb5839e119aff6fbb0c66ad6d84a1321)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- Mark update-schedule and update-actor-task as destructive ([#1878](https://github.com/apify/apify-mcp-server/pull/1878)) ([e463b37](https://github.com/apify/apify-mcp-server/commit/e463b37bbe3c2994a5e68096e1496e2a23f97b7f)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- Handle object property names as ordinary selectors and keys ([#1880](https://github.com/apify/apify-mcp-server/pull/1880)) ([d2285b5](https://github.com/apify/apify-mcp-server/commit/d2285b576843025837e2810470ac143316092b97)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- Normalize IDs in linear time and limit ID and name length ([#1879](https://github.com/apify/apify-mcp-server/pull/1879)) ([47050f4](https://github.com/apify/apify-mcp-server/commit/47050f4dfc47cf49712b0c5c519af5c79476dce8)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- Find string literals in a cut body and detect email in linear time ([#1883](https://github.com/apify/apify-mcp-server/pull/1883)) ([d7c307c](https://github.com/apify/apify-mcp-server/commit/d7c307c663ed6f062a3c526cf8e6a4e09187a62d)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- Validate resource identifiers and request paths before API calls ([#1881](https://github.com/apify/apify-mcp-server/pull/1881)) ([0cb83af](https://github.com/apify/apify-mcp-server/commit/0cb83afe026cecd911ba47128ed43cd8829d3bfb)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- Read a bounded tail of run and build logs ([#1882](https://github.com/apify/apify-mcp-server/pull/1882)) ([c1a9950](https://github.com/apify/apify-mcp-server/commit/c1a9950769ee502d305a0f8abfbd6da8af57752d)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- Stop get-key-value-store-record from reading whole records ([#1870](https://github.com/apify/apify-mcp-server/pull/1870)) ([4709743](https://github.com/apify/apify-mcp-server/commit/4709743b294f2cb3a8e14872b5fb5956dba0b7d4)) by [@jirispilka](https://github.com/jirispilka), closes [#1814](https://github.com/apify/apify-mcp-server/issues/1814)
+- Replace @apify&#x2F;datastructures with a Map-based LRU cache ([#1893](https://github.com/apify/apify-mcp-server/pull/1893)) ([afcaad8](https://github.com/apify/apify-mcp-server/commit/afcaad89db32d5f64b9a17b014cf82c364e0e0b9)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.21.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.7) (2026-11-12)
 
 ### 🐛 Bug Fixes

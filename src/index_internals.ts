@@ -17,6 +17,7 @@ import {
 } from './tools/index.js';
 import type { ActorStore, ToolCategory } from './types.js';
 import { parseQueryParamList } from './utils/generic.js';
+import { LruCache } from './utils/lru.js';
 import { getExpectedToolNamesByCategories } from './utils/tool_categories_helpers.js';
 import { getToolPublicFieldOnly } from './utils/tools.js';
 import { TTLLRUCache } from './utils/ttl_lru.js';
@@ -25,6 +26,7 @@ export {
     ApifyClient,
     getExpectedToolNamesByCategories,
     getServerCard,
+    LruCache,
     TTLLRUCache,
     actorNameToToolName,
     defaults,

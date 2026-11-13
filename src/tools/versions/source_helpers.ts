@@ -16,6 +16,7 @@ import { REDACTED } from '../../resources/api_resources.js';
 import type { ConsoleLinkContext, InternalToolArgs } from '../../types.js';
 import { getResourceByIdOrName } from '../../utils/apify_resource_id.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
+import { stripTrailingChars } from '../../utils/generic.js';
 import { logHttpError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondUserError } from '../../utils/mcp.js';
@@ -214,7 +215,9 @@ export function buildSourceFileEntry({
  */
 function isBase64(content: string): boolean {
     const compact = content.replace(/\s/g, '').replace(/-/g, '+').replace(/_/g, '/');
-    return Buffer.from(compact, 'base64').toString('base64').replace(/=+$/, '') === compact.replace(/=+$/, '');
+    return (
+        stripTrailingChars(Buffer.from(compact, 'base64').toString('base64'), '=') === stripTrailingChars(compact, '=')
+    );
 }
 
 /**

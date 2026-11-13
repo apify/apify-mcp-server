@@ -2,6 +2,7 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { ApifyClient as ApifyClientBase } from 'apify-client';
+import { AxiosError } from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
@@ -676,6 +677,32 @@ describe('executeToolAndUpdateTask()', () => {
 
         expect(trackSpy.mock.calls).toHaveLength(1);
         expectClientContextTelemetry(trackSpy.mock.calls[0][2]);
+    });
+
+    it('logs a failed Apify API request without its headers or body', async () => {
+        const client = new ApifyClientBase({ token: 'test-token', maxRetries: 0 });
+        // axios rejects a connection failure with the request config attached.
+        client.httpClient.axios.defaults.adapter = async (config) => {
+            throw new AxiosError('read ECONNRESET', 'ECONNRESET', config);
+        };
+        const error = await client
+            .actor('apify/rag-web-browser')
+            .start({ query: 'input-value' })
+            .catch((e: unknown) => e);
+        const consoleSpies = [
+            vi.spyOn(console, 'log').mockImplementation(() => {}),
+            vi.spyOn(console, 'error').mockImplementation(() => {}),
+        ];
+
+        await withServer(async (server) => {
+            const { task } = await runTaskAndReadBack(server, makeThrowingTool({ error, taskSupport: 'optional' }));
+            expect(task.status).toBe('failed');
+        });
+
+        const logOutput = consoleSpies.flatMap((spy) => spy.mock.calls.flat()).join('\n');
+        expect(logOutput).toContain('read ECONNRESET');
+        expect(logOutput).not.toContain('test-token');
+        expect(logOutput).not.toContain('input-value');
     });
 
     it('takes the task-call trace_id from the Apify AI thread id', async () => {

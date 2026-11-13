@@ -399,8 +399,14 @@ export function fixActorNameInputAndLog(actorName: string, extra?: Record<string
 export const EMPTY_ACTOR_NAME_MESSAGE =
     '"actor" must not be empty. Give the Actor ID or its name in the "username/name" form.';
 
-/** The `:toolName` of the removed `actorName:toolName` form; a URL's `scheme://` is not one. */
-export const MCP_TOOL_NAME_SUFFIX = /:[^/]*$/;
+/**
+ * Where the `:toolName` of the removed `actorName:toolName` form starts: the first colon after the last slash, so a
+ * URL's `scheme://` is not one. -1 when there is none. Index lookups rather than `/:[^/]*$/`, so the time stays
+ * linear in the length of the name (see apify/apify-mcp-server-internal#973).
+ */
+export function getMcpToolNameSuffixIndex(actorName: string): number {
+    return actorName.indexOf(':', actorName.lastIndexOf('/') + 1);
+}
 
 /**
  * Fixes Actor name strings (`username/name`) before cache + Apify API lookup.
@@ -411,7 +417,9 @@ export const MCP_TOOL_NAME_SUFFIX = /:[^/]*$/;
  * It also drops the `:toolName` of the removed `actorName:toolName` form, since a name never contains a colon.
  */
 export function fixActorNameInput(actorName: string): string {
-    return normalizeActorNameInput(actorName).replace(MCP_TOOL_NAME_SUFFIX, '');
+    const normalized = normalizeActorNameInput(actorName);
+    const suffixIndex = getMcpToolNameSuffixIndex(normalized);
+    return suffixIndex === -1 ? normalized : normalized.slice(0, suffixIndex);
 }
 
 /** {@link fixActorNameInput} without dropping the `:toolName` suffix, so the legacy-syntax check sees the same name. */

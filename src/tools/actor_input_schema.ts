@@ -2,8 +2,6 @@ import { createHash } from 'node:crypto';
 
 import type { ValidateFunction } from 'ajv';
 
-import { LruCache } from '@apify/datastructures';
-
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../const.js';
 import { SchemaTooLargeError } from '../errors.js';
 import type { ActorInputSchema, SchemaProperties } from '../types.js';
@@ -16,6 +14,7 @@ import {
     addRequestListSourcesProperties,
     addResourcePickerProperties as addArrayResourcePickerProperties,
 } from '../utils/apify_properties.js';
+import { LruCache } from '../utils/lru.js';
 import { getToolSchemaID } from './actor_tool_naming.js';
 
 type ActorInputSchemaProperties = Record<string, SchemaProperties>;
@@ -112,9 +111,7 @@ const UNTRUSTED_VALIDATOR_CACHE_MAX_CODE_BYTES = 64 * 1024 * 1024;
 // A failed compilation costs as much as a successful one, so the cache remembers its error too.
 const untrustedValidatorCache = new LruCache<
     { validate: ValidateFunction<unknown>; schema: object } | { compileError: unknown }
->({
-    maxLength: UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE,
-});
+>(UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE);
 /** The code of the validators added to the cache since it was last emptied; never less than what it holds. */
 let cachedValidatorCodeBytes = 0;
 
@@ -576,7 +573,7 @@ function addToValidatorCache(
         cachedValidatorCodeBytes = 0;
     }
     cachedValidatorCodeBytes += codeBytes;
-    untrustedValidatorCache.add(cacheKey, entry);
+    untrustedValidatorCache.set(cacheKey, entry);
 }
 
 /**

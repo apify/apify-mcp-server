@@ -230,6 +230,16 @@ describe('create-schedule', () => {
 });
 
 describe('update-schedule', () => {
+    it('is annotated as destructive because it replaces stored fields and actions', () => {
+        expect(updateSchedule.annotations).toEqual({
+            title: 'Update schedule',
+            readOnlyHint: false,
+            destructiveHint: true,
+            idempotentHint: true,
+            openWorldHint: false,
+        });
+    });
+
     it('sends only the provided fields and skips the pre-read for a plain name', async () => {
         const { apifyClient, calls } = mockScheduleApiClient(mockSchedule({ isEnabled: false, nextRunAt: null }));
         const result = await run(updateSchedule, { scheduleId: 'insta-daily', isEnabled: false }, apifyClient);

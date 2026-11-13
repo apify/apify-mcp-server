@@ -76,8 +76,12 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     and wait-timeout modes: storage IDs plus a `summary` (past) / `nextStep` (one primary
     action) pair, never inline dataset items or KV bodies — except the reserved `TIP` key,
     inlined as `tip` on terminal RAG Web Browser runs only.
-  - `runs/` — get/abort runs, run logs, run list.
+  - `runs/` — get/abort runs, run logs, run list. The run and build log tools read the log through
+    `readLogTail` (`../utils/log_tail.ts`), which streams it and keeps only its last `MAX_INLINE_BYTES`.
   - `storage/` — dataset and key-value-store tools plus `storage_helpers.ts`.
+    `get-key-value-store-record` reads a record through `fetchRecordUnderCap` (`sendApifyApiRequest`), not
+    `getRecord()`, which buffers a record of any size whole: over `MAX_INLINE_BYTES` the download stops and
+    the tool returns a link, whatever the content type.
   - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public
     landing page (`task_helpers.ts` holds the shared task response shape and the publication call).
   - `schedules/` — schedule create/get/update/delete for Actors and tasks; `schedule_helpers.ts`

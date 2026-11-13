@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.21.7",
+  "version": "0.21.8",
   "type": "module",
   "description": "Apify MCP Server",
   "mcpName": "com.apify/apify-mcp-server",
@@ -59,7 +59,6 @@
     "model context protocol"
   ],
   "dependencies": {
-    "@apify/datastructures": "^2.0.3",
     "@apify/log": "^2.5.16",
     "@apify/utilities": "^2.25.1",
     "@modelcontextprotocol/ext-apps": "^1.1.2",
