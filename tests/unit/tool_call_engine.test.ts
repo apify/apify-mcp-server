@@ -26,6 +26,7 @@ import {
     REPORT_PROBLEM_NUDGE,
     reportProblem,
 } from '../../src/tools/dev/report_problem.js';
+import { searchApifyDocs } from '../../src/tools/docs/search_apify_docs.js';
 import { getActorRunList } from '../../src/tools/runs/get_actor_run_list.js';
 import type { ToolCallTelemetryProperties, ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
@@ -173,6 +174,26 @@ describe('prepareToolCall()', () => {
             expect(prepared.standbyRejection).toBeNull();
             expect(prepared.paymentRequiredResult).toBeUndefined();
             expect(telemetryData.tool_name).toBe('recorder-tool');
+        });
+    });
+
+    it('sanitizes logged arguments while preserving the execution input', async () => {
+        const result = await prepareToolCall({
+            tools: new Map([[HELPER_TOOLS.DOCS_SEARCH, searchApifyDocs]]),
+            apifyToken: 'fake-token',
+            name: HELPER_TOOLS.DOCS_SEARCH,
+            args: { query: 'proxy error status code 597' },
+            meta: undefined,
+            requestHeaders: undefined,
+            isTaskRequest: false,
+            mcpSessionId: 's1',
+            telemetryData: null,
+            clientContext: undefined,
+        });
+
+        expect(result).toMatchObject({
+            logSafeArgs: { query: 'proxy failure status code 597' },
+            toolArgs: { query: 'proxy error status code 597' },
         });
     });
 
