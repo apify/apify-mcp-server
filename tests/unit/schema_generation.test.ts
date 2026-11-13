@@ -209,6 +209,22 @@ describe('generateSchemaFromItems — format detection', () => {
         expect(props(result)!.url?.type).toBe('string');
         expect(props(result)!.url?.format).toBeUndefined();
     });
+
+    it('detects email only with a dot inside the domain, with characters on both sides of it', () => {
+        const p = props(generateSchemaFromItems([{ inside: 'a@.b.c', atStart: 'a@.bc', atEnd: 'a@bc.' }]))!;
+        expect(p.inside?.format).toBe('email');
+        expect(p.atStart?.format).toBeUndefined();
+        expect(p.atEnd?.format).toBeUndefined();
+    });
+
+    // Linear time takes well under a millisecond here; the bound only catches time that grows faster than the length.
+    it('checks a 100,000-character string with a dot run after an at sign within a second', () => {
+        const startedAt = performance.now();
+        const result = generateSchemaFromItems([{ text: `a@${'.'.repeat(100_000)} ` }]);
+
+        expect(performance.now() - startedAt).toBeLessThan(1000);
+        expect(props(result)!.text).toEqual({ type: 'string' });
+    });
 });
 
 describe('generateSchemaFromItems — arrays inside items', () => {

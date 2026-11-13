@@ -290,19 +290,45 @@ function dropCutEscape(literal: string): string {
     return trailingBackslashes % 2 === 1 ? withoutUnicode.slice(0, -1) : withoutUnicode;
 }
 
-/** Masks the token in each JSON string literal of `text`, complete or cut off at its end. */
+/** A backslash before one of these escapes nothing, so it ends no string literal. */
+const LINE_TERMINATORS = new Set(['\n', '\r', '\u2028', '\u2029']);
+
+/** `literal` with the token masked in its value; as is when it holds no token or is not a string literal. */
+function maskStringLiteral(literal: string, token: string, isComplete: boolean): string {
+    if (isComplete) {
+        const value = parseStringLiteral(literal);
+        return value?.includes(token) ? JSON.stringify(value.replaceAll(token, REDACTED)) : literal;
+    }
+    const value = parseStringLiteral(`${dropCutEscape(literal)}"`);
+    return value?.includes(token) ? JSON.stringify(value.replaceAll(token, REDACTED)).slice(0, -1) : literal;
+}
+
+/**
+ * Masks the token in each JSON string literal of `text`, complete or cut off at its end, in one pass. A literal runs
+ * from a quote to the next quote no backslash escapes; one that reaches the end of `text` is cut off. A backslash
+ * before a line terminator ends no literal: the text up to it is kept as is, and the scan goes on after it.
+ */
 function maskJsonStringLiterals(text: string, token: string): string {
-    return text.replace(
-        /("(?:[^"\\]|\\.)*")|("(?:[^"\\]|\\.)*\\?$)/g,
-        (match: string, complete: string | undefined, unterminated: string | undefined) => {
-            if (complete !== undefined) {
-                const value = parseStringLiteral(complete);
-                return value?.includes(token) ? JSON.stringify(value.replaceAll(token, REDACTED)) : match;
-            }
-            const value = parseStringLiteral(`${dropCutEscape(unterminated ?? '')}"`);
-            return value?.includes(token) ? JSON.stringify(value.replaceAll(token, REDACTED)).slice(0, -1) : match;
-        },
-    );
+    let result = '';
+    let copiedUpTo = 0;
+    let start = text.indexOf('"');
+    while (start !== -1) {
+        let end = start + 1;
+        while (end < text.length && text[end] !== '"') {
+            if (text[end] === '\\' && end + 1 < text.length && LINE_TERMINATORS.has(text[end + 1])) break;
+            end += text[end] === '\\' ? 2 : 1;
+        }
+        if (end < text.length && text[end] === '\\') {
+            start = text.indexOf('"', end + 2);
+            continue;
+        }
+        const isComplete = end < text.length;
+        const literalEnd = isComplete ? end + 1 : text.length;
+        result += text.slice(copiedUpTo, start) + maskStringLiteral(text.slice(start, literalEnd), token, isComplete);
+        copiedUpTo = literalEnd;
+        start = text.indexOf('"', literalEnd);
+    }
+    return result + text.slice(copiedUpTo);
 }
 
 /** The `nextStep` of a response whose body was cut at `MAX_INLINE_BYTES`. Reading stops at the chunk that crosses the limit, so `bytes` is a little under it. */
