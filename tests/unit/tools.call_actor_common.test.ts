@@ -195,7 +195,25 @@ describe('call_actor_common', () => {
             );
         });
 
-        // Only the two standby kinds take the user-error branch. LOAD_FAILED masks a backend fault,
+        it('says that the input schema could not be loaded, not that the Actor was not found', () => {
+            const error = ActorLoadError.inputSchemaNotLoaded('apify/rag-web-browser', new Error('invalid'));
+
+            const response = buildCallActorErrorResponse({
+                actorName: 'apify/rag-web-browser',
+                error,
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH],
+            });
+
+            expect(response.isError).toBe(true);
+            expect((response.content ?? []).map(textOf).join('\n')).toBe(
+                'Actor "apify/rag-web-browser" was not loaded because its input schema is not valid.',
+            );
+            expect(response.toolTelemetry).toEqual(
+                expect.objectContaining({ toolStatus: TOOL_STATUS.SOFT_FAIL, failureDetail: error.kind }),
+            );
+        });
+
+        // Only the sanitized kinds take the user-error branch. LOAD_FAILED masks a backend fault,
         // so it must stay on the generic server-error path and keep its INTERNAL_ERROR telemetry.
         it('keeps a LOAD_FAILED Actor load failure on the generic server-error path', () => {
             const error = ActorLoadError.loadFailed('apify/rag-web-browser');
@@ -463,6 +481,40 @@ describe('call_actor_common', () => {
             } as unknown as ToolEntry;
             vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [tool], errors: [] });
         }
+
+        it('serves an MCP-server Actor that loaded without one of its tools', async () => {
+            const tool = {
+                type: TOOL_TYPE.ACTOR_MCP,
+                name: 'apify--example-mcp-server--export',
+                actorId: 'actor-id-mcp',
+                actorFullName: 'apify/example-mcp-server',
+                inputSchema: INPUT_SCHEMA,
+                ajvValidate: () => true,
+            } as unknown as ToolEntry;
+            const error = ActorLoadError.inputSchemaNotLoaded(
+                'apify/example-mcp-server',
+                new Error('invalid'),
+                'search',
+            );
+            vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [tool], errors: [error] });
+
+            const resolution = await resolveAndValidateActor({
+                actorName: 'apify/example-mcp-server',
+                input: { query: 'x' },
+                toolArgs: stubToolArgs,
+            });
+
+            expect(resolution).toEqual({ actor: tool });
+        });
+
+        it('throws the load error of an Actor whose input schema is not loaded', async () => {
+            const error = ActorLoadError.inputSchemaNotLoaded('apify/rag-web-browser', new Error('invalid'));
+            vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [], errors: [error] });
+
+            await expect(
+                resolveAndValidateActor({ actorName: 'apify/rag-web-browser', input: {}, toolArgs: stubToolArgs }),
+            ).rejects.toBe(error);
+        });
 
         it('returns a SOFT_FAIL/404 not-found error when the Actor is missing', async () => {
             vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [], errors: [] });

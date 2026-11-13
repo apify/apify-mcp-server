@@ -141,14 +141,20 @@ function isReadOnlyActor({ actor, definition }: ActorInfo): boolean {
  * 5. Prefill/default values are added to descriptions as examples using addExampleValuesToDescriptions()
  *
  * @param {ActorInfo[]} actorsInfo - An array of ActorInfo objects with webServerMcpPath, definition, and Actor.
- * @param options - Optional settings: mcpSessionId for telemetry correlation, actorStore for per-Actor itemsSchema enrichment.
+ * @param options - Optional settings: mcpSessionId for telemetry correlation, actorStore for per-Actor itemsSchema
+ * enrichment, onLoadError for each Actor left out because its input schema cannot be compiled.
  * @returns {Promise<ToolEntry[]>} - A promise that resolves to an array of MCP tools.
  */
 export async function getNormalActorsAsTools(
     actorsInfo: ActorInfo[],
-    options?: { mcpSessionId?: string; actorStore?: ActorStore; isDirectTool?: boolean },
+    options?: {
+        mcpSessionId?: string;
+        actorStore?: ActorStore;
+        isDirectTool?: boolean;
+        onLoadError?: (error: ActorLoadError) => void;
+    },
 ): Promise<ToolEntry[]> {
-    const { mcpSessionId, actorStore, isDirectTool = true } = options ?? {};
+    const { mcpSessionId, actorStore, isDirectTool = true, onLoadError } = options ?? {};
     const tools: ToolEntry[] = [];
 
     for (const actorInfo of actorsInfo) {
@@ -198,6 +204,7 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
                 actorName: definition.actorFullName,
                 mcpSessionId,
             });
+            onLoadError?.(ActorLoadError.inputSchemaNotLoaded(definition.actorFullName, e));
             continue;
         }
 
@@ -305,10 +312,12 @@ export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
     return tools;
 }
 
+/** `onLoadError` receives each tool left out because its input schema cannot be compiled. */
 export async function getMCPServersAsTools(
     actorsInfo: ActorInfo[],
     apifyClient: Pick<ApifyClient, 'token' | 'requestOrigin'>,
     mcpSessionId?: string,
+    onLoadError?: (error: ActorLoadError) => void,
 ): Promise<ToolEntry[]> {
     const { token, requestOrigin } = apifyClient;
     // Payment-provider request with no Apify token: standby Actors aren't supported here, so
@@ -346,7 +355,11 @@ export async function getMCPServersAsTools(
                 // Skip this Actor, connectMCPClient will log the error
                 return [];
             }
-            return await getMCPServerTools(actorId, client, mcpServerUrl, actorInfo.definition.actorFullName);
+            const { actorFullName } = actorInfo.definition;
+            return await getMCPServerTools(actorId, client, mcpServerUrl, actorFullName, (toolName, compileError) => {
+                logHttpError(compileError, 'Failed to compile schema', { actorFullName, toolName, mcpSessionId });
+                onLoadError?.(ActorLoadError.inputSchemaNotLoaded(actorFullName, compileError, toolName));
+            });
         } catch (error) {
             logHttpError(error, 'Failed to load tools from MCP server', {
                 actorFullName: actorInfo.definition.actorFullName,
@@ -418,7 +431,8 @@ export function normalizeActorNameInput(actorName: string): string {
  * Result type for {@link getActorsAsTools}: every requested name produces
  * either a successful load (contributing to `tools` — a single Actor can fan
  * out into multiple tools for MCP-server Actors) or an `ActorLoadError`
- * describing why the load failed.
+ * describing why the load failed. An MCP-server Actor produces both when only
+ * some of its tools are left out (`INPUT_SCHEMA_NOT_LOADED`).
  *
  * Bulk callers (`getActors`, server load-helpers) typically only read
  * `tools`. The single-Actor caller (`call-actor`) reads `errors[0]` to surface
@@ -545,9 +559,10 @@ export async function getActorsAsTools(
         else normalActorsInfo.push(actorInfo);
     }
 
+    const onLoadError = (error: ActorLoadError) => errors.push(error);
     const [normalTools, mcpServerTools] = await Promise.all([
-        getNormalActorsAsTools(normalActorsInfo, { mcpSessionId, actorStore, isDirectTool }),
-        getMCPServersAsTools(actorMCPServersInfo, apifyClient, mcpSessionId),
+        getNormalActorsAsTools(normalActorsInfo, { mcpSessionId, actorStore, isDirectTool, onLoadError }),
+        getMCPServersAsTools(actorMCPServersInfo, apifyClient, mcpSessionId, onLoadError),
     ]);
 
     return { tools: [...normalTools, ...getServerActorsAsTools(serverActorsInfo), ...mcpServerTools], errors };

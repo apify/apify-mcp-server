@@ -8,6 +8,7 @@ import type { ApifyClient } from 'apify-client';
 import log from '@apify/log';
 
 import { defaults, HELPER_TOOLS, type HelperToolName, RETIRED_SELECTOR_NAMES } from '../const.js';
+import { ACTOR_LOAD_ERROR_KIND } from '../errors.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { actorNameToToolName } from '../tools/actor_tool_naming.js';
 import { reportProblem } from '../tools/dev/report_problem.js';
@@ -136,15 +137,25 @@ export function resolveActorsToLoad(input: Input): string[] {
  * Pass `paymentProvider` for sessions authenticated via an external payment
  * provider (x402, Skyfire) so standby/MCP-server Actors are filtered out —
  * see `getActorsAsTools` for the full rationale.
+ *
+ * `onToolNotLoaded` receives one sentence, safe to show to the client, for each tool left out because its
+ * input schema cannot be compiled.
  */
 export async function getActors(
     input: Input,
     apifyClient: ApifyClient,
-    options?: { actorStore?: ActorStore; paymentProvider?: PaymentProvider },
+    options?: {
+        actorStore?: ActorStore;
+        paymentProvider?: PaymentProvider;
+        onToolNotLoaded?: (notice: string) => void;
+    },
 ): Promise<ToolEntry[]> {
     const actorNames = resolveActorsToLoad(input);
     if (actorNames.length === 0) return [];
-    const { tools } = await getActorsAsTools(actorNames, apifyClient, options);
+    const { tools, errors } = await getActorsAsTools(actorNames, apifyClient, options);
+    for (const error of errors) {
+        if (error.kind === ACTOR_LOAD_ERROR_KIND.INPUT_SCHEMA_NOT_LOADED) options?.onToolNotLoaded?.(error.message);
+    }
     return tools;
 }
 

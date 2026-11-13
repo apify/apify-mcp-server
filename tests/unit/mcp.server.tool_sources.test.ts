@@ -9,7 +9,7 @@ import { SERVER_MODE } from '../../src/types.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
 import { getActors } from '../../src/utils/tools_loader.js';
 import { mockActor } from './helpers/actor_build_client.js';
-import { makePaymentProvider } from './helpers/mcp_server.js';
+import { getRequestHandler, makePaymentProvider } from './helpers/mcp_server.js';
 
 // Stub getActors so a load runs without a network fetch to the Apify platform.
 vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
@@ -115,6 +115,56 @@ describe('composing tools in a payment-provider session', () => {
         await load(server, { actors: ['apify/server-actor-test'] });
 
         expect(server.listToolNames()).not.toContain('apify--server-actor-test');
+    });
+});
+
+describe('telling the client about tools left out of a load', () => {
+    const NOTICE =
+        'Tool "search" of Actor "apify/example-mcp-server" was not loaded because its input schema is too large.';
+    const listTools = async (server: ActorsMcpServer, sendNotification: (notification: unknown) => Promise<void>) =>
+        getRequestHandler(server, 'tools/list')({ method: 'tools/list', params: {} }, { sendNotification });
+
+    async function loadWithNotice(): Promise<ActorsMcpServer> {
+        vi.mocked(getActors).mockImplementationOnce(async (_input, _apifyClient, options) => {
+            options?.onToolNotLoaded?.(NOTICE);
+            return [];
+        });
+        const server = makeServer();
+        await load(server, { actors: ['apify/example-mcp-server'] });
+        return server;
+    }
+
+    it('sends each notice once, as a warning log message with the tool list', async () => {
+        const server = await loadWithNotice();
+        const sendNotification = vi.fn().mockResolvedValue(undefined);
+
+        await listTools(server, sendNotification);
+        await listTools(server, sendNotification);
+
+        expect(sendNotification).toHaveBeenCalledExactlyOnceWith({
+            method: 'notifications/message',
+            params: { level: 'warning', data: NOTICE },
+        });
+    });
+
+    it('sends nothing when the client asked for errors only', async () => {
+        const server = await loadWithNotice();
+        const sendNotification = vi.fn().mockResolvedValue(undefined);
+        await getRequestHandler(server, 'logging/setLevel')(
+            { method: 'logging/setLevel', params: { level: 'error' } },
+            {},
+        );
+
+        await listTools(server, sendNotification);
+
+        expect(sendNotification).not.toHaveBeenCalled();
+    });
+
+    it('lists the tools when the notice cannot be sent', async () => {
+        const server = await loadWithNotice();
+        const sendNotification = vi.fn().mockRejectedValue(new Error('Not connected'));
+
+        await expect(listTools(server, sendNotification)).resolves.toEqual({ tools: expect.any(Array) });
     });
 });
 

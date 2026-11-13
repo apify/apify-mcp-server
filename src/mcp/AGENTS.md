@@ -42,7 +42,8 @@ Two MCP protocol revisions are served, each by its own adapter:
   session's request origin (`ApifyClient.requestOrigin`, `APIFY_AI` for the Apify AI client) on every request.
 - `remote_tool_call.ts` — `withRemoteMcpClient()`: connect-call-close round trip for
   `tool_dispatch.ts` and the MCP server Actor tools (`runOnActorMcpServer` in `call_actor_mcp_tool.ts`).
-- `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`, `getProxyMCPServerToolName(actorFullName, toolName)`.
+- `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`, `getProxyMCPServerToolName(actorFullName, toolName)`, and
+  `getMCPServerTools()`, which leaves out a tool whose input schema cannot be compiled and serves the rest.
 - `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`; `resolveOnStandbyOrigin()`:
   resolves a path against the Actor's `standbyUrl` (no `standbyUrl`, no URL) and flags a path that leaves that
   origin, for `getActorMCPServerURL()` and `send-server-actor-request`.
@@ -58,6 +59,10 @@ Two MCP protocol revisions are served, each by its own adapter:
 
 ## Gotchas & invariants
 
+- **A tool left out of a load is reported once.** A load that drops a tool because its input schema cannot be
+  compiled records one sentence on the facade (`takeToolLoadNotices()`); the legacy `tools/list` handler sends it
+  as a `warning` `notifications/message` with the response. The stateless adapter declares no `logging` and sends
+  none; `call-actor` answers with the same sentence for such an Actor.
 - **Facade → adapter, one direction only.** `ActorsMcpServer` (facade) constructs and delegates
   to `LegacyMcpServer`; `createStatelessServer` builds the stateless adapter per request from the
   same facade, which never constructs it. Each adapter reads shared state only through its own

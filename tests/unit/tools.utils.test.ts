@@ -12,7 +12,7 @@ import {
     inferArrayItemType,
     MAX_UNTRUSTED_ENUM_VALUES,
     MAX_UNTRUSTED_SCHEMA_BYTES,
-    MAX_UNTRUSTED_SUBSCHEMA_CHAIN_LENGTH,
+    MAX_UNTRUSTED_SUBSCHEMA_DEPTH,
     MAX_UNTRUSTED_SUBSCHEMAS,
     markInputPropertiesAsRequired,
     shortenProperties,
@@ -77,29 +77,44 @@ describe('compileUntrustedSchema', () => {
         ),
     });
 
-    it('compiles a schema with as many properties as the chain limit, and its validator runs', () => {
-        const { validate } = compileUntrustedSchema(schemaWithProperties(MAX_UNTRUSTED_SUBSCHEMA_CHAIN_LENGTH));
+    it('compiles a schema with more properties than any public Actor has, and its validator runs', () => {
+        const { validate } = compileUntrustedSchema(schemaWithProperties(1100));
         expect(validate({ field0: 'https://example.com' })).toBe(true);
+        expect(validate({ field0: {} })).toBe(false);
     });
 
-    it('throws SchemaTooLargeError on a schema with more properties than the chain limit', () => {
-        expect(() => compileUntrustedSchema(schemaWithProperties(MAX_UNTRUSTED_SUBSCHEMA_CHAIN_LENGTH + 1))).toThrow(
+    it('throws SchemaTooLargeError on a schema whose validator could not run', () => {
+        // Under the subschema limit, and still more properties than a generated validator can hold.
+        expect(() => compileUntrustedSchema(schemaWithProperties(MAX_UNTRUSTED_SUBSCHEMAS - 100))).toThrow(
             SchemaTooLargeError,
         );
     });
 
-    it('adds the siblings of nested properties, tuple items and schema lists to one chain', () => {
-        const third = Math.ceil(MAX_UNTRUSTED_SUBSCHEMA_CHAIN_LENGTH / 3);
-        const strings = Array.from({ length: third }, () => ({ type: 'string' }));
-        const schema = {
-            type: 'object',
-            properties: { rows: { type: 'array', items: [...strings.slice(1), { anyOf: [...strings, true] }] } },
-            allOf: strings,
+    it('throws SchemaTooLargeError when only the validator of a referenced schema could not run', () => {
+        // A schema that refers to itself gets a validator function of its own.
+        const category = {
+            ...schemaWithProperties(MAX_UNTRUSTED_SUBSCHEMAS - 100),
+            additionalProperties: { $ref: '#/$defs/category' },
         };
+        const schema = { type: 'object', properties: { category: { $ref: '#/$defs/category' } }, $defs: { category } };
         expect(() => compileUntrustedSchema(schema)).toThrow(SchemaTooLargeError);
     });
 
-    it('compiles a schema with as many subschemas as the limit when no chain is over its limit', () => {
+    const schemaWithNestedLevels = (levels: number) => {
+        let schema: object = { type: 'string' };
+        for (let level = 0; level < levels; level++) schema = { type: 'object', properties: { child: schema } };
+        return schema;
+    };
+
+    it('compiles a schema nested as deep as the limit, and throws SchemaTooLargeError one level deeper', () => {
+        const { validate } = compileUntrustedSchema(schemaWithNestedLevels(MAX_UNTRUSTED_SUBSCHEMA_DEPTH));
+        expect(validate({ child: { child: {} } })).toBe(true);
+        expect(() => compileUntrustedSchema(schemaWithNestedLevels(MAX_UNTRUSTED_SUBSCHEMA_DEPTH + 1))).toThrow(
+            SchemaTooLargeError,
+        );
+    });
+
+    it('compiles a schema with as many subschemas as the limit, and throws SchemaTooLargeError on one more', () => {
         const groups = Object.fromEntries(
             Array.from({ length: 4 }, (_, index) => [`group${index}`, schemaWithProperties(400)]),
         );
@@ -116,24 +131,167 @@ describe('compileUntrustedSchema', () => {
         );
     });
 
+    it('counts tuple items and the members of schema lists', () => {
+        const half = MAX_UNTRUSTED_SUBSCHEMAS / 2;
+        const strings = Array.from({ length: half }, () => ({ type: 'string' }));
+        const schema = { type: 'object', properties: { row: { type: 'array', items: strings } }, anyOf: strings };
+        expect(() => compileUntrustedSchema(schema)).toThrow(SchemaTooLargeError);
+    });
+
     it('does not count objects inside default, prefill, enum, examples and const values', () => {
-        const records = Array.from({ length: MAX_UNTRUSTED_SUBSCHEMAS }, (_, index) => ({ id: index, active: true }));
+        const records = Array.from({ length: MAX_UNTRUSTED_SUBSCHEMAS }, (_, index) => ({ id: index }));
+        // Keyed records: an object under a keyword that is not a data keyword would be read as a subschema.
+        const recordsById = Object.fromEntries(records.map((record) => [`r${record.id}`, record]));
         const { validate } = compileUntrustedSchema({
             type: 'object',
             properties: {
-                startUrls: { type: 'array', default: records, prefill: records, examples: records },
-                mode: { enum: records, const: records[0], example: records },
+                startUrls: { type: 'array', default: recordsById, prefill: recordsById, examples: records },
+                mode: { enum: records, const: recordsById, example: recordsById },
             },
         });
-        expect(validate({ startUrls: [], mode: records[0] })).toBe(true);
+        expect(validate({ startUrls: [] })).toBe(true);
     });
 
     it('counts the schema of a property that is named like a data keyword', () => {
         const schema = {
             type: 'object',
-            properties: { default: schemaWithProperties(MAX_UNTRUSTED_SUBSCHEMA_CHAIN_LENGTH) },
+            properties: { default: schemaWithProperties(MAX_UNTRUSTED_SUBSCHEMAS) },
         };
         expect(() => compileUntrustedSchema(schema)).toThrow(SchemaTooLargeError);
+    });
+
+    describe('schemas with `$ref`', () => {
+        const address = schemaWithProperties(100);
+        const schemaWithReferences = (count: number, reference: string, definitions: Record<string, unknown>) => ({
+            type: 'object',
+            properties: Object.fromEntries(
+                Array.from({ length: count }, (_, index) => [`address${index}`, { $ref: reference }]),
+            ),
+            $defs: definitions,
+        });
+
+        it('counts a referenced schema at every reference it is copied into', () => {
+            const { validate } = compileUntrustedSchema(schemaWithReferences(10, '#/$defs/address', { address }));
+            expect(validate({ address9: { field0: 'Prague' } })).toBe(true);
+            expect(validate({ address9: { field0: {} } })).toBe(false);
+            // 30 copies of 101 subschemas.
+            expect(() => compileUntrustedSchema(schemaWithReferences(30, '#/$defs/address', { address }))).toThrow(
+                SchemaTooLargeError,
+            );
+        });
+
+        it('counts the bytes of a referenced schema at every reference it is copied into', () => {
+            const country = { type: 'string', description: 'x'.repeat(MAX_UNTRUSTED_SCHEMA_BYTES / 20) };
+            expect(compileUntrustedSchema(schemaWithReferences(10, '#/$defs/country', { country }))).toBeDefined();
+            expect(() => compileUntrustedSchema(schemaWithReferences(30, '#/$defs/country', { country }))).toThrow(
+                SchemaTooLargeError,
+            );
+        });
+
+        it('counts a schema that refers to itself once, however often it is referenced', () => {
+            const category = { ...schemaWithProperties(500), additionalProperties: { $ref: '#/$defs/category' } };
+            const { validate } = compileUntrustedSchema(schemaWithReferences(30, '#/$defs/category', { category }));
+            expect(validate({ address0: { field0: 'Books', sub: { field0: 'Novels' } } })).toBe(true);
+            expect(validate({ address0: { sub: { field0: {} } } })).toBe(false);
+        });
+
+        it('counts a schema that refers to itself again for another spelling of the reference', () => {
+            const category = { ...schemaWithProperties(900), additionalProperties: { $ref: '#/$defs/category' } };
+            const schema = schemaWithReferences(30, '#/$defs/category', { category });
+            expect(compileUntrustedSchema(schema)).toBeDefined();
+            const references = ['#/%24defs/category', '#/$defs/categor%79'];
+            expect(() =>
+                compileUntrustedSchema({ ...schema, anyOf: references.map((reference) => ({ $ref: reference })) }),
+            ).toThrow(SchemaTooLargeError);
+        });
+
+        it('does not count a definition that nothing refers to', () => {
+            const definitions = schemaWithProperties(MAX_UNTRUSTED_SUBSCHEMAS).properties;
+            const { validate } = compileUntrustedSchema({
+                type: 'object',
+                properties: { url: { type: 'string' } },
+                $defs: definitions,
+            });
+            expect(validate({ url: 'https://example.com' })).toBe(true);
+        });
+
+        it('follows a reference to a schema that is only a reference', () => {
+            const definitions = { address, alias: { $ref: '#/$defs/address' } };
+            expect(() => compileUntrustedSchema(schemaWithReferences(30, '#/$defs/alias', definitions))).toThrow(
+                SchemaTooLargeError,
+            );
+        });
+
+        it('counts a schema that refers to itself again for each schema that is only a reference to it', () => {
+            const category = { ...schemaWithProperties(900), additionalProperties: { $ref: '#/$defs/category' } };
+            const aliases = { first: { $ref: '#/$defs/category' }, second: { $ref: '#/$defs/category' } };
+            const schema = schemaWithReferences(1, '#/$defs/first', { category, ...aliases });
+            expect(compileUntrustedSchema(schema)).toBeDefined();
+            expect(() => compileUntrustedSchema({ ...schema, not: { $ref: '#/$defs/second' } })).toThrow(
+                SchemaTooLargeError,
+            );
+        });
+
+        it('reads the escaped characters of a reference', () => {
+            const definitions = { 'postal/address list': address };
+            expect(() =>
+                compileUntrustedSchema(schemaWithReferences(30, '#/$defs/postal~1address%20list', definitions)),
+            ).toThrow(SchemaTooLargeError);
+        });
+
+        it('applies the worst case to a reference with a second number sign', () => {
+            // Ajv drops the trailing sign and compiles `address`.
+            const definitions = { 'address#': { type: 'string' }, address };
+            expect(() => compileUntrustedSchema(schemaWithReferences(30, '#/$defs/address#', definitions))).toThrow(
+                SchemaTooLargeError,
+            );
+        });
+
+        it('does not count the whole schema for a reference to it', () => {
+            const schema = schemaWithReferences(30, '#', {});
+            const { validate } = compileUntrustedSchema({
+                ...schema,
+                properties: { ...schema.properties, ...schemaWithProperties(900).properties },
+            });
+            expect(validate({ address0: { address1: { field0: 'Prague' } } })).toBe(true);
+            expect(validate({ address0: { address1: { field0: {} } } })).toBe(false);
+        });
+
+        it('applies the worst case when it cannot tell where a reference points', () => {
+            // A nested `$id` can change what any reference points to.
+            const definitions = (properties: number) => ({
+                address: { $id: 'address', ...schemaWithProperties(properties) },
+            });
+            const { validate } = compileUntrustedSchema(schemaWithReferences(2, 'address', definitions(3)));
+            expect(validate({ address0: { field0: 'Prague' } })).toBe(true);
+            expect(validate({ address0: { field0: {} } })).toBe(false);
+            expect(() => compileUntrustedSchema(schemaWithReferences(10, '#/$defs/address', definitions(100)))).toThrow(
+                SchemaTooLargeError,
+            );
+            // Not a `#/...` pointer.
+            const anchored = { address: { $anchor: 'address', ...address } };
+            expect(() => compileUntrustedSchema(schemaWithReferences(10, '#address', anchored))).toThrow(
+                SchemaTooLargeError,
+            );
+            // Few bytes and many subschemas.
+            const flags = Object.fromEntries(Array.from({ length: 200 }, (_, index) => [`flag${index}`, true]));
+            const flagged = { address: { $id: 'address', properties: flags } };
+            expect(() => compileUntrustedSchema(schemaWithReferences(3, 'address', flagged))).toThrow(
+                SchemaTooLargeError,
+            );
+        });
+
+        it('ignores references inside data values', () => {
+            const apiDescription = {
+                $id: 'https://example.com/api.json',
+                paths: Array.from({ length: 50 }, () => ({ schema: { $ref: 'components.json#/schemas/User' } })),
+            };
+            const { validate } = compileUntrustedSchema({
+                type: 'object',
+                properties: { specification: { type: 'object', prefill: apiDescription, default: apiDescription } },
+            });
+            expect(validate({ specification: {} })).toBe(true);
+        });
     });
 
     const schemaWithEnumValues = (count: number) => ({
@@ -151,6 +309,11 @@ describe('compileUntrustedSchema', () => {
         expect(() => compileUntrustedSchema(schemaWithEnumValues(MAX_UNTRUSTED_ENUM_VALUES + 1))).toThrow(
             SchemaTooLargeError,
         );
+    });
+
+    it('applies the enum limit inside a definition that nothing refers to', () => {
+        const { country } = schemaWithEnumValues(MAX_UNTRUSTED_ENUM_VALUES + 1).properties;
+        expect(() => compileUntrustedSchema({ type: 'object', definitions: { country } })).toThrow(SchemaTooLargeError);
     });
 
     it('remembers a schema that fails to compile', () => {

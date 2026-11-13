@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ACTOR_LOAD_ERROR_KIND, SchemaTooLargeError } from '../../src/errors.js';
+import { MAX_UNTRUSTED_ENUM_VALUES } from '../../src/tools/actor_input_schema.js';
 import type { ActorInfo, ToolEntry } from '../../src/types.js';
 
 const getActorMCPServerURL = vi.fn();
@@ -63,6 +65,35 @@ describe('getMCPServersAsTools', () => {
             expect.anything(),
             'https://good.apify.actor/mcp',
             'user/good',
+            expect.any(Function),
+        );
+    });
+
+    it('reports a tool the MCP server loaded without, naming the tool, the Actor and the reason', async () => {
+        const goodTool = { tool: { name: 'good-tool' } } as unknown as ToolEntry;
+        getActorMCPServerURL.mockImplementation(async (actor: { id: string }) => `https://${actor.id}.apify.actor/mcp`);
+        connectMCPClient.mockResolvedValue({ close: vi.fn() });
+        getMCPServerTools.mockImplementation(async (...args: unknown[]) => {
+            const onToolSkipped = args[4] as (toolName: string, compileError: unknown) => void;
+            onToolSkipped('search-by-country', new SchemaTooLargeError(MAX_UNTRUSTED_ENUM_VALUES, 'enum values'));
+            return [goodTool];
+        });
+        const onLoadError = vi.fn();
+
+        const tools = await getMCPServersAsTools(
+            [makeActorInfo('good', '/mcp')],
+            { token: 'token-123' },
+            undefined,
+            onLoadError,
+        );
+
+        expect(tools).toEqual([goodTool]);
+        expect(onLoadError).toHaveBeenCalledExactlyOnceWith(
+            expect.objectContaining({
+                kind: ACTOR_LOAD_ERROR_KIND.INPUT_SCHEMA_NOT_LOADED,
+                message:
+                    'Tool "search-by-country" of Actor "user/good" was not loaded because its input schema is too large.',
+            }),
         );
     });
 });

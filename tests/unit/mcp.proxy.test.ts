@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
+import { SchemaTooLargeError } from '../../src/errors.js';
 import {
     MAX_TOOL_NAME_LENGTH,
     MAX_TOOL_NAME_USERNAME_LENGTH,
@@ -10,6 +11,7 @@ import {
     TOOL_NAME_HASH_LENGTH,
 } from '../../src/mcp/const.js';
 import { getMCPServerID, getMCPServerTools, getProxyMCPServerToolName } from '../../src/mcp/proxy.js';
+import { MAX_UNTRUSTED_ENUM_VALUES } from '../../src/tools/actor_input_schema.js';
 import { extractActorId, extractActorName } from '../../src/utils/tools.js';
 
 describe('getMCPServerID()', () => {
@@ -171,6 +173,37 @@ describe('getProxyMCPServerToolName()', () => {
 });
 
 describe('getMCPServerTools()', () => {
+    it('leaves out only the tool whose input schema cannot be compiled, and reports it', async () => {
+        const countries = Array.from({ length: MAX_UNTRUSTED_ENUM_VALUES + 1 }, (_, index) => `C${index}`);
+        const client = {
+            listTools: async () => ({
+                tools: [
+                    { name: 'search', inputSchema: { type: 'object' } },
+                    {
+                        name: 'search-by-country',
+                        inputSchema: { type: 'object', properties: { country: { enum: countries } } },
+                    },
+                    { name: 'export', inputSchema: { type: 'object' } },
+                ],
+            }),
+        } as unknown as Client;
+        const onToolSkipped = vi.fn();
+
+        const tools = await getMCPServerTools(
+            'actor-id',
+            client,
+            'https://example-mcp-server.apify.actor/mcp',
+            'apify/example-mcp-server',
+            onToolSkipped,
+        );
+
+        expect(tools.map(({ name }) => name)).toEqual([
+            'apify--example-mcp-server--search',
+            'apify--example-mcp-server--export',
+        ]);
+        expect(onToolSkipped).toHaveBeenCalledExactlyOnceWith('search-by-country', expect.any(SchemaTooLargeError));
+    });
+
     it('keeps the full username when every tool name fits', async () => {
         const client = {
             listTools: async () => ({

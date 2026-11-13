@@ -3,6 +3,7 @@ import { ApifyClient } from 'apify-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
+import { ActorLoadError } from '../../src/errors.js';
 import { ActorsMcpServer } from '../../src/index.js';
 import type * as ToolsIndexModule from '../../src/tools/index.js';
 import { SERVER_MODE } from '../../src/types.js';
@@ -29,6 +30,23 @@ describe('getActors()', () => {
 
         expect(tools).toEqual([]);
         expect(getActorsAsToolsMock).not.toHaveBeenCalled();
+    });
+
+    it('hands over a notice for a tool left out for its input schema, and for no other load error', async () => {
+        const schemaError = ActorLoadError.inputSchemaNotLoaded(
+            'apify/example-mcp-server',
+            new Error('invalid'),
+            'search',
+        );
+        getActorsAsToolsMock.mockResolvedValueOnce({
+            tools: [],
+            errors: [ActorLoadError.notFound('apify/missing'), schemaError],
+        });
+        const onToolNotLoaded = vi.fn();
+
+        await getActors({ actors: ['apify/missing', 'apify/example-mcp-server'] }, apifyClient, { onToolNotLoaded });
+
+        expect(onToolNotLoaded).toHaveBeenCalledExactlyOnceWith(schemaError.message);
     });
 });
 

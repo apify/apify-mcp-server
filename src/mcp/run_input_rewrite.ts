@@ -46,7 +46,8 @@ export async function loadReplacedDefaultTool(params: {
     const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin });
     const loaded = await getActorsAsTools([actorName], apifyClient, { mcpSessionId });
     const [loadError] = loaded.errors;
-    if (loadError && loadError.kind !== ACTOR_LOAD_ERROR_KIND.NOT_FOUND) throw loadError;
+    // An MCP-server Actor that loaded without some of its tools has both tools and an error.
+    if (loaded.tools.length === 0 && loadError && loadError.kind !== ACTOR_LOAD_ERROR_KIND.NOT_FOUND) throw loadError;
     // An Actor served as an MCP server loads as tools with other names.
     const tool = loaded.tools.find((entry) => entry.name === toolName);
     if (tool) log.info('Served the replaced default tool', { toolName: name, mcpSessionId });

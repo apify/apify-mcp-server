@@ -164,7 +164,8 @@ export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOL
 }
 
 /**
- * Rejection for an Actor whose standby configuration `call-actor` cannot serve. softFail, not
+ * Rejection for an Actor `call-actor` cannot serve: its standby configuration, or (`actorLoadErrorKind`
+ * `input-schema-not-loaded`) an input schema that cannot be loaded. softFail, not
  * logHttpError: the caller asked for an Actor we cannot expose, so this is a client fault and
  * must not raise an error-level alert.
  */
@@ -172,7 +173,11 @@ function respondStandbyRejection(
     error: ActorLoadError,
     opts: { mcpSessionId?: string; actorId?: string; paymentProviderId?: string },
 ): ToolResponse {
-    log.softFail('Rejecting a tool call for an unsupported standby Actor', {
+    const rejected =
+        error.kind === ACTOR_LOAD_ERROR_KIND.INPUT_SCHEMA_NOT_LOADED
+            ? 'an Actor whose input schema is not loaded'
+            : 'an unsupported standby Actor';
+    log.softFail(`Rejecting a tool call for ${rejected}`, {
         // The error's canonical Actor name, not the caller's identifier, which may be an Actor ID.
         // `actorLoadErrorKind` distinguishes which cell rejected it.
         actorName: error.actorName,
@@ -218,13 +223,14 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         });
     }
 
-    // These two kinds (a server Actor without MCP, and a standby Actor under a payment provider) are sanitized,
-    // user-facing reasons: forward them verbatim instead of wrapping them in the generic server-error text.
-    // LOAD_FAILED masks a backend fault and stays below.
+    // These kinds (a server Actor without MCP, a standby Actor under a payment provider, and an Actor whose input
+    // schema cannot be loaded) are sanitized, user-facing reasons: forward them verbatim instead of wrapping them
+    // in the generic server-error text. LOAD_FAILED masks a backend fault and stays below.
     if (
         error instanceof ActorLoadError &&
         (error.kind === ACTOR_LOAD_ERROR_KIND.SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED ||
-            error.kind === ACTOR_LOAD_ERROR_KIND.STANDBY_PAYMENT_NOT_SUPPORTED)
+            error.kind === ACTOR_LOAD_ERROR_KIND.STANDBY_PAYMENT_NOT_SUPPORTED ||
+            error.kind === ACTOR_LOAD_ERROR_KIND.INPUT_SCHEMA_NOT_LOADED)
     ) {
         return respondStandbyRejection(error, { mcpSessionId, actorId });
     }
@@ -424,11 +430,12 @@ export async function resolveAndValidateActor(params: {
 
     // NOT_FOUND falls through to the structured "Actor not found" response below.
     // Any other error (LOAD_FAILED / STANDBY_PAYMENT_NOT_SUPPORTED /
-    // SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED) is rethrown so the outer call-actor handler reports it.
-    // STANDBY_PAYMENT_NOT_SUPPORTED cannot actually appear here: the call above passes no
+    // SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED / INPUT_SCHEMA_NOT_LOADED) is rethrown so the outer call-actor
+    // handler reports it. STANDBY_PAYMENT_NOT_SUPPORTED cannot actually appear here: the call above passes no
     // `paymentProvider`, so `getActorsAsTools`' payment gate never fires. Kept in the list because
     // the rethrow is keyed on "not NOT_FOUND", not on an enumeration of kinds.
-    if (errors[0] && errors[0].kind !== ACTOR_LOAD_ERROR_KIND.NOT_FOUND) {
+    // An MCP-server Actor that loaded without some of its tools has both tools and errors, and is served.
+    if (tools.length === 0 && errors[0] && errors[0].kind !== ACTOR_LOAD_ERROR_KIND.NOT_FOUND) {
         throw errors[0];
     }
     const actor = tools[0];

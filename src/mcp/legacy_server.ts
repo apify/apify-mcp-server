@@ -11,7 +11,7 @@ import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/int
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { InitializeRequest, InitializeResult, Task } from '@modelcontextprotocol/sdk/types.js';
+import type { InitializeRequest, InitializeResult, ServerNotification, Task } from '@modelcontextprotocol/sdk/types.js';
 import {
     CallToolRequestSchema,
     CancelTaskRequestSchema,
@@ -95,6 +95,7 @@ export interface LegacyMcpServerHost {
     resolveApifyClient(params: ApifyRequestParams): ApifyClient | undefined;
     getServerInstructions(): string;
     applyInitialize(request: InitializeRequest): Promise<void>;
+    takeToolLoadNotices(): string[];
 }
 
 /**
@@ -360,14 +361,32 @@ export class LegacyMcpServer {
         });
     }
 
+    /**
+     * Tells the client which tools are missing from the list and why, as `warning` log messages sent with the
+     * `tools/list` response. Best effort: the list is served whether or not the client receives them.
+     */
+    private async sendToolLoadNotices(sendNotification: (notification: ServerNotification) => Promise<void>) {
+        const notices = this.host.takeToolLoadNotices();
+        if (LOG_LEVEL_MAP.warning < (LOG_LEVEL_MAP[this.currentLogLevel] ?? LOG_LEVEL_MAP.info)) return;
+        for (const notice of notices) {
+            await sendNotification({
+                method: 'notifications/message',
+                params: { level: 'warning', data: notice },
+            }).catch((error: unknown) => {
+                log.debug('Failed to send a tool load notice', { errMessage: sanitizeMezmoMessage(String(error)) });
+            });
+        }
+    }
+
     private setupToolHandlers(): void {
         // Handles the request to list tools.
-        this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+        this.server.setRequestHandler(ListToolsRequestSchema, async (_request, extra) => {
             const presentTools = new Set(this.host.tools.keys());
             const { clientParam } = this.host.options;
             const tools = Array.from(this.host.tools.values()).map((tool) =>
                 getToolPublicFieldOnly(tool, { presentTools, clientParam }),
             );
+            await this.sendToolLoadNotices(extra.sendNotification);
             return { tools };
         });
 

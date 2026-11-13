@@ -47,11 +47,16 @@ export function getProxyMCPServerToolName(actorFullName: string, toolName: strin
     return `${cappedName.slice(0, MAX_TOOL_NAME_LENGTH - TOOL_NAME_HASH_LENGTH - 1)}-${hash}`;
 }
 
+/**
+ * Lists the tools of an Actor's MCP server. A tool whose input schema cannot be compiled is left out and
+ * reported to `onToolSkipped`; the other tools are served.
+ */
 export async function getMCPServerTools(
     actorID: string,
     client: Client,
     serverUrl: string,
     actorFullName: string,
+    onToolSkipped?: (toolName: string, compileError: unknown) => void,
 ): Promise<ToolEntry[]> {
     const { tools } = await client.listTools();
     const { escapedUsername, actorName } = parseActorFullName(actorFullName);
@@ -60,8 +65,16 @@ export async function getMCPServerTools(
         escapedUsername !== null &&
         tools.some(({ name }) => `${escapedUsername}--${actorName}--${name}`.length > MAX_TOOL_NAME_LENGTH);
 
-    return tools.map(
-        (tool): ActorMcpTool => ({
+    const loadedTools: ActorMcpTool[] = [];
+    for (const tool of tools) {
+        let ajvValidate;
+        try {
+            ajvValidate = compileUntrustedSchema(tool.inputSchema).validate;
+        } catch (compileError) {
+            onToolSkipped?.(tool.name, compileError);
+            continue;
+        }
+        loadedTools.push({
             type: TOOL_TYPE.ACTOR_MCP,
             actorId: actorID,
             actorFullName,
@@ -70,8 +83,9 @@ export async function getMCPServerTools(
             name: getProxyMCPServerToolName(actorFullName, tool.name, shouldCapUsername),
             description: tool.description || '',
             inputSchema: tool.inputSchema,
-            ajvValidate: compileUntrustedSchema(tool.inputSchema).validate,
+            ajvValidate,
             annotations: tool.annotations,
-        }),
-    );
+        });
+    }
+    return loadedTools;
 }

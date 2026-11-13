@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
+import { ACTOR_LOAD_ERROR_KIND } from '../../src/errors.js';
 import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import type { ActorInfo, SchemaProperties } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
@@ -49,6 +50,26 @@ async function getAnnotations(actorInfo: ActorInfo) {
 const LIMITED = { actorPermissionLevel: 'LIMITED_PERMISSIONS' };
 
 describe('getNormalActorsAsTools()', () => {
+    it('reports an Actor whose input schema cannot be compiled, and loads the other Actors', async () => {
+        const onLoadError = vi.fn();
+
+        const tools = await getNormalActorsAsTools(
+            [
+                createMockActorInfo('apify/unknown-property-type', { inputProperties: { mode: { type: 'text' } } }),
+                createMockActorInfo('apify/rag-web-browser'),
+            ],
+            { onLoadError },
+        );
+
+        expect(tools.map(({ name }) => name)).toEqual(['apify--rag-web-browser']);
+        expect(onLoadError).toHaveBeenCalledExactlyOnceWith(
+            expect.objectContaining({
+                kind: ACTOR_LOAD_ERROR_KIND.INPUT_SCHEMA_NOT_LOADED,
+                message: 'Actor "apify/unknown-property-type" was not loaded because its input schema is not valid.',
+            }),
+        );
+    });
+
     describe('input schema and validator are shared across sessions', () => {
         it('shares one input schema and validator between builds of the same Actor', async () => {
             // Each session's build starts from its own clone of the definition, as getActorsAsTools hands them out.

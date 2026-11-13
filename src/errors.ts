@@ -12,17 +12,22 @@ export class UserInputError extends Error {
 
 /**
  * Thrown by `compileUntrustedSchema` when an untrusted Actor / proxied-MCP input schema exceeds a cap
- * (bytes, subschemas, enum values) that bounds AJV's synchronous codegen. It's a property of the schema,
- * not a server fault, so `logHttpError` logs it as a soft fail and the caller drops just that one tool.
+ * (bytes, subschemas, nested levels, enum values) that bounds AJV's synchronous codegen, or nests too deep for its validator
+ * to run (no `limit` then). It's a property of the schema, not a server fault, so `logHttpError` logs it as a
+ * soft fail and the caller drops just that one tool.
  */
 export class SchemaTooLargeError extends Error {
     override readonly name = 'SchemaTooLargeError';
 
     constructor(
-        public readonly limit: number,
-        unit: 'bytes' | 'subschemas' | 'chained subschemas' | 'enum values',
+        public readonly limit?: number,
+        unit?: 'bytes' | 'subschemas' | 'nested levels' | 'enum values',
     ) {
-        super(`Input schema exceeds the safety limit of ${limit} ${unit}`);
+        super(
+            limit === undefined
+                ? 'Input schema is nested too deep for its validator to run'
+                : `Input schema exceeds the safety limit of ${limit} ${unit}`,
+        );
     }
 }
 
@@ -31,6 +36,7 @@ export const ACTOR_LOAD_ERROR_KIND = {
     LOAD_FAILED: 'load-failed',
     STANDBY_PAYMENT_NOT_SUPPORTED: 'standby-payment-not-supported',
     SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED: 'server-actor-without-mcp-not-supported',
+    INPUT_SCHEMA_NOT_LOADED: 'input-schema-not-loaded',
 } as const;
 export type ActorLoadErrorKind = (typeof ACTOR_LOAD_ERROR_KIND)[keyof typeof ACTOR_LOAD_ERROR_KIND];
 
@@ -80,6 +86,17 @@ export class ActorLoadError extends Error {
             ACTOR_LOAD_ERROR_KIND.SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED,
             actorName,
             `Actor "${actorName}" has no MCP tools or input interface.`,
+        );
+    }
+
+    /** `toolName` is the tool of an MCP server Actor; without it the Actor's own tool was left out. */
+    static inputSchemaNotLoaded(actorName: string, compileError: unknown, toolName?: string): ActorLoadError {
+        const subject = toolName ? `Tool "${toolName}" of Actor "${actorName}"` : `Actor "${actorName}"`;
+        const reason = compileError instanceof SchemaTooLargeError ? 'too large' : 'not valid';
+        return new ActorLoadError(
+            ACTOR_LOAD_ERROR_KIND.INPUT_SCHEMA_NOT_LOADED,
+            actorName,
+            `${subject} was not loaded because its input schema is ${reason}.`,
         );
     }
 

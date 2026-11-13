@@ -157,6 +157,11 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      * inputs instead of growing per reload for the facade's lifetime.
      */
     private readonly toolSources = new Map<string, ToolSource>();
+    /**
+     * One sentence for each tool a load left out because its input schema cannot be compiled, kept until the
+     * client lists the tools. A set, so a repeated load does not repeat a notice.
+     */
+    private readonly pendingToolLoadNotices = new Set<string>();
 
     // Telemetry configuration (resolved from options and env vars, see setupTelemetry)
     public readonly telemetryEnabled: boolean;
@@ -478,6 +483,17 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         if (!this.clientKnown) this.pendingToolsUntilClientKnown.set(key, source);
     }
 
+    private readonly addToolLoadNotice = (notice: string): void => {
+        this.pendingToolLoadNotices.add(notice);
+    };
+
+    /** Hands over the notices about tools the loads left out. Each notice is handed over once. */
+    public takeToolLoadNotices(): string[] {
+        const notices = [...this.pendingToolLoadNotices];
+        this.pendingToolLoadNotices.clear();
+        return notices;
+    }
+
     /**
      * Loads missing toolNames from a provided list of tool names.
      * Skips toolNames that are already loaded and loads only the missing ones.
@@ -491,6 +507,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         const actorTools = await getActors(restoreInput, apifyClient, {
             actorStore: this.actorStore,
             paymentProvider: this.options.paymentProvider,
+            onToolNotLoaded: this.addToolLoadNotice,
         });
 
         this.registerFetchedActorTools(restoreInput, actorTools);
@@ -502,6 +519,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         const actorTools = await getActors(input, apifyClient, {
             actorStore: this.actorStore,
             paymentProvider: this.options.paymentProvider,
+            onToolNotLoaded: this.addToolLoadNotice,
         });
 
         log.debug('Loading tools from query parameters');
@@ -517,6 +535,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         const actorTools = await getActors(input, apifyClient, {
             actorStore: this.actorStore,
             paymentProvider: this.options.paymentProvider,
+            onToolNotLoaded: this.addToolLoadNotice,
         });
         this.registerFetchedActorTools(input, actorTools);
     }
