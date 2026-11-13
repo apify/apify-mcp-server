@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { SchemaTooLargeError } from '../../src/errors.js';
-import { compileUntrustedSchema, MAX_UNTRUSTED_VALIDATOR_CODE_BYTES } from '../../src/tools/actor_input_schema.js';
+import {
+    compileUntrustedSchema,
+    getUntrustedValidatorCacheUsage,
+    MAX_UNTRUSTED_VALIDATOR_CODE_BYTES,
+    MAX_UNTRUSTED_VALIDATOR_NESTING,
+    UNTRUSTED_VALIDATOR_CACHE_MAX_CODE_BYTES,
+    UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE,
+} from '../../src/tools/actor_input_schema.js';
 import type * as AjvModule from '../../src/utils/ajv.js';
 import { createAjv } from '../../src/utils/ajv.js';
 
@@ -54,38 +61,64 @@ describe('compileUntrustedSchema and the validator Ajv generates', () => {
         expect(createAjv).not.toHaveBeenCalled();
     });
 
+    const names = (count: number) => Array.from({ length: count }, (_, index) => `field${index}`);
+    const strings = (count: number) => names(count).map(() => ({ type: 'string' }));
+
+    it.each([
+        ['properties', { type: 'object', properties: Object.fromEntries(names(1400).map((name) => [name, {}])) }],
+        ['members of a schema list', { allOf: strings(900) }],
+        ['tuple items', { type: 'array', items: strings(900) }],
+        ['names a property depends on', { dependencies: { url: names(900) } }],
+        [
+            'properties with dependencies',
+            { dependencies: Object.fromEntries(names(450).map((name) => [name, ['url']])) },
+        ],
+        [
+            'properties and list members together',
+            { properties: Object.fromEntries(names(700).map((name) => [name, {}])), anyOf: strings(700) },
+        ],
+    ])(
+        'refuses a schema whose validator would nest too deep for its %s, before Ajv generates any code',
+        (_name, schema) => {
+            vi.mocked(createAjv).mockClear();
+
+            expect(() => compileUntrustedSchema(schema)).toThrow(SchemaTooLargeError);
+            expect(createAjv).not.toHaveBeenCalled();
+        },
+    );
+
+    it('throws SchemaTooLargeError when the generated code nests deeper than the limit', () => {
+        vi.mocked(createAjv).mockImplementationOnce((checkCode) => {
+            checkCode?.(
+                `${'{'.repeat(MAX_UNTRUSTED_VALIDATOR_NESTING + 1)}${'}'.repeat(MAX_UNTRUSTED_VALIDATOR_NESTING + 1)}`,
+            );
+            return createRealAjv(checkCode);
+        });
+
+        expect(() => compileUntrustedSchema(schemaFor('apify/website-content-crawler'))).toThrow(
+            /nested blocks of validator code/,
+        );
+    });
+
+    it('refuses a schema that asks for asynchronous validation, which is not supported, before Ajv generates any code', () => {
+        vi.mocked(createAjv).mockClear();
+        const schema = { ...schemaFor('apify/instagram-scraper'), $async: true };
+
+        expect(() => compileUntrustedSchema(schema)).toThrow(/not supported/);
+        expect(() => compileUntrustedSchema(schema)).not.toThrow(SchemaTooLargeError);
+        expect(createAjv).not.toHaveBeenCalled();
+        expect(
+            compileUntrustedSchema({ ...schema, $async: false }).validate({ startUrls: ['https://example.com'] }),
+        ).toBe(true);
+    });
+
     it('throws SchemaTooLargeError when the generated code is over the limit', () => {
         addValidatorCodeOnce(MAX_UNTRUSTED_VALIDATOR_CODE_BYTES);
 
         expect(() => compileUntrustedSchema(schemaFor('apify/web-scraper'))).toThrow(SchemaTooLargeError);
     });
 
-    it('checks that the validator runs from a deeper call stack than its own', () => {
-        const countStackFrames = (): number => {
-            const holder: { stack?: string } = {};
-            const { stackTraceLimit } = Error;
-            Error.stackTraceLimit = Infinity;
-            Error.captureStackTrace(holder);
-            Error.stackTraceLimit = stackTraceLimit;
-            return holder.stack?.split('\n').length ?? 0;
-        };
-        const framesAtValidation: number[] = [];
-        vi.mocked(createAjv).mockImplementationOnce((checkCode) =>
-            createRealAjv(checkCode).addKeyword({
-                keyword: 'stackFrames',
-                validate: () => framesAtValidation.push(countStackFrames()) > 0,
-            }),
-        );
-
-        const { validate } = compileUntrustedSchema({ ...schemaFor('apify/cheerio-scraper'), stackFrames: true });
-        validate({});
-
-        const [framesAtCheck, framesAtCall] = framesAtValidation;
-        // Room for the engine to compile the validator again later, from a call deeper than this one.
-        expect(framesAtCheck - framesAtCall).toBeGreaterThanOrEqual(200);
-    });
-
-    it('does not remember that a validator could not run: the answer depends on the engine and the call stack', () => {
+    it('does not remember that Ajv ran out of stack: the answer depends on the engine and the call stack', () => {
         vi.mocked(createAjv).mockImplementationOnce(() => {
             throw new RangeError('Maximum call stack size exceeded');
         });
@@ -106,5 +139,44 @@ describe('compileUntrustedSchema and the validator Ajv generates', () => {
         // Several of the largest validators fit; an unlimited number of them does not.
         expect(compiledCount).toBeGreaterThan(4);
         expect(compiledCount).toBeLessThan(100);
+    });
+
+    it('keeps the validator cache within its two limits, however many distinct schemas load', () => {
+        let mostEntries = 0;
+        let mostCodeBytes = 0;
+        for (let index = 0; index < UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE + 200; index++) {
+            // Every tenth schema stands for a large one.
+            if (index % 10 === 0) addValidatorCodeOnce(MAX_UNTRUSTED_VALIDATOR_CODE_BYTES / 4);
+            compileUntrustedSchema(schemaFor(`apify/distinct-input-${index}`));
+            const { entries, codeBytes } = getUntrustedValidatorCacheUsage();
+            mostEntries = Math.max(mostEntries, entries);
+            mostCodeBytes = Math.max(mostCodeBytes, codeBytes);
+        }
+
+        expect(mostEntries).toBeLessThanOrEqual(UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE);
+        expect(mostCodeBytes).toBeLessThanOrEqual(UNTRUSTED_VALIDATOR_CACHE_MAX_CODE_BYTES);
+        // The cache was full: the limits were reached, not avoided.
+        expect(mostCodeBytes).toBeGreaterThan(UNTRUSTED_VALIDATOR_CACHE_MAX_CODE_BYTES / 2);
+    });
+
+    it('serves a validator that holds no compiled code: it compiles again once the cache has dropped it', () => {
+        const { validate } = compileUntrustedSchema({
+            ...schemaFor('apify/google-search-scraper'),
+            required: ['startUrls'],
+        });
+        // Fills the cache until it is emptied.
+        for (let index = 0; getUntrustedValidatorCacheUsage().entries > 1 || index === 0; index++) {
+            addValidatorCodeOnce(MAX_UNTRUSTED_VALIDATOR_CODE_BYTES / 2);
+            compileUntrustedSchema(schemaFor(`apify/large-search-input-${index}`));
+        }
+        vi.mocked(createAjv).mockClear();
+
+        expect(validate({ startUrls: ['https://example.com'] })).toBe(true);
+        expect(validate({})).toBe(false);
+        expect(validate.errors).toMatchObject([{ keyword: 'required', params: { missingProperty: 'startUrls' } }]);
+        expect(validate({ startUrls: [] })).toBe(true);
+        expect(validate.errors).toBeNull();
+        // One compilation for the four calls.
+        expect(createAjv).toHaveBeenCalledOnce();
     });
 });

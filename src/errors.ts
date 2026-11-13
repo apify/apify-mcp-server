@@ -21,7 +21,7 @@ export class InvalidRequestPathError extends UserInputError {
 /**
  * Thrown by `compileUntrustedSchema` when an untrusted Actor / proxied-MCP input schema exceeds a cap
  * (bytes, validator code, nested levels, enum values) that bounds AJV's synchronous codegen, or nests too deep for
- * its validator to run (no `limit` then). It's a property of the schema, not a server fault, so `logHttpError` logs it as a
+ * Ajv to compile (no `limit` then). It's a property of the schema, not a server fault, so `logHttpError` logs it as a
  * soft fail and the caller drops just that one tool.
  */
 export class SchemaTooLargeError extends Error {
@@ -39,7 +39,7 @@ export class SchemaTooLargeError extends Error {
     ) {
         super(
             limit === undefined
-                ? 'Input schema is nested too deep for its validator to run'
+                ? 'Input schema is nested too deep to compile'
                 : `Input schema exceeds the safety limit of ${limit} ${unit}`,
         );
     }
@@ -50,11 +50,15 @@ const DISPLAYED_NAME_MAX_LENGTH = 64;
 
 /**
  * A name that comes from outside, as plain text for one line of a message: without control and formatting
- * characters, line breaks included, and cut to a fixed length.
+ * characters, line breaks included, and cut to a fixed length. The message shows the name in double quotes, so
+ * every kind of double quote in it becomes a single one and the name cannot end its own quotation.
  */
 function toDisplayedName(name: string): string {
     const characters = [
-        ...name.slice(0, 2 * DISPLAYED_NAME_MAX_LENGTH).replace(/[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/gu, ''),
+        ...name
+            .slice(0, 2 * DISPLAYED_NAME_MAX_LENGTH)
+            .replace(/[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/gu, '')
+            .replace(/["\p{Pi}\p{Pf}\u201E\u201A\uFF02\u301D-\u301F]/gu, "'"),
     ];
     const isCut = characters.length > DISPLAYED_NAME_MAX_LENGTH || name.length > 2 * DISPLAYED_NAME_MAX_LENGTH;
     return `${characters.slice(0, DISPLAYED_NAME_MAX_LENGTH).join('')}${isCut ? '…' : ''}`;

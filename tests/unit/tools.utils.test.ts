@@ -101,8 +101,8 @@ describe('compileUntrustedSchema', () => {
     });
 
     describe('the nesting of the validator code', () => {
-        // The validator of an object with N typed properties nests N blocks and a few more around them.
-        const NESTING_AROUND_PROPERTIES = 8;
+        // The nesting of an object with N typed properties is estimated at N blocks and a few more around them.
+        const NESTING_AROUND_PROPERTIES = 10;
 
         it('compiles a schema with more properties than any public Actor has, and its validator runs', () => {
             const { validate } = compileUntrustedSchema(schemaWithProperties(600));
@@ -210,6 +210,18 @@ describe('compileUntrustedSchema', () => {
             expect(getRefusedLimit(schema)).toBe(TOO_LARGE);
         });
 
+        it.each([
+            ['a keyword with one value', { type: 'string' }],
+            ['a keyword with a list', { required: ['url'] }],
+        ])('counts the names on the way to a subschema for %s', (_name, property) => {
+            const group = (name: string) => ({
+                type: 'object',
+                properties: { [name]: schemaWithProperties(1000, property) },
+            });
+            expect(compileUntrustedSchema(group('settings'))).toBeDefined();
+            expect(getRefusedLimit(group('settings'.padEnd(4000, 's')))).toBe(TOO_LARGE);
+        });
+
         it('counts the names on the way to a subschema for each of its keywords', () => {
             const groupName = (length: number) => 'group'.padEnd(length, 'x');
             const schema = (length: number) => ({
@@ -242,10 +254,12 @@ describe('compileUntrustedSchema', () => {
             expect(getRefusedLimit(schema)).toBe(TOO_LARGE);
         });
 
-        it('counts tuple items and the members of schema lists', () => {
-            const strings = Array.from({ length: 5000 }, () => ({ type: 'string' }));
-            const schema = { type: 'object', properties: { row: { type: 'array', items: strings } }, anyOf: strings };
-            expect(getRefusedLimit(schema)).toBe(TOO_LARGE);
+        it.each(['items', 'anyOf'])('counts the members of an `%s` list', (keyword) => {
+            const codes = Array.from({ length: 30 }, (_, index) => `code${index}`);
+            const members = (count: number) =>
+                Array.from({ length: count }, () => ({ type: 'string', minLength: 1, maxLength: 9, enum: codes }));
+            expect(compileUntrustedSchema({ [keyword]: members(100) })).toBeDefined();
+            expect(getRefusedLimit({ [keyword]: members(700) })).toBe(TOO_LARGE);
         });
 
         it('does not count objects inside default, prefill, enum, examples and const values', () => {
@@ -402,6 +416,31 @@ describe('compileUntrustedSchema', () => {
             // Few bytes and many subschemas.
             const flagged = { address: { $id: 'address', ...schemaWithProperties(600, false) } };
             expect(getRefusedLimit(schemaWithReferences(3, 'address', flagged))).toBe(TOO_LARGE);
+            // Many bytes and few subschemas: every reference can copy the schema in again.
+            const described = (bytes: number) => ({
+                address: { $id: 'address', type: 'string', description: 'x'.repeat(bytes) },
+            });
+            expect(compileUntrustedSchema(schemaWithReferences(1, 'address', described(1000)))).toBeDefined();
+            expect(getRefusedLimit(schemaWithReferences(1, 'address', described(MAX_UNTRUSTED_SCHEMA_BYTES / 3)))).toBe(
+                'bytes',
+            );
+        });
+
+        it('leaves the references of a schema with a nested `$id` to Ajv', () => {
+            // Inside `address` the reference points to its own definition, not to the one of the whole schema.
+            const { validate } = compileUntrustedSchema({
+                type: 'object',
+                properties: {
+                    address: {
+                        $id: 'https://example.com/address.json',
+                        allOf: [{ $ref: '#/definitions/city' }],
+                        definitions: { city: { type: 'object', properties: { name: { type: 'string' } } } },
+                    },
+                },
+                definitions: { city: { allOf: [{ $ref: '#/definitions/city' }] } },
+            });
+            expect(validate({ address: { name: 'Prague' } })).toBe(true);
+            expect(validate({ address: { name: {} } })).toBe(false);
         });
 
         it('ignores references inside data values', () => {

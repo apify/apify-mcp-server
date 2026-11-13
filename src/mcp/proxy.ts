@@ -47,6 +47,9 @@ export function getProxyMCPServerToolName(actorFullName: string, toolName: strin
     return `${cappedName.slice(0, MAX_TOOL_NAME_LENGTH - TOOL_NAME_HASH_LENGTH - 1)}-${hash}`;
 }
 
+/** Compiling the input schemas of one server's tools is synchronous work; after this much of it other requests get their turn. */
+const TOOL_COMPILE_SLICE_MILLIS = 20;
+
 /**
  * Lists the tools of an Actor's MCP server. A tool whose input schema cannot be compiled is left out and
  * reported to `onToolSkipped`; the other tools are served.
@@ -66,7 +69,14 @@ export async function getMCPServerTools(
         tools.some(({ name }) => `${escapedUsername}--${actorName}--${name}`.length > MAX_TOOL_NAME_LENGTH);
 
     const loadedTools: ActorMcpTool[] = [];
+    let sliceStartedAt = performance.now();
     for (const tool of tools) {
+        if (performance.now() - sliceStartedAt > TOOL_COMPILE_SLICE_MILLIS) {
+            await new Promise((resolve) => {
+                setImmediate(resolve);
+            });
+            sliceStartedAt = performance.now();
+        }
         let ajvValidate;
         try {
             ajvValidate = compileUntrustedSchema(tool.inputSchema).validate;

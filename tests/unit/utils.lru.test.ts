@@ -50,6 +50,17 @@ describe('LruCache', () => {
         expect(cache.get('b')).toBeNull();
     });
 
+    it('reports how many entries it holds', () => {
+        const cache = new LruCache<string>(2);
+        expect(cache.size).toBe(0);
+
+        cache.set('a', 'first');
+        cache.set('b', 'second');
+        cache.set('c', 'third');
+
+        expect(cache.size).toBe(2);
+    });
+
     it.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty'])(
         'treats the built-in property name %s as an ordinary key',
         (key) => {

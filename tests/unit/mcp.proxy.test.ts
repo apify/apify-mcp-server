@@ -204,6 +204,40 @@ describe('getMCPServerTools()', () => {
         expect(onToolSkipped).toHaveBeenCalledExactlyOnceWith('search-by-country', expect.any(SchemaTooLargeError));
     });
 
+    it('lets other work run between the tools of a server whose schemas take long to compile', async () => {
+        const toolNames = Array.from({ length: 6 }, (_, index) => `tool-${index}`);
+        const client = {
+            listTools: async () => ({
+                tools: toolNames.map((name) => ({
+                    name,
+                    inputSchema: { type: 'object', properties: { [name]: { type: 'string' } } },
+                })),
+            }),
+        } as unknown as Client;
+        // Every look at the clock is 15 ms after the one before: two tools take longer than one slice of work.
+        let now = 0;
+        const clock = vi.spyOn(performance, 'now').mockImplementation(() => (now += 15));
+        let loadedTools: unknown[] | undefined;
+        let turnsOfOtherWork = 0;
+        const doOtherWork = () => {
+            if (loadedTools) return;
+            turnsOfOtherWork++;
+            setImmediate(doOtherWork);
+        };
+        setImmediate(doOtherWork);
+
+        loadedTools = await getMCPServerTools(
+            'actor-id',
+            client,
+            'https://example-mcp-server.apify.actor/mcp',
+            'apify/example-mcp-server',
+        );
+        clock.mockRestore();
+
+        expect(loadedTools.map((tool) => (tool as { originToolName: string }).originToolName)).toEqual(toolNames);
+        expect(turnsOfOtherWork).toBeGreaterThanOrEqual(2);
+    });
+
     it('keeps the full username when every tool name fits', async () => {
         const client = {
             listTools: async () => ({

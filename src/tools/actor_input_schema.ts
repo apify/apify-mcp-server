@@ -49,10 +49,19 @@ export const MAX_UNTRUSTED_ENUM_VALUES = 3000;
 /**
  * A generated validator checks the properties of an object one inside another, and a JavaScript engine can
  * only compile code that nests so deep; how deep depends on the Node.js version. This limit is below what
- * Node.js 22, 24 and 26 compile, so a schema loads on all of them or on none. The validator of the widest input
- * schema of a public Actor in the Apify Store (2026-10) nests 457 deep.
+ * Node.js 22, 24 and 26 compile, so a schema loads on all of them or on none: an object with 1,300 typed
+ * properties loads. The nesting is estimated from the schema before Ajv runs and measured on the code Ajv
+ * generates. The validator of the widest input schema of a public Actor in the Apify Store (2026-10) nests
+ * 457 deep.
  */
-export const MAX_UNTRUSTED_VALIDATOR_NESTING = 800;
+export const MAX_UNTRUSTED_VALIDATOR_NESTING = 1320;
+
+/**
+ * The part of that nesting that may come from anything but the properties of an object: other keywords, the
+ * members of schema lists and listed values. The validators of the input schemas of public Actors in the Apify
+ * Store (2026-10) use at most 119 of it.
+ */
+export const MAX_UNTRUSTED_VALIDATOR_NESTING_OUTSIDE_PROPERTIES = 800;
 
 /**
  * A schema can apply several references to one and the same value, and the schemas they point to can do so
@@ -95,25 +104,31 @@ const LISTED_VALUES_IN_CODE = 200;
 const LISTED_VALUES_JOIN_DIVISOR = 512;
 /** The code that adds an array index or a property name unknown until run time to a path. */
 const PATH_STEP_CODE_BYTES = 64;
+/** At most this many blocks, one inside another, check one keyword apart from its listed values. */
+const KEYWORD_NESTED_BLOCKS = 2;
+/** The blocks of a validator function around the checks of its schema. */
+const FUNCTION_NESTED_BLOCKS = 4;
 
-/**
- * V8 may drop a compiled function that was not called for a while and compile it again on its next call, from
- * wherever in the stack that call is made. `assertValidatorRuns` calls this many frames deeper to leave room.
- */
-const VALIDATOR_CHECK_STACK_FRAMES = 200;
-
-const UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE = 1000;
+export const UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE = 1000;
 /**
  * V8 keeps the code of every cached validator and several times as much memory for what it compiled from it.
  * The validators of 1,000 typical public Actors have about 44 MB of code together.
  */
-const UNTRUSTED_VALIDATOR_CACHE_MAX_CODE_BYTES = 64 * 1024 * 1024;
+export const UNTRUSTED_VALIDATOR_CACHE_MAX_CODE_BYTES = 64 * 1024 * 1024;
+/** What a caller gets: the schema and a validator that holds no compiled code, see `createServedValidator`. */
+type ServedValidator = { validate: ValidateFunction<unknown>; schema: object };
 // A failed compilation costs as much as a successful one, so the cache remembers its error too.
 const untrustedValidatorCache = new LruCache<
-    { validate: ValidateFunction<unknown>; schema: object } | { compileError: unknown }
+    { compiledValidate: ValidateFunction<unknown>; served: ServedValidator } | { compileError: unknown }
 >(UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE);
 /** The code of the validators added to the cache since it was last emptied; never less than what it holds. */
 let cachedValidatorCodeBytes = 0;
+
+/** How much of its two limits the validator cache uses. */
+export const getUntrustedValidatorCacheUsage = (): { entries: number; codeBytes: number } => ({
+    entries: untrustedValidatorCache.size,
+    codeBytes: cachedValidatorCodeBytes,
+});
 
 const isSubschema = (value: unknown): boolean =>
     typeof value === 'boolean' || (typeof value === 'object' && value !== null && !Array.isArray(value));
@@ -174,7 +189,34 @@ function estimateCodeBytes(subschema: unknown, pathCodeBytes: number): number {
     return codeBytes;
 }
 
-type ChildSubschema = { subschema: unknown; isCompiled: boolean; pathStepCodeBytes: number };
+/**
+ * An upper estimate of the blocks the checks of one subschema open one inside another, without its subschemas:
+ * Ajv checks the next keyword, property, list member or listed value inside the check of the one before.
+ * `properties` counts the blocks of the properties of an object, `others` all the other ones.
+ */
+function estimateNestedBlocks(subschema: unknown): { properties: number; others: number } {
+    const nestedBlocks = { properties: 0, others: 0 };
+    if (typeof subschema !== 'object' || subschema === null) return nestedBlocks;
+    for (const [keyword, value] of Object.entries(subschema)) {
+        if (!CODE_KEYWORDS.has(keyword)) continue;
+
+        nestedBlocks.others += KEYWORD_NESTED_BLOCKS;
+        if (Array.isArray(value)) {
+            nestedBlocks.others += SUBSCHEMA_LIST_KEYWORDS.has(keyword)
+                ? value.length
+                : Math.min(value.length, LISTED_VALUES_IN_CODE);
+        } else if (keyword === 'properties') {
+            nestedBlocks.properties += Object.keys(value ?? {}).length;
+        } else if (keyword === 'dependencies') {
+            for (const member of Object.values(value ?? {})) {
+                nestedBlocks.others += 1 + (Array.isArray(member) ? member.length : 0);
+            }
+        }
+    }
+    return nestedBlocks;
+}
+
+type ChildSubschema = { subschema: unknown; isCompiled: boolean; isDefinition: boolean; pathStepCodeBytes: number };
 
 /** The subschemas directly inside a schema; `default`, `enum` and other data values hold none. */
 function getChildSubschemas(schema: object): ChildSubschema[] {
@@ -182,18 +224,25 @@ function getChildSubschemas(schema: object): ChildSubschema[] {
     for (const [keyword, value] of Object.entries(schema)) {
         if (DATA_KEYWORDS.has(keyword) || typeof value !== 'object' || value === null) continue;
 
-        const isCompiled = !DEFINITION_KEYWORDS.has(keyword);
+        const isDefinition = DEFINITION_KEYWORDS.has(keyword);
+        const isCompiled = !isDefinition;
         if (SUBSCHEMA_MAP_KEYWORDS.has(keyword) || (SUBSCHEMA_LIST_KEYWORDS.has(keyword) && Array.isArray(value))) {
             for (const [name, member] of Object.entries(value)) {
                 if (!isSubschema(member)) continue;
                 childSubschemas.push({
                     subschema: member,
                     isCompiled,
+                    isDefinition,
                     pathStepCodeBytes: getPathStepCodeBytes(keyword, name),
                 });
             }
         } else if (!Array.isArray(value)) {
-            childSubschemas.push({ subschema: value, isCompiled, pathStepCodeBytes: getPathStepCodeBytes(keyword) });
+            childSubschemas.push({
+                subschema: value,
+                isCompiled,
+                isDefinition,
+                pathStepCodeBytes: getPathStepCodeBytes(keyword),
+            });
         }
     }
     return childSubschemas;
@@ -320,6 +369,7 @@ function getSchemasCompiledForReference(
 /**
  * Throws SchemaTooLargeError on a schema over the byte, the validator code, the nesting or the enum limit. The
  * bytes and the code are counted as Ajv compiles them: a referenced schema counts at each place it is compiled.
+ * The nesting of the validator code is estimated for every subschema, a definition as a validator of its own.
  */
 function validateSchemaSize(schema: object, serialized: string, schemaReferences: SchemaReferences | undefined): void {
     let schemaBytes = Buffer.byteLength(serialized);
@@ -341,10 +391,31 @@ function validateSchemaSize(schema: object, serialized: string, schemaReferences
         }
     };
     // `isCompiled` is false inside a definition: Ajv compiles it where it is referenced, not where it stands.
-    const pendingSubschemas: (Omit<ChildSubschema, 'pathStepCodeBytes'> & { depth: number; pathCodeBytes: number })[] =
-        [{ subschema: schema, depth: 0, pathCodeBytes: 0, isCompiled: true }];
+    // `nestedBlocks` are the blocks of validator code a subschema is checked inside.
+    const functionNestedBlocks = { properties: 0, others: FUNCTION_NESTED_BLOCKS };
+    const pendingSubschemas: {
+        subschema: unknown;
+        isCompiled: boolean;
+        depth: number;
+        pathCodeBytes: number;
+        nestedBlocks: { properties: number; others: number };
+    }[] = [{ subschema: schema, depth: 0, pathCodeBytes: 0, nestedBlocks: functionNestedBlocks, isCompiled: true }];
     for (let pending = pendingSubschemas.pop(); pending !== undefined; pending = pendingSubschemas.pop()) {
         const { subschema, depth, pathCodeBytes, isCompiled } = pending;
+        const ownNestedBlocks = estimateNestedBlocks(subschema);
+        const nestedBlocks = {
+            properties: pending.nestedBlocks.properties + ownNestedBlocks.properties,
+            others: pending.nestedBlocks.others + ownNestedBlocks.others,
+        };
+        if (nestedBlocks.properties + nestedBlocks.others > MAX_UNTRUSTED_VALIDATOR_NESTING) {
+            throw new SchemaTooLargeError(MAX_UNTRUSTED_VALIDATOR_NESTING, 'nested blocks of validator code');
+        }
+        if (nestedBlocks.others > MAX_UNTRUSTED_VALIDATOR_NESTING_OUTSIDE_PROPERTIES) {
+            throw new SchemaTooLargeError(
+                MAX_UNTRUSTED_VALIDATOR_NESTING_OUTSIDE_PROPERTIES,
+                'nested blocks of validator code',
+            );
+        }
         if (isCompiled) addValidatorCodeBytes(estimateCodeBytes(subschema, pathCodeBytes));
         if (isCompiled && depth > MAX_UNTRUSTED_SUBSCHEMA_DEPTH) {
             throw new SchemaTooLargeError(MAX_UNTRUSTED_SUBSCHEMA_DEPTH, 'nested levels');
@@ -385,6 +456,10 @@ function validateSchemaSize(schema: object, serialized: string, schemaReferences
                     subschema: referencedSchema,
                     depth,
                     pathCodeBytes: pathCodeBytes + getPathStepCodeBytes('$ref', subschema.$ref),
+                    // A schema with references of its own gets a validator function of its own.
+                    nestedBlocks: schemaReferences?.referenceHolders.has(referencedSchema as object)
+                        ? functionNestedBlocks
+                        : nestedBlocks,
                     isCompiled: true,
                 });
             }
@@ -394,6 +469,7 @@ function validateSchemaSize(schema: object, serialized: string, schemaReferences
                 subschema: child.subschema,
                 depth: depth + 1,
                 pathCodeBytes: pathCodeBytes + child.pathStepCodeBytes,
+                nestedBlocks: child.isDefinition ? functionNestedBlocks : nestedBlocks,
                 isCompiled: isCompiled && child.isCompiled,
             });
         }
@@ -483,57 +559,63 @@ function getCodeNesting(code: string): number {
     return deepestNesting;
 }
 
-/** Calls `run` from `frames` calls deeper in the stack. */
-const callFromDeeperStack = (frames: number, run: () => void): void =>
-    frames > 0 ? callFromDeeperStack(frames - 1, run) : run();
-
-/** Defined once, so that a waiting promise keeps no validator alive. */
-const ignoreRejection = (): void => undefined;
-
-/**
- * Throws a RangeError when a compiled validator cannot run. Ajv validates the subschemas of a schema one inside
- * another, V8 compiles a function on its first call, and it cannot compile one whose blocks nest too deep
- * ("Maximum call stack size exceeded"). The nesting limit keeps every schema away from that; this is the last
- * line of defence, for an engine that can compile less than the ones the limit was measured on.
- * A schema Ajv did not copy in at its `$ref` has a validator function of its own.
- */
-function assertValidatorRuns(validate: ValidateFunction<unknown>): void {
-    const validators: unknown[] = [validate];
-    for (const referenced of Object.values(validate.schemaEnv?.refs ?? {})) {
-        if (typeof referenced === 'object' && 'validate' in referenced) validators.push(referenced.validate);
-    }
-    callFromDeeperStack(VALIDATOR_CHECK_STACK_FRAMES, () => {
-        for (const validator of validators) {
-            if (typeof validator !== 'function') continue;
-            // An `$async` schema returns a promise that rejects on invalid data.
-            const result: unknown = validator({});
-            if (result instanceof Promise) result.catch(ignoreRejection);
-        }
-    });
-}
-
 /**
  * Compiles an Actor or proxied-MCP input schema, one validator per schema content.
  *
  * Create a fresh Ajv instance per compilation to avoid unbounded memory growth.
  * Ajv internally caches every compiled schema in a Map that is never evicted.
+ *
+ * The returned validator holds no compiled code, see `createServedValidator`.
  */
 export function compileUntrustedSchema<T extends object>(
     schema: T,
 ): { validate: ValidateFunction<unknown>; schema: T } {
     const serialized = JSON.stringify(schema);
-    // In serialized JSON only a key is a string followed by a colon.
-    const references = serialized.includes('"$ref":') ? findSchemaReferences(schema) : undefined;
-    // Ajv codegen is synchronous; an oversized untrusted schema would freeze the event loop.
-    validateSchemaSize(schema, serialized, references);
-    if (references) assertReferencesEnd(schema, references);
-
     const cacheKey = createHash('sha256').update(serialized).digest('base64');
     const cached = untrustedValidatorCache.get(cacheKey);
     if (cached && 'compileError' in cached) throw cached.compileError;
     // A hit holds a schema with the same content as `schema`, so it is still a T.
-    if (cached) return cached as { validate: ValidateFunction<unknown>; schema: T };
+    if (cached) return cached.served as { validate: ValidateFunction<unknown>; schema: T };
 
+    const served = createServedValidator(cacheKey, schema);
+    compileIntoCache(cacheKey, served, serialized);
+    return served;
+}
+
+/**
+ * The validator a tool keeps: it looks the compiled validator up in the cache at each call and compiles it again
+ * when the cache has dropped it. A tool that stays loaded keeps no compiled code alive this way, so the limits
+ * of the cache are the limits of all the compiled validators of the process.
+ */
+function createServedValidator<T extends object>(
+    cacheKey: string,
+    schema: T,
+): { validate: ValidateFunction<unknown>; schema: T } {
+    // The validator is added below: it refers to `served` itself.
+    const served = { schema } as { validate: ValidateFunction<unknown>; schema: T };
+    const validate = (data: unknown): boolean => {
+        const cached = untrustedValidatorCache.get(cacheKey);
+        const compiledValidate =
+            cached && 'compiledValidate' in cached ? cached.compiledValidate : compileIntoCache(cacheKey, served);
+        const isValid = compiledValidate(data);
+        served.validate.errors = compiledValidate.errors;
+        return isValid;
+    };
+    // It has what the callers of a validator use: the call, `errors` and `schema`.
+    served.validate = Object.assign(validate, { schema }) as unknown as ValidateFunction<unknown>;
+    return served;
+}
+
+/**
+ * Checks and compiles the schema of `served` and adds the validator, or the error it fails with, to the cache.
+ * Throws what `compileUntrustedSchema` throws.
+ */
+function compileIntoCache(
+    cacheKey: string,
+    served: ServedValidator,
+    serialized = JSON.stringify(served.schema),
+): ValidateFunction<unknown> {
+    const { schema } = served;
     let codeBytes = 0;
     // Ajv hands over the code of each validator function before V8 parses it.
     const checkCode = (code: string): void => {
@@ -546,13 +628,20 @@ export function compileUntrustedSchema<T extends object>(
         }
     };
     try {
-        const compiled = { validate: createAjv(checkCode).compile(schema), schema };
-        assertValidatorRuns(compiled.validate);
-        addToValidatorCache(cacheKey, compiled, codeBytes);
-        return compiled;
+        // A validator of such a schema would answer with a promise; the server validates synchronously.
+        if ('$async' in schema && schema.$async) throw new Error('Input schema uses `$async`, which is not supported');
+        // In serialized JSON only a key is a string followed by a colon.
+        const references = serialized.includes('"$ref":') ? findSchemaReferences(schema) : undefined;
+        // Ajv codegen is synchronous; an oversized untrusted schema would freeze the event loop.
+        validateSchemaSize(schema, serialized, references);
+        if (references) assertReferencesEnd(schema, references);
+
+        const compiledValidate = createAjv(checkCode).compile(schema);
+        addToValidatorCache(cacheKey, { compiledValidate, served }, codeBytes);
+        return compiledValidate;
     } catch (error) {
-        // Ajv and V8 both run out of stack on a schema that nests too deep. How deep depends on the Node.js
-        // version and on the stack of this call, so that answer is not kept; every other one follows from the schema.
+        // Ajv runs out of stack on a schema that nests too deep. How deep depends on the Node.js version and on
+        // the stack of this call, so that answer is not kept; every other one follows from the schema.
         if (error instanceof RangeError) throw new SchemaTooLargeError();
         // Until its stack is read, an error keeps what the functions on its stack worked with: here the code Ajv
         // had generated. Reading it leaves only the text.
@@ -565,7 +654,7 @@ export function compileUntrustedSchema<T extends object>(
 /** Empties the cache first when the code of its validators would exceed what the process can hold. */
 function addToValidatorCache(
     cacheKey: string,
-    entry: { validate: ValidateFunction<unknown>; schema: object } | { compileError: unknown },
+    entry: { compiledValidate: ValidateFunction<unknown>; served: ServedValidator } | { compileError: unknown },
     codeBytes: number,
 ): void {
     if (cachedValidatorCodeBytes + codeBytes > UNTRUSTED_VALIDATOR_CACHE_MAX_CODE_BYTES) {

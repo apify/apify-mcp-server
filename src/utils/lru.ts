@@ -31,6 +31,11 @@ export class LruCache<T> {
         this.entries.delete(key);
     }
 
+    /** The number of stored entries. */
+    get size(): number {
+        return this.entries.size;
+    }
+
     clear(): void {
         this.entries.clear();
     }
