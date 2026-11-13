@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.21.9 - **not yet released**
+
+### 🚀 Features
+
+- Forward host-provided headers on Apify API requests ([#1896](https://github.com/apify/apify-mcp-server/pull/1896)) ([f31e004](https://github.com/apify/apify-mcp-server/commit/f31e004c0b00805dc1cdcfe0290e5ee2f7cd1f22)) by [@mfori](https://github.com/mfori)
+
+### 🐛 Bug Fixes
+
+- Pin the redirect policy of Actor MCP connections ([#1895](https://github.com/apify/apify-mcp-server/pull/1895)) ([ad42c6f](https://github.com/apify/apify-mcp-server/commit/ad42c6fe006fd101c7fd3694d1b46f41adfea1b9)) by [@jirispilka](https://github.com/jirispilka), closes [#991](https://github.com/apify/apify-mcp-server/issues/991)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.21.8](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.8) (2026-11-13)
 
 ### 🐛 Bug Fixes

@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import type {
     ActorClient,
     ApifyClientOptions,
@@ -119,6 +121,28 @@ function withLastRunStoreChecks<Client extends ActorClient | TaskClient>(client:
     });
 }
 
+const forwardedHeadersStorage = new AsyncLocalStorage<Record<string, string>>();
+
+/**
+ * Runs `fn` so that every Apify API request made from it, including background work it starts, carries `headers`.
+ * A host uses it to forward headers that came with the token, such as the Console's admin IP proof.
+ * A request the client sends to another origin, such as an Actor's server, does not carry them.
+ */
+export function runWithForwardedApiHeaders<T>(headers: Record<string, string>, fn: () => T): T {
+    return forwardedHeadersStorage.run(headers, fn);
+}
+
+/** The headers of the `runWithForwardedApiHeaders` call the request is made in, when it goes to the API origin. */
+function getForwardedApiHeaders(
+    config: InterceptedRequestConfig,
+    apiBaseUrl: string,
+): Record<string, string> | undefined {
+    const headers = forwardedHeadersStorage.getStore();
+    const url = resolveRequestUrl(config);
+    if (!headers || !url) return undefined;
+    return new URL(url).origin === new URL(apiBaseUrl).origin ? headers : undefined;
+}
+
 type ExtendedApifyClientOptions = Omit<ApifyClientOptions, 'token'> & {
     token?: string | null | undefined;
     /** Payment headers to forward on outbound API requests (from PaymentProvider.getPaymentHeaders) */
@@ -172,11 +196,13 @@ export class ApifyClient extends _ApifyClient {
             ...paymentHeaders,
         };
 
+        // Explicit baseUrl wins over env default.
+        const baseUrl = clientOptions.baseUrl ?? getApifyAPIBaseUrl();
+
         super({
             // token null case is handled, we can assert type here
             ...(clientOptions as ApifyClientOptions),
-            // Explicit baseUrl wins over env default.
-            baseUrl: clientOptions.baseUrl ?? getApifyAPIBaseUrl(),
+            baseUrl,
             // Signed storage links (`getRecordPublicUrl`) are handed to clients, so they take the client-facing origin.
             publicBaseUrl: clientOptions.publicBaseUrl ?? getApifyAPIPublicBaseUrl(),
             userAgentSuffix: USER_AGENT_ORIGIN,
@@ -188,7 +214,7 @@ export class ApifyClient extends _ApifyClient {
                         ...config,
                         httpAgent: sharedAgent,
                         httpsAgent: sharedAgent,
-                        headers: { ...config.headers, ...staticHeaders },
+                        headers: { ...config.headers, ...getForwardedApiHeaders(config, baseUrl), ...staticHeaders },
                     };
                 },
             ],

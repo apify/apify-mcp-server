@@ -5,7 +5,7 @@ FROM node:24-alpine AS builder
 # so the image always matches what we install locally / in CI.
 RUN corepack enable
 
-WORKDIR /app
+WORKDIR /build
 
 # Copy manifests + lockfile first so the install layer caches independently of source.
 # pnpm-workspace.yaml is required because src/web is a workspace package.
@@ -19,16 +19,11 @@ COPY tsconfig.json ./
 # Skip tests/test_kit — dist/stdio.js never imports it.
 RUN pnpm exec tsc -b src && pnpm run build:web && pnpm run postbuild
 
-# Stage 2: Runtime image
-FROM node:24-alpine
-
-RUN corepack enable
-
-WORKDIR /app
-
 # `pnpm deploy --legacy --filter` produces a self-contained node_modules for the
 # named package with production dependencies only — the pnpm equivalent of
 # `npm ci --omit=dev`, with no extra registry resolution at runtime.
+# - Runs in this stage so it copies packages from the pnpm store filled by the
+#   install above instead of downloading them again.
 # - `--filter` is required from the workspace root so pnpm knows which package to
 #   deploy (workspace contains both the server and the `src/web` widget package).
 # - `--legacy` opts out of pnpm v10+'s `inject-workspace-packages` requirement; the
@@ -36,9 +31,15 @@ WORKDIR /app
 #   the correct one (see ERR_PNPM_DEPLOY_NONINJECTED_WORKSPACE).
 # - `--node-linker=hoisted` installs the server's own peer dependencies (`@apify/log`):
 #   here the server is the app, and the default isolated layout leaves them out.
-COPY --from=builder /app /build
-RUN cd /build && pnpm deploy --legacy --filter "@apify/actors-mcp-server" --prod --node-linker=hoisted /app && rm -rf /build
-COPY --from=builder /app/dist ./dist
+RUN pnpm deploy --legacy --filter "@apify/actors-mcp-server" --prod --node-linker=hoisted /app
+
+# Stage 2: Runtime image
+FROM node:24-alpine
+
+WORKDIR /app
+
+COPY --from=builder /app ./
+COPY --from=builder /build/dist ./dist
 # server_card.ts reads server.json at load (resolved as dist/../server.json).
 COPY server.json ./
 
