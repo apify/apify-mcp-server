@@ -3,6 +3,13 @@ import { describe, it } from 'vitest';
 import type { Case, CaseCtx, Fixture } from './types.js';
 
 /**
+ * Retries of a case that sets no `retry`. Cases run against the live platform: an Actor run that usually takes
+ * seconds is now and then still running, or has failed, when the tool's wait ends, and the API can answer 429 while
+ * several CI jobs share one account. A case that fails for a real reason fails on the retry too.
+ */
+const DEFAULT_RETRY = 1;
+
+/**
  * Register cases under `describe(suiteName)`.
  * - `isDeploymentTestOnly`: non-deployment-test → `it.skip`
  * - `skipIf`: also → `it.skip`
@@ -28,13 +35,8 @@ export function registerCases(suiteName: string, cases: Case[], ctx: Omit<CaseCt
             const skip = (ctx.isDeploymentTestOnly && !c.isDeploymentTest) || (c.skipIf?.(fullCtx) ?? false);
             const runIt = skip ? it.skip : it;
             const runFn = async () => c.run(fullCtx);
-            if (c.retry !== undefined || c.timeout !== undefined) {
-                // eslint-disable-next-line vitest/valid-title vitest/expect-expect
-                runIt(c.name, { retry: c.retry, timeout: c.timeout }, runFn);
-            } else {
-                // eslint-disable-next-line vitest/valid-title vitest/expect-expect
-                runIt(c.name, runFn);
-            }
+            // eslint-disable-next-line vitest/valid-title vitest/expect-expect
+            runIt(c.name, { retry: c.retry ?? DEFAULT_RETRY, timeout: c.timeout }, runFn);
         }
     });
 }
