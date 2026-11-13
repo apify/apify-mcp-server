@@ -117,8 +117,7 @@ describe('record keys', () => {
         await expect(getStore(client).getRecord('a/b')).rejects.toMatchObject({ statusCode: 400 });
         await getStore(client).getRecord(KEY);
 
-        expect(urls).toHaveLength(1);
-        expect(urls[0]).toMatch(/\/key-value-store\/records\/OUTPUT\.json-\(1\)!_'$/);
+        expect(urls).toEqual([expect.stringMatching(/\/key-value-store\/records\/OUTPUT\.json-\(1\)!_'$/)]);
     });
 
     it('getRecordPublicUrl builds the link from a valid key and refuses any other', async () => {
@@ -183,21 +182,14 @@ describe('request URLs', () => {
         expect(urls).toEqual(['users/me']);
     });
 
-    it('reads a protocol-relative URL as absolute, as the HTTP library does', async () => {
+    it.each([
+        // Read as absolute, as the HTTP library reads it.
+        ['a protocol-relative URL', { baseURL: `${API}/v2`, url: '//example.com/x' }],
+        ['a relative URL with no baseURL', { url: '/v2/users/me' }],
+    ])('refuses %s', async (_label, config) => {
         const { client, urls } = buildRecordingClient();
 
-        await expect(
-            client.httpClient.axios.request({ baseURL: `${API}/v2`, url: '//example.com/x' }),
-        ).rejects.toMatchObject({ statusCode: 400 });
-        expect(urls).toEqual([]);
-    });
-
-    it('refuses a relative URL with no baseURL', async () => {
-        const { client, urls } = buildRecordingClient();
-
-        await expect(client.httpClient.axios.request({ url: '/v2/users/me' })).rejects.toMatchObject({
-            statusCode: 400,
-        });
+        await expect(client.httpClient.axios.request(config)).rejects.toMatchObject({ statusCode: 400 });
         expect(urls).toEqual([]);
     });
 });

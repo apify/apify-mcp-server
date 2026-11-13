@@ -497,30 +497,18 @@ describe('get-key-value-store-record with a bare store name', () => {
 });
 
 describe('get-key-value-store-record with an invalid key or store name', () => {
-    it('sends no request and fails with an input error that names the key', async () => {
+    it.each([
+        ['key', { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'OUTPUT?x=1' }, '"OUTPUT?x=1"'],
+        ['store name', { keyValueStoreId: 'a?x=1', recordKey: 'OUTPUT' }, '"a?x=1"'],
+    ])('sends no request and fails with an input error that names the %s as given', async (_label, args, named) => {
         const client = new ApifyClient({ token: 'test-token', baseUrl: 'https://api.apify.com', maxRetries: 0 });
         const adapter = vi.fn();
         client.httpClient.axios.defaults.adapter = adapter;
 
-        const call = (getKeyValueStoreRecord as HelperTool).call(
-            stubToolCallContext({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'OUTPUT?x=1' }, client),
-        );
+        const call = (getKeyValueStoreRecord as HelperTool).call(stubToolCallContext(args, client));
 
         await expect(call).rejects.toThrow(InvalidRequestPathError);
-        await expect(call).rejects.toThrow('"OUTPUT?x=1"');
-        expect(adapter).not.toHaveBeenCalled();
-    });
-
-    it('names a refused store name as the caller gave it', async () => {
-        const client = new ApifyClient({ token: 'test-token', baseUrl: 'https://api.apify.com', maxRetries: 0 });
-        const adapter = vi.fn();
-        client.httpClient.axios.defaults.adapter = adapter;
-
-        const call = (getKeyValueStoreRecord as HelperTool).call(
-            stubToolCallContext({ keyValueStoreId: 'a?x=1', recordKey: 'OUTPUT' }, client),
-        );
-
-        await expect(call).rejects.toThrow('"a?x=1"');
+        await expect(call).rejects.toThrow(named);
         expect(adapter).not.toHaveBeenCalled();
     });
 });

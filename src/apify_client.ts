@@ -111,6 +111,14 @@ function withRunStoreChecks(run: RunClient): RunClient {
     return Object.assign(run, { keyValueStore: () => withRecordKeyChecks(keyValueStore.call(run)) });
 }
 
+/** `client` whose last run is wrapped by `withRunStoreChecks`. */
+function withLastRunStoreChecks<Client extends ActorClient | TaskClient>(client: Client): Client {
+    const { lastRun } = client;
+    return Object.assign(client, {
+        lastRun: (...args: Parameters<Client['lastRun']>) => withRunStoreChecks(lastRun.apply(client, args)),
+    });
+}
+
 type ExtendedApifyClientOptions = Omit<ApifyClientOptions, 'token'> & {
     token?: string | null | undefined;
     /** Payment headers to forward on outbound API requests (from PaymentProvider.getPaymentHeaders) */
@@ -190,11 +198,7 @@ export class ApifyClient extends _ApifyClient {
 
     // apify-client writes these IDs into the request path unencoded; each is checked once here, for every caller.
     override actor(id: string): ActorClient {
-        const actor = super.actor(assertValidResourceId(id, 'Actor'));
-        const { lastRun } = actor;
-        return Object.assign(actor, {
-            lastRun: (...args: Parameters<ActorClient['lastRun']>) => withRunStoreChecks(lastRun.apply(actor, args)),
-        });
+        return withLastRunStoreChecks(super.actor(assertValidResourceId(id, 'Actor')));
     }
 
     override build(id: string): BuildClient {
@@ -224,11 +228,7 @@ export class ApifyClient extends _ApifyClient {
     }
 
     override task(id: string): TaskClient {
-        const task = super.task(assertValidResourceId(id, 'task'));
-        const { lastRun } = task;
-        return Object.assign(task, {
-            lastRun: (...args: Parameters<TaskClient['lastRun']>) => withRunStoreChecks(lastRun.apply(task, args)),
-        });
+        return withLastRunStoreChecks(super.task(assertValidResourceId(id, 'task')));
     }
 
     override schedule(id: string): ScheduleClient {
