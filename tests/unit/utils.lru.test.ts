@@ -26,6 +26,10 @@ describe('LruCache', () => {
         cache.set('a', 'new');
         expect(cache.get('a')).toBe('new');
         expect(cache.get('b')).toBe('valueB');
+        cache.set('a', 'newer'); // 'b' is now the least recently used entry.
+        cache.set('c', 'valueC');
+        expect(cache.get('b')).toBeNull();
+        expect(cache.get('a')).toBe('newer');
     });
 
     it('deletes an entry', () => {

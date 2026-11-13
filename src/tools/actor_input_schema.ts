@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 
 import type { ValidateFunction } from 'ajv';
 
-
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../const.js';
 import { SchemaTooLargeError } from '../errors.js';
 import type { ActorInputSchema, SchemaProperties } from '../types.js';
