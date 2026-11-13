@@ -37,7 +37,7 @@ import { ActorsMcpServer } from './mcp/server.js';
 import { getTelemetryEnv } from './telemetry.js';
 import type { ApifyRequestParams, Input, ServerModeOption, TelemetryEnv, ToolSelector } from './types.js';
 import { isApiTokenRequired } from './utils/auth.js';
-import { parseCommaSeparatedList } from './utils/generic.js';
+import { parseQueryParamList } from './utils/generic.js';
 import { injectMcpSessionId } from './utils/mcp.js';
 import { parseServerMode } from './utils/server_mode.js';
 import { getPackageVersion } from './utils/version.js';
@@ -45,9 +45,9 @@ import { getPackageVersion } from './utils/version.js';
 // Keeping this type here and not types.ts since
 // it is only relevant to the CLI/STDIO transport in this file
 type CliArgs = {
-    actors?: string;
+    actors?: string | string[];
     /** Tool categories to include */
-    tools?: string;
+    tools?: string | string[];
     /** Enable or disable telemetry tracking (default: true) */
     telemetryEnabled: boolean;
     /** Telemetry environment: 'PROD' or 'DEV' (default: 'PROD', only used when telemetry-enabled is true) */
@@ -136,8 +136,9 @@ Only used when --telemetry-enabled is true`,
     .epilogue('For more information, visit https://mcp.apify.com or https://github.com/apify/apify-mcp-server')
     .parseSync() as CliArgs;
 
-const actorList = argv.actors !== undefined ? parseCommaSeparatedList(argv.actors) : undefined;
-const toolCategoryKeys = argv.tools !== undefined ? parseCommaSeparatedList(argv.tools) : undefined;
+// yargs turns a repeated flag (`--tools a --tools b`) into an array.
+const actorList = argv.actors !== undefined ? parseQueryParamList(argv.actors) : undefined;
+const toolCategoryKeys = argv.tools !== undefined ? parseQueryParamList(argv.tools) : undefined;
 
 // Propagate log.error to console.error for easier debugging
 const originalError = log.error.bind(log);
