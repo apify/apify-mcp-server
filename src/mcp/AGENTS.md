@@ -46,8 +46,8 @@ Two MCP protocol revisions are served, each by its own adapter:
 - `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`; `resolveOnStandbyOrigin()`:
   resolves a path against the Actor's `standbyUrl` (no `standbyUrl`, no URL) and flags a path that leaves that
   origin, for `getActorMCPServerURL()` and `send-server-actor-request`. It accepts a `standbyUrl` only on an https
-  subdomain of `apify.actor` with the default port, or on a loopback host when the configured API base URL
-  (`getApifyAPIBaseUrl()`) is itself on one (local development); otherwise nothing is sent.
+  subdomain of `apify.actor` with the default port and no credentials, or on a loopback host when the configured
+  API base URL (`getApifyAPIBaseUrl()`) is itself on one (local development); otherwise nothing is sent.
 - `utils.ts` — `processParamsGetTools()`: turns `?actors=` URL params into tools.
 - `tool_call_error_mapper.ts` — shared tool-call error classification.
 - `tool_dispatch.ts` — neutral dispatch for internal, Actor MCP, Actor, and Actor server tools (the last run their

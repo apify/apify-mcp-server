@@ -114,7 +114,7 @@ describe('getActorMCPServerURL', () => {
 
     // The API omits `standbyUrl` when Actor Standby is off; a guessed host would carry the caller's token elsewhere.
     it('throws a configuration error instead of inventing a host when the Actor has no standby URL', async () => {
-        await expect(getActorMCPServerURL({ id: 'abc123' }, '/mcp')).rejects.toThrow(/no valid standby URL/);
+        await expect(getActorMCPServerURL({ id: 'abc123' }, '/mcp')).rejects.toThrow(/standby URL/);
     });
 
     it('throws a configuration error for an unparsable standby URL', async () => {
@@ -152,7 +152,7 @@ describe('accepts a standby URL only on the platform standby domain', () => {
             ['a loopback host', 'http://127.0.0.1:8003'],
         ])('refuses %s', async (_case, standbyUrl) => {
             await expect(getActorMCPServerURL({ id: 'abc123', standbyUrl }, '/mcp')).rejects.toThrow(
-                /Actor abc123 .*not on the platform standby domain/,
+                /Actor abc123 has no valid standby URL/,
             );
         });
     });
@@ -175,7 +175,7 @@ describe('accepts a standby URL only on the platform standby domain', () => {
         it('refuses plain http on another host', async () => {
             await expect(
                 getActorMCPServerURL({ id: 'abc123', standbyUrl: 'http://acme.example.com' }, '/mcp'),
-            ).rejects.toThrow(/standby domain/);
+            ).rejects.toThrow(/no valid standby URL/);
         });
 
         // On the platform, the configured API is the platform API whatever APIFY_API_BASE_URL says.
@@ -184,7 +184,7 @@ describe('accepts a standby URL only on the platform standby domain', () => {
 
             await expect(
                 getActorMCPServerURL({ id: 'abc123', standbyUrl: 'http://127.0.0.1:8003' }, '/mcp'),
-            ).rejects.toThrow(/standby domain/);
+            ).rejects.toThrow(/no valid standby URL/);
         });
     });
 });

@@ -92,11 +92,9 @@ export async function getActorMCPServerURL(
 ): Promise<string> {
     const resolved = resolveOnStandbyOrigin(actor, mcpServerPath);
     if (!resolved) {
-        const problem =
-            actor.standbyUrl && URL.canParse(actor.standbyUrl)
-                ? 'has a standby URL that is not on the platform standby domain'
-                : 'has no valid standby URL in its Actor Standby configuration';
-        throw new Error(`Actor ${actor.id} ${problem}, so its MCP server cannot be reached`);
+        throw new Error(
+            `Actor ${actor.id} has no valid standby URL in its Actor Standby configuration, so its MCP server cannot be reached`,
+        );
     }
     const { url } = resolved;
     if (!url) throw new Error(`Actor ${actor.id} declares a webServerMcpPath that resolves outside its standby origin`);

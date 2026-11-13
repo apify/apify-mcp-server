@@ -889,7 +889,7 @@ describe('rejecting a call before sending', () => {
 
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toContain(`Actor '${SERVER_ACTOR}'`);
-        expect(result.content[0].text).toContain('not on the platform standby domain');
+        expect(result.content[0].text).toContain('has no valid Actor Server URL');
         expect(received).toHaveLength(0);
     });
 

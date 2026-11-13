@@ -371,7 +371,7 @@ describe('call-actor-mcp-tool', () => {
         const result = await execute(executeCallActorMcpTool, { tool: 'add' });
 
         expect(result.isError).toBe(true);
-        expect(JSON.stringify(result.content)).toContain('not on the platform standby domain');
+        expect(JSON.stringify(result.content)).toContain('has no valid standby URL');
         expect(requestHeaders).toHaveLength(0);
     });
 

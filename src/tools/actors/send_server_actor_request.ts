@@ -166,12 +166,7 @@ function buildRequestUrl(
     const resolved = resolveOnStandbyOrigin(actor, path);
     if (!resolved) {
         return {
-            error: respondServerError(
-                actor.standbyUrl && URL.canParse(actor.standbyUrl)
-                    ? `Actor '${actorName}' has an Actor Server URL that is not on the platform standby domain. ` +
-                          'The request was not sent.'
-                    : `Actor '${actorName}' has no valid Actor Server URL. The request was not sent.`,
-            ),
+            error: respondServerError(`Actor '${actorName}' has no valid Actor Server URL. The request was not sent.`),
         };
     }
     // Unlike the MCP URL, a path with credentials is refused rather than stripped: the agent wrote them.
