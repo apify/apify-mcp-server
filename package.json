@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.21.5",
+  "version": "0.21.9",
   "type": "module",
   "description": "Apify MCP Server",
   "mcpName": "com.apify/apify-mcp-server",
@@ -26,6 +26,7 @@
     "./manifest.json": "./manifest.json"
   },
   "peerDependencies": {
+    "@apify/log": "^2.5.16",
     "@modelcontextprotocol/client": "2.3.1"
   },
   "peerDependenciesMeta": {
@@ -59,8 +60,6 @@
     "model context protocol"
   ],
   "dependencies": {
-    "@apify/datastructures": "^2.0.3",
-    "@apify/log": "^2.5.16",
     "@apify/utilities": "^2.25.1",
     "@modelcontextprotocol/ext-apps": "^1.1.2",
     "@modelcontextprotocol/node": "2.1.2",
@@ -81,6 +80,7 @@
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.206",
+    "@apify/log": "^2.5.16",
     "@apify/mcpc": "^0.8.0",
     "@apify/oxlint-config": "^0.2.10",
     "@apify/tsconfig": "^0.1.2",

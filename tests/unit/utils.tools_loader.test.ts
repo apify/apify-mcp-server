@@ -243,6 +243,25 @@ describe('getToolsForServerMode report-problem default injection', () => {
     });
 });
 
+describe('selectors that match no category or tool', () => {
+    // Category lookup must only match the category names themselves, not other object keys.
+    const OBJECT_KEY_SELECTORS = ['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf', 'prototype'];
+    const MODES = ['default', 'apps'] as const;
+
+    describe.each(MODES)('in %s mode', (mode) => {
+        it.each(OBJECT_KEY_SELECTORS)('adds no internal tools for %s', (selector) => {
+            const expected = getToolsForServerMode({ tools: ['docs'] }, [], mode).map((t) => t.name);
+            const toolNames = getToolsForServerMode({ tools: ['docs', selector] }, [], mode).map((t) => t.name);
+            expect(toolNames).toEqual(expected);
+        });
+
+        it.each(OBJECT_KEY_SELECTORS)('resolves %s to the same tool names as another unknown selector', (selector) => {
+            const expected = resolveToolNamesFromInput({ tools: ['docs', 'my-scraper'] }, mode);
+            expect(resolveToolNamesFromInput({ tools: ['docs', selector] }, mode)).toEqual(expected);
+        });
+    });
+});
+
 describe('get-actor-list selection (in no category)', () => {
     it('does not treat tools=get-actor-list as an Actor name', () => {
         expect(resolveActorsToLoad({ tools: [HELPER_TOOLS.ACTOR_LIST_GET] })).toEqual([]);

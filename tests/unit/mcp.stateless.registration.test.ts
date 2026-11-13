@@ -42,10 +42,10 @@ describe('createStatelessServer()', () => {
         });
     });
 
-    // Handler absence is all this can assert. Unlike `tasks/*`, registering nothing does not make
-    // the method answer method-not-found: the SDK's serving entry answers `subscriptions/listen`
-    // upstream of our handlers, with a stream that honors none of our declared capabilities.
-    // Refusing it outright is a follow-up (see the capability block in `stateless_server.ts`).
+    // Unlike `tasks/*`, registering nothing does not make the method answer method-not-found: the
+    // SDK's serving entry answers `subscriptions/listen` itself. No declared capability is
+    // subscribable, so it acknowledges an empty filter, sends a completion result and closes the
+    // stream. That is SDK behavior, so only the handler absence is asserted here.
     it('registers no subscriptions/listen handler', async () => {
         await withStatelessServer(async ({ buildServer }) => {
             expect(listStatelessHandlerMethods(buildServer())).not.toContain('subscriptions/listen');

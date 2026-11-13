@@ -1,11 +1,17 @@
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { AxiosError } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
+import { ApifyClient } from '../../src/apify_client.js';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
+import { InvalidRequestPathError } from '../../src/errors.js';
 import { getKeyValueStoreRecord } from '../../src/tools/storage/get_key_value_store_record.js';
 import { keyValueStoreRecordOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -28,24 +34,56 @@ vi.mock('../../src/utils/userid_cache.js', () => ({
 const MOCK_RECORD = { key: 'INPUT', value: { query: 'hello' }, contentType: 'application/json' };
 const MOCK_STORE = { id: 'KvsWkzbQMuFYuam3Y', name: 'my-store' };
 
+type RequestConfig = { url: string; method: string; params?: unknown; maxContentLength?: number };
+
+/** A record over the size limit: the Content-Type the API sent before axios stopped the download. */
+type OverLimitRecord = { contentType?: string };
+
+/** The abort axios raises once a body crosses `maxContentLength`; its request keeps the response headers. */
+function overLimitAbort({ contentType }: OverLimitRecord): AxiosError {
+    return new AxiosError(`maxContentLength size of ${MAX_INLINE_BYTES} exceeded`, 'ERR_BAD_RESPONSE', undefined, {
+        res: { headers: contentType ? { 'content-type': contentType } : {} },
+    });
+}
+
+/**
+ * Stubs the record request as apify-client's axios instance answers it: `record.value` is the body its
+ * interceptors already parsed by Content-Type, a missing record is a resolved 404, `overLimit` the abort.
+ */
 function stubApifyClient(opts: {
-    record: unknown;
+    record?: unknown;
+    overLimit?: OverLimitRecord;
     store?: unknown;
     onGetRecordPublicUrl?: () => void;
+    onRequest?: (config: RequestConfig) => void;
     /** Egress base URL of the SDK client (ends with `/v2`); `url` is built on it, as apify-client does. */
     baseUrl?: string;
 }): InternalToolArgs['apifyClient'] {
-    const { record, store, onGetRecordPublicUrl, baseUrl = 'https://api.apify.com/v2' } = opts;
+    const { overLimit, store, onGetRecordPublicUrl, onRequest, baseUrl = 'https://api.apify.com/v2' } = opts;
+    const record = opts.record as { value: unknown; contentType?: string } | undefined;
     return mockApifyClient({
         keyValueStore: (id: string) => ({
             url: `${baseUrl}/key-value-stores/${id}`,
-            getRecord: async (_key: string) => record,
             get: async () => store,
             getRecordPublicUrl: async (key: string) => {
                 onGetRecordPublicUrl?.();
                 return `https://api.apify.com/v2/key-value-stores/${id}/records/${key}?signature=signed`;
             },
         }),
+        httpClient: {
+            axios: {
+                request: async (config: RequestConfig) => {
+                    onRequest?.(config);
+                    if (overLimit) throw overLimitAbort(overLimit);
+                    if (!record) return { data: { error: { type: 'record-not-found' } }, headers: {}, status: 404 };
+                    return {
+                        data: record.value,
+                        headers: record.contentType ? { 'content-type': record.contentType } : {},
+                        status: 200,
+                    };
+                },
+            },
+        },
     });
 }
 
@@ -211,11 +249,10 @@ describe('get-key-value-store-record', () => {
     });
 
     it('returns a resource_link instead of inlining a binary record over the size limit', async () => {
-        const bytes = Buffer.alloc(MAX_INLINE_BYTES + 1);
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
                 { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'big.png' },
-                stubApifyClient({ record: { key: 'big.png', value: bytes, contentType: 'image/png' } }),
+                stubApifyClient({ overLimit: { contentType: 'image/png' } }),
             ),
         );
         const { content, isError } = result as CallToolResult;
@@ -225,17 +262,15 @@ describe('get-key-value-store-record', () => {
             type: 'resource_link',
             uri: 'https://api.apify.com/v2/key-value-stores/KvsWkzbQMuFYuam3Y/records/big.png?signature=signed',
             name: 'big.png',
-            size: MAX_INLINE_BYTES + 1,
             mimeType: 'image/png',
         });
     });
 
     it('returns a resource_link without mimeType when the record has no Content-Type', async () => {
-        const bytes = Buffer.alloc(MAX_INLINE_BYTES + 1);
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
                 { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'blob' },
-                stubApifyClient({ record: { key: 'blob', value: bytes, contentType: undefined } }),
+                stubApifyClient({ overLimit: {} }),
             ),
         );
         const { content, isError } = result as CallToolResult;
@@ -245,11 +280,66 @@ describe('get-key-value-store-record', () => {
             type: 'resource_link',
             uri: 'https://api.apify.com/v2/key-value-stores/KvsWkzbQMuFYuam3Y/records/blob?signature=signed',
             name: 'blob',
-            size: MAX_INLINE_BYTES + 1,
         });
     });
 
-    it('returns isError "record not found" when getRecord is undefined but the store exists', async () => {
+    it('returns a resource_link, not the value, for a text record over the size limit', async () => {
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'page.md' },
+                stubApifyClient({ overLimit: { contentType: 'text/markdown; charset=utf-8' } }),
+            ),
+        );
+        const { content, isError, structuredContent } = result as CallToolResult;
+
+        expect(isError).not.toBe(true);
+        expect(content[0]).toMatchObject({ type: 'resource_link', mimeType: 'text/markdown' });
+        expect(structuredContent?.value).toBe(`<text/markdown, over ${MAX_INLINE_BYTES} bytes>`);
+        expect(structuredContent?.summary).toContain(`over the ${MAX_INLINE_BYTES}-byte limit`);
+    });
+
+    // The cap is what keeps a record of any size out of the server's memory.
+    it('requests the record with the response body capped at the inline limit', async () => {
+        const onRequest = vi.fn();
+        await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'INPUT' },
+                stubApifyClient({ record: MOCK_RECORD, onRequest }),
+            ),
+        );
+
+        expect(onRequest).toHaveBeenCalledWith({
+            url: 'https://api.apify.com/v2/key-value-stores/KvsWkzbQMuFYuam3Y/records/INPUT',
+            method: 'GET',
+            params: { attachment: 'true' },
+            isUrlQueryAllowed: true,
+            maxContentLength: MAX_INLINE_BYTES,
+        });
+    });
+
+    it('throws an API failure other than a missing record', async () => {
+        const client = mockApifyClient({
+            keyValueStore: (id: string) => ({ url: `https://api.apify.com/v2/key-value-stores/${id}` }),
+            httpClient: {
+                axios: {
+                    request: async () => ({
+                        data: { error: { type: 'insufficient-permissions', message: 'Insufficient permissions' } },
+                        headers: {},
+                        status: 403,
+                        config: { method: 'get', url: 'https://api.apify.com/v2/key-value-stores/x/records/INPUT' },
+                    }),
+                },
+            },
+        });
+
+        await expect(
+            (getKeyValueStoreRecord as HelperTool).call(
+                stubToolCallContext({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'INPUT' }, client),
+            ),
+        ).rejects.toMatchObject({ statusCode: 403, message: 'Insufficient permissions' });
+    });
+
+    it('returns isError "record not found" when the record is missing but the store exists', async () => {
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
                 { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'MISSING' },
@@ -262,7 +352,7 @@ describe('get-key-value-store-record', () => {
         expect(content[0].text).toContain("Record 'MISSING' not found in key-value store 'KvsWkzbQMuFYuam3Y'");
     });
 
-    it('returns isError "store not found" when both getRecord and store get are undefined', async () => {
+    it('returns isError "store not found" when both the record and the store are missing', async () => {
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
                 { keyValueStoreId: 'missing-kv', recordKey: 'INPUT' },
@@ -294,11 +384,6 @@ describe('get-key-value-store-record', () => {
             { recordKey: 'screenshot.png', value: Buffer.from([0x89, 0x50, 0x4e, 0x47]), contentType: 'image/png' },
             { recordKey: 'clip.mp3', value: Buffer.from([0x49, 0x44, 0x33]), contentType: 'audio/mpeg' },
             { recordKey: 'report.pdf', value: Buffer.from([0x25, 0x50, 0x44, 0x46]), contentType: 'application/pdf' },
-            {
-                recordKey: 'big.png',
-                value: Buffer.alloc(MAX_INLINE_BYTES + 1),
-                contentType: 'image/png',
-            },
         ];
 
         for (const { recordKey, value, contentType } of cases) {
@@ -318,6 +403,22 @@ describe('get-key-value-store-record', () => {
                 });
             });
         }
+
+        it('a record over the size limit', async () => {
+            const result = await (getKeyValueStoreRecord as HelperTool).call(
+                stubToolCallContext(
+                    { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'big.png' },
+                    stubApifyClient({ overLimit: { contentType: 'image/png' } }),
+                ),
+            );
+            expectSchemaConformingStructuredContent(result, keyValueStoreRecordOutputSchema);
+            const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+            expect(structuredContent).toMatchObject({
+                keyValueStoreId: 'KvsWkzbQMuFYuam3Y',
+                key: 'big.png',
+                contentType: 'image/png',
+            });
+        });
     });
 
     // OFFICIAL SDK client — the "pedantic client".
@@ -327,14 +428,14 @@ describe('get-key-value-store-record', () => {
     describe('official SDK client round-trip (pedantic output-schema validation)', () => {
         const tool = getKeyValueStoreRecord as HelperTool;
 
-        async function connectClientForRecord(record: unknown): Promise<Client> {
+        async function connectClientForRecord(stub: Parameters<typeof stubApifyClient>[0]): Promise<Client> {
             const server = new Server({ name: 'test-server', version: '0.0.0' }, { capabilities: { tools: {} } });
             server.setRequestHandler(ListToolsRequestSchema, async () => ({
                 tools: [{ name: tool.name, inputSchema: tool.inputSchema, outputSchema: tool.outputSchema }],
             }));
             server.setRequestHandler(CallToolRequestSchema, async (req) => {
                 const result = (await tool.call(
-                    stubToolCallContext(req.params.arguments ?? {}, stubApifyClient({ record })),
+                    stubToolCallContext(req.params.arguments ?? {}, stubApifyClient(stub)),
                 )) as CallToolResult;
                 // Mirror the real server, which strips internal telemetry before sending the result.
                 return {
@@ -354,9 +455,11 @@ describe('get-key-value-store-record', () => {
 
         it('accepts a binary image fetch that pre-fix threw "did not return structured content"', async () => {
             const client = await connectClientForRecord({
-                key: 'screenshot.png',
-                value: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
-                contentType: 'image/png',
+                record: {
+                    key: 'screenshot.png',
+                    value: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+                    contentType: 'image/png',
+                },
             });
             const result = await client.callTool({
                 name: tool.name,
@@ -373,11 +476,7 @@ describe('get-key-value-store-record', () => {
         });
 
         it('accepts an over-limit binary fetch returned as a resource_link', async () => {
-            const client = await connectClientForRecord({
-                key: 'big.png',
-                value: Buffer.alloc(MAX_INLINE_BYTES + 1),
-                contentType: 'image/png',
-            });
+            const client = await connectClientForRecord({ overLimit: { contentType: 'image/png' } });
             const result = await client.callTool({
                 name: tool.name,
                 arguments: { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'big.png' },
@@ -390,17 +489,19 @@ describe('get-key-value-store-record', () => {
         });
     });
 
-    it('passes wrapper-stripped keyValueStoreId and recordKey to the SDK', async () => {
-        const getRecordSpy = vi.fn().mockResolvedValue(MOCK_RECORD);
-        const kvStoreSpy = vi.fn().mockReturnValue({ getRecord: getRecordSpy, get: async () => MOCK_STORE });
-        const client = mockApifyClient({ keyValueStore: kvStoreSpy });
+    it('requests the wrapper-stripped keyValueStoreId and recordKey', async () => {
+        const onRequest = vi.fn();
 
         await (getKeyValueStoreRecord as HelperTool).call(
-            stubToolCallContext({ keyValueStoreId: '`user~my-store`', recordKey: '`INPUT`' }, client),
+            stubToolCallContext(
+                { keyValueStoreId: '`user~my-store`', recordKey: '`INPUT`' },
+                stubApifyClient({ record: MOCK_RECORD, store: MOCK_STORE, onRequest }),
+            ),
         );
 
-        expect(kvStoreSpy).toHaveBeenCalledWith('user~my-store');
-        expect(getRecordSpy).toHaveBeenCalledWith('INPUT');
+        expect(onRequest).toHaveBeenCalledWith(
+            expect.objectContaining({ url: 'https://api.apify.com/v2/key-value-stores/user~my-store/records/INPUT' }),
+        );
     });
 
     it('appends the store Console link for Console UI token sessions', async () => {
@@ -427,31 +528,31 @@ describe('get-key-value-store-record with a bare store name', () => {
     const STORE_BY_NAME = { id: 'WkzbQMuFYuamGv3YF', name: 'eval-ai-store' };
 
     it("reads the name as one of the caller's own stores", async () => {
-        const kvStoreSpy = vi
-            .fn()
-            .mockReturnValue({ getRecord: async () => MOCK_RECORD, get: async () => STORE_BY_NAME });
+        const onRequest = vi.fn();
 
         await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
                 { keyValueStoreId: 'eval-ai-store', recordKey: 'INPUT' },
-                mockApifyClient({ keyValueStore: kvStoreSpy }),
+                stubApifyClient({ record: MOCK_RECORD, store: STORE_BY_NAME, onRequest }),
             ),
         );
 
-        expect(kvStoreSpy).toHaveBeenCalledWith('~eval-ai-store');
+        expect(onRequest).toHaveBeenCalledWith(
+            expect.objectContaining({ url: 'https://api.apify.com/v2/key-value-stores/~eval-ai-store/records/INPUT' }),
+        );
     });
 
     it('reports a missing record, not a missing store, when the named store exists', async () => {
-        const kvStoreSpy = vi.fn().mockImplementation((id: string) => ({
-            getRecord: async () => undefined,
-            get: async () => (id === '~eval-ai-store' ? STORE_BY_NAME : undefined),
-        }));
+        const client = mockApifyClient({
+            keyValueStore: (id: string) => ({
+                url: `https://api.apify.com/v2/key-value-stores/${id}`,
+                get: async () => (id === '~eval-ai-store' ? STORE_BY_NAME : undefined),
+            }),
+            httpClient: { axios: { request: async () => ({ data: undefined, headers: {}, status: 404 }) } },
+        });
 
         const result = await (getKeyValueStoreRecord as HelperTool).call(
-            stubToolCallContext(
-                { keyValueStoreId: 'eval-ai-store', recordKey: 'MISSING' },
-                mockApifyClient({ keyValueStore: kvStoreSpy }),
-            ),
+            stubToolCallContext({ keyValueStoreId: 'eval-ai-store', recordKey: 'MISSING' }, client),
         );
         const { content } = result as TextToolResult;
 
@@ -475,15 +576,11 @@ describe('get-key-value-store-record with a bare store name', () => {
     });
 
     // A public link is opened without a token, so `~name` (the token holder's store) cannot resolve in it.
-    it('signs the public link of an over-limit binary record on the store ID', async () => {
-        const bytes = Buffer.alloc(MAX_INLINE_BYTES + 1);
+    it('signs the public link of an over-limit record on the store ID', async () => {
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
                 { keyValueStoreId: 'eval-ai-store', recordKey: 'big.png' },
-                stubApifyClient({
-                    record: { key: 'big.png', value: bytes, contentType: 'image/png' },
-                    store: STORE_BY_NAME,
-                }),
+                stubApifyClient({ overLimit: { contentType: 'image/png' }, store: STORE_BY_NAME }),
             ),
         );
         const { content } = result as CallToolResult;
@@ -491,5 +588,70 @@ describe('get-key-value-store-record with a bare store name', () => {
         expect((content[0] as { uri: string }).uri).toBe(
             'https://api.apify.com/v2/key-value-stores/WkzbQMuFYuamGv3YF/records/big.png?signature=signed',
         );
+    });
+});
+
+describe('get-key-value-store-record with an invalid key or store name', () => {
+    it.each([
+        ['key', { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'OUTPUT?x=1' }, '"OUTPUT?x=1"'],
+        ['store name', { keyValueStoreId: 'a?x=1', recordKey: 'OUTPUT' }, '"a?x=1"'],
+    ])('sends no request and fails with an input error that names the %s as given', async (_label, args, named) => {
+        const client = new ApifyClient({ token: 'test-token', baseUrl: 'https://api.apify.com', maxRetries: 0 });
+        const adapter = vi.fn();
+        client.httpClient.axios.defaults.adapter = adapter;
+
+        const call = (getKeyValueStoreRecord as HelperTool).call(stubToolCallContext(args, client));
+
+        await expect(call).rejects.toThrow(InvalidRequestPathError);
+        await expect(call).rejects.toThrow(named);
+        expect(adapter).not.toHaveBeenCalled();
+    });
+});
+
+// The real client against a local server: the stubs above cannot show that the download stops.
+describe('get-key-value-store-record with a record far over the size limit', () => {
+    const RECORD_BYTES = 64 * 1024 * 1024;
+
+    it('stops the download near the limit and returns a link', async () => {
+        let sentBytes = 0;
+        const server = createServer((req, res) => {
+            if (!req.url?.includes('/records/')) {
+                res.writeHead(200, { 'content-type': 'application/json' });
+                res.end(JSON.stringify({ data: MOCK_STORE }));
+                return;
+            }
+            res.writeHead(200, { 'content-type': 'application/zip', 'content-length': RECORD_BYTES });
+            const chunk = Buffer.alloc(64 * 1024);
+            const write = () => {
+                while (sentBytes < RECORD_BYTES && !res.destroyed) {
+                    sentBytes += chunk.length;
+                    if (!res.write(chunk)) {
+                        res.once('drain', write);
+                        return;
+                    }
+                }
+                if (!res.destroyed) res.end();
+            };
+            write();
+        });
+        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+
+        try {
+            const result = await (getKeyValueStoreRecord as HelperTool).call(
+                stubToolCallContext(
+                    { keyValueStoreId: MOCK_STORE.id, recordKey: 'export.zip' },
+                    new ApifyClient({ token: 'test-token', baseUrl, maxRetries: 0 }),
+                ),
+            );
+            const { content } = result as CallToolResult;
+
+            expect(content[0]).toMatchObject({ type: 'resource_link', name: 'export.zip' });
+            // Socket buffers hold some bytes past the limit; a full read would send all of them.
+            expect(sentBytes).toBeLessThan(RECORD_BYTES / 4);
+        } finally {
+            server.closeAllConnections();
+            await new Promise<void>((resolve) => server.close(() => resolve()));
+        }
     });
 });

@@ -1,19 +1,26 @@
 <!-- A PR that is hard to review is not ready for review. One concern per PR, clean diff (no debug logs, formatting noise, commented-out code). -->
 
-<!-- AI agents: fill in Why, What changed, and Proof it works. Leave "Notes for reviewers" empty — it belongs to the human author. No file lists, no restating the diff, no praising the change. -->
+<!-- The opener and Proof are required. Every other section is optional: delete it when it doesn't apply, never leave a heading empty. Don't list files, narrate commits or restate the diff. -->
 
-<!-- Human author: an AI draft is a draft, not a description. Before requesting review: (1) self-review your own diff in the GitHub UI, (2) check every claim below against the diff and cut what you wouldn't say yourself, (3) write "Notes for reviewers" in your own words. -->
+<!-- AI agents: draft only applicable sections. Put long material in the <details> block; delete the block if unused. -->
 
-> **Outside contributors:** maintainers implement unassigned issues. Unless this is a documentation fix or a maintainer asked you to write it, close this and [open an issue](https://github.com/apify/apify-mcp-server/issues) instead. A reproduction is more useful than a patch. See [Before you write code](https://github.com/apify/apify-mcp-server/blob/master/CONTRIBUTING.md#before-you-write-code). Using AI? [Disclose it and show proof](https://github.com/apify/apify-mcp-server/blob/master/CONTRIBUTING.md#ai-assisted-contributions).
+<!-- Human author: the opener is your promise to the reviewer. Rewrite it in your own words and check every visible claim against the diff. If AI wrote parts you don't fully follow, say which after the opener. -->
 
-## Why
-<!-- "Closes #123". No issue? Ad-hoc is the exception, not the default — one line on the problem and why the change is needed. Evidence beats adjectives: a measurement, a failing run, a probe result. -->
+<!-- Outside contributors: only submit documentation fixes or work a maintainer invited you to do. Otherwise, open an issue: https://github.com/apify/apify-mcp-server/issues. See CONTRIBUTING.md for the issue-first and AI disclosure rules. -->
 
-## What changed
-<!-- For a small fix, "Before: … / Now: …" is enough. Don't list files — the diff shows that. Explain the approach only when it's non-obvious; otherwise it's noise. -->
+<!-- Opener, 1–3 sentences: what changes for the user or agent, and why. "Closes #123". Every PR links an issue, except a documentation fix or, in exceptional cases, a maintainer change labelled `adhoc`; then state the problem in one line, evidence beats adjectives. If a decision needs the reviewer's judgement, or you're unsure about a part, add it as one line after the opener. -->
 
-## Notes for reviewers (human-written)
-<!-- Your own words — two sentences beat none. Where should review look hardest? What are you unsure about? If AI wrote parts you don't fully follow, say which — the reviewer must not be the first human to read them. Any impact on apify-mcp-server-internal (internals.js exports, _meta, structuredContent, clientInfo, ?ui=)? -->
+## Before / after
+<!-- A real tool call with its real result text, or a screenshot. -->
 
-## Proof it works
-<!-- Not "unit tests pass" — CI shows that. An end-to-end MCP probe (mcpc transcript), a screenshot, or a link to an Actor run on the Apify platform. "Works on my machine" / "the AI said it works" is not proof. -->
+## Breaking / unchanged
+<!-- State breaking contracts and any impact on apify-mcp-server-internal. Mention unchanged behavior only if a reviewer might reasonably assume it changed. -->
+
+**Proof:** <!-- What you tested and the observed result: a focused regression test, mcpc probe, screenshot, or Actor run. Use mcpc when tool behavior warrants it. Put long output below. -->
+
+<details>
+<summary>Details</summary>
+
+<!-- The approach if non-obvious, mcpc transcripts, eval tables, test matrix. -->
+
+</details>

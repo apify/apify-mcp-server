@@ -196,6 +196,16 @@ describe('create-actor-task', () => {
 });
 
 describe('update-actor-task', () => {
+    it('is annotated as destructive because it replaces the stored input', () => {
+        expect(updateActorTask.annotations).toEqual({
+            title: 'Update Actor task',
+            readOnlyHint: false,
+            destructiveHint: true,
+            idempotentHint: true,
+            openWorldHint: false,
+        });
+    });
+
     it('passes publicConfig through so a task can be prepared for publishing', async () => {
         const { apifyClient, calls } = mockTaskApiClient(mockTask());
         const result = (await (updateActorTask as HelperTool).call(

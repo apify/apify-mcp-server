@@ -549,3 +549,34 @@ describe('MCP connection headers', () => {
         }
     });
 });
+
+describe('MCP connection redirects', () => {
+    it('does not follow a redirect that leaves the MCP server origin, on either transport', async () => {
+        const listen = async (server: HttpServer) => {
+            await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+            return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+        };
+        const otherOriginMethods: (string | undefined)[] = [];
+        const otherOrigin = createServer((req, res) => {
+            otherOriginMethods.push(req.method);
+            res.writeHead(200).end();
+        });
+        const otherOriginUrl = await listen(otherOrigin);
+        const redirectedMethods: (string | undefined)[] = [];
+        const redirecting = createServer((req, res) => {
+            redirectedMethods.push(req.method);
+            // 307 keeps the method, so a client that follows it would repeat both the POST and the GET.
+            res.writeHead(307, { location: `${otherOriginUrl}/mcp` }).end();
+        });
+
+        const client = await connectMCPClient(`${await listen(redirecting)}/mcp`, { token: TOKEN });
+        for (const server of [redirecting, otherOrigin]) {
+            await new Promise<void>((resolve) => server.close(() => resolve()));
+        }
+
+        expect(client).toBeNull();
+        // The streamable transport and the SSE fallback each stopped at the redirect.
+        expect(redirectedMethods).toEqual(['POST', 'GET']);
+        expect(otherOriginMethods).toEqual([]);
+    });
+});

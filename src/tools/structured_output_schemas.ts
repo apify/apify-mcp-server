@@ -1341,6 +1341,7 @@ export const actorDetailsOutputSchema = {
         inputSchema: { type: 'object' as const, description: 'Actor input schema.' },
         outputSchema: { type: 'object' as const, description: 'Output schema inferred from successful runs.' },
         serverInterface: serverInterfaceDetailsSchema,
+        nextStep: nextStepProperty,
     },
 };
 

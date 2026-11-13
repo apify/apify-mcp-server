@@ -70,16 +70,18 @@ describe('getRequestOriginForClient()', () => {
 
 describe('resolveStoreSearchTracking()', () => {
     const meta = { 'com.apify/traceId': 'thread-1', 'com.apify/useCase': 'find a scraper' };
+    // SHA-256 of 'session-1': the session ID is a credential, so only its hash is sent.
+    const SESSION_ID_HASH = '84097828fc31a8c8d29210df48901a85de7fd013f686b17be77d1be29cb7a98b';
 
-    it('takes the trace id from _meta for Apify AI, falling back to the session id', () => {
+    it('takes the trace id from _meta for Apify AI, falling back to the hashed session id', () => {
         expect(resolveStoreSearchTracking('APIFY_AI', meta, 'session-1')).toEqual({ traceId: 'thread-1' });
         expect(resolveStoreSearchTracking('APIFY_AI', { 'com.apify/traceId': ' ' }, 'session-1').traceId).toBe(
-            'session-1',
+            SESSION_ID_HASH,
         );
     });
 
-    it('uses only the session id for other clients, and never a use case from _meta', () => {
-        expect(resolveStoreSearchTracking('MCP', meta, 'session-1')).toEqual({ traceId: 'session-1' });
+    it('uses only the hashed session id for other clients, and never a use case from _meta', () => {
+        expect(resolveStoreSearchTracking('MCP', meta, 'session-1')).toEqual({ traceId: SESSION_ID_HASH });
         expect(resolveStoreSearchTracking('APIFY_AI', meta, 'session-1')).not.toHaveProperty('useCase');
     });
 

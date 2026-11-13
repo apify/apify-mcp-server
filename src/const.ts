@@ -142,6 +142,14 @@ export const MAX_LIMIT_WITH_INPUT_SCHEMA = 10;
 export const STORE_USE_CASE_MAX_LENGTH = 1024;
 /** Max `_traceId` length (UTF-16 code units) the API accepts. */
 export const STORE_TRACE_ID_MAX_LENGTH = 256;
+/**
+ * Max length of an Actor or storage ID-or-name argument. The longest valid value is a full name: a username (at most
+ * 30 characters), a separator and a name (at most 63). The rest leaves room for quotes and spaces that are stripped
+ * before the lookup, and for the removed `actorName:toolName` form, which gets its own error.
+ */
+export const RESOURCE_ID_OR_NAME_MAX_LENGTH = 256;
+/** Max length of a key-value store record key, the platform's limit (`KEY_VALUE_STORE_KEY_REGEX` in `@apify/consts`). */
+export const KEY_VALUE_STORE_KEY_MAX_LENGTH = 256;
 /** Max input fields shown inline in text and structured Actor cards. */
 export const MAX_INPUT_FIELDS_IN_ACTOR_CARD = 20;
 
@@ -287,8 +295,9 @@ export const FAILURE_CATEGORY = {
 
 // Apify API error types
 export const APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED = 'full-permission-actor-not-approved';
-export const APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED = 'memory-limit-exceeded';
+export const APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED = 'actor-memory-limit-exceeded';
 export const APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS = 'cannot-start-actor-runs';
+export const APIFY_ERROR_TYPE_CONCURRENT_RUNS_LIMIT_EXCEEDED = 'concurrent-runs-limit-exceeded';
 export const APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK = 'cannot-publish-actor-task';
 export const APIFY_ERROR_TYPE_INVALID_INPUT = 'invalid-input';
 export const APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE = 'actor-name-not-unique';
