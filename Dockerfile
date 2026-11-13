@@ -29,7 +29,9 @@ RUN pnpm exec tsc -b src && pnpm run build:web && pnpm run postbuild
 # - `--legacy` opts out of pnpm v10+'s `inject-workspace-packages` requirement; the
 #   server doesn't depend on any workspace package at runtime, so the legacy path is
 #   the correct one (see ERR_PNPM_DEPLOY_NONINJECTED_WORKSPACE).
-RUN pnpm deploy --legacy --filter "@apify/actors-mcp-server" --prod /app
+# - `--node-linker=hoisted` installs the server's own peer dependencies (`@apify/log`):
+#   here the server is the app, and the default isolated layout leaves them out.
+RUN pnpm deploy --legacy --filter "@apify/actors-mcp-server" --prod --node-linker=hoisted /app
 
 # Stage 2: Runtime image
 FROM node:24-alpine
