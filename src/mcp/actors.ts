@@ -1,5 +1,8 @@
 import type { ActorDefinition } from 'apify-client';
 
+import log from '@apify/log';
+
+import { getApifyAPIBaseUrl } from '../apify_client.js';
 import type { Actor, ActorDefinitionPruned } from '../types.js';
 import { parseCommaSeparatedList } from '../utils/generic.js';
 import { MCP_STREAMABLE_ENDPOINT } from './const.js';
@@ -29,13 +32,40 @@ export function getActorMCPServerPath(actorDefinition: ActorDefinition | ActorDe
     return null;
 }
 
+/** The platform serves Server Actors on https subdomains of this domain. */
+const SERVER_ACTOR_DOMAIN = 'apify.actor';
+
+function isLoopbackHost(hostname: string): boolean {
+    return hostname === 'localhost' || hostname.endsWith('.localhost') || ['127.0.0.1', '[::1]'].includes(hostname);
+}
+
+/**
+ * Whether requests carrying the caller's token may go to `serverUrl`: an https subdomain of the Server Actor
+ * domain on the default port, or, only when the configured API is itself on a loopback host (local development),
+ * a loopback host. Credentials in the URL are refused.
+ */
+function isAllowedServerActorUrl(serverUrl: URL): boolean {
+    if (serverUrl.username || serverUrl.password) return false;
+    if (serverUrl.protocol === 'https:' && !serverUrl.port && serverUrl.hostname.endsWith(`.${SERVER_ACTOR_DOMAIN}`)) {
+        return true;
+    }
+    const apiBaseUrl = getApifyAPIBaseUrl();
+    return (
+        ['http:', 'https:'].includes(serverUrl.protocol) &&
+        isLoopbackHost(serverUrl.hostname) &&
+        URL.canParse(apiBaseUrl) &&
+        isLoopbackHost(new URL(apiBaseUrl).hostname)
+    );
+}
+
 /**
  * Resolves `path` against the Actor's platform-assigned `standbyUrl` (absent when Actor Standby is off).
  *
  * `path` is publisher-controlled, and the caller's Apify token goes to whatever host the result names. A crafted
  * path (`@host/...`, `.host/...`, `//host/...`, `https://host/...`) could point the token at a third-party host,
  * so `url` is null when the path leaves the standby origin or does not parse. Returns null when the Actor has no
- * valid standby URL; don't build a fallback hostname from the Actor ID: the platform never assigned it.
+ * valid standby URL, or one that `isAllowedServerActorUrl` refuses; don't build a fallback hostname from the Actor
+ * ID: the platform never assigned it.
  */
 export function resolveOnStandbyOrigin(
     actor: Pick<Actor, 'standbyUrl'>,
@@ -45,6 +75,12 @@ export function resolveOnStandbyOrigin(
     // Compare origins produced by the same parser; a raw-string comparison would miss case and default-port
     // differences.
     const standby = new URL(actor.standbyUrl);
+    if (!isAllowedServerActorUrl(standby)) {
+        log.warning('Server Actor URL is outside the Server Actor domain; nothing is sent to it', {
+            serverActorOrigin: standby.origin,
+        });
+        return null;
+    }
     const url = URL.canParse(path, standby.href) ? new URL(path, standby) : null;
     return { standbyOrigin: standby.origin, url: url?.origin === standby.origin ? url : null };
 }
