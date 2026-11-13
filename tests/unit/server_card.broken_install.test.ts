@@ -4,12 +4,12 @@ import { SERVER_NAME, SERVER_TITLE } from '../../src/const.js';
 import type * as GenericModule from '../../src/utils/generic.js';
 import { getPackageVersion } from '../../src/utils/version.js';
 
-/** Loads a fresh `server_card.js` whose `server.json` read is replaced by `readServerJson`. */
+/** Imports a fresh `server_card.js` that reads `server.json` through `readServerJson`. */
 async function importServerCardWith(readServerJson: () => unknown) {
     vi.resetModules();
     vi.doMock('../../src/utils/generic.js', async (importOriginal) => {
         const actual = await importOriginal<typeof GenericModule>();
-        // Only server.json is broken; package.json (read for the version) stays real.
+        // package.json (the version) is still read from disk.
         const readJsonFile = ((importMetaUrl: string, relativePath: string) =>
             relativePath.endsWith('server.json')
                 ? readServerJson()
@@ -19,7 +19,6 @@ async function importServerCardWith(readServerJson: () => unknown) {
     return import('../../src/server_card.js');
 }
 
-// A broken install (truncated npx cache, files mixed from two releases) must not stop the stdio server.
 describe('server info with a broken server.json install', () => {
     afterEach(() => {
         vi.doUnmock('../../src/utils/generic.js');
