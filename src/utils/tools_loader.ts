@@ -228,7 +228,7 @@ export function getToolsForServerMode(
     const internalSelections: ToolEntry[] = [];
     if (selectors !== undefined && selectors.length > 0) {
         for (const sel of selectors) {
-            const categoryTools = categories[sel as ToolCategory];
+            const categoryTools = CATEGORY_NAME_SET.has(sel) ? categories[sel as ToolCategory] : undefined;
             if (categoryTools) {
                 internalSelections.push(...categoryTools);
                 continue;
