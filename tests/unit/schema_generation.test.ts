@@ -96,6 +96,28 @@ describe('generateSchemaFromItems — object merge across items', () => {
     });
 });
 
+describe('generateSchemaFromItems — field names that match built-in object properties', () => {
+    /** Two items where `name` is set only in the second, at the top level and inside `metadata`; parsed from JSON like dataset items. */
+    function itemsWithField(name: string): unknown[] {
+        const field = JSON.stringify(name);
+        return JSON.parse(
+            `[{"title":"A","metadata":{"url":"https://apify.com"}},` +
+                `{"title":"B",${field}:"x","metadata":{"url":"https://apify.com",${field}:1}}]`,
+        );
+    }
+
+    it.each(['constructor', 'toString', 'valueOf', 'hasOwnProperty', '__proto__'])(
+        'infers %s like any other field name',
+        (name) => {
+            const expected = JSON.stringify(generateSchemaFromItems(itemsWithField('rating'))).replaceAll(
+                '"rating"',
+                JSON.stringify(name),
+            );
+            expect(JSON.stringify(generateSchemaFromItems(itemsWithField(name)))).toBe(expected);
+        },
+    );
+});
+
 describe('generateSchemaFromItems — type unification', () => {
     it('promotes integer + number to number', () => {
         const result = generateSchemaFromItems([{ x: 1 }, { x: 1.5 }]);

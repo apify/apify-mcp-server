@@ -33,16 +33,11 @@ export function cleanEmptyArrays(obj: unknown): unknown {
     if (typeof obj !== 'object' || obj === null) {
         return obj;
     }
-    return Object.entries(obj).reduce(
-        (acc, [key, value]) => {
-            const processed = cleanEmptyArrays(value);
-            if (Array.isArray(processed) && processed.length === 0) {
-                return acc;
-            }
-            acc[key] = processed;
-            return acc;
-        },
-        {} as Record<string, unknown>,
+    // `Object.fromEntries` keeps every key, `__proto__` included, as an own property.
+    return Object.fromEntries(
+        Object.entries(obj)
+            .map(([key, value]) => [key, cleanEmptyArrays(value)] as const)
+            .filter(([, processed]) => !(Array.isArray(processed) && processed.length === 0)),
     );
 }
 
@@ -113,10 +108,7 @@ function inferSchema(value: unknown): JsonSchemaProperty {
     if (type === 'object') {
         const entries = Object.entries(value as Record<string, unknown>);
         if (entries.length === 0) return { type: 'object' };
-        const properties: Record<string, JsonSchemaProperty> = {};
-        for (const [k, v] of entries) {
-            properties[k] = inferSchema(v);
-        }
+        const properties = Object.fromEntries(entries.map(([k, v]) => [k, inferSchema(v)]));
         return { type: 'object', properties };
     }
 
@@ -164,14 +156,14 @@ function mergeSchemas(a: JsonSchemaProperty, b: JsonSchemaProperty): JsonSchemaP
         const bp = b.properties ?? {};
         const allKeys = new Set([...Object.keys(ap), ...Object.keys(bp)]);
         if (allKeys.size > 0) {
-            const merged: Record<string, JsonSchemaProperty> = {};
-            for (const k of allKeys) {
-                const av = ap[k];
-                const bv = bp[k];
-                if (av && bv) merged[k] = mergeSchemas(av, bv);
-                else merged[k] = (av ?? bv) as JsonSchemaProperty;
-            }
-            result.properties = merged;
+            // Own-property lookups: a field name may match a built-in object property.
+            result.properties = Object.fromEntries(
+                Array.from(allKeys, (k) => {
+                    const av = Object.hasOwn(ap, k) ? ap[k] : undefined;
+                    const bv = Object.hasOwn(bp, k) ? bp[k] : undefined;
+                    return [k, av && bv ? mergeSchemas(av, bv) : ((av ?? bv) as JsonSchemaProperty)];
+                }),
+            );
         }
     }
 

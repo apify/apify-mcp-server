@@ -23,6 +23,11 @@ const TEXT_MIME_TYPE = 'text/plain';
 
 export const REDACTED = '[REDACTED]';
 
+/** `value` with its query string and fragment cut to `?[REDACTED]`, for logging. */
+export function redactQueryString(value: string): string {
+    return value.replace(/[?#][\s\S]*$/, `?${REDACTED}`);
+}
+
 /** Textual base MIME types (returned as `text`); everything else becomes a base64 `blob`. */
 export function isTextualMimeType(baseMimeType: string | undefined): boolean {
     if (!baseMimeType) return false;
@@ -120,7 +125,10 @@ async function fetchRecordDownloadUrl(uri: string, apifyClient: ApifyClient): Pr
         const store = apifyClient.keyValueStore(safeDecodeURIComponent(match[1]));
         return await store.getRecordPublicUrl(safeDecodeURIComponent(match[2]));
     } catch (err) {
-        logHttpError(err, `Failed to mint signed download URL for ${uri}; falling back to API URL`);
+        logHttpError(
+            err,
+            `Failed to mint signed download URL for ${redactQueryString(new URL(uri).href)}; falling back to API URL`,
+        );
         return apiUrl;
     }
 }
@@ -224,6 +232,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     // A GET with the method query parameter can delete, and one to a synchronous run endpoint starts a paid run;
     // see apify/apify-mcp-server#1524.
     const { pathname, search } = new URL(uri);
+    const loggedUri = redactQueryString(new URL(uri).href);
     const refusal = validateApiBlocklist({
         method: 'GET',
         normalizedPath: normalizeApiPath(`${pathname}${search}`),
@@ -240,7 +249,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
             responseType: 'stream',
         });
     } catch (err) {
-        logHttpError(err, `resources/read request failed`, { uri });
+        logHttpError(err, `resources/read request failed`, { uri: loggedUri });
         throwReadFailure(uri, getHttpStatusCode(err), err instanceof Error ? err.message : String(err));
     }
 
@@ -250,7 +259,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
         body = await readBodyUnderCap(response);
     } catch (err) {
         // A drop mid-body (reset, truncation, bad gzip). Never return partial content.
-        logHttpError(err, `resources/read response interrupted`, { uri });
+        logHttpError(err, `resources/read response interrupted`, { uri: loggedUri });
         const message = err instanceof Error ? err.message : String(err);
         throw new InternalError(`Failed to read ${uri}: response interrupted: ${message}`, {
             uri,
@@ -264,7 +273,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     if (response.status >= 300) {
         const message = parseApiErrorMessage(body) ?? response.statusText;
         logHttpError(Object.assign(new Error(message), { statusCode: response.status }), `resources/read failed`, {
-            uri,
+            uri: loggedUri,
         });
         throwReadFailure(uri, response.status, message);
     }

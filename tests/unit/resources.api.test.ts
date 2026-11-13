@@ -58,6 +58,16 @@ function abortingStream(prefix: string | Buffer = 'partial'): Readable {
     );
 }
 
+/** A body stream that drops mid-body, as a reset connection does. */
+function droppedStream(): Readable {
+    return Readable.from(
+        (async function* generate() {
+            yield Buffer.from('{"items":[');
+            throw new Error('socket hang up');
+        })(),
+    );
+}
+
 type RequestConfig = { url: string; responseType?: string; maxContentLength?: number };
 type RequestResult = { data: unknown; headers: Record<string, unknown>; status: number; statusText: string };
 
@@ -757,6 +767,59 @@ describe('readApiResource()', () => {
         expect(firstContent(result).text).toContain(uri);
         expect(logOutput()).toContain('Failed to mint signed download URL');
         expect(logOutput()).not.toContain('test-token');
+    });
+
+    it.each([
+        [
+            'the request fails',
+            async () => {
+                throw Object.assign(new Error('not found'), { statusCode: 404 });
+            },
+        ],
+        [
+            'the body is interrupted',
+            async () => ({ data: droppedStream(), headers: {}, status: 200, statusText: 'OK' }),
+        ],
+        ['the response is non-2xx', requestFailing(404, 'Not Found')],
+        // No status and a 5xx take the error and exception log branches, not softFail.
+        [
+            'the request fails without a status',
+            async () => {
+                throw new Error('connect ECONNREFUSED');
+            },
+        ],
+        ['the response is 5xx', requestFailing(500, 'Internal Server Error')],
+    ])('logs the URI without its query values when %s', async (_case, request) => {
+        const uri = `${API}/v2/datasets/ds-1/items?token=query-token&limit=5`;
+        const logOutput = captureLogOutput();
+
+        await expectReadError(readApiResource(uri, stubApifyClient({ request })));
+
+        expect(logOutput()).toContain(`${API}/v2/datasets/ds-1/items?[REDACTED]`);
+        expect(logOutput()).not.toContain('query-token');
+    });
+
+    it('logs the URI without its query values when minting the signed link fails', async () => {
+        const uri = `${API}/v2/key-value-stores/kv-1/records/BIG?token=query-token`;
+        const { request } = requestReturning(abortingStream(), 'application/octet-stream');
+        const logOutput = captureLogOutput();
+
+        await readApiResource(uri, stubApifyClient({ request, recordPublicUrlThrows: true }));
+
+        expect(logOutput()).toContain('Failed to mint signed download URL');
+        expect(logOutput()).not.toContain('query-token');
+    });
+
+    it('logs the parsed URI, not the raw string, when minting the signed link fails', async () => {
+        // new URL() drops tabs and newlines; the raw string keeps them.
+        const uri = `${API}/v2/key-value-stores/kv-1/records/BI\nG`;
+        const { request } = requestReturning(abortingStream(), 'application/octet-stream');
+        const logOutput = captureLogOutput();
+
+        await readApiResource(uri, stubApifyClient({ request, recordPublicUrlThrows: true }));
+
+        expect(logOutput()).toContain(`${API}/v2/key-value-stores/kv-1/records/BIG`);
+        expect(logOutput()).not.toContain('BI\nG');
     });
 
     describe('with the egress origin separate from the client-facing one', () => {
