@@ -339,6 +339,34 @@ describe('get-key-value-store-record', () => {
         ).rejects.toMatchObject({ statusCode: 403, message: 'Insufficient permissions' });
     });
 
+    it('returns a user error for a record whose body does not match its Content-Type', async () => {
+        // What apify-client's response interceptor throws for gzip bytes stored as application/json.
+        const parseFailure = Object.assign(new Error('Response body could not be parsed.'), {
+            name: 'InvalidResponseBodyError',
+            code: 'invalid-response-body',
+            response: { headers: { 'content-type': 'application/json; charset=utf-8' } },
+        });
+        const client = mockApifyClient({
+            keyValueStore: (id: string) => ({ url: `https://api.apify.com/v2/key-value-stores/${id}` }),
+            httpClient: {
+                axios: {
+                    request: async () => {
+                        throw parseFailure;
+                    },
+                },
+            },
+        });
+
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'INPUT' }, client),
+        );
+
+        expectSoftFailInvalidInput(result);
+        expect((result as TextToolResult).content[0].text).toContain(
+            "Record 'INPUT' is stored as application/json; charset=utf-8, but its body is not valid for that type",
+        );
+    });
+
     it('returns isError "record not found" when the record is missing but the store exists', async () => {
         const result = await (getKeyValueStoreRecord as HelperTool).call(
             stubToolCallContext(
