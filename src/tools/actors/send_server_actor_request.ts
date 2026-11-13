@@ -41,7 +41,7 @@ import { redactApiCallArgs } from '../api/apify_api_request.js';
 import { API_METHODS, type ApiMethod, isRecord } from '../api/apify_api_spec.js';
 import { parseBaseMimeType } from '../storage/storage_helpers.js';
 import { anyJsonBodySchema, serverActorRequestOutputSchema } from '../structured_output_schemas.js';
-import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from './actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInput } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 
 const queryValue = z.union([z.string(), z.number(), z.boolean()]);
@@ -502,7 +502,7 @@ export async function executeSendServerActorRequest(
     toolArgs: InternalToolArgs,
     { timeoutMillis = EXTERNAL_TOOL_CALL_TIMEOUT_MSEC }: { timeoutMillis?: number } = {},
 ): Promise<ToolResponse> {
-    const { apifyToken, apifyClient, mcpSessionId, loadedToolNames, signal } = toolArgs;
+    const { apifyToken, apifyClient, loadedToolNames, signal } = toolArgs;
     const args = sendServerActorRequestArgs.parse(toolArgs.args);
     if (!apifyToken) {
         return respondUserError('An Apify API token is required to send requests to an Actor Server.', {
@@ -515,7 +515,7 @@ export async function executeSendServerActorRequest(
         return respondUserError('A GET request cannot have a body. Send the data in query instead.');
     }
 
-    const actorName = fixActorNameInputAndLog(args.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_SERVER_REQUEST });
+    const actorName = fixActorNameInput(args.actor);
     if (!actorName) return respondUserError(EMPTY_ACTOR_NAME_MESSAGE);
     const cached = await getActorDefinitionCached(actorName, apifyClient);
     if (!cached) return buildActorNotFoundResponse(actorName, loadedToolNames);

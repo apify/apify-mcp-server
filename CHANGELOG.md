@@ -3,7 +3,25 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.21.9 - **not yet released**
+## 0.21.11 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Return a user error for a key-value record whose body does not match its Content-Type ([#1909](https://github.com/apify/apify-mcp-server/pull/1909)) ([756ce6e](https://github.com/apify/apify-mcp-server/commit/756ce6e5aefc554e2ed0eca2b675a471fd4d33a9)) by [@jirispilka](https://github.com/jirispilka), closes [#1907](https://github.com/apify/apify-mcp-server/issues/1907)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.21.10](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.10) (2026-11-13)
+
+### 🐛 Bug Fixes
+
+- Log &quot;Invalid event ID format&quot; as a client fault ([#1906](https://github.com/apify/apify-mcp-server/pull/1906)) ([55e4966](https://github.com/apify/apify-mcp-server/commit/55e4966f66deb607b0a81ea64ce28ed0a54f5ae7)) by [@jirispilka](https://github.com/jirispilka), closes [#1904](https://github.com/apify/apify-mcp-server/issues/1904)
+- Return a user error for an unknown Actor MCP tool name ([#1910](https://github.com/apify/apify-mcp-server/pull/1910)) ([789e505](https://github.com/apify/apify-mcp-server/commit/789e505d472b5266a7c7d4cec726bdaf8d6e3469)) by [@jirispilka](https://github.com/jirispilka)
+- Keep invalid Actor names out of the logs ([#1902](https://github.com/apify/apify-mcp-server/pull/1902)) ([de21e49](https://github.com/apify/apify-mcp-server/commit/de21e4987f404ef336ab458e726db685b35078da)) by [@jirispilka](https://github.com/jirispilka)
+- Cap search-apify-docs queries at 150 characters ([#1905](https://github.com/apify/apify-mcp-server/pull/1905)) ([33468bc](https://github.com/apify/apify-mcp-server/commit/33468bc00bcb194abd23a726db8e700b2cd3a8e0)) by [@jirispilka](https://github.com/jirispilka), closes [#1903](https://github.com/apify/apify-mcp-server/issues/1903)
+
+
+## [0.21.9](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.9) (2026-11-13)
 
 ### 🚀 Features
 
@@ -14,9 +32,9 @@ All notable changes to this project will be documented in this file.
 - Pin the redirect policy of Actor MCP connections ([#1895](https://github.com/apify/apify-mcp-server/pull/1895)) ([ad42c6f](https://github.com/apify/apify-mcp-server/commit/ad42c6fe006fd101c7fd3694d1b46f41adfea1b9)) by [@jirispilka](https://github.com/jirispilka), closes [#991](https://github.com/apify/apify-mcp-server/issues/991)
 - Make @apify&#x2F;log a peer dependency ([#1900](https://github.com/apify/apify-mcp-server/pull/1900)) ([00c8544](https://github.com/apify/apify-mcp-server/commit/00c8544b40aa69ffd0ec7d322f042c606c129161)) by [@jirispilka](https://github.com/jirispilka)
 - Don&#x27;t crash stdio on repeated flags or a broken server.json ([#1894](https://github.com/apify/apify-mcp-server/pull/1894)) ([53436b7](https://github.com/apify/apify-mcp-server/commit/53436b73b7e5a779c3940513c516b65323c2f66e)) by [@MQ37](https://github.com/MQ37)
+- Keep Actor input out of the tool call logs ([#1866](https://github.com/apify/apify-mcp-server/pull/1866)) ([3029a59](https://github.com/apify/apify-mcp-server/commit/3029a59f0c0b4d349db3cc54d978902f0db6c38a)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.21.8](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.8) (2026-11-13)
 
 ### 🐛 Bug Fixes

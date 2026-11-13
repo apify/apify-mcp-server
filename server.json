@@ -8,7 +8,7 @@
     "url": "https://github.com/apify/apify-mcp-server",
     "source": "github"
   },
-  "version": "0.21.9",
+  "version": "0.21.11",
   "icons": [
     {
       "src": "https://mcp.apify.com/images/apify-icon.png",

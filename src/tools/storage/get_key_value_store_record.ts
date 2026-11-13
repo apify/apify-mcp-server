@@ -87,6 +87,11 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             return respondUserError(text);
         }
         const { result: record, safeId } = found;
+        if (!record.isOverLimit && record.isUnparsable) {
+            return respondUserError(
+                `Record '${recordKey}' is stored as ${record.contentType ?? 'an unknown type'}, but its body is not valid for that type, so its value cannot be returned.`,
+            );
+        }
         const store = client.keyValueStore(safeId);
         // Shared by the Console link and the public record link, so a name is read back once.
         let storeIdPromise: Promise<string> | undefined;
