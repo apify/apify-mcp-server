@@ -9,7 +9,7 @@ import {
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { maskLoggedValues, pickLoggedValues, REDACTED } from '../../resources/api_resources.js';
+import { maskLoggedInputs, pickLoggedValues, REDACTED } from '../../resources/api_resources.js';
 import { getResourceByIdOrName } from '../../utils/apify_resource_id.js';
 import { toIsoString } from '../actors/actor_run_response.js';
 import { isRecord } from '../api/apify_api_spec.js';
@@ -97,7 +97,7 @@ export type ScheduleActionInput = z.infer<typeof scheduleActionSchema>;
 
 /**
  * The logged copy of a schedule tool's arguments (`redactArgs`), built as an allowlist of `keys` and each action's
- * declared keys, with the action's run input as `REDACTED`: it can hold passwords, API keys, or cookies.
+ * declared keys, with the action's run input cut to its key names: its values can hold passwords, API keys, or cookies.
  */
 export function redactScheduleToolArgs(
     args: Record<string, unknown>,
@@ -108,7 +108,7 @@ export function redactScheduleToolArgs(
         isRecord(action)
             ? {
                   ...pickLoggedValues(action, Object.keys(scheduleActionSchema.shape)),
-                  ...maskLoggedValues(action, ['input']),
+                  ...maskLoggedInputs(action, ['input']),
               }
             : REDACTED;
     return {

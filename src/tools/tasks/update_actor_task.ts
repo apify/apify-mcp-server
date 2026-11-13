@@ -2,7 +2,7 @@ import type { TaskUpdateData } from 'apify-client';
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
-import { maskLoggedValues, pickLoggedValues } from '../../resources/api_resources.js';
+import { maskLoggedInputs, pickLoggedValues } from '../../resources/api_resources.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -65,10 +65,10 @@ export const updateActorTask: ToolEntry = Object.freeze({
     inputSchema: z.toJSONSchema(updateActorTaskArgs) as ToolInputSchema,
     outputSchema: actorTaskOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(updateActorTaskArgs)),
-    // Task input can hold credentials.
+    // Task input can hold credentials, so only its key names are logged.
     redactArgs: (args: Record<string, unknown>) => ({
         ...pickLoggedValues(args, Object.keys(updateActorTaskArgs.shape)),
-        ...maskLoggedValues(args, ['input']),
+        ...maskLoggedInputs(args, ['input']),
     }),
     annotations: {
         title: 'Update Actor task',

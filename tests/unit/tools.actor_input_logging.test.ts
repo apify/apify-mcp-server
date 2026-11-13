@@ -58,7 +58,7 @@ describe('Actor input stays out of the logged arguments', () => {
             },
             {
                 actor: 'apify/website-content-crawler',
-                input: '[REDACTED]',
+                input: { startUrls: '[REDACTED]', password: '[REDACTED]' },
                 waitSecs: 10,
                 callOptions: { memory: 1024, build: 'latest' },
             },
@@ -72,7 +72,11 @@ describe('Actor input stays out of the logged arguments', () => {
                 waitSecs: 10,
                 callOptions: { timeout: 60 },
             },
-            { actor: 'apify/website-content-crawler', input: '[REDACTED]', callOptions: { timeout: 60 } },
+            {
+                actor: 'apify/website-content-crawler',
+                input: { password: '[REDACTED]' },
+                callOptions: { timeout: 60 },
+            },
         ],
         [
             'create-actor-task',
@@ -89,7 +93,7 @@ describe('Actor input stays out of the logged arguments', () => {
                 actorId: 'apify/website-content-crawler',
                 name: 'daily-crawl',
                 title: 'Daily crawl',
-                input: '[REDACTED]',
+                input: { cookie: '[REDACTED]' },
                 timeoutSecs: 60,
             },
         ],
@@ -97,7 +101,7 @@ describe('Actor input stays out of the logged arguments', () => {
             'update-actor-task',
             updateActorTask,
             { taskId: 'daily-crawl', input: { cookie: SECRET }, memoryMbytes: 2048, undeclared: SECRET },
-            { taskId: 'daily-crawl', input: '[REDACTED]', memoryMbytes: 2048 },
+            { taskId: 'daily-crawl', input: { cookie: '[REDACTED]' }, memoryMbytes: 2048 },
         ],
         [
             'create-schedule',
@@ -116,20 +120,23 @@ describe('Actor input stays out of the logged arguments', () => {
                 name: 'nightly',
                 cronExpression: '0 3 * * *',
                 isEnabled: true,
-                actions: [{ actorId: 'apify/website-content-crawler', input: '[REDACTED]' }, { taskId: 'daily-crawl' }],
+                actions: [
+                    { actorId: 'apify/website-content-crawler', input: { apiKey: '[REDACTED]' } },
+                    { taskId: 'daily-crawl' },
+                ],
             },
         ],
         [
             'update-schedule',
             updateSchedule,
             { scheduleId: 'nightly', actions: [{ taskId: 'daily-crawl', input: { apiKey: SECRET } }] },
-            { scheduleId: 'nightly', actions: [{ taskId: 'daily-crawl', input: '[REDACTED]' }] },
+            { scheduleId: 'nightly', actions: [{ taskId: 'daily-crawl', input: { apiKey: '[REDACTED]' } }] },
         ],
         [
             'call-actor-mcp-tool',
             callActorMcpTool,
             { actor: 'apify/actors-mcp-server', tool: 'search', arguments: { apiKey: SECRET }, undeclared: SECRET },
-            { actor: 'apify/actors-mcp-server', tool: 'search', arguments: '[REDACTED]' },
+            { actor: 'apify/actors-mcp-server', tool: 'search', arguments: { apiKey: '[REDACTED]' } },
         ],
         [
             'a direct Actor tool',
@@ -143,7 +150,7 @@ describe('Actor input stays out of the logged arguments', () => {
             { query: 'apify', apiKey: SECRET },
             { query: '[REDACTED]', apiKey: '[REDACTED]' },
         ],
-    ])('%s logs the control arguments and marks the input', (_, tool, args, expected) => {
+    ])('%s logs the control arguments and only the key names of the input', (_, tool, args, expected) => {
         const argsBefore = structuredClone(args);
 
         const { toolArgsRedacted, toolArgsWithoutPayment } = prepareLoggedArgs(tool, args);
@@ -155,6 +162,7 @@ describe('Actor input stays out of the logged arguments', () => {
 
     it.each<[string, ToolEntry, Record<string, unknown>]>([
         ['input that is a string', callActor, { actor: 'apify/website-content-crawler', input: SECRET }],
+        ['input that is a list', createActorTask, { actorId: 'apify/website-content-crawler', input: [SECRET] }],
         ['callOptions that are not an object', callActor, { actor: 'a', input: {}, callOptions: [SECRET] }],
         ['actions that are not a list', createSchedule, { name: 'nightly', actions: SECRET }],
         ['actions that are not objects', updateSchedule, { scheduleId: 'nightly', actions: [SECRET, null] }],

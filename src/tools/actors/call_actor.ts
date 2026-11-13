@@ -14,7 +14,7 @@ import {
 } from '../../const.js';
 import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
 import type { PaymentProvider } from '../../payments/types.js';
-import { maskLoggedValues, pickLoggedValues, REDACTED } from '../../resources/api_resources.js';
+import { maskLoggedInputs, pickLoggedValues, REDACTED } from '../../resources/api_resources.js';
 import type { ApifyToken, InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ACTOR_TOOL_MODE, ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorDefinitionCached, getActorToolResolutionCached } from '../../utils/actor.js';
@@ -337,13 +337,13 @@ export const callActorAjvValidate = compileSchema({ ...z.toJSONSchema(callActorA
 
 /**
  * The logged copy of a call's arguments (`redactArgs`), built as an allowlist of `keys` and the declared
- * `callOptions`, with the Actor input as `REDACTED`: it can hold passwords, API keys, or cookies.
+ * `callOptions`, with the Actor input cut to its key names: its values can hold passwords, API keys, or cookies.
  */
 export function redactCallActorArgs(args: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
     const { callOptions } = args;
     return {
         ...pickLoggedValues(args, keys),
-        ...maskLoggedValues(args, ['input']),
+        ...maskLoggedInputs(args, ['input']),
         ...(callOptions !== undefined && {
             callOptions: isRecord(callOptions)
                 ? pickLoggedValues(callOptions, Object.keys(callOptionsSchema.shape))

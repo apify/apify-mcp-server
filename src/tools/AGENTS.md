@@ -155,7 +155,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   It runs before AJV validation, so it must accept any shape, must not mutate the arguments, and must
   be an allowlist: the logged copy keeps the undeclared keys AJV strips only from the tool's copy.
   Actor input counts as a secret: `call-actor`, its widget, the task and schedule tools and `call-actor-mcp-tool`
-  log it as `REDACTED`, through `pickLoggedValues` and `maskLoggedValues` in `../resources/api_resources.ts`.
+  log only its key names, each value as `REDACTED`, through `pickLoggedValues` and `maskLoggedInputs` in
+  `../resources/api_resources.ts`.
   A direct Actor tool or a proxied Actor MCP tool has no `redactArgs`: `prepareToolCallContext`
   (`../payments/helpers.ts`) logs its argument names only, each value as `REDACTED`.
 - Descriptions, result text, annotations and the tool set follow [TOOL_GUIDELINES.md](../../TOOL_GUIDELINES.md); the gating mechanics below implement its "name only what the session has" rule.
