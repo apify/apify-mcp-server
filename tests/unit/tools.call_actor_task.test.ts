@@ -155,7 +155,7 @@ describe('call-actor-task returns the run', () => {
 });
 
 describe('call-actor-task keeps the input override out of the logs', () => {
-    it('logs the allowlisted arguments with input withheld and unknown keys dropped', () => {
+    it('logs the allowlisted arguments with only the input key names and unknown keys dropped', () => {
         const args = {
             taskId: 'my-task',
             waitSecs: 0,
@@ -174,7 +174,7 @@ describe('call-actor-task keeps the input override out of the logs', () => {
             taskId: 'my-task',
             waitSecs: 0,
             callOptions: { memory: 1024, build: 'beta' },
-            input: REDACTED,
+            input: { apiKey: REDACTED },
         });
         // The tool still receives every argument.
         expect(toolArgsWithoutPayment).toEqual(args);
