@@ -75,7 +75,8 @@ export const updateSchedule: ToolEntry = Object.freeze({
     annotations: {
         title: 'Update schedule',
         readOnlyHint: false,
-        destructiveHint: false,
+        // Overwrites stored fields; `actions` replaces the stored actions and drops the ones left out.
+        destructiveHint: true,
         idempotentHint: true,
         openWorldHint: false,
     },

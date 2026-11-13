@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import log from '@apify/log';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
@@ -31,6 +31,7 @@ const callActorWidgetArgsSchema = z
     .object({
         actor: z
             .string()
+            .max(RESOURCE_ID_OR_NAME_MAX_LENGTH)
             .describe('The name of the Actor to call. Format: "username/name" (e.g., "apify/rag-web-browser").'),
         input: anyJsonObjectSchema.describe('The input JSON to pass to the Actor. Required.'),
         callOptions: callOptionsSchema

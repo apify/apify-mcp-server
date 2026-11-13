@@ -73,7 +73,8 @@ export const updateActorTask: ToolEntry = Object.freeze({
     annotations: {
         title: 'Update Actor task',
         readOnlyHint: false,
-        destructiveHint: false,
+        // Overwrites stored fields; `input` replaces the stored input instead of merging into it.
+        destructiveHint: true,
         idempotentHint: true,
         openWorldHint: false,
     },

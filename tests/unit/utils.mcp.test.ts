@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
 import type { HelperTool } from '../../src/types.js';
+import { ACTOR_RUN_LIMIT_MESSAGE } from '../../src/utils/apify_errors.js';
 import { wrapJsonText } from '../../src/utils/encode_text.js';
 import {
     computeToolResponseBytes,
@@ -267,9 +268,7 @@ describe('getToolCallErrorUserText()', () => {
     it('returns the concurrent-run-limit hint when a direct Actor tool hits the limit', () => {
         const error = Object.assign(new Error('Cannot start new Actor runs.'), { type: 'cannot-start-actor-runs' });
         const text = getToolCallErrorUserText('apify/instagram-scraper', error);
-        expect(text).toContain('account limit for concurrent Actor runs');
-        expect(text).toContain('console.apify.com/billing/subscription');
-        expect(text).not.toContain('Verify the tool name');
+        expect(text).toContain(ACTOR_RUN_LIMIT_MESSAGE);
     });
 
     it('sources the 401 hint from getHttpErrorHint', () => {

@@ -7,6 +7,7 @@ import { fetchApifyDocsCache } from '../../state.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { stripTrailingChars } from '../../utils/generic.js';
 import { logHttpError } from '../../utils/logging.js';
 import { respondOk, respondServerError, respondUserError } from '../../utils/mcp.js';
 import { fetchApifyDocsToolOutputSchema } from '../structured_output_schemas.js';
@@ -30,7 +31,7 @@ const fetchApifyDocsToolInputSchema = z.toJSONSchema(fetchApifyDocsToolArgsSchem
 export function buildMarkdownUrl(url: string): string {
     const parsed = new URL(url);
     parsed.hash = '';
-    const path = parsed.pathname.replace(/\/+$/, '');
+    const path = stripTrailingChars(parsed.pathname, '/');
     parsed.pathname = path ? `${path}.md` : '/index.md';
     return parsed.toString();
 }
