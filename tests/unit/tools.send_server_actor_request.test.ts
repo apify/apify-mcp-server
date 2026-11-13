@@ -102,6 +102,19 @@ async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
             res.end(`{"pad":"${pad}","error":"\\u0074est-token${'b'.repeat(MAX_INLINE_BYTES)}\\u0074est-token"}`);
             return;
         }
+        case '/backslash-run-cut':
+            // The limit cuts the string after a long run of escaped backslashes.
+            res.writeHead(200, { 'content-type': 'application/json' });
+            res.end(`{"pad":"${'\\\\'.repeat(50_000)}${'a'.repeat(MAX_INLINE_BYTES)}"}`);
+            return;
+        case '/escaped-quote-run-cut':
+            // A run of escaped quotes, then a backslash before a line break, which ends no string literal, then an
+            // escaped token in a later literal.
+            res.writeHead(200, { 'content-type': 'application/json' });
+            res.end(
+                `{"pad":"${'\\"'.repeat(50_000)}\\\n, "error":"\\u0074est-token","p":"${'a'.repeat(MAX_INLINE_BYTES)}"}`,
+            );
+            return;
         case '/big-error':
             res.writeHead(400, { 'content-type': 'application/json' });
             res.end(JSON.stringify({ error: 'e'.repeat(200_000) }));
@@ -268,6 +281,20 @@ beforeAll(async () => {
 afterAll(async () => {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
+});
+
+describe('body input schema', () => {
+    // VS Code Copilot rejects the whole tool list when any array schema lacks `items`.
+    it('gives every array an items schema', () => {
+        const arraysWithoutItems: unknown[] = [];
+        const visit = (node: unknown) => {
+            if (!node || typeof node !== 'object') return;
+            if ((node as { type?: unknown }).type === 'array' && !('items' in node)) arraysWithoutItems.push(node);
+            Object.values(node).forEach(visit);
+        };
+        visit(sendServerActorRequest.inputSchema);
+        expect(arraysWithoutItems).toEqual([]);
+    });
 });
 
 describe('sending the request', () => {
@@ -612,6 +639,33 @@ describe('returning an Actor Server error', () => {
 
         expect(result.structuredContent).toMatchObject({ bodyTruncated: true });
         expect(body).toContain('"error":"[REDACTED]b');
+        expect(JSON.stringify(result)).not.toContain(TOKEN);
+    });
+
+    // Linear time takes a few milliseconds here; the bound only catches time that grows faster than the length.
+    it('checks a cut string with a 100,000-character backslash run within a second', async () => {
+        const startedAt = performance.now();
+        const result = await callTool({ path: '/backslash-run-cut' });
+
+        expect(performance.now() - startedAt).toBeLessThan(1000);
+        expect(result.structuredContent).toMatchObject({ bodyTruncated: true });
+    });
+
+    // Linear time takes a few milliseconds here; the bound only catches time that grows faster than the length.
+    it('checks a cut body with a 100,000-character run of escaped quotes within a second', async () => {
+        const startedAt = performance.now();
+        const result = await callTool({ path: '/escaped-quote-run-cut' });
+
+        expect(performance.now() - startedAt).toBeLessThan(1000);
+        expect(result.structuredContent).toMatchObject({ bodyTruncated: true });
+    });
+
+    it('masks a token that JSON escapes hide in a cut body with escaped quotes and line breaks', async () => {
+        const result = await callTool({ path: '/escaped-quote-run-cut' });
+        const { body } = result.structuredContent as { body: string };
+
+        expect(result.structuredContent).toMatchObject({ bodyTruncated: true });
+        expect(body).toContain('"error":"[REDACTED]"');
         expect(JSON.stringify(result)).not.toContain(TOKEN);
     });
 

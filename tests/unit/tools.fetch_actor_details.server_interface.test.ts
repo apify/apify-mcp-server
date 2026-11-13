@@ -558,7 +558,7 @@ describe('fetching details of a Server Actor', () => {
     ) => {
         const { apifyClient } = mockActorBuildClient({
             actor: mockActor({ id: 'server-actor-id', name: 'server-actor-test', username: 'apify', ...serverActor() }),
-            defaultBuild: mockDefaultBuild({ webServerSchema: SCHEMA }),
+            defaultBuild: mockDefaultBuild({ webServerSchema: SCHEMA, webServerMcpPath: undefined }),
             hasToken: false,
         });
         const client = mockApifyClient({

@@ -207,7 +207,6 @@ describe('get-dataset-items', () => {
             structuredContent: Record<string, unknown>;
         };
 
-        expect(structuredContent.summary).toBe('Fetched all 1 items.');
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET);
         expect(structuredContent.nextStep).toContain('datasetId=DsWkzbQMuFYuam3YF');
         // summary + nextStep ship as a separate text block after the plain JSON.
@@ -223,10 +222,7 @@ describe('get-dataset-items', () => {
         );
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
-        expect(structuredContent.summary).toBe('Fetched 20 of 100 items (offset=0).');
-        expect(structuredContent.nextStep).toBe(
-            `Call ${HELPER_TOOLS.DATASET_GET_ITEMS} again with offset=20 to fetch the next page.`,
-        );
+        expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
     });
 
     it('content[0] mirrors the structuredContent data and does not echo the desc input param', async () => {

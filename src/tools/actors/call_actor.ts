@@ -10,15 +10,18 @@ import {
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
     FAILURE_CATEGORY,
     HELPER_TOOLS,
+    RESOURCE_ID_OR_NAME_MAX_LENGTH,
 } from '../../const.js';
 import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
 import type { PaymentProvider } from '../../payments/types.js';
+import { maskLoggedInputs, pickLoggedValues, REDACTED } from '../../resources/api_resources.js';
 import type { ApifyToken, InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ACTOR_TOOL_MODE, ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorDefinitionCached, getActorToolResolutionCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
 import {
     ACTOR_RUN_LIMIT_MESSAGE,
+    getApifyErrorType,
     isActorInputValidationError,
     isActorRunLimitError,
     isMemoryQuotaError,
@@ -38,6 +41,7 @@ import { buildPermissionApprovalTexts } from '../../utils/payment_errors.js';
 import { classifyFailureCategory, extractAjvErrorDetails } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
 import { findServerTool, getOwnServerRemedy, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
+import { isRecord } from '../api/apify_api_spec.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
 import { actorRunOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
 import {
@@ -48,9 +52,10 @@ import {
 } from './actor_run_response.js';
 import {
     EMPTY_ACTOR_NAME_MESSAGE,
-    fixActorNameInputAndLog,
+    fixActorNameInput,
     getActorsAsTools,
-    MCP_TOOL_NAME_SUFFIX,
+    getMcpToolNameSuffixIndex,
+    normalizeActorNameInput,
 } from './actor_tools_factory.js';
 
 // ---------------------------------------------------------------------------
@@ -240,7 +245,7 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         return respondServerError(
             [
                 `Failed to call Actor '${actorName}': ${errMsg}`,
-                `Account memory quota exceeded for your plan. A smaller callOptions.memory may fit the remaining quota; memory is freed when current runs finish.`,
+                `This run would exceed the account memory limit. A smaller callOptions.memory may fit the remaining quota. Memory frees up when runs and builds finish.`,
             ],
             { error, detail: APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED, actorId },
         );
@@ -249,7 +254,7 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
     if (isActorRunLimitError(error)) {
         return respondServerError([`Failed to call Actor '${actorName}': ${errMsg}`, ACTOR_RUN_LIMIT_MESSAGE], {
             error,
-            detail: APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS,
+            detail: getApifyErrorType(error) ?? APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS,
             actorId,
         });
     }
@@ -279,7 +284,7 @@ export const callOptionsSchema = z.object({
         .max(32768, 'Memory cannot exceed 32 GB (32768 MB)')
         .optional().describe(dedent`
             Memory per run in MB. Power of 2 from 128 to 32768.
-            Apify also caps total memory across all your concurrent runs (account plan limit); a run that would exceed that quota is rejected.
+            The account memory limit covers all running Actor runs and builds; a run that would exceed it is rejected.
         `),
     timeout: z.number().min(0, 'Timeout must be 0 or greater').optional().describe(dedent`
             Maximum runtime for the Actor in seconds. After this time elapses, the Actor will be automatically terminated.
@@ -305,6 +310,7 @@ export const callOptionsSchema = z.object({
 export const callActorArgs = z.object({
     actor: z
         .string()
+        .max(RESOURCE_ID_OR_NAME_MAX_LENGTH)
         .describe(
             'The Actor to call: its ID, or its name in the "username/name" form (e.g., "apify/rag-web-browser").',
         ),
@@ -328,6 +334,23 @@ export const callActorArgs = z.object({
 
 export const callActorInputSchema = z.toJSONSchema(callActorArgs) as ToolInputSchema;
 export const callActorAjvValidate = compileSchema({ ...z.toJSONSchema(callActorArgs), additionalProperties: true });
+
+/**
+ * The logged copy of a call's arguments (`redactArgs`), built as an allowlist of `keys` and the declared
+ * `callOptions`, with the Actor input cut to its key names: its values can hold passwords, API keys, or cookies.
+ */
+export function redactCallActorArgs(args: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+    const { callOptions } = args;
+    return {
+        ...pickLoggedValues(args, keys),
+        ...maskLoggedInputs(args, ['input']),
+        ...(callOptions !== undefined && {
+            callOptions: isRecord(callOptions)
+                ? pickLoggedValues(callOptions, Object.keys(callOptionsSchema.shape))
+                : REDACTED,
+        }),
+    };
+}
 
 /**
  * Parsed call-actor arguments.
@@ -359,7 +382,7 @@ export async function checkPaymentProviderStandbyConflict(params: {
     const actorName = tool.type === TOOL_TYPE.ACTOR_SERVER ? tool.actorFullName : args.actor;
     if (typeof actorName !== 'string' || !actorName) return null;
 
-    const normalizedActorName = fixActorNameInputAndLog(actorName, { mcpSessionId });
+    const normalizedActorName = fixActorNameInput(actorName);
 
     // Token-based client — payment headers are only relevant for actual Actor runs.
     const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
@@ -394,7 +417,7 @@ export function buildLegacyMcpSyntaxRejection(
     loadedToolNames: readonly string[],
 ): ToolResponse | null {
     if (toolName !== HELPER_TOOLS.ACTOR_CALL && toolName !== HELPER_TOOLS.ACTOR_CALL_WIDGET) return null;
-    if (typeof actor !== 'string' || !MCP_TOOL_NAME_SUFFIX.test(actor)) return null;
+    if (typeof actor !== 'string' || getMcpToolNameSuffixIndex(normalizeActorNameInput(actor)) === -1) return null;
     const replacement = loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL)
         ? ` Use ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} with separate actor and tool arguments.`
         : ` MCP tools cannot be called in this configuration. To use them, ${getOwnServerRemedy()}`;
@@ -504,7 +527,7 @@ export async function callActorPreExecute(
     const parsedArgs = callActorArgs.parse(args);
     const legacyRejection = buildLegacyMcpSyntaxRejection(options.route, parsedArgs.actor, loadedToolNames);
     if (legacyRejection) return { earlyResponse: legacyRejection };
-    const actorName = fixActorNameInputAndLog(parsedArgs.actor, { mcpSessionId, route: options.route });
+    const actorName = fixActorNameInput(parsedArgs.actor);
     if (!actorName) return { earlyResponse: respondUserError(EMPTY_ACTOR_NAME_MESSAGE) };
 
     // For definition resolution we always use a token-based client; payment provider is only for actual Actor runs.
@@ -629,6 +652,7 @@ export const callActor: ToolEntry = Object.freeze({
     paymentRequired: true,
     hasPaymentProviderStandbyCheck: true,
     actorInterface: 'input',
+    redactArgs: (args: Record<string, unknown>) => redactCallActorArgs(args, Object.keys(callActorArgs.shape)),
     annotations: {
         title: 'Call Actor',
         readOnlyHint: false,

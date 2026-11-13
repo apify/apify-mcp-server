@@ -8,6 +8,12 @@ import { searchDocsBySourceCached } from '../../utils/apify_docs.js';
 import { respondOk } from '../../utils/mcp.js';
 import { searchApifyDocsToolOutputSchema } from '../structured_output_schemas.js';
 
+/**
+ * Algolia rejects a query of 512 bytes or more with a 400. A character is at most 3 bytes in
+ * UTF-8, so this cap keeps any query under that limit.
+ */
+const QUERY_MAX_LENGTH = 150;
+
 const PLATFORM_DOCS_PREFERENCE = `When results contain both platform documentation (\`docs.apify.com/platform\`) \
 and Academy content (\`docs.apify.com/academy\`) on the same topic, prefer the platform documentation.`;
 
@@ -49,6 +55,7 @@ const searchApifyDocsToolArgsSchema = z.object({
     query: z
         .string()
         .min(1)
+        .max(QUERY_MAX_LENGTH)
         .describe(
             `Algolia full-text search query to find relevant documentation pages.
 Use only keywords, do not use full sentences or questions.
