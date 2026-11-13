@@ -220,22 +220,29 @@ describe('compileUntrustedSchema and the validator Ajv generates', () => {
         );
     });
 
-    it('keeps the validator cache within its two limits, however many distinct schemas load', () => {
-        let mostEntries = 0;
+    it('keeps the code of the cached validators within its limit, however many large schemas load', () => {
         let mostCodeBytes = 0;
-        for (let index = 0; index < UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE + 200; index++) {
-            // Every tenth schema stands for a large one.
-            if (index % 10 === 0) addValidatorCodeOnce(MAX_UNTRUSTED_VALIDATOR_CODE_BYTES / 4);
-            compileUntrustedSchema(schemaFor(`apify/distinct-input-${index}`));
-            const { entries, codeBytes } = getUntrustedValidatorCacheUsage();
-            mostEntries = Math.max(mostEntries, entries);
-            mostCodeBytes = Math.max(mostCodeBytes, codeBytes);
+        for (let index = 0; index < 60; index++) {
+            addValidatorCodeOnce(MAX_UNTRUSTED_VALIDATOR_CODE_BYTES / 2);
+            compileUntrustedSchema(schemaFor(`apify/large-distinct-input-${index}`));
+            mostCodeBytes = Math.max(mostCodeBytes, getUntrustedValidatorCacheUsage().codeBytes);
         }
 
-        expect(mostEntries).toBeLessThanOrEqual(UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE);
         expect(mostCodeBytes).toBeLessThanOrEqual(UNTRUSTED_VALIDATOR_CACHE_MAX_CODE_BYTES);
-        // The cache was full: the limits were reached, not avoided.
+        // The cache was full: the limit was reached, not avoided.
         expect(mostCodeBytes).toBeGreaterThan(UNTRUSTED_VALIDATOR_CACHE_MAX_CODE_BYTES / 2);
+    });
+
+    it('keeps the number of cached validators within its limit, however many distinct schemas load', () => {
+        let mostEntries = 0;
+        for (let index = 0; index < UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE + 100; index++) {
+            compileUntrustedSchema(schemaFor(`apify/distinct-input-${index}`));
+            mostEntries = Math.max(mostEntries, getUntrustedValidatorCacheUsage().entries);
+        }
+
+        expect(mostEntries).toBe(UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE);
+        // Their code alone does not fill the cache: the number of validators is what limits it here.
+        expect(getUntrustedValidatorCacheUsage().codeBytes).toBeLessThan(UNTRUSTED_VALIDATOR_CACHE_MAX_CODE_BYTES);
     });
 
     it('serves a validator that holds no compiled code: it compiles again once the cache has dropped it', () => {
