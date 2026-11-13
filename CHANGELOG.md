@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Pin the redirect policy of Actor MCP connections ([#1895](https://github.com/apify/apify-mcp-server/pull/1895)) ([ad42c6f](https://github.com/apify/apify-mcp-server/commit/ad42c6fe006fd101c7fd3694d1b46f41adfea1b9)) by [@jirispilka](https://github.com/jirispilka), closes [#991](https://github.com/apify/apify-mcp-server/issues/991)
 - Make @apify&#x2F;log a peer dependency ([#1900](https://github.com/apify/apify-mcp-server/pull/1900)) ([00c8544](https://github.com/apify/apify-mcp-server/commit/00c8544b40aa69ffd0ec7d322f042c606c129161)) by [@jirispilka](https://github.com/jirispilka)
 - Don&#x27;t crash stdio on repeated flags or a broken server.json ([#1894](https://github.com/apify/apify-mcp-server/pull/1894)) ([53436b7](https://github.com/apify/apify-mcp-server/commit/53436b73b7e5a779c3940513c516b65323c2f66e)) by [@MQ37](https://github.com/MQ37)
+- Keep Actor input out of the tool call logs ([#1866](https://github.com/apify/apify-mcp-server/pull/1866)) ([3029a59](https://github.com/apify/apify-mcp-server/commit/3029a59f0c0b4d349db3cc54d978902f0db6c38a)) by [@jirispilka](https://github.com/jirispilka)
 
 
 <!-- git-cliff-unreleased-end -->
