@@ -47,7 +47,7 @@ export interface Case {
     isDeploymentTest: boolean;
     /** Register as `it.skip` when true. */
     skipIf?: (ctx: CaseCtx) => boolean;
-    /** Forwarded to vitest `it(name, { retry }, ...)`. */
+    /** Forwarded to vitest `it(name, { retry }, ...)`; a case that sets none is retried once (`registerCases`). */
     retry?: number;
     /** Forwarded to vitest `it(name, { timeout }, ...)`, for a case that outlasts the suite's timeout. */
     timeout?: number;
