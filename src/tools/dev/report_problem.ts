@@ -110,6 +110,7 @@ export const reportProblem: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async () => {
-        return respondOk(ACKNOWLEDGEMENT, { structuredContent: { reported: true } });
+        const structuredContent = { reported: true };
+        return respondOk([JSON.stringify(structuredContent), ACKNOWLEDGEMENT], { structuredContent });
     },
 } as const);

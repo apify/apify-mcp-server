@@ -111,9 +111,8 @@ describe('get-key-value-store-record', () => {
         expect(structuredContent).not.toHaveProperty('nextStep');
         expect(content).toHaveLength(2);
         expect(content[1].text).toBe(structuredContent.summary);
-        // content[0] is the data-only JSON dump (no narrative summary).
-        const { summary, ...data } = structuredContent;
-        expect(JSON.parse(content[0].text)).toEqual(data);
+        // content[0] mirrors structuredContent as JSON, summary included.
+        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
     });
 
     it('returns a text record value in structuredContent', async () => {

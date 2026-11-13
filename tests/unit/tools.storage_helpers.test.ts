@@ -4,10 +4,12 @@ import { HELPER_TOOLS } from '../../src/const.js';
 import {
     buildDatasetItemsSummaryNextStep,
     buildKvsKeysSummaryNextStep,
+    buildStorageResponse,
     fetchStorageByIdOrName,
     normalizeRecordKey,
     resolveStorageId,
 } from '../../src/tools/storage/storage_helpers.js';
+import type { TextToolResult } from './helpers/tool_context.js';
 
 // `buildStorageNotFound` was deleted in #937 — its six call sites call `respondUserError(text)`
 // directly. The SOFT_FAIL + INVALID_INPUT contract it guarded is now covered by the `respondUserError`
@@ -85,6 +87,32 @@ describe('buildKvsKeysSummaryNextStep()', () => {
 
         expect(nextStep).toBe('No follow-up step.');
         expect(nextStep).not.toContain(sibling);
+    });
+});
+
+describe('buildStorageResponse()', () => {
+    it('mirrors the whole structuredContent as the first text block, before the narrative and Console link', () => {
+        const result = buildStorageResponse({
+            structuredContent: { datasetId: 'ds-1', itemCount: 3 },
+            summary: 'Dataset has 3 items.',
+            nextStep: 'Use get-dataset-items with datasetId=ds-1.',
+            apifyConsoleUrl: 'https://console.apify.com/storage/datasets/ds-1',
+        }) as TextToolResult;
+
+        expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+        expect(result.structuredContent).toMatchObject({ summary: 'Dataset has 3 items.' });
+        expect(result.content[1].text).toBe('Dataset has 3 items.\nUse get-dataset-items with datasetId=ds-1.');
+        expect(result.content[2].text).toContain('https://console.apify.com/storage/datasets/ds-1');
+    });
+
+    it('mirrors a terminal response that has no nextStep', () => {
+        const result = buildStorageResponse({
+            structuredContent: { keyValueStoreId: 'kv-1', key: 'INPUT', value: {} },
+            summary: 'Record INPUT read.',
+        }) as TextToolResult;
+
+        expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+        expect(result.structuredContent).not.toHaveProperty('nextStep');
     });
 });
 

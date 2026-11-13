@@ -409,10 +409,17 @@ describe('fetch-actor-mcp-tool-list', () => {
         expect(listCursors).toEqual([undefined, 'page-2']);
         const texts = (result.content as { text: string }[]).map(({ text }) => text);
         expect(texts).toEqual([
+            JSON.stringify({ tools: REMOTE_TOOL_PAGES.flat() }),
             "The Actor's MCP server has 2 tools.",
             `add: Adds two numbers.\nInput schema: ${JSON.stringify(REMOTE_TOOL_PAGES[0][0].inputSchema)}`,
             `subtract: No description.\nInput schema: ${JSON.stringify(REMOTE_TOOL_PAGES[1][0].inputSchema)}`,
         ]);
+    });
+
+    it('mirrors structuredContent as JSON in the first text block', async () => {
+        const result = await dispatch(fetchActorMcpToolList, { actor: MCP_ACTOR });
+
+        expect(JSON.parse((result.content as { text: string }[])[0].text)).toEqual(result.structuredContent);
     });
 
     it('fails the listing when a page fails, without a partial list', async () => {

@@ -413,8 +413,8 @@ describe('returning the response', () => {
             bytes: Buffer.byteLength(body),
             summary: expect.stringContaining('returned HTTP 200'),
         });
-        const { summary, ...data } = result.structuredContent as Record<string, unknown>;
-        expect(JSON.parse(result.content[0].text)).toEqual(data);
+        const { summary } = result.structuredContent as Record<string, unknown>;
+        expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
         expect(result.content[1].text).toBe(summary);
         expect(result.toolTelemetry).toEqual({
             actorId: 'server-actor-test-id',
@@ -568,6 +568,17 @@ describe('returning the response', () => {
     );
 });
 
+describe('mirroring structuredContent', () => {
+    it.each([
+        ['a success', '/echo'],
+        ['an Actor Server error', '/fetch'],
+    ])('puts the whole structuredContent as JSON in the first text block for %s', async (_, path) => {
+        const result = await callTool({ path });
+
+        expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+    });
+});
+
 describe('returning an Actor Server error', () => {
     it('passes an Actor error body through as an error, with the session token masked', async () => {
         const result = await callTool({ path: '/status/404' });
@@ -585,7 +596,7 @@ describe('returning an Actor Server error', () => {
         });
     });
 
-    it('mirrors response data first and returns error guidance separately', async () => {
+    it('mirrors structuredContent first and returns error guidance separately', async () => {
         const received = recordRequests();
         const result = await callTool({ path: '/fetch' });
         const message = 'There is nothing at route GET /fetch. A "url" query parameter is required.';
@@ -596,8 +607,8 @@ describe('returning an Actor Server error', () => {
             errorMessage: message,
             summary: expect.stringContaining('returned HTTP 404'),
         });
-        const { summary, errorMessage, nextStep, ...data } = result.structuredContent as Record<string, unknown>;
-        expect(JSON.parse(result.content[0].text)).toEqual(data);
+        const { summary, errorMessage, nextStep } = result.structuredContent as Record<string, unknown>;
+        expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
         expect(result.content.slice(1).map(({ text }) => text)).toEqual([
             summary,
             `Actor Server error: ${errorMessage}`,

@@ -13,7 +13,13 @@ import {
 import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockApifyClient, mockUserInfo, only, stubToolCallContext } from './helpers/tool_context.js';
+import {
+    mockApifyClient,
+    mockUserInfo,
+    only,
+    stubToolCallContext,
+    type TextToolResult,
+} from './helpers/tool_context.js';
 import { MOCK_STORE_ACTOR, NO_ACTORS_FOUND_TEXT, SEARCH_KEYWORDS } from './tools.search_actors.fixtures.js';
 
 /**
@@ -84,10 +90,10 @@ describe('search-actors without widget (searchActors)', () => {
         );
         expect(structuredContent.instructions).toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
 
-        expect(content).toHaveLength(1);
+        expect(content).toHaveLength(2);
         expect((result as { _meta?: unknown })._meta).toBeUndefined();
 
-        const { text } = content[0];
+        const { text } = content[1];
         expect(text).toContain('# Search results:');
         expect(text).toContain(SEARCH_KEYWORDS);
         expect(text).toContain('Number of Actors found:** 1');
@@ -148,7 +154,7 @@ describe('search-actors without widget (searchActors)', () => {
                 }),
             )
             .join('\n\n');
-        expect(content[0].text).toContain(expectedActorText);
+        expect(content[1].text).toContain(expectedActorText);
     });
 
     it('returns empty structured content and keyword guidance when no actors match', async () => {
@@ -183,8 +189,21 @@ describe('search-actors without widget (searchActors)', () => {
         expect(structuredContent.query).toBe(SEARCH_KEYWORDS);
         expect(structuredContent.instructions).toBe(NO_ACTORS_FOUND_TEXT);
 
-        expect(content).toHaveLength(1);
-        expect(content[0].text).toBe(NO_ACTORS_FOUND_TEXT);
+        expect(content).toHaveLength(2);
+        expect(content[1].text).toBe(NO_ACTORS_FOUND_TEXT);
+    });
+
+    it.each([
+        ['results', [MOCK_STORE_ACTOR]],
+        ['no results', []],
+    ])('mirrors structuredContent as JSON in the first text block (%s)', async (_, actors) => {
+        vi.mocked(searchAgentSafeActors).mockResolvedValue(actors);
+
+        const result = (await (searchActors as HelperTool).call(
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient()),
+        )) as TextToolResult;
+
+        expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
     });
 
     it('describes an empty page at a later offset without saying the results ended', async () => {
@@ -202,7 +221,10 @@ describe('search-actors without widget (searchActors)', () => {
         };
         const text = `No Actors returned at offset 8 for the search query "${SEARCH_KEYWORDS}".`;
         expect(structuredContent).toEqual({ actors: [], query: SEARCH_KEYWORDS, count: 0, instructions: text });
-        expect(content).toEqual([{ type: 'text', text }]);
+        expect(content).toEqual([
+            { type: 'text', text: JSON.stringify(structuredContent) },
+            { type: 'text', text },
+        ]);
     });
 
     it('declares every field the structured card emits (guards schema/runtime drift)', () => {
@@ -252,8 +274,8 @@ describe('search-actors without widget (searchActors)', () => {
         const consoleUrl = `https://console.apify.com/actors/${MOCK_STORE_ACTOR.id}`;
 
         expect(structuredContent.actors[0].url).toBe(consoleUrl);
-        expect(content[0].text).toContain(`## [${MOCK_STORE_ACTOR.title}](${consoleUrl})`);
-        expect(content[0].text).not.toContain(`${APIFY_STORE_URL}/apify/web-scraper`);
+        expect(content[1].text).toContain(`## [${MOCK_STORE_ACTOR.title}](${consoleUrl})`);
+        expect(content[1].text).not.toContain(`${APIFY_STORE_URL}/apify/web-scraper`);
     });
 
     it('places the verbatim-links nudge on its own line between the details hint and the caveat for a Console UI token', async () => {
@@ -274,8 +296,8 @@ describe('search-actors without widget (searchActors)', () => {
         expect(structuredContent.instructions).toBe(
             `${ACTOR_DETAILS_HINT}\n${VERBATIM_LINKS_NUDGE}\n${getActorCallabilityCaveat()}`,
         );
-        expect(content[0].text.endsWith(`\n\n${structuredContent.instructions}`)).toBe(true);
-        expect(content[0].text.split(VERBATIM_LINKS_NUDGE)).toHaveLength(2);
+        expect(content[1].text.endsWith(`\n\n${structuredContent.instructions}`)).toBe(true);
+        expect(content[1].text.split(VERBATIM_LINKS_NUDGE)).toHaveLength(2);
     });
 
     // The footer is result text, which `tools.mode_contract.test.ts` cannot see — it renders
@@ -294,7 +316,7 @@ describe('search-actors without widget (searchActors)', () => {
         };
 
         expect(structuredContent.instructions).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
-        expect(content[0].text).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
+        expect(content[1].text).not.toContain(HELPER_TOOLS.ACTOR_GET_DETAILS);
     });
 
     // `?tools=search-actors,call-actor` with an API token: no details hint, no caveat, no nudge.
@@ -317,7 +339,7 @@ describe('search-actors without widget (searchActors)', () => {
         });
 
         expect(Object.keys(structuredContent).sort()).toEqual(['actors', 'count', 'query', 'userTier']);
-        expect(content[0].text).toBe(
+        expect(content[1].text).toBe(
             `# Search results:\n- **Search query:** ${SEARCH_KEYWORDS}\n- **Number of Actors found:** 1\n\n# Actors:\n\n${cardText}`,
         );
     });
@@ -336,7 +358,7 @@ describe('search-actors without widget (searchActors)', () => {
         };
 
         expect(structuredContent.instructions).toContain('cannot be run in this configuration');
-        expect(content[0].text).toContain('cannot be run in this configuration');
+        expect(content[1].text).toContain('cannot be run in this configuration');
     });
 
     it('omits the not-runnable caveat when call-actor is loaded', async () => {
@@ -354,7 +376,7 @@ describe('search-actors without widget (searchActors)', () => {
 
         // No footer part applies in this session, so `instructions` is left out.
         expect(structuredContent.instructions).toBeUndefined();
-        expect(content[0].text).not.toContain('cannot be run in this configuration');
+        expect(content[1].text).not.toContain('cannot be run in this configuration');
     });
 
     it('omits the not-runnable caveat when call-actor is absent but every result is already loaded', async () => {
@@ -373,7 +395,7 @@ describe('search-actors without widget (searchActors)', () => {
 
         // No footer part applies in this session, so `instructions` is left out.
         expect(structuredContent.instructions).toBeUndefined();
-        expect(content[0].text).not.toContain('cannot be run in this configuration');
+        expect(content[1].text).not.toContain('cannot be run in this configuration');
     });
 
     it('adds the not-runnable caveat for mixed results when call-actor is absent and only one result is loaded', async () => {
@@ -392,7 +414,7 @@ describe('search-actors without widget (searchActors)', () => {
         };
 
         expect(structuredContent.instructions).toContain('cannot be run in this configuration');
-        expect(content[0].text).toContain('cannot be run in this configuration');
+        expect(content[1].text).toContain('cannot be run in this configuration');
     });
 });
 
