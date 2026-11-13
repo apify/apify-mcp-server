@@ -153,9 +153,12 @@ export async function runOnActorMcpServer(
 /**
  * True when the remote server rejected the tool name. Servers that throw a plain error from their handler
  * answer with an internal error (-32603) rather than invalid params, so only the message tells.
+ * The prefix repeats when the server throws an `McpError`, whose message already carries it.
  */
 function isUnknownRemoteToolError(error: unknown, toolName: string): boolean {
-    return error instanceof McpError && /^MCP error -?\d+: unknown tool: (.+)$/i.exec(error.message)?.[1] === toolName;
+    return (
+        error instanceof McpError && /^(?:MCP error -?\d+: )+unknown tool: (.+)$/i.exec(error.message)?.[1] === toolName
+    );
 }
 
 export async function executeCallActorMcpTool(toolArgs: InternalToolArgs): Promise<ToolResponse> {
