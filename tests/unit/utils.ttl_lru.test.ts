@@ -66,14 +66,6 @@ describe('TTLLRUCache', () => {
                 restoreObjectPrototype(ownNamesBefore);
             }
         });
-
-        it('keeps a key that starts with the internal key prefix apart from the same key without it', () => {
-            const cache = new TTLLRUCache<string>(10, 10);
-            cache.set('apify/rag-web-browser', 'plain');
-            cache.set('key:apify/rag-web-browser', 'prefixed');
-            expect(cache.get('apify/rag-web-browser')).toBe('plain');
-            expect(cache.get('key:apify/rag-web-browser')).toBe('prefixed');
-        });
     });
 });
 

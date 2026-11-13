@@ -214,9 +214,6 @@ importers:
 
   .:
     dependencies:
-      '@apify/datastructures':
-        specifier: ^2.0.3
-        version: 2.0.6
       '@apify/log':
         specifier: ^2.5.16
         version: 2.5.39
@@ -519,9 +516,6 @@ packages:
 
   '@apify/consts@2.53.1':
     resolution: {integrity: sha512-dIapeviS1DubmhMLQVHj19nmGllgvFV8ZQTqsnYYperuKjVaTwoEs+dKoRmOnm+OvkZcVQOyDGnbQUoXsCghgw==}
-
-  '@apify/datastructures@2.0.6':
-    resolution: {integrity: sha512-hI/Q5cCjXXI/g4OPwX+/xuk+JsOtXRhKNXl2wnq/nKmdrji3nYCc9vGsAEc1iXVbs16xQMZy5uRhoY3XTABovA==}
 
   '@apify/log@2.5.39':
     resolution: {integrity: sha512-cip5u5DDBdbsKpWVWKsMS7QtIkI1pSk/E2AGi/m7EHGP4IaIBq5J/WFqlPycQ0fq385tXiNz6W4O6FO/ZWNyDg==}
@@ -4654,8 +4648,6 @@ snapshots:
       zod: 4.6.7
 
   '@apify/consts@2.53.1': {}
-
-  '@apify/datastructures@2.0.6': {}
 
   '@apify/log@2.5.39':
     dependencies:
