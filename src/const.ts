@@ -151,6 +151,8 @@ export const RESOURCE_ID_OR_NAME_MAX_LENGTH = 256;
 export const KEY_VALUE_STORE_KEY_MAX_LENGTH = 256;
 /** Max input fields shown inline in text and structured Actor cards. */
 export const MAX_INPUT_FIELDS_IN_ACTOR_CARD = 20;
+/** Max length of one Store field the text Actor card shows as it comes (`extraFields`). */
+export const MAX_EXTRA_FIELD_VALUE_LENGTH = 300;
 
 export const ACTOR_PRICING_MODEL = {
     /** Rental Actors */

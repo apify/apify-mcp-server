@@ -19,6 +19,7 @@ import { compileSchema } from '../../utils/ajv.js';
 import { getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { respondOk } from '../../utils/mcp.js';
 import type { PricingTier } from '../../utils/pricing_info.js';
+import { IS_UNSTABLE_STORE_SEARCH_ENABLED } from '../../utils/store_unstable.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunActor, canRunAnyActor, getActorCallabilityCaveat } from '../actor_tool_naming.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
@@ -76,6 +77,14 @@ export const searchActorsBaseArgsSchema = z.object({
             Respect the user's privacy: when unsure, leave it out.
         `),
 });
+
+/**
+ * The args the search tools publish. `/unstable/store` decides how many Actors it returns, so with it they publish
+ * no `limit` or `offset`: AJV strips them from a call, and the call parses their defaults, which it ignores.
+ */
+export const searchActorsPublishedArgsSchema = IS_UNSTABLE_STORE_SEARCH_ENABLED
+    ? searchActorsBaseArgsSchema.omit({ limit: true, offset: true })
+    : searchActorsBaseArgsSchema;
 
 function buildDescription({ hasTool, clientParam }: ToolDescriptionContext): string {
     const runLimitationLine = canRunAnyActor(hasTool) ? '' : `${getActorCallabilityCaveat(clientParam)}\n`;
@@ -193,9 +202,9 @@ export const searchActors: ToolEntry = Object.freeze({
     title: 'Search Actors',
     description: buildDescription(ALL_TOOLS_PRESENT),
     buildDescription,
-    inputSchema: z.toJSONSchema(searchActorsBaseArgsSchema) as ToolInputSchema,
+    inputSchema: z.toJSONSchema(searchActorsPublishedArgsSchema) as ToolInputSchema,
     outputSchema: actorSearchOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(searchActorsBaseArgsSchema)),
+    ajvValidate: compileSchema(z.toJSONSchema(searchActorsPublishedArgsSchema)),
     annotations: {
         title: 'Search Actors',
         readOnlyHint: true,
