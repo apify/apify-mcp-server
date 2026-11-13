@@ -6,7 +6,8 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { AxiosError } from 'axios';
+import { InvalidResponseBodyError } from 'apify-client';
+import { AxiosError, type AxiosResponse } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
@@ -44,6 +45,14 @@ function overLimitAbort({ contentType }: OverLimitRecord): AxiosError {
     return new AxiosError(`maxContentLength size of ${MAX_INLINE_BYTES} exceeded`, 'ERR_BAD_RESPONSE', undefined, {
         res: { headers: contentType ? { 'content-type': contentType } : {} },
     });
+}
+
+/** What apify-client's response interceptor throws for a body that does not parse as its Content-Type. */
+function unparsableBodyError(contentType: string): InvalidResponseBodyError {
+    return new InvalidResponseBodyError(
+        { headers: { 'content-type': contentType } } as unknown as AxiosResponse,
+        new SyntaxError('Unterminated string in JSON at position 65536'),
+    );
 }
 
 /**
@@ -340,20 +349,11 @@ describe('get-key-value-store-record', () => {
     });
 
     it('returns a user error for a record whose body does not match its Content-Type', async () => {
-        // What apify-client's response interceptor throws for gzip bytes stored as application/json.
-        const parseFailure = Object.assign(new Error('Response body could not be parsed.'), {
-            name: 'InvalidResponseBodyError',
-            code: 'invalid-response-body',
-            response: { headers: { 'content-type': 'application/json; charset=utf-8' } },
-        });
-        const client = mockApifyClient({
-            keyValueStore: (id: string) => ({ url: `https://api.apify.com/v2/key-value-stores/${id}` }),
-            httpClient: {
-                axios: {
-                    request: async () => {
-                        throw parseFailure;
-                    },
-                },
+        // E.g. gzip bytes stored as application/json: every read fails to parse.
+        const client = stubApifyClient({
+            record: MOCK_RECORD,
+            onRequest: () => {
+                throw unparsableBodyError('application/json; charset=utf-8');
             },
         });
 
@@ -365,6 +365,28 @@ describe('get-key-value-store-record', () => {
         expect((result as TextToolResult).content[0].text).toContain(
             "Record 'INPUT' is stored as application/json; charset=utf-8, but its body is not valid for that type",
         );
+    });
+
+    it('reads the record again when the first response body could not be parsed', async () => {
+        // An interrupted response can end early without an error, so a valid record fails to parse once.
+        let requestCount = 0;
+        const client = stubApifyClient({
+            record: MOCK_RECORD,
+            onRequest: () => {
+                requestCount += 1;
+                if (requestCount === 1) throw unparsableBodyError('application/json; charset=utf-8');
+            },
+        });
+
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'INPUT' }, client),
+        );
+        const { isError, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
+
+        expect(isError).not.toBe(true);
+        expect(structuredContent).toMatchObject({ value: MOCK_RECORD.value });
     });
 
     it('returns isError "record not found" when the record is missing but the store exists', async () => {
