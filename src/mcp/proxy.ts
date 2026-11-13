@@ -60,8 +60,15 @@ export async function getMCPServerTools(
         escapedUsername !== null &&
         tools.some(({ name }) => `${escapedUsername}--${actorName}--${name}`.length > MAX_TOOL_NAME_LENGTH);
 
-    return tools.map(
-        (tool): ActorMcpTool => ({
+    return tools.map((tool): ActorMcpTool => {
+        // AJV here is draft-07 only. A declared `$schema` makes compile throw
+        // and drops every tool from this Actor. Copy first so the client object stays intact.
+        const inputSchema = { ...tool.inputSchema };
+        if ('$schema' in inputSchema) {
+            delete (inputSchema as { $schema?: string }).$schema;
+        }
+
+        return {
             type: TOOL_TYPE.ACTOR_MCP,
             actorId: actorID,
             actorFullName,
@@ -69,9 +76,9 @@ export async function getMCPServerTools(
             originToolName: tool.name,
             name: getProxyMCPServerToolName(actorFullName, tool.name, shouldCapUsername),
             description: tool.description || '',
-            inputSchema: tool.inputSchema,
-            ajvValidate: compileUntrustedSchema(tool.inputSchema).validate,
+            inputSchema,
+            ajvValidate: compileUntrustedSchema(inputSchema).validate,
             annotations: tool.annotations,
-        }),
-    );
+        };
+    });
 }
