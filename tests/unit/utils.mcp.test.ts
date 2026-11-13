@@ -11,6 +11,7 @@ import {
     computeToolResponseBytes,
     getHttpErrorHint,
     getToolCallErrorUserText,
+    hashSessionId,
     injectMcpSessionId,
     respondAborted,
     respondErrorNoTelemetry,
@@ -22,6 +23,13 @@ import {
     type ToolResponse,
 } from '../../src/utils/mcp.js';
 import { textOf } from './helpers/tool_context.js';
+
+describe('session reference in telemetry', () => {
+    it('is the first 12 hex chars of the sha256 of the session ID, as the hosted server logs it', () => {
+        // `printf %s <id> | sha256sum | cut -c1-12`; apify-mcp-server-internal logs the same value.
+        expect(hashSessionId('2eb04213-1ac4-4f9f-885a-fb26eccde798')).toBe('878cc3a272d6');
+    });
+});
 
 describe('injectMcpSessionId()', () => {
     it('returns a new params object with _meta.mcpSessionId when params is undefined', () => {
