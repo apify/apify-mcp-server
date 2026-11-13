@@ -8,7 +8,7 @@ import { isActorRunLimitError } from './apify_errors.js';
 
 /**
  * Safely extract HTTP status code from errors.
- * Checks both `statusCode` and `code` properties for compatibility.
+ * Checks the `statusCode`, `code` and `status` properties for compatibility.
  */
 export function getHttpStatusCode(error: unknown): number | undefined {
     if (typeof error !== 'object' || error === null) {
@@ -28,6 +28,14 @@ export function getHttpStatusCode(error: unknown): number | undefined {
         const { code } = error as { code?: unknown };
         if (typeof code === 'number' && code >= 100 && code < 600) {
             return code;
+        }
+    }
+
+    // Check for status property (used by the Algolia client)
+    if ('status' in error) {
+        const { status } = error as { status?: unknown };
+        if (typeof status === 'number' && status >= 100 && status < 600) {
+            return status;
         }
     }
 

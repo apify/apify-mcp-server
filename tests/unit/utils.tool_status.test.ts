@@ -29,6 +29,12 @@ describe('getToolStatusFromError', () => {
         expect(status).toBe(TOOL_STATUS.SOFT_FAIL);
     });
 
+    it('classifies an Algolia 4xx error, which carries `status`, as soft_fail', () => {
+        const error = Object.assign(new Error('Invalid value for "query" parameter'), { status: 400 });
+        const status = getToolStatusFromError(error, false);
+        expect(status).toBe(TOOL_STATUS.SOFT_FAIL);
+    });
+
     it('classifies HTTP 5xx errors as failed', () => {
         const error = Object.assign(new Error('Internal Error'), { statusCode: 500 });
         const status = getToolStatusFromError(error, false);
