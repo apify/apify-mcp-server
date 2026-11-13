@@ -3,7 +3,7 @@ import { ErrorCode, ListToolsResultSchema, McpError } from '@modelcontextprotoco
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
@@ -17,7 +17,11 @@ import { runOnActorMcpServer } from './call_actor_mcp_tool.js';
 export const MAX_TOOL_LIST_PAGES = 100;
 
 const fetchActorMcpToolListArgs = z.object({
-    actor: z.string().min(1).describe('The MCP server Actor: its ID, or its name in the "username/name" form.'),
+    actor: z
+        .string()
+        .min(1)
+        .max(RESOURCE_ID_OR_NAME_MAX_LENGTH)
+        .describe('The MCP server Actor: its ID, or its name in the "username/name" form.'),
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
