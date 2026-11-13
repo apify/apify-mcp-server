@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.21.8 - **not yet released**
+## [0.21.8](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.8) (2026-11-13)
 
 ### 🐛 Bug Fixes
 
@@ -18,7 +17,6 @@ All notable changes to this project will be documented in this file.
 - Replace @apify&#x2F;datastructures with a Map-based LRU cache ([#1893](https://github.com/apify/apify-mcp-server/pull/1893)) ([afcaad8](https://github.com/apify/apify-mcp-server/commit/afcaad89db32d5f64b9a17b014cf82c364e0e0b9)) by [@MQ37](https://github.com/MQ37)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.21.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.7) (2026-11-12)
 
 ### 🐛 Bug Fixes
