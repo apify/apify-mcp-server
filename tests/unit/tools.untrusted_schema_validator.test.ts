@@ -81,7 +81,10 @@ describe('compileUntrustedSchema and the validator Ajv generates', () => {
     const strings = (count: number) => names(count).map(() => ({ type: 'string' }));
 
     it.each([
-        ['properties', { type: 'object', properties: Object.fromEntries(names(1400).map((name) => [name, {}])) }],
+        [
+            'properties',
+            { type: 'object', properties: Object.fromEntries(names(1400).map((name) => [name, { type: 'string' }])) },
+        ],
         ['members of a schema list', { allOf: strings(900) }],
         ['tuple items', { type: 'array', items: strings(900) }],
         ['names a property depends on', { dependencies: { url: names(900) } }],
@@ -91,7 +94,7 @@ describe('compileUntrustedSchema and the validator Ajv generates', () => {
         ],
         [
             'properties and list members together',
-            { properties: Object.fromEntries(names(700).map((name) => [name, {}])), anyOf: strings(700) },
+            { properties: Object.fromEntries(names(700).map((name) => [name, false])), anyOf: strings(700) },
         ],
     ])(
         'refuses a schema whose validator would nest too deep for its %s, before Ajv generates any code',
@@ -102,6 +105,20 @@ describe('compileUntrustedSchema and the validator Ajv generates', () => {
             expect(createAjv).not.toHaveBeenCalled();
         },
     );
+
+    it('does not count a property without a keyword to check towards the nesting', () => {
+        const described = Object.fromEntries(
+            names(2000).map((name) => [name, { title: name, description: 'Any value' }]),
+        );
+
+        const { validate } = compileUntrustedSchema({
+            type: 'object',
+            properties: { ...described, url: { type: 'string' } },
+        });
+
+        expect(validate({ field0: 1, field1999: {}, url: 'https://example.com' })).toBe(true);
+        expect(validate({ url: {} })).toBe(false);
+    });
 
     it('throws SchemaTooLargeError when the generated code nests deeper than the limit', () => {
         vi.mocked(createAjv).mockImplementationOnce((checkCode) => {

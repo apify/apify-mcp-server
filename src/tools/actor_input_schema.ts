@@ -192,6 +192,13 @@ function estimateCodeBytes(subschema: unknown, pathCodeBytes: number): number {
     return codeBytes;
 }
 
+/** Whether Ajv generates any code for a subschema: `true`, `{}` and a schema of annotations only need none. */
+const hasCodeKeyword = (subschema: unknown): boolean =>
+    subschema === false ||
+    (typeof subschema === 'object' &&
+        subschema !== null &&
+        Object.keys(subschema).some((keyword) => CODE_KEYWORDS.has(keyword)));
+
 /**
  * An upper estimate of the blocks the checks of one subschema open one inside another, without its subschemas:
  * Ajv checks the next keyword, property, list member or listed value inside the check of the one before.
@@ -209,7 +216,8 @@ function estimateNestedBlocks(subschema: unknown): { properties: number; others:
                 ? value.length
                 : Math.min(value.length, LISTED_VALUES_IN_CODE);
         } else if (keyword === 'properties') {
-            nestedBlocks.properties += Object.keys(value ?? {}).length;
+            // Ajv generates no check for a property whose schema has no keyword to check.
+            nestedBlocks.properties += Object.values(value ?? {}).filter(hasCodeKeyword).length;
         } else if (keyword === 'dependencies') {
             for (const member of Object.values(value ?? {})) {
                 nestedBlocks.others += 1 + (Array.isArray(member) ? member.length : 0);
