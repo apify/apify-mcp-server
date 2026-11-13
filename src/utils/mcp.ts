@@ -26,11 +26,12 @@ export const APIFY_ACTOR_RUN_META_KEY = 'com.apify/ActorRun';
 export const APIFY_TRACE_ID_META_KEY = 'com.apify/traceId';
 
 /**
- * Identifier of a session in telemetry and Store search tracking. The session ID is the client's
- * credential on a hosted server, so it must not leave the process as-is.
+ * Identifier of a session in telemetry and Store search tracking: the first 12 hex chars of its
+ * sha256, the reference the hosted server's logs use, so one value finds a session everywhere.
+ * The session ID is the client's credential on a hosted server, so it must not leave the process as-is.
  */
 export function hashSessionId(sessionId: string): string {
-    return createHash('sha256').update(sessionId).digest('hex');
+    return createHash('sha256').update(sessionId).digest('hex').slice(0, 12);
 }
 
 /**
