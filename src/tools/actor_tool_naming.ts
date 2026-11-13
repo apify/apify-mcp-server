@@ -133,9 +133,12 @@ export function getToolSchemaID(actorName: string): string {
     return `https://apify.com/mcp/${actorNameToToolName(actorName)}/schema.json`;
 }
 
-/** `?client=claude` is the Claude connector URL; the only client whose add-a-server flow has a name. */
+/**
+ * `?client=claude` is the Claude connector URL; the only client whose add-a-server flow has a name.
+ * Matches any tag containing `claude` (e.g. `apify-web-hero-claude`), except `claude-code`, which has no connector.
+ */
 export function isClaudeClient(clientParam?: string): boolean {
-    return clientParam === 'claude';
+    return !!clientParam?.includes('claude') && !clientParam.includes('claude-code');
 }
 
 /** How to get an Actor this session cannot run. Tool results use the neutral wording; descriptions and instructions see `clientParam`. */

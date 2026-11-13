@@ -80,9 +80,14 @@ Claude Code opens the Apify sign-in page the first time it uses the server. To i
 <details>
 <summary><b>ChatGPT</b></summary>
 
-1. Open [ChatGPT Plugins](https://chatgpt.com/plugins), select **+**, then **Add custom MCP server**.
-2. Name it `Apify`, enter `https://mcp.apify.com` as the server URL, and choose **OAuth** authentication.
-3. Review the risk warning, select **I understand and want to continue**, then **Create as a plugin**.
+1. Open [ChatGPT Plugins](https://chatgpt.com/plugins), select **Add** in the top-right corner, then **Add custom MCP server**.
+2. Fill in the form:
+    - **Icon**: upload the [Apify icon](https://mcp.apify.com/images/apify_icon_256.png).
+    - **Name**: `Apify`
+    - **Description**: `Extract data from any website with thousands of scrapers, crawlers, and automations on Apify Store`
+    - **Connection**: **Server URL**, the URL with your settings from the [configurator](https://mcp.apify.com), for example with [`?tools=`](#choose-which-tools-load). Without custom settings, use `https://mcp.apify.com`.
+    - **Authentication**: **OAuth**
+3. Check **I understand and want to continue**, then select **Create as a plugin**.
 4. Sign in with Apify, review the tools, and install the plugin. No API token is needed.
 5. Start a new conversation, type `@`, and select **Apify**.
 
@@ -95,7 +100,7 @@ The ChatGPT desktop app uses local MCP configuration shared with Codex instead: 
 <details>
 <summary><b>Cursor</b></summary>
 
-Use the one-click install link from the [configurator](https://mcp.apify.com), or let the [Apify CLI](https://docs.apify.com/cli) write the configuration, including your API token:
+[Add Apify to Cursor](https://cursor.com/install-mcp?name=apify&config=eyJ0eXBlIjoiaHR0cCIsInVybCI6Imh0dHBzOi8vbWNwLmFwaWZ5LmNvbS8%2FY2xpZW50PWN1cnNvciJ9), or let the [Apify CLI](https://docs.apify.com/cli) write the configuration, including your API token:
 
 ```bash
 apify mcp install cursor
@@ -126,7 +131,9 @@ Use the one-click install link from the [configurator](https://mcp.apify.com), r
 <details>
 <summary><b>Claude</b></summary>
 
-Apify is available as a Claude connector. Open **Settings** > **Connectors**, find **Apify** in the connector directory, and connect it. You can also select **Add custom connector**, name it `Apify`, and enter `https://mcp.apify.com` as the remote MCP server URL. Sign in with Apify when prompted. The same connector works on Claude.ai and in Claude Desktop. See the [Claude guide](https://docs.apify.com/integrations/claude-desktop).
+[Add Apify to Claude](https://claude.ai/new?modal=add-custom-connector&connectorName=Apify&connectorUrl=https%3A%2F%2Fmcp.apify.com%2F%3Fclient%3Dclaude#customize/connectors): the link opens the custom connector dialog with the name and URL filled in. Sign in with Apify when prompted.
+
+To set it up by hand, open **Settings** > **Connectors**, select **Add custom connector**, name it `Apify`, and enter `https://mcp.apify.com` as the remote MCP server URL. The same connector works on Claude.ai and in Claude Desktop. See the [Claude guide](https://docs.apify.com/integrations/claude-desktop).
 
 </details>
 
