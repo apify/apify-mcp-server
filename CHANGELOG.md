@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.21.9 - **not yet released**
+## [0.21.9](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.9) (2026-11-13)
 
 ### 🚀 Features
 
@@ -17,7 +16,6 @@ All notable changes to this project will be documented in this file.
 - Keep Actor input out of the tool call logs ([#1866](https://github.com/apify/apify-mcp-server/pull/1866)) ([3029a59](https://github.com/apify/apify-mcp-server/commit/3029a59f0c0b4d349db3cc54d978902f0db6c38a)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.21.8](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.8) (2026-11-13)
 
 ### 🐛 Bug Fixes
