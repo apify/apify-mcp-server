@@ -178,7 +178,7 @@ export async function executeCallActorMcpTool(toolArgs: InternalToolArgs): Promi
                 if (!isUnknownRemoteToolError(error, parsed.tool)) throw error;
                 // A wrong tool name is the caller's to fix, e.g. one of this server's own tool names.
                 const hint = toolArgs.loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST)
-                    ? ` List its tools with ${HELPER_TOOLS.ACTOR_MCP_TOOL_LIST}.`
+                    ? ` ${HELPER_TOOLS.ACTOR_MCP_TOOL_LIST} lists its tools.`
                     : '';
                 return respondUserError(`Actor '${parsed.actor}' has no MCP tool named '${parsed.tool}'.${hint}`);
             }
