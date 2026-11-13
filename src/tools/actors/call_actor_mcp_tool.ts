@@ -25,7 +25,7 @@ import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondRaw, respondServerError, respondUserError } from '../../utils/mcp.js';
 import { findServerTool, resolveActorInterfaces } from '../actor_tool_naming.js';
 import { anyJsonObjectSchema } from '../structured_output_schemas.js';
-import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from './actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInput } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 
 /** The MCP spec's upper bound for a tool name. */
@@ -95,7 +95,7 @@ export async function runOnActorMcpServer(
             },
         );
     }
-    const actorName = fixActorNameInputAndLog(params.actor, { mcpSessionId });
+    const actorName = fixActorNameInput(params.actor);
     if (!actorName) return respondUserError(EMPTY_ACTOR_NAME_MESSAGE);
     const cached = await getActorDefinitionCached(actorName, apifyClient);
     if (!cached) return buildActorNotFoundResponse(actorName, loadedToolNames);

@@ -28,6 +28,7 @@ import {
     TOOL_TYPE,
 } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
+import { isValidResourceId } from '../../utils/apify_resource_id.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildActorInputSchema, compileUntrustedSchema } from '../actor_input_schema.js';
@@ -364,25 +365,6 @@ export async function getMCPServersAsTools(
     return actorToolsArrays.flat();
 }
 
-/**
- * Fixes an Actor name input from LLM and logs at INFO when the input differed from the fixed version.
- * Single entry point for fix+log — avoids duplicating the pattern at every call site.
- */
-export function fixActorNameInputAndLog(actorName: string, extra?: Record<string, unknown>): string {
-    const fixed = fixActorNameInput(actorName);
-    if (fixed !== actorName) {
-        log.info(
-            'Actor name input required normalization before lookup (quotes, spacing, slash padding, or a tool name)',
-            {
-                actorNameInput: actorName,
-                actorNameFixed: fixed,
-                ...extra,
-            },
-        );
-    }
-    return fixed;
-}
-
 export const EMPTY_ACTOR_NAME_MESSAGE =
     '"actor" must not be empty. Give the Actor ID or its name in the "username/name" form.';
 
@@ -463,7 +445,7 @@ export async function getActorsAsTools(
 ): Promise<ActorsAsToolsResult> {
     const { mcpSessionId, actorStore, paymentProvider, isDirectTool = true } = options ?? {};
     log.debug('Fetching Actors as tools', {
-        actorNames: actorIdsOrNames,
+        actorCount: actorIdsOrNames.length,
         mcpSessionId,
         paymentProviderId: paymentProvider?.id,
     });
@@ -472,7 +454,18 @@ export async function getActorsAsTools(
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
-            const actorName = fixActorNameInputAndLog(actorIdOrName, { mcpSessionId });
+            const actorName = fixActorNameInput(actorIdOrName);
+            // A name of any other shape is not an Actor name but whatever the caller sent, a pasted `Authorization`
+            // header included, so it is neither looked up nor logged.
+            if (!isValidResourceId(actorName)) {
+                log.softFail('Actor name is not valid', {
+                    mcpSessionId,
+                    statusCode: 400,
+                    failureCategory: 'INVALID_INPUT',
+                });
+                errors.push(ActorLoadError.notFound(actorIdOrName));
+                return null;
+            }
 
             let actorDefinitionWithInfo: ActorDefinitionWithInfo | null;
             try {
@@ -480,7 +473,6 @@ export async function getActorsAsTools(
             } catch (error) {
                 logHttpError(error, 'Failed to fetch Actor definition', {
                     actorName,
-                    ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
                     mcpSessionId,
                 });
                 errors.push(ActorLoadError.loadFailed(actorIdOrName));
@@ -490,7 +482,6 @@ export async function getActorsAsTools(
             if (!actorDefinitionWithInfo) {
                 log.softFail('Actor not found or definition is not available', {
                     actorName,
-                    ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
                     mcpSessionId,
                     statusCode: 404,
                     failureCategory: 'INVALID_INPUT',
