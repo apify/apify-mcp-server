@@ -36,11 +36,27 @@ function addValidatorCodeOnce(codeBytes: number): void {
 
 describe('compileUntrustedSchema and the validator Ajv generates', () => {
     const groupOfFlags = Object.fromEntries(Array.from({ length: 700 }, (_, index) => [`flag${index}`, false]));
+    const groupOf = (property: object) =>
+        Object.fromEntries(Array.from({ length: 1000 }, (_, index) => [`field${index}`, property]));
 
     it.each([
         [
             'a long property name',
             { type: 'object', properties: { ['settings'.padEnd(20_000, 'x')]: { properties: groupOfFlags } } },
+        ],
+        [
+            'a long property name for every property with one keyword',
+            {
+                type: 'object',
+                properties: { ['settings'.padEnd(4000, 'x')]: { properties: groupOf({ type: 'string' }) } },
+            },
+        ],
+        [
+            'a long property name for every property with a list of names',
+            {
+                type: 'object',
+                properties: { ['settings'.padEnd(4000, 'x')]: { properties: groupOf({ required: ['url'] }) } },
+            },
         ],
         [
             'a property name with characters that are written as escapes',
@@ -164,8 +180,9 @@ describe('compileUntrustedSchema and the validator Ajv generates', () => {
             ...schemaFor('apify/google-search-scraper'),
             required: ['startUrls'],
         });
+        expect(validate({ startUrls: ['https://example.com'] })).toBe(true);
         // Fills the cache until it is emptied.
-        for (let index = 0; getUntrustedValidatorCacheUsage().entries > 1 || index === 0; index++) {
+        for (let index = 0; index < 100 && (index === 0 || getUntrustedValidatorCacheUsage().entries > 1); index++) {
             addValidatorCodeOnce(MAX_UNTRUSTED_VALIDATOR_CODE_BYTES / 2);
             compileUntrustedSchema(schemaFor(`apify/large-search-input-${index}`));
         }
@@ -176,7 +193,7 @@ describe('compileUntrustedSchema and the validator Ajv generates', () => {
         expect(validate.errors).toMatchObject([{ keyword: 'required', params: { missingProperty: 'startUrls' } }]);
         expect(validate({ startUrls: [] })).toBe(true);
         expect(validate.errors).toBeNull();
-        // One compilation for the four calls.
+        // One compilation for the three calls.
         expect(createAjv).toHaveBeenCalledOnce();
     });
 });

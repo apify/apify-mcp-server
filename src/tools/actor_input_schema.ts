@@ -59,7 +59,7 @@ export const MAX_UNTRUSTED_VALIDATOR_NESTING = 1320;
 /**
  * The part of that nesting that may come from anything but the properties of an object: other keywords, the
  * members of schema lists and listed values. The validators of the input schemas of public Actors in the Apify
- * Store (2026-10) use at most 119 of it.
+ * Store (2026-10) use at most 230 of it.
  */
 export const MAX_UNTRUSTED_VALIDATOR_NESTING_OUTSIDE_PROPERTIES = 800;
 

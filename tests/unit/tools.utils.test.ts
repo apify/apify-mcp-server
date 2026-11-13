@@ -210,18 +210,6 @@ describe('compileUntrustedSchema', () => {
             expect(getRefusedLimit(schema)).toBe(TOO_LARGE);
         });
 
-        it.each([
-            ['a keyword with one value', { type: 'string' }],
-            ['a keyword with a list', { required: ['url'] }],
-        ])('counts the names on the way to a subschema for %s', (_name, property) => {
-            const group = (name: string) => ({
-                type: 'object',
-                properties: { [name]: schemaWithProperties(1000, property) },
-            });
-            expect(compileUntrustedSchema(group('settings'))).toBeDefined();
-            expect(getRefusedLimit(group('settings'.padEnd(4000, 's')))).toBe(TOO_LARGE);
-        });
-
         it('counts the names on the way to a subschema for each of its keywords', () => {
             const groupName = (length: number) => 'group'.padEnd(length, 'x');
             const schema = (length: number) => ({
