@@ -357,6 +357,7 @@ async function fetchActorTip(
     mcpSessionId?: string,
 ): Promise<RunResponse['tip']> {
     try {
+        // TODO: read through `fetchRecordUnderCap`; `getRecord()` buffers a record of any size whole.
         const record = await client.keyValueStore(keyValueStoreId).getRecord(TIP_KVS_KEY);
         return parseActorTip(record?.value);
     } catch (error) {
