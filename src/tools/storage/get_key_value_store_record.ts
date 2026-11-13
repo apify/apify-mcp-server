@@ -103,15 +103,17 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             const summary = `Record '${recordKey}'${contentType ? ` (contentType=${contentType})` : ''} is over the ${MAX_INLINE_BYTES}-byte limit, so a link to it is returned instead of its value.`;
             // The link is opened without a token, so it addresses the store by ID, not by `~name`.
             const uri = await client.keyValueStore(await getStoreId()).getRecordPublicUrl(recordKey);
+            const structuredContent = {
+                keyValueStoreId,
+                key: recordKey,
+                value: `<${mimeType ?? 'application/octet-stream'}, over ${MAX_INLINE_BYTES} bytes>`,
+                ...(contentType && { contentType }),
+                summary,
+            };
             return respondRaw({
-                structuredContent: {
-                    keyValueStoreId,
-                    key: recordKey,
-                    value: `<${mimeType ?? 'application/octet-stream'}, over ${MAX_INLINE_BYTES} bytes>`,
-                    ...(contentType && { contentType }),
-                    summary,
-                },
+                structuredContent,
                 content: [
+                    { type: 'text', text: JSON.stringify(structuredContent) },
                     {
                         type: 'resource_link',
                         uri,
@@ -136,7 +138,8 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
         // {"type":"Buffer",...}); the bytes ride in MCP content blocks. But the tool declares an
         // outputSchema, and the official SDK client rejects any result that has a schema but no
         // structuredContent — so emit a minimal schema-conforming descriptor alongside the block.
-        // The Console link (Console UI token sessions) rides as a trailing text block.
+        // Its JSON leads the content, as in every storage tool; the Console link (Console UI token
+        // sessions) rides as a trailing text block.
         if (Buffer.isBuffer(value)) {
             const structuredContent = {
                 keyValueStoreId,
@@ -145,17 +148,18 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                 ...(contentType && { contentType }),
                 summary,
             };
+            const mirror = { type: 'text' as const, text: JSON.stringify(structuredContent) };
             const data = value.toString('base64');
             if (mimeType?.startsWith('image/')) {
                 return respondRaw({
                     structuredContent,
-                    content: [{ type: 'image', data, mimeType } satisfies ImageContent, ...consoleLinkContent],
+                    content: [mirror, { type: 'image', data, mimeType } satisfies ImageContent, ...consoleLinkContent],
                 });
             }
             if (mimeType?.startsWith('audio/')) {
                 return respondRaw({
                     structuredContent,
-                    content: [{ type: 'audio', data, mimeType } satisfies AudioContent, ...consoleLinkContent],
+                    content: [mirror, { type: 'audio', data, mimeType } satisfies AudioContent, ...consoleLinkContent],
                 });
             }
             // The blob is inlined, so the uri is just an identifier — build it from the store's API
@@ -165,6 +169,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             return respondRaw({
                 structuredContent,
                 content: [
+                    mirror,
                     {
                         type: 'resource',
                         resource: { uri, blob: data, ...(mimeType && { mimeType }) },
