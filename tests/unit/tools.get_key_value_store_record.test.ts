@@ -159,7 +159,7 @@ describe('get-key-value-store-record', () => {
         const { content, isError } = result as CallToolResult;
 
         expect(isError).not.toBe(true);
-        expect(content[0]).toEqual({
+        expect(content[1]).toEqual({
             type: 'image',
             data: bytes.toString('base64'),
             mimeType: 'image/png',
@@ -177,7 +177,7 @@ describe('get-key-value-store-record', () => {
         const { content, isError } = result as CallToolResult;
 
         expect(isError).not.toBe(true);
-        expect(content[0]).toEqual({
+        expect(content[1]).toEqual({
             type: 'image',
             data: bytes.toString('base64'),
             mimeType: 'image/png',
@@ -195,7 +195,7 @@ describe('get-key-value-store-record', () => {
         const { content, isError } = result as CallToolResult;
 
         expect(isError).not.toBe(true);
-        expect(content[0]).toEqual({
+        expect(content[1]).toEqual({
             type: 'audio',
             data: bytes.toString('base64'),
             mimeType: 'audio/mpeg',
@@ -220,7 +220,7 @@ describe('get-key-value-store-record', () => {
 
         expect(isError).not.toBe(true);
         expect(onGetRecordPublicUrl).not.toHaveBeenCalled();
-        expect(content[0]).toEqual({
+        expect(content[1]).toEqual({
             type: 'resource',
             resource: {
                 uri: 'https://api.apify.com/v2/key-value-stores/KvsWkzbQMuFYuam3Y/records/report.pdf',
@@ -243,7 +243,7 @@ describe('get-key-value-store-record', () => {
         );
         const { content } = result as CallToolResult;
 
-        expect((content[0] as { resource: { uri: string } }).resource.uri).toBe(
+        expect((content[1] as { resource: { uri: string } }).resource.uri).toBe(
             'https://api.apify.com/v2/key-value-stores/KvsWkzbQMuFYuam3Y/records/report.pdf',
         );
     });
@@ -258,7 +258,7 @@ describe('get-key-value-store-record', () => {
         const { content, isError } = result as CallToolResult;
 
         expect(isError).not.toBe(true);
-        expect(content[0]).toEqual({
+        expect(content[1]).toEqual({
             type: 'resource_link',
             uri: 'https://api.apify.com/v2/key-value-stores/KvsWkzbQMuFYuam3Y/records/big.png?signature=signed',
             name: 'big.png',
@@ -276,7 +276,7 @@ describe('get-key-value-store-record', () => {
         const { content, isError } = result as CallToolResult;
 
         expect(isError).not.toBe(true);
-        expect(content[0]).toEqual({
+        expect(content[1]).toEqual({
             type: 'resource_link',
             uri: 'https://api.apify.com/v2/key-value-stores/KvsWkzbQMuFYuam3Y/records/blob?signature=signed',
             name: 'blob',
@@ -293,7 +293,7 @@ describe('get-key-value-store-record', () => {
         const { content, isError, structuredContent } = result as CallToolResult;
 
         expect(isError).not.toBe(true);
-        expect(content[0]).toMatchObject({ type: 'resource_link', mimeType: 'text/markdown' });
+        expect(content[1]).toMatchObject({ type: 'resource_link', mimeType: 'text/markdown' });
         expect(structuredContent?.value).toBe(`<text/markdown, over ${MAX_INLINE_BYTES} bytes>`);
         expect(structuredContent?.summary).toContain(`over the ${MAX_INLINE_BYTES}-byte limit`);
     });
@@ -421,6 +421,26 @@ describe('get-key-value-store-record', () => {
         });
     });
 
+    // Text-only clients get the descriptor from the JSON mirror; the binary block follows it.
+    it.each([
+        ['an image', { record: { value: Buffer.from([0x89, 0x50, 0x4e, 0x47]), contentType: 'image/png' } }, 'image'],
+        ['audio', { record: { value: Buffer.from([0x49, 0x44, 0x33]), contentType: 'audio/mpeg' } }, 'audio'],
+        [
+            'another binary type',
+            { record: { value: Buffer.from([0x25, 0x50, 0x44, 0x46]), contentType: 'application/pdf' } },
+            'resource',
+        ],
+        ['a record over the size limit', { overLimit: { contentType: 'image/png' } }, 'resource_link'],
+    ])('mirrors structuredContent as JSON before the binary block for %s', async (_, stub, blockType) => {
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'file' }, stubApifyClient(stub)),
+        );
+        const { content, structuredContent } = result as CallToolResult;
+
+        expect(JSON.parse((content[0] as { text: string }).text)).toEqual(structuredContent);
+        expect(content[1].type).toBe(blockType);
+    });
+
     // OFFICIAL SDK client — the "pedantic client".
     // On listTools() it compiles a validator from the tool's outputSchema; on callTool() it throws
     // McpError if the result carries no structuredContent (or it fails the schema).
@@ -471,7 +491,7 @@ describe('get-key-value-store-record', () => {
                 keyValueStoreId: 'KvsWkzbQMuFYuam3Y',
                 key: 'screenshot.png',
             });
-            expect((result.content as { type: string }[])[0].type).toBe('image');
+            expect((result.content as { type: string }[])[1].type).toBe('image');
             await client.close();
         });
 
@@ -484,7 +504,7 @@ describe('get-key-value-store-record', () => {
 
             expect(result.isError).not.toBe(true);
             expect(result.structuredContent).toMatchObject({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', key: 'big.png' });
-            expect((result.content as { type: string }[])[0].type).toBe('resource_link');
+            expect((result.content as { type: string }[])[1].type).toBe('resource_link');
             await client.close();
         });
     });
@@ -585,7 +605,7 @@ describe('get-key-value-store-record with a bare store name', () => {
         );
         const { content } = result as CallToolResult;
 
-        expect((content[0] as { uri: string }).uri).toBe(
+        expect((content[1] as { uri: string }).uri).toBe(
             'https://api.apify.com/v2/key-value-stores/WkzbQMuFYuamGv3YF/records/big.png?signature=signed',
         );
     });
@@ -646,7 +666,7 @@ describe('get-key-value-store-record with a record far over the size limit', () 
             );
             const { content } = result as CallToolResult;
 
-            expect(content[0]).toMatchObject({ type: 'resource_link', name: 'export.zip' });
+            expect(content[1]).toMatchObject({ type: 'resource_link', name: 'export.zip' });
             // Socket buffers hold some bytes past the limit; a full read would send all of them.
             expect(sentBytes).toBeLessThan(RECORD_BYTES / 4);
         } finally {
