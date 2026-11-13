@@ -52,6 +52,12 @@ describe('TailBuffer keeps the end of a stream', () => {
 
         expect(tail).toEqual({ text: '€€', isTruncated: true, startsMidLine: true });
     });
+
+    it('keeps the end of a line longer than the window when that line ends the stream with a newline', () => {
+        // Window 'defgh\n': the only newline is the last byte, so no line starts in the window.
+        expect(fill(6, ['abcdefgh\n']).read()).toEqual({ text: 'defgh\n', isTruncated: true, startsMidLine: true });
+    });
+
     it('skips at most 3 continuation bytes at the start of a cut line', () => {
         const tail = new TailBuffer(6);
         tail.push(Buffer.from([0x61, 0x80, 0x80, 0x80, 0x80, 0x80, 0x62]));

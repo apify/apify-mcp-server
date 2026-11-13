@@ -81,7 +81,8 @@ export class TailBuffer {
         const isTruncated = lastDroppedByte !== undefined;
         let startsMidLine = isTruncated && lastDroppedByte !== NEWLINE;
         if (startsMidLine) {
-            const firstLineEnd = body.indexOf(NEWLINE);
+            // A newline that ends the window starts no line in it, so it is not searched.
+            const firstLineEnd = body.subarray(0, body.length - 1).indexOf(NEWLINE);
             if (firstLineEnd === -1) {
                 // Skip the UTF-8 continuation bytes (10xxxxxx, at most 3) of a character that started before the window.
                 let start = 0;
