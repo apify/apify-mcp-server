@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.21.11 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Return a user error for a key-value record whose body does not match its Content-Type ([#1909](https://github.com/apify/apify-mcp-server/pull/1909)) ([756ce6e](https://github.com/apify/apify-mcp-server/commit/756ce6e5aefc554e2ed0eca2b675a471fd4d33a9)) by [@jirispilka](https://github.com/jirispilka), closes [#1907](https://github.com/apify/apify-mcp-server/issues/1907)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.21.10](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.10) (2026-11-13)
 
 ### 🐛 Bug Fixes
