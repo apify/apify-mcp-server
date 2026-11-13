@@ -9,6 +9,8 @@ All notable changes to this project will be documented in this file.
 
 - Log &quot;Invalid event ID format&quot; as a client fault ([#1906](https://github.com/apify/apify-mcp-server/pull/1906)) ([55e4966](https://github.com/apify/apify-mcp-server/commit/55e4966f66deb607b0a81ea64ce28ed0a54f5ae7)) by [@jirispilka](https://github.com/jirispilka), closes [#1904](https://github.com/apify/apify-mcp-server/issues/1904)
 - Return a user error for an unknown Actor MCP tool name ([#1910](https://github.com/apify/apify-mcp-server/pull/1910)) ([789e505](https://github.com/apify/apify-mcp-server/commit/789e505d472b5266a7c7d4cec726bdaf8d6e3469)) by [@jirispilka](https://github.com/jirispilka)
+- Keep invalid Actor names out of the logs ([#1902](https://github.com/apify/apify-mcp-server/pull/1902)) ([de21e49](https://github.com/apify/apify-mcp-server/commit/de21e4987f404ef336ab458e726db685b35078da)) by [@jirispilka](https://github.com/jirispilka)
+- Cap search-apify-docs queries at 150 characters ([#1905](https://github.com/apify/apify-mcp-server/pull/1905)) ([33468bc](https://github.com/apify/apify-mcp-server/commit/33468bc00bcb194abd23a726db8e700b2cd3a8e0)) by [@jirispilka](https://github.com/jirispilka), closes [#1903](https://github.com/apify/apify-mcp-server/issues/1903)
 
 
 <!-- git-cliff-unreleased-end -->
