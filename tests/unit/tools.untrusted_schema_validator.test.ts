@@ -204,17 +204,20 @@ describe('compileUntrustedSchema and the validator Ajv generates', () => {
         expect(compileUntrustedSchema(schema).validate({ startUrls: ['https://example.com'] })).toBe(true);
     });
 
-    it('drops the cached validators once their code takes more memory than the cache may use', () => {
-        const first = compileUntrustedSchema(schemaFor('apify/playwright-scraper'));
-        let compiledCount = 0;
-        while (compileUntrustedSchema(schemaFor('apify/playwright-scraper')) === first && compiledCount < 100) {
+    it('drops the least recently used validators once their code takes more memory than the cache may use', () => {
+        const used = compileUntrustedSchema(schemaFor('apify/playwright-scraper'));
+        const unused = compileUntrustedSchema(schemaFor('apify/camoufox-scraper'));
+        // More code than the cache may hold.
+        for (let index = 0; index < 30; index++) {
             addValidatorCodeOnce(MAX_UNTRUSTED_VALIDATOR_CODE_BYTES / 2);
-            compileUntrustedSchema(schemaFor(`apify/large-input-${compiledCount++}`));
+            compileUntrustedSchema(schemaFor(`apify/large-input-${index}`));
+            expect(compileUntrustedSchema(schemaFor('apify/playwright-scraper'))).toBe(used);
         }
 
-        // Several of the largest validators fit; an unlimited number of them does not.
-        expect(compiledCount).toBeGreaterThan(4);
-        expect(compiledCount).toBeLessThan(100);
+        expect(compileUntrustedSchema(schemaFor('apify/camoufox-scraper'))).not.toBe(unused);
+        expect(getUntrustedValidatorCacheUsage().codeBytes).toBeLessThanOrEqual(
+            UNTRUSTED_VALIDATOR_CACHE_MAX_CODE_BYTES,
+        );
     });
 
     it('keeps the validator cache within its two limits, however many distinct schemas load', () => {
@@ -241,8 +244,8 @@ describe('compileUntrustedSchema and the validator Ajv generates', () => {
             required: ['startUrls'],
         });
         expect(validate({ startUrls: ['https://example.com'] })).toBe(true);
-        // Fills the cache until it is emptied.
-        for (let index = 0; index < 100 && (index === 0 || getUntrustedValidatorCacheUsage().entries > 1); index++) {
+        // More code than the cache may hold: the cache drops the validator.
+        for (let index = 0; index < 30; index++) {
             addValidatorCodeOnce(MAX_UNTRUSTED_VALIDATOR_CODE_BYTES / 2);
             compileUntrustedSchema(schemaFor(`apify/large-search-input-${index}`));
         }

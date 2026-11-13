@@ -14,7 +14,6 @@ import {
     addRequestListSourcesProperties,
     addResourcePickerProperties as addArrayResourcePickerProperties,
 } from '../utils/apify_properties.js';
-import { LruCache } from '../utils/lru.js';
 import { getToolSchemaID } from './actor_tool_naming.js';
 
 type ActorInputSchemaProperties = Record<string, SchemaProperties>;
@@ -120,11 +119,14 @@ export const UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE = 1000;
 export const UNTRUSTED_VALIDATOR_CACHE_MAX_CODE_BYTES = 64 * 1024 * 1024;
 /** What a caller gets: the schema and a validator that holds no compiled code, see `createServedValidator`. */
 type ServedValidator = { validate: ValidateFunction<unknown>; schema: object };
-// A failed compilation costs as much as a successful one, so the cache remembers its error too.
-const untrustedValidatorCache = new LruCache<
-    { compiledValidate: ValidateFunction<unknown>; served: ServedValidator } | { compileError: unknown }
->(UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE);
-/** The code of the validators added to the cache since it was last emptied; never less than what it holds. */
+type CachedCompilation =
+    | { compiledValidate: ValidateFunction<unknown>; served: ServedValidator }
+    | { compileError: unknown };
+/**
+ * The compiled validators by schema content, the least recently used one first. A failed compilation costs as
+ * much as a successful one, so the cache remembers its error too. `codeBytes` is the code of a validator.
+ */
+const untrustedValidatorCache = new Map<string, CachedCompilation & { codeBytes: number }>();
 let cachedValidatorCodeBytes = 0;
 
 /** How much of its two limits the validator cache uses. */
@@ -132,6 +134,31 @@ export const getUntrustedValidatorCacheUsage = (): { entries: number; codeBytes:
     entries: untrustedValidatorCache.size,
     codeBytes: cachedValidatorCodeBytes,
 });
+
+/** Returns a cached compilation and marks it as the most recently used. */
+function getFromValidatorCache(cacheKey: string): CachedCompilation | undefined {
+    const cached = untrustedValidatorCache.get(cacheKey);
+    if (!cached) return undefined;
+    untrustedValidatorCache.delete(cacheKey);
+    untrustedValidatorCache.set(cacheKey, cached);
+    return cached;
+}
+
+/** Adds a compilation and drops the least recently used ones until the cache is within its two limits again. */
+function addToValidatorCache(cacheKey: string, compilation: CachedCompilation, codeBytes: number): void {
+    cachedValidatorCodeBytes += codeBytes - (untrustedValidatorCache.get(cacheKey)?.codeBytes ?? 0);
+    untrustedValidatorCache.delete(cacheKey);
+    untrustedValidatorCache.set(cacheKey, { ...compilation, codeBytes });
+    for (const [leastRecentlyUsedKey, cached] of untrustedValidatorCache) {
+        const isWithinLimits =
+            untrustedValidatorCache.size <= UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE &&
+            cachedValidatorCodeBytes <= UNTRUSTED_VALIDATOR_CACHE_MAX_CODE_BYTES;
+        // The compilation just added stays: its code is under the limit of one validator.
+        if (isWithinLimits || leastRecentlyUsedKey === cacheKey) break;
+        untrustedValidatorCache.delete(leastRecentlyUsedKey);
+        cachedValidatorCodeBytes -= cached.codeBytes;
+    }
+}
 
 const isSubschema = (value: unknown): boolean =>
     typeof value === 'boolean' || (typeof value === 'object' && value !== null && !Array.isArray(value));
@@ -583,7 +610,7 @@ export function compileUntrustedSchema<T extends object>(
 ): { validate: ValidateFunction<unknown>; schema: T } {
     const serialized = JSON.stringify(schema);
     const cacheKey = createHash('sha256').update(serialized).digest('base64');
-    const cached = untrustedValidatorCache.get(cacheKey);
+    const cached = getFromValidatorCache(cacheKey);
     if (cached && 'compileError' in cached) throw cached.compileError;
     // A hit holds a schema with the same content as `schema`, so it is still a T.
     if (cached) return cached.served as { validate: ValidateFunction<unknown>; schema: T };
@@ -605,7 +632,7 @@ function createServedValidator<T extends object>(
     // The validator is added below: it refers to `served` itself.
     const served = { schema } as { validate: ValidateFunction<unknown>; schema: T };
     const validate = (data: unknown): boolean => {
-        const cached = untrustedValidatorCache.get(cacheKey);
+        const cached = getFromValidatorCache(cacheKey);
         const compiledValidate =
             cached && 'compiledValidate' in cached ? cached.compiledValidate : compileIntoCache(cacheKey, served);
         const isValid = compiledValidate(data);
@@ -662,20 +689,6 @@ function compileIntoCache(
         addToValidatorCache(cacheKey, { compileError: error }, 0);
         throw error;
     }
-}
-
-/** Empties the cache first when the code of its validators would exceed what the process can hold. */
-function addToValidatorCache(
-    cacheKey: string,
-    entry: { compiledValidate: ValidateFunction<unknown>; served: ServedValidator } | { compileError: unknown },
-    codeBytes: number,
-): void {
-    if (cachedValidatorCodeBytes + codeBytes > UNTRUSTED_VALIDATOR_CACHE_MAX_CODE_BYTES) {
-        untrustedValidatorCache.clear();
-        cachedValidatorCodeBytes = 0;
-    }
-    cachedValidatorCodeBytes += codeBytes;
-    untrustedValidatorCache.set(cacheKey, entry);
 }
 
 /**
