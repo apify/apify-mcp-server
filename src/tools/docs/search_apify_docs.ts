@@ -5,11 +5,14 @@ import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSche
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { searchDocsBySourceCached } from '../../utils/apify_docs.js';
-import { respondOk, respondUserError } from '../../utils/mcp.js';
+import { respondOk } from '../../utils/mcp.js';
 import { searchApifyDocsToolOutputSchema } from '../structured_output_schemas.js';
 
-/** Algolia rejects a query of this many bytes or more with a 400. */
-const ALGOLIA_QUERY_LIMIT_BYTES = 512;
+/**
+ * Algolia rejects a query of 512 bytes or more with a 400. A character is at most 3 bytes in
+ * UTF-8, so this cap keeps any query under that limit.
+ */
+const QUERY_MAX_LENGTH = 150;
 
 const PLATFORM_DOCS_PREFERENCE = `When results contain both platform documentation (\`docs.apify.com/platform\`) \
 and Academy content (\`docs.apify.com/academy\`) on the same topic, prefer the platform documentation.`;
@@ -52,6 +55,7 @@ const searchApifyDocsToolArgsSchema = z.object({
     query: z
         .string()
         .min(1)
+        .max(QUERY_MAX_LENGTH)
         .describe(
             `Algolia full-text search query to find relevant documentation pages.
 Use only keywords, do not use full sentences or questions.
@@ -92,13 +96,6 @@ export const searchApifyDocs: ToolEntry = Object.freeze({
         const parsed = searchApifyDocsToolArgsSchema.parse(args);
 
         const query = parsed.query.trim();
-        // The limit is in bytes, which a character-based schema `maxLength` cannot express.
-        if (Buffer.byteLength(query) >= ALGOLIA_QUERY_LIMIT_BYTES) {
-            return respondUserError(
-                `The query is too long: it must be shorter than ${ALGOLIA_QUERY_LIMIT_BYTES} bytes. \
-Use only a few keywords, not full sentences or questions.`,
-            );
-        }
         const resultsRaw = await searchDocsBySourceCached(parsed.docSource, query);
 
         const results = resultsRaw.slice(parsed.offset, parsed.offset + parsed.limit);
