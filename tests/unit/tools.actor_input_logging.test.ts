@@ -170,11 +170,23 @@ describe('Actor input stays out of the logged arguments', () => {
         expect(JSON.stringify(prepareLoggedArgs(tool, args).toolArgsRedacted)).not.toContain(SECRET);
     });
 
-    it('every registered tool that takes Actor input redacts its logged arguments', () => {
+    it('every registered tool that takes a free-form object redacts its logged arguments', () => {
+        // The serialized `anyJsonObjectSchema`, at any depth and under any property name: Actor input, task and
+        // schedule input, and an Actor MCP tool's arguments.
+        const hasFreeFormObject = (node: unknown): boolean => {
+            if (Array.isArray(node)) return node.some(hasFreeFormObject);
+            if (typeof node !== 'object' || node === null) return false;
+            const schema = node as Record<string, unknown>;
+            const isFreeForm =
+                schema.type === 'object' &&
+                schema.additionalProperties === true &&
+                JSON.stringify(schema.properties) === '{}';
+            return isFreeForm || Object.values(schema).some(hasFreeFormObject);
+        };
         const tools = [...Object.values(toolCategories).flat(), ...ALL_WIDGET_TOOLS, ...UNCATEGORIZED_TOOLS];
-        const toolsTakingInput = tools.filter((tool) => JSON.stringify(tool.inputSchema).includes('"input":{'));
+        const toolsTakingInput = tools.filter((tool) => hasFreeFormObject(tool.inputSchema));
 
-        expect(toolsTakingInput.length).toBeGreaterThan(0);
+        expect(toolsTakingInput.map((tool) => tool.name)).toContain(callActorMcpTool.name);
         for (const tool of toolsTakingInput) {
             expect({ name: tool.name, hasRedactArgs: 'redactArgs' in tool && !!tool.redactArgs }).toStrictEqual({
                 name: tool.name,

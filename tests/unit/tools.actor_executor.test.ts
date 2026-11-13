@@ -294,16 +294,47 @@ describe('actorExecutor', () => {
             expect(spies.startInput).toBeUndefined();
         });
 
-        it('keeps the Actor input out of the abort log', async () => {
+        // Each moment reaches a different abort log in the executor.
+        it.each<[string, (abort: () => void) => Record<string, unknown>]>([
+            ['before the run starts', (abort) => (abort(), {})],
+            [
+                'while the run starts',
+                (abort) => ({
+                    actor: () => ({
+                        start: async () => {
+                            abort();
+                            return mockRunningRun();
+                        },
+                    }),
+                }),
+            ],
+            [
+                'while waiting for the run',
+                (abort) => ({
+                    run: () => ({
+                        get: async () => mockRunningRun(),
+                        waitForFinish: async () => {
+                            abort();
+                            return mockSucceededRun();
+                        },
+                        abort: async () => undefined,
+                    }),
+                }),
+            ],
+        ])('keeps the Actor input out of the abort log when aborted %s', async (_, buildClientOverrides) => {
             const infoSpy = vi.spyOn(log, 'info').mockImplementation(() => undefined);
             const controller = new AbortController();
-            controller.abort();
             const { params } = buildParams({ password: 'synthetic-secret-4f2a' }, { abortSignal: controller.signal });
+            params.apifyClient = mockApifyClient({
+                ...params.apifyClient,
+                ...buildClientOverrides(() => controller.abort()),
+            });
 
-            await actorExecutor.executeActorTool(params);
+            const result = await actorExecutor.executeActorTool(params);
             const loggedCalls = JSON.stringify(infoSpy.mock.calls);
             infoSpy.mockRestore();
 
+            expect(result).toBeNull();
             expect(loggedCalls).not.toBe('[]');
             expect(loggedCalls).not.toContain('synthetic-secret-4f2a');
         });
