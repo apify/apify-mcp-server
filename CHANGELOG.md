@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - Validate resource identifiers and request paths before API calls ([#1881](https://github.com/apify/apify-mcp-server/pull/1881)) ([0cb83af](https://github.com/apify/apify-mcp-server/commit/0cb83afe026cecd911ba47128ed43cd8829d3bfb)) by [@RobertCrupa](https://github.com/RobertCrupa)
 - Read a bounded tail of run and build logs ([#1882](https://github.com/apify/apify-mcp-server/pull/1882)) ([c1a9950](https://github.com/apify/apify-mcp-server/commit/c1a9950769ee502d305a0f8abfbd6da8af57752d)) by [@RobertCrupa](https://github.com/RobertCrupa)
 - Stop get-key-value-store-record from reading whole records ([#1870](https://github.com/apify/apify-mcp-server/pull/1870)) ([4709743](https://github.com/apify/apify-mcp-server/commit/4709743b294f2cb3a8e14872b5fb5956dba0b7d4)) by [@jirispilka](https://github.com/jirispilka), closes [#1814](https://github.com/apify/apify-mcp-server/issues/1814)
+- Replace @apify&#x2F;datastructures with a Map-based LRU cache ([#1893](https://github.com/apify/apify-mcp-server/pull/1893)) ([afcaad8](https://github.com/apify/apify-mcp-server/commit/afcaad89db32d5f64b9a17b014cf82c364e0e0b9)) by [@MQ37](https://github.com/MQ37)
 
 
 <!-- git-cliff-unreleased-end -->
