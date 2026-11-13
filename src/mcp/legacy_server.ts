@@ -48,6 +48,7 @@ import type {
     TelemetryEnv,
     ToolEntry,
     ToolStatus,
+    ValidationInputChange,
 } from '../types.js';
 import { isMcpClientFaultMessage, sanitizeMezmoMessage } from '../utils/logging.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
@@ -392,6 +393,7 @@ export class LegacyMcpServer {
             const startTime = Date.now();
             let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
             let callDiagnostics: CallDiagnostics = {};
+            let validationInputChange: ValidationInputChange | undefined;
             let shouldTrackTelemetry = true;
             let resolvedToolName = name;
             // Set only on the pre-flight task path — the one task-mode flow whose telemetry rides
@@ -472,6 +474,7 @@ export class LegacyMcpServer {
                 const { tool, toolArgs, logSafeArgs, apifyClient, standbyRejection, paymentRequiredResult } = prepared;
                 actorName = prepared.actorName;
                 actorId = prepared.actorId;
+                validationInputChange = prepared.validationInputChange;
                 resolvedToolName = getToolFullName(tool);
                 // Telemetry uses the decoded arguments.
                 args = prepared.decodedArgs;
@@ -573,6 +576,7 @@ export class LegacyMcpServer {
                             userId,
                             telemetryEnv: this.host.telemetryEnv,
                             sendNotification,
+                            validationInputChange,
                         }).catch((error) =>
                             // Benign task-expiry is handled in-method (see the catch block and
                             // storeTaskResultOrSkipIfExpired); anything reaching here is genuinely unexpected.
@@ -629,7 +633,10 @@ export class LegacyMcpServer {
                         startTime,
                         telemetryData,
                         userId,
-                        callDiagnostics,
+                        callDiagnostics: {
+                            ...callDiagnostics,
+                            ...(validationInputChange && { validation_input_change: validationInputChange }),
+                        },
                         args,
                         result: toolResult,
                         taskId: preflightTaskId,

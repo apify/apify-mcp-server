@@ -254,15 +254,22 @@ export function makePermissionApprovalError(): ApifyApiError {
     );
 }
 
-/** A minimal ACTOR tool with an empty input schema; tests spy on `actorExecutor` to read what dispatch passes it. */
-export function makeActorTool(options: { name?: string; actorFullName?: string; actorId?: string } = {}): ToolEntry {
-    const { name = 'test-actor-tool', actorFullName = 'test/actor', actorId = 'test/actor' } = options;
+/** A minimal ACTOR tool, empty input schema by default; tests spy on `actorExecutor` to see what dispatch passes. */
+export function makeActorTool(
+    options: { name?: string; actorFullName?: string; actorId?: string; inputSchema?: Record<string, unknown> } = {},
+): ToolEntry {
+    const {
+        name = 'test-actor-tool',
+        actorFullName = 'test/actor',
+        actorId = 'test/actor',
+        inputSchema = { type: 'object', properties: {} },
+    } = options;
     return {
         type: TOOL_TYPE.ACTOR,
         name,
         description: 'actor',
-        inputSchema: { type: 'object', properties: {} } as ToolInputSchema,
-        ajvValidate: compileSchema({ type: 'object', properties: {} }),
+        inputSchema: inputSchema as ToolInputSchema,
+        ajvValidate: compileSchema(inputSchema),
         actorId,
         actorFullName,
     } as ToolEntry;

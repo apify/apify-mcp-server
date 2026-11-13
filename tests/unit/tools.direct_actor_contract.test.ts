@@ -54,6 +54,15 @@ const actorInfo: ActorInfo = {
 
 Object.assign(actorInfo.definition.input!, { additionalProperties: false });
 
+const STARTED_RUN = {
+    id: 'run-id',
+    actId: 'wcc-id',
+    status: 'RUNNING',
+    startedAt: new Date(),
+    defaultDatasetId: 'dataset-id',
+    defaultKeyValueStoreId: 'store-id',
+};
+
 beforeEach(() => {
     vi.mocked(getActorDefinitionCached).mockResolvedValue({
         definition: actorInfo.definition,
@@ -90,6 +99,59 @@ describe.each([
         expect(start.mock.calls[0]?.[0]).not.toHaveProperty('respectRobotsTxtFile');
         expect(start.mock.calls[0]?.[0]).toHaveProperty('pageFunction');
         expect(start.mock.calls[0]?.[0]).toHaveProperty('initialCookies');
+        expect(result.toolTelemetry?.validationInputChange).toBeUndefined();
+    });
+
+    it('records how a passing check changed the input and starts the run with the checked input', async () => {
+        const start = vi.fn().mockResolvedValue(STARTED_RUN);
+        const result = await (tool as HelperTool).call(
+            stubToolCallContext(
+                {
+                    actor: ACTOR_FULL_NAME,
+                    input: { url: 'https://example.com', respectRobotsTxtFile: 'true', crawlerType: 'cheerio' },
+                    ...options,
+                },
+                mockApifyClient({ actor: () => ({ start }) }),
+            ),
+        );
+        expect(result.toolTelemetry?.validationInputChange).toBe('coerced_and_removed');
+        expect(start.mock.calls[0]?.[0]).toEqual({ url: 'https://example.com', respectRobotsTxtFile: true });
+    });
+
+    it('keeps the input change when the platform rejects the run', async () => {
+        const start = vi.fn().mockRejectedValue(
+            Object.assign(new Error('Input is not valid: Field input.url must be a valid URL'), {
+                statusCode: 400,
+            }),
+        );
+        const result = await (tool as HelperTool).call(
+            stubToolCallContext(
+                { actor: ACTOR_FULL_NAME, input: { url: 'example', respectRobotsTxtFile: 'true' }, ...options },
+                mockApifyClient({ actor: () => ({ start }) }),
+            ),
+        );
+        expect(result.isError).toBe(true);
+        expect(result.toolTelemetry).toMatchObject({
+            failureHttpStatus: 400,
+            failureDetail: expect.stringContaining('Input is not valid'),
+            validationInputChange: 'coerced',
+        });
+    });
+
+    // AJV drops `crawlerType` before `respectRobotsTxtFile` fails; that partial change is not a passing check's.
+    it('records no input change when the check fails after AJV changed part of the input', async () => {
+        const result = await (tool as HelperTool).call(
+            stubToolCallContext(
+                {
+                    actor: ACTOR_FULL_NAME,
+                    input: { url: 'https://example.com', crawlerType: 'cheerio', respectRobotsTxtFile: 'yes' },
+                    ...options,
+                },
+                mockApifyClient({ actor: () => ({ start: vi.fn() }) }),
+            ),
+        );
+        expect(result.isError).toBe(true);
+        expect(result.toolTelemetry?.validationInputChange).toBeUndefined();
     });
 
     it('reports the unrestricted input schema for invalid input', async () => {
@@ -146,6 +208,37 @@ describe('direct tool call', () => {
             }
         },
     );
+
+    it('records how a passing check changed the Actor input', async () => {
+        const result = await prepareDirectToolCall({ url: 'https://example.com', respectRobotsTxtFile: 'true' });
+        if (!('tool' in result)) throw new Error('Valid input failed validation');
+        expect(result.validationInputChange).toBe('coerced');
+    });
+
+    it('ignores a change to the MCP-only waitSecs', async () => {
+        const result = await prepareDirectToolCall({ url: 'https://example.com', waitSecs: '30' });
+        if (!('tool' in result)) throw new Error('Valid input failed validation');
+        expect(result.toolArgs.waitSecs).toBe(30);
+        expect(result.validationInputChange).toBeUndefined();
+    });
+
+    it("ignores a change to call-actor's own arguments", async () => {
+        const result = await prepareToolCall({
+            tools: new Map([[HELPER_TOOLS.ACTOR_CALL, callActor]]),
+            apifyToken: 'test-token',
+            name: HELPER_TOOLS.ACTOR_CALL,
+            args: { actor: ACTOR_FULL_NAME, input: { url: 'https://example.com' }, callOptions: { memory: '1024' } },
+            meta: undefined,
+            requestHeaders: undefined,
+            isTaskRequest: false,
+            mcpSessionId: 'test-session',
+            telemetryData: null,
+            clientContext: undefined,
+        });
+        if (!('tool' in result)) throw new Error('Valid input failed validation');
+        expect(result.toolArgs.callOptions).toEqual({ memory: 1024 });
+        expect(result.validationInputChange).toBeUndefined();
+    });
 
     it('points other validation errors at the tool schema instead of the original Actor schema', async () => {
         const result = await prepareDirectToolCall({});
