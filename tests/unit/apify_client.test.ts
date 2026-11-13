@@ -14,7 +14,7 @@ vi.mock('apify-client', () => ({
     },
 }));
 
-type RequestConfig = { headers: Record<string, string> };
+type RequestConfig = { url: string; headers: Record<string, string> };
 type CapturedClientOptions = {
     requestInterceptors: ((config: RequestConfig) => RequestConfig)[];
     baseUrl: string;
@@ -26,7 +26,7 @@ function buildStaticHeaders(options: ConstructorParameters<typeof ApifyClient>[0
     capturedOptions.length = 0;
     void new ApifyClient(options);
     const passed = capturedOptions[0] as CapturedClientOptions;
-    return passed.requestInterceptors[0]({ headers: {} }).headers;
+    return passed.requestInterceptors[0]({ url: 'https://api.apify.com/v2/users/me', headers: {} }).headers;
 }
 
 /** baseUrl passed to the underlying apify-client. */
