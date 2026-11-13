@@ -268,11 +268,37 @@ export function parseBaseMimeType(contentType: string | undefined): string | und
 
 /**
  * A record read by `fetchRecordUnderCap`: the value as apify-client parses it (JSON -> object, text/xml ->
- * string, else -> Buffer, empty -> `undefined`), or `isOverLimit` when the body passed `MAX_INLINE_BYTES`.
+ * string, else -> Buffer, empty -> `undefined`), `isOverLimit` when the body passed `MAX_INLINE_BYTES`, or
+ * `isUnparsable` when the body does not match its Content-Type.
  */
 export type FetchedRecord =
-    | { isOverLimit: false; value: unknown; contentType?: string }
+    | { isOverLimit: false; isUnparsable?: false; value: unknown; contentType?: string }
+    | { isOverLimit: false; isUnparsable: true; contentType?: string }
     | { isOverLimit: true; contentType?: string };
+
+/**
+ * The Content-Type of a body apify-client could not parse as that type, e.g. gzip bytes stored as
+ * `application/json`. `null` when the error is anything else.
+ */
+function readUnparsableBodyContentType(error: unknown): { contentType?: string } | null {
+    if (!isRecord(error) || error.code !== 'invalid-response-body') return null;
+    const headers = isRecord(error.response) ? error.response.headers : undefined;
+    const contentType = isRecord(headers) ? headers['content-type'] : undefined;
+    return typeof contentType === 'string' ? { contentType } : {};
+}
+
+/**
+ * Sends the request once more when the body could not be parsed: an interrupted response can end early
+ * without an error. apify-client's `call()` retries that case, and `sendApifyApiRequest` skips `call()`.
+ */
+async function sendWithParseRetry<T>(send: () => Promise<T>): Promise<T> {
+    try {
+        return await send();
+    } catch (error) {
+        if (!readUnparsableBodyContentType(error)) throw error;
+        return send();
+    }
+}
 
 /** The Content-Type of a response axios aborted mid-body; Node's request object keeps the response it got. */
 function readAbortedResponseContentType(error: unknown): string | undefined {
@@ -297,13 +323,19 @@ export async function fetchRecordUnderCap(
     const url = `${client.keyValueStore(safeId).url}/records/${assertValidRecordKey(recordKey)}`;
     let response: Awaited<ReturnType<typeof sendApifyApiRequest>>;
     try {
-        response = await sendApifyApiRequest(client, {
-            url,
-            method: 'GET',
-            // As `getRecord()` sends.
-            params: { attachment: 'true' },
-        });
+        response = await sendWithParseRetry(async () =>
+            sendApifyApiRequest(client, {
+                url,
+                method: 'GET',
+                // As `getRecord()` sends.
+                params: { attachment: 'true' },
+            }),
+        );
     } catch (error) {
+        // Still unparsable on the second read: the record's writer chose its bytes and its Content-Type,
+        // so a mismatch is not a server fault.
+        const unparsable = readUnparsableBodyContentType(error);
+        if (unparsable) return { isOverLimit: false, isUnparsable: true, ...unparsable };
         if (!isMaxContentLengthAbort(error)) throw toPlainError(error);
         const contentType = readAbortedResponseContentType(error);
         return { isOverLimit: true, ...(contentType && { contentType }) };
