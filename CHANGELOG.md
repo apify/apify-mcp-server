@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Log &quot;Invalid event ID format&quot; as a client fault ([#1906](https://github.com/apify/apify-mcp-server/pull/1906)) ([55e4966](https://github.com/apify/apify-mcp-server/commit/55e4966f66deb607b0a81ea64ce28ed0a54f5ae7)) by [@jirispilka](https://github.com/jirispilka), closes [#1904](https://github.com/apify/apify-mcp-server/issues/1904)
+- Return a user error for an unknown Actor MCP tool name ([#1910](https://github.com/apify/apify-mcp-server/pull/1910)) ([789e505](https://github.com/apify/apify-mcp-server/commit/789e505d472b5266a7c7d4cec726bdaf8d6e3469)) by [@jirispilka](https://github.com/jirispilka)
 
 
 <!-- git-cliff-unreleased-end -->
