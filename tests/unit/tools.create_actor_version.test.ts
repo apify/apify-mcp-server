@@ -615,6 +615,17 @@ describe('create-actor-version', () => {
             expect(buildMock).not.toHaveBeenCalled();
         });
 
+        // Linear time takes well under a millisecond here; the bound only catches time that grows faster than the length.
+        it('checks 100,000 characters of base64 with a padding run inside it within a second', async () => {
+            const startedAt = performance.now();
+            const text = await callToolExpectingUserError({
+                files: [{ path: 'assets/a.png', content: `${'='.repeat(100_000)}QQ` }],
+            });
+
+            expect(performance.now() - startedAt).toBeLessThan(1000);
+            expect(text).toContain('not valid base64');
+        });
+
         it('checks 20,000 files for repeated and colliding paths within a second', async () => {
             const files = Array.from({ length: 20_000 }, (_, i) => ({ path: `src/d${i % 50}/f${i}.js`, content: 'x' }));
 

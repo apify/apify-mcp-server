@@ -30,7 +30,7 @@ import { getActorRunList } from '../../src/tools/runs/get_actor_run_list.js';
 import type { ToolCallTelemetryProperties, ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
-import { respondRaw, respondUserError } from '../../src/utils/mcp.js';
+import { hashSessionId, respondRaw, respondUserError } from '../../src/utils/mcp.js';
 import { makePaymentRequiredError, makeRecorderTool, makeThrowingTool, withServer } from './helpers/mcp_server.js';
 
 /** An abort signal for direct engine tests, optionally already aborted. */
@@ -80,7 +80,7 @@ describe('prepareToolCall()', () => {
             expect(invalid.toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
             expect(invalid.callDiagnostics.failure_category).toBe(FAILURE_CATEGORY.AUTH);
             expect(invalid.message).toContain('Apify API token is required');
-            expect(telemetryData.trace_id).toBe('s1');
+            expect(telemetryData.trace_id).toBe(hashSessionId('s1'));
         });
     });
 
@@ -103,7 +103,7 @@ describe('prepareToolCall()', () => {
             const invalid = result as InvalidToolCall;
             expect(invalid.callDiagnostics.failure_category).toBe(FAILURE_CATEGORY.INVALID_INPUT);
             expect(invalid.message).toContain('was not found');
-            expect(telemetryData.trace_id).toBe('s1');
+            expect(telemetryData.trace_id).toBe(hashSessionId('s1'));
         });
     });
 

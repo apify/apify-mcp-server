@@ -100,13 +100,15 @@ function waitForAbort(signal: AbortSignal): Promise<{ content: []; tools: [] }> 
 /**
  * The Actor's MCP server, by path: `/mcp` serves `REMOTE_RESULTS` and `REMOTE_TOOL_PAGES` (an unknown tool or
  * cursor is a JSON-RPC error), `/mcp-broken-pages` fails the second page, `/mcp-endless` never runs out of
- * cursors, and `/mcp-slow` answers only once the request is cancelled.
+ * cursors, `/mcp-slow` answers only once the request is cancelled, and `/mcp-unknown-tool` rejects every tool
+ * name with an internal error.
  */
 function createRemoteServer(path: string | undefined): Server {
     const server = new Server({ name: 'example-mcp-server', version: '1.0.0' }, { capabilities: { tools: {} } });
     server.setRequestHandler(CallToolRequestSchema, async ({ params }, extra) => {
         remoteCalls.push({ name: params.name, arguments: params.arguments });
         if (path === '/mcp-slow') return waitForAbort(extra.signal);
+        if (path === '/mcp-unknown-tool') throw new McpError(ErrorCode.InternalError, `Unknown tool: ${params.name}`);
         const result = REMOTE_RESULTS[params.name];
         if (!result) throw new McpError(ErrorCode.InvalidParams, `Tool ${params.name} not found`);
         return result;
@@ -373,6 +375,48 @@ describe('call-actor-mcp-tool', () => {
         });
     });
 
+    it.each([true, false])('suggests listing remote tools only when served (loaded=%s)', async (isToolListLoaded) => {
+        vi.spyOn(Client.prototype, 'callTool').mockRejectedValueOnce(
+            new McpError(ErrorCode.InternalError, 'Unknown tool: fetch-actor-details'),
+        );
+        const context = stubToolCallContext(
+            { actor: MCP_ACTOR, tool: 'fetch-actor-details' },
+            new ApifyClient({ token: TOKEN }),
+            { loadedToolNames: isToolListLoaded ? [HELPER_TOOLS.ACTOR_MCP_TOOL_LIST] : [] },
+        );
+
+        const result = await executeCallActorMcpTool(context);
+
+        expectSoftFailInvalidInput(result);
+        const text = JSON.stringify(result.content);
+        expect(text.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST)).toBe(isToolListLoaded);
+    });
+
+    it('returns a user error when the remote server throws the unknown tool rejection as an McpError', async () => {
+        // The SDK client prefixes the message of a thrown McpError a second time.
+        seedActor('apify/strict-mcp-server', { definition: { webServerMcpPath: '/mcp-unknown-tool' } });
+
+        const result = await execute(executeCallActorMcpTool, { tool: 'add', actor: 'apify/strict-mcp-server' });
+
+        expectSoftFailInvalidInput(result);
+    });
+
+    it.each(['Backend failed with unknown tool: add', 'Unknown tool: backend-search'])(
+        'preserves a remote failure that does not reject the requested tool: %s',
+        async (message) => {
+            vi.spyOn(Client.prototype, 'callTool').mockRejectedValueOnce(
+                new McpError(ErrorCode.InternalError, message),
+            );
+
+            const result = await execute(executeCallActorMcpTool, { tool: 'add' });
+
+            expect(result.toolTelemetry).toMatchObject({
+                toolStatus: TOOL_STATUS.FAILED,
+                failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
+            });
+        },
+    );
+
     it('rejects a tool name longer than the MCP limit without connecting', async () => {
         await expect(
             execute(executeCallActorMcpTool, { tool: 'a'.repeat(MCP_TOOL_NAME_MAX_LENGTH + 1) }),
@@ -547,5 +591,36 @@ describe('MCP connection headers', () => {
         for (const { headers } of seen) {
             expect(headers).toMatchObject({ authorization: `Bearer ${TOKEN}`, 'x-apify-request-origin': 'APIFY_AI' });
         }
+    });
+});
+
+describe('MCP connection redirects', () => {
+    it('does not follow a redirect that leaves the MCP server origin, on either transport', async () => {
+        const listen = async (server: HttpServer) => {
+            await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+            return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+        };
+        const otherOriginMethods: (string | undefined)[] = [];
+        const otherOrigin = createServer((req, res) => {
+            otherOriginMethods.push(req.method);
+            res.writeHead(200).end();
+        });
+        const otherOriginUrl = await listen(otherOrigin);
+        const redirectedMethods: (string | undefined)[] = [];
+        const redirecting = createServer((req, res) => {
+            redirectedMethods.push(req.method);
+            // 307 keeps the method, so a client that follows it would repeat both the POST and the GET.
+            res.writeHead(307, { location: `${otherOriginUrl}/mcp` }).end();
+        });
+
+        const client = await connectMCPClient(`${await listen(redirecting)}/mcp`, { token: TOKEN });
+        for (const server of [redirecting, otherOrigin]) {
+            await new Promise<void>((resolve) => server.close(() => resolve()));
+        }
+
+        expect(client).toBeNull();
+        // The streamable transport and the SSE fallback each stopped at the redirect.
+        expect(redirectedMethods).toEqual(['POST', 'GET']);
+        expect(otherOriginMethods).toEqual([]);
     });
 });

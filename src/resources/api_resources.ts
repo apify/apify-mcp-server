@@ -15,6 +15,7 @@ import { MAX_INLINE_BYTES } from '../const.js';
 import { InternalError, InvalidParamsError } from '../mcp/errors.js';
 import { validateApiBlocklist } from '../tools/api/apify_api_blocklist.js';
 import { normalizeApiPath } from '../tools/api/apify_api_path.js';
+import { isRecord } from '../tools/api/apify_api_spec.js';
 import { parseBaseMimeType } from '../tools/storage/storage_helpers.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 import { getHttpErrorHint } from '../utils/mcp.js';
@@ -22,6 +23,41 @@ import { getHttpErrorHint } from '../utils/mcp.js';
 const TEXT_MIME_TYPE = 'text/plain';
 
 export const REDACTED = '[REDACTED]';
+
+/** `value` with its query string and fragment cut to `?[REDACTED]`, for logging. */
+export function redactQueryString(value: string): string {
+    return value.replace(/[?#][\s\S]*$/, `?${REDACTED}`);
+}
+
+/** `keys` of `record` that are set: a string, number, or boolean as is, any other value as `REDACTED`. */
+export function pickLoggedValues(record: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+    return Object.fromEntries(
+        keys.flatMap((key) => {
+            const value = record[key];
+            if (value === undefined) return [];
+            return [[key, ['string', 'number', 'boolean'].includes(typeof value) ? value : REDACTED]];
+        }),
+    );
+}
+
+/** `keys` of `record` that are set, each as `REDACTED`. */
+export function maskLoggedValues(record: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+    return Object.fromEntries(keys.filter((key) => record[key] !== undefined).map((key) => [key, REDACTED]));
+}
+
+/**
+ * `keys` of `record` that are set, for Actor input and other caller-defined objects: an object keeps its own key
+ * names with each value as `REDACTED`, so a wrong or missing key shows in the log; any other value is `REDACTED`.
+ */
+export function maskLoggedInputs(record: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+    return Object.fromEntries(
+        keys.flatMap((key) => {
+            const value = record[key];
+            if (value === undefined) return [];
+            return [[key, isRecord(value) ? maskLoggedValues(value, Object.keys(value)) : REDACTED]];
+        }),
+    );
+}
 
 /** Textual base MIME types (returned as `text`); everything else becomes a base64 `blob`. */
 export function isTextualMimeType(baseMimeType: string | undefined): boolean {
@@ -120,7 +156,10 @@ async function fetchRecordDownloadUrl(uri: string, apifyClient: ApifyClient): Pr
         const store = apifyClient.keyValueStore(safeDecodeURIComponent(match[1]));
         return await store.getRecordPublicUrl(safeDecodeURIComponent(match[2]));
     } catch (err) {
-        logHttpError(err, `Failed to mint signed download URL for ${uri}; falling back to API URL`);
+        logHttpError(
+            err,
+            `Failed to mint signed download URL for ${redactQueryString(new URL(uri).href)}; falling back to API URL`,
+        );
         return apiUrl;
     }
 }
@@ -224,12 +263,17 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     // A GET with the method query parameter can delete, and one to a synchronous run endpoint starts a paid run;
     // see apify/apify-mcp-server#1524.
     const { pathname, search } = new URL(uri);
+    const loggedUri = redactQueryString(new URL(uri).href);
     const refusal = validateApiBlocklist({
         method: 'GET',
         normalizedPath: normalizeApiPath(`${pathname}${search}`),
         loadedToolNames: [],
     });
     if (refusal) throw new InvalidParamsError(`Failed to read ${uri}: ${refusal}`, { uri });
+    // `pathname` has its dot segments resolved, so the check applies to the path the request goes to.
+    if (!pathname.startsWith('/v2/')) {
+        throw new InvalidParamsError(`Failed to read ${uri}: only paths under /v2/ are readable.`, { uri });
+    }
 
     let response: { data: unknown; headers: Record<string, unknown>; status: number; statusText: string };
     try {
@@ -240,7 +284,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
             responseType: 'stream',
         });
     } catch (err) {
-        logHttpError(err, `resources/read request failed`, { uri });
+        logHttpError(err, `resources/read request failed`, { uri: loggedUri });
         throwReadFailure(uri, getHttpStatusCode(err), err instanceof Error ? err.message : String(err));
     }
 
@@ -250,7 +294,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
         body = await readBodyUnderCap(response);
     } catch (err) {
         // A drop mid-body (reset, truncation, bad gzip). Never return partial content.
-        logHttpError(err, `resources/read response interrupted`, { uri });
+        logHttpError(err, `resources/read response interrupted`, { uri: loggedUri });
         const message = err instanceof Error ? err.message : String(err);
         throw new InternalError(`Failed to read ${uri}: response interrupted: ${message}`, {
             uri,
@@ -264,7 +308,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     if (response.status >= 300) {
         const message = parseApiErrorMessage(body) ?? response.statusText;
         logHttpError(Object.assign(new Error(message), { statusCode: response.status }), `resources/read failed`, {
-            uri,
+            uri: loggedUri,
         });
         throwReadFailure(uri, response.status, message);
     }

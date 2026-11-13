@@ -1361,6 +1361,17 @@ describe('buildStatusTemplate', () => {
         expect(t.summary).not.toMatch(/\.\./);
     });
 
+    // Linear time takes well under a millisecond here; the bound only catches time that grows faster than the length.
+    it('renders a 100,000-character statusMessage with a period run inside it within a second', () => {
+        const statusMessage = `${'.'.repeat(100_000)}done`;
+
+        const startedAt = performance.now();
+        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING', statusMessage) });
+
+        expect(performance.now() - startedAt).toBeLessThan(1000);
+        expect(t.summary).toContain(`Actor status: "${statusMessage}"`);
+    });
+
     it('RUNNING without statusMessage falls back to In progress (no Actor status attribution)', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING') });
         expect(t.summary).toContain('In progress.');

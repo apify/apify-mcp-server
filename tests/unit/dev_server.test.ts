@@ -2,9 +2,11 @@ import { once } from 'node:events';
 import { request as httpRequest, type Server as HttpServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
+import type * as McpServerModule from '@modelcontextprotocol/server';
 import {
     CLIENT_CAPABILITIES_META_KEY,
     CLIENT_INFO_META_KEY,
+    createMcpHandler,
     PROTOCOL_VERSION_META_KEY,
 } from '@modelcontextprotocol/server';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -33,6 +35,12 @@ vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
 });
 
 const getActorsMock = vi.mocked(getActors);
+
+// Pass-through, so a test can make the handler's fetch throw past the entry into the Node adapter.
+vi.mock('@modelcontextprotocol/server', async (importOriginal) => {
+    const actual = await importOriginal<typeof McpServerModule>();
+    return { ...actual, createMcpHandler: vi.fn(actual.createMcpHandler) };
+});
 
 /** The per-request `_meta` envelope that makes a request 2026-07-28 traffic. */
 const ENVELOPE = {
@@ -470,6 +478,32 @@ describe('createExpressApp() era routing', () => {
             expect(response.status).toBe(200);
             expect(received.called).toBe(true);
         });
+    });
+
+    it('logs a failure the Node adapter answers with a 500 itself', async () => {
+        const { createMcpHandler: createRealMcpHandler } =
+            await vi.importActual<typeof McpServerModule>('@modelcontextprotocol/server');
+        vi.mocked(createMcpHandler).mockImplementationOnce((...args) =>
+            Object.assign(createRealMcpHandler(...args), {
+                fetch: async () => {
+                    throw new Error('This MCP handler has been closed');
+                },
+            }),
+        );
+        const exception = vi.spyOn(log, 'exception').mockImplementation(() => log);
+
+        await withDevServer(async (post) => {
+            const { body, headers } = statelessRequest('tools/list');
+
+            const response = await post(DEV_URL, body, { ...headers, authorization: 'Bearer dev-token' });
+
+            expect(response.status).toBe(500);
+        });
+        expect(exception).toHaveBeenCalledWith(
+            expect.objectContaining({ message: 'This MCP handler has been closed' }),
+            expect.any(String),
+            expect.objectContaining({ statusCode: 500 }),
+        );
     });
 
     it('accepts a 2025-era session tool call body over the SDK 4 MiB body limit', async () => {
