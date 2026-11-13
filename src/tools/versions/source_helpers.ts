@@ -12,7 +12,7 @@ import {
     HELPER_TOOLS,
 } from '../../const.js';
 import { UserInputError } from '../../errors.js';
-import { REDACTED } from '../../resources/api_resources.js';
+import { maskLoggedValues, pickLoggedValues, REDACTED } from '../../resources/api_resources.js';
 import type { ConsoleLinkContext, InternalToolArgs } from '../../types.js';
 import { getResourceByIdOrName } from '../../utils/apify_resource_id.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
@@ -35,22 +35,6 @@ export const sourceFileArgs = z.object({
             'utf8 for text, base64 for binary files. Defaults to base64 for binary extensions such as .png and to utf8 otherwise.',
         ),
 });
-
-/** `keys` of `record` that are set: a string, number, or boolean as is, any other value as `REDACTED`. */
-function pickLoggedValues(record: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
-    return Object.fromEntries(
-        keys.flatMap((key) => {
-            const value = record[key];
-            if (value === undefined) return [];
-            return [[key, ['string', 'number', 'boolean'].includes(typeof value) ? value : REDACTED]];
-        }),
-    );
-}
-
-/** `keys` of `record` that are set, each as `REDACTED`. */
-function maskLoggedValues(record: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
-    return Object.fromEntries(keys.filter((key) => record[key] !== undefined).map((key) => [key, REDACTED]));
-}
 
 /** The logged copy of an entry's edits, each with its oldText and newText as `REDACTED`. */
 function redactEdits(edits: unknown): unknown {

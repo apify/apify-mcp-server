@@ -15,6 +15,7 @@ import { MAX_INLINE_BYTES } from '../const.js';
 import { InternalError, InvalidParamsError } from '../mcp/errors.js';
 import { validateApiBlocklist } from '../tools/api/apify_api_blocklist.js';
 import { normalizeApiPath } from '../tools/api/apify_api_path.js';
+import { isRecord } from '../tools/api/apify_api_spec.js';
 import { parseBaseMimeType } from '../tools/storage/storage_helpers.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 import { getHttpErrorHint } from '../utils/mcp.js';
@@ -26,6 +27,36 @@ export const REDACTED = '[REDACTED]';
 /** `value` with its query string and fragment cut to `?[REDACTED]`, for logging. */
 export function redactQueryString(value: string): string {
     return value.replace(/[?#][\s\S]*$/, `?${REDACTED}`);
+}
+
+/** `keys` of `record` that are set: a string, number, or boolean as is, any other value as `REDACTED`. */
+export function pickLoggedValues(record: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+    return Object.fromEntries(
+        keys.flatMap((key) => {
+            const value = record[key];
+            if (value === undefined) return [];
+            return [[key, ['string', 'number', 'boolean'].includes(typeof value) ? value : REDACTED]];
+        }),
+    );
+}
+
+/** `keys` of `record` that are set, each as `REDACTED`. */
+export function maskLoggedValues(record: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+    return Object.fromEntries(keys.filter((key) => record[key] !== undefined).map((key) => [key, REDACTED]));
+}
+
+/**
+ * `keys` of `record` that are set, for Actor input and other caller-defined objects: an object keeps its own key
+ * names with each value as `REDACTED`, so a wrong or missing key shows in the log; any other value is `REDACTED`.
+ */
+export function maskLoggedInputs(record: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+    return Object.fromEntries(
+        keys.flatMap((key) => {
+            const value = record[key];
+            if (value === undefined) return [];
+            return [[key, isRecord(value) ? maskLoggedValues(value, Object.keys(value)) : REDACTED]];
+        }),
+    );
 }
 
 /** Textual base MIME types (returned as `text`); everything else becomes a base64 `blob`. */

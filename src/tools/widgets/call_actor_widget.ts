@@ -14,6 +14,7 @@ import {
     buildCallActorErrorResponse,
     callActorPreExecute,
     callOptionsSchema,
+    redactCallActorArgs,
     resolveAndValidateActor,
 } from '../actors/call_actor.js';
 import { actorRunOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
@@ -84,6 +85,8 @@ export const callActorWidget: ToolEntry = Object.freeze({
     paymentRequired: true,
     hasPaymentProviderStandbyCheck: true,
     actorInterface: 'input',
+    redactArgs: (args: Record<string, unknown>) =>
+        redactCallActorArgs(args, Object.keys(callActorWidgetArgsSchema.shape)),
     _meta: getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
     annotations: {
         title: 'Call Actor (widget)',

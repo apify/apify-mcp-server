@@ -8,6 +8,7 @@ import { FAILURE_CATEGORY, HELPER_TOOLS, RESOURCE_ID_OR_NAME_MAX_LENGTH, TOOL_ST
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import { withRemoteMcpClient } from '../../mcp/remote_tool_call.js';
+import { maskLoggedInputs, pickLoggedValues } from '../../resources/api_resources.js';
 import type {
     ActorInterfaces,
     InternalToolArgs,
@@ -184,6 +185,11 @@ export const callActorMcpTool: ToolEntry = Object.freeze({
     // A third-party payment provider cannot pay for a Server Actor run, so such a session is rejected before the call.
     hasPaymentProviderStandbyCheck: true,
     actorInterface: 'mcp',
+    // The remote tool's arguments can hold credentials, so only their key names are logged.
+    redactArgs: (args: Record<string, unknown>) => ({
+        ...pickLoggedValues(args, Object.keys(callActorMcpToolArgs.shape)),
+        ...maskLoggedInputs(args, ['arguments']),
+    }),
     annotations: {
         title: 'Call Actor MCP tool',
         readOnlyHint: false,
