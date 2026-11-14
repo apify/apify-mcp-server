@@ -222,7 +222,7 @@ Legend for the **Enabled by default** column:
 
 - ✅ In the default tool set.
 - ⚡ Added automatically when `call-actor`, an Actor tool, or `get-actor-run` is loaded, which is true in the default configuration.
-- ✅¹ Served by default only when telemetry is on and the client name doesn't contain `claude`, `anthropic`, or `local-agent-mode`. Select it explicitly with `tools=report-problem` or `tools=dev` to serve it to any client; telemetry still has to be on.
+- ✅¹ Served by default only when telemetry is on and the client name doesn't contain `claude`, `anthropic`, or `local-agent-mode`. Select it explicitly with `tools=report-problem` or `tools=dev` to serve it to any client; telemetry still has to be on. Not served in a session that uses a payment provider (`payment=`).
 
 | Tool name | Category | Description | Enabled by default |
 | :--- | :--- | :--- | :---: |
