@@ -39,22 +39,21 @@ const untrustedValidatorCache = new LruCache<{ validate: ValidateFunction<unknow
 export function compileUntrustedSchema<T extends object>(
     schema: T,
 ): { validate: ValidateFunction<unknown>; schema: T } {
-    const serialized = JSON.stringify(schema);
+    // A root `$async` makes Ajv return a Promise from the validator, and every caller reads a boolean.
+    // Below the root it cannot: there Ajv ignores the keyword or fails the compile.
+    const syncSchema = { ...schema };
+    delete (syncSchema as { $async?: unknown }).$async;
+
+    const serialized = JSON.stringify(syncSchema);
     // Ajv codegen is synchronous; an oversized untrusted schema would freeze the event loop.
     if (Buffer.byteLength(serialized) > MAX_UNTRUSTED_SCHEMA_BYTES) {
         throw new SchemaTooLargeError(MAX_UNTRUSTED_SCHEMA_BYTES);
     }
 
     const cacheKey = createHash('sha256').update(serialized).digest('base64');
-    // A hit holds a schema with the same content as `schema`, so it is still a T.
+    // A hit holds a schema with the same content as `syncSchema`, so it is still a T.
     const cached = untrustedValidatorCache.get(cacheKey) as { validate: ValidateFunction<unknown>; schema: T } | null;
     if (cached) return cached;
-
-    // A root `$async` makes Ajv compile a validator that returns a Promise, while every caller reads the result
-    // as a boolean. Ajv rejects `$async` below the root of a synchronous schema, so only the root key is left
-    // out, of the served schema too.
-    const syncSchema = { ...schema };
-    delete (syncSchema as { $async?: unknown }).$async;
 
     const compiled = { validate: createAjv().compile(syncSchema), schema: syncSchema };
     untrustedValidatorCache.set(cacheKey, compiled);
