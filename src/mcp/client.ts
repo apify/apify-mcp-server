@@ -1,4 +1,4 @@
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { Client, type ClientOptions } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
@@ -68,14 +68,23 @@ async function withTimeout<T>(millis: number, promise: Promise<T>): Promise<T> {
     return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutPid));
 }
 
+/**
+ * The SDK client compiles the output schema of every tool a server lists, to validate that tool's results.
+ * Results of an Actor's MCP server are passed on as they are, and compiling a schema the Actor wrote is
+ * unbounded work on the event loop, so this validator compiles nothing and accepts every result.
+ */
+const ACCEPT_ANY_RESULT: NonNullable<ClientOptions['jsonSchemaValidator']> = {
+    getValidator: () => (input) => ({ valid: true, data: input as never, errorMessage: undefined }),
+};
+
 async function connectWithTransport(
     url: string,
     transport: SSEClientTransport | StreamableHTTPClientTransport,
 ): Promise<Client> {
-    const client = new Client({
-        name: getMCPServerID(url),
-        version: '1.0.0',
-    });
+    const client = new Client(
+        { name: getMCPServerID(url), version: '1.0.0' },
+        { jsonSchemaValidator: ACCEPT_ANY_RESULT },
+    );
     await withTimeout(ACTORIZED_MCP_CONNECTION_TIMEOUT_MSEC, client.connect(transport));
     return client;
 }
