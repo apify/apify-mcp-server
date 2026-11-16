@@ -84,8 +84,6 @@ describe('compileUntrustedSchema skips validation of a schema that is costly to 
         properties: Object.fromEntries(Array.from({ length: count }, (_, i) => [`field${i}`, { type: 'string' }])),
         required: ['field0'],
     });
-    // `properties` itself is one nested object.
-    const widestValidatedSchema = () => buildSchemaWithProperties(MAX_VALIDATED_SCHEMA_OBJECTS - 1);
 
     it.each([
         {
@@ -111,7 +109,7 @@ describe('compileUntrustedSchema skips validation of a schema that is costly to 
     ])('accepts any input unchanged and logs the limit when the schema exceeds $limit', ({ limit, schema }) => {
         const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
         const { validate } = compileUntrustedSchema(schema, { actorName: 'apify/rag-web-browser' });
-        // Missing the required property and carrying an unknown one: a compiled validator rejects it.
+        // Lacks the required property, so a compiled validator rejects it.
         const input = { maxResults: '3' };
 
         expect(validate(input)).toBe(true);
@@ -124,7 +122,8 @@ describe('compileUntrustedSchema skips validation of a schema that is costly to 
 
     it('validates a schema at the nested-object limit', () => {
         const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
-        const { validate } = compileUntrustedSchema(widestValidatedSchema());
+        // `properties` itself is one nested object.
+        const { validate } = compileUntrustedSchema(buildSchemaWithProperties(MAX_VALIDATED_SCHEMA_OBJECTS - 1));
 
         expect(validate({ maxResults: '3' })).toBe(false);
         expect(info).not.toHaveBeenCalled();
