@@ -81,6 +81,7 @@ function findExceededCompileLimit(schema: object, serializedBytes: number): Exce
 
 /**
  * Compiles an Actor or proxied-MCP input schema, one validator per schema content.
+ * Returns the schema to serve: a copy without Ajv's root `$async`, which is what the validator is compiled from.
  * A schema that is costly to compile gets a validator that accepts every input and leaves it unchanged.
  *
  * Create a fresh Ajv instance per compilation to avoid unbounded memory growth.
@@ -90,7 +91,12 @@ export function compileUntrustedSchema<T extends object>(
     schema: T,
     logContext: Record<string, unknown> = {},
 ): { validate: ValidateFunction<unknown>; schema: T } {
-    const serialized = JSON.stringify(schema);
+    // Validators are called synchronously, so the schema is compiled without Ajv's root `$async`.
+    // Below the root Ajv ignores the keyword or fails the compile.
+    const syncSchema = { ...schema };
+    delete (syncSchema as { $async?: unknown }).$async;
+
+    const serialized = JSON.stringify(syncSchema);
     const serializedBytes = Buffer.byteLength(serialized);
     // Ajv codegen is synchronous; an oversized untrusted schema would freeze the event loop.
     if (serializedBytes > MAX_UNTRUSTED_SCHEMA_BYTES) {
@@ -100,10 +106,10 @@ export function compileUntrustedSchema<T extends object>(
     const cacheKey = createHash('sha256').update(serialized).digest('base64');
     let compiled = untrustedValidatorCache.get(cacheKey);
     if (!compiled) {
-        const exceededLimit = findExceededCompileLimit(schema, serializedBytes);
+        const exceededLimit = findExceededCompileLimit(syncSchema, serializedBytes);
         // An inlined `$ref` is compiled again at every place that refers to it.
         const ajv = createAjv({ inlineRefs: false });
-        compiled = { validate: ajv.compile(exceededLimit ? {} : schema), schema, exceededLimit };
+        compiled = { validate: ajv.compile(exceededLimit ? {} : syncSchema), schema: syncSchema, exceededLimit };
         untrustedValidatorCache.set(cacheKey, compiled);
     }
     if (compiled.exceededLimit) {
@@ -113,7 +119,7 @@ export function compileUntrustedSchema<T extends object>(
             schemaBytes: serializedBytes,
         });
     }
-    // A hit holds a schema with the same content as `schema`, so it is still a T.
+    // A hit holds a schema with the same content as `syncSchema`, so it is still a T.
     return compiled as CompiledSchema & { schema: T };
 }
 

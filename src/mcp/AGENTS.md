@@ -40,13 +40,17 @@ Two MCP protocol revisions are served, each by its own adapter:
   logs stop.
 - `client.ts` — `connectMCPClient(url, options)`: transport negotiation; both transports send the token and the
   session's request origin (`ApifyClient.requestOrigin`, `APIFY_AI` for the Apify AI client) on every request, and
-  follow a redirect only within the origin of `url` (`REDIRECT_POLICY`).
+  follow a redirect only within the origin of `url` (`REDIRECT_POLICY`). The client compiles no output schema of the
+  tools the server lists (`ACCEPT_ANY_RESULT`): the results are passed on unvalidated.
 - `remote_tool_call.ts` — `withRemoteMcpClient()`: connect-call-close round trip for
   `tool_dispatch.ts` and the MCP server Actor tools (`runOnActorMcpServer` in `call_actor_mcp_tool.ts`).
 - `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`, `getProxyMCPServerToolName(actorFullName, toolName)`.
 - `actors.ts` — `getActorMCPServerPath()`: parses an Actor's `webServerMcpPath`; `resolveOnStandbyOrigin()`:
   resolves a path against the Actor's `standbyUrl` (no `standbyUrl`, no URL) and flags a path that leaves that
-  origin, for `getActorMCPServerURL()` and `send-server-actor-request`.
+  origin, for `getActorMCPServerURL()`, `send-server-actor-request` and the `baseUrl` of `fetch-actor-details`. It
+  accepts a `standbyUrl` only on an https subdomain of `apify.actor` with the default port and no credentials, or
+  on a loopback host when the configured API base URL (`getApifyAPIBaseUrl()`) is itself on one (local
+  development); otherwise nothing is sent.
 - `utils.ts` — `processParamsGetTools()`: turns `?actors=` URL params into tools.
 - `tool_call_error_mapper.ts` — shared tool-call error classification.
 - `tool_dispatch.ts` — neutral dispatch for internal, Actor MCP, Actor, and Actor server tools (the last run their

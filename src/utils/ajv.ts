@@ -19,6 +19,9 @@ export function createAjv(options: Options = {}): Ajv {
     instance.removeKeyword('pattern');
     instance.removeKeyword('patternProperties');
     instance.removeKeyword('format');
+    // `uniqueItems` compares every pair of items unless they are typed scalars, so its cost grows with the
+    // square of the array. Dropped for the same reason; the platform or the proxied MCP server enforces it.
+    instance.removeKeyword('uniqueItems');
     return instance;
 }
 

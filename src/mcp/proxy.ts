@@ -60,8 +60,9 @@ export async function getMCPServerTools(
         escapedUsername !== null &&
         tools.some(({ name }) => `${escapedUsername}--${actorName}--${name}`.length > MAX_TOOL_NAME_LENGTH);
 
-    return tools.map(
-        (tool): ActorMcpTool => ({
+    return tools.map((tool): ActorMcpTool => {
+        const compiled = compileUntrustedSchema(tool.inputSchema, { actorName: actorFullName, toolName: tool.name });
+        return {
             type: TOOL_TYPE.ACTOR_MCP,
             actorId: actorID,
             actorFullName,
@@ -69,12 +70,9 @@ export async function getMCPServerTools(
             originToolName: tool.name,
             name: getProxyMCPServerToolName(actorFullName, tool.name, shouldCapUsername),
             description: tool.description || '',
-            inputSchema: tool.inputSchema,
-            ajvValidate: compileUntrustedSchema(tool.inputSchema, {
-                actorName: actorFullName,
-                toolName: tool.name,
-            }).validate,
+            inputSchema: compiled.schema,
+            ajvValidate: compiled.validate,
             annotations: tool.annotations,
-        }),
-    );
+        };
+    });
 }
