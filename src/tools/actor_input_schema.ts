@@ -28,12 +28,17 @@ type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 export const MAX_UNTRUSTED_SCHEMA_BYTES = 262_144;
 
 // Ajv compile time does not follow schema size: 2,000 flat properties in 51 KB take 1.8 s
-// (apify/apify-mcp-server-internal#974). A schema over either limit is served without local
-// validation; the platform or the proxied MCP server validates the input.
+// (apify/apify-mcp-server-internal#974). A schema over either limit, or with a `$ref` that is not to a
+// definition, is served without local validation; the platform or the proxied MCP server validates the input.
 export const MAX_VALIDATED_SCHEMA_BYTES = 65_536;
 export const MAX_VALIDATED_SCHEMA_OBJECTS = 300;
 
-type ExceededCompileLimit = 'bytes' | 'nested-objects';
+// Ajv compiles each `$ref` target as its own function, with every schema below it. A definition is
+// compiled only through a `$ref`; any other target is also compiled as part of the schema around it,
+// so 120 refs into a 120-level chain take 3.3 s.
+const DEFINITION_REF_PATTERN = /^#\/(?:definitions|\$defs)\/[^/]+$/;
+
+type ExceededCompileLimit = 'bytes' | 'nested-objects' | '$ref';
 type CompiledSchema = {
     validate: ValidateFunction<unknown>;
     schema: object;
@@ -54,6 +59,9 @@ function findExceededCompileLimit(schema: object, serializedBytes: number): Exce
         const node = pending.pop();
         if (typeof node !== 'object' || node === null) continue;
         if (!Array.isArray(node)) {
+            const ref = (node as { $ref?: unknown }).$ref;
+            // A property named `$ref` holds a schema object, not a string.
+            if (typeof ref === 'string' && !DEFINITION_REF_PATTERN.test(ref)) return '$ref';
             nestedObjectCount++;
             if (nestedObjectCount > MAX_VALIDATED_SCHEMA_OBJECTS) return 'nested-objects';
         }
