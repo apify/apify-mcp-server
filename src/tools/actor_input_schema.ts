@@ -50,7 +50,13 @@ export function compileUntrustedSchema<T extends object>(
     const cached = untrustedValidatorCache.get(cacheKey) as { validate: ValidateFunction<unknown>; schema: T } | null;
     if (cached) return cached;
 
-    const compiled = { validate: createAjv().compile(schema), schema };
+    // A root `$async` makes Ajv compile a validator that returns a Promise, while every caller reads the result
+    // as a boolean. Ajv rejects `$async` below the root of a synchronous schema, so only the root key is left
+    // out, of the served schema too.
+    const syncSchema = { ...schema };
+    delete (syncSchema as { $async?: unknown }).$async;
+
+    const compiled = { validate: createAjv().compile(syncSchema), schema: syncSchema };
     untrustedValidatorCache.set(cacheKey, compiled);
     return compiled;
 }

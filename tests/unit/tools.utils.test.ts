@@ -46,6 +46,18 @@ describe('compileUntrustedSchema', () => {
         expect(input).toEqual({ url: 'https://example.com' });
     });
 
+    it('compiles a synchronous validator for a schema that sets `$async`', () => {
+        const { validate, schema } = compileUntrustedSchema({
+            $async: true,
+            type: 'object',
+            properties: { url: { type: 'string' } },
+            required: ['url'],
+        });
+        // An async validator returns a Promise, which every caller would read as a valid input.
+        expect(validate({})).toBe(false);
+        expect(schema).not.toHaveProperty('$async');
+    });
+
     it('caches validator for identical schemas', () => {
         const schema = () => ({ type: 'object', properties: { url: { type: 'string' } }, required: ['url'] });
         const first = compileUntrustedSchema(schema());
