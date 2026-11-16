@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.21.12 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Validate synchronously when an input schema sets $async ([#1917](https://github.com/apify/apify-mcp-server/pull/1917)) ([5bb5c0c](https://github.com/apify/apify-mcp-server/commit/5bb5c0cc3f6be7d3876454b25063b7cf24ff0853)) by [@vojtechj-apify](https://github.com/vojtechj-apify)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.21.11](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.11) (2026-11-16)
 
 ### 🐛 Bug Fixes
