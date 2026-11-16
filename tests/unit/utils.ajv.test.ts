@@ -139,6 +139,18 @@ describe('createAjv — regex keywords disabled (ReDoS guard)', () => {
     });
 });
 
+describe('createAjv — `uniqueItems` disabled', () => {
+    // Ajv compares every pair of items, so the check takes time that grows with the square of an array the
+    // caller sends. The keyword is removed from the instance, so an array with a repeated item still validates.
+    it('does not enforce `uniqueItems`', () => {
+        const validate = createAjv().compile({
+            type: 'object',
+            properties: { startUrls: { type: 'array', uniqueItems: true } },
+        });
+        expect(validate({ startUrls: ['https://apify.com', 'https://apify.com'] })).toBe(true);
+    });
+});
+
 describe('createAjv — Actor input schemas', () => {
     it('strips extra properties when schema has additionalProperties: false', () => {
         const validate = createAjv().compile({
