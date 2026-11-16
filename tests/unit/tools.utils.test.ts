@@ -142,6 +142,21 @@ describe('compileUntrustedSchema skips validation of a schema that is costly to 
         expect(info).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ exceededLimit: '$ref' }));
     });
 
+    it('counts boolean subschemas in an array toward the nested-object limit', () => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+        const { validate } = compileUntrustedSchema({
+            type: 'object',
+            properties: { startUrls: { anyOf: Array.from({ length: MAX_VALIDATED_SCHEMA_OBJECTS }, () => false) } },
+            required: ['startUrls'],
+        });
+
+        expect(validate({ maxResults: '3' })).toBe(true);
+        expect(info).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ exceededLimit: 'nested-objects' }),
+        );
+    });
+
     it('validates a schema at the nested-object limit', () => {
         const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
         // `properties` itself is one nested object.

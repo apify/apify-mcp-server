@@ -58,13 +58,17 @@ function findExceededCompileLimit(schema: object, serializedBytes: number): Exce
     while (pending.length > 0) {
         const node = pending.pop();
         if (typeof node !== 'object' || node === null) continue;
-        if (!Array.isArray(node)) {
+        if (Array.isArray(node)) {
+            // A boolean in `anyOf`, `oneOf`, `allOf` or `items` is a schema, and costs like an object there:
+            // 8 properties with 1,000 `false` branches each take 2 s.
+            nestedObjectCount += node.filter((item) => typeof item === 'boolean').length;
+        } else {
             const ref = (node as { $ref?: unknown }).$ref;
             // A property named `$ref` holds a schema object, not a string.
             if (typeof ref === 'string' && !DEFINITION_REF_PATTERN.test(ref)) return '$ref';
             nestedObjectCount++;
-            if (nestedObjectCount > MAX_VALIDATED_SCHEMA_OBJECTS) return 'nested-objects';
         }
+        if (nestedObjectCount > MAX_VALIDATED_SCHEMA_OBJECTS) return 'nested-objects';
         pending.push(...Object.values(node));
     }
     return null;
