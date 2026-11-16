@@ -39,10 +39,10 @@ tools too. `get-key-value-store-record` builds its inlined-record URI with `buil
 
 Both origins come from the server's `platformUrls`, resolved once in the `ActorsMcpServer` constructor:
 the `apiBaseUrl` / `apiPublicBaseUrl` option, then `APIFY_API_BASE_URL` / `APIFY_API_PUBLIC_BASE_URL`
-(`getApifyAPIBaseUrl()` / `getApifyAPIPublicBaseUrl()` in `../apify_client.ts`), then production. The server
+(`getApifyAPIBaseUrl()` / `getApifyAPIPublicBaseUrl()` in `../apify_client.ts`), then the default. The server
 passes them to `createResourceService()` and to every `ApifyClient` it builds (`ApifyClient.platformUrls`);
-tools read them from the client. Do not call the env resolvers from a consumer: a caller with no server
-gets them through the default parameters.
+tools read them from the client. The env resolvers are only the fallback for a caller with no server
+(a default parameter, or `platformUrls` unset).
 
 `sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through
 `httpClient.axios.request` with `maxContentLength: MAX_INLINE_BYTES`; `readBodyUnderCap()` next to it reads a
