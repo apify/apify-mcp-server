@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.21.11 - **not yet released**
+## [0.21.11](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.11) (2026-11-16)
 
 ### 🐛 Bug Fixes
 
@@ -12,7 +11,6 @@ All notable changes to this project will be documented in this file.
 - Keep the word &quot;error&quot; in tool input from raising a false alert ([#1911](https://github.com/apify/apify-mcp-server/pull/1911)) ([6a557c5](https://github.com/apify/apify-mcp-server/commit/6a557c5397495f9cb9c5d2c7846d1731ae796cd9)) by [@jirispilka](https://github.com/jirispilka), closes [#1908](https://github.com/apify/apify-mcp-server/issues/1908)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.21.10](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.10) (2026-11-13)
 
 ### 🐛 Bug Fixes
