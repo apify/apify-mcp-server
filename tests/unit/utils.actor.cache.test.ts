@@ -58,6 +58,26 @@ beforeEach(() => {
     getUserInfoCachedMock.mockReset();
 });
 
+describe('getActorDefinitionCached — API origin isolation', () => {
+    it('fetches again for a server with another API origin instead of serving the cached definition', async () => {
+        seedCache('acme/two-origins', true, 'owner-origin');
+        const fetched = { definition: { id: 'other' }, info: { id: 'other', isPublic: true } };
+        getActorDefinitionMock.mockResolvedValue(fetched as unknown as ActorDefinitionWithInfo);
+        const otherOriginClient = mockApifyClient({
+            token: 'caller-token',
+            platformUrls: {
+                apiBaseUrl: 'http://api.internal.example:3333',
+                apiPublicBaseUrl: 'https://api.example.test',
+                consoleBaseUrl: 'https://console.example.test',
+            },
+        });
+
+        expect(await getActorDefinitionCached('acme/two-origins', otherOriginClient)).toBe(fetched);
+        // The default origin still gets its own entry.
+        expect((await getActorDefinitionCached('acme/two-origins', client))?.info.userId).toBe('owner-origin');
+    });
+});
+
 describe('getActorDefinitionCached — tenant isolation', () => {
     it('serves a cached public Actor to any caller without an ownership check', async () => {
         const cached = seedCache('acme/public-1', true, 'owner-1');
