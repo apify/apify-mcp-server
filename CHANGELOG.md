@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - Validate synchronously when an input schema sets $async ([#1917](https://github.com/apify/apify-mcp-server/pull/1917)) ([5bb5c0c](https://github.com/apify/apify-mcp-server/commit/5bb5c0cc3f6be7d3876454b25063b7cf24ff0853)) by [@vojtechj-apify](https://github.com/vojtechj-apify)
 - Do not compile the output schemas of an Actor&#x27;s MCP tools ([#1919](https://github.com/apify/apify-mcp-server/pull/1919)) ([60e10ff](https://github.com/apify/apify-mcp-server/commit/60e10ff748230a8758c741c627142f6e30471ed2)) by [@vojtechj-apify](https://github.com/vojtechj-apify)
+- Skip the uniqueItems check in local input validation ([#1918](https://github.com/apify/apify-mcp-server/pull/1918)) ([e04a25e](https://github.com/apify/apify-mcp-server/commit/e04a25e7ca2d32d182d2bbbe85da7567aef1494c)) by [@vojtechj-apify](https://github.com/vojtechj-apify)
 
 
 <!-- git-cliff-unreleased-end -->
