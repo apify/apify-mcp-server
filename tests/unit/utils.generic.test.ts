@@ -127,6 +127,19 @@ describe('stripQuoteWrappers', () => {
         expect(stripQuoteWrappers('ds-1"')).toBe('ds-1');
         expect(stripQuoteWrappers('`ds-1')).toBe('ds-1');
     });
+
+    it('reduces an id of only quotes to an empty string', () => {
+        expect(stripQuoteWrappers('`""`')).toBe('');
+    });
+
+    // Linear time takes well under a millisecond here; the bound only catches time that grows faster than the length.
+    it('strips a 100,000-character id with a quote run inside it within a second', () => {
+        const id = `a${'`'.repeat(100_000)}a`;
+
+        const startedAt = performance.now();
+        expect(stripQuoteWrappers(id)).toBe(id);
+        expect(performance.now() - startedAt).toBeLessThan(1000);
+    });
 });
 
 describe('computeValueBytes()', () => {

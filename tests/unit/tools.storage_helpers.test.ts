@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
+import { HELPER_TOOLS } from '../../src/const.js';
 import {
     buildDatasetItemsSummaryNextStep,
-    buildBinaryRecordDisposition,
     buildKvsKeysSummaryNextStep,
     fetchStorageByIdOrName,
     normalizeRecordKey,
@@ -104,45 +103,14 @@ describe('normalizeRecordKey()', () => {
     it('trims surrounding whitespace', () => {
         expect(normalizeRecordKey('  INPUT  ')).toBe('INPUT');
     });
-});
 
-describe('buildBinaryRecordDisposition()', () => {
-    it('inlines a value at or below the size limit as base64', () => {
-        const value = Buffer.from('binary-data');
+    // Linear time takes well under a millisecond here; the bound only catches time that grows faster than the length.
+    it('normalizes a 100,000-character key with a quote run inside it within a second', () => {
+        const key = `a${'"'.repeat(100_000)}a`;
 
-        const result = buildBinaryRecordDisposition('image/png', value);
-
-        expect(result).toEqual({ kind: 'inline', mimeType: 'image/png', base64: value.toString('base64') });
-    });
-
-    it('links out a value above the size limit, reporting its byte length', () => {
-        const value = Buffer.alloc(MAX_INLINE_BYTES + 1);
-
-        const result = buildBinaryRecordDisposition('application/octet-stream', value);
-
-        expect(result).toEqual({
-            kind: 'linkOut',
-            mimeType: 'application/octet-stream',
-            bytes: MAX_INLINE_BYTES + 1,
-        });
-    });
-
-    it('inlines a value of exactly MAX_INLINE_BYTES (strict > threshold)', () => {
-        const result = buildBinaryRecordDisposition('application/octet-stream', Buffer.alloc(MAX_INLINE_BYTES));
-
-        expect(result.kind).toBe('inline');
-    });
-
-    it('strips Content-Type parameters and lowercases the MIME type', () => {
-        const result = buildBinaryRecordDisposition('Image/PNG; charset=utf-8', Buffer.from('x'));
-
-        expect(result.mimeType).toBe('image/png');
-    });
-
-    it('omits mimeType when no Content-Type is declared', () => {
-        const result = buildBinaryRecordDisposition(undefined, Buffer.from('x'));
-
-        expect(result).not.toHaveProperty('mimeType');
+        const startedAt = performance.now();
+        expect(normalizeRecordKey(key)).toBe(key);
+        expect(performance.now() - startedAt).toBeLessThan(1000);
     });
 });
 

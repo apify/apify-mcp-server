@@ -2,8 +2,6 @@ import { createHash } from 'node:crypto';
 
 import type { ValidateFunction } from 'ajv';
 
-import { LruCache } from '@apify/datastructures';
-
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../const.js';
 import { SchemaTooLargeError } from '../errors.js';
 import type { ActorInputSchema, SchemaProperties } from '../types.js';
@@ -16,6 +14,7 @@ import {
     addRequestListSourcesProperties,
     addResourcePickerProperties as addArrayResourcePickerProperties,
 } from '../utils/apify_properties.js';
+import { LruCache } from '../utils/lru.js';
 import { getToolSchemaID } from './actor_tool_naming.js';
 
 type ActorInputSchemaProperties = Record<string, SchemaProperties>;
@@ -27,9 +26,9 @@ type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 export const MAX_UNTRUSTED_SCHEMA_BYTES = 262_144;
 
 const UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE = 1000;
-const untrustedValidatorCache = new LruCache<{ validate: ValidateFunction<unknown>; schema: object }>({
-    maxLength: UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE,
-});
+const untrustedValidatorCache = new LruCache<{ validate: ValidateFunction<unknown>; schema: object }>(
+    UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE,
+);
 
 /**
  * Compiles an Actor or proxied-MCP input schema, one validator per schema content.
@@ -52,7 +51,7 @@ export function compileUntrustedSchema<T extends object>(
     if (cached) return cached;
 
     const compiled = { validate: createAjv().compile(schema), schema };
-    untrustedValidatorCache.add(cacheKey, compiled);
+    untrustedValidatorCache.set(cacheKey, compiled);
     return compiled;
 }
 

@@ -1,4 +1,4 @@
-import { LruCache } from '@apify/datastructures';
+import { LruCache } from './lru.js';
 
 /**
  * LRU cache with TTL: entries expire after a set time and are checked (and evicted if expired)
@@ -28,9 +28,7 @@ export class TTLLRUCache<T> {
         this.cache = new LruCache<{
             value: T;
             expiresAt: number;
-        }>({
-            maxLength,
-        });
+        }>(maxLength);
     }
 
     /**
@@ -39,10 +37,7 @@ export class TTLLRUCache<T> {
      * @param value Value to store
      */
     set(key: string, value: T) {
-        if (this.cache.get(key)) {
-            this.cache.remove(key);
-        }
-        this.cache.add(key, {
+        this.cache.set(key, {
             value,
             expiresAt: Date.now() + this.ttlMillis,
         });
@@ -58,7 +53,7 @@ export class TTLLRUCache<T> {
         if (entry && entry.expiresAt > Date.now()) {
             return entry.value;
         }
-        this.cache.remove(key);
+        this.cache.delete(key);
         return null;
     }
 }

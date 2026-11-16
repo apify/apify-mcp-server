@@ -35,7 +35,6 @@ export const actorExecutor: ActorExecutor = {
             log.info('Actor run aborted by client before start', {
                 actorName: actorFullName,
                 mcpSessionId,
-                input: params.input,
             });
             return null;
         }
@@ -72,7 +71,6 @@ export const actorExecutor: ActorExecutor = {
                 actorName: actorFullName,
                 mcpSessionId,
                 runId: actorRun.id,
-                input: params.input,
             });
             return null;
         }
@@ -93,7 +91,6 @@ export const actorExecutor: ActorExecutor = {
                 actorName: actorFullName,
                 mcpSessionId,
                 runId: actorRun.id,
-                input: params.input,
             });
             return null;
         }

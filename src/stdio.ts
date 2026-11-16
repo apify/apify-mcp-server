@@ -1,21 +1,8 @@
 #!/usr/bin/env node
 
-// Sentry must be imported before all other modules to ensure early initialization
+// Must stay the first import so Sentry instruments every module loaded after it.
 import './instrument.js';
 
-/**
- * This script initializes and starts the Apify MCP server using the Stdio transport.
- *
- * Usage:
- *   node <script_name> --actors=<actor1,actor2,...>
- *
- * Command-line arguments:
- *   --actors - A comma-separated list of Actor full names to add to the server.
- *   --help - Display help information
- *
- * Example:
- *   node stdio.js --actors=apify/google-search-scraper,apify/instagram-scraper
- */
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -23,8 +10,7 @@ import { join } from 'node:path';
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import yargs from 'yargs';
-// Had to ignore the eslint import extension error for the yargs package.
-// Using .js or /index.js didn't resolve it due to the @types package issues.
+// The yargs typings don't resolve with a .js or /index.js extension.
 // eslint-disable-next-line import/extensions
 import { hideBin } from 'yargs/helpers';
 
@@ -37,34 +23,21 @@ import { ActorsMcpServer } from './mcp/server.js';
 import { getTelemetryEnv } from './telemetry.js';
 import type { ApifyRequestParams, Input, ServerModeOption, TelemetryEnv, ToolSelector } from './types.js';
 import { isApiTokenRequired } from './utils/auth.js';
-import { parseCommaSeparatedList } from './utils/generic.js';
+import { parseQueryParamList } from './utils/generic.js';
 import { injectMcpSessionId } from './utils/mcp.js';
 import { parseServerMode } from './utils/server_mode.js';
 import { getPackageVersion } from './utils/version.js';
 
-// Keeping this type here and not types.ts since
-// it is only relevant to the CLI/STDIO transport in this file
 type CliArgs = {
-    actors?: string;
-    /** Tool categories to include */
-    tools?: string;
-    /** Enable or disable telemetry tracking (default: true) */
+    // yargs turns a repeated flag (`--tools a --tools b`) into an array.
+    actors?: string | string[];
+    tools?: string | string[];
     telemetryEnabled: boolean;
-    /** Telemetry environment: 'PROD' or 'DEV' (default: 'PROD', only used when telemetry-enabled is true) */
     telemetryEnv: TelemetryEnv;
-    /** Server mode for tool responses.
-     * - `'apps'` / `'true'` / `'on'`: force MCP Apps widget rendering
-     * - `'default'` / `'false'` / `'off'`: force standard (non-widget) tool set
-     * - `'auto'` (default): resolve from the client's `initialize` capabilities
-     * - `'openai'`: deprecated alias for `'apps'`
-     */
     ui: ServerModeOption;
 };
 
-/**
- * Attempts to read Apify token from ~/.apify/auth.json file
- * Returns the token if found, undefined otherwise
- */
+/** Reads the token saved by `apify login`. */
 function getTokenFromAuthFile(): string | undefined {
     try {
         const authPath = join(homedir(), '.apify', 'auth.json');
@@ -79,9 +52,8 @@ function getTokenFromAuthFile(): string | undefined {
 log.setLevel(log.LEVELS.ERROR);
 const packageVersion = getPackageVersion() ?? '0.0.0';
 
-// Parse command line arguments using yargs
 const argv = yargs(hideBin(process.argv))
-    .wrap(null) // Disable automatic wrapping to avoid issues with long lines and links
+    .wrap(null) // Wrapping breaks long links.
     .usage('Usage: $0 [options]')
     .env()
     .option('actors', {
@@ -117,7 +89,7 @@ Only used when --telemetry-enabled is true`,
     .option('ui', {
         default: undefined,
         coerce: (arg: string | boolean | undefined): ServerModeOption => {
-            // Normalize: bare --ui flag (boolean true) or empty string both mean 'true'
+            // A bare `--ui` means 'true'.
             const normalized = arg === true || arg === '' ? 'true' : arg;
             return parseServerMode((normalized as string) || process.env.UI_MODE);
         },
@@ -136,10 +108,9 @@ Only used when --telemetry-enabled is true`,
     .epilogue('For more information, visit https://mcp.apify.com or https://github.com/apify/apify-mcp-server')
     .parseSync() as CliArgs;
 
-const actorList = argv.actors !== undefined ? parseCommaSeparatedList(argv.actors) : undefined;
-const toolCategoryKeys = argv.tools !== undefined ? parseCommaSeparatedList(argv.tools) : undefined;
+const actorList = argv.actors !== undefined ? parseQueryParamList(argv.actors) : undefined;
+const toolCategoryKeys = argv.tools !== undefined ? parseQueryParamList(argv.tools) : undefined;
 
-// Propagate log.error to console.error for easier debugging
 const originalError = log.error.bind(log);
 log.error = (...args: Parameters<typeof log.error>) => {
     originalError(...args);
@@ -147,24 +118,20 @@ log.error = (...args: Parameters<typeof log.error>) => {
     console.error(...args);
 };
 
-// Get token from environment or auth file
 const apifyToken = process.env.APIFY_TOKEN || getTokenFromAuthFile();
 
-// Determine if authentication is required based on requested tools
-// Only public tools (like docs) can run without a token
+// Only public tools (e.g. docs) work without a token.
 const requiresAuthentication = isApiTokenRequired({
     toolCategoryKeys,
     actorList,
 });
 
-// Validate environment
 if (requiresAuthentication && !apifyToken) {
     log.error('APIFY_TOKEN is required but not set in the environment variables or in ~/.apify/auth.json');
     process.exit(1);
 }
 
 async function main() {
-    // Node.js version guard — surface a clear error instead of cryptic failures
     const [major] = process.versions.node.split('.').map(Number);
     if (major < 22) {
         // eslint-disable-next-line no-console
@@ -186,27 +153,19 @@ async function main() {
         allowUnauthMode: !requiresAuthentication,
     });
 
-    // Create an Input object from CLI arguments
     const input: Input = {
         actors: actorList,
         tools: toolCategoryKeys as ToolSelector[],
     };
-
-    // Normalize (merges actors into tools for backward compatibility)
     const normalizedInput = processInput(input);
 
     const apifyClient = new ApifyClient({ token: apifyToken });
-    // Fetch actor metadata and queue mode-agnostic sources. Sources are composed
-    // with the final mode inside the initialize request handler once the client's
-    // capabilities are known (see src/mcp/server.ts#setupInitializeHandler).
+    // The server mode is applied in the initialize handler, once client capabilities are known.
     await mcpServer.loadToolsFromInput(normalizedInput, apifyClient);
 
-    // Start server
     const transport = new StdioServerTransport();
 
-    // Generate a unique session ID for this stdio connection
-    // Note: stdio transport does not have a strict session ID concept like HTTP transports,
-    // so we generate a UUID4 to represent this single session interaction for telemetry tracking
+    // stdio has no session ID; one is generated for telemetry and task isolation.
     const mcpSessionId = randomUUID();
 
     await mcpServer.connect(transport);
@@ -214,7 +173,6 @@ async function main() {
     const sdkOnMessage = transport.onmessage;
     transport.onmessage = (message) => {
         const msgRecord = message as Record<string, unknown>;
-        // Inject session ID into all requests for task isolation and session tracking.
         msgRecord.params = injectMcpSessionId(msgRecord.params as ApifyRequestParams | undefined, mcpSessionId);
 
         sdkOnMessage?.(message);

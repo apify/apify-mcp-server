@@ -2,7 +2,14 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { ErrorObject } from 'ajv';
 import type { ZodError } from 'zod';
 
-import { FAILURE_CATEGORY, HTTP_FORBIDDEN, HTTP_NOT_FOUND, HTTP_UNAUTHORIZED, TOOL_STATUS } from '../const.js';
+import {
+    FAILURE_CATEGORY,
+    HTTP_FORBIDDEN,
+    HTTP_NOT_FOUND,
+    HTTP_UNAUTHORIZED,
+    RESOURCE_ID_OR_NAME_MAX_LENGTH,
+    TOOL_STATUS,
+} from '../const.js';
 import type { RunResponse } from '../tools/actors/actor_run_response.js';
 import type {
     AjvErrorDetails,
@@ -22,9 +29,13 @@ type ResourceIds = Pick<
     'run_id' | 'run_status' | 'dataset_id' | 'key_value_store_id' | 'tip_recommended_actor_id'
 >;
 
+function readIdArg(value: unknown): string | undefined {
+    return typeof value === 'string' && value.length <= RESOURCE_ID_OR_NAME_MAX_LENGTH ? value : undefined;
+}
+
 /**
  * The resource ids for the "MCP Tool Call" Segment event, read from data the telemetry sink already
- * holds — the validated tool args and the tool's public structured output. No tool threads anything.
+ * holds — the tool args and the tool's public structured output. No tool threads anything.
  *
  * - `run_id` / `run_status` come from the spec'd RunResponse `structuredContent` (call-actor,
  *   get-actor-run, direct Actors, widgets). `run_status` is the run's own outcome (RUNNING/SUCCEEDED/
@@ -33,6 +44,9 @@ type ResourceIds = Pick<
  *   (abort-actor-run, get-actor-run-log) and for not-found.
  * - `dataset_id` / `key_value_store_id` come from `args`, quote-stripped to match the storage tools.
  * - `tip_recommended_actor_id` comes from `structuredContent.tip`, when the run's Actor named one.
+ *
+ * The args arrive here even when validation rejected them, so an arg longer than
+ * `RESOURCE_ID_OR_NAME_MAX_LENGTH` is skipped, not normalized.
  */
 export function deriveResourceIds(args: Record<string, unknown> | undefined, result: unknown): ResourceIds {
     const argObj = (args ?? {}) as { datasetId?: unknown; keyValueStoreId?: unknown; runId?: unknown };
@@ -43,14 +57,14 @@ export function deriveResourceIds(args: Record<string, unknown> | undefined, res
     const scRunId: string | undefined = run?.runId;
     const scStatus: string | undefined = run?.status;
     const scRecommendedActorId: string | undefined = run?.tip?.recommendedActorId;
-    const runId = scRunId ?? (typeof argObj.runId === 'string' ? argObj.runId : undefined);
+    const runId = scRunId ?? readIdArg(argObj.runId);
+    const datasetId = readIdArg(argObj.datasetId);
+    const keyValueStoreId = readIdArg(argObj.keyValueStoreId);
     return {
         ...(typeof runId === 'string' && { run_id: runId }),
         ...(typeof scStatus === 'string' && { run_status: scStatus }),
-        ...(typeof argObj.datasetId === 'string' && { dataset_id: stripQuoteWrappers(argObj.datasetId) }),
-        ...(typeof argObj.keyValueStoreId === 'string' && {
-            key_value_store_id: stripQuoteWrappers(argObj.keyValueStoreId),
-        }),
+        ...(datasetId !== undefined && { dataset_id: stripQuoteWrappers(datasetId) }),
+        ...(keyValueStoreId !== undefined && { key_value_store_id: stripQuoteWrappers(keyValueStoreId) }),
         ...(typeof scRecommendedActorId === 'string' && { tip_recommended_actor_id: scRecommendedActorId }),
     };
 }

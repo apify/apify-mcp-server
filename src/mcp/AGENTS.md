@@ -39,7 +39,8 @@ Two MCP protocol revisions are served, each by its own adapter:
   (`SERVER_PATHS_FOR_RUN_INPUT`, `REPLACED_DEFAULT_ACTORS`). Delete it and its calls in `tool_call_engine.ts` once its
   logs stop.
 - `client.ts` — `connectMCPClient(url, options)`: transport negotiation; both transports send the token and the
-  session's request origin (`ApifyClient.requestOrigin`, `APIFY_AI` for the Apify AI client) on every request.
+  session's request origin (`ApifyClient.requestOrigin`, `APIFY_AI` for the Apify AI client) on every request, and
+  follow a redirect only within the origin of `url` (`REDIRECT_POLICY`).
 - `remote_tool_call.ts` — `withRemoteMcpClient()`: connect-call-close round trip for
   `tool_dispatch.ts` and the MCP server Actor tools (`runOnActorMcpServer` in `call_actor_mcp_tool.ts`).
 - `proxy.ts` — MCP-in-MCP: `getMCPServerID(url)`, `getProxyMCPServerToolName(actorFullName, toolName)`.

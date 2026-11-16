@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
@@ -10,7 +10,7 @@ import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunAnyActor } from '../actor_tool_naming.js';
-import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from '../actors/actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInput } from '../actors/actor_tools_factory.js';
 import {
     actorDetailsOutputDefaults,
     buildActorNotFoundResponse,
@@ -31,6 +31,7 @@ const fetchActorDetailsWidgetArgsSchema = z
         actor: z
             .string()
             .min(1)
+            .max(RESOURCE_ID_OR_NAME_MAX_LENGTH)
             .describe('Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".'),
     })
     .strict();
@@ -72,12 +73,9 @@ export const fetchActorDetailsWidget: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { apifyToken, apifyClient, actorStore, mcpSessionId, loadedToolNames, loadedActorIds } = toolArgs;
+        const { apifyToken, apifyClient, actorStore, loadedToolNames, loadedActorIds } = toolArgs;
         const parsed = fetchActorDetailsWidgetArgsSchema.parse(toolArgs.args);
-        const actorName = fixActorNameInputAndLog(parsed.actor, {
-            mcpSessionId,
-            route: HELPER_TOOLS.ACTOR_GET_DETAILS_WIDGET,
-        });
+        const actorName = fixActorNameInput(parsed.actor);
         if (!actorName) return respondUserError(EMPTY_ACTOR_NAME_MESSAGE);
 
         const { userPlanTier } = await getUserInfoCached(apifyToken, apifyClient);

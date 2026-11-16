@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { HELPER_TOOLS } from '../../src/const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
 import { buildActor } from '../../src/tools/builds/build_actor.js';
 import { BUILD_WAIT_SECS_DEFAULT } from '../../src/tools/builds/build_helpers.js';
@@ -389,7 +389,7 @@ describe('build-actor', () => {
                 const { content } = await callTool({ actor: 'actor-1' }, [HELPER_TOOLS.ACTOR_BUILD_LOG]);
 
                 expect(content[1].text).toBe(
-                    `${summary} ${status}.\nRead the build log with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId build-1; pass lines 0 for the whole log.`,
+                    `${summary} ${status}.\nRead the build log with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId build-1; pass lines 0 for the whole log, up to its last ${MAX_INLINE_BYTES} bytes.`,
                 );
             },
         );

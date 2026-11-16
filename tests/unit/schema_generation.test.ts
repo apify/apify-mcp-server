@@ -96,6 +96,28 @@ describe('generateSchemaFromItems — object merge across items', () => {
     });
 });
 
+describe('generateSchemaFromItems — field names that match built-in object properties', () => {
+    /** Two items where `name` is set only in the second, at the top level and inside `metadata`; parsed from JSON like dataset items. */
+    function itemsWithField(name: string): unknown[] {
+        const field = JSON.stringify(name);
+        return JSON.parse(
+            `[{"title":"A","metadata":{"url":"https://apify.com"}},` +
+                `{"title":"B",${field}:"x","metadata":{"url":"https://apify.com",${field}:1}}]`,
+        );
+    }
+
+    it.each(['constructor', 'toString', 'valueOf', 'hasOwnProperty', '__proto__'])(
+        'infers %s like any other field name',
+        (name) => {
+            const expected = JSON.stringify(generateSchemaFromItems(itemsWithField('rating'))).replaceAll(
+                '"rating"',
+                JSON.stringify(name),
+            );
+            expect(JSON.stringify(generateSchemaFromItems(itemsWithField(name)))).toBe(expected);
+        },
+    );
+});
+
 describe('generateSchemaFromItems — type unification', () => {
     it('promotes integer + number to number', () => {
         const result = generateSchemaFromItems([{ x: 1 }, { x: 1.5 }]);
@@ -186,6 +208,22 @@ describe('generateSchemaFromItems — format detection', () => {
         const result = generateSchemaFromItems([{ url: 'https://example.com' }, { url: 'not a url' }]);
         expect(props(result)!.url?.type).toBe('string');
         expect(props(result)!.url?.format).toBeUndefined();
+    });
+
+    it('detects email only with a dot inside the domain, with characters on both sides of it', () => {
+        const p = props(generateSchemaFromItems([{ inside: 'a@.b.c', atStart: 'a@.bc', atEnd: 'a@bc.' }]))!;
+        expect(p.inside?.format).toBe('email');
+        expect(p.atStart?.format).toBeUndefined();
+        expect(p.atEnd?.format).toBeUndefined();
+    });
+
+    // Linear time takes well under a millisecond here; the bound only catches time that grows faster than the length.
+    it('checks a 100,000-character string with a dot run after an at sign within a second', () => {
+        const startedAt = performance.now();
+        const result = generateSchemaFromItems([{ text: `a@${'.'.repeat(100_000)} ` }]);
+
+        expect(performance.now() - startedAt).toBeLessThan(1000);
+        expect(props(result)!.text).toEqual({ type: 'string' });
     });
 });
 
