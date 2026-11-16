@@ -69,9 +69,10 @@ async function withTimeout<T>(millis: number, promise: Promise<T>): Promise<T> {
 }
 
 /**
- * The SDK client compiles the output schema of every tool a server lists, to validate that tool's results.
- * Results of an Actor's MCP server are passed on as they are, and compiling a schema the Actor wrote is
- * unbounded work on the event loop, so this validator compiles nothing and accepts every result.
+ * A connection to an Actor's MCP server either lists its tools or calls one, never both.
+ * The SDK's `listTools()` compiles every listed tool's output schema, so that a later `callTool()` on the same
+ * client can check the result. We never make that call, so the compile is wasted, and it is unbounded
+ * synchronous work on a schema the Actor's author wrote. This validator compiles nothing.
  */
 const ACCEPT_ANY_RESULT: NonNullable<ClientOptions['jsonSchemaValidator']> = {
     getValidator: () => (input) => ({ valid: true, data: input as never, errorMessage: undefined }),
