@@ -129,18 +129,22 @@ describe('compileUntrustedSchema skips validation of a schema that is costly to 
         );
     });
 
-    it('accepts any input and logs the limit when a $ref points below a definition', () => {
-        const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
-        const { validate } = compileUntrustedSchema({
-            type: 'object',
-            properties: { startUrls: { $ref: '#/definitions/requestSources/items' } },
-            required: ['startUrls'],
-            definitions: { requestSources: { type: 'array', items: { type: 'object' } } },
-        });
+    // A percent-encoded name is another spelling of the same ref, and Ajv compiles the definition once per spelling.
+    it.each(['#/definitions/requestSources/items', '#/definitions/request%53ources'])(
+        'accepts any input and logs the limit when the $ref is %s',
+        (ref) => {
+            const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+            const { validate } = compileUntrustedSchema({
+                type: 'object',
+                properties: { startUrls: { $ref: ref } },
+                required: ['startUrls'],
+                definitions: { requestSources: { type: 'array', items: { type: 'object' } } },
+            });
 
-        expect(validate({ maxResults: '3' })).toBe(true);
-        expect(info).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ exceededLimit: '$ref' }));
-    });
+            expect(validate({ maxResults: '3' })).toBe(true);
+            expect(info).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ exceededLimit: '$ref' }));
+        },
+    );
 
     it('counts boolean subschemas in an array toward the nested-object limit', () => {
         const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);

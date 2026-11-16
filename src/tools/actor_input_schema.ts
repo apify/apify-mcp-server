@@ -27,16 +27,17 @@ type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 // is intentionally uncapped.
 export const MAX_UNTRUSTED_SCHEMA_BYTES = 262_144;
 
-// Ajv compile time does not follow schema size: 2,000 flat properties in 51 KB take 1.8 s
-// (apify/apify-mcp-server-internal#974). A schema over either limit, or with a `$ref` that is not to a
-// definition, is served without local validation; the platform or the proxied MCP server validates the input.
+// Ajv compile time does not follow schema size: 2,000 flat properties in 51 KB take 1.8 s.
+// A schema over either limit, or with a `$ref` that is not to a definition, is served without local
+// validation; the platform or the proxied MCP server validates the input.
 export const MAX_VALIDATED_SCHEMA_BYTES = 65_536;
 export const MAX_VALIDATED_SCHEMA_OBJECTS = 300;
 
 // Ajv compiles each `$ref` target as its own function, with every schema below it. A definition is
 // compiled only through a `$ref`; any other target is also compiled as part of the schema around it,
-// so 120 refs into a 120-level chain take 3.3 s.
-const DEFINITION_REF_PATTERN = /^#\/(?:definitions|\$defs)\/[^/]+$/;
+// so 120 refs into a 120-level chain take 3.3 s. Ajv also compiles a target once per spelling of its ref,
+// and `%` or `~` escapes spell one name many ways: 150 spellings of a 145-property definition take 4.5 s.
+const DEFINITION_REF_PATTERN = /^#\/(?:definitions|\$defs)\/[^/%~]+$/;
 
 type ExceededCompileLimit = 'bytes' | 'nested-objects' | '$ref';
 type CompiledSchema = {
