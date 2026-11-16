@@ -140,8 +140,7 @@ describe('createAjv — regex keywords disabled (ReDoS guard)', () => {
 });
 
 describe('createAjv — `uniqueItems` disabled', () => {
-    // Ajv compares every pair of items, so the check takes time that grows with the square of an array the
-    // caller sends. The keyword is removed from the instance, so an array with a repeated item still validates.
+    // The keyword is removed from the instance (`createAjv` says why), so an array with a repeated item validates.
     it('does not enforce `uniqueItems`', () => {
         const validate = createAjv().compile({
             type: 'object',
