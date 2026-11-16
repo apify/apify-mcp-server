@@ -32,6 +32,7 @@ const untrustedValidatorCache = new LruCache<{ validate: ValidateFunction<unknow
 
 /**
  * Compiles an Actor or proxied-MCP input schema, one validator per schema content.
+ * Returns the schema that was compiled, which is the one to serve: a copy without Ajv's root `$async`.
  *
  * Create a fresh Ajv instance per compilation to avoid unbounded memory growth.
  * Ajv internally caches every compiled schema in a Map that is never evicted.
@@ -39,8 +40,8 @@ const untrustedValidatorCache = new LruCache<{ validate: ValidateFunction<unknow
 export function compileUntrustedSchema<T extends object>(
     schema: T,
 ): { validate: ValidateFunction<unknown>; schema: T } {
-    // A root `$async` makes Ajv return a Promise from the validator, and every caller reads a boolean.
-    // Below the root it cannot: there Ajv ignores the keyword or fails the compile.
+    // Validators are called synchronously, so the schema is compiled without Ajv's root `$async`.
+    // Below the root Ajv ignores the keyword or fails the compile.
     const syncSchema = { ...schema };
     delete (syncSchema as { $async?: unknown }).$async;
 

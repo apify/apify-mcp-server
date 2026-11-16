@@ -53,9 +53,19 @@ describe('compileUntrustedSchema', () => {
             properties: { url: { type: 'string' } },
             required: ['url'],
         });
-        // An async validator returns a Promise, which every caller would read as a valid input.
         expect(validate({})).toBe(false);
         expect(schema).not.toHaveProperty('$async');
+    });
+
+    it('does not compile a schema that sets `$async` below the root', () => {
+        // Only the root keyword is left out, and Ajv rejects an async schema inside a synchronous one.
+        expect(() =>
+            compileUntrustedSchema({
+                $async: true,
+                type: 'object',
+                properties: { url: { $async: true, type: 'string' } },
+            }),
+        ).toThrow();
     });
 
     it('caches validator for identical schemas', () => {
