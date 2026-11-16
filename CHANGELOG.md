@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - Return a user error for a key-value record whose body does not match its Content-Type ([#1909](https://github.com/apify/apify-mcp-server/pull/1909)) ([756ce6e](https://github.com/apify/apify-mcp-server/commit/756ce6e5aefc554e2ed0eca2b675a471fd4d33a9)) by [@jirispilka](https://github.com/jirispilka), closes [#1907](https://github.com/apify/apify-mcp-server/issues/1907)
 - Send Server Actor requests only to the platform domain ([#1886](https://github.com/apify/apify-mcp-server/pull/1886)) ([3e414ca](https://github.com/apify/apify-mcp-server/commit/3e414ca794edd669be9b306c7b9a33be87c1f6ea)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- Keep the word &quot;error&quot; in tool input from raising a false alert ([#1911](https://github.com/apify/apify-mcp-server/pull/1911)) ([6a557c5](https://github.com/apify/apify-mcp-server/commit/6a557c5397495f9cb9c5d2c7846d1731ae796cd9)) by [@jirispilka](https://github.com/jirispilka), closes [#1908](https://github.com/apify/apify-mcp-server/issues/1908)
 
 
 <!-- git-cliff-unreleased-end -->
