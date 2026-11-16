@@ -32,6 +32,7 @@ const untrustedValidatorCache = new LruCache<{ validate: ValidateFunction<unknow
 
 /**
  * Compiles an Actor or proxied-MCP input schema, one validator per schema content.
+ * Returns the schema that was compiled, which is the one to serve: a copy without Ajv's root `$async`.
  *
  * Create a fresh Ajv instance per compilation to avoid unbounded memory growth.
  * Ajv internally caches every compiled schema in a Map that is never evicted.
@@ -39,18 +40,23 @@ const untrustedValidatorCache = new LruCache<{ validate: ValidateFunction<unknow
 export function compileUntrustedSchema<T extends object>(
     schema: T,
 ): { validate: ValidateFunction<unknown>; schema: T } {
-    const serialized = JSON.stringify(schema);
+    // Validators are called synchronously, so the schema is compiled without Ajv's root `$async`.
+    // Below the root Ajv ignores the keyword or fails the compile.
+    const syncSchema = { ...schema };
+    delete (syncSchema as { $async?: unknown }).$async;
+
+    const serialized = JSON.stringify(syncSchema);
     // Ajv codegen is synchronous; an oversized untrusted schema would freeze the event loop.
     if (Buffer.byteLength(serialized) > MAX_UNTRUSTED_SCHEMA_BYTES) {
         throw new SchemaTooLargeError(MAX_UNTRUSTED_SCHEMA_BYTES);
     }
 
     const cacheKey = createHash('sha256').update(serialized).digest('base64');
-    // A hit holds a schema with the same content as `schema`, so it is still a T.
+    // A hit holds a schema with the same content as `syncSchema`, so it is still a T.
     const cached = untrustedValidatorCache.get(cacheKey) as { validate: ValidateFunction<unknown>; schema: T } | null;
     if (cached) return cached;
 
-    const compiled = { validate: createAjv().compile(schema), schema };
+    const compiled = { validate: createAjv().compile(syncSchema), schema: syncSchema };
     untrustedValidatorCache.set(cacheKey, compiled);
     return compiled;
 }

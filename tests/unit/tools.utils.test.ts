@@ -46,6 +46,28 @@ describe('compileUntrustedSchema', () => {
         expect(input).toEqual({ url: 'https://example.com' });
     });
 
+    it('compiles a synchronous validator for a schema that sets `$async`', () => {
+        const { validate, schema } = compileUntrustedSchema({
+            $async: true,
+            type: 'object',
+            properties: { url: { type: 'string' } },
+            required: ['url'],
+        });
+        expect(validate({})).toBe(false);
+        expect(schema).not.toHaveProperty('$async');
+    });
+
+    it('does not compile a schema that sets `$async` below the root', () => {
+        // Only the root keyword is left out, and Ajv rejects an async schema inside a synchronous one.
+        expect(() =>
+            compileUntrustedSchema({
+                $async: true,
+                type: 'object',
+                properties: { url: { $async: true, type: 'string' } },
+            }),
+        ).toThrow();
+    });
+
     it('caches validator for identical schemas', () => {
         const schema = () => ({ type: 'object', properties: { url: { type: 'string' } }, required: ['url'] });
         const first = compileUntrustedSchema(schema());
