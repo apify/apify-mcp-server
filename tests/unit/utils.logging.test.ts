@@ -7,7 +7,12 @@ import log, { LoggerJson } from '@apify/log';
 
 import { SchemaTooLargeError } from '../../src/errors.js';
 import { MAX_UNTRUSTED_SCHEMA_BYTES } from '../../src/tools/actor_input_schema.js';
-import { isMcpClientFaultMessage, logHttpError, sanitizeMezmoMessage } from '../../src/utils/logging.js';
+import {
+    isMcpClientFaultMessage,
+    logHttpError,
+    sanitizeMezmoMessage,
+    sanitizeMezmoValue,
+} from '../../src/utils/logging.js';
 
 describe('isMcpClientFaultMessage', () => {
     it('matches the exact MCP SDK client-fault literals', () => {
@@ -253,5 +258,17 @@ describe('logHttpError', () => {
 
         expect(() => logHttpError(buildError(), 'Failed to get Actor run')).not.toThrow();
         expect(consoleError).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('sanitizeMezmoValue', () => {
+    it('replaces the standalone word in every nested string and leaves other values as they are', () => {
+        const input = { query: 'proxy error status code 597', limit: 5, tags: ['Error handling', 'INTERNAL_ERROR'] };
+
+        expect(sanitizeMezmoValue(input)).toEqual({
+            query: 'proxy failure status code 597',
+            limit: 5,
+            tags: ['failure handling', 'INTERNAL_ERROR'],
+        });
     });
 });
