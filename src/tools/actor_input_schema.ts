@@ -27,13 +27,13 @@ type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 // is intentionally uncapped.
 export const MAX_UNTRUSTED_SCHEMA_BYTES = 262_144;
 
-// Ajv compile time does not follow schema size: a 15 KB schema with 500 `$ref`s takes 9 s
-// (apify/apify-mcp-server-internal#974). A schema over any of these limits is served without local
+// Ajv compile time does not follow schema size: 2,000 flat properties in 51 KB take 1.8 s
+// (apify/apify-mcp-server-internal#974). A schema over either limit is served without local
 // validation; the platform or the proxied MCP server validates the input.
 export const MAX_VALIDATED_SCHEMA_BYTES = 65_536;
 export const MAX_VALIDATED_SCHEMA_OBJECTS = 300;
 
-type ExceededCompileLimit = 'bytes' | 'nested-objects' | '$ref';
+type ExceededCompileLimit = 'bytes' | 'nested-objects';
 type CompiledSchema = {
     validate: ValidateFunction<unknown>;
     schema: object;
@@ -54,8 +54,6 @@ function findExceededCompileLimit(schema: object, serializedBytes: number): Exce
         const node = pending.pop();
         if (typeof node !== 'object' || node === null) continue;
         if (!Array.isArray(node)) {
-            // A property named `$ref` holds a schema object, not a string.
-            if (typeof (node as { $ref?: unknown }).$ref === 'string') return '$ref';
             nestedObjectCount++;
             if (nestedObjectCount > MAX_VALIDATED_SCHEMA_OBJECTS) return 'nested-objects';
         }
@@ -86,7 +84,10 @@ export function compileUntrustedSchema<T extends object>(
     let compiled = untrustedValidatorCache.get(cacheKey);
     if (!compiled) {
         const exceededLimit = findExceededCompileLimit(schema, serializedBytes);
-        compiled = { validate: createAjv().compile(exceededLimit ? {} : schema), schema, exceededLimit };
+        // An inlined `$ref` is compiled again at every place that refers to it: 250 references to one
+        // 40-property definition take 3 s, and 36 ms as a separate function.
+        const ajv = createAjv({ inlineRefs: false });
+        compiled = { validate: ajv.compile(exceededLimit ? {} : schema), schema, exceededLimit };
         untrustedValidatorCache.set(cacheKey, compiled);
     }
     if (compiled.exceededLimit) {

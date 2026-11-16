@@ -1,12 +1,12 @@
-import type { ValidateFunction } from 'ajv';
+import type { Options, ValidateFunction } from 'ajv';
 import Ajv from 'ajv';
 
 /**
  * Ajv with the server's validation policy. One instance per compile, never shared: Ajv caches every compiled
  * schema in a Map that is never evicted.
  */
-export function createAjv(): Ajv {
-    const instance = new Ajv({ coerceTypes: 'array', strict: false, removeAdditional: true });
+export function createAjv(options: Options = {}): Ajv {
+    const instance = new Ajv({ coerceTypes: 'array', strict: false, removeAdditional: true, ...options });
 
     // `pattern`/`patternProperties` compile a RegExp from untrusted Actor / proxied-MCP input schemas;
     // a catastrophic-backtracking pattern freezes the single-threaded event loop (ReDoS). `format` is

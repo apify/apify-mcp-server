@@ -67,6 +67,24 @@ describe('compileUntrustedSchema', () => {
         expect(second.toString()).toBe(first.toString());
     });
 
+    it('validates through a $ref and compiles the referenced schema once, outside the validator', () => {
+        const { validate } = compileUntrustedSchema({
+            type: 'object',
+            properties: {
+                startUrls: { type: 'array', items: { $ref: '#/definitions/requestSource' } },
+                excludeUrls: { type: 'array', items: { $ref: '#/definitions/requestSource' } },
+            },
+            definitions: {
+                requestSource: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] },
+            },
+        });
+
+        expect(validate({ startUrls: [{ url: 'https://apify.com' }] })).toBe(true);
+        expect(validate({ startUrls: [{ method: 'GET' }] })).toBe(false);
+        // An inlined reference repeats the definition's checks in the validator at every place it is used.
+        expect(validate.toString()).not.toContain('url');
+    });
+
     it('throws SchemaTooLargeError on an oversized schema before AJV codegen runs (DoS guard)', () => {
         const properties: Record<string, unknown> = {};
         for (let i = 0; i < 16000; i++) properties[`p${i}`] = { type: 'string' };
@@ -97,15 +115,6 @@ describe('compileUntrustedSchema skips validation of a schema that is costly to 
             },
         },
         { limit: 'nested-objects', schema: buildSchemaWithProperties(MAX_VALIDATED_SCHEMA_OBJECTS) },
-        {
-            limit: '$ref',
-            schema: {
-                type: 'object',
-                properties: { startUrls: { $ref: '#/definitions/url' } },
-                required: ['startUrls'],
-                definitions: { url: { type: 'string' } },
-            },
-        },
     ])('accepts any input unchanged and logs the limit when the schema exceeds $limit', ({ limit, schema }) => {
         const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
         const { validate } = compileUntrustedSchema(schema, { actorName: 'apify/rag-web-browser' });
@@ -127,16 +136,6 @@ describe('compileUntrustedSchema skips validation of a schema that is costly to 
 
         expect(validate({ maxResults: '3' })).toBe(false);
         expect(info).not.toHaveBeenCalled();
-    });
-
-    it('validates a schema whose property is named $ref', () => {
-        const { validate } = compileUntrustedSchema({
-            type: 'object',
-            properties: { $ref: { type: 'string' } },
-            required: ['$ref'],
-        });
-
-        expect(validate({})).toBe(false);
     });
 
     it('logs the skip again when the schema is served from the cache', () => {
