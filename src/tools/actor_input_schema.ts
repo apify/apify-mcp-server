@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 
 import type { ValidateFunction } from 'ajv';
 
+import log from '@apify/log';
+
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../const.js';
 import { SchemaTooLargeError } from '../errors.js';
 import type { ActorInputSchema, SchemaProperties } from '../types.js';
@@ -25,34 +27,77 @@ type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 // is intentionally uncapped.
 export const MAX_UNTRUSTED_SCHEMA_BYTES = 262_144;
 
+// Ajv compile time does not follow schema size: a 15 KB schema with 500 `$ref`s takes 9 s
+// (apify/apify-mcp-server-internal#974). A schema over any of these limits is served without local
+// validation; the platform validates the input when it creates the run.
+export const MAX_VALIDATED_SCHEMA_BYTES = 65_536;
+export const MAX_VALIDATED_SCHEMA_OBJECTS = 300;
+
+type ExceededCompileLimit = 'bytes' | 'nested-objects' | '$ref';
+type CompiledSchema = {
+    validate: ValidateFunction<unknown>;
+    schema: object;
+    exceededLimit: ExceededCompileLimit | null;
+};
+
 const UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE = 1000;
-const untrustedValidatorCache = new LruCache<{ validate: ValidateFunction<unknown>; schema: object }>(
-    UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE,
-);
+const untrustedValidatorCache = new LruCache<CompiledSchema>(UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE);
+
+/** Returns the limit that makes the schema too costly to compile, or null when Ajv may compile it. */
+function findExceededCompileLimit(schema: object, serializedBytes: number): ExceededCompileLimit | null {
+    if (serializedBytes > MAX_VALIDATED_SCHEMA_BYTES) return 'bytes';
+
+    // The root is not a nested object.
+    let nestedObjectCount = -1;
+    const pending: unknown[] = [schema];
+    while (pending.length > 0) {
+        const node = pending.pop();
+        if (typeof node !== 'object' || node === null) continue;
+        if (!Array.isArray(node)) {
+            // A property named `$ref` holds a schema object, not a string.
+            if (typeof (node as { $ref?: unknown }).$ref === 'string') return '$ref';
+            nestedObjectCount++;
+            if (nestedObjectCount > MAX_VALIDATED_SCHEMA_OBJECTS) return 'nested-objects';
+        }
+        pending.push(...Object.values(node));
+    }
+    return null;
+}
 
 /**
  * Compiles an Actor or proxied-MCP input schema, one validator per schema content.
+ * A schema that is costly to compile gets a validator that accepts every input and leaves it unchanged.
  *
  * Create a fresh Ajv instance per compilation to avoid unbounded memory growth.
  * Ajv internally caches every compiled schema in a Map that is never evicted.
  */
 export function compileUntrustedSchema<T extends object>(
     schema: T,
+    logContext: Record<string, unknown> = {},
 ): { validate: ValidateFunction<unknown>; schema: T } {
     const serialized = JSON.stringify(schema);
+    const serializedBytes = Buffer.byteLength(serialized);
     // Ajv codegen is synchronous; an oversized untrusted schema would freeze the event loop.
-    if (Buffer.byteLength(serialized) > MAX_UNTRUSTED_SCHEMA_BYTES) {
+    if (serializedBytes > MAX_UNTRUSTED_SCHEMA_BYTES) {
         throw new SchemaTooLargeError(MAX_UNTRUSTED_SCHEMA_BYTES);
     }
 
     const cacheKey = createHash('sha256').update(serialized).digest('base64');
+    let compiled = untrustedValidatorCache.get(cacheKey);
+    if (!compiled) {
+        const exceededLimit = findExceededCompileLimit(schema, serializedBytes);
+        compiled = { validate: createAjv().compile(exceededLimit ? {} : schema), schema, exceededLimit };
+        untrustedValidatorCache.set(cacheKey, compiled);
+    }
+    if (compiled.exceededLimit) {
+        log.info('Skipped input validation, schema is costly to compile', {
+            ...logContext,
+            exceededLimit: compiled.exceededLimit,
+            schemaBytes: serializedBytes,
+        });
+    }
     // A hit holds a schema with the same content as `schema`, so it is still a T.
-    const cached = untrustedValidatorCache.get(cacheKey) as { validate: ValidateFunction<unknown>; schema: T } | null;
-    if (cached) return cached;
-
-    const compiled = { validate: createAjv().compile(schema), schema };
-    untrustedValidatorCache.set(cacheKey, compiled);
-    return compiled;
+    return compiled as CompiledSchema & { schema: T };
 }
 
 /**

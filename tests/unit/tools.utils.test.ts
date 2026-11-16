@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+import log from '@apify/log';
 
 import {
     ACTOR_ENUM_MAX_LENGTH,
@@ -15,6 +17,8 @@ import {
     inferArrayItemsTypeIfMissing,
     inferArrayItemType,
     MAX_UNTRUSTED_SCHEMA_BYTES,
+    MAX_VALIDATED_SCHEMA_BYTES,
+    MAX_VALIDATED_SCHEMA_OBJECTS,
     markInputPropertiesAsRequired,
     shortenProperties,
     transformActorInputSchemaProperties,
@@ -69,6 +73,81 @@ describe('compileUntrustedSchema', () => {
         const huge = { type: 'object', properties };
         expect(JSON.stringify(huge).length).toBeGreaterThan(MAX_UNTRUSTED_SCHEMA_BYTES);
         expect(() => compileUntrustedSchema(huge)).toThrow(SchemaTooLargeError);
+    });
+});
+
+describe('compileUntrustedSchema skips validation of a schema that is costly to compile', () => {
+    const buildSchemaWithProperties = (count: number) => ({
+        type: 'object',
+        properties: Object.fromEntries(Array.from({ length: count }, (_, i) => [`field${i}`, { type: 'string' }])),
+        required: ['field0'],
+    });
+    // `properties` itself is one nested object.
+    const widestValidatedSchema = () => buildSchemaWithProperties(MAX_VALIDATED_SCHEMA_OBJECTS - 1);
+
+    it.each([
+        {
+            limit: 'bytes',
+            schema: {
+                type: 'object',
+                properties: {
+                    startUrls: { type: 'string', description: 'a'.repeat(MAX_VALIDATED_SCHEMA_BYTES) },
+                },
+                required: ['startUrls'],
+            },
+        },
+        { limit: 'nested-objects', schema: buildSchemaWithProperties(MAX_VALIDATED_SCHEMA_OBJECTS) },
+        {
+            limit: '$ref',
+            schema: {
+                type: 'object',
+                properties: { startUrls: { $ref: '#/definitions/url' } },
+                required: ['startUrls'],
+                definitions: { url: { type: 'string' } },
+            },
+        },
+    ])('accepts any input unchanged and logs the limit when the schema exceeds $limit', ({ limit, schema }) => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+        const { validate } = compileUntrustedSchema(schema, { actorName: 'apify/rag-web-browser' });
+        // Missing the required property and carrying an unknown one: a compiled validator rejects it.
+        const input = { maxResults: '3' };
+
+        expect(validate(input)).toBe(true);
+        expect(input).toEqual({ maxResults: '3' });
+        expect(info).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ exceededLimit: limit, actorName: 'apify/rag-web-browser' }),
+        );
+        info.mockRestore();
+    });
+
+    it('validates a schema at the nested-object limit', () => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+        const { validate } = compileUntrustedSchema(widestValidatedSchema());
+
+        expect(validate({ maxResults: '3' })).toBe(false);
+        expect(info).not.toHaveBeenCalled();
+        info.mockRestore();
+    });
+
+    it('validates a schema whose property is named $ref', () => {
+        const { validate } = compileUntrustedSchema({
+            type: 'object',
+            properties: { $ref: { type: 'string' } },
+            required: ['$ref'],
+        });
+
+        expect(validate({})).toBe(false);
+    });
+
+    it('logs the skip again when the schema is served from the cache', () => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+        const schema = buildSchemaWithProperties(MAX_VALIDATED_SCHEMA_OBJECTS + 1);
+        compileUntrustedSchema(schema);
+        compileUntrustedSchema(schema);
+
+        expect(info).toHaveBeenCalledTimes(2);
+        info.mockRestore();
     });
 });
 

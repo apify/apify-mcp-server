@@ -192,7 +192,10 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
             // Unknown properties are silently stripped by AJV's removeAdditional option.
             // Dynamic Actor input fields are part of the Actor's own inputSchema, so they
             // are declared properties and won't be stripped.
-            compiled = compileUntrustedSchema(inputSchema as ToolInputSchema);
+            compiled = compileUntrustedSchema(inputSchema as ToolInputSchema, {
+                actorName: definition.actorFullName,
+                mcpSessionId,
+            });
         } catch (e) {
             // SchemaTooLargeError logs as a soft fail; a genuine AJV compile error stays an error.
             logHttpError(e, 'Failed to compile schema', {
