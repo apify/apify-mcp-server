@@ -609,6 +609,18 @@ describe('MCP connection headers', () => {
     });
 });
 
+describe('MCP connection output schemas', () => {
+    it('lists a tool whose output schema does not compile', async () => {
+        const client = await connectMCPClient(`${standbyUrl}/mcp`, { token: TOKEN });
+
+        // `subtract`, on the second page, has an output schema with a `$ref` that does not resolve.
+        const page = await client?.listTools({ cursor: 'page-2' });
+        await client?.close();
+
+        expect(page?.tools.map(({ name }) => name)).toEqual(['subtract']);
+    });
+});
+
 describe('MCP connection redirects', () => {
     it('does not follow a redirect that leaves the MCP server origin, on either transport', async () => {
         const listen = async (server: HttpServer) => {

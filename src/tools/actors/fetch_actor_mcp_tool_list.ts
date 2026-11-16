@@ -54,7 +54,6 @@ export async function executeFetchActorMcpToolList(toolArgs: InternalToolArgs): 
     return runOnActorMcpServer(toolArgs, {
         actor,
         operation: 'list the MCP tools',
-        // Not `client.listTools`: it compiles every remote output schema, so one that does not compile would fail it.
         run: async (client) => {
             const tools: Tool[] = [];
             let cursor: string | undefined;
