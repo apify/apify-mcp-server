@@ -19,8 +19,6 @@ export function createAjv(): Ajv {
     instance.removeKeyword('pattern');
     instance.removeKeyword('patternProperties');
     instance.removeKeyword('format');
-    // `uniqueItems` compares every pair of items, so its time grows with the square of an array the caller
-    // sends. It is dropped for the same reason; the platform or the proxied MCP server still enforces it.
     instance.removeKeyword('uniqueItems');
     return instance;
 }
