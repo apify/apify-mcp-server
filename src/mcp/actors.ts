@@ -43,6 +43,9 @@ function isLoopbackHost(hostname: string): boolean {
  * Whether requests carrying the caller's token may go to `serverUrl`: an https subdomain of the Server Actor
  * domain on the default port, or, only when the configured API is itself on a loopback host (local development),
  * a loopback host. Credentials in the URL are refused.
+ *
+ * A second guard: the platform assigns `standbyUrl`, so a genuine Actor always passes. It holds when a response
+ * that is not an Actor is read as one.
  */
 function isAllowedServerActorUrl(serverUrl: URL): boolean {
     if (serverUrl.username || serverUrl.password) return false;
