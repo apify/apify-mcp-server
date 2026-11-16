@@ -20,8 +20,9 @@ Two MCP protocol revisions are served, each by its own adapter:
 ## Files
 
 - `server.ts` — `ActorsMcpServer`, the shared facade for tools, server mode, services,
-  widgets, and telemetry. Its constructor resolves `platformUrls` (API, client-facing API and Console origins:
-  option, then env var, then default) once; adapters, resources and every Apify client take them from there. It constructs and delegates v1 work to `LegacyMcpServer`,
+  widgets, and telemetry. Its constructor resolves `platformUrls` (API, client-facing API and
+  Console origins: option, then env var, then default) once; adapters, resources and every Apify
+  client take them from there. It constructs and delegates v1 work to `LegacyMcpServer`,
   and hands the stateless adapter a per-request snapshot via `createRequestSnapshot`.
 - `legacy_server.ts` — package-private v1 SDK adapter for handlers, Tasks, errors,
   notifications, logging, and transport lifecycle. It reads shared state through

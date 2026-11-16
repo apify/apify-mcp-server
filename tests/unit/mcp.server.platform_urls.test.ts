@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApifyClient } from '../../src/apify_client.js';
 import { getDataset } from '../../src/tools/storage/get_dataset.js';
 import type { ActorsMcpServerOptions } from '../../src/types.js';
-import { getRequestHandler, withServer } from './helpers/mcp_server.js';
+import { getRequestHandler, withServer, withStatelessServer } from './helpers/mcp_server.js';
 
 const API_BASE_URL = 'http://api.internal.example:3333';
 const API_PUBLIC_BASE_URL = 'https://api.example.test';
@@ -14,7 +14,17 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
-describe('ActorsMcpServer platform URL options', () => {
+/** Stubs the API calls `get-dataset` makes for a Console UI token session. */
+function stubDatasetApi() {
+    vi.spyOn(ApifyClient.prototype, 'user').mockReturnValue({
+        get: async () => ({ id: 'USER_ID' }),
+    } as unknown as ReturnType<ApifyClient['user']>);
+    vi.spyOn(ApifyClient.prototype, 'dataset').mockReturnValue({
+        get: async () => ({ id: 'DATASET_ID', name: 'my-dataset', itemCount: 1, fields: ['url'] }),
+    } as unknown as ReturnType<ApifyClient['dataset']>);
+}
+
+describe('each origin comes from its option, then its env var', () => {
     it.each([
         ['apiBaseUrl', 'APIFY_API_BASE_URL', API_BASE_URL],
         ['apiPublicBaseUrl', 'APIFY_API_PUBLIC_BASE_URL', API_PUBLIC_BASE_URL],
@@ -40,7 +50,7 @@ describe('ActorsMcpServer platform URL options', () => {
     });
 });
 
-describe('ActorsMcpServer with platform URL options', () => {
+describe('the resolved origins reach tool results, instructions and resource reads', () => {
     const options: Partial<ActorsMcpServerOptions> = {
         apiBaseUrl: API_BASE_URL,
         apiPublicBaseUrl: API_PUBLIC_BASE_URL,
@@ -50,12 +60,7 @@ describe('ActorsMcpServer with platform URL options', () => {
     };
 
     it('builds the Console link in a tool result on the passed Console origin', async () => {
-        vi.spyOn(ApifyClient.prototype, 'user').mockReturnValue({
-            get: async () => ({ id: 'USER_ID' }),
-        } as unknown as ReturnType<ApifyClient['user']>);
-        vi.spyOn(ApifyClient.prototype, 'dataset').mockReturnValue({
-            get: async () => ({ id: 'DATASET_ID', name: 'my-dataset', itemCount: 1, fields: ['url'] }),
-        } as unknown as ReturnType<ApifyClient['dataset']>);
+        stubDatasetApi();
 
         await withServer(async (server) => {
             server.upsertTools([getDataset]);
@@ -72,6 +77,22 @@ describe('ActorsMcpServer with platform URL options', () => {
             );
 
             expect(JSON.stringify(result.content)).toContain(`${CONSOLE_BASE_URL}/storage/datasets/DATASET_ID`);
+        }, options);
+    });
+
+    it('builds the Console link in a stateless tool result on the passed Console origin', async () => {
+        stubDatasetApi();
+
+        await withStatelessServer(async ({ server, call }) => {
+            await server.loadToolsByName([getDataset.name], new ApifyClient({ token: options.token }));
+            const response = await call('tools/call', {
+                name: getDataset.name,
+                arguments: { datasetId: 'DATASET_ID' },
+            });
+
+            expect(JSON.stringify(response.result?.content)).toContain(
+                `${CONSOLE_BASE_URL}/storage/datasets/DATASET_ID`,
+            );
         }, options);
     });
 

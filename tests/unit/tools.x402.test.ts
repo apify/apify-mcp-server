@@ -3,11 +3,12 @@
  * HTTP PAYMENT-SIGNATURE header) and tool-schema decoration with multi-scheme `accepts[]`.
  */
 import Ajv from 'ajv';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
 import type { PaymentMeta, RequestHeaders } from '../../src/payments/types.js';
 import {
+    fetchX402PaymentRequirements,
     X402_PAYMENT_REQUIRED_OUTPUT_SCHEMA,
     X402PaymentProvider,
     type X402PaymentRequirements,
@@ -278,5 +279,29 @@ describe('decorateToolSchema() — outputSchema widening (#917)', () => {
         expect(validate({})).toBe(false); // disjoint required-sets still reject garbage
         // anyOf did NOT loosen success validation: a run missing required keys still fails.
         expect(validate({ status: 'SUCCEEDED' })).toBe(false);
+    });
+});
+
+describe('payment requirements are cached per API origin', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('returns the requirements of the API origin asked for, not ones cached for another origin', async () => {
+        // The 402 response names the origin it came from in `payTo`, so the result shows which API answered.
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async (url: string) => {
+                const requirements: X402PaymentRequirements = {
+                    x402Version: 2,
+                    accepts: [{ ...EXACT_ACCEPT, payTo: new URL(url).origin }],
+                };
+                const header = Buffer.from(JSON.stringify(requirements)).toString('base64');
+                return new Response(null, { status: 402, headers: { 'payment-required': header } });
+            }),
+        );
+
+        await fetchX402PaymentRequirements('https://api.one.example.test');
+        const requirements = await fetchX402PaymentRequirements('https://api.two.example.test');
+
+        expect(requirements?.accepts?.[0].payTo).toBe('https://api.two.example.test');
     });
 });

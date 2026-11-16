@@ -15,8 +15,8 @@ import type { ApifyClient } from '../apify_client.js';
 import { getApifyAPIPublicBaseUrl } from '../apify_client.js';
 import { InternalError, InvalidParamsError } from '../mcp/errors.js';
 import type { PaymentProvider } from '../payments/types.js';
-import type { PlatformUrls } from '../types.js';
 import { SERVER_MODE } from '../types.js';
+import type { ApiUrls } from './api_resources.js';
 import { readApiResource } from './api_resources.js';
 import type { AvailableWidget } from './widgets.js';
 import { RESOURCE_MIME_TYPE } from './widgets.js';
@@ -39,7 +39,7 @@ type ResourceService = {
 
 type ResourceServiceOptions = {
     /** The server's resolved origins; the env defaults apply when omitted. */
-    platformUrls?: Pick<PlatformUrls, 'apiBaseUrl' | 'apiPublicBaseUrl'>;
+    platformUrls?: ApiUrls;
     paymentProvider?: PaymentProvider;
     /**
      * Read the current server mode at call time. Callers must pass a getter rather
