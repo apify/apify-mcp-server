@@ -28,10 +28,12 @@ type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 export const MAX_UNTRUSTED_SCHEMA_BYTES = 262_144;
 
 // Ajv compile time does not follow schema size: 2,000 flat properties in 51 KB take 1.8 s.
-// A schema over either limit, or with a `$ref` that is not to a definition, is served without local
+// Its code for each level repeats the data path of every level above it: 298 nested `items` take 1.7 s.
+// A schema over any limit, or with a `$ref` that is not to a definition, is served without local
 // validation; the platform or the proxied MCP server validates the input.
 export const MAX_VALIDATED_SCHEMA_BYTES = 65_536;
 export const MAX_VALIDATED_SCHEMA_OBJECTS = 300;
+export const MAX_VALIDATED_SCHEMA_DEPTH = 32;
 
 // Ajv compiles each `$ref` target as its own function, with every schema below it. A definition is
 // compiled only through a `$ref`; any other target is also compiled as part of the schema around it,
@@ -39,7 +41,7 @@ export const MAX_VALIDATED_SCHEMA_OBJECTS = 300;
 // and `%` or `~` escapes spell one name many ways: 150 spellings of a 145-property definition take 4.5 s.
 const DEFINITION_REF_PATTERN = /^#\/(?:definitions|\$defs)\/[^/%~]+$/;
 
-type ExceededCompileLimit = 'bytes' | 'nested-objects' | '$ref';
+type ExceededCompileLimit = 'bytes' | 'nested-objects' | 'depth' | '$ref';
 type CompiledSchema = {
     validate: ValidateFunction<unknown>;
     schema: object;
@@ -55,10 +57,11 @@ function findExceededCompileLimit(schema: object, serializedBytes: number): Exce
 
     // The root is not a nested object.
     let nestedObjectCount = -1;
-    const pending: unknown[] = [schema];
-    while (pending.length > 0) {
-        const node = pending.pop();
+    const pending: [unknown, number][] = [[schema, 0]];
+    for (let entry = pending.pop(); entry; entry = pending.pop()) {
+        const [node, depth] = entry;
         if (typeof node !== 'object' || node === null) continue;
+        if (depth > MAX_VALIDATED_SCHEMA_DEPTH) return 'depth';
         if (Array.isArray(node)) {
             // A boolean in `anyOf`, `oneOf`, `allOf` or `items` is a schema, and costs like an object there:
             // 8 properties with 1,000 `false` branches each take 2 s.
@@ -70,7 +73,7 @@ function findExceededCompileLimit(schema: object, serializedBytes: number): Exce
             nestedObjectCount++;
         }
         if (nestedObjectCount > MAX_VALIDATED_SCHEMA_OBJECTS) return 'nested-objects';
-        pending.push(...Object.values(node));
+        pending.push(...Object.values(node).map((child): [unknown, number] => [child, depth + 1]));
     }
     return null;
 }

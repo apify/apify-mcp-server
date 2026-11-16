@@ -18,6 +18,7 @@ import {
     inferArrayItemType,
     MAX_UNTRUSTED_SCHEMA_BYTES,
     MAX_VALIDATED_SCHEMA_BYTES,
+    MAX_VALIDATED_SCHEMA_DEPTH,
     MAX_VALIDATED_SCHEMA_OBJECTS,
     markInputPropertiesAsRequired,
     shortenProperties,
@@ -115,6 +116,19 @@ describe('compileUntrustedSchema skips validation of a schema that is costly to 
             },
         },
         { limit: 'nested-objects', schema: buildSchemaWithProperties(MAX_VALIDATED_SCHEMA_OBJECTS) },
+        {
+            limit: 'depth',
+            schema: {
+                type: 'object',
+                properties: {
+                    startUrls: Array.from({ length: MAX_VALIDATED_SCHEMA_DEPTH }).reduce<object>(
+                        (items) => ({ type: 'array', items }),
+                        { type: 'string' },
+                    ),
+                },
+                required: ['startUrls'],
+            },
+        },
     ])('accepts any input unchanged and logs the limit when the schema exceeds $limit', ({ limit, schema }) => {
         const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
         const { validate } = compileUntrustedSchema(schema, { actorName: 'apify/rag-web-browser' });
