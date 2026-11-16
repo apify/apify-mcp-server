@@ -8,7 +8,7 @@ import log from '@apify/log';
 import { ACTOR_TIP_CAVEAT } from '../../src/tools/actor_tool_naming.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import type { RunResponse } from '../../src/tools/actors/actor_run_response.js';
-import { WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
+import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
 import type { ActorExecutionParams } from '../../src/types.js';
 import { mockApifyClient, textOf } from './helpers/tool_context.js';
 
@@ -143,13 +143,17 @@ describe('actorExecutor', () => {
             expect(spies.startInput).toEqual({ query: 'foo' });
         });
 
-        it('caps waitSecs at WAIT_SECS_MAX when the input skipped AJV validation', async () => {
-            const { params, spies } = buildParams({ query: 'foo', waitSecs: WAIT_SECS_MAX + 555 });
+        // A schema that is costly to compile skips AJV, so the executor is the only check of waitSecs.
+        it.each([WAIT_SECS_MAX + 1, -5, 1.5, 'soon'])(
+            'falls back to the default wait when waitSecs is %j',
+            async (waitSecs) => {
+                const { params, spies } = buildParams({ query: 'foo', waitSecs });
 
-            await actorExecutor.executeActorTool(params);
+                await actorExecutor.executeActorTool(params);
 
-            expect(spies.waitForFinishOpts).toEqual({ waitSecs: WAIT_SECS_MAX });
-        });
+                expect(spies.waitForFinishOpts).toEqual({ waitSecs: CALL_ACTOR_WAIT_SECS_DEFAULT });
+            },
+        );
 
         it('ignores waitSecs in task mode and waits until terminal', async () => {
             const { params, spies } = buildParams({ query: 'foo', waitSecs: 5 }, { taskMode: true });

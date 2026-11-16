@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import log from '@apify/log';
 
 import { FAILURE_CATEGORY } from '../../const.js';
@@ -14,6 +16,8 @@ import {
 } from './actor_run_response.js';
 import { buildDirectActorRunInput } from './actor_tool_contract.js';
 
+const waitSecsSchema = z.number().int().min(0).max(WAIT_SECS_MAX).catch(CALL_ACTOR_WAIT_SECS_DEFAULT);
+
 /**
  * Direct actor tool executor. Mode-agnostic — used in both default and apps modes.
  * Returns the canonical `RunResponse` shape; dataset items are not inlined — the LLM
@@ -27,15 +31,12 @@ export const actorExecutor: ActorExecutor = {
             params;
         // Strip `waitSecs` from the Actor's input — it's an MCP-injected opt-in, not an
         // Actor field — so `actor.start()` doesn't reject or silently pass it through.
-        const { waitSecs: argsWaitSecs, ...actorInput } = params.input as { waitSecs?: number } & Record<
-            string,
-            unknown
-        >;
+        const { waitSecs: argsWaitSecs, ...actorInput } = params.input;
         // Task mode waits until terminal; honoring waitSecs would let the task complete
         // before the Actor produced output. Mirrors executeCallActor.
-        // AJV doesn't fill `default` values, so apply the 30 s default here when the LLM omits waitSecs.
-        // AJV does not validate a schema that is costly to compile, so the 45 s cap is applied here too.
-        const waitSecs = taskMode ? undefined : Math.min(argsWaitSecs ?? CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX);
+        // AJV doesn't fill `default` values, and it does not validate a schema that is costly to compile,
+        // so an omitted or invalid waitSecs gets the 30 s default here.
+        const waitSecs = taskMode ? undefined : waitSecsSchema.parse(argsWaitSecs);
 
         if (abortSignal?.aborted) {
             log.info('Actor run aborted by client before start', {
