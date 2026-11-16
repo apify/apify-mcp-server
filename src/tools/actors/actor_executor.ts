@@ -6,7 +6,12 @@ import { isActorInputValidationError } from '../../utils/apify_errors.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { buildInvalidInputTexts, respondUserError } from '../../utils/mcp.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
-import { abortRunOnSignal, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './actor_run_response.js';
+import {
+    abortRunOnSignal,
+    CALL_ACTOR_WAIT_SECS_DEFAULT,
+    fetchActorRunData,
+    WAIT_SECS_MAX,
+} from './actor_run_response.js';
 import { buildDirectActorRunInput } from './actor_tool_contract.js';
 
 /**
@@ -29,7 +34,8 @@ export const actorExecutor: ActorExecutor = {
         // Task mode waits until terminal; honoring waitSecs would let the task complete
         // before the Actor produced output. Mirrors executeCallActor.
         // AJV doesn't fill `default` values, so apply the 30 s default here when the LLM omits waitSecs.
-        const waitSecs = taskMode ? undefined : (argsWaitSecs ?? CALL_ACTOR_WAIT_SECS_DEFAULT);
+        // AJV does not validate a schema that is costly to compile, so the 45 s cap is applied here too.
+        const waitSecs = taskMode ? undefined : Math.min(argsWaitSecs ?? CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX);
 
         if (abortSignal?.aborted) {
             log.info('Actor run aborted by client before start', {

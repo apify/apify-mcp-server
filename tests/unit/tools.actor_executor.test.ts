@@ -8,6 +8,7 @@ import log from '@apify/log';
 import { ACTOR_TIP_CAVEAT } from '../../src/tools/actor_tool_naming.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import type { RunResponse } from '../../src/tools/actors/actor_run_response.js';
+import { WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
 import type { ActorExecutionParams } from '../../src/types.js';
 import { mockApifyClient, textOf } from './helpers/tool_context.js';
 
@@ -140,6 +141,14 @@ describe('actorExecutor', () => {
 
             expect(spies.waitForFinishOpts).toEqual({ waitSecs: 30 });
             expect(spies.startInput).toEqual({ query: 'foo' });
+        });
+
+        it('caps waitSecs at WAIT_SECS_MAX when the input skipped AJV validation', async () => {
+            const { params, spies } = buildParams({ query: 'foo', waitSecs: WAIT_SECS_MAX + 555 });
+
+            await actorExecutor.executeActorTool(params);
+
+            expect(spies.waitForFinishOpts).toEqual({ waitSecs: WAIT_SECS_MAX });
         });
 
         it('ignores waitSecs in task mode and waits until terminal', async () => {

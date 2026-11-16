@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
 
@@ -77,6 +77,8 @@ describe('compileUntrustedSchema', () => {
 });
 
 describe('compileUntrustedSchema skips validation of a schema that is costly to compile', () => {
+    afterEach(() => vi.restoreAllMocks());
+
     const buildSchemaWithProperties = (count: number) => ({
         type: 'object',
         properties: Object.fromEntries(Array.from({ length: count }, (_, i) => [`field${i}`, { type: 'string' }])),
@@ -118,7 +120,6 @@ describe('compileUntrustedSchema skips validation of a schema that is costly to 
             expect.any(String),
             expect.objectContaining({ exceededLimit: limit, actorName: 'apify/rag-web-browser' }),
         );
-        info.mockRestore();
     });
 
     it('validates a schema at the nested-object limit', () => {
@@ -127,7 +128,6 @@ describe('compileUntrustedSchema skips validation of a schema that is costly to 
 
         expect(validate({ maxResults: '3' })).toBe(false);
         expect(info).not.toHaveBeenCalled();
-        info.mockRestore();
     });
 
     it('validates a schema whose property is named $ref', () => {
@@ -147,7 +147,6 @@ describe('compileUntrustedSchema skips validation of a schema that is costly to 
         compileUntrustedSchema(schema);
 
         expect(info).toHaveBeenCalledTimes(2);
-        info.mockRestore();
     });
 });
 

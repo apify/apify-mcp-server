@@ -29,7 +29,7 @@ export const MAX_UNTRUSTED_SCHEMA_BYTES = 262_144;
 
 // Ajv compile time does not follow schema size: a 15 KB schema with 500 `$ref`s takes 9 s
 // (apify/apify-mcp-server-internal#974). A schema over any of these limits is served without local
-// validation; the platform validates the input when it creates the run.
+// validation; the platform or the proxied MCP server validates the input.
 export const MAX_VALIDATED_SCHEMA_BYTES = 65_536;
 export const MAX_VALIDATED_SCHEMA_OBJECTS = 300;
 
