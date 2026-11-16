@@ -166,6 +166,8 @@ Requires Node.js 22 or later.
 }
 ```
 
+[Create an API token in Apify Console](https://console.apify.com/settings/integrations?createApiToken=true&for=MCP&utm_source=mcp&utm_medium=integrations) and copy it right after creating it. It is shown only once.
+
 If you've run `apify login`, the server can also read the token saved by the Apify CLI. Run `npx @apify/actors-mcp-server --help` for all options.
 
 </details>
