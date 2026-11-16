@@ -19,7 +19,7 @@ import { actorNameToToolName, legacyToolNameToNew } from '../tools/actor_tool_na
 import { getActorToolPolicy } from '../tools/actors/actor_tool_contract.js';
 import { getActorsAsTools } from '../tools/actors/actor_tools_factory.js';
 import { isRecord } from '../tools/api/apify_api_spec.js';
-import type { ToolEntry } from '../types.js';
+import type { PlatformUrls, ToolEntry } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 import { resolveToolNamesFromInput } from '../utils/tools_loader.js';
 
@@ -36,14 +36,15 @@ export async function loadReplacedDefaultTool(params: {
     tools: Map<string, ToolEntry>;
     apifyToken: string;
     requestOrigin: REQUEST_ORIGIN;
+    platformUrls?: PlatformUrls;
     mcpSessionId: string | undefined;
 }): Promise<ToolEntry | undefined> {
-    const { name, tools, apifyToken, requestOrigin, mcpSessionId } = params;
+    const { name, tools, apifyToken, requestOrigin, platformUrls, mcpSessionId } = params;
     const toolName = legacyToolNameToNew(name) ?? name;
     const actorName = REPLACED_DEFAULT_ACTORS.find((removed) => actorNameToToolName(removed) === toolName);
     if (!actorName || !servesDefaultTools(tools)) return undefined;
 
-    const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin });
+    const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin, platformUrls });
     const loaded = await getActorsAsTools([actorName], apifyClient, { mcpSessionId });
     const [loadError] = loaded.errors;
     if (loadError && loadError.kind !== ACTOR_LOAD_ERROR_KIND.NOT_FOUND) throw loadError;

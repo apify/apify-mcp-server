@@ -44,6 +44,7 @@ import type {
     ActorStore,
     ApifyRequestParams,
     CallDiagnostics,
+    PlatformUrls,
     SERVER_MODE,
     TelemetryEnv,
     ToolEntry,
@@ -89,6 +90,7 @@ export interface LegacyMcpServerHost {
     readonly telemetryEnabled: boolean;
     readonly telemetryEnv: TelemetryEnv;
     readonly options: ActorsMcpServerOptions;
+    readonly platformUrls: PlatformUrls;
     readonly promptService: ReturnType<typeof createPromptService>;
     readonly resourceService: ReturnType<typeof createResourceService>;
     resolveApifyToken(meta?: ApifyRequestParams['_meta']): string | undefined;
@@ -139,7 +141,11 @@ export class LegacyMcpServer {
                 logging: {},
             },
             // Placeholder overwritten below once the real tool set is known; matches the pre-gating default (all but report-problem).
-            instructions: getServerInstructions(undefined, { hasTool: (name) => name !== HELPER_TOOLS.PROBLEM_REPORT }),
+            instructions: getServerInstructions(
+                undefined,
+                { hasTool: (name) => name !== HELPER_TOOLS.PROBLEM_REPORT },
+                host.platformUrls.apiPublicBaseUrl,
+            ),
         });
         this.setupInitializeHandler();
         this.setupLoggingProxy();
@@ -420,6 +426,7 @@ export class LegacyMcpServer {
                 paymentProvider,
                 telemetryEnabled: this.host.telemetryEnabled,
                 transportType: this.host.options.transportType,
+                platformUrls: this.host.platformUrls,
             });
 
             try {
@@ -436,6 +443,7 @@ export class LegacyMcpServer {
                     tools: this.host.tools,
                     paymentProvider,
                     allowUnauthMode,
+                    platformUrls: this.host.platformUrls,
                     signal,
                 });
 

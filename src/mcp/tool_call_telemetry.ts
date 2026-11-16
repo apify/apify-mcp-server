@@ -6,6 +6,7 @@ import type { PaymentProvider } from '../payments/types.js';
 import { buildReportedProblemProperties, trackReportedProblem, trackToolCall } from '../telemetry.js';
 import type {
     CallDiagnostics,
+    PlatformUrls,
     TelemetryEnv,
     ToolCallTelemetryProperties,
     ToolStatus,
@@ -29,6 +30,8 @@ type PrepareTelemetryDataParams = {
     clientParam?: string;
     /** Payment provider the connection was opened with, if any. */
     paymentProvider?: PaymentProvider;
+    /** The server's resolved origins, for the user lookup. */
+    platformUrls?: PlatformUrls;
 };
 
 /**
@@ -55,7 +58,7 @@ export async function prepareTelemetryData(
     let userId: string | null = null;
     if (apifyToken) {
         const requestOrigin = getRequestOriginForClient(clientContext);
-        const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin });
+        const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin, platformUrls: params.platformUrls });
         ({ userId } = await getUserInfoCached(apifyToken, apifyClient));
         log.debug('Telemetry: fetched userId', { userId, mcpSessionId });
     }

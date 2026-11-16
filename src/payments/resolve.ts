@@ -8,16 +8,18 @@ import { X402PaymentProvider } from './x402.js';
  * Some providers require async initialization (e.g., fetching payment requirements
  * from the Apify API), so this function is async.
  *
+ * @param apiBaseUrl - Where API requests go; pass the server's `apiBaseUrl` option when it is set.
  * @returns A PaymentProvider instance, or undefined if the value is not a known provider.
  */
 export async function resolvePaymentProvider(
     paymentParam: string | null | undefined,
+    apiBaseUrl?: string,
 ): Promise<PaymentProvider | undefined> {
     if (!paymentParam) return undefined;
 
     const providers: Record<PaymentProviderId, () => Promise<PaymentProvider>> = {
         skyfire: async () => SkyfirePaymentProvider.create(),
-        x402: async () => X402PaymentProvider.create(),
+        x402: async () => X402PaymentProvider.create(apiBaseUrl),
     };
 
     // Own-property check: a bare index resolves `Object.prototype` names such as `constructor` to a

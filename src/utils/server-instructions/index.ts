@@ -56,14 +56,16 @@ Some clients render widget-backed Actor tools: the response includes a live UI t
 ${dupWarning}${pollOkLine}`;
 }
 
-/** Every cross-tool mention gates on `ctx.hasTool(...)`, so a session missing a tool is never told to call it. */
+/**
+ * Every cross-tool mention gates on `ctx.hasTool(...)`, so a session missing a tool is never told to call it.
+ * `apiBaseUrl` is the client-facing API origin, matching the templates and the read gate.
+ */
 export function getServerInstructions(
     mode: SERVER_MODE = SERVER_MODE.DEFAULT,
     { hasTool, clientParam }: ToolDescriptionContext = ALL_TOOLS_PRESENT,
+    apiBaseUrl: string = getApifyAPIPublicBaseUrl(),
 ): string {
     const isApps = mode === SERVER_MODE.APPS;
-    // Client-facing origin, matching the templates and the read gate.
-    const apiBaseUrl = getApifyAPIPublicBaseUrl();
 
     const hasSearch = hasTool(HELPER_TOOLS.STORE_SEARCH);
     const hasDetails = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS);

@@ -1,7 +1,7 @@
 import type { REQUEST_ORIGIN } from '../apify_client.js';
 import { ApifyClient } from '../apify_client.js';
 import { maskLoggedValues } from '../resources/api_resources.js';
-import type { ApifyToken, ToolEntry } from '../types.js';
+import type { ApifyToken, PlatformUrls, ToolEntry } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 import { buildPaymentRequiredResponse, registerPaymentRequiredInterceptor } from '../utils/payment_errors.js';
 import type { PaymentMeta, PaymentProvider, RequestHeaders } from './types.js';
@@ -48,8 +48,10 @@ export function prepareToolCallContext(input: {
     requestHeaders?: RequestHeaders;
     /** Request origin to attribute started runs to (from getRequestOriginForClient). Defaults to MCP. */
     requestOrigin?: REQUEST_ORIGIN;
+    /** The server's resolved origins, for the client. */
+    platformUrls?: PlatformUrls;
 }): PrepareToolCallContextResult {
-    const { provider, tool, args, apifyToken, meta, requestHeaders, requestOrigin } = input;
+    const { provider, tool, args, apifyToken, meta, requestHeaders, requestOrigin, platformUrls } = input;
     // A direct Actor tool's arguments are the Actor input, and a proxied MCP tool's are the remote tool's: either can
     // hold credentials, so only their key names are logged.
     const toolRedactedArgs =
@@ -58,7 +60,7 @@ export function prepareToolCallContext(input: {
             : (tool.redactArgs?.(args) ?? args);
 
     if (!provider) {
-        const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin });
+        const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin, platformUrls });
         registerPaymentRequiredInterceptor(apifyClient);
         return {
             toolArgsWithoutPayment: { ...args },
@@ -75,8 +77,8 @@ export function prepareToolCallContext(input: {
     const paymentHeaders = provider.getPaymentHeaders(args, meta, requestHeaders);
     const apifyClient =
         Object.keys(paymentHeaders).length > 0
-            ? new ApifyClient({ paymentHeaders, requestOrigin })
-            : new ApifyClient({ token: apifyToken, requestOrigin });
+            ? new ApifyClient({ paymentHeaders, requestOrigin, platformUrls })
+            : new ApifyClient({ token: apifyToken, requestOrigin, platformUrls });
     registerPaymentRequiredInterceptor(apifyClient);
 
     return {

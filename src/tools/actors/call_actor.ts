@@ -15,7 +15,14 @@ import {
 import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
 import type { PaymentProvider } from '../../payments/types.js';
 import { maskLoggedInputs, pickLoggedValues, REDACTED } from '../../resources/api_resources.js';
-import type { ApifyToken, InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
+import type {
+    ApifyToken,
+    InternalToolArgs,
+    PlatformUrls,
+    ToolDescriptionContext,
+    ToolEntry,
+    ToolInputSchema,
+} from '../../types.js';
 import { ACTOR_TOOL_MODE, ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorDefinitionCached, getActorToolResolutionCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -374,9 +381,10 @@ export async function checkPaymentProviderStandbyConflict(params: {
     args: Record<string, unknown>;
     paymentProvider: PaymentProvider | undefined;
     apifyToken: ApifyToken;
+    platformUrls?: PlatformUrls;
     mcpSessionId?: string;
 }): Promise<Record<string, unknown> | null> {
-    const { tool, args, paymentProvider, apifyToken, mcpSessionId } = params;
+    const { tool, args, paymentProvider, apifyToken, platformUrls, mcpSessionId } = params;
     if (!paymentProvider || !tool.hasPaymentProviderStandbyCheck) return null;
     // A Server Actor's own tool takes no `actor` argument: its Actor is fixed.
     const actorName = tool.type === TOOL_TYPE.ACTOR_SERVER ? tool.actorFullName : args.actor;
@@ -385,7 +393,7 @@ export async function checkPaymentProviderStandbyConflict(params: {
     const normalizedActorName = fixActorNameInput(actorName);
 
     // Token-based client — payment headers are only relevant for actual Actor runs.
-    const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
+    const apifyClientForDefinition = new ApifyClient({ token: apifyToken, platformUrls });
     const actorDefinitionWithInfo = await getActorDefinitionCached(normalizedActorName, apifyClientForDefinition);
     if (!actorDefinitionWithInfo) {
         return null;
@@ -523,7 +531,7 @@ export async function callActorPreExecute(
     toolArgs: InternalToolArgs,
     options: { route: string },
 ): Promise<{ earlyResponse: ToolResponse } | { parsed: CallActorParsedArgs }> {
-    const { args, apifyToken, mcpSessionId, loadedToolNames } = toolArgs;
+    const { args, apifyToken, apifyClient, mcpSessionId, loadedToolNames } = toolArgs;
     const parsedArgs = callActorArgs.parse(args);
     const legacyRejection = buildLegacyMcpSyntaxRejection(options.route, parsedArgs.actor, loadedToolNames);
     if (legacyRejection) return { earlyResponse: legacyRejection };
@@ -533,7 +541,7 @@ export async function callActorPreExecute(
     // For definition resolution we always use a token-based client; payment provider is only for actual Actor runs.
     // Standby/MCP-server Actors under a third-party payment provider are rejected upstream by
     // `checkPaymentProviderStandbyConflict` — see src/mcp/tool_call_engine.ts.
-    const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
+    const apifyClientForDefinition = new ApifyClient({ token: apifyToken, platformUrls: apifyClient.platformUrls });
     const resolution = await getActorToolResolutionCached(actorName, apifyClientForDefinition);
 
     if (resolution?.toolMode === ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP) {

@@ -34,6 +34,7 @@ import type {
     ActorStore,
     ApifyRequestParams,
     CallDiagnostics,
+    PlatformUrls,
     SERVER_MODE,
     TelemetryEnv,
     ToolEntry,
@@ -73,6 +74,7 @@ export interface StatelessMcpServerHost {
     readonly telemetryEnabled: boolean;
     readonly telemetryEnv: TelemetryEnv;
     readonly options: ActorsMcpServerOptions;
+    readonly platformUrls: PlatformUrls;
     readonly promptService: ReturnType<typeof createPromptService>;
     resolveApifyToken(meta?: ApifyRequestParams['_meta']): string | undefined;
     getStatelessServerInstructions(requestUrl?: string): string;
@@ -210,6 +212,7 @@ class StatelessMcpServer {
                 paymentProvider,
                 telemetryEnabled: this.host.telemetryEnabled,
                 transportType: this.host.options.transportType,
+                platformUrls: this.host.platformUrls,
             });
 
             try {
@@ -227,6 +230,7 @@ class StatelessMcpServer {
                     tools: snapshot.tools,
                     paymentProvider,
                     allowUnauthMode,
+                    platformUrls: this.host.platformUrls,
                     signal,
                 });
 

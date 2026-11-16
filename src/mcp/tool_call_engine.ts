@@ -34,6 +34,7 @@ import { withReportProblemNudge } from '../tools/dev/report_problem.js';
 import type {
     ActorStore,
     CallDiagnostics,
+    PlatformUrls,
     ToolCallTelemetryProperties,
     ToolEntry,
     ToolStatus,
@@ -227,10 +228,13 @@ export async function prepareToolCall(params: {
     tools: Map<string, ToolEntry>;
     paymentProvider?: PaymentProvider;
     allowUnauthMode?: boolean;
+    /** The server's resolved origins, for every Apify client the call builds. */
+    platformUrls?: PlatformUrls;
     // Used to preserve abort status for a post-resolution classified failure.
     signal?: AbortSignal;
 }): Promise<PreparedCall | InvalidToolCall | PreparedCallError> {
     const {
+        platformUrls,
         apifyToken,
         name,
         meta,
@@ -271,6 +275,7 @@ export async function prepareToolCall(params: {
             tools,
             apifyToken,
             requestOrigin,
+            platformUrls,
             mcpSessionId: params.mcpSessionId,
         });
     } catch (error) {
@@ -355,6 +360,7 @@ export async function prepareToolCall(params: {
             meta,
             requestHeaders,
             requestOrigin,
+            platformUrls,
         });
         apifyClient.storeSearchTracking = storeSearchTracking;
 
@@ -446,6 +452,7 @@ export async function prepareToolCall(params: {
                 args: toolArgs,
                 paymentProvider,
                 apifyToken,
+                platformUrls,
                 mcpSessionId: params.mcpSessionId,
             }));
 

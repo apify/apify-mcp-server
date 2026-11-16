@@ -166,7 +166,8 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             // The blob is inlined, so the uri is just an identifier — build it from the store's API
             // URL instead of getRecordPublicUrl, which fetches store metadata to sign a link nobody follows.
             // `store.url` is on the egress origin; clients get the client-facing one.
-            const uri = `${buildUrlOnOrigin(store.url, getApifyAPIPublicBaseUrl())}/records/${recordKey}`;
+            const apiPublicBaseUrl = client.platformUrls?.apiPublicBaseUrl ?? getApifyAPIPublicBaseUrl();
+            const uri = `${buildUrlOnOrigin(store.url, apiPublicBaseUrl)}/records/${recordKey}`;
             return respondRaw({
                 structuredContent,
                 content: [

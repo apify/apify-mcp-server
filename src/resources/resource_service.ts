@@ -15,6 +15,7 @@ import type { ApifyClient } from '../apify_client.js';
 import { getApifyAPIPublicBaseUrl } from '../apify_client.js';
 import { InternalError, InvalidParamsError } from '../mcp/errors.js';
 import type { PaymentProvider } from '../payments/types.js';
+import type { PlatformUrls } from '../types.js';
 import { SERVER_MODE } from '../types.js';
 import { readApiResource } from './api_resources.js';
 import type { AvailableWidget } from './widgets.js';
@@ -37,6 +38,8 @@ type ResourceService = {
 };
 
 type ResourceServiceOptions = {
+    /** The server's resolved origins; the env defaults apply when omitted. */
+    platformUrls?: Pick<PlatformUrls, 'apiBaseUrl' | 'apiPublicBaseUrl'>;
     paymentProvider?: PaymentProvider;
     /**
      * Read the current server mode at call time. Callers must pass a getter rather
@@ -50,7 +53,7 @@ type ResourceServiceOptions = {
 };
 
 export function createResourceService(options: ResourceServiceOptions): ResourceService {
-    const { paymentProvider, getMode, getAvailableWidgets } = options;
+    const { platformUrls, paymentProvider, getMode, getAvailableWidgets } = options;
 
     const listResources = async (): Promise<ListResourcesResult> => {
         const resources: Resource[] = [];
@@ -89,7 +92,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
         // non-Apify URL gets the explanatory origin refusal instead of the generic fallback.
         if (/^https?:\/\//i.test(uri)) {
             // API contents carry no widget `_meta`/`html`; the extended shape only adds optional fields.
-            return (await readApiResource(uri, apifyClient)) as ExtendedReadResourceResult;
+            return (await readApiResource(uri, apifyClient, platformUrls)) as ExtendedReadResourceResult;
         }
 
         const usageGuide = paymentProvider?.getUsageGuide?.();
@@ -156,7 +159,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
     // Advertisement only, NOT a route table: the read path stays a generic proxy, and any other
     // Apify API GET URL is readable the same way.
     const listResourceTemplates = async (): Promise<ListResourceTemplatesResult> => {
-        const api = getApifyAPIPublicBaseUrl();
+        const api = platformUrls?.apiPublicBaseUrl ?? getApifyAPIPublicBaseUrl();
         return {
             resourceTemplates: [
                 {

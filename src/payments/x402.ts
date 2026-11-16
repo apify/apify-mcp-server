@@ -103,7 +103,9 @@ const CACHE_TTL_MS = 30 * 60 * 1000;
  *
  * @returns The decoded payment requirements, or undefined if the fetch fails.
  */
-export async function fetchX402PaymentRequirements(): Promise<X402PaymentRequirements | undefined> {
+export async function fetchX402PaymentRequirements(
+    apiBaseUrl: string = getApifyAPIBaseUrl(),
+): Promise<X402PaymentRequirements | undefined> {
     const now = Date.now();
     // If we have a cached promise, and the TTL hasn't expired since it successfully resolved, return it.
     // Note: During the very first fetch, lastFetchTime is 0, so this will be false and we will
@@ -116,7 +118,6 @@ export async function fetchX402PaymentRequirements(): Promise<X402PaymentRequire
     }
 
     cachedRequirementsPromise = (async () => {
-        const apiBaseUrl = getApifyAPIBaseUrl();
         const url = `${apiBaseUrl}/v2/acts/`;
 
         const controller = new AbortController();
@@ -207,9 +208,10 @@ export class X402PaymentProvider implements PaymentProvider {
     /**
      * Creates an X402PaymentProvider, fetching payment requirements from the Apify API.
      * Falls back to a provider without full requirements if the fetch fails.
+     * `apiBaseUrl` is where API requests go; `getApifyAPIBaseUrl()` when omitted.
      */
-    static async create(): Promise<X402PaymentProvider> {
-        const requirements = await fetchX402PaymentRequirements();
+    static async create(apiBaseUrl?: string): Promise<X402PaymentProvider> {
+        const requirements = await fetchX402PaymentRequirements(apiBaseUrl);
         return new X402PaymentProvider(requirements);
     }
 

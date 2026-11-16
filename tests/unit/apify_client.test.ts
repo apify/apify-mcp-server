@@ -96,6 +96,23 @@ describe('ApifyClient', () => {
         }
     });
 
+    it('takes the origins in platformUrls over the env vars', () => {
+        vi.stubEnv('APIFY_API_BASE_URL', 'http://localhost:3333');
+        vi.stubEnv('APIFY_API_PUBLIC_BASE_URL', 'http://localhost:3333');
+        capturedOptions.length = 0;
+        void new ApifyClient({
+            token: 'test-token',
+            platformUrls: {
+                apiBaseUrl: 'http://api.internal.example:3333',
+                apiPublicBaseUrl: 'https://api.example.test',
+                consoleBaseUrl: 'https://console.example.test',
+            },
+        });
+        const passed = capturedOptions[0] as CapturedClientOptions;
+        expect(passed.baseUrl).toBe('http://api.internal.example:3333');
+        expect(passed.publicBaseUrl).toBe('https://api.example.test');
+    });
+
     it('passes the client-facing origin as publicBaseUrl, separately from the egress baseUrl', () => {
         vi.stubEnv('APIFY_API_BASE_URL', 'http://api.internal.example:3333');
         capturedOptions.length = 0;
