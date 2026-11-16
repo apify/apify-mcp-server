@@ -27,21 +27,17 @@ type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 // is intentionally uncapped.
 export const MAX_UNTRUSTED_SCHEMA_BYTES = 262_144;
 
-// Ajv compile time does not follow schema size: 2,000 flat properties in 51 KB take 1.8 s.
-// Its code for each level repeats the data path of every level above it: 298 nested `items` take 1.7 s.
-// A schema over any limit, or with a `$ref` that is not to a definition, is served without local
-// validation; the platform or the proxied MCP server validates the input.
+// Ajv compile time does not follow schema size, so a schema over any of these limits is served without
+// local validation; the platform or the proxied MCP server validates the input.
 export const MAX_VALIDATED_SCHEMA_BYTES = 65_536;
 export const MAX_VALIDATED_SCHEMA_OBJECTS = 300;
 export const MAX_VALIDATED_SCHEMA_DEPTH = 32;
 
-// Ajv compiles each `$ref` target as its own function, with every schema below it. A definition is
-// compiled only through a `$ref`; any other target is also compiled as part of the schema around it,
-// so 120 refs into a 120-level chain take 3.3 s. Ajv also compiles a target once per spelling of its ref,
-// and `%` or `~` escapes spell one name many ways: 150 spellings of a 145-property definition take 4.5 s.
+// Only a definition is compiled once. Ajv compiles any other `$ref` target again inside the schema around
+// it, and compiles a target once per spelling of its ref; `%` and `~` escapes spell one name many ways.
 const DEFINITION_REF_PATTERN = /^#\/(?:definitions|\$defs)\/[^/%~]+$/;
 
-type ExceededCompileLimit = 'bytes' | 'nested-objects' | 'depth' | '$ref';
+type ExceededCompileLimit = 'bytes' | 'nested-objects' | 'depth' | '$ref' | '$id';
 type CompiledSchema = {
     validate: ValidateFunction<unknown>;
     schema: object;
@@ -63,14 +59,19 @@ function findExceededCompileLimit(schema: object, serializedBytes: number): Exce
         if (typeof node !== 'object' || node === null) continue;
         if (depth > MAX_VALIDATED_SCHEMA_DEPTH) return 'depth';
         if (Array.isArray(node)) {
-            // A boolean in `anyOf`, `oneOf`, `allOf` or `items` is a schema, and costs like an object there:
-            // 8 properties with 1,000 `false` branches each take 2 s.
+            // A boolean in `anyOf`, `oneOf`, `allOf` or `items` is a schema, and costs like an object there.
             nestedObjectCount += node.filter((item) => typeof item === 'boolean').length;
         } else {
-            const ref = (node as { $ref?: unknown }).$ref;
-            // A property named `$ref` holds a schema object, not a string.
-            if (typeof ref === 'string' && !DEFINITION_REF_PATTERN.test(ref)) return '$ref';
+            // A property named `$ref`, `$id` or `dependencies` holds a schema object, not a string or name lists.
+            const { $ref, $id, dependencies } = node as Record<string, unknown>;
+            if (typeof $ref === 'string' && !DEFINITION_REF_PATTERN.test($ref)) return '$ref';
+            // A nested `$id` can give a schema that is not a definition the name of one.
+            if (depth > 0 && typeof $id === 'string') return '$id';
             nestedObjectCount++;
+            // Ajv's code for a list of dependency names grows faster than the list.
+            for (const names of Object.values(dependencies ?? {})) {
+                if (Array.isArray(names)) nestedObjectCount += names.length;
+            }
         }
         if (nestedObjectCount > MAX_VALIDATED_SCHEMA_OBJECTS) return 'nested-objects';
         pending.push(...Object.values(node).map((child): [unknown, number] => [child, depth + 1]));
@@ -100,8 +101,7 @@ export function compileUntrustedSchema<T extends object>(
     let compiled = untrustedValidatorCache.get(cacheKey);
     if (!compiled) {
         const exceededLimit = findExceededCompileLimit(schema, serializedBytes);
-        // An inlined `$ref` is compiled again at every place that refers to it: 250 references to one
-        // 40-property definition take 3 s, and 36 ms as a separate function.
+        // An inlined `$ref` is compiled again at every place that refers to it.
         const ajv = createAjv({ inlineRefs: false });
         compiled = { validate: ajv.compile(exceededLimit ? {} : schema), schema, exceededLimit };
         untrustedValidatorCache.set(cacheKey, compiled);

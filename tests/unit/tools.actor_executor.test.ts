@@ -144,7 +144,7 @@ describe('actorExecutor', () => {
         });
 
         // A schema that is costly to compile skips AJV, so the executor is the only check of waitSecs.
-        it.each([WAIT_SECS_MAX + 1, -5, 1.5, 'soon'])(
+        it.each([WAIT_SECS_MAX + 1, -5, 1.5, 'soon', '', null])(
             'falls back to the default wait when waitSecs is %j',
             async (waitSecs) => {
                 const { params, spies } = buildParams({ query: 'foo', waitSecs });
@@ -154,6 +154,14 @@ describe('actorExecutor', () => {
                 expect(spies.waitForFinishOpts).toEqual({ waitSecs: CALL_ACTOR_WAIT_SECS_DEFAULT });
             },
         );
+
+        it('reads a numeric string waitSecs as a number, as AJV does on a validated schema', async () => {
+            const { params, spies } = buildParams({ query: 'foo', waitSecs: '10' });
+
+            await actorExecutor.executeActorTool(params);
+
+            expect(spies.waitForFinishOpts).toEqual({ waitSecs: 10 });
+        });
 
         it('ignores waitSecs in task mode and waits until terminal', async () => {
             const { params, spies } = buildParams({ query: 'foo', waitSecs: 5 }, { taskMode: true });

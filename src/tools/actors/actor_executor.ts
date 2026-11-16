@@ -16,7 +16,13 @@ import {
 } from './actor_run_response.js';
 import { buildDirectActorRunInput } from './actor_tool_contract.js';
 
-const waitSecsSchema = z.number().int().min(0).max(WAIT_SECS_MAX).catch(CALL_ACTOR_WAIT_SECS_DEFAULT);
+// AJV coerces a numeric string on a validated schema; a schema that skips AJV gets the same here.
+const waitSecsSchema = z
+    .preprocess(
+        (value) => (typeof value === 'string' && value.trim() !== '' ? Number(value) : value),
+        z.number().int().min(0).max(WAIT_SECS_MAX),
+    )
+    .catch(CALL_ACTOR_WAIT_SECS_DEFAULT);
 
 /**
  * Direct actor tool executor. Mode-agnostic — used in both default and apps modes.

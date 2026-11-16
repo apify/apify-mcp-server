@@ -68,22 +68,19 @@ describe('compileUntrustedSchema', () => {
         expect(second.toString()).toBe(first.toString());
     });
 
-    it('validates through a $ref and compiles the referenced schema once, outside the validator', () => {
+    it.each(['definitions', '$defs'])('validates through a $ref to #/%s and does not inline it', (keyword) => {
         const { validate } = compileUntrustedSchema({
             type: 'object',
-            properties: {
-                startUrls: { type: 'array', items: { $ref: '#/definitions/requestSource' } },
-                excludeUrls: { type: 'array', items: { $ref: '#/definitions/requestSource' } },
-            },
-            definitions: {
+            properties: { startUrls: { type: 'array', items: { $ref: `#/${keyword}/requestSource` } } },
+            [keyword]: {
                 requestSource: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] },
             },
         });
 
         expect(validate({ startUrls: [{ url: 'https://apify.com' }] })).toBe(true);
         expect(validate({ startUrls: [{ method: 'GET' }] })).toBe(false);
-        // An inlined reference repeats the definition's checks in the validator at every place it is used.
-        expect(validate.toString()).not.toContain('url');
+        // An inlined reference reports the path from the root: `#/properties/startUrls/items/$ref/required`.
+        expect(validate.errors?.[0].schemaPath).toBe('#/required');
     });
 
     it('throws SchemaTooLargeError on an oversized schema before AJV codegen runs (DoS guard)', () => {
@@ -160,6 +157,40 @@ describe('compileUntrustedSchema skips validation of a schema that is costly to 
         },
     );
 
+    it('accepts any input and logs the limit when a nested schema has an $id', () => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+        // Ajv resolves `#/definitions/requestSource` to the schema with that `$id`, which is not a definition.
+        const { validate } = compileUntrustedSchema({
+            $id: 'https://apify.com/schemas/input',
+            type: 'object',
+            properties: {
+                startUrls: { $id: '#/definitions/requestSource', type: 'object' },
+                excludeUrls: { $ref: '#/definitions/requestSource' },
+            },
+            required: ['startUrls'],
+        });
+
+        expect(validate({ maxResults: '3' })).toBe(true);
+        expect(info).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ exceededLimit: '$id' }));
+    });
+
+    it('counts the names in dependencies toward the nested-object limit', () => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+        const { validate } = compileUntrustedSchema({
+            type: 'object',
+            dependencies: {
+                startUrls: Array.from({ length: MAX_VALIDATED_SCHEMA_OBJECTS }, (_, i) => `field${i}`),
+            },
+            required: ['startUrls'],
+        });
+
+        expect(validate({ maxResults: '3' })).toBe(true);
+        expect(info).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ exceededLimit: 'nested-objects' }),
+        );
+    });
+
     it('counts boolean subschemas in an array toward the nested-object limit', () => {
         const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
         const { validate } = compileUntrustedSchema({
@@ -182,6 +213,21 @@ describe('compileUntrustedSchema skips validation of a schema that is costly to 
 
         expect(validate({ maxResults: '3' })).toBe(false);
         expect(info).not.toHaveBeenCalled();
+    });
+
+    it('validates a schema at the depth limit', () => {
+        // `properties` and `startUrls` are two levels; each `items` adds one.
+        const startUrls = Array.from({ length: MAX_VALIDATED_SCHEMA_DEPTH - 2 }).reduce<object>(
+            (items) => ({ type: 'array', items }),
+            { type: 'string' },
+        );
+        const { validate } = compileUntrustedSchema({
+            type: 'object',
+            properties: { startUrls },
+            required: ['startUrls'],
+        });
+
+        expect(validate({ maxResults: '3' })).toBe(false);
     });
 
     it('logs the skip again when the schema is served from the cache', () => {
