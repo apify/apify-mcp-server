@@ -1,4 +1,5 @@
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
+import { UserInputError } from '../errors.js';
 import type { CallDiagnostics, ToolStatus } from '../types.js';
 import { isPermissionApprovalError } from '../utils/apify_errors.js';
 import { isZodValidationError } from '../utils/logging.js';
@@ -103,6 +104,7 @@ export function buildToolCallErrorResult(error: unknown, params: ToolCallErrorPa
         kind: TOOL_CALL_ERROR_KIND.EXECUTION,
         toolStatus,
         callDiagnostics,
-        userText: getToolCallErrorUserText(toolName, error),
+        // A UserInputError message is the full text to show; wrapping it adds a second period.
+        userText: error instanceof UserInputError ? error.message : getToolCallErrorUserText(toolName, error),
     };
 }
