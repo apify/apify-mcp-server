@@ -47,22 +47,30 @@ type CompiledSchema = {
 const UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE = 1000;
 const untrustedValidatorCache = new LruCache<CompiledSchema>(UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE);
 
+// Ajv does not compile what these keywords hold, so example data does not count toward the limits.
+const DATA_KEYWORDS = new Set(['default', 'prefill', 'examples', 'enum', 'const']);
+// These keywords hold schemas by name: a key inside them is a name, not a keyword.
+const SCHEMA_MAP_KEYWORDS = new Set(['properties', 'patternProperties', 'definitions', '$defs', 'dependencies']);
+
 /** Returns the limit that makes the schema too costly to compile, or null when Ajv may compile it. */
 function findExceededCompileLimit(schema: object, serializedBytes: number): ExceededCompileLimit | null {
     if (serializedBytes > MAX_VALIDATED_SCHEMA_BYTES) return 'bytes';
 
     // The root is not a nested object.
     let nestedObjectCount = -1;
-    const pending: [unknown, number][] = [[schema, 0]];
+    const pending: [node: unknown, depth: number, isSchemaMap: boolean][] = [[schema, 0, false]];
     for (let entry = pending.pop(); entry; entry = pending.pop()) {
-        const [node, depth] = entry;
+        const [node, depth, isSchemaMap] = entry;
         if (typeof node !== 'object' || node === null) continue;
         if (depth > MAX_VALIDATED_SCHEMA_DEPTH) return 'depth';
         if (Array.isArray(node)) {
             // A boolean in `anyOf`, `oneOf`, `allOf` or `items` is a schema, and costs like an object there.
             nestedObjectCount += node.filter((item) => typeof item === 'boolean').length;
+            pending.push(...node.map((child): [unknown, number, boolean] => [child, depth + 1, false]));
+        } else if (isSchemaMap) {
+            nestedObjectCount++;
+            pending.push(...Object.values(node).map((child): [unknown, number, boolean] => [child, depth + 1, false]));
         } else {
-            // A property named `$ref`, `$id` or `dependencies` holds a schema object, not a string or name lists.
             const { $ref, $id, dependencies } = node as Record<string, unknown>;
             if (typeof $ref === 'string' && !DEFINITION_REF_PATTERN.test($ref)) return '$ref';
             // A nested `$id` can give a schema that is not a definition the name of one.
@@ -72,9 +80,11 @@ function findExceededCompileLimit(schema: object, serializedBytes: number): Exce
             for (const names of Object.values(dependencies ?? {})) {
                 if (Array.isArray(names)) nestedObjectCount += names.length;
             }
+            for (const [keyword, child] of Object.entries(node)) {
+                if (!DATA_KEYWORDS.has(keyword)) pending.push([child, depth + 1, SCHEMA_MAP_KEYWORDS.has(keyword)]);
+            }
         }
         if (nestedObjectCount > MAX_VALIDATED_SCHEMA_OBJECTS) return 'nested-objects';
-        pending.push(...Object.values(node).map((child): [unknown, number] => [child, depth + 1]));
     }
     return null;
 }

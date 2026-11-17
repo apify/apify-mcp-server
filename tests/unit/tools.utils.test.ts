@@ -252,6 +252,37 @@ describe('compileUntrustedSchema skips validation of a schema that is costly to 
         expect(validate({ maxResults: '3' })).toBe(false);
     });
 
+    it('does not count example data, or read a $ref or $id in it', () => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+        const sources = Array.from({ length: MAX_VALIDATED_SCHEMA_OBJECTS }, () => ({ $ref: 'a', $id: 'b' }));
+        const { validate } = compileUntrustedSchema({
+            type: 'object',
+            properties: {
+                startUrls: { type: 'array', default: sources, prefill: sources, examples: sources },
+                mode: { enum: sources, const: sources[0] },
+            },
+            required: ['startUrls'],
+        });
+
+        expect(validate({ maxResults: '3' })).toBe(false);
+        expect(info).not.toHaveBeenCalled();
+    });
+
+    it('counts the schema of a property named like a data keyword', () => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+        const { validate } = compileUntrustedSchema({
+            type: 'object',
+            properties: { default: { anyOf: Array.from({ length: MAX_VALIDATED_SCHEMA_OBJECTS }, () => false) } },
+            required: ['startUrls'],
+        });
+
+        expect(validate({ maxResults: '3' })).toBe(true);
+        expect(info).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ exceededLimit: 'nested-objects' }),
+        );
+    });
+
     it('logs the skip again when the schema is served from the cache', () => {
         const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
         const schema = buildSchemaWithProperties(MAX_VALIDATED_SCHEMA_OBJECTS + 1);
