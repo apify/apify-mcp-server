@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.21.13 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Link missing-token messages to the Console create-token form ([#1916](https://github.com/apify/apify-mcp-server/pull/1916)) ([13f0549](https://github.com/apify/apify-mcp-server/commit/13f05497046fbf13c369c0d35fef4d847a394b89)) by [@protoss70](https://github.com/protoss70), closes [#181](https://github.com/apify/apify-mcp-server/issues/181)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.21.12](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.12) (2026-11-17)
 
 ### 🐛 Bug Fixes
