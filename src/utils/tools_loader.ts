@@ -184,7 +184,8 @@ const WITHOUT_USE_CASE_FIELD = new WeakMap<ToolEntry, ToolEntry>();
  */
 export function withoutUseCaseField(tool: ToolEntry): ToolEntry {
     const { useCase, ...properties } = tool.inputSchema.properties ?? {};
-    if (!useCase) return tool;
+    // A `useCase` of an Actor or proxied MCP tool is its own input, and `compileSchema` is not for untrusted schemas.
+    if (!useCase || tool.type !== TOOL_TYPE.INTERNAL) return tool;
     let served = WITHOUT_USE_CASE_FIELD.get(tool);
     if (!served) {
         const inputSchema = { ...tool.inputSchema, properties };

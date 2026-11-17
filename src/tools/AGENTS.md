@@ -148,6 +148,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 
 - **Validate inputs with Zod**; no ad-hoc shape checks. AJV + Zod already validate
   before a tool runs — don't re-check the same constraint inside the tool body.
+  Exception: `compileUntrustedSchema` (`actor_input_schema.ts`) skips AJV for an Actor or proxied MCP input
+  schema that is costly to compile, so `actor_executor.ts` checks the injected `waitSecs` itself.
 - **Reference tool names via the `HELPER_TOOLS` `as const` object**, never hardcoded strings
   (exception: the integration suite, `tests/integration/` and the shared `tests/test_kit/` cases and helpers, which hardcode them so a renamed tool fails).
 - Keep a new tool mode-agnostic unless it is genuinely a widget variant.

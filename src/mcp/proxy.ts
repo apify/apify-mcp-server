@@ -61,7 +61,7 @@ export async function getMCPServerTools(
         tools.some(({ name }) => `${escapedUsername}--${actorName}--${name}`.length > MAX_TOOL_NAME_LENGTH);
 
     return tools.map((tool): ActorMcpTool => {
-        const compiled = compileUntrustedSchema(tool.inputSchema);
+        const compiled = compileUntrustedSchema(tool.inputSchema, { actorName: actorFullName, toolName: tool.name });
         return {
             type: TOOL_TYPE.ACTOR_MCP,
             actorId: actorID,
