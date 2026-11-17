@@ -40,6 +40,10 @@ jobs:
                 # users would get from the registry.
                 id: pack
                 if: ${{ inputs.from_source }}
+                # `shell: bash` turns on pipefail. Without it a failed `pnpm pack` is
+                # hidden by `tail`, the output stays empty, and the install step falls
+                # back to the registry version instead of this commit.
+                shell: bash
                 run: |
                     pnpm run build
                     tarball=$(pnpm pack --pack-destination "$RUNNER_TEMP" | tail -n1)
