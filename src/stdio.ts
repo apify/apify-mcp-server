@@ -103,7 +103,8 @@ Only used when --telemetry-enabled is true`,
     .version(packageVersion)
     .epilogue(
         'To connect, set your MCP client server command to `npx @apify/actors-mcp-server`' +
-            ' and set the environment variable `APIFY_TOKEN` to your Apify API token.\n',
+            ' and set the environment variable `APIFY_TOKEN` to your Apify API token.' +
+            ` Create one at https://console.apify.com/settings/integrations?createApiToken=true&for=MCP&utm_source=mcp&utm_medium=integrations (it is shown only once).\n`,
     )
     .epilogue('For more information, visit https://mcp.apify.com or https://github.com/apify/apify-mcp-server')
     .parseSync() as CliArgs;

@@ -56,7 +56,7 @@ Your agent searches Apify Store, checks an Actor's input and pricing, runs it, a
 2. Copy the generated configuration, deeplink, or command into your client.
 3. Sign in to Apify in the browser window that opens. If you don't have an account, you can create a free one there.
 
-The hosted endpoint is `https://mcp.apify.com`. If your client can't use OAuth, send your [Apify API token](https://docs.apify.com/integrations/api#api-token) in an `Authorization: Bearer <APIFY_TOKEN>` header instead. Treat the token like a password and keep it out of repositories.
+The hosted endpoint is `https://mcp.apify.com`. If your client can't use OAuth, send your [Apify API token](https://docs.apify.com/integrations/api#api-token) in an `Authorization: Bearer <APIFY_TOKEN>` header instead. Treat the token like a password and keep it out of repositories. [Create a token in Apify Console](https://console.apify.com/settings/integrations) and copy it right after creating it. It is shown only once.
 
 Using a coding agent such as Claude Code, Codex, Cursor, or GitHub Copilot? An [official Apify plugin](https://docs.apify.com/agents/plugins) installs this MCP server together with [Apify agent skills](https://docs.apify.com/agents/skills) in one step.
 
@@ -165,6 +165,8 @@ Requires Node.js 22 or later.
   }
 }
 ```
+
+[Create an API token in Apify Console](https://console.apify.com/settings/integrations) and copy it right after creating it. It is shown only once.
 
 If you've run `apify login`, the server can also read the token saved by the Apify CLI. Run `npx @apify/actors-mcp-server --help` for all options.
 
