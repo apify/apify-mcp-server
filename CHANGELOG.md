@@ -10,6 +10,8 @@ All notable changes to this project will be documented in this file.
 - Validate synchronously when an input schema sets $async ([#1917](https://github.com/apify/apify-mcp-server/pull/1917)) ([5bb5c0c](https://github.com/apify/apify-mcp-server/commit/5bb5c0cc3f6be7d3876454b25063b7cf24ff0853)) by [@vojtechj-apify](https://github.com/vojtechj-apify)
 - Do not compile the output schemas of an Actor&#x27;s MCP tools ([#1919](https://github.com/apify/apify-mcp-server/pull/1919)) ([60e10ff](https://github.com/apify/apify-mcp-server/commit/60e10ff748230a8758c741c627142f6e30471ed2)) by [@vojtechj-apify](https://github.com/vojtechj-apify)
 - Skip the uniqueItems check in local input validation ([#1918](https://github.com/apify/apify-mcp-server/pull/1918)) ([e04a25e](https://github.com/apify/apify-mcp-server/commit/e04a25e7ca2d32d182d2bbbe85da7567aef1494c)) by [@vojtechj-apify](https://github.com/vojtechj-apify)
+- Skip local validation for costly Actor input schemas ([#1914](https://github.com/apify/apify-mcp-server/pull/1914)) ([2a7f0c5](https://github.com/apify/apify-mcp-server/commit/2a7f0c5a8f8f8f42dcb6714be8b60ab0035318b3)) by [@jirispilka](https://github.com/jirispilka)
+- Show a UserInputError message as is, not wrapped again ([#1921](https://github.com/apify/apify-mcp-server/pull/1921)) ([34f8efa](https://github.com/apify/apify-mcp-server/commit/34f8efafa8ac2be5463b594136dbdc4eda641a6a)) by [@jirispilka](https://github.com/jirispilka)
 
 
 <!-- git-cliff-unreleased-end -->
