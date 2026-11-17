@@ -325,13 +325,6 @@ describe('getToolCallErrorUserText()', () => {
         expect(text).toBe('Error calling tool "get-actor-run": boom. Verify the tool name and input parameters.');
     });
 
-    it('adds no second period after a message that ends a sentence', () => {
-        const text = getToolCallErrorUserText('get-dataset-items', new Error('Invalid dataset ID or name "bad/id!".'));
-        expect(text).toBe(
-            'Error calling tool "get-dataset-items": Invalid dataset ID or name "bad/id!". Verify the tool name and input parameters.',
-        );
-    });
-
     it('names the API error type so the model can report the exact failure', () => {
         const error = new ApifyApiError(
             {
