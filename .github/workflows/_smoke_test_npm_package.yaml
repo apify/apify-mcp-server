@@ -4,7 +4,7 @@ on:
     workflow_call:
         inputs:
             npm_tag:
-                description: NPM dist-tag to install (e.g. "beta", "latest"). Ignored when version is set.
+                description: NPM dist-tag to install (e.g. "beta", "latest"). Ignored when version or from_source is set.
                 required: false
                 type: string
                 default: latest
@@ -13,10 +13,15 @@ on:
                 required: false
                 type: string
                 default: ""
+            from_source:
+                description: Build and pack the checked-out commit, then install that tarball instead of a version from the registry.
+                required: false
+                type: boolean
+                default: false
 
 jobs:
     smoke_test:
-        name: Smoke test published package
+        name: Smoke test npm package
         runs-on: ubuntu-latest
         steps:
             -   name: Use Node.js
@@ -24,10 +29,26 @@ jobs:
                 with:
                     node-version: 22
 
-            -   name: Install published package
+            -   uses: actions/checkout@v6
+                if: ${{ inputs.from_source }}
+            -   name: Install pnpm and dependencies
+                if: ${{ inputs.from_source }}
+                uses: apify/actions/pnpm-install@v1.1.2
+            -   name: Build and pack
+                # `pnpm pack` keeps only what package.json#files lists, the same
+                # content `pnpm publish` uploads, so the install below sees what
+                # users would get from the registry.
+                id: pack
+                if: ${{ inputs.from_source }}
+                run: |
+                    pnpm run build
+                    tarball=$(pnpm pack --pack-destination "$RUNNER_TEMP" | tail -n1)
+                    echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+
+            -   name: Install package
                 uses: nick-fields/retry@v4
                 env:
-                    PKG_VERSION: ${{ inputs.version || inputs.npm_tag }}
+                    PKG_SPEC: ${{ steps.pack.outputs.tarball || format('@apify/actors-mcp-server@{0}', inputs.version || inputs.npm_tag) }}
                 with:
                     timeout_minutes: 5
                     max_attempts: 3
@@ -35,7 +56,7 @@ jobs:
                     command: |
                         mkdir -p smoke-test && cd smoke-test
                         npm init -y
-                        npm install "@apify/actors-mcp-server@${PKG_VERSION}" @apify/mcpc
+                        npm install "${PKG_SPEC}" @apify/mcpc
 
             -   name: Smoke test MCP server via mcpc
                 working-directory: smoke-test

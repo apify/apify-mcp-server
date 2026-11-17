@@ -60,8 +60,11 @@ jobs:
             -   name: Wait until the version is on the registry
                 # npm scans each version before it becomes installable: "typically around five
                 # minutes ... up to 15 minutes or more" (https://github.blog/changelog/2026-07-28-npm-publish-time-malware-scanning-and-dual-use-metadata/).
-                # Jobs that run after this workflow (smoke test, internal repo bump) install
+                # After a stable release, the smoke test and the internal repo bump install
                 # the version right away, so don't finish until the registry serves it.
+                # Nothing installs a beta right after publishing, so beta skips the wait
+                # and releases the `release` concurrency group sooner.
+                if: ${{ inputs.tag == 'latest' }}
                 run: |
                     version=$(jq -r '.version' package.json)
                     for _ in $(seq 1 80); do

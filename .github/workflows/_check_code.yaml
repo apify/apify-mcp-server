@@ -86,6 +86,14 @@ jobs:
             -   name: Type checks
                 run: pnpm run type-check
 
+    packed_package_smoke_test:
+        # Installs the packed tarball the way users install the npm package, so a
+        # broken package (missing files, bin entry, dependencies) fails before merge.
+        name: Packed package smoke test
+        uses: ./.github/workflows/_smoke_test_npm_package.yaml
+        with:
+            from_source: true
+
     docker_build_smoke_test:
         # The Dockerfile is consumed by the external Docker Hub auto-build integration
         # (see README) but no other CI job builds it, so breakage — like the pnpm v10+
