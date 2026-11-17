@@ -323,12 +323,14 @@ export function getToolCallErrorUserText(toolName: string, error: unknown): stri
     if (apiErrorType) {
         msg = `${msg} (API error type: ${apiErrorType})`;
     }
+    // Many API and tool messages already end with a period.
+    const sentence = /[.!?]$/.test(msg) ? msg : `${msg}.`;
     if (isActorRunLimitError(error)) {
-        return `Error calling tool "${toolName}": ${msg}. ${ACTOR_RUN_LIMIT_MESSAGE}`;
+        return `Error calling tool "${toolName}": ${sentence} ${ACTOR_RUN_LIMIT_MESSAGE}`;
     }
     if (isCannotPublishTaskError(error)) {
         return (
-            `Error calling tool "${toolName}": ${msg}.\n\n` +
+            `Error calling tool "${toolName}": ${sentence}\n\n` +
             'The API validates supplied `publicConfig` fields on create and update, and all publication ' +
             'requirements on publish. The error message names the requirement that is not met. If `datasetView` is invalid, ' +
             'ask the user for its key; no tool can list dataset views.'
@@ -338,7 +340,7 @@ export function getToolCallErrorUserText(toolName: string, error: unknown): stri
     // blame valid input (#1561).
     const statusCode = getHttpStatusCode(error);
     const hint = statusCode === undefined ? 'Verify the tool name and input parameters.' : getHttpErrorHint(statusCode);
-    return `Error calling tool "${toolName}": ${msg}.${hint ? ` ${hint}` : ''}`;
+    return `Error calling tool "${toolName}": ${sentence}${hint ? ` ${hint}` : ''}`;
 }
 
 /** Texts for a confirmed platform input-validation error — same shape wherever start() can throw one. */
