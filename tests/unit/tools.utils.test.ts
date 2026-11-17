@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../../src/const.js';
+import log from '@apify/log';
+
+import {
+    ACTOR_ENUM_MAX_LENGTH,
+    ACTOR_MAX_DESCRIPTION_LENGTH,
+    RESOURCE_ID_OR_NAME_MAX_LENGTH,
+} from '../../src/const.js';
 import { SchemaTooLargeError } from '../../src/errors.js';
 import {
     buildActorInputSchema,
@@ -11,6 +17,9 @@ import {
     inferArrayItemsTypeIfMissing,
     inferArrayItemType,
     MAX_UNTRUSTED_SCHEMA_BYTES,
+    MAX_VALIDATED_SCHEMA_BYTES,
+    MAX_VALIDATED_SCHEMA_DEPTH,
+    MAX_VALIDATED_SCHEMA_OBJECTS,
     markInputPropertiesAsRequired,
     shortenProperties,
     transformActorInputSchemaProperties,
@@ -42,6 +51,28 @@ describe('compileUntrustedSchema', () => {
         expect(input).toEqual({ url: 'https://example.com' });
     });
 
+    it('compiles a synchronous validator for a schema that sets `$async`', () => {
+        const { validate, schema } = compileUntrustedSchema({
+            $async: true,
+            type: 'object',
+            properties: { url: { type: 'string' } },
+            required: ['url'],
+        });
+        expect(validate({})).toBe(false);
+        expect(schema).not.toHaveProperty('$async');
+    });
+
+    it('does not compile a schema that sets `$async` below the root', () => {
+        // Only the root keyword is left out, and Ajv rejects an async schema inside a synchronous one.
+        expect(() =>
+            compileUntrustedSchema({
+                $async: true,
+                type: 'object',
+                properties: { url: { $async: true, type: 'string' } },
+            }),
+        ).toThrow();
+    });
+
     it('caches validator for identical schemas', () => {
         const schema = () => ({ type: 'object', properties: { url: { type: 'string' } }, required: ['url'] });
         const first = compileUntrustedSchema(schema());
@@ -59,12 +90,206 @@ describe('compileUntrustedSchema', () => {
         expect(second.toString()).toBe(first.toString());
     });
 
+    it.each(['definitions', '$defs'])('validates through a $ref to #/%s and does not inline it', (keyword) => {
+        const { validate } = compileUntrustedSchema({
+            type: 'object',
+            properties: { startUrls: { type: 'array', items: { $ref: `#/${keyword}/requestSource` } } },
+            [keyword]: {
+                requestSource: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] },
+            },
+        });
+
+        expect(validate({ startUrls: [{ url: 'https://apify.com' }] })).toBe(true);
+        expect(validate({ startUrls: [{ method: 'GET' }] })).toBe(false);
+        // An inlined reference reports the path from the root: `#/properties/startUrls/items/$ref/required`.
+        expect(validate.errors?.[0].schemaPath).toBe('#/required');
+    });
+
     it('throws SchemaTooLargeError on an oversized schema before AJV codegen runs (DoS guard)', () => {
         const properties: Record<string, unknown> = {};
         for (let i = 0; i < 16000; i++) properties[`p${i}`] = { type: 'string' };
         const huge = { type: 'object', properties };
         expect(JSON.stringify(huge).length).toBeGreaterThan(MAX_UNTRUSTED_SCHEMA_BYTES);
         expect(() => compileUntrustedSchema(huge)).toThrow(SchemaTooLargeError);
+    });
+});
+
+describe('compileUntrustedSchema skips validation of a schema that is costly to compile', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    const buildSchemaWithProperties = (count: number) => ({
+        type: 'object',
+        properties: Object.fromEntries(Array.from({ length: count }, (_, i) => [`field${i}`, { type: 'string' }])),
+        required: ['field0'],
+    });
+
+    it.each([
+        {
+            limit: 'bytes',
+            schema: {
+                type: 'object',
+                properties: {
+                    startUrls: { type: 'string', description: 'a'.repeat(MAX_VALIDATED_SCHEMA_BYTES) },
+                },
+                required: ['startUrls'],
+            },
+        },
+        { limit: 'nested-objects', schema: buildSchemaWithProperties(MAX_VALIDATED_SCHEMA_OBJECTS) },
+        {
+            limit: 'depth',
+            schema: {
+                type: 'object',
+                properties: {
+                    startUrls: Array.from({ length: MAX_VALIDATED_SCHEMA_DEPTH }).reduce<object>(
+                        (items) => ({ type: 'array', items }),
+                        { type: 'string' },
+                    ),
+                },
+                required: ['startUrls'],
+            },
+        },
+    ])('accepts any input unchanged and logs the limit when the schema exceeds $limit', ({ limit, schema }) => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+        const { validate } = compileUntrustedSchema(schema, { actorName: 'apify/rag-web-browser' });
+        // Lacks the required property, so a compiled validator rejects it.
+        const input = { maxResults: '3' };
+
+        expect(validate(input)).toBe(true);
+        expect(input).toEqual({ maxResults: '3' });
+        expect(info).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ exceededLimit: limit, actorName: 'apify/rag-web-browser' }),
+        );
+    });
+
+    // A percent-encoded name is another spelling of the same ref, and Ajv compiles the definition once per spelling.
+    it.each(['#/definitions/requestSources/items', '#/definitions/request%53ources'])(
+        'accepts any input and logs the limit when the $ref is %s',
+        (ref) => {
+            const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+            const { validate } = compileUntrustedSchema({
+                type: 'object',
+                properties: { startUrls: { $ref: ref } },
+                required: ['startUrls'],
+                definitions: { requestSources: { type: 'array', items: { type: 'object' } } },
+            });
+
+            expect(validate({ maxResults: '3' })).toBe(true);
+            expect(info).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ exceededLimit: '$ref' }));
+        },
+    );
+
+    it('accepts any input and logs the limit when a nested schema has an $id', () => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+        // Ajv resolves `#/definitions/requestSource` to the schema with that `$id`, which is not a definition.
+        const { validate } = compileUntrustedSchema({
+            $id: 'https://apify.com/schemas/input',
+            type: 'object',
+            properties: {
+                startUrls: { $id: '#/definitions/requestSource', type: 'object' },
+                excludeUrls: { $ref: '#/definitions/requestSource' },
+            },
+            required: ['startUrls'],
+        });
+
+        expect(validate({ maxResults: '3' })).toBe(true);
+        expect(info).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ exceededLimit: '$id' }));
+    });
+
+    it('counts the names in dependencies toward the nested-object limit', () => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+        const { validate } = compileUntrustedSchema({
+            type: 'object',
+            dependencies: {
+                startUrls: Array.from({ length: MAX_VALIDATED_SCHEMA_OBJECTS }, (_, i) => `field${i}`),
+            },
+            required: ['startUrls'],
+        });
+
+        expect(validate({ maxResults: '3' })).toBe(true);
+        expect(info).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ exceededLimit: 'nested-objects' }),
+        );
+    });
+
+    it('counts boolean subschemas in an array toward the nested-object limit', () => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+        const { validate } = compileUntrustedSchema({
+            type: 'object',
+            properties: { startUrls: { anyOf: Array.from({ length: MAX_VALIDATED_SCHEMA_OBJECTS }, () => false) } },
+            required: ['startUrls'],
+        });
+
+        expect(validate({ maxResults: '3' })).toBe(true);
+        expect(info).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ exceededLimit: 'nested-objects' }),
+        );
+    });
+
+    it('validates a schema at the nested-object limit', () => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+        // `properties` itself is one nested object.
+        const { validate } = compileUntrustedSchema(buildSchemaWithProperties(MAX_VALIDATED_SCHEMA_OBJECTS - 1));
+
+        expect(validate({ maxResults: '3' })).toBe(false);
+        expect(info).not.toHaveBeenCalled();
+    });
+
+    it('validates a schema at the depth limit', () => {
+        // `properties` and `startUrls` are two levels; each `items` adds one.
+        const startUrls = Array.from({ length: MAX_VALIDATED_SCHEMA_DEPTH - 2 }).reduce<object>(
+            (items) => ({ type: 'array', items }),
+            { type: 'string' },
+        );
+        const { validate } = compileUntrustedSchema({
+            type: 'object',
+            properties: { startUrls },
+            required: ['startUrls'],
+        });
+
+        expect(validate({ maxResults: '3' })).toBe(false);
+    });
+
+    it('does not count example data, or read a $ref or $id in it', () => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+        const sources = Array.from({ length: MAX_VALIDATED_SCHEMA_OBJECTS }, () => ({ $ref: 'a', $id: 'b' }));
+        const { validate } = compileUntrustedSchema({
+            type: 'object',
+            properties: {
+                startUrls: { type: 'array', default: sources, prefill: sources, examples: sources },
+                mode: { enum: sources, const: sources[0] },
+            },
+            required: ['startUrls'],
+        });
+
+        expect(validate({ maxResults: '3' })).toBe(false);
+        expect(info).not.toHaveBeenCalled();
+    });
+
+    it('counts the schema of a property named like a data keyword', () => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+        const { validate } = compileUntrustedSchema({
+            type: 'object',
+            properties: { default: { anyOf: Array.from({ length: MAX_VALIDATED_SCHEMA_OBJECTS }, () => false) } },
+            required: ['startUrls'],
+        });
+
+        expect(validate({ maxResults: '3' })).toBe(true);
+        expect(info).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ exceededLimit: 'nested-objects' }),
+        );
+    });
+
+    it('logs the skip again when the schema is served from the cache', () => {
+        const info = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+        const schema = buildSchemaWithProperties(MAX_VALIDATED_SCHEMA_OBJECTS + 1);
+        compileUntrustedSchema(schema);
+        compileUntrustedSchema(schema);
+
+        expect(info).toHaveBeenCalledTimes(2);
     });
 });
 
@@ -1096,6 +1321,12 @@ describe('extractActorName', () => {
     it('strips :toolName suffix from call-actor args', () => {
         const tool = { type: TOOL_TYPE.INTERNAL, name: 'call-actor' } as unknown as ToolEntry;
         expect(extractActorName(tool, { actor: 'apify/example-mcp-server:add' })).toBe('apify/example-mcp-server');
+    });
+
+    // The args are read before validation.
+    it('returns undefined for an actor arg longer than the argument limit', () => {
+        const tool = { type: TOOL_TYPE.INTERNAL, name: 'call-actor' } as unknown as ToolEntry;
+        expect(extractActorName(tool, { actor: 'a'.repeat(RESOURCE_ID_OR_NAME_MAX_LENGTH + 1) })).toBeUndefined();
     });
 
     it('returns undefined for internal tools without actor arg', () => {

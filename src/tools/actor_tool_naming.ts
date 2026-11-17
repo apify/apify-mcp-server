@@ -39,6 +39,14 @@ export function resolveActorInterfaces({ actor, definition, webServerMcpPath }: 
     return { input: hasInputProperties, mcp: Boolean(webServerMcpPath), server: definition.hasWebServerSchema };
 }
 
+/** The `mcp` column of the table on {@link resolveActorInterfaces}, for callers without a pruned definition. */
+export function hasMcpInterface(
+    actor: Pick<Actor, 'actorStandby'>,
+    webServerMcpPath: string | null | undefined,
+): boolean {
+    return actor.actorStandby?.isEnabled === true && Boolean(webServerMcpPath);
+}
+
 /** The own-tool column of the table on {@link resolveActorInterfaces}. */
 export function resolveActorToolMode(actorInfo: ActorInfo): ACTOR_TOOL_MODE {
     const { server, mcp, input } = resolveActorInterfaces(actorInfo);

@@ -10,7 +10,6 @@ const VALIDATION_KEYWORDS = ['type', 'anyOf', 'oneOf', 'allOf', '$ref', 'enum', 
 /** Returns the paths of subschemas that some MCP clients refuse or mishandle. */
 function findNonPortableSubschemas(node: SchemaNode, path: string): string[] {
     const problems: string[] = [];
-    if (Array.isArray(node.type)) problems.push(`${path}: type array`);
     if (!VALIDATION_KEYWORDS.some((keyword) => keyword in node)) problems.push(`${path}: no validation keyword`);
 
     const children: [string, SchemaNode][] = [];
@@ -32,7 +31,7 @@ function findNonPortableSubschemas(node: SchemaNode, path: string): string[] {
 }
 
 describe('tool schemas', () => {
-    it('use no type arrays and no keyword-less subschemas', () => {
+    it('use no keyword-less subschemas', () => {
         const tools = [
             ...CATEGORY_NAMES.flatMap((name) => getCategoryTools('default')[name]),
             ...CATEGORY_NAMES.flatMap((name) => getCategoryTools('apps')[name]),

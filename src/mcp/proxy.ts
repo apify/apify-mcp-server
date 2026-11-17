@@ -67,7 +67,7 @@ export async function getMCPServerTools(
         if ('$schema' in inputSchema) {
             delete (inputSchema as { $schema?: string }).$schema;
         }
-
+        const compiled = compileUntrustedSchema(inputSchema, { actorName: actorFullName, toolName: tool.name });
         return {
             type: TOOL_TYPE.ACTOR_MCP,
             actorId: actorID,
@@ -76,8 +76,8 @@ export async function getMCPServerTools(
             originToolName: tool.name,
             name: getProxyMCPServerToolName(actorFullName, tool.name, shouldCapUsername),
             description: tool.description || '',
-            inputSchema,
-            ajvValidate: compileUntrustedSchema(inputSchema).validate,
+            inputSchema: compiled.schema,
+            ajvValidate: compiled.validate,
             annotations: tool.annotations,
         };
     });

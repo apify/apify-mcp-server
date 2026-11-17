@@ -131,9 +131,9 @@ class StatelessMcpServer {
             capabilities: {
                 // Deliberately no `tasks` (tasks/* → method-not-found), no `logging` (deprecated by SEP-2577), no
                 // `tools.listChanged` (never originated; `tool_dispatch.ts` only relays a proxied Actor-MCP server's).
-                // TODO: the SDK answers `subscriptions/listen` upstream of our handlers and opens a
-                // stream that can never emit; the dev server closes it per request, a long-lived
-                // host does not. Refusing the method outright is a follow-up.
+                // The SDK answers `subscriptions/listen` upstream of our handlers. None of these capabilities
+                // is subscribable, so it acknowledges an empty filter, sends the completion result and
+                // closes the stream.
                 tools: {},
                 resources: {},
                 prompts: {},

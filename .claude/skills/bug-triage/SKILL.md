@@ -93,7 +93,7 @@ These patterns recur. Check for them first:
 
 **Style rules:**
 - Developer-to-developer, plain language
-- Concise — 3-8 lines typical, no fluff
+- Concise, no fluff: say only what the reporter needs to act
 - Acknowledge the issue and apologize briefly if the user is stuck
 - Reference documentation when a fix or troubleshooting guide exists
 - If the server works correctly (logs prove it), say so clearly

@@ -370,7 +370,8 @@ export const toolsCases: Case[] = [
         name: 'filters notifications/message by the level set via logging/setLevel',
         isDeploymentTest: false,
         skipIf: skipUnlessStatefulEra,
-        run: withClient(undefined, async (client) => {
+        // The logging level and the message handler are per-client state: never share the stdio process.
+        run: withClient({ isolated: true }, async (client) => {
             const statefulClient = client as ClientV1;
             const received: { level: string; data?: unknown }[] = [];
             statefulClient.setNotificationHandler(LoggingMessageNotificationSchema, (notification) => {

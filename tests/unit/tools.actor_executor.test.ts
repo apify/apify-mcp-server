@@ -3,9 +3,12 @@ import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
+import log from '@apify/log';
+
 import { ACTOR_TIP_CAVEAT } from '../../src/tools/actor_tool_naming.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import type { RunResponse } from '../../src/tools/actors/actor_run_response.js';
+import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
 import type { ActorExecutionParams } from '../../src/types.js';
 import { mockApifyClient, textOf } from './helpers/tool_context.js';
 
@@ -138,6 +141,26 @@ describe('actorExecutor', () => {
 
             expect(spies.waitForFinishOpts).toEqual({ waitSecs: 30 });
             expect(spies.startInput).toEqual({ query: 'foo' });
+        });
+
+        // A schema that is costly to compile skips AJV, so the executor is the only check of waitSecs.
+        it.each([WAIT_SECS_MAX + 1, -5, 1.5, 'soon', '', null])(
+            'falls back to the default wait when waitSecs is %j',
+            async (waitSecs) => {
+                const { params, spies } = buildParams({ query: 'foo', waitSecs });
+
+                await actorExecutor.executeActorTool(params);
+
+                expect(spies.waitForFinishOpts).toEqual({ waitSecs: CALL_ACTOR_WAIT_SECS_DEFAULT });
+            },
+        );
+
+        it('reads a numeric string waitSecs as a number, as AJV does on a validated schema', async () => {
+            const { params, spies } = buildParams({ query: 'foo', waitSecs: '10' });
+
+            await actorExecutor.executeActorTool(params);
+
+            expect(spies.waitForFinishOpts).toEqual({ waitSecs: 10 });
         });
 
         it('ignores waitSecs in task mode and waits until terminal', async () => {
@@ -290,6 +313,51 @@ describe('actorExecutor', () => {
 
             expect(result).toBeNull();
             expect(spies.startInput).toBeUndefined();
+        });
+
+        // Each moment reaches a different abort log in the executor.
+        it.each<[string, (abort: () => void) => Record<string, unknown>]>([
+            ['before the run starts', (abort) => (abort(), {})],
+            [
+                'while the run starts',
+                (abort) => ({
+                    actor: () => ({
+                        start: async () => {
+                            abort();
+                            return mockRunningRun();
+                        },
+                    }),
+                }),
+            ],
+            [
+                'while waiting for the run',
+                (abort) => ({
+                    run: () => ({
+                        get: async () => mockRunningRun(),
+                        waitForFinish: async () => {
+                            abort();
+                            return mockSucceededRun();
+                        },
+                        abort: async () => undefined,
+                    }),
+                }),
+            ],
+        ])('keeps the Actor input out of the abort log when aborted %s', async (_, buildClientOverrides) => {
+            const infoSpy = vi.spyOn(log, 'info').mockImplementation(() => undefined);
+            const controller = new AbortController();
+            const { params } = buildParams({ password: 'synthetic-secret-4f2a' }, { abortSignal: controller.signal });
+            params.apifyClient = mockApifyClient({
+                ...params.apifyClient,
+                ...buildClientOverrides(() => controller.abort()),
+            });
+
+            const result = await actorExecutor.executeActorTool(params);
+            const loggedCalls = JSON.stringify(infoSpy.mock.calls);
+            infoSpy.mockRestore();
+
+            expect(result).toBeNull();
+            expect(loggedCalls).not.toBe('[]');
+            expect(loggedCalls).not.toContain('synthetic-secret-4f2a');
         });
     });
 });

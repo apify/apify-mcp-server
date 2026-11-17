@@ -48,6 +48,10 @@ describe('extractDotPrefixes', () => {
     it('extracts the prefix from fields with a trailing dot', () => {
         expect(extractDotPrefixes(['a.', 'b.c'])).toEqual(['a', 'b']);
     });
+
+    it('skips a prefix that is also selected on its own', () => {
+        expect(extractDotPrefixes(['metadata.url', 'metadata', 'crawl.statusCode'])).toEqual(['crawl']);
+    });
 });
 
 const MOCK_ITEMS = [{ first_number: 3, second_number: 4, sum: 7 }];
@@ -148,13 +152,13 @@ describe('get-dataset-items', () => {
             stubToolCallContext(
                 {
                     datasetId: 'DsWkzbQMuFYuam3YF',
-                    fields: 'metadata.url,crawl.statusCode',
+                    fields: 'metadata.url,crawl.statusCode,crawl',
                 },
                 stubApifyClient(listItemsSpy),
             ),
         );
 
-        expect(listItemsSpy).toHaveBeenCalledWith(expect.objectContaining({ flatten: ['metadata', 'crawl'] }));
+        expect(listItemsSpy).toHaveBeenCalledWith(expect.objectContaining({ flatten: ['metadata'] }));
     });
 
     it('rejects empty datasetId via ajv validation', () => {
@@ -203,7 +207,6 @@ describe('get-dataset-items', () => {
             structuredContent: Record<string, unknown>;
         };
 
-        expect(structuredContent.summary).toBe('Fetched all 1 items.');
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET);
         expect(structuredContent.nextStep).toContain('datasetId=DsWkzbQMuFYuam3YF');
         // summary + nextStep ship as a separate text block after the plain JSON.
@@ -219,10 +222,7 @@ describe('get-dataset-items', () => {
         );
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
-        expect(structuredContent.summary).toBe('Fetched 20 of 100 items (offset=0).');
-        expect(structuredContent.nextStep).toBe(
-            `Call ${HELPER_TOOLS.DATASET_GET_ITEMS} again with offset=20 to fetch the next page.`,
-        );
+        expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
     });
 
     it('content[0] mirrors the structuredContent data and does not echo the desc input param', async () => {

@@ -1,14 +1,14 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/console_link.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { respondUserError } from '../../utils/mcp.js';
-import { datasetSizeNextStepHint, normalizeDatasetFields } from '../actors/actor_run_response.js';
+import { datasetSizeNextStepHint, fieldsProjectionHint, normalizeDatasetFields } from '../actors/actor_run_response.js';
 import { datasetMetadataOutputSchema } from '../structured_output_schemas.js';
 import { DEFAULT_DATASET_ITEMS_LIMIT } from './get_dataset_items.js';
 import {
@@ -20,7 +20,7 @@ import {
 } from './storage_helpers.js';
 
 const getDatasetArgs = z.object({
-    datasetId: z.string().min(1).describe(storageIdArgDescription('dataset')),
+    datasetId: z.string().min(1).max(RESOURCE_ID_OR_NAME_MAX_LENGTH).describe(storageIdArgDescription('dataset')),
 });
 
 function buildDescription({ hasTool }: ToolDescriptionContext): string {
@@ -85,11 +85,9 @@ export const getDataset: ToolEntry = Object.freeze({
         const { schema, urlSigningSecretKey, ...metadata } = dataset as typeof dataset & { schema?: unknown };
         // Apify returns `fields` slash-separated AND with array indices expanded
         // (e.g. `latestComments/0/owner/username`). For a real Instagram-scraper
-        // dataset this inflates ~78 schema fields into 528 paths (~85% bloat) and
-        // produces slash-notation paths that aren't directly usable as projection
-        // hints for `get-dataset-items` (which expects dot-notation). Run the same
-        // normalization `buildRunDataset` applies so this tool's `fields` matches
-        // the structured `storages.datasets.default.fields` shape.
+        // dataset this inflates ~78 schema fields into 528 paths (~85% bloat). Run the same
+        // normalization `buildRunDataset` applies so this tool's `fields` matches the structured
+        // `storages.datasets.default.fields` shape.
         const normalized = metadata.fields
             ? { ...metadata, fields: normalizeDatasetFields(metadata.fields) }
             : metadata;
@@ -101,7 +99,7 @@ export const getDataset: ToolEntry = Object.freeze({
         const nextStep = resolveSiblingNextStep(
             HELPER_TOOLS.DATASET_GET_ITEMS,
             loadedToolNames,
-            `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}`,
+            `Use ${HELPER_TOOLS.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit (for example ${DEFAULT_DATASET_ITEMS_LIMIT}) to fetch items.${datasetSizeNextStepHint(inflatedBytes)}${fieldsProjectionHint(metadata.fields)}`,
         );
         return buildStorageResponse({
             structuredContent: normalized,

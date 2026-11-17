@@ -34,7 +34,7 @@ templates, instructions, refusals and link-out URLs name only the client-facing 
 then refuses, without a request, what the API tools refuse (`validateApiBlocklist` in
 `../tools/api/apify_api_blocklist.ts`): the `method` query parameter and a GET to the synchronous run
 endpoints. The API tools' `callApi` (`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`,
-`maskSessionToken()`, `redactJsonSecrets()` and `REDACTED`, so a change to any changes the
+`maskSessionToken()`, `redactJsonSecrets()`, `redactQueryString()` and `REDACTED`, so a change to any changes the
 tools too. `get-key-value-store-record` builds its inlined-record URI with `buildUrlOnOrigin()`.
 
 `sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through
@@ -64,7 +64,8 @@ Genuine failures **throw** a domain error carrying `data: { uri }` (SEP-2164 / d
 protocol adapters turn it into a JSON-RPC error, never success-shaped content): 3xx/4xx except
 429 → `InvalidParamsError`; 429, 5xx, no status (network, mid-stream drop) → `InternalError`. 401/403/429/5xx
 append a hint via `getHttpErrorHint()`
-(shared with `tools/call`); failures are logged via `logHttpError` (5xx → exception). Size
+(shared with `tools/call`); failures are logged via `logHttpError` (5xx → exception), with the URI's
+query cut to `?[REDACTED]` (`redactQueryString()`). Size
 link-outs are **successful** reads returning a download pointer, not failures. Discovery is the
 server-instructions prose plus `resources/templates/list`, which advertises the common URL shapes
 (dataset items, KVS record/keys, run, log) as RFC 6570 templates with paging params — advertisement

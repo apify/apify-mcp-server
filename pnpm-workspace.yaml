@@ -41,6 +41,16 @@ strictDepBuilds: false
 # Dependency version overrides. pnpm 11 reads these from the workspace manifest, not package.json.
 overrides:
   "@modelcontextprotocol/sdk": "1.32.1"
+  # oxfmt 0.51.0 pins tinypool 2.1.0 (GHSA-85c8-ppgw-ccpr, GHSA-5gmw-xhrv-c9v3: prototype-pollution gadgets
+  # to RCE in worker/run options). Dev-only. Remove once oxfmt is on >=0.67.0, which ships tinypool >=2.1.2.
+  tinypool: ">=2.1.2 <3"
+  # get-uri (via proxy-agent) pins basic-ftp ^5 (GHSA-c475-qrg2-pj4r: quadratic-time DoS in Client.list()). 6.x only
+  # changes the default for separate FTP transfer hosts, which PAC-over-FTP never uses here. Remove once get-uri
+  # depends on basic-ftp >=6.2.1.
+  basic-ftp: ">=6.2.1 <7"
+  # query-string 8 (via @apify/ui-library) pins decode-uri-component ^0.4 (GHSA-vcc3-ghjq-m6fr, GHSA-qr28-fpjm-wq7f:
+  # DoS via malformed percent-encoding). Same ESM default export. Remove once query-string depends on >=0.5.1.
+  decode-uri-component: ">=0.5.1 <1"
 
 # Required by pnpm v10+ modern `pnpm deploy`: workspace deps get copied ("injected")
 # into consumers' node_modules instead of symlinked, so deploy output is portable.

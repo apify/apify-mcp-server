@@ -206,6 +206,7 @@ describe('validateApiBlocklist()', () => {
             'actor-tasks/HG7ML7M8z78YcAPEB/run-sync-get-dataset-items',
             normalizeApiPath('/v2/actors/abc/run-sync'),
             normalizeApiPath('v2/actor-tasks/abc/run-sync'),
+            normalizeApiPath('//v2/acts/apify~hello-world/run-sync'),
         ])('refuses a GET to %j, not a POST', (normalizedPath) => {
             expect(validate({ normalizedPath })).toBe(SYNC_RUN_REFUSAL);
             expect(validate({ normalizedPath, method: 'POST' })).toBeUndefined();

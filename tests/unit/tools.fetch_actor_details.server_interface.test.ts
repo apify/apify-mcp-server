@@ -323,6 +323,16 @@ describe('the operations in full', () => {
         expect(text).not.toContain('example-server-actor');
     });
 
+    it('gives no base URL when the Server Actor URL is outside the Server Actor domain', () => {
+        const { serverInterface, text } = sectionOf({
+            actor: serverActor({ standbyUrl: 'https://server-actor-test.example.com' }),
+            loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS],
+        });
+
+        expect(serverInterface.baseUrl).toBeUndefined();
+        expect(text).not.toContain('example.com');
+    });
+
     // At the limit the operations fit in full; one byte over, the section is the index.
     it.each([0, 1])('counts the whole text against the byte limit, %i byte over', (over) => {
         const fullBytes = Buffer.byteLength(sectionOf({ schema: withDescriptionOnEmpty('') }).text);
@@ -558,7 +568,7 @@ describe('fetching details of a Server Actor', () => {
     ) => {
         const { apifyClient } = mockActorBuildClient({
             actor: mockActor({ id: 'server-actor-id', name: 'server-actor-test', username: 'apify', ...serverActor() }),
-            defaultBuild: mockDefaultBuild({ webServerSchema: SCHEMA }),
+            defaultBuild: mockDefaultBuild({ webServerSchema: SCHEMA, webServerMcpPath: undefined }),
             hasToken: false,
         });
         const client = mockApifyClient({

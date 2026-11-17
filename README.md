@@ -56,7 +56,7 @@ Your agent searches Apify Store, checks an Actor's input and pricing, runs it, a
 2. Copy the generated configuration, deeplink, or command into your client.
 3. Sign in to Apify in the browser window that opens. If you don't have an account, you can create a free one there.
 
-The hosted endpoint is `https://mcp.apify.com`. If your client can't use OAuth, send your [Apify API token](https://docs.apify.com/integrations/api#api-token) in an `Authorization: Bearer <APIFY_TOKEN>` header instead. Treat the token like a password and keep it out of repositories.
+The hosted endpoint is `https://mcp.apify.com`. If your client can't use OAuth, send your [Apify API token](https://docs.apify.com/integrations/api#api-token) in an `Authorization: Bearer <APIFY_TOKEN>` header instead. Treat the token like a password and keep it out of repositories. [Create a token in Apify Console](https://console.apify.com/settings/integrations) and copy it right after creating it. It is shown only once.
 
 Using a coding agent such as Claude Code, Codex, Cursor, or GitHub Copilot? An [official Apify plugin](https://docs.apify.com/agents/plugins) installs this MCP server together with [Apify agent skills](https://docs.apify.com/agents/skills) in one step.
 
@@ -165,6 +165,8 @@ Requires Node.js 22 or later.
   }
 }
 ```
+
+[Create an API token in Apify Console](https://console.apify.com/settings/integrations) and copy it right after creating it. It is shown only once.
 
 If you've run `apify login`, the server can also read the token saved by the Apify CLI. Run `npx @apify/actors-mcp-server --help` for all options.
 
@@ -380,7 +382,7 @@ Follow-ups work too. "Show me the next 10 results from that run" makes the agent
 
 ## 📡 Telemetry
 
-The Apify MCP server collects telemetry about tool calls to help Apify understand usage patterns and improve the service. Telemetry is **on** by default. With telemetry on, Actor searches in Apify Store send the MCP session ID as `_traceId`, and tool-call events carry it as `trace_id`. `search-actors` also sends `_useCase`, a one-sentence reason for the search written by the model, which Apify uses to improve Store search results. The stdio transport also uses [Sentry](https://sentry.io) for error tracking, which helps the Apify team find and fix issues faster.
+The Apify MCP server collects telemetry about tool calls to help Apify understand usage patterns and improve the service. Telemetry is **on** by default. With telemetry on, Actor searches in Apify Store send the first 12 hex characters of the SHA-256 hash of the MCP session ID as `_traceId`, and tool-call events carry it as `trace_id`. `search-actors` also sends `_useCase`, a one-sentence reason for the search written by the model, which Apify uses to improve Store search results. The stdio transport also uses [Sentry](https://sentry.io) for error tracking, which helps the Apify team find and fix issues faster.
 
 To opt out, including Sentry, set the `telemetry-enabled` URL parameter or the `--telemetry-enabled` CLI flag to `false`, or set `TELEMETRY_ENABLED=false`. CLI flags take precedence over environment variables.
 
@@ -397,6 +399,7 @@ TELEMETRY_ENABLED=false npx @apify/actors-mcp-server
 
 - **The local server won't start.** Check your Node.js version: the package requires Node.js 22 or later.
 - **Authentication fails.** Reconnect so the client repeats the OAuth flow, or switch to a Bearer token. For the local server, check that `APIFY_TOKEN` is set in the client's server configuration, not only in your shell.
+- **VS Code says the OAuth app is not registered.** Run **Authentication: Remove Dynamic Authentication Providers**, select Apify, and sign in again.
 - **Client features vary.** Any MCP client can connect, but support for dynamic tool lists, OAuth, and MCP Apps differs between clients.
 - **Invalid Actor input.** When `call-actor` fails because of invalid input, the error includes the Actor's input schema so the agent can correct the input and retry.
 

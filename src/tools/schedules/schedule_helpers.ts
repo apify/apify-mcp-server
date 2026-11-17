@@ -9,8 +9,10 @@ import {
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
+import { maskLoggedInputs, pickLoggedValues, REDACTED } from '../../resources/api_resources.js';
 import { getResourceByIdOrName } from '../../utils/apify_resource_id.js';
 import { toIsoString } from '../actors/actor_run_response.js';
+import { isRecord } from '../api/apify_api_spec.js';
 import { anyJsonObjectSchema } from '../structured_output_schemas.js';
 import { getTaskByIdOrName } from '../tasks/task_helpers.js';
 
@@ -42,10 +44,9 @@ export const cronExpressionSchema = z.string().min(1).max(100);
 
 /**
  * Only the length caps the API enforces. No `pattern`: the server's AJV removes that keyword
- * as a ReDoS mitigation (`utils/ajv.ts`), so a regex here never gates the call — it only fires in the
- * tool body's `parse()`, which throws a raw ZodError that reaches the client as serialised JSON with
- * the pattern in it. The API rejects the same name with a far better message, and the field's
- * `.describe()` text states the rule for the model.
+ * as a ReDoS mitigation (`utils/ajv.ts`), so a regex here would only fire in the tool body's `parse()`.
+ * The API rejects the same name with its own message, and the field's `.describe()` text states the
+ * rule for the model.
  */
 const scheduleNameSchema = z.string().min(3).max(63);
 
@@ -93,6 +94,28 @@ export const scheduleActionSchema = z.object({
     restartOnError: z.boolean().optional().describe('Actor actions only: restart the run when it fails.'),
 });
 export type ScheduleActionInput = z.infer<typeof scheduleActionSchema>;
+
+/**
+ * The logged copy of a schedule tool's arguments (`redactArgs`), built as an allowlist of `keys` and each action's
+ * declared keys, with the action's run input cut to its key names: its values can hold passwords, API keys, or cookies.
+ */
+export function redactScheduleToolArgs(
+    args: Record<string, unknown>,
+    keys: readonly string[],
+): Record<string, unknown> {
+    const { actions } = args;
+    const redactAction = (action: unknown) =>
+        isRecord(action)
+            ? {
+                  ...pickLoggedValues(action, Object.keys(scheduleActionSchema.shape)),
+                  ...maskLoggedInputs(action, ['input']),
+              }
+            : REDACTED;
+    return {
+        ...pickLoggedValues(args, keys),
+        ...(actions !== undefined && { actions: Array.isArray(actions) ? actions.map(redactAction) : REDACTED }),
+    };
+}
 
 /** Every schedule field the tools write, all optional; the create tool tightens `cronExpression` and `isEnabled`. */
 export const scheduleFieldsSchema = z.object({

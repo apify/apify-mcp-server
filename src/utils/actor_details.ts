@@ -2,6 +2,7 @@ import type { Build } from 'apify-client';
 
 import type { ApifyClient } from '../apify_client.js';
 import { CODE_RUNTIME_ACTOR_NAME } from '../const.js';
+import { getActorMCPServerPath } from '../mcp/actors.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/actor_input_schema.js';
 import { resolveServerInterfaceDefinition } from '../tools/actors/actor_definition.js';
 import type {
@@ -79,6 +80,8 @@ export type ActorDetailsResult = {
     readmeSummary?: string;
     /** API schema of the build standby serves (`resolveServerInterfaceDefinition`); absent when unresolved. */
     webServerSchema?: unknown;
+    /** MCP path of the same build; absent when the Actor declares none or the build is unresolved. */
+    webServerMcpPath?: string;
 };
 
 type FetchActorDetailsOptions = {
@@ -137,6 +140,7 @@ export async function fetchActorDetails(
             readme: buildInfo.actorDefinition.readme || 'No README provided.',
             readmeSummary: actorInfo.readmeSummary,
             webServerSchema: serverDefinition?.webServerSchema,
+            webServerMcpPath: (serverDefinition && getActorMCPServerPath(serverDefinition)) ?? undefined,
         };
     } catch (error) {
         // 404/400 is a genuine "Actor doesn't exist" — same treatment as the not-found check

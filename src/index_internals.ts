@@ -2,7 +2,7 @@
  This file provides essential internal functions for Apify MCP servers, serving as an internal library.
 */
 
-import { ApifyClient } from './apify_client.js';
+import { ApifyClient, runWithForwardedApiHeaders } from './apify_client.js';
 import { defaults, HELPER_TOOLS, type HelperToolName } from './const.js';
 import { processParamsGetTools } from './mcp/utils.js';
 import { resolvePaymentProvider } from './payments/index.js';
@@ -17,6 +17,7 @@ import {
 } from './tools/index.js';
 import type { ActorStore, ToolCategory } from './types.js';
 import { parseQueryParamList } from './utils/generic.js';
+import { LruCache } from './utils/lru.js';
 import { getExpectedToolNamesByCategories } from './utils/tool_categories_helpers.js';
 import { getToolPublicFieldOnly } from './utils/tools.js';
 import { TTLLRUCache } from './utils/ttl_lru.js';
@@ -25,6 +26,7 @@ export {
     ApifyClient,
     getExpectedToolNamesByCategories,
     getServerCard,
+    LruCache,
     TTLLRUCache,
     actorNameToToolName,
     defaults,
@@ -38,6 +40,7 @@ export {
     unauthEnabledTools,
     parseQueryParamList,
     resolvePaymentProvider,
+    runWithForwardedApiHeaders,
     type PaymentProvider,
 };
 

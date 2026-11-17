@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "apify-mcp-server",
   "display_name": "Apify",
-  "version": "0.21.4",
+  "version": "0.21.13",
   "description": "Extract data from any website with thousands of scrapers, crawlers, and automations on Apify Store.",
   "long_description": "Apify is the world's largest marketplace of tools for web scraping, crawling, data extraction, and web automation. Get structured data from social media, e-commerce, search engines, maps, travel sites, or any other website.",
   "keywords": [
@@ -66,7 +66,7 @@
     "apify_token": {
       "type": "string",
       "title": "Apify API token",
-      "description": "You can create a free account and get an API token at https://console.apify.com/settings/integrations",
+      "description": "Create a free Apify account if you don't have one, then create an API token for MCP in Apify Console (https://console.apify.com/settings/integrations) and copy it right after creating it. It is shown only once.",
       "sensitive": true,
       "required": true
     },

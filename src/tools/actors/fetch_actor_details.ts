@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
 import type {
     ConsoleLinkContext,
     HelperTool,
@@ -23,9 +23,9 @@ import { buildConsoleActorUrl, getConsoleLinkContext, VERBATIM_LINKS_NUDGE } fro
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import { canRunActor, getOwnServerRemedy } from '../actor_tool_naming.js';
+import { canRunActor, getOwnServerRemedy, hasMcpInterface } from '../actor_tool_naming.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
-import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from './actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInput } from './actor_tools_factory.js';
 import type { ServerInterfaceSection } from './server_interface_details.js';
 import { buildServerInterfaceDetails } from './server_interface_details.js';
 
@@ -108,6 +108,7 @@ export const fetchActorDetailsToolArgsSchema = z.object({
     actor: z
         .string()
         .min(1)
+        .max(RESOURCE_ID_OR_NAME_MAX_LENGTH)
         .describe(`Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".`),
     output: actorDetailsOutputOptionsSchema
         .optional()
@@ -176,6 +177,31 @@ export function buildActorNotRunnableGuidance(
     `;
 }
 
+/**
+ * `nextStep` for an MCP server Actor whose own MCP tools the session does not serve. It names only tools the
+ * session has and replaces the not-runnable guidance.
+ */
+function buildMcpServerNextStep(
+    details: ActorDetailsResult,
+    loadedToolNames: readonly string[],
+    loadedActorIds: ReadonlySet<string>,
+): string | undefined {
+    const { actorInfo, webServerMcpPath } = details;
+    if (loadedActorIds.has(actorInfo.id) || !hasMcpInterface(actorInfo, webServerMcpPath)) return undefined;
+    const canList = loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST);
+    const canCall = loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL);
+    const remedy = `To use them, ${getOwnServerRemedy()}`;
+    if (canList && canCall) return `This Actor is an MCP server; ${HELPER_TOOLS.ACTOR_MCP_TOOL_LIST} lists its tools.`;
+    if (canList) {
+        return (
+            `This Actor is an MCP server; ${HELPER_TOOLS.ACTOR_MCP_TOOL_LIST} lists its tools. ` +
+            `They cannot be called in this configuration. ${remedy}`
+        );
+    }
+    if (canCall) return `This Actor is an MCP server; ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} calls its tools by name.`;
+    return `This Actor is an MCP server. Its MCP tools cannot be listed or called in this configuration. ${remedy}`;
+}
+
 /** Build text and structured response for actor details. */
 export function buildActorDetailsTextResponse(options: {
     details: ActorDetailsResult;
@@ -183,11 +209,12 @@ export function buildActorDetailsTextResponse(options: {
     actorOutputSchema?: Record<string, unknown> | null;
     serverInterface?: ServerInterfaceSection;
     linkContext?: ConsoleLinkContext;
+    nextStep?: string;
 }): {
     texts: string[];
     structuredContent: Record<string, unknown>;
 } {
-    const { details, output, actorOutputSchema, serverInterface, linkContext } = options;
+    const { details, output, actorOutputSchema, serverInterface, linkContext, nextStep } = options;
 
     const actorUrl =
         buildConsoleActorUrl(linkContext, details.actorInfo.id) ??
@@ -232,6 +259,8 @@ export function buildActorDetailsTextResponse(options: {
 
     if (serverInterface?.text) texts.push(serverInterface.text);
 
+    if (nextStep) texts.push(nextStep);
+
     if (linkContext) {
         texts.push(VERBATIM_LINKS_NUDGE);
     }
@@ -242,6 +271,7 @@ export function buildActorDetailsTextResponse(options: {
         inputSchema: output.inputSchema ? details.inputSchema : undefined,
         outputSchema: output.outputSchema ? (actorOutputSchema ?? {}) : undefined,
         serverInterface: serverInterface?.serverInterface,
+        ...(nextStep && { nextStep }),
     };
 
     return { texts, structuredContent };
@@ -252,18 +282,9 @@ export function buildActorDetailsTextResponse(options: {
  * Returns the same text + structured response in both modes.
  */
 export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): Promise<ToolResponse> {
-    const {
-        args,
-        apifyToken,
-        apifyClient,
-        actorStore,
-        paymentProvider,
-        mcpSessionId,
-        loadedToolNames,
-        loadedActorIds,
-    } = toolArgs;
+    const { args, apifyToken, apifyClient, actorStore, paymentProvider, loadedToolNames, loadedActorIds } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
-    const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_GET_DETAILS });
+    const actorName = fixActorNameInput(parsed.actor);
     if (!actorName) return respondUserError(EMPTY_ACTOR_NAME_MESSAGE);
 
     const resolvedOutput = resolveOutputOptions(parsed.output);
@@ -298,6 +319,8 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
             : null;
     }
 
+    const nextStep = buildMcpServerNextStep(details, loadedToolNames, loadedActorIds);
+
     // NOTE: Data duplication between texts and structuredContent is intentional and required.
     // Some MCP clients only read text content, while others only read structured content.
     const { texts, structuredContent } = buildActorDetailsTextResponse({
@@ -306,10 +329,13 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         actorOutputSchema,
         serverInterface,
         linkContext,
+        nextStep,
     });
 
     // Resolved Actor ID, not the raw `actor` input — that may itself be an ID.
-    const runnableGuidance = buildActorNotRunnableGuidance(details.actorInfo.id, loadedToolNames, loadedActorIds);
+    const runnableGuidance = nextStep
+        ? ''
+        : buildActorNotRunnableGuidance(details.actorInfo.id, loadedToolNames, loadedActorIds);
     if (runnableGuidance) texts.push(runnableGuidance);
 
     return respondOk(texts, { structuredContent });

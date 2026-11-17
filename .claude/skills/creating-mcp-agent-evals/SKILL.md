@@ -19,7 +19,7 @@ Commands, item shapes, probe patterns, and sweep queries: [reference.md](referen
 4. **Write cases in waves**: 2–3 easy (single tool, explicit input) → 1–2 medium (cross-tool chains, run options) → 2–3 hard (vague user language, error recovery, collisions). Run and review each wave before writing the next.
 5. **Calibrate on the strongest model first** (Opus). A failure there is a case defect or a product gap — never a description problem. Only a calibrated suite (strong model 100%) can attribute weaker-model failures to descriptions.
 6. **Ladder down** (Sonnet → Haiku). Passes-on-Opus-fails-on-Haiku = the tool description or output doesn't carry a naive agent. That's the signal you built the suite for.
-7. **Fix tools via outputs before descriptions.** A steering sentence in the tool's response summary/nextStep reaches every agent on every call; description text gets skimmed. Both output nudges that fixed Haiku failures in the original build were response-text changes.
+7. **Fix tools via outputs before descriptions.** A steering sentence in the tool's response summary/nextStep reaches every agent on every call; description text gets skimmed.
 
 ## Diagnosing a failed case — in this order
 

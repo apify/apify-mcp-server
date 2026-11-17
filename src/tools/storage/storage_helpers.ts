@@ -1,9 +1,15 @@
-import { HELPER_TOOLS, HTTP_NOT_FOUND, MAX_INLINE_BYTES } from '../../const.js';
-import { getResourceByIdOrName, isAmbiguousResourceId } from '../../utils/apify_resource_id.js';
+import { ApifyApiError } from 'apify-client';
+import { isAxiosError } from 'axios';
+
+import type { ApifyClient } from '../../apify_client.js';
+import { isMaxContentLengthAbort, sendApifyApiRequest } from '../../apify_client.js';
+import { HELPER_TOOLS, HTTP_NOT_FOUND } from '../../const.js';
+import { assertValidRecordKey, getResourceByIdOrName, isAmbiguousResourceId } from '../../utils/apify_resource_id.js';
 import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
-import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
-import { getHttpStatusCode } from '../../utils/logging.js';
+import { QUOTE_WRAPPER_CHARS, stripEdgeChars } from '../../utils/generic.js';
+import { getHttpStatusCode, toPlainError } from '../../utils/logging.js';
 import { respondOk } from '../../utils/mcp.js';
+import { isRecord } from '../api/apify_api_spec.js';
 
 /**
  * Wrap a storage SDK promise to convert a 404 rejection into null.
@@ -163,33 +169,41 @@ export function buildStorageListSummaryNextStep(params: {
 }
 
 /**
- * Pagination-aware {summary, nextStep}: when more items remain, point at the next page;
- * otherwise point at get-dataset for the field list (structure lives there, not in a heavy schema dump).
+ * {summary, nextStep} guidance for a dataset items page. The counts and offsets are in the structured
+ * content, so the text does not repeat them. More pages remain while `offset + limit < totalItemCount`:
+ * with `clean`, the API pages before it drops empty items, so `itemCount` can fall short of the page size.
+ * An empty page counts as past the end only when its offset is, because `totalItemCount` lags new pushes.
  */
 export function buildDatasetItemsSummaryNextStep(params: {
     datasetId: string;
     itemCount: number;
     totalItemCount: number;
     offset: number;
-    /** Active loaded tool set; gates the terminal get-dataset reference (see #1007). */
+    limit: number;
+    /** Active loaded tool set; gates the terminal get-dataset reference. */
     loadedToolNames: readonly string[];
 }): { summary: string; nextStep: string } {
-    const { datasetId, itemCount, totalItemCount, offset, loadedToolNames } = params;
-    if (offset + itemCount < totalItemCount) {
+    const { datasetId, itemCount, totalItemCount, offset, limit, loadedToolNames } = params;
+    if (itemCount === 0 && totalItemCount > 0 && offset >= totalItemCount) {
         return {
-            summary: `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}).`,
-            nextStep: `Call ${HELPER_TOOLS.DATASET_GET_ITEMS} again with offset=${offset + itemCount} to fetch the next page.`,
+            summary: 'No items at this offset: it is past the end of the dataset.',
+            nextStep: `Call ${HELPER_TOOLS.DATASET_GET_ITEMS} with a lower offset.`,
         };
     }
-    const summary =
-        offset === 0 && itemCount === totalItemCount
-            ? `Fetched all ${itemCount} items.`
-            : `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}); no more pages.`;
+    if (offset + limit < totalItemCount) {
+        return {
+            summary: 'Fetched one page; more items remain.',
+            nextStep: `Call ${HELPER_TOOLS.DATASET_GET_ITEMS} again with offset increased by limit to fetch the next page.`,
+        };
+    }
     return {
-        summary,
-        nextStep: suggestTool(HELPER_TOOLS.DATASET_GET, loadedToolNames)
-            ? `Use ${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} to see the field list if you need the data structure.`
-            : `No more pages. Inspect the returned items directly.`,
+        summary: 'Fetched the last page; no more items remain.',
+        nextStep: resolveSiblingNextStep(
+            HELPER_TOOLS.DATASET_GET,
+            loadedToolNames,
+            `Use ${HELPER_TOOLS.DATASET_GET} with datasetId=${datasetId} to see the field list if you need the data structure.`,
+            'Inspect the returned items directly.',
+        ),
     };
 }
 
@@ -239,20 +253,9 @@ export function buildKvsKeysSummaryNextStep(params: {
  * allow `'` as a valid character (`/^[a-zA-Z0-9!\-_.'()]{1,256}$/`), so
  * stripping it could corrupt a real key.
  */
-const NORMALIZE_RECORD_KEY_REGEX = new RegExp(`^[${QUOTE_WRAPPER_CHARS}]+|[${QUOTE_WRAPPER_CHARS}]+$`, 'g');
 export function normalizeRecordKey(key: string): string {
-    return key.trim().replace(NORMALIZE_RECORD_KEY_REGEX, '').trim();
+    return stripEdgeChars(key.trim(), QUOTE_WRAPPER_CHARS).trim();
 }
-
-/**
- * How to surface a binary key-value-store record value: inline as base64 below
- * `MAX_INLINE_BYTES`, otherwise link out (inlining a multi-MB blob would blow up the
- * client's context). `mimeType` is the Content-Type with parameters stripped and lowercased
- * (`Image/PNG; charset=…` → `image/png`), or `undefined` when no Content-Type was declared.
- */
-export type BinaryRecordDisposition =
-    | { kind: 'inline'; mimeType?: string; base64: string }
-    | { kind: 'linkOut'; mimeType?: string; bytes: number };
 
 /**
  * Base MIME type of a Content-Type header: parameters stripped, lowercased
@@ -264,14 +267,81 @@ export function parseBaseMimeType(contentType: string | undefined): string | und
 }
 
 /**
- * Build the transport disposition for a binary record value: normalize the MIME type, decide
- * inline-vs-link-out at the byte threshold, base64-encode when inlining. It does NOT mint the
- * link-out URL — the caller handles `linkOut` by minting its own URL via async calls.
+ * A record read by `fetchRecordUnderCap`: the value as apify-client parses it (JSON -> object, text/xml ->
+ * string, else -> Buffer, empty -> `undefined`), `isOverLimit` when the body passed `MAX_INLINE_BYTES`, or
+ * `isUnparsable` when the body does not match its Content-Type.
  */
-export function buildBinaryRecordDisposition(contentType: string | undefined, value: Buffer): BinaryRecordDisposition {
-    const mimeType = parseBaseMimeType(contentType);
-    if (value.length > MAX_INLINE_BYTES) {
-        return { kind: 'linkOut', ...(mimeType !== undefined && { mimeType }), bytes: value.length };
+export type FetchedRecord =
+    | { isOverLimit: false; isUnparsable?: false; value: unknown; contentType?: string }
+    | { isOverLimit: false; isUnparsable: true; contentType?: string }
+    | { isOverLimit: true; contentType?: string };
+
+/**
+ * The Content-Type of a body apify-client could not parse as that type, e.g. gzip bytes stored as
+ * `application/json`. `null` when the error is anything else.
+ */
+function readUnparsableBodyContentType(error: unknown): { contentType?: string } | null {
+    if (!isRecord(error) || error.code !== 'invalid-response-body') return null;
+    const headers = isRecord(error.response) ? error.response.headers : undefined;
+    const contentType = isRecord(headers) ? headers['content-type'] : undefined;
+    return typeof contentType === 'string' ? { contentType } : {};
+}
+
+/**
+ * Sends the request once more when the body could not be parsed: an interrupted response can end early
+ * without an error. apify-client's `call()` retries that case, and `sendApifyApiRequest` skips `call()`.
+ */
+async function sendWithParseRetry<T>(send: () => Promise<T>): Promise<T> {
+    try {
+        return await send();
+    } catch (error) {
+        if (!readUnparsableBodyContentType(error)) throw error;
+        return send();
     }
-    return { kind: 'inline', ...(mimeType !== undefined && { mimeType }), base64: value.toString('base64') };
+}
+
+/** The Content-Type of a response axios aborted mid-body; Node's request object keeps the response it got. */
+function readAbortedResponseContentType(error: unknown): string | undefined {
+    const request: unknown = isAxiosError(error) ? error.request : undefined;
+    const headers = isRecord(request) && isRecord(request.res) ? request.res.headers : undefined;
+    const contentType = isRecord(headers) ? headers['content-type'] : undefined;
+    return typeof contentType === 'string' ? contentType : undefined;
+}
+
+/**
+ * Reads a key-value store record without holding more than `MAX_INLINE_BYTES` of it: a record is as large
+ * as its writer made it, and `getRecord()` buffers it whole. Over the limit the download stops and the
+ * result has only the Content-Type, not the size: axios drops `Content-Encoding` once it decompresses, so
+ * `Content-Length` cannot be told from a compressed length. `undefined` on a 404, as `getRecord()` returns.
+ */
+export async function fetchRecordUnderCap(
+    client: ApifyClient,
+    safeId: string,
+    recordKey: string,
+): Promise<FetchedRecord | undefined> {
+    // Built outside the `try`: an invalid store name or key must surface as it is thrown.
+    const url = `${client.keyValueStore(safeId).url}/records/${assertValidRecordKey(recordKey)}`;
+    let response: Awaited<ReturnType<typeof sendApifyApiRequest>>;
+    try {
+        response = await sendWithParseRetry(async () =>
+            sendApifyApiRequest(client, {
+                url,
+                method: 'GET',
+                // As `getRecord()` sends.
+                params: { attachment: 'true' },
+            }),
+        );
+    } catch (error) {
+        // Still unparsable on the second read: the record's writer chose its bytes and its Content-Type,
+        // so a mismatch is not a server fault.
+        const unparsable = readUnparsableBodyContentType(error);
+        if (unparsable) return { isOverLimit: false, isUnparsable: true, ...unparsable };
+        if (!isMaxContentLengthAbort(error)) throw toPlainError(error);
+        const contentType = readAbortedResponseContentType(error);
+        return { isOverLimit: true, ...(contentType && { contentType }) };
+    }
+    if (response.status === HTTP_NOT_FOUND) return undefined;
+    if (response.status >= 300) throw new ApifyApiError(response, 1);
+    const contentType = response.headers['content-type'];
+    return { isOverLimit: false, value: response.data, ...(typeof contentType === 'string' && { contentType }) };
 }

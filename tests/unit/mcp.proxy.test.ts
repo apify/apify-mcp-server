@@ -315,4 +315,29 @@ describe('getMCPServerTools()', () => {
             getMCPServerTools('actor-id', client, 'https://example-mcp-server.apify.actor/mcp', 'apify/example'),
         ).rejects.toThrow();
     });
+
+    it('serves the input schema its validator was compiled from', async () => {
+        const client = {
+            listTools: async () => ({
+                tools: [
+                    {
+                        name: 'add',
+                        description: 'Adds two numbers',
+                        inputSchema: { $async: true, type: 'object', required: ['a'] },
+                    },
+                ],
+            }),
+        } as unknown as Client;
+
+        const [tool] = await getMCPServerTools(
+            'Iei3c51WbI7eKwgSg',
+            client,
+            'https://example-mcp-server.apify.actor/mcp',
+            'apify/example-mcp-server',
+        );
+
+        // `$async` is left out at compile, so the served schema does not carry it to the client either.
+        expect(tool.inputSchema).toEqual({ type: 'object', required: ['a'] });
+        expect(tool.ajvValidate({})).toBe(false);
+    });
 });

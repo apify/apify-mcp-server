@@ -2,7 +2,7 @@ import type { Actor, ActorBuildOptions, Build } from 'apify-client';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
 import type { ConsoleLinkContext } from '../../types.js';
 import { buildConsoleBuildUrl } from '../../utils/console_link.js';
 import { logHttpError } from '../../utils/logging.js';
@@ -133,7 +133,7 @@ export function buildNextStepForBuild(
     }
     if (TERMINAL_RUN_STATUSES.has(build.status)) {
         return loadedToolNames.includes(HELPER_TOOLS.ACTOR_BUILD_LOG)
-            ? `Read the build log with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId ${build.id}; pass lines 0 for the whole log.`
+            ? `Read the build log with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId ${build.id}; pass lines 0 for the whole log, up to its last ${MAX_INLINE_BYTES} bytes.`
             : 'Read the build log for the error, fix the source, and build again.';
     }
     if (options.nonTerminalNextStep !== undefined) return options.nonTerminalNextStep;

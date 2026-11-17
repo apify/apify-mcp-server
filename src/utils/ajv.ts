@@ -1,12 +1,12 @@
-import type { ValidateFunction } from 'ajv';
+import type { Options, ValidateFunction } from 'ajv';
 import Ajv from 'ajv';
 
 /**
  * Ajv with the server's validation policy. One instance per compile, never shared: Ajv caches every compiled
  * schema in a Map that is never evicted.
  */
-export function createAjv(): Ajv {
-    const instance = new Ajv({ coerceTypes: 'array', strict: false, removeAdditional: true });
+export function createAjv(options: Options = {}): Ajv {
+    const instance = new Ajv({ coerceTypes: 'array', strict: false, removeAdditional: true, ...options });
 
     // `pattern`/`patternProperties` compile a RegExp from untrusted Actor / proxied-MCP input schemas;
     // a catastrophic-backtracking pattern freezes the single-threaded event loop (ReDoS). `format` is
@@ -14,12 +14,14 @@ export function createAjv(): Ajv {
     // layer only sanitizes LLM args — the Actor re-validates its real input on the run — so dropping
     // regex enforcement removes the DoS surface with no loss of protection. Consequence for `src/`
     // schemas: a `.regex()` on a Zod field is NOT enforced here. It still reaches `tools/list` and still
-    // fires in a tool body's `parse()`, where it throws a raw ZodError at the client instead of a
-    // readable error — so rely on the API's own validation rather than adding one. `taskNameSchema`
-    // (`tools/tasks/task_helpers.ts`) still carries one and predates this note.
+    // fires in a tool body's `parse()`, which the server reports as invalid arguments. `taskNameSchema`
+    // (`tools/tasks/task_helpers.ts`) carries one.
     instance.removeKeyword('pattern');
     instance.removeKeyword('patternProperties');
     instance.removeKeyword('format');
+    // `uniqueItems` compares every pair of items unless they are typed scalars, so its cost grows with the
+    // square of the array. Dropped for the same reason; the platform or the proxied MCP server enforces it.
+    instance.removeKeyword('uniqueItems');
     return instance;
 }
 

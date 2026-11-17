@@ -25,7 +25,6 @@ jobs:
                 run: pnpm run test:integration
 
     conformance_tests:
-        needs: integration_tests
         name: Conformance tests
         uses: ./.github/workflows/_conformance_tests.yaml
         secrets:

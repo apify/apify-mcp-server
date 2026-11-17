@@ -1,13 +1,14 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolResultSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../const.js';
+import { FAILURE_CATEGORY, HELPER_TOOLS, RESOURCE_ID_OR_NAME_MAX_LENGTH, TOOL_STATUS } from '../../const.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
 import { withRemoteMcpClient } from '../../mcp/remote_tool_call.js';
+import { maskLoggedInputs, pickLoggedValues } from '../../resources/api_resources.js';
 import type {
     ActorInterfaces,
     InternalToolArgs,
@@ -24,14 +25,18 @@ import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondRaw, respondServerError, respondUserError } from '../../utils/mcp.js';
 import { findServerTool, resolveActorInterfaces } from '../actor_tool_naming.js';
 import { anyJsonObjectSchema } from '../structured_output_schemas.js';
-import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from './actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInput } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 
 /** The MCP spec's upper bound for a tool name. */
 export const MCP_TOOL_NAME_MAX_LENGTH = 128;
 
 const callActorMcpToolArgs = z.object({
-    actor: z.string().min(1).describe('The MCP server Actor: its ID, or its name in the "username/name" form.'),
+    actor: z
+        .string()
+        .min(1)
+        .max(RESOURCE_ID_OR_NAME_MAX_LENGTH)
+        .describe('The MCP server Actor: its ID, or its name in the "username/name" form.'),
     tool: z.string().min(1).max(MCP_TOOL_NAME_MAX_LENGTH).describe("The name of the tool on the Actor's MCP server."),
     arguments: anyJsonObjectSchema
         .optional()
@@ -90,7 +95,7 @@ export async function runOnActorMcpServer(
             },
         );
     }
-    const actorName = fixActorNameInputAndLog(params.actor, { mcpSessionId });
+    const actorName = fixActorNameInput(params.actor);
     if (!actorName) return respondUserError(EMPTY_ACTOR_NAME_MESSAGE);
     const cached = await getActorDefinitionCached(actorName, apifyClient);
     if (!cached) return buildActorNotFoundResponse(actorName, loadedToolNames);
@@ -145,18 +150,40 @@ export async function runOnActorMcpServer(
     }
 }
 
+/**
+ * True when the remote server rejected the tool name. Servers that throw a plain error from their handler
+ * answer with an internal error (-32603) rather than invalid params, so only the message tells.
+ * The prefix repeats when the server throws an `McpError`, whose message already carries it.
+ */
+function isUnknownRemoteToolError(error: unknown, toolName: string): boolean {
+    return (
+        error instanceof McpError && /^(?:MCP error -?\d+: )+unknown tool: (.+)$/i.exec(error.message)?.[1] === toolName
+    );
+}
+
 export async function executeCallActorMcpTool(toolArgs: InternalToolArgs): Promise<ToolResponse> {
     const parsed = callActorMcpToolArgs.parse(toolArgs.args);
     return runOnActorMcpServer(toolArgs, {
         actor: parsed.actor,
         operation: `call MCP tool '${parsed.tool}'`,
         run: async (client) => {
+            let remoteResult: Awaited<ReturnType<Client['callTool']>>;
+            try {
+                remoteResult = await client.callTool(
+                    { name: parsed.tool, arguments: parsed.arguments ?? {} },
+                    CallToolResultSchema,
+                    { timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, signal: toolArgs.signal },
+                );
+            } catch (error) {
+                if (!isUnknownRemoteToolError(error, parsed.tool)) throw error;
+                // A wrong tool name is the caller's to fix, e.g. one of this server's own tool names.
+                const hint = toolArgs.loadedToolNames.includes(HELPER_TOOLS.ACTOR_MCP_TOOL_LIST)
+                    ? ` ${HELPER_TOOLS.ACTOR_MCP_TOOL_LIST} lists its tools.`
+                    : '';
+                return respondUserError(`Actor '${parsed.actor}' has no MCP tool named '${parsed.tool}'.${hint}`);
+            }
             // `toolTelemetry` is this server's internal channel, so a remote result must not set it.
-            const { toolTelemetry: _remoteTelemetry, ...result } = await client.callTool(
-                { name: parsed.tool, arguments: parsed.arguments ?? {} },
-                CallToolResultSchema,
-                { timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, signal: toolArgs.signal },
-            );
+            const { toolTelemetry: _remoteTelemetry, ...result } = remoteResult;
             const response = respondRaw(result as CallToolResult);
             if (!result.isError) return response;
             // The remote reports no cause, so this is recorded like a proxied Actor MCP tool's error.
@@ -180,6 +207,11 @@ export const callActorMcpTool: ToolEntry = Object.freeze({
     // A third-party payment provider cannot pay for a Server Actor run, so such a session is rejected before the call.
     hasPaymentProviderStandbyCheck: true,
     actorInterface: 'mcp',
+    // The remote tool's arguments can hold credentials, so only their key names are logged.
+    redactArgs: (args: Record<string, unknown>) => ({
+        ...pickLoggedValues(args, Object.keys(callActorMcpToolArgs.shape)),
+        ...maskLoggedInputs(args, ['arguments']),
+    }),
     annotations: {
         title: 'Call Actor MCP tool',
         readOnlyHint: false,

@@ -37,7 +37,10 @@ export async function getActorDefinitionCached(
     actorIdOrName: string,
     apifyClient: ApifyClient,
 ): Promise<ActorDefinitionWithInfo | null> {
-    const cached = actorDefinitionCache.get(actorIdOrName);
+    // The platform resolves `~name` to the caller's own Actor (apify-client sends `/name` as `~name`), so one
+    // string names a different Actor per token and must not be a key in the process-wide cache.
+    const isCallerRelativeName = /^[~/]/.test(actorIdOrName);
+    const cached = isCallerRelativeName ? undefined : actorDefinitionCache.get(actorIdOrName);
     if (cached && (await callerMaySeeCachedActor(cached, apifyClient))) return cached;
     const fetched = await getActorDefinition(actorIdOrName, apifyClient);
     // Without a token, a Standby build named by an untagged build number can't be resolved (listing builds needs
@@ -49,7 +52,9 @@ export async function getActorDefinitionCached(
         fetched?.info.actorStandby?.isEnabled === true &&
         !fetched.definition.webServerMcpPath &&
         !fetched.definition.hasWebServerSchema;
-    if (fetched && !isUnresolvedAnonymousServer) actorDefinitionCache.set(actorIdOrName, fetched);
+    if (fetched && !isUnresolvedAnonymousServer && !isCallerRelativeName) {
+        actorDefinitionCache.set(actorIdOrName, fetched);
+    }
     return fetched;
 }
 
