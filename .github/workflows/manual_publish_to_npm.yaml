@@ -56,14 +56,28 @@ jobs:
                 # devEngines `onFail: error` pin (`npm publish` would be rejected).
                 # `--no-git-checks` skips pnpm's working-tree/branch guards — release
                 # tags & branches are validated upstream by the release workflow.
-                run: pnpm publish --tag ${{ inputs.tag }} --no-git-checks
+                #
+                # A beta publish that fails is retried with the next beta number.
+                # `before-beta-release.js` picks the number from the versions the
+                # registry lists, and a beta that npm is still scanning is not listed
+                # yet, so two merges close together can pick the same number.
+                run: |
+                    for _ in 1 2 3; do
+                        pnpm publish --tag ${{ inputs.tag }} --no-git-checks && exit 0
+                        [ "${{ inputs.tag }}" = "beta" ] || exit 1
+                        jq '.version |= (capture("^(?<base>.*-beta\\.)(?<n>\\d+)$") | "\(.base)\(.n | tonumber + 1)")' package.json > package.json.tmp
+                        mv package.json.tmp package.json
+                        echo "Publish failed, retrying as $(jq -r '.version' package.json)"
+                    done
+                    exit 1
             -   name: Wait until the version is on the registry
                 # npm scans each version before it becomes installable: "typically around five
                 # minutes ... up to 15 minutes or more" (https://github.blog/changelog/2026-07-28-npm-publish-time-malware-scanning-and-dual-use-metadata/).
                 # After a stable release, the smoke test and the internal repo bump install
                 # the version right away, so don't finish until the registry serves it.
                 # Nothing installs a beta right after publishing, so beta skips the wait
-                # and releases the `release` concurrency group sooner.
+                # and releases the `release` concurrency group sooner. The next beta
+                # publish may not see this version yet; its publish step retries.
                 if: ${{ inputs.tag == 'latest' }}
                 run: |
                     version=$(jq -r '.version' package.json)
