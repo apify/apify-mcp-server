@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.21.12 - **not yet released**
+## [0.21.12](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.12) (2026-11-17)
 
 ### 🐛 Bug Fixes
 
@@ -14,7 +13,6 @@ All notable changes to this project will be documented in this file.
 - Show a UserInputError message as is, not wrapped again ([#1921](https://github.com/apify/apify-mcp-server/pull/1921)) ([34f8efa](https://github.com/apify/apify-mcp-server/commit/34f8efafa8ac2be5463b594136dbdc4eda641a6a)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.21.11](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.11) (2026-11-16)
 
 ### 🐛 Bug Fixes
