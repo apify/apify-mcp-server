@@ -81,6 +81,7 @@ chore: Update dependencies
 
 Write for a reviewer who has the diff open: lead with what changes for the user, not with the code. Use the [template](./.github/pull_request_template.md).
 - **Opener** (required): 1–3 sentences on what changes for the user or agent, and why, with the issue link (`Closes #123`). Write it yourself, or rewrite the agent's draft. Add one line for a decision that needs the reviewer's judgement or a part you're unsure about.
+- **Context the diff does not show**: when the change depends on behavior outside the diff (a dependency's side effect, a caller in another file), explain it right after the opener, in this order: what happens today, naming the function; why it matters (who hits it and what they see, or the number you measured); what the change does; what stays the same.
 - **Before / after**: a real tool call with its result text, or a screenshot.
 - **Breaking / unchanged**: state breaking contracts and any impact on apify-mcp-server-internal. Mention unchanged behavior only if a reviewer might reasonably assume it changed.
 - **Proof** (required): one line stating what you tested and the observed result. A focused regression test counts; use `mcpc` when tool behavior warrants it. Put long output in the collapsed block.
@@ -88,6 +89,8 @@ Write for a reviewer who has the diff open: lead with what changes for the user,
 Every PR links an issue (see [Before you write code](#before-you-write-code)). A PR without one is a documentation fix or, in exceptional cases, a maintainer change labelled `adhoc` whose opener states the problem.
 
 Omit any section that doesn't apply. Don't list files, narrate commits or describe the review history. Put long agent-written detail in the collapsed `<details>` block; delete it if unused.
+
+For a security fix, keep the measurements and the reproduction in the private issue. The PR description, commit messages and code comments say what the code does and link the issue.
 
 ---
 
@@ -199,10 +202,11 @@ Use comments to guide reviewers:
         3. **If you can't write a clear comment, the code is probably the problem.** A comment you struggle to phrase is a signal to simplify the code.
         4. **Dispel confusion, don't cause it.** A comment that contradicts the code (wrong `@param`, stale example, inverted assertion) is worse than none — keep comments in sync with the code they describe.
         5. **Explain unidiomatic code.** When code is deliberately unusual (a cast the compiler forces, a workaround for an upstream quirk), say why. This is the comment that earns its place.
-        6. **Link the source of copied/adapted code.** Paste a URL to the original.
-        7. **Link external references where they help.** API endpoints, spec sections, algorithms — link the exact page (e.g. the matching `docs.apify.com/api/v2/...` slug), not a generic one.
-        8. **Comment bug fixes.** When a line exists to fix a bug or work around a defect, note it and link the issue (`// see apify/apify-mcp-server#637`).
-        9. **Mark incomplete work.** Use `TODO`/`FIXME` with concrete context and an issue link where one exists (e.g. `TODO(#675): ...`) — not a vague `// TODO: fix this`.
+        6. **Give the setup the reason depends on.** When the reason lies in other code (a dependency's side effect, a caller elsewhere), say what that code does, then why it is a problem here, then what this code does about it. One idea per sentence. Example: `ACCEPT_ANY_RESULT` in `src/mcp/client.ts`.
+        7. **Link the source of copied/adapted code.** Paste a URL to the original.
+        8. **Link external references where they help.** API endpoints, spec sections, algorithms — link the exact page (e.g. the matching `docs.apify.com/api/v2/...` slug), not a generic one.
+        9. **Comment bug fixes.** When a line exists to fix a bug or work around a defect, note it and link the issue (`// see apify/apify-mcp-server#637`).
+        10. **Mark incomplete work.** Use `TODO`/`FIXME` with concrete context and an issue link where one exists (e.g. `TODO(#675): ...`) — not a vague `// TODO: fix this`.
     * **No commented-out code.** Delete it; git history is the archive. Don't repeat the same comment across many lines — state it once (file- or block-level) or make the code self-explanatory.
 
 *   **Parameters**
