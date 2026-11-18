@@ -10,18 +10,18 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             -   name: Checkout repository
-                uses: actions/checkout@v6
+                uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
             -   name: Run actionlint
-                uses: rhysd/actionlint@v1.7.10
+                uses: rhysd/actionlint@0933c147c9d6587653d45fdcb4c497c57a65f9af # v1.7.10
 
     lint_check:
         name: Lint
         runs-on: ubuntu-latest
 
         steps:
-            -   uses: actions/checkout@v6
+            -   uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
             -   name: Use Node.js
-                uses: actions/setup-node@v6
+                uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
                 with:
                     node-version-file: '.nvmrc'
             -   name: Install pnpm and dependencies
@@ -40,9 +40,9 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            -   uses: actions/checkout@v6
+            -   uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
             -   name: Use Node.js
-                uses: actions/setup-node@v6
+                uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
                 with:
                     node-version-file: '.nvmrc'
             -   name: Install pnpm and dependencies
@@ -61,9 +61,9 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            -   uses: actions/checkout@v6
+            -   uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
             -   name: Use Node.js ${{ matrix.node-version }}
-                uses: actions/setup-node@v6
+                uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
                 with:
                     node-version: ${{ matrix.node-version }}
             -   name: Install pnpm and dependencies
@@ -76,9 +76,9 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            -   uses: actions/checkout@v6
+            -   uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
             -   name: Use Node.js
-                uses: actions/setup-node@v6
+                uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
                 with:
                     node-version-file: '.nvmrc'
             -   name: Install pnpm and dependencies
@@ -95,13 +95,13 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            -   uses: actions/checkout@v6
+            -   uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
             # Default `docker` driver builds straight into the runner's daemon: no buildkit
             # container, no tarball load. No layer cache — restoring and saving the
             # dependency layer through GHA cache took longer than a fresh `pnpm install`.
             -   name: Build image
-                uses: docker/build-push-action@v6
+                uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
                 with:
                     context: .
                     load: true
