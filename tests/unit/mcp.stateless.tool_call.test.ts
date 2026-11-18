@@ -441,6 +441,30 @@ describe('createStatelessServer() tools/call', () => {
         }, options);
     });
 
+    it('answers arguments failing the input schema with an isError tool result', async () => {
+        // The tool has an outputSchema, so the result also passes the SDK codec's projection against it.
+        const schema = { type: 'object', properties: { x: { type: 'string' } }, required: ['x'] };
+        const tool = {
+            type: TOOL_TYPE.INTERNAL,
+            name: 'strict-schema-tool',
+            description: 'requires x',
+            inputSchema: schema as ToolInputSchema,
+            ajvValidate: compileSchema(schema),
+            outputSchema: { type: 'object', properties: { y: { type: 'string' } }, required: ['y'] },
+            call: async () => respondRaw({ content: [], structuredContent: { y: 'ok' } }),
+        } as ToolEntry;
+
+        await withStatelessServer(async ({ server, call }) => {
+            await loadSource(server, [tool]);
+
+            const response = await call('tools/call', { name: 'strict-schema-tool', arguments: {} });
+
+            expect(response.error).toBeUndefined();
+            expect(response.result?.isError).toBe(true);
+            expect(JSON.stringify(response.result?.content)).toContain("must have required property 'x'");
+        });
+    });
+
     it('answers an unknown tool name with an invalid-params protocol error', async () => {
         await withStatelessServer(async ({ server, call }) => {
             await loadSource(server, []);

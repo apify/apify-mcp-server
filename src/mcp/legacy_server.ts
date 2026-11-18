@@ -465,6 +465,11 @@ export class LegacyMcpServer {
                         validationAdditionalProperty: prepared.callDiagnostics.validation_additional_property,
                         ...prepared.logFields,
                     });
+                    if (prepared.isToolExecutionError) {
+                        const result = { content: [{ type: 'text' as const, text: prepared.message }], isError: true };
+                        toolResult = result;
+                        return result;
+                    }
                     await this.server.sendLoggingMessage({ level: 'error', data: prepared.message });
                     throw new McpError(ErrorCode.InvalidParams, prepared.message);
                 }

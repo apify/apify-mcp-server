@@ -151,6 +151,35 @@ describe('prepareToolCall()', () => {
         });
     });
 
+    it('rejects a denied direct-Actor input as a tool execution error', async () => {
+        const schema = { type: 'object', properties: { startUrls: { type: 'array' } } };
+        const tool: ToolEntry = {
+            type: TOOL_TYPE.ACTOR,
+            name: actorNameToToolName('apify/website-content-crawler'),
+            description: 'crawls websites',
+            inputSchema: schema as ToolInputSchema,
+            ajvValidate: compileSchema(schema),
+            actorId: 'actor-id-1',
+            actorFullName: 'apify/website-content-crawler',
+        };
+        const result = await prepareToolCall({
+            tools: new Map([[tool.name, tool]]),
+            apifyToken: 'fake-token',
+            name: tool.name,
+            args: { pageFunction: 'async () => {}' },
+            meta: undefined,
+            requestHeaders: undefined,
+            isTaskRequest: false,
+            mcpSessionId: 's1',
+            telemetryData: null,
+            clientContext: undefined,
+        });
+        const invalid = result as InvalidToolCall;
+
+        expect(invalid.message).toContain('"pageFunction"');
+        expect(invalid.isToolExecutionError).toBe(true);
+    });
+
     it('returns a PreparedCall and updates telemetry tool_name for a valid call', async () => {
         await withServer(async (server) => {
             const { tool } = makeRecorderTool('recorder-tool');

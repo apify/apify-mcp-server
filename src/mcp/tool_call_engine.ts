@@ -135,9 +135,18 @@ function buildReplacedToolText(name: string, tools: Map<string, ToolEntry>): str
     return `\nTool "${name}" was replaced: ${replacements.map(([toolName, use]) => `${toolName} ${use}`).join(' and ')}.`;
 }
 
-/** A pre-dispatch failure that the shell converts to v1's protocol-error sequence. */
+/**
+ * A pre-dispatch failure. The shell returns `message` as a tool result with `isError: true` when
+ * `isToolExecutionError` is set, and as an InvalidParams protocol error otherwise.
+ */
 export type InvalidToolCall = {
     message: string;
+    /**
+     * Set when the arguments fail the tool's input checks on a call that is not task-augmented. The MCP spec
+     * (2025-11-25, SEP-1303) classifies input-validation errors as tool execution errors, so the model can correct
+     * its arguments. A task-augmented call keeps the protocol error: the SDK accepts only a `CreateTaskResult` there.
+     */
+    isToolExecutionError?: boolean;
     toolStatus: ToolStatus;
     callDiagnostics: CallDiagnostics;
     logFields?: Record<string, unknown>;
@@ -370,6 +379,7 @@ export async function prepareToolCall(params: {
         if (tool.type === TOOL_TYPE.ACTOR && deniedInputs.length) {
             return {
                 message: `Invalid arguments for tool "${tool.name}": ${buildDeniedInputsNote(tool.actorFullName, deniedInputs)}`,
+                isToolExecutionError: !isTaskRequest,
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
                 callDiagnostics: {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
@@ -411,6 +421,7 @@ export async function prepareToolCall(params: {
                     ...(replacedToolText ? [replacedToolText.trim()] : []),
                     ...(runInputRewrite ? [runInputRewrite.note] : exampleCall ? [`Example call: ${exampleCall}`] : []),
                 ].join('\n'),
+                isToolExecutionError: !isTaskRequest,
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
                 callDiagnostics: {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
