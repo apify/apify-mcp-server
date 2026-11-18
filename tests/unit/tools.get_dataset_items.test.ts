@@ -1,15 +1,20 @@
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+
 import { describe, expect, it, vi } from 'vitest';
 
-import { HELPER_TOOLS } from '../../src/const.js';
+import { ApifyClient } from '../../src/apify_client.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { extractDotPrefixes, getDatasetItems } from '../../src/tools/storage/get_dataset_items.js';
 import { datasetItemsOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
+    type DatasetItemsReply,
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
-    mockApifyClient,
+    mockDatasetItemsClient,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -58,17 +63,9 @@ const MOCK_ITEMS = [{ first_number: 3, second_number: 4, sum: 7 }];
 const MANY_ITEMS = Array.from({ length: 20 }, (_, i) => ({ n: i }));
 
 function stubApifyClient(
-    listItems: (...args: unknown[]) => unknown = async () => ({ items: MOCK_ITEMS, total: 1 }),
+    reply: (params: Record<string, unknown>) => DatasetItemsReply = () => ({ items: MOCK_ITEMS, total: 1 }),
 ): InternalToolArgs['apifyClient'] {
-    return mockApifyClient({
-        dataset: (_id: string) => ({ listItems }),
-    });
-}
-
-function stubApifyClientThrowing(err: unknown): InternalToolArgs['apifyClient'] {
-    return stubApifyClient(async () => {
-        throw err;
-    });
+    return mockDatasetItemsClient(reply);
 }
 
 describe('get-dataset-items', () => {
@@ -118,16 +115,18 @@ describe('get-dataset-items', () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext(
                 { datasetId: 'DsWkzbQMuFYuam3YF' },
-                stubApifyClient(async () => ({ items: [], total: 0 })),
+                stubApifyClient(() => ({ items: [], total: 0 })),
             ),
         );
         expectSchemaConformingStructuredContent(result, datasetItemsOutputSchema);
     });
 
-    it('returns isError with a not-found message when listItems throws 404', async () => {
-        const notFound = Object.assign(new Error('Dataset was not found'), { statusCode: 404 });
+    it('returns isError with a not-found message when the API returns 404', async () => {
         const result = await (getDatasetItems as HelperTool).call(
-            stubToolCallContext({ datasetId: 'missing' }, stubApifyClientThrowing(notFound)),
+            stubToolCallContext(
+                { datasetId: 'missing' },
+                stubApifyClient(() => ({ status: 404 })),
+            ),
         );
         const { content, structuredContent } = result as TextToolResult & { structuredContent?: unknown };
 
@@ -136,17 +135,19 @@ describe('get-dataset-items', () => {
         expect(content[0].text).toContain("Dataset 'missing' not found");
     });
 
-    it('rethrows non-404 errors from listItems', async () => {
-        const serverError = Object.assign(new Error('Internal server error'), { statusCode: 500 });
+    it('throws an API error other than 404', async () => {
         await expect(
             (getDatasetItems as HelperTool).call(
-                stubToolCallContext({ datasetId: 'DsWkzbQMuFYuam3YF' }, stubApifyClientThrowing(serverError)),
+                stubToolCallContext(
+                    { datasetId: 'DsWkzbQMuFYuam3YF' },
+                    stubApifyClient(() => ({ status: 500 })),
+                ),
             ),
-        ).rejects.toBe(serverError);
+        ).rejects.toMatchObject({ statusCode: 500 });
     });
 
     it('auto-derives flatten from dot-notation in fields', async () => {
-        const listItemsSpy = vi.fn().mockResolvedValue({ items: [], total: 0 });
+        const requestSpy = vi.fn((_params: Record<string, unknown>) => ({ items: [], total: 0 }));
 
         await (getDatasetItems as HelperTool).call(
             stubToolCallContext(
@@ -154,11 +155,11 @@ describe('get-dataset-items', () => {
                     datasetId: 'DsWkzbQMuFYuam3YF',
                     fields: 'metadata.url,crawl.statusCode,crawl',
                 },
-                stubApifyClient(listItemsSpy),
+                stubApifyClient(requestSpy),
             ),
         );
 
-        expect(listItemsSpy).toHaveBeenCalledWith(expect.objectContaining({ flatten: ['metadata'] }));
+        expect(requestSpy).toHaveBeenCalledWith(expect.objectContaining({ flatten: ['metadata'] }));
     });
 
     it('rejects empty datasetId via ajv validation', () => {
@@ -168,8 +169,8 @@ describe('get-dataset-items', () => {
     });
 
     it('passes the wrapper-stripped datasetId to client.dataset()', async () => {
-        const datasetSpy = vi.fn().mockReturnValue({ listItems: async () => ({ items: MOCK_ITEMS, total: 1 }) });
-        const client = mockApifyClient({ dataset: datasetSpy });
+        const datasetSpy = vi.fn((id: string) => ({ url: `https://api.apify.com/v2/datasets/${id}` }));
+        const client = mockDatasetItemsClient(() => ({ items: MOCK_ITEMS, total: 1 }), { dataset: datasetSpy });
 
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext({ datasetId: '`user~my-dataset`' }, client),
@@ -217,7 +218,7 @@ describe('get-dataset-items', () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext(
                 { datasetId: 'DsWkzbQMuFYuam3YF' },
-                stubApifyClient(async () => ({ items: MANY_ITEMS, total: 100 })),
+                stubApifyClient(() => ({ items: MANY_ITEMS, total: 100 })),
             ),
         );
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
@@ -241,10 +242,13 @@ describe('get-dataset-items', () => {
 
 describe('get-dataset-items with a bare dataset name', () => {
     it("reads the name as one of the caller's own datasets", async () => {
-        const datasetSpy = vi.fn().mockReturnValue({ listItems: async () => ({ items: MOCK_ITEMS, total: 1 }) });
+        const datasetSpy = vi.fn((id: string) => ({ url: `https://api.apify.com/v2/datasets/${id}` }));
 
         await (getDatasetItems as HelperTool).call(
-            stubToolCallContext({ datasetId: 'eval-ai-items' }, mockApifyClient({ dataset: datasetSpy })),
+            stubToolCallContext(
+                { datasetId: 'eval-ai-items' },
+                mockDatasetItemsClient(() => ({ items: MOCK_ITEMS, total: 1 }), { dataset: datasetSpy }),
+            ),
         );
 
         expect(datasetSpy).toHaveBeenCalledWith('~eval-ai-items');
@@ -252,9 +256,9 @@ describe('get-dataset-items with a bare dataset name', () => {
 
     it('links Console to the dataset ID, which the list response does not carry', async () => {
         vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
-        const client = mockApifyClient({
-            dataset: (_id: string) => ({
-                listItems: async () => ({ items: MOCK_ITEMS, total: 1 }),
+        const client = mockDatasetItemsClient(() => ({ items: MOCK_ITEMS, total: 1 }), {
+            dataset: (id: string) => ({
+                url: `https://api.apify.com/v2/datasets/${id}`,
                 get: async () => ({ id: 'WkzbQMuFYuamGv3YF', name: 'eval-ai-items' }),
             }),
         });
@@ -266,5 +270,51 @@ describe('get-dataset-items with a bare dataset name', () => {
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
         expect(structuredContent.apifyConsoleUrl).toBe('https://console.apify.com/storage/datasets/WkzbQMuFYuamGv3YF');
+    });
+});
+
+// The real client against a local server: the stubs above cannot show that the download stops.
+describe('get-dataset-items with a page far over the size limit', () => {
+    const PAGE_BYTES = 64 * 1024 * 1024;
+
+    it('stops the download near the limit and returns an input error naming limit, fields and omit', async () => {
+        let sentBytes = 0;
+        const server = createServer((_req, res) => {
+            res.writeHead(200, { 'content-type': 'application/json', 'x-apify-pagination-total': '1' });
+            res.write('[');
+            const chunk = Buffer.from('"x",'.repeat(16 * 1024));
+            const write = () => {
+                while (sentBytes < PAGE_BYTES && !res.destroyed) {
+                    sentBytes += chunk.length;
+                    if (!res.write(chunk)) {
+                        res.once('drain', write);
+                        return;
+                    }
+                }
+                if (!res.destroyed) res.end('"x"]');
+            };
+            write();
+        });
+        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+
+        try {
+            const result = await (getDatasetItems as HelperTool).call(
+                stubToolCallContext(
+                    { datasetId: 'DsWkzbQMuFYuam3YF' },
+                    new ApifyClient({ token: 'test-token', baseUrl, maxRetries: 0 }),
+                ),
+            );
+
+            expectSoftFailInvalidInput(result);
+            const { content } = result as TextToolResult;
+            expect(content[0].text).toContain(`${MAX_INLINE_BYTES}-byte limit`);
+            expect(content[0].text).toMatch(/limit.*fields.*omit/);
+            // Socket buffers hold some bytes past the limit; a full read would send all of them.
+            expect(sentBytes).toBeLessThan(PAGE_BYTES / 4);
+        } finally {
+            server.closeAllConnections();
+            await new Promise<void>((resolve) => server.close(() => resolve()));
+        }
     });
 });
