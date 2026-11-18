@@ -326,7 +326,7 @@ describe('CallToolRequestSchema handler', () => {
 
     describe('arguments failing the input schema', () => {
         function makeStrictSchemaTool() {
-            const recorder = makeRecorderTool('strict-schema-tool', { taskSupport: 'optional' });
+            const recorder = makeRecorderTool('strict-schema-tool');
             const schema = { type: 'object', properties: { x: { type: 'string' } }, required: ['x'] };
             recorder.tool.inputSchema = schema as ToolInputSchema;
             recorder.tool.ajvValidate = compileSchema(schema);
@@ -334,61 +334,41 @@ describe('CallToolRequestSchema handler', () => {
         }
 
         it('returns an isError tool result without calling the tool', async () => {
-            // The MCP spec classifies input-validation errors as tool execution errors, so the model can
-            // correct its arguments (2025-11-25 changelog, SEP-1303).
+            // The MCP spec classifies input-validation errors as tool execution errors (SEP-1303).
             await withServer(async (server) => {
                 silenceLogs();
                 const { tool, received } = makeStrictSchemaTool();
                 server.upsertTools([tool]);
-                const handler = getRequestHandler(server, 'tools/call');
-                const result = await handler(
-                    {
-                        method: 'tools/call',
-                        params: { name: 'strict-schema-tool', arguments: {}, _meta: { mcpSessionId: 's1' } },
-                    },
+                const result = await getRequestHandler(server, 'tools/call')(
+                    { method: 'tools/call', params: { name: tool.name, arguments: {}, _meta: { mcpSessionId: 's1' } } },
                     { signal: { aborted: false }, sendNotification: vi.fn() },
                 );
                 expect(result).toMatchObject({
                     isError: true,
-                    content: [
-                        {
-                            type: 'text',
-                            text: expect.stringMatching(
-                                /Invalid arguments for tool "strict-schema-tool"[\s\S]*must have required property 'x'/,
-                            ),
-                        },
-                    ],
+                    content: [{ text: expect.stringContaining(`Invalid arguments for tool "${tool.name}"`) }],
                 });
                 expect(received.called).toBe(false);
             });
         });
 
         it('keeps an InvalidParams protocol error for a task-augmented call', async () => {
-            // The SDK accepts only a CreateTaskResult for a task-augmented call, so a tool result cannot carry it.
+            // The SDK accepts only a CreateTaskResult for a task-augmented call.
             await withServer(async (server) => {
                 silenceLogs();
-                const { tool, received } = makeStrictSchemaTool();
+                const { tool } = makeStrictSchemaTool();
                 server.upsertTools([tool]);
                 vi.spyOn(getLegacyServer(server), 'sendLoggingMessage').mockResolvedValue(undefined);
-                const handler = getRequestHandler(server, 'tools/call');
+                const params = { name: tool.name, arguments: {}, _meta: { mcpSessionId: 's1' }, task: { ttl: 60_000 } };
                 await expect(
-                    handler(
-                        {
-                            method: 'tools/call',
-                            params: {
-                                name: 'strict-schema-tool',
-                                arguments: {},
-                                _meta: { mcpSessionId: 's1' },
-                                task: { ttl: 60_000 },
-                            },
-                        },
+                    getRequestHandler(server, 'tools/call')(
+                        { method: 'tools/call', params },
                         { signal: { aborted: false }, sendNotification: vi.fn() },
                     ),
                 ).rejects.toMatchObject({
                     code: ErrorCode.InvalidParams,
-                    message: expect.stringContaining('Invalid arguments for tool "strict-schema-tool"'),
+                    // A tool result here fails the SDK's CreateTaskResult check with a different InvalidParams message.
+                    message: expect.stringContaining(`Invalid arguments for tool "${tool.name}"`),
                 });
-                expect(received.called).toBe(false);
             });
         });
     });

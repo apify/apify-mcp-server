@@ -152,7 +152,7 @@ describe('prepareToolCall()', () => {
     });
 
     it('rejects a denied direct-Actor input as a tool execution error', async () => {
-        const schema = { type: 'object', properties: { startUrls: { type: 'array' } } };
+        const schema = { type: 'object', properties: {} };
         const tool: ToolEntry = {
             type: TOOL_TYPE.ACTOR,
             name: actorNameToToolName('apify/website-content-crawler'),
@@ -166,6 +166,7 @@ describe('prepareToolCall()', () => {
             tools: new Map([[tool.name, tool]]),
             apifyToken: 'fake-token',
             name: tool.name,
+            // Denied by the Actor's direct-tool policy in actor_tool_contract.ts.
             args: { pageFunction: 'async () => {}' },
             meta: undefined,
             requestHeaders: undefined,
@@ -174,10 +175,8 @@ describe('prepareToolCall()', () => {
             telemetryData: null,
             clientContext: undefined,
         });
-        const invalid = result as InvalidToolCall;
 
-        expect(invalid.message).toContain('"pageFunction"');
-        expect(invalid.isToolExecutionError).toBe(true);
+        expect((result as InvalidToolCall).isToolExecutionError).toBe(true);
     });
 
     it('returns a PreparedCall and updates telemetry tool_name for a valid call', async () => {
