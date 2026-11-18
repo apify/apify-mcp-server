@@ -140,10 +140,38 @@ describe('get-dataset-items', () => {
             (getDatasetItems as HelperTool).call(
                 stubToolCallContext(
                     { datasetId: 'DsWkzbQMuFYuam3YF' },
-                    stubApifyClient(() => ({ status: 500 })),
+                    stubApifyClient(() => ({ status: 403 })),
                 ),
             ),
-        ).rejects.toMatchObject({ statusCode: 500 });
+        ).rejects.toMatchObject({ statusCode: 403 });
+    });
+
+    // A cut-off response can end without a network error; apify-client's `listItems()` retried it too.
+    it('reads the page once more when the body does not parse', async () => {
+        const replies: DatasetItemsReply[] = ['unparsable', { items: MOCK_ITEMS, total: 1 }];
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'DsWkzbQMuFYuam3YF' },
+                stubApifyClient(() => replies.shift()!),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+        expect(structuredContent.items).toEqual(MOCK_ITEMS);
+    });
+
+    it('names only fields and omit when one item is over the size limit', async () => {
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'DsWkzbQMuFYuam3YF', limit: 1 },
+                stubApifyClient(() => 'overLimit'),
+            ),
+        );
+        const { content } = result as TextToolResult;
+
+        expectSoftFailInvalidInput(result);
+        expect(content[0].text).toContain('`fields` or `omit`');
+        expect(content[0].text).not.toContain('Lower');
     });
 
     it('auto-derives flatten from dot-notation in fields', async () => {
@@ -279,7 +307,9 @@ describe('get-dataset-items with a page far over the size limit', () => {
 
     it('stops the download near the limit and returns an input error naming limit, fields and omit', async () => {
         let sentBytes = 0;
-        const server = createServer((_req, res) => {
+        let requestUrl: string | undefined;
+        const server = createServer((req, res) => {
+            requestUrl = req.url;
             res.writeHead(200, { 'content-type': 'application/json', 'x-apify-pagination-total': '1' });
             res.write('[');
             const chunk = Buffer.from('"x",'.repeat(16 * 1024));
@@ -308,8 +338,9 @@ describe('get-dataset-items with a page far over the size limit', () => {
 
             expectSoftFailInvalidInput(result);
             const { content } = result as TextToolResult;
-            expect(content[0].text).toContain(`${MAX_INLINE_BYTES}-byte limit`);
-            expect(content[0].text).toMatch(/limit.*fields.*omit/);
+            expect(content[0].text).toContain(`${MAX_INLINE_BYTES}-byte response limit`);
+            expect(content[0].text).toContain('Lower `limit`, or use `fields` or `omit`');
+            expect(requestUrl).toMatch(/^\/v2\/datasets\/DsWkzbQMuFYuam3YF\/items\?/);
             // Socket buffers hold some bytes past the limit; a full read would send all of them.
             expect(sentBytes).toBeLessThan(PAGE_BYTES / 4);
         } finally {

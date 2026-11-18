@@ -125,7 +125,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         const { result: v, safeId } = found;
         if (v.isOverLimit) {
             return respondUserError(
-                `This page of dataset '${datasetId}' is over the ${MAX_INLINE_BYTES}-byte limit. Lower limit, or use fields or omit.`,
+                `This page of dataset '${datasetId}' is over the ${MAX_INLINE_BYTES}-byte response limit. ${effectiveLimit > 1 ? 'Lower `limit`, or use' : 'Use'} \`fields\` or \`omit\`.`,
             );
         }
 

@@ -141,8 +141,19 @@ describe('get-dataset-schema', () => {
         const { content } = result as TextToolResult;
 
         expectSoftFailInvalidInput(result);
-        expect(content[0].text).toContain(`${MAX_INLINE_BYTES}-byte limit`);
-        expect(content[0].text).toContain('Lower limit');
+        expect(content[0].text).toContain(`${MAX_INLINE_BYTES}-byte response limit`);
+        expect(content[0].text).toContain('Lower `limit`');
+    });
+
+    // At limit=1 a lower limit cannot help, and this tool has no fields or omit.
+    it('does not ask for a lower limit when one item is over the size limit', async () => {
+        const result = await (getDatasetSchema as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1', limit: 1 }, stubApifyClient('overLimit')),
+        );
+        const { content } = result as TextToolResult;
+
+        expectSoftFailInvalidInput(result);
+        expect(content[0].text).not.toContain('Lower');
     });
 
     it('returns isError when schema generation fails (generator returns null)', async () => {

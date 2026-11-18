@@ -351,8 +351,10 @@ export type FetchedDatasetItems = { isOverLimit: false; items: unknown[]; total:
 
 /**
  * Reads one page of dataset items without holding more than `MAX_INLINE_BYTES` of it: `listItems()` buffers
- * a page of any size whole. It sends the request `listItems()` sends, once, with no retry. `undefined` on a
- * 404, as `catchNotFound` reads one.
+ * a page of any size whole. It sends the query params `listItems()` sends, through `sendApifyApiRequest`: one
+ * attempt, without apify-client's User-Agent, and an unparsable body is read once more. axios stops at the
+ * limit whatever the status, so an error body over it also returns `isOverLimit`. `undefined` on a 404, as
+ * `catchNotFound` reads one.
  */
 export async function fetchDatasetItemsUnderCap(
     client: ApifyClient,
@@ -363,7 +365,7 @@ export async function fetchDatasetItemsUnderCap(
     const url = `${client.dataset(safeId).url}/items`;
     let response: Awaited<ReturnType<typeof sendApifyApiRequest>>;
     try {
-        response = await sendApifyApiRequest(client, { url, method: 'GET', params });
+        response = await sendWithParseRetry(async () => sendApifyApiRequest(client, { url, method: 'GET', params }));
     } catch (error) {
         if (isMaxContentLengthAbort(error)) return { isOverLimit: true };
         throw toPlainError(error);

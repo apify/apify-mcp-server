@@ -1,6 +1,7 @@
 import type { CallToolResult, ContentBlock } from '@modelcontextprotocol/sdk/types.js';
 import Ajv from 'ajv';
-import { AxiosError } from 'axios';
+import { InvalidResponseBodyError } from 'apify-client';
+import { AxiosError, type AxiosResponse } from 'axios';
 import { expect } from 'vitest';
 
 import type { ApifyClient } from '../../../src/apify_client.js';
@@ -43,8 +44,8 @@ export function mockApifyClient(methods: Record<string, unknown> = {}): ApifyCli
     return methods as unknown as ApifyClient;
 }
 
-/** A page of dataset items, an error status, or a body over `MAX_INLINE_BYTES`. */
-export type DatasetItemsReply = { items: unknown[]; total: number } | { status: number } | 'overLimit';
+/** A page of dataset items, an error status, a body over `MAX_INLINE_BYTES`, or a body that does not parse. */
+export type DatasetItemsReply = { items: unknown[]; total: number } | { status: number } | 'overLimit' | 'unparsable';
 
 /**
  * Stubs the dataset items request as apify-client's axios instance answers it. `reply` gets the request's
@@ -64,6 +65,13 @@ export function mockDatasetItemsClient(
                         throw new AxiosError(
                             `maxContentLength size of ${MAX_INLINE_BYTES} exceeded`,
                             'ERR_BAD_RESPONSE',
+                        );
+                    }
+                    if (answer === 'unparsable') {
+                        // What apify-client's response interceptor throws for a cut-off JSON body.
+                        throw new InvalidResponseBodyError(
+                            { headers: { 'content-type': 'application/json' } } as unknown as AxiosResponse,
+                            new SyntaxError('Unterminated string in JSON at position 65536'),
                         );
                     }
                     if ('status' in answer) {
