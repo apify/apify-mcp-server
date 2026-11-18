@@ -18,6 +18,7 @@ import {
 } from '../../src/tools/actors/call_actor.js';
 import type { InternalToolArgs, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
+import { compileSchema } from '../../src/utils/ajv.js';
 import { ACTOR_RUN_LIMIT_MESSAGE } from '../../src/utils/apify_errors.js';
 import { only, textOf, type TextToolResult } from './helpers/tool_context.js';
 
@@ -565,6 +566,24 @@ describe('call_actor_common', () => {
                 failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
                 actorId: 'actor-id-rag',
             });
+        });
+
+        it('reports whether validation coerced a value of the input', async () => {
+            mockActorTool(compileSchema({ type: 'object', properties: { maxResults: { type: 'integer' } } }));
+
+            const coerced = await resolveAndValidateActor({
+                actorName: 'apify/rag-web-browser',
+                input: { maxResults: '3' },
+                toolArgs: stubToolArgs,
+            });
+            const unchanged = await resolveAndValidateActor({
+                actorName: 'apify/rag-web-browser',
+                input: { maxResults: 3 },
+                toolArgs: stubToolArgs,
+            });
+
+            expect(coerced).toMatchObject({ isInputCoerced: true });
+            expect(unchanged).toMatchObject({ isInputCoerced: false });
         });
     });
 });

@@ -18,7 +18,7 @@ import { maskLoggedInputs, pickLoggedValues, REDACTED } from '../../resources/ap
 import type { ApifyToken, InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ACTOR_TOOL_MODE, ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorDefinitionCached, getActorToolResolutionCached } from '../../utils/actor.js';
-import { compileSchema } from '../../utils/ajv.js';
+import { compileSchema, hasCoercedValue } from '../../utils/ajv.js';
 import {
     ACTOR_RUN_LIMIT_MESSAGE,
     getApifyErrorType,
@@ -434,7 +434,7 @@ export async function resolveAndValidateActor(params: {
     actorName: string;
     input: Record<string, unknown>;
     toolArgs: InternalToolArgs;
-}): Promise<{ error: ToolResponse } | { actor: ToolEntry }> {
+}): Promise<{ error: ToolResponse } | { actor: ToolEntry; isInputCoerced: boolean }> {
     const { actorName, input, toolArgs } = params;
     const { apifyClient, loadedToolNames } = toolArgs;
 
@@ -478,6 +478,8 @@ export async function resolveAndValidateActor(params: {
         };
     }
 
+    // Ajv coerces the input in place; the copy shows whether it changed a value.
+    const inputBeforeValidation = structuredClone(input);
     if (!actor.ajvValidate(input)) {
         const { errors } = actor.ajvValidate;
         const ajvDetails = extractAjvErrorDetails(errors ?? null);
@@ -508,7 +510,7 @@ export async function resolveAndValidateActor(params: {
         };
     }
 
-    return { actor };
+    return { actor, isInputCoerced: hasCoercedValue(inputBeforeValidation, input) };
 }
 
 /**
@@ -582,6 +584,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
 
         resolvedActorId = extractActorId(resolution.actor);
         resolvedInputSchema = resolution.actor.inputSchema;
+        const { isInputCoerced } = resolution;
         const { apifyClient } = toolArgs;
         const abortSignal = toolArgs.signal;
 
@@ -606,7 +609,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
         // waitSecs:0 means "fire and forget" — start() already returned the full run, skip re-fetch.
         if (waitSecs === 0) {
             const response = buildStartRunResponse({ actorName, actorRun, linkContext });
-            return { ...response, toolTelemetry: { actorId: resolvedActorId } };
+            return { ...response, toolTelemetry: { actorId: resolvedActorId, isInputCoerced } };
         }
 
         const fetchResult = await fetchActorRunData({
@@ -625,7 +628,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
 
         return {
             ...buildGetActorRunResponse({ ...fetchResult.result, linkContext }),
-            toolTelemetry: { actorId: resolvedActorId },
+            toolTelemetry: { actorId: resolvedActorId, isInputCoerced },
         };
     } catch (error) {
         return buildCallActorErrorResponse({

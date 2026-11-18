@@ -270,6 +270,7 @@ export function extractToolTelemetry(
         ...(telemetry.actorTenancy && { actor_tenancy: telemetry.actorTenancy }),
         ...actorFields,
         ...telemetry.ajvErrorDetails,
+        ...(telemetry.isInputCoerced !== undefined && { input_coerced: telemetry.isInputCoerced }),
     };
 
     return { toolStatus, callDiagnostics };

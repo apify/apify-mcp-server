@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { compileSchema, createAjv, fixZodSchemaRequired } from '../../src/utils/ajv.js';
+import { compileSchema, createAjv, fixZodSchemaRequired, hasCoercedValue } from '../../src/utils/ajv.js';
 
 describe('compileSchema', () => {
     it('validates declared properties normally', () => {
@@ -174,5 +174,49 @@ describe('createAjv — Actor input schemas', () => {
         const data: Record<string, unknown> = { url: 'https://example.com', dynamicField: 'kept' };
         expect(validate(data)).toBe(true);
         expect(data).toEqual({ url: 'https://example.com', dynamicField: 'kept' });
+    });
+});
+
+describe('hasCoercedValue — a value Ajv changed in place', () => {
+    // Shaped like a real Actor input schema; validation runs on the data in place, as at the call sites.
+    const validate = compileSchema({
+        type: 'object',
+        properties: {
+            maxItems: { type: 'integer' },
+            queries: { type: 'array', items: { type: 'string' } },
+            proxyConfiguration: { type: 'object', properties: { useApifyProxy: { type: 'boolean' } } },
+            startUrls: { type: 'array', items: { type: 'object', properties: { depth: { type: 'integer' } } } },
+        },
+        additionalProperties: false,
+    });
+
+    function validateAndCheck(input: Record<string, unknown>): boolean {
+        const before = structuredClone(input);
+        expect(validate(input)).toBe(true);
+        return hasCoercedValue(before, input);
+    }
+
+    it('detects a numeric string converted to an integer', () => {
+        expect(validateAndCheck({ maxItems: '50' })).toBe(true);
+    });
+
+    it('detects a single value wrapped into an array', () => {
+        expect(validateAndCheck({ queries: 'cafe' })).toBe(true);
+    });
+
+    it('detects a coerced value inside a nested object', () => {
+        expect(validateAndCheck({ proxyConfiguration: { useApifyProxy: 'true' } })).toBe(true);
+    });
+
+    it('detects a coerced value inside an array item', () => {
+        expect(validateAndCheck({ startUrls: [{ depth: 1 }, { depth: '2' }] })).toBe(true);
+    });
+
+    it('ignores a field Ajv removed', () => {
+        expect(validateAndCheck({ maxItems: 50, searchStringsArray: ['cafe'] })).toBe(false);
+    });
+
+    it('reports nothing for input that already matches the schema', () => {
+        expect(validateAndCheck({ maxItems: 50, queries: ['cafe'], startUrls: [{ depth: 1 }] })).toBe(false);
     });
 });

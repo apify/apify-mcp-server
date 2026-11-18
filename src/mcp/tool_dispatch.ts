@@ -60,6 +60,8 @@ export async function dispatchToolCall(params: {
     tools: Map<string, ToolEntry>;
     actorName?: string;
     actorId?: string;
+    /** Whether validation coerced an Actor tool's input; recorded on the call's telemetry. */
+    isInputCoerced?: boolean;
     taskMode: boolean;
     // Caller-supplied log decoration (task mode: ' for task' suffix + taskId field), applied
     // mechanically to the per-branch "Calling …" lines — no effect on dispatch behavior.
@@ -83,6 +85,7 @@ export async function dispatchToolCall(params: {
         tools,
         actorName,
         actorId,
+        isInputCoerced,
         taskMode,
         logContext,
     } = params;
@@ -90,7 +93,10 @@ export async function dispatchToolCall(params: {
     let result: Record<string, unknown> = {};
     let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
     // Always populate actor fields so they're tracked on both success and failure paths.
-    let callDiagnostics: CallDiagnostics = { ...buildActorFields(actorName, actorId) };
+    let callDiagnostics: CallDiagnostics = {
+        ...buildActorFields(actorName, actorId),
+        ...(isInputCoerced !== undefined && { input_coerced: isInputCoerced }),
+    };
     const loadedToolNames = Array.from(tools.keys());
     const loadedActorIds = new Set(
         Array.from(tools.values(), extractActorId).filter((id): id is string => id !== undefined),

@@ -13,6 +13,7 @@ import type { McpClientContext } from '../../src/mcp/client_context.js';
 import { getMCPServerTools } from '../../src/mcp/proxy.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import * as telemetry from '../../src/telemetry.js';
+import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import * as callActor from '../../src/tools/actors/call_actor.js';
 import {
     REPORT_PROBLEM_INVALID_INPUT_NUDGE,
@@ -31,6 +32,7 @@ import {
     getLegacyServer,
     getRequestHandler,
     getTaskStore,
+    makeActorTool,
     makePaymentRequiredError,
     makePermissionApprovalError,
     makePaymentProvider,
@@ -1496,5 +1498,69 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 paymentProvider: makePaymentProvider(),
             },
         );
+    });
+});
+
+describe('input_coerced telemetry for a direct Actor tool', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    const ACTOR_INPUT_SCHEMA = {
+        type: 'object',
+        properties: { maxItems: { type: 'integer' }, waitSecs: { type: 'integer' } },
+    };
+
+    async function callActorToolAndReadTelemetry(
+        args: Record<string, unknown>,
+        options: { isTask?: boolean } = {},
+    ): Promise<Record<string, unknown>> {
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        vi.spyOn(actorExecutor, 'executeActorTool').mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
+        const tool = {
+            ...makeActorTool(),
+            inputSchema: ACTOR_INPUT_SCHEMA as ToolInputSchema,
+            ajvValidate: compileSchema(ACTOR_INPUT_SCHEMA),
+            execution: { taskSupport: 'optional' },
+        } as ToolEntry;
+        await withServer(
+            async (server) => {
+                server.upsertTools([tool]);
+                const handler = getRequestHandler(server, 'tools/call');
+                await handler(
+                    {
+                        method: 'tools/call',
+                        params: {
+                            name: tool.name,
+                            arguments: args,
+                            _meta: { mcpSessionId: 's1' },
+                            ...(options.isTask && { task: { ttl: 60_000 } }),
+                        },
+                    },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                );
+                await vi.waitFor(() => expect(trackSpy).toHaveBeenCalledTimes(1));
+            },
+            { token: undefined, telemetry: { enabled: true }, allowUnauthMode: true },
+        );
+        return trackSpy.mock.calls[0][2] as Record<string, unknown>;
+    }
+
+    it('records a numeric string converted to an integer', async () => {
+        expect(await callActorToolAndReadTelemetry({ maxItems: '5' })).toMatchObject({ input_coerced: true });
+    });
+
+    it('records false for input that already matches the schema', async () => {
+        expect(await callActorToolAndReadTelemetry({ maxItems: 5 })).toMatchObject({ input_coerced: false });
+    });
+
+    it('ignores a coerced waitSecs, which never reaches the Actor', async () => {
+        expect(await callActorToolAndReadTelemetry({ maxItems: 5, waitSecs: '10' })).toMatchObject({
+            input_coerced: false,
+        });
+    });
+
+    it('records coercion on a task-mode call', async () => {
+        expect(await callActorToolAndReadTelemetry({ maxItems: '5' }, { isTask: true })).toMatchObject({
+            input_coerced: true,
+        });
     });
 });
