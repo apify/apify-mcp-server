@@ -23,8 +23,10 @@ For detailed data from a specific platform (e.g. Amazon products with prices, In
 // The `apify/web-fetch` and `apify/web-search` tool descriptions, Server Actor tools (`GET /` and `POST /`), share
 // one shape: what the tool returns, the parameters that change what it returns, when it fits, what it does not do,
 // and an example call. The facts are the Actors' own API schemas. Client-agnostic on purpose: no references to any
-// specific client or its built-in tools, so the same text works for every MCP client; the sibling web tool is named
-// only when the session serves it.
+// specific client or its built-in tools, so the same text works for every MCP client; the sibling web tool is pointed
+// to only when the session serves it. It is pointed to by what it does, not by its key: clients prefix the server's
+// tool names (`mcp__apify__…`, `apify-ai_…`), and a model that reads `apify--web-search` calls that exact name,
+// which no prefixing client has.
 
 /** The `apify/web-fetch` tool description. */
 const buildWebFetchDescription = ({ hasTool }: ToolDescriptionContext): string => {
@@ -33,7 +35,7 @@ const buildWebFetchDescription = ({ hasTool }: ToolDescriptionContext): string =
 formats selects markdown, html, text, links (a deduplicated list) or raw (the original bytes); when omitted, an HTML or PDF page comes back as markdown, other text as text and binary content as raw.
 The page is fetched without running JavaScript unless wait is set, which renders it in a real browser and waits the given milliseconds for late-loaded content; a rendered request is slower. The Actor handles common bot protection and rate limits, so it also retrieves pages where a plain HTTP fetch is blocked.
 Use it when the user gives a URL and wants its content, data or links, or an answer that requires reading that page.
-It does not search the web; it needs a URL.${hasTool(webSearchTool) ? ` To find pages by query, use ${webSearchTool}.` : ''}
+It does not search the web; it needs a URL.${hasTool(webSearchTool) ? ' To find pages by query, use the web search tool.' : ''}
 Example: ${WEB_FETCH_EXAMPLE_CALL}`;
 };
 
@@ -43,7 +45,7 @@ const buildWebSearchDescription = ({ hasTool }: ToolDescriptionContext): string 
     return `Runs one web search and returns one page of organic results as JSON: title, URL, snippet and position of each result, with publication date, publisher and sublinks when the search engine provides them.
 provider picks google (the default) or duckduckgo; maxResults caps the results, and omitting it returns the whole page, about 10; countryCode and languageCode localize the ranking; dateFrom and dateTo (YYYY-MM-DD) bound the publication date; allowedDomains and blockedDomains (up to 10 hostnames each, subdomains included) restrict or exclude sites.
 Use it when the user wants links to choose from, wants to know which pages exist for a topic, or asks a question that a result title or snippet answers.
-It does not fetch page content; it returns links and snippets only.${hasTool(webFetchTool) ? ` To read a result page, use ${webFetchTool}.` : ''}
+It does not fetch page content; it returns links and snippets only.${hasTool(webFetchTool) ? ' To read a result page, use the web fetch tool.' : ''}
 Example: ${WEB_SEARCH_EXAMPLE_CALL}`;
 };
 

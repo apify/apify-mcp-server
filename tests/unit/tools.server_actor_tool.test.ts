@@ -790,13 +790,15 @@ describe('the default apify/web-fetch tool', () => {
         expect(tool.ajvValidate({ query: { url: 'https://example.com' } })).toBe(false);
     });
 
-    // The session may not serve the web search tool, and a description names no absent tool.
-    it('names the web search tool only when the session has it', async () => {
+    // The session may not serve the web search tool, and a description names no absent tool. Every client
+    // prefixes the server's tool names, so the description points at the tool by what it does, not by its key.
+    it('points to the web search tool only when the session has it, without its key', async () => {
         const tool = await loadWebFetchTool();
         const webSearchTool = actorNameToToolName(WEB_SEARCH);
 
-        expect(tool.buildDescription?.(only(webSearchTool))).toContain(webSearchTool);
-        expect(tool.buildDescription?.(only())).not.toContain(webSearchTool);
+        expect(tool.buildDescription?.(only(webSearchTool))).toContain('use the web search tool');
+        expect(tool.buildDescription?.(only(webSearchTool))).not.toContain(webSearchTool);
+        expect(tool.buildDescription?.(only())).not.toContain('web search tool');
     });
 
     it('keeps the read-only hint of the Actor', async () => {
@@ -857,13 +859,15 @@ describe('the default apify/web-search tool', () => {
         ).toBe(true);
     });
 
-    // The session may not serve the other web Actor tools, and a description names no absent tool.
-    it('names the web fetch tool only when the session has it, and rag-web-browser never', async () => {
+    // The session may not serve the other web Actor tools, and a description names no absent tool. Every client
+    // prefixes the server's tool names, so the description points at the tool by what it does, not by its key.
+    it('points to the web fetch tool only when the session has it, without its key, and rag-web-browser never', async () => {
         const tool = await loadWebSearchTool();
         const webFetchTool = actorNameToToolName(WEB_FETCH);
 
-        expect(tool.buildDescription?.(only(webFetchTool))).toContain(webFetchTool);
-        expect(tool.buildDescription?.(only())).not.toContain(webFetchTool);
+        expect(tool.buildDescription?.(only(webFetchTool))).toContain('use the web fetch tool');
+        expect(tool.buildDescription?.(only(webFetchTool))).not.toContain(webFetchTool);
+        expect(tool.buildDescription?.(only())).not.toContain('web fetch tool');
         expect(tool.description).not.toContain(RAG_WEB_BROWSER);
     });
 
