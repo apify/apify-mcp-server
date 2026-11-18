@@ -80,8 +80,16 @@ describe('classifyFailureCategory', () => {
     });
 
     it('classifies generic 4xx as INVALID_INPUT', () => {
-        const category = classifyFailureCategory(Object.assign(new Error('Bad request'), { statusCode: 402 }));
+        const category = classifyFailureCategory(Object.assign(new Error('Bad request'), { statusCode: 400 }));
         expect(category).toBe(FAILURE_CATEGORY.INVALID_INPUT);
+    });
+
+    it('classifies 402 as BILLING', () => {
+        const error = Object.assign(new Error('By launching this job you will exceed the memory limit'), {
+            statusCode: 402,
+            type: 'actor-memory-limit-exceeded',
+        });
+        expect(classifyFailureCategory(error)).toBe(FAILURE_CATEGORY.BILLING);
     });
 
     it('classifies 5xx as INTERNAL_ERROR', () => {
@@ -94,9 +102,9 @@ describe('classifyFailureCategory', () => {
         expect(category).toBe(FAILURE_CATEGORY.INTERNAL_ERROR);
     });
 
-    it('classifies the concurrent-run limit as INVALID_INPUT even when wrapped as a 5xx', () => {
+    it('classifies the concurrent-run limit as BILLING even when wrapped as a 5xx', () => {
         const error = Object.assign(new Error('Streamable HTTP error: cannot-start-actor-runs'), { statusCode: 500 });
-        expect(classifyFailureCategory(error)).toBe(FAILURE_CATEGORY.INVALID_INPUT);
+        expect(classifyFailureCategory(error)).toBe(FAILURE_CATEGORY.BILLING);
     });
 });
 

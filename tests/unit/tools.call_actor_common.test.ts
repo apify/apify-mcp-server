@@ -294,7 +294,7 @@ describe('call_actor_common', () => {
             expect(response.toolTelemetry).toEqual(
                 expect.objectContaining({
                     toolStatus: TOOL_STATUS.SOFT_FAIL,
-                    failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                    failureCategory: FAILURE_CATEGORY.BILLING,
                     failureHttpStatus: 402,
                     failureDetail: APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
                     actorId: 'actor-789',
@@ -330,7 +330,7 @@ describe('call_actor_common', () => {
             expect(response.toolTelemetry).toEqual(
                 expect.objectContaining({
                     toolStatus: TOOL_STATUS.SOFT_FAIL,
-                    failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                    failureCategory: FAILURE_CATEGORY.BILLING,
                     failureDetail: 'concurrent-runs-limit-exceeded',
                     actorId: 'actor-999',
                 }),

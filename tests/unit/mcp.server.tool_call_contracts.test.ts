@@ -75,7 +75,7 @@ const FAILURE_CLASSES: FailureClass[] = [
         storedResult: { content: X402_RESPONSE_CONTENT, isError: true, structuredContent: X402_PAYMENT_DATA },
         telemetry: {
             tool_status: TOOL_STATUS.SOFT_FAIL,
-            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+            failure_category: FAILURE_CATEGORY.BILLING,
             failure_http_status: 402,
         },
         telemetryExtraKeys: ['failure_category', 'failure_http_status'],
@@ -888,7 +888,7 @@ describe('ACTOR_MCP remote-McpError containment (sync tools/call catch)', () => 
         const properties = trackSpy.mock.calls[0][2];
         expect(properties.tool_status).toBe(TOOL_STATUS.SOFT_FAIL);
         expect(properties.failure_http_status).toBe(402);
-        expect(properties.failure_category).toBe(FAILURE_CATEGORY.INVALID_INPUT);
+        expect(properties.failure_category).toBe(FAILURE_CATEGORY.BILLING);
     });
 
     it('forwards the abort signal into the remote Actor-MCP callTool options', async () => {

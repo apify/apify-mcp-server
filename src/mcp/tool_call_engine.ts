@@ -194,7 +194,7 @@ export function buildPreflightFailureOutcome(
     return {
         toolStatus: TOOL_STATUS.SOFT_FAIL,
         callDiagnostics: {
-            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+            failure_category: standbyRejection ? FAILURE_CATEGORY.INVALID_INPUT : FAILURE_CATEGORY.BILLING,
             ...(standbyRejection ? {} : { failure_http_status: 402 }),
             ...(toolTelemetry?.failureDetail && { failure_detail: toolTelemetry.failureDetail }),
             ...buildActorFields(actorName, actorId),

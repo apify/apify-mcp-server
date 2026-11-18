@@ -289,6 +289,8 @@ export const FAILURE_CATEGORY = {
     INVALID_INPUT: 'INVALID_INPUT',
     AUTH: 'AUTH',
     PERMISSION_APPROVAL_REQUIRED: 'PERMISSION_APPROVAL_REQUIRED',
+    /** HTTP 402: an account limit (concurrent runs, memory, usage) or a payment the client must make. */
+    BILLING: 'BILLING',
     INTERNAL_ERROR: 'INTERNAL_ERROR',
 } as const;
 

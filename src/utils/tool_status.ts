@@ -6,6 +6,7 @@ import {
     FAILURE_CATEGORY,
     HTTP_FORBIDDEN,
     HTTP_NOT_FOUND,
+    HTTP_PAYMENT_REQUIRED,
     HTTP_UNAUTHORIZED,
     RESOURCE_ID_OR_NAME_MAX_LENGTH,
     TOOL_STATUS,
@@ -117,11 +118,12 @@ export function classifyFailureCategory(error: unknown): FailureCategory {
 
     // Account run-limit is a user billing condition even when it arrives wrapped as a 5xx.
     if (isActorRunLimitError(error)) {
-        return FAILURE_CATEGORY.INVALID_INPUT;
+        return FAILURE_CATEGORY.BILLING;
     }
 
     const statusCode = getHttpStatusCode(error);
     if (statusCode === HTTP_UNAUTHORIZED || statusCode === HTTP_FORBIDDEN) return FAILURE_CATEGORY.AUTH;
+    if (statusCode === HTTP_PAYMENT_REQUIRED) return FAILURE_CATEGORY.BILLING;
     if (statusCode === HTTP_NOT_FOUND) return FAILURE_CATEGORY.INVALID_INPUT;
     if (statusCode !== undefined && statusCode >= 400 && statusCode < 500) return FAILURE_CATEGORY.INVALID_INPUT;
     if (statusCode !== undefined && statusCode >= 500) return FAILURE_CATEGORY.INTERNAL_ERROR;

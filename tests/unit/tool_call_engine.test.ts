@@ -32,6 +32,7 @@ import type { ToolCallTelemetryProperties, ToolEntry, ToolInputSchema } from '..
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
 import { hashSessionId, respondRaw, respondUserError } from '../../src/utils/mcp.js';
+import { buildPaymentRequiredResponse } from '../../src/utils/payment_errors.js';
 import { makePaymentRequiredError, makeRecorderTool, makeThrowingTool, withServer } from './helpers/mcp_server.js';
 
 /** An abort signal for direct engine tests, optionally already aborted. */
@@ -505,6 +506,22 @@ describe('classifyToolCallError()', () => {
         const texts = (outcome.result.content as { text: string }[]).map((c) => c.text);
         expect(texts).toHaveLength(2);
         expect(texts[1]).toBe(sentence);
+    });
+});
+
+describe('pre-flight payment request outcome', () => {
+    it('classifies a payment request as BILLING', () => {
+        const outcome = buildPreflightFailureOutcome(
+            null,
+            buildPaymentRequiredResponse('Payment required'),
+            'apify/rag-web-browser',
+            undefined,
+        );
+
+        expect(outcome.callDiagnostics).toMatchObject({
+            failure_category: FAILURE_CATEGORY.BILLING,
+            failure_http_status: 402,
+        });
     });
 });
 
