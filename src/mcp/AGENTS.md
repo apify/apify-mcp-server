@@ -81,7 +81,8 @@ Two MCP protocol revisions are served, each by its own adapter:
   tail, or both — carries a `TOOL_NAME_HASH_LENGTH` suffix hashed from the uncapped name;
   truncation alone collides. If any proxied name exceeds the cap, all sibling tools cap their
   username to `MAX_TOOL_NAME_USERNAME_LENGTH`; direct Actor tools do not. Collisions remain
-  first-wins in `getToolsForServerMode`. Never widen the cap — clients depend on it
+  first-wins: within one load in `getToolsForServerMode`, across loads in `storeTool` (`server.ts`), which skips a
+  tool whose name another Actor's tool holds. Never widen the cap — clients depend on it
   (Actor tools: `../tools/actor_tool_naming.ts`; proxied Actor-MCP tools: `proxy.ts`
   `getProxyMCPServerToolName`).
 - **Proxy server IDs are keyed by URL, not Actor ID.** `getMCPServerID(url)` is

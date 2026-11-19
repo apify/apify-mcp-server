@@ -3,13 +3,14 @@ import { ApifyClient } from 'apify-client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ActorsMcpServer } from '../../src/mcp/server.js';
+import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { getServerActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import type { ActorDefinitionPruned, Input } from '../../src/types.js';
 import { SERVER_MODE } from '../../src/types.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
 import { getActors } from '../../src/utils/tools_loader.js';
 import { mockActor } from './helpers/actor_build_client.js';
-import { makePaymentProvider } from './helpers/mcp_server.js';
+import { makeActorTool, makePaymentProvider } from './helpers/mcp_server.js';
 
 // Stub getActors so a load runs without a network fetch to the Apify platform.
 vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
@@ -115,6 +116,49 @@ describe('composing tools in a payment-provider session', () => {
         await load(server, { actors: ['apify/server-actor-test'] });
 
         expect(server.listToolNames()).not.toContain('apify--server-actor-test');
+    });
+});
+
+describe('two Actors that map to one tool name', () => {
+    // A dot in a username becomes `-dot-`, so both of these Actors get the tool name `my-dot-org--my-actor`.
+    const first = { actorFullName: 'my.org/my-actor', actorId: 'first-actor-id' };
+    const second = { actorFullName: 'my-dot-org/my-actor', actorId: 'second-actor-id' };
+    const name = actorNameToToolName(first.actorFullName);
+    const loadBoth = async (server: ActorsMcpServer) => {
+        vi.mocked(getActors)
+            .mockResolvedValueOnce([makeActorTool({ name, ...first })])
+            .mockResolvedValueOnce([makeActorTool({ name: actorNameToToolName(second.actorFullName), ...second })]);
+        await load(server, { actors: [first.actorFullName] });
+        await load(server, { actors: [second.actorFullName] });
+    };
+
+    it('keeps the tool of the Actor loaded first', async () => {
+        const server = makeServer();
+
+        await loadBoth(server);
+
+        expect(server.tools.get(name)).toMatchObject(first);
+    });
+
+    it('keeps the tool of the Actor loaded first in a stateless request snapshot', async () => {
+        const server = makeServer();
+
+        await loadBoth(server);
+
+        const snapshot = await server.createRequestSnapshot(undefined);
+        expect(snapshot.tools.get(name)).toMatchObject(first);
+    });
+
+    it("replaces an Actor's tool when the same Actor is loaded again", async () => {
+        const server = makeServer();
+        vi.mocked(getActors)
+            .mockResolvedValueOnce([makeActorTool({ name, ...first })])
+            .mockResolvedValueOnce([{ ...makeActorTool({ name, ...first }), description: 'updated' }]);
+
+        await load(server, { actors: [first.actorFullName] });
+        await load(server, { actors: [first.actorFullName] });
+
+        expect(server.tools.get(name)).toMatchObject({ description: 'updated' });
     });
 });
 

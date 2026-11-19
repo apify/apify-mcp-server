@@ -332,10 +332,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         // over would re-add tools this view's gating just withheld.
         const tools = new Map<string, ToolEntry>();
         for (const source of this.toolSources.values()) {
-            for (const tool of this.composeToolsForClient(source, view)) {
-                const stored = this.toStoredTool(tool);
-                tools.set(stored.name, stored);
-            }
+            for (const tool of this.composeToolsForClient(source, view)) this.storeTool(tools, tool);
         }
 
         const availableWidgets = await this.resolveWidgetsForMode(serverMode);
@@ -529,11 +526,28 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     public upsertTools(tools: ToolEntry[]) {
         // Client gating happens earlier, in composeToolsForClient. Do not filter here: this is a
         // low-level commit point reached before the client is known too.
-        for (const tool of tools) {
-            const stored = this.toStoredTool(tool);
-            this.tools.set(stored.name, stored);
-        }
+        for (const tool of tools) this.storeTool(this.tools, tool);
         return tools;
+    }
+
+    /**
+     * Stores `tool` in `tools` under its name. Two Actors can map to one tool name (`my.org/my-actor` and
+     * `my-dot-org/my-actor` both give `my-dot-org--my-actor`), so a name that another Actor's tool holds is kept:
+     * the new tool is skipped with a warning. A tool of the same Actor, or a tool without an Actor, replaces the
+     * stored one.
+     */
+    private storeTool(tools: Map<string, ToolEntry>, tool: ToolEntry): void {
+        const stored = this.toStoredTool(tool);
+        const existing = tools.get(stored.name);
+        if (existing && 'actorId' in existing && 'actorId' in stored && existing.actorId !== stored.actorId) {
+            log.warning('Tool name is taken by another Actor, skipping the tool', {
+                toolName: stored.name,
+                actorFullName: stored.actorFullName,
+                loadedActorFullName: existing.actorFullName,
+            });
+            return;
+        }
+        tools.set(stored.name, stored);
     }
 
     private toStoredTool(tool: ToolEntry): ToolEntry {
