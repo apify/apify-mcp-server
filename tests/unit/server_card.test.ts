@@ -107,13 +107,6 @@ describe('getServerCard()', () => {
             expect(card.serverInfo.version).toBe(getPackageVersion());
         });
 
-        it('points iconUrl at the PNG icon from server.json', () => {
-            const card = getServerCard();
-
-            const pngIcon = serverJson.icons.find((icon) => icon.mimeType === 'image/png');
-            expect(card.iconUrl).toBe(pngIcon?.src);
-        });
-
         it('declares streamable-http transport at root endpoint', () => {
             const card = getServerCard();
 

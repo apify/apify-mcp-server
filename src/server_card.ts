@@ -80,7 +80,7 @@ export function getServerCard(): ServerCard {
             title: SERVER_TITLE,
             version: getPackageVersion()!,
         },
-        // SEP-1649 allows one icon of any format. PNG is the format every icon-rendering client supports.
+        // SEP-1649 allows one icon of any format. SEP-2127 requires icon-rendering clients to support PNG, not SVG.
         iconUrl: serverJson.icons.find((icon) => icon.mimeType === 'image/png')!.src,
         documentationUrl: APIFY_DOCS_MCP_URL,
         transport: {
