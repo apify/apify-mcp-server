@@ -64,7 +64,9 @@ function isAllowedServerActorUrl(serverUrl: URL): boolean {
 /**
  * Resolves `path` against the Actor's platform-assigned `standbyUrl` (absent when Actor Standby is off).
  *
- * `path` is publisher-controlled, and the caller's Apify token goes to whatever host the result names. A crafted
+ * `path` is publisher-controlled, and the caller's Apify token goes to whatever host the result names. On the
+ * standby origin that host is the platform's standby controller, which authenticates the caller with the token and
+ * removes it before the request reaches the Actor's code. Any other host would receive the token as sent. A crafted
  * path (`@host/...`, `.host/...`, `//host/...`, `https://host/...`) could point the token at a third-party host,
  * so `url` is null when the path leaves the standby origin or does not parse. Returns null when the Actor has no
  * valid standby URL, or one that `isAllowedServerActorUrl` refuses; don't build a fallback hostname from the Actor
