@@ -8,6 +8,7 @@ import type { ApifyClient } from '../../src/apify_client.js';
 import {
     getActorDefinition,
     getDeclaredDatasetItemsSchema,
+    MAX_DATASET_FIELD_DEPTH,
     MAX_DATASET_ITEM_PROPERTIES_BYTES,
     reduceToFieldNamesAndTypes,
 } from '../../src/tools/actors/actor_definition.js';
@@ -344,6 +345,18 @@ describe('the dataset schema an Actor declares for its default dataset', () => {
         expect(getDeclaredDatasetItemsSchema({ storages: { dataset: { views: {} } } })).toBeUndefined();
     });
 
+    it('is absent when a multi-dataset Actor declares no `default` alias', () => {
+        const storages = { datasets: { errors: { fields: PROFILE_FIELDS } } };
+
+        expect(getDeclaredDatasetItemsSchema({ storages })).toBeUndefined();
+    });
+
+    it('is absent when the declared properties are not an object', () => {
+        const fields = { type: 'object', properties: ['username', 'followersCount'] };
+
+        expect(getDeclaredDatasetItemsSchema({ storages: { dataset: { fields } } })).toBeUndefined();
+    });
+
     it('is absent when the declared fields have no properties', () => {
         const fields = { type: 'object', properties: {} };
 
@@ -392,10 +405,12 @@ describe('reducing declared dataset fields to names and types', () => {
         const reduced = reduceToFieldNamesAndTypes({
             scrapedAt: { type: 'date' },
             price: { type: ['number', 'money'] },
+            rating: { type: ['stars', 'score'] },
             anything: 'not a schema',
         });
 
-        expect(reduced).toEqual({ scrapedAt: {}, price: { type: ['number'] }, anything: {} });
+        // Strict: `type: undefined` or `type: []` would not be a field without a type.
+        expect(reduced).toStrictEqual({ scrapedAt: {}, price: { type: ['number'] }, rating: {}, anything: {} });
     });
 
     it('lists a type name the declaration repeats once', () => {
@@ -404,20 +419,41 @@ describe('reducing declared dataset fields to names and types', () => {
         expect(reduced).toEqual({ price: { type: ['number', 'null'] } });
     });
 
+    // tiktok-scraper declares nullability this way, 136 times.
+    it('lists the null type for a field marked `nullable: true`', () => {
+        const reduced = reduceToFieldNamesAndTypes({
+            text: { type: 'string', nullable: true },
+            diggCount: { type: ['integer', 'null'], nullable: true },
+            createTime: { type: 'integer', nullable: false },
+        });
+
+        expect(reduced).toEqual({
+            text: { type: ['string', 'null'] },
+            diggCount: { type: ['integer', 'null'] },
+            createTime: { type: 'integer' },
+        });
+    });
+
     // A creator's schema can nest without end; the reduction must stay bounded.
     it('keeps the type of a deeply nested field and drops what lies below it', () => {
+        // Nests through `properties` and `items` in turn: both count as a level.
         let deepest: Record<string, unknown> = { type: 'string' };
-        for (let level = 0; level < 50; level++) deepest = { type: 'object', properties: { child: deepest } };
+        for (let level = 0; level < 50; level++) {
+            deepest =
+                level % 2 === 0
+                    ? { type: 'array', items: deepest }
+                    : { type: 'object', properties: { child: deepest } };
+        }
 
         let node = reduceToFieldNamesAndTypes({ root: deepest })?.root as Record<string, unknown>;
         let depth = 1;
-        while (node.properties) {
-            node = (node.properties as Record<string, Record<string, unknown>>).child;
+        while (node.properties || node.items) {
+            node = (node.items ?? (node.properties as Record<string, unknown>).child) as Record<string, unknown>;
             depth++;
         }
 
-        expect(depth).toBeLessThan(50);
-        expect(node).toEqual({ type: 'object' });
+        expect(depth).toBe(MAX_DATASET_FIELD_DEPTH);
+        expect(Object.keys(node)).toEqual(['type']);
     });
 
     it('returns nothing when the reduced fields exceed the size limit', () => {

@@ -167,8 +167,8 @@ describe('Structured Output Schemas', () => {
         });
     });
 
-    describe('getNormalActorsAsTools enrichment', () => {
-        it('uses the canonical RunResponse schema when no actorStore is provided', async () => {
+    describe('getNormalActorsAsTools output schema', () => {
+        it('uses the canonical RunResponse schema for an Actor that declares no dataset fields', async () => {
             const tools = await getNormalActorsAsTools([createMockActorInfo('apify/test-actor')]);
 
             expect(tools).toHaveLength(1);
@@ -198,12 +198,6 @@ describe('Structured Output Schemas', () => {
             const tools = await getNormalActorsAsTools([createMockActorInfo('apify/test-actor', itemProperties)]);
 
             expect(pickItemsSchema((tools[0] as ActorTool).outputSchema)?.properties).toEqual(itemProperties);
-        });
-
-        it('advertises the canonical schema for an Actor that declares no dataset fields', async () => {
-            const tools = await getNormalActorsAsTools([createMockActorInfo('apify/test-actor')]);
-
-            expect((tools[0] as ActorTool).outputSchema).toBe(actorRunOutputSchema);
         });
 
         it('emits no widget meta on actor tools', async () => {

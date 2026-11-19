@@ -23,7 +23,7 @@ const BUILD_NUMBER_PATTERN = /^\d+\.\d+\.\d+$/;
 
 const JSON_SCHEMA_TYPES = new Set(['string', 'number', 'integer', 'boolean', 'object', 'array', 'null']);
 /** Nesting of declared dataset fields kept by `reduceToFieldNamesAndTypes`; a deeper field keeps no shape. */
-const MAX_DATASET_FIELD_DEPTH = 8;
+export const MAX_DATASET_FIELD_DEPTH = 8;
 /** Serialized size above which `reduceToFieldNamesAndTypes` returns nothing; `compass/crawler-google-places` has 4 KB. */
 export const MAX_DATASET_ITEM_PROPERTIES_BYTES = 65_536;
 
@@ -52,8 +52,10 @@ export function getDeclaredDatasetItemsSchema(actorDefinition: unknown): Dataset
  *
  * The result goes into `tools/list` for every selected Actor, where descriptions and examples would multiply its
  * size (38 KB against 4 KB for `compass/crawler-google-places`). The schema is written by the Actor's creator, so
- * any other keyword is dropped as well: a client that compiles the tool's `outputSchema` then never meets one its
- * validator rejects. For the same reason nesting stops at `MAX_DATASET_FIELD_DEPTH`, and a result over
+ * any other keyword is dropped as well, and a type name JSON Schema does not define with it: a client that compiles
+ * the tool's `outputSchema` rejects the tool on a keyword or type its validator does not know. A field typed only
+ * through `$ref`, `anyOf` or `oneOf` therefore keeps its name and no type. OpenAPI's `nullable: true` is kept as
+ * the `null` type. Nesting stops at `MAX_DATASET_FIELD_DEPTH`, and a result over
  * `MAX_DATASET_ITEM_PROPERTIES_BYTES` is not returned. The full schema is served by `fetch-actor-details`.
  */
 export function reduceToFieldNamesAndTypes(
@@ -77,7 +79,8 @@ function reduceFieldSchema(schema: unknown, depth: number): Record<string, unkno
     const types = [...new Set<unknown>(Array.isArray(schema.type) ? schema.type : [schema.type])].filter(
         (type): type is string => typeof type === 'string' && JSON_SCHEMA_TYPES.has(type),
     );
-    if (types.length > 0) reduced.type = Array.isArray(schema.type) ? types : types[0];
+    if (schema.nullable === true && types.length > 0 && !types.includes('null')) types.push('null');
+    if (types.length > 0) reduced.type = types.length > 1 || Array.isArray(schema.type) ? types : types[0];
     if (depth >= MAX_DATASET_FIELD_DEPTH) return reduced;
     if (isRecord(schema.properties)) reduced.properties = reduceProperties(schema.properties, depth + 1);
     if (isRecord(schema.items)) reduced.items = reduceFieldSchema(schema.items, depth + 1);
