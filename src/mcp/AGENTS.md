@@ -41,9 +41,8 @@ Two MCP protocol revisions are served, each by its own adapter:
 - `client.ts` — `connectMCPClient(url, options)`: transport negotiation; both transports send the token and the
   session's request origin (`ApifyClient.requestOrigin`, `APIFY_AI` for the Apify AI client) on every request, and
   follow a redirect only within the origin of `url` (`REDIRECT_POLICY`). The token authenticates the caller to the
-  platform's standby controller, which removes it before the request reaches the Actor's code
-  (`extractApiTokenFromRequest` in `apify/actor-standby-controller`); the Actor never receives it, which is why the
-  URL must stay on the Actor's standby origin. The client compiles no output schema of the
+  Apify platform, which removes it before the request reaches the Actor's code; the Actor never receives it, which
+  is why the URL must stay on the Actor's standby origin. The client compiles no output schema of the
   tools the server lists (`ACCEPT_ANY_RESULT`): the results are passed on unvalidated.
 - `remote_tool_call.ts` — `withRemoteMcpClient()`: connect-call-close round trip for
   `tool_dispatch.ts` and the MCP server Actor tools (`runOnActorMcpServer` in `call_actor_mcp_tool.ts`).
