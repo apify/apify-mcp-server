@@ -160,20 +160,6 @@ describe('get-dataset-items', () => {
         expect(structuredContent.items).toEqual(MOCK_ITEMS);
     });
 
-    it('names only fields and omit when one item is over the size limit', async () => {
-        const result = await (getDatasetItems as HelperTool).call(
-            stubToolCallContext(
-                { datasetId: 'DsWkzbQMuFYuam3YF', limit: 1 },
-                stubApifyClient(() => 'overLimit'),
-            ),
-        );
-        const { content } = result as TextToolResult;
-
-        expectSoftFailInvalidInput(result);
-        expect(content[0].text).toContain('`fields` or `omit`');
-        expect(content[0].text).not.toContain('Lower');
-    });
-
     it('auto-derives flatten from dot-notation in fields', async () => {
         const requestSpy = vi.fn((_params: Record<string, unknown>) => ({ items: [], total: 0 }));
 

@@ -85,7 +85,7 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
         }
         if (datasetResponse.isOverLimit) {
             return respondUserError(
-                `The sample from dataset '${datasetId}' is over the ${MAX_INLINE_BYTES}-byte response limit. ${parsed.limit === 1 ? 'Its first item alone is over the limit, so no schema can be inferred from it.' : 'Lower `limit`.'}`,
+                `The sample from dataset '${datasetId}' is over the ${MAX_INLINE_BYTES}-byte response limit. Lower \`limit\`. One item over the limit cannot be sampled.`,
             );
         }
 
