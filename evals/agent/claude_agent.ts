@@ -18,6 +18,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 
 import { REPORT_PROBLEM_NUDGE } from '../../src/tools/dev/report_problem.js';
 import { isMcpToolName, MCP_SERVER_NAME, stripToolPrefix } from '../config.js';
+import { ENV_KEYS_TO_SANITIZE } from '../environment.js';
 import type { AttemptedToolCall } from '../runner/tool_call_mode.js';
 import { TOOL_CALL_DENY_REASON, TOOL_CALL_MAX_TURNS } from '../runner/tool_call_mode.js';
 import type { AdaptedConversation } from './conversation_adapter.js';
@@ -55,6 +56,19 @@ const STDIO_BIN_PATH = resolve(process.cwd(), 'dist/stdio.js');
 
 /** Number of trailing non-empty stderr lines kept to append to a thrown error. */
 const MAX_APPENDED_STDERR_LINES = 5;
+
+/**
+ * `process.env` without the eval runner's credentials (`ENV_KEYS_TO_SANITIZE`), except `keptKey`.
+ * The Claude Code and MCP server subprocesses each get only the credential they authenticate with.
+ */
+function envWithoutRunnerCredentials(keptKey?: string): Record<string, string> {
+    return Object.fromEntries(
+        Object.entries(process.env).filter(
+            (entry): entry is [string, string] =>
+                entry[1] !== undefined && (entry[0] === keptKey || !ENV_KEYS_TO_SANITIZE.includes(entry[0])),
+        ),
+    );
+}
 
 /** Throw with the fix if the MCP server has not been built yet. */
 export function assertStdioBinExists(): void {
@@ -129,12 +143,14 @@ export async function runAgentConversation(options: AgentRunOptions): Promise<Ag
         model,
         systemPrompt: { type: 'preset', preset: 'claude_code' },
         tools: [],
+        env: envWithoutRunnerCredentials('ANTHROPIC_API_KEY'),
         mcpServers: {
             [MCP_SERVER_NAME]: {
                 type: 'stdio',
                 command: 'node',
                 args: serverArgs,
-                env: { ...process.env, APIFY_TOKEN: apifyToken },
+                // The CLI merges its own env into the server's, so the Anthropic key is blanked, not omitted.
+                env: { ...envWithoutRunnerCredentials(), APIFY_TOKEN: apifyToken, ANTHROPIC_API_KEY: '' },
                 timeout: toolTimeoutSeconds * 1000,
                 // Keep the server's tools in the prompt instead of behind tool search, or the
                 // eval measures tool search rather than our tool descriptions.

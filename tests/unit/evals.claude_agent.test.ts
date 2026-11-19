@@ -133,6 +133,28 @@ describe('runAgentConversation()', () => {
         expect(result).toMatchObject({ behavior: 'deny' });
     });
 
+    it('keeps the eval runner credentials out of the agent and MCP server subprocesses', async () => {
+        vi.stubEnv('ANTHROPIC_API_KEY', 'anthropic-key');
+        vi.stubEnv('LANGFUSE_SECRET_KEY', 'langfuse-key');
+        vi.stubEnv('OPENROUTER_API_KEY', 'openrouter-key');
+        vi.stubEnv('APIFY_TOKEN', 'runner-token');
+
+        await runAgentConversation(baseOptions({ apifyToken: 'item-token' }));
+        vi.unstubAllEnvs();
+
+        // The CLI authenticates with the Anthropic key; the server only with the token it serves.
+        expect(capturedOptions?.env).toMatchObject({ ANTHROPIC_API_KEY: 'anthropic-key', PATH: process.env.PATH });
+        expect(capturedOptions?.env).not.toHaveProperty('LANGFUSE_SECRET_KEY');
+        expect(capturedOptions?.env).not.toHaveProperty('OPENROUTER_API_KEY');
+        expect(capturedOptions?.env).not.toHaveProperty('APIFY_TOKEN');
+
+        const serverEnv = (capturedOptions?.mcpServers?.apify as { env: Record<string, string> } | undefined)?.env;
+        // Blank, not absent: the CLI would otherwise hand its own Anthropic key down to the server.
+        expect(serverEnv).toMatchObject({ APIFY_TOKEN: 'item-token', ANTHROPIC_API_KEY: '', PATH: process.env.PATH });
+        expect(serverEnv).not.toHaveProperty('LANGFUSE_SECRET_KEY');
+        expect(serverEnv).not.toHaveProperty('OPENROUTER_API_KEY');
+    });
+
     it('denies and records tool-call attempts with the fixed turn limit', async () => {
         let hookResult: unknown;
         mocks.query.mockImplementation(({ options }: { options: Options }) => {
