@@ -5,12 +5,13 @@ import log from '@apify/log';
 
 import type * as ApifyClientModule from '../../src/apify_client.js';
 import { REQUEST_ORIGIN } from '../../src/apify_client.js';
-import { APIFY_AI_CLIENT_NAME, HELPER_TOOLS } from '../../src/const.js';
+import { APIFY_AI_CLIENT_NAME, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import * as mcpClient from '../../src/mcp/client.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import * as telemetry from '../../src/telemetry.js';
 import { getOwnServerRemedy } from '../../src/tools/actor_tool_naming.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
+import * as callActor from '../../src/tools/actors/call_actor.js';
 import type { ActorsMcpServerOptions, Input, ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
@@ -385,6 +386,33 @@ describe('createStatelessServer() tools/call', () => {
 
             expect(response.result?.structuredContent).toBe(42);
             expect(response.result?.content).toEqual([{ type: 'text', text: '42' }]);
+        });
+    });
+
+    it('returns a failure classified after name resolution as the projected tool result', async () => {
+        // A non-protocol throw while preparing a resolved tool is classified by the engine, so the handler
+        // returns through its `'result' in prepared` branch instead of dispatching.
+        vi.spyOn(log, 'exception').mockImplementation(() => log);
+        vi.spyOn(callActor, 'buildLegacyMcpSyntaxRejection').mockImplementation(() => {
+            throw Object.assign(new Error('server error'), { statusCode: 500 });
+        });
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        const options = { token: undefined, allowUnauthMode: true, telemetry: { enabled: true } };
+        const legacy = await callViaLegacy(() => [makeArgsRecorderTool().tool], 'recorder-tool', options);
+        trackSpy.mockClear();
+
+        await withStatelessServer(async ({ server, call }) => {
+            await loadSource(server, [makeArgsRecorderTool().tool]);
+
+            const response = await call('tools/call', { name: 'recorder-tool', arguments: {} });
+
+            expect(response.result?.isError).toBe(true);
+            expect(response.result).toMatchObject(asWire(legacy) as Record<string, unknown>);
+        }, options);
+        expect(trackSpy.mock.calls).toHaveLength(1);
+        expect(trackSpy.mock.calls[0][2]).toMatchObject({
+            tool_name: 'recorder-tool',
+            tool_status: TOOL_STATUS.FAILED,
         });
     });
 
