@@ -16,7 +16,6 @@ import {
     buildCardOptions,
     fetchActorDetails as fetchActorDetailsFromApi,
     resolveReadmeContent,
-    typeObjectToString,
 } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleActorUrl, getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
@@ -53,7 +52,7 @@ export const actorDetailsOutputOptionsSchema = z.object({
     outputSchema: z
         .boolean()
         .optional()
-        .describe('Include inferred output schema from recent successful runs (TypeScript type).'),
+        .describe('Include the JSON Schema the Actor declares for items of its default dataset.'),
     serverInterface: z.union([z.boolean(), z.string()]).optional().describe(dedent`
             Server Actor HTTP API. true: every operation with its parameters and request body schema when they fit; otherwise an index with one entry per operation.
             "METHOD /path" (e.g. "GET /search"): that one operation in full.
@@ -206,7 +205,6 @@ function buildMcpServerNextStep(
 export function buildActorDetailsTextResponse(options: {
     details: ActorDetailsResult;
     output: ResolvedOutputOptions;
-    actorOutputSchema?: Record<string, unknown> | null;
     serverInterface?: ServerInterfaceSection;
     linkContext?: ConsoleLinkContext;
     nextStep?: string;
@@ -214,7 +212,7 @@ export function buildActorDetailsTextResponse(options: {
     texts: string[];
     structuredContent: Record<string, unknown>;
 } {
-    const { details, output, actorOutputSchema, serverInterface, linkContext, nextStep } = options;
+    const { details, output, serverInterface, linkContext, nextStep } = options;
 
     const actorUrl =
         buildConsoleActorUrl(linkContext, details.actorInfo.id) ??
@@ -240,21 +238,11 @@ export function buildActorDetailsTextResponse(options: {
     }
 
     if (output.outputSchema) {
-        if (actorOutputSchema && Object.keys(actorOutputSchema).length > 0) {
-            const typeString = typeObjectToString(actorOutputSchema);
-            texts.push(dedent`
-                # Output Schema (TypeScript)
-                Inferred from recent successful runs:
-                \`\`\`typescript
-                type ActorOutput = ${typeString}
-                \`\`\`
-            `);
-        } else {
-            texts.push(dedent`
-                # Output Schema
-                No output schema available. The Actor may not have recent successful runs, or the output structure could not be determined.
-            `);
-        }
+        texts.push(
+            details.outputSchema
+                ? `# Output schema\nJSON Schema the Actor declares for items of its default dataset:\n${wrapJsonText(details.outputSchema)}`
+                : '# Output schema\nThe Actor declares no schema for items of its default dataset.',
+        );
     }
 
     if (serverInterface?.text) texts.push(serverInterface.text);
@@ -269,7 +257,7 @@ export function buildActorDetailsTextResponse(options: {
         actorInfo: needsCard ? details.actorCardStructured : undefined,
         readme: resolvedReadme?.content,
         inputSchema: output.inputSchema ? details.inputSchema : undefined,
-        outputSchema: output.outputSchema ? (actorOutputSchema ?? {}) : undefined,
+        outputSchema: output.outputSchema ? (details.outputSchema ?? {}) : undefined,
         serverInterface: serverInterface?.serverInterface,
         ...(nextStep && { nextStep }),
     };
@@ -312,13 +300,6 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     });
     if ('error' in serverInterface) return respondUserError(serverInterface.error);
 
-    let actorOutputSchema: Record<string, unknown> | null | undefined;
-    if (resolvedOutput.outputSchema) {
-        actorOutputSchema = actorStore
-            ? await actorStore.getActorOutputSchemaAsTypeObject(actorName).catch(() => null)
-            : null;
-    }
-
     const nextStep = buildMcpServerNextStep(details, loadedToolNames, loadedActorIds);
 
     // NOTE: Data duplication between texts and structuredContent is intentional and required.
@@ -326,7 +307,6 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
     const { texts, structuredContent } = buildActorDetailsTextResponse({
         details,
         output: resolvedOutput,
-        actorOutputSchema,
         serverInterface,
         linkContext,
         nextStep,

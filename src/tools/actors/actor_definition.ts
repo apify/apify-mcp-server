@@ -10,6 +10,7 @@ import type {
     ActorDefinitionWithDesc,
     ActorDefinitionWithInfo,
     ActorDefinitionWithServerInterface,
+    DatasetItemsSchema,
     SchemaProperties,
 } from '../../types.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
@@ -19,6 +20,68 @@ import { buildServerActorToolInfo } from './server_interface_details.js';
 import { listCommaJoinedQueryParameters, listDocumentedOperations } from './server_interface_schema.js';
 
 const BUILD_NUMBER_PATTERN = /^\d+\.\d+\.\d+$/;
+
+const JSON_SCHEMA_TYPES = new Set(['string', 'number', 'integer', 'boolean', 'object', 'array', 'null']);
+/** Nesting of declared dataset fields kept by `reduceToFieldNamesAndTypes`; a deeper field keeps no shape. */
+const MAX_DATASET_FIELD_DEPTH = 8;
+/** Serialized size above which `reduceToFieldNamesAndTypes` returns nothing; `compass/crawler-google-places` has 4 KB. */
+export const MAX_DATASET_ITEM_PROPERTIES_BYTES = 65_536;
+
+/**
+ * Returns the JSON Schema an Actor declares for the items of its default dataset: the `fields` of its dataset
+ * schema. `undefined` when the Actor declares no fields.
+ *
+ * An Actor with several datasets declares them under `storages.datasets.<alias>`, any other under
+ * `storages.dataset`. The platform reads `storages.datasets` first and treats `storages.dataset` as the `default`
+ * alias, so `storages.dataset` is not read when `storages.datasets` exists.
+ */
+export function getDeclaredDatasetItemsSchema(actorDefinition: unknown): DatasetItemsSchema | undefined {
+    const storages = isRecord(actorDefinition) ? actorDefinition.storages : undefined;
+    if (!isRecord(storages)) return undefined;
+    const dataset = isRecord(storages.datasets) ? storages.datasets.default : storages.dataset;
+    const fields = isRecord(dataset) ? dataset.fields : undefined;
+    if (!isRecord(fields) || !isRecord(fields.properties) || Object.keys(fields.properties).length === 0) {
+        return undefined;
+    }
+    return fields as DatasetItemsSchema;
+}
+
+/**
+ * Reduces the `properties` of a declared dataset schema to field names and types: per field only `type`, and
+ * recursively `properties` and `items`. Returns `undefined` for no properties.
+ *
+ * The result goes into `tools/list` for every selected Actor, where descriptions and examples would multiply its
+ * size (38 KB against 4 KB for `compass/crawler-google-places`). The schema is written by the Actor's creator, so
+ * any other keyword is dropped as well: a client that compiles the tool's `outputSchema` then never meets one its
+ * validator rejects. For the same reason nesting stops at `MAX_DATASET_FIELD_DEPTH`, and a result over
+ * `MAX_DATASET_ITEM_PROPERTIES_BYTES` is not returned. The full schema is served by `fetch-actor-details`.
+ */
+export function reduceToFieldNamesAndTypes(
+    properties: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+    if (!properties) return undefined;
+    const reduced = reduceProperties(properties, 1);
+    return JSON.stringify(reduced).length > MAX_DATASET_ITEM_PROPERTIES_BYTES ? undefined : reduced;
+}
+
+function reduceProperties(properties: Record<string, unknown>, depth: number): Record<string, unknown> {
+    return Object.fromEntries(
+        Object.entries(properties).map(([name, schema]) => [name, reduceFieldSchema(schema, depth)]),
+    );
+}
+
+function reduceFieldSchema(schema: unknown, depth: number): Record<string, unknown> {
+    if (!isRecord(schema)) return {};
+    const reduced: Record<string, unknown> = {};
+    const types = (Array.isArray(schema.type) ? schema.type : [schema.type]).filter(
+        (type): type is string => typeof type === 'string' && JSON_SCHEMA_TYPES.has(type),
+    );
+    if (types.length > 0) reduced.type = Array.isArray(schema.type) ? types : types[0];
+    if (depth >= MAX_DATASET_FIELD_DEPTH) return reduced;
+    if (isRecord(schema.properties)) reduced.properties = reduceProperties(schema.properties, depth + 1);
+    if (isRecord(schema.items)) reduced.items = reduceFieldSchema(schema.items, depth + 1);
+    return reduced;
+}
 
 /**
  * Get an Actor's pruned definition by Actor ID or name.
@@ -154,6 +217,7 @@ function pruneActorDefinition(
     serverDefinition: ActorDefinitionWithServerInterface | undefined,
 ): ActorDefinitionPruned {
     const commaJoinedQueryParameters = listCommaJoinedQueryParameters(serverDefinition?.webServerSchema);
+    const datasetItemProperties = reduceToFieldNamesAndTypes(getDeclaredDatasetItemsSchema(response)?.properties);
     return {
         id: response.id,
         actorFullName: response.actorFullName || '',
@@ -178,6 +242,7 @@ function pruneActorDefinition(
         }),
         webServerToolInfo: buildServerActorToolInfo(serverDefinition?.webServerSchema, response.actorFullName || ''),
         pictureUrl: 'pictureUrl' in response ? (response.pictureUrl as string | undefined) : undefined,
+        ...(datasetItemProperties && { datasetItemProperties }),
     };
 }
 /**

@@ -182,7 +182,6 @@ The hosted remote MCP server with OAuth is the recommended option. Use the local
 | :--- | :--- | :--- |
 | Transport | Streamable HTTP | stdio |
 | Authentication | OAuth or Bearer token | `APIFY_TOKEN` environment variable or Apify CLI login |
-| Output schemas inferred for Actor results | Yes | No |
 | Tool selection | `tools` URL parameter | `--tools` flag or `TOOLS` environment variable |
 | Updates | Always the latest server | The npm version you install |
 

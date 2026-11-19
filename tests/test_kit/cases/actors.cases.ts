@@ -27,6 +27,8 @@ import type { Case, SuiteClient } from '../types.js';
 
 // call-actor calls Actors by name — this tool name must never appear in the tool list.
 const NORMAL_MODE_TOOL_NAME = actorNameToToolName(ACTOR_NORMAL_MODE);
+/** Declares `fields` for its default dataset (under `storages.datasets.default`); none of the test Actors does. */
+const ACTOR_WITH_DATASET_SCHEMA = 'apify/website-content-crawler';
 
 type ServerActorRequestContent = {
     status: number;
@@ -408,6 +410,55 @@ export const actorsCases: Case[] = [
 
             // This should validate successfully - structured output must match schema
             validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
+        }),
+    },
+    {
+        name: 'should return the dataset schema the Actor declares for fetch-actor-details with output={ outputSchema: true }',
+        isDeploymentTest: true,
+        run: withClient({ tools: ['actors'] }, async (client) => {
+            const result = await client.callTool({
+                name: 'fetch-actor-details',
+                arguments: { actor: ACTOR_WITH_DATASET_SCHEMA, output: { outputSchema: true } },
+            });
+
+            validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
+            const { outputSchema } = result.structuredContent as {
+                outputSchema: { properties: Record<string, { type?: unknown; description?: string }> };
+            };
+            // The declaration in full: the field keeps the description its creator wrote.
+            expect(outputSchema.properties.url.description).toEqual(expect.any(String));
+            expect((result.content as { text: string }[]).map((item) => item.text).join('\n')).toContain(
+                '# Output schema',
+            );
+        }),
+    },
+    {
+        name: 'should advertise the declared dataset fields of a direct Actor tool as names and types only',
+        isDeploymentTest: false,
+        run: withClient({ tools: [ACTOR_WITH_DATASET_SCHEMA] }, async (client) => {
+            const { tools } = await client.listTools();
+            const tool = tools.find((item) => item.name === actorNameToToolName(ACTOR_WITH_DATASET_SCHEMA));
+
+            if (!tool) throw new Error(`Tool for ${ACTOR_WITH_DATASET_SCHEMA} is not listed`);
+
+            const { itemsSchema } = (
+                tool.outputSchema as unknown as {
+                    properties: {
+                        storages: {
+                            properties: {
+                                datasets: {
+                                    properties: {
+                                        default: {
+                                            properties: { itemsSchema: { properties: Record<string, unknown> } };
+                                        };
+                                    };
+                                };
+                            };
+                        };
+                    };
+                }
+            ).properties.storages.properties.datasets.properties.default.properties;
+            expect(itemsSchema.properties.url).toEqual({ type: 'string' });
         }),
     },
     {

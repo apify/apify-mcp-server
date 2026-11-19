@@ -18,8 +18,6 @@ import type { PaymentProvider } from '../../payments/types.js';
 import {
     type ActorDefinitionWithInfo,
     type ActorInfo,
-    type ActorStore,
-    type ActorTool,
     type ToolDescriptionContext,
     type ToolEntry,
     type ToolInputSchema,
@@ -72,40 +70,6 @@ const WAIT_SECS_INPUT_PROPERTY = {
 } as const;
 
 /**
- * For each direct actor tool with a known historical item schema, replaces the generic
- * `actorRunOutputSchema` with a per-tool variant that declares
- * `storages.datasets.default.itemsSchema` — letting an LLM plan field projection from
- * `tools/list` alone, before any call.
- *
- * Uses `Promise.allSettled` so a single store failure doesn't block other tools. Individual
- * misses (null / empty properties / thrown errors) leave the tool on the generic schema.
- */
-export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStore: ActorStore): Promise<void> {
-    const enrichPromises = tools
-        .filter((tool): tool is ActorTool => tool.type === TOOL_TYPE.ACTOR)
-        .map(async (tool) => {
-            try {
-                const itemProperties = await actorStore.getActorOutputSchema(tool.actorFullName);
-                if (itemProperties && Object.keys(itemProperties).length > 0) {
-                    // eslint-disable-next-line no-param-reassign
-                    tool.outputSchema = buildEnrichedDirectActorOutputSchema(itemProperties);
-                    // Stash the raw properties so the executor can mirror them into
-                    // `structuredContent.storages.datasets.default.itemsSchema` at runtime.
-                    // eslint-disable-next-line no-param-reassign
-                    tool.datasetItemsSchema = itemProperties;
-                }
-            } catch (error) {
-                log.debug('Failed to enrich output schema for Actor', {
-                    actorName: tool.actorFullName,
-                    errMessage: error instanceof Error ? error.message : String(error),
-                });
-            }
-        });
-
-    await Promise.allSettled(enrichPromises);
-}
-
-/**
  * Clients such as Claude run read-only tools without asking each time (see apify/apify-mcp-server#973).
  * An Actor counts as read-only only when Apify maintains it and nothing lets it act outside its run
  * storages: limited permissions keep it out of the user's other Apify data, and it has no secret input
@@ -142,14 +106,14 @@ function isReadOnlyActor({ actor, definition }: ActorInfo): boolean {
  * 5. Prefill/default values are added to descriptions as examples using addExampleValuesToDescriptions()
  *
  * @param {ActorInfo[]} actorsInfo - An array of ActorInfo objects with webServerMcpPath, definition, and Actor.
- * @param options - Optional settings: mcpSessionId for telemetry correlation, actorStore for per-Actor itemsSchema enrichment.
+ * @param options - Optional settings: mcpSessionId for telemetry correlation.
  * @returns {Promise<ToolEntry[]>} - A promise that resolves to an array of MCP tools.
  */
 export async function getNormalActorsAsTools(
     actorsInfo: ActorInfo[],
-    options?: { mcpSessionId?: string; actorStore?: ActorStore; isDirectTool?: boolean },
+    options?: { mcpSessionId?: string; isDirectTool?: boolean },
 ): Promise<ToolEntry[]> {
-    const { mcpSessionId, actorStore, isDirectTool = true } = options ?? {};
+    const { mcpSessionId, isDirectTool = true } = options ?? {};
     const tools: ToolEntry[] = [];
 
     for (const actorInfo of actorsInfo) {
@@ -215,8 +179,10 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
             buildDescription,
             // The compile cache returns one schema object per content, so sessions share one copy.
             inputSchema: compiled.schema,
-            // Canonical RunResponse shape — same as call-actor and get-actor-run.
-            outputSchema: actorRunOutputSchema,
+            // Canonical RunResponse shape — same as call-actor and get-actor-run — plus the row shape the Actor declares.
+            outputSchema: definition.datasetItemProperties
+                ? buildEnrichedDirectActorOutputSchema(definition.datasetItemProperties)
+                : actorRunOutputSchema,
             ajvValidate: compiled.validate,
             paymentRequired: true,
             memoryMbytes,
@@ -232,10 +198,6 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
                 taskSupport: 'optional',
             },
         });
-    }
-
-    if (actorStore) {
-        await enrichActorToolOutputSchemas(tools, actorStore);
     }
 
     return tools;
@@ -441,12 +403,11 @@ export async function getActorsAsTools(
     apifyClient: ApifyClient,
     options?: {
         mcpSessionId?: string;
-        actorStore?: ActorStore;
         paymentProvider?: PaymentProvider;
         isDirectTool?: boolean;
     },
 ): Promise<ActorsAsToolsResult> {
-    const { mcpSessionId, actorStore, paymentProvider, isDirectTool = true } = options ?? {};
+    const { mcpSessionId, paymentProvider, isDirectTool = true } = options ?? {};
     log.debug('Fetching Actors as tools', {
         actorCount: actorIdsOrNames.length,
         mcpSessionId,
@@ -548,7 +509,7 @@ export async function getActorsAsTools(
     }
 
     const [normalTools, mcpServerTools] = await Promise.all([
-        getNormalActorsAsTools(normalActorsInfo, { mcpSessionId, actorStore, isDirectTool }),
+        getNormalActorsAsTools(normalActorsInfo, { mcpSessionId, isDirectTool }),
         getMCPServersAsTools(actorMCPServersInfo, apifyClient, mcpSessionId),
     ]);
 

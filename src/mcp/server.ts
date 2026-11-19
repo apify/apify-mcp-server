@@ -489,7 +489,6 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
 
         const restoreInput = toolNamesToInput(missingToolNames);
         const actorTools = await getActors(restoreInput, apifyClient, {
-            actorStore: this.actorStore,
             paymentProvider: this.options.paymentProvider,
         });
 
@@ -500,7 +499,6 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     public async loadToolsFromUrl(url: string, apifyClient: ApifyClient) {
         const input = parseInputParamsFromUrl(url);
         const actorTools = await getActors(input, apifyClient, {
-            actorStore: this.actorStore,
             paymentProvider: this.options.paymentProvider,
         });
 
@@ -515,7 +513,6 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      */
     public async loadToolsFromInput(input: Input, apifyClient: ApifyClient): Promise<void> {
         const actorTools = await getActors(input, apifyClient, {
-            actorStore: this.actorStore,
             paymentProvider: this.options.paymentProvider,
         });
         this.registerFetchedActorTools(input, actorTools);

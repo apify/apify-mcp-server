@@ -109,13 +109,6 @@ export const actorExecutor: ActorExecutor = {
         }
         if ('error' in fetchResult) return fetchResult.error as ActorExecutionResult;
 
-        // Mirror the tool's declared `itemsSchema` into the runtime response so the response
-        // matches its outputSchema. Only direct actor tools know the row shape up front.
-        const dataset = fetchResult.result.structuredContent.storages?.datasets?.default;
-        if (dataset && params.datasetItemsSchema) {
-            dataset.itemsSchema = { type: 'object', properties: params.datasetItemsSchema };
-        }
-
         return buildGetActorRunResponse({
             ...fetchResult.result,
             linkContext: await getConsoleLinkContext(apifyClient.token, apifyClient),

@@ -90,7 +90,16 @@ export type ActorDefinitionPruned = Pick<
     /** What the Actor's own tool is built from when it is served through its server interface. */
     webServerToolInfo?: ServerActorToolInfo;
     pictureUrl?: string; // Optional, URL to the Actor's icon/picture
+    /**
+     * Names and types of the fields the Actor declares for items of its default dataset (`reduceToFieldNamesAndTypes`),
+     * e.g. `{ url: { type: 'string' } }`; absent when it declares none or they are too large. A direct Actor tool
+     * advertises them in its `outputSchema`.
+     */
+    datasetItemProperties?: Record<string, unknown>;
 };
+
+/** JSON Schema an Actor declares for the items of its default dataset: the `fields` of its dataset schema. */
+export type DatasetItemsSchema = Record<string, unknown> & { properties: Record<string, unknown> };
 
 /** A selected Server Actor's tool, as `buildServerActorToolInfo` renders it from the API schema. */
 export type ServerActorToolInfo = {
@@ -224,13 +233,6 @@ export type ActorTool = ToolBase & {
     actorFullName: string;
     /** Optional memory limit in MB for the Actor execution */
     memoryMbytes?: number;
-    /**
-     * Per-Actor dataset row properties (e.g. `{ url: { type: 'string' } }`) from the actorStore.
-     * Stashed at tools/list time and injected by the executor into
-     * `structuredContent.storages.datasets.default.itemsSchema` so the declared outputSchema
-     * matches the response. Stripped before the public tools/list wire output.
-     */
-    datasetItemsSchema?: Record<string, unknown>;
 };
 
 /**
@@ -246,7 +248,7 @@ export type InternalToolArgs = {
     apifyToken: string;
     /** ApifyClient pre-configured with payment headers (if applicable) or standard token. */
     apifyClient: ApifyClient;
-    /** External store for Actor metadata (output schemas); only set in hosted deployments. */
+    /** External store for Actor metadata; only set in hosted deployments. */
     actorStore?: ActorStore;
     /** Payment provider for agentic payment modes (Skyfire, x402), when configured. */
     paymentProvider?: PaymentProvider;
@@ -632,11 +634,6 @@ export type ActorExecutionParams = {
     /** MCP session ID for logging */
     mcpSessionId?: string;
     /**
-     * Per-Actor dataset row properties from {@link ActorTool.datasetItemsSchema}. Forwarded
-     * by the request handler so the executor can inject `itemsSchema` into the response.
-     */
-    datasetItemsSchema?: Record<string, unknown>;
-    /**
      * When true, the call is wrapped in an MCP task. The executor ignores the LLM-provided
      * `waitSecs` and waits until the run reaches a terminal status — honoring `waitSecs` in
      * task mode would let the task complete before the Actor has produced output.
@@ -667,37 +664,8 @@ export type ActorExecutor = {
 
 /**
  * External store for Actor metadata that can be injected by the hosting environment.
- * Provides access to Actor output schemas inferred from historical run data.
- * When not provided, tools use generic output schemas without field-level detail.
  */
 export type ActorStore = {
-    /**
-     * Returns the inferred JSON Schema `properties` object for an Actor's dataset items, e.g.:
-     * `{ url: { type: 'string' }, price: { type: 'number' } }`
-     *
-     * Converts the result of {@link ActorStore.getActorOutputSchemaAsTypeObject} — same source
-     * (historical successful runs) and same null contract.
-     *
-     * @param actorFullName - Full Actor name in "username/name" format (e.g., "apify/rag-web-browser")
-     */
-    getActorOutputSchema(actorFullName: string): Promise<Record<string, unknown> | null>;
-
-    /**
-     * Returns the inferred output schema as a simplified type object for an Actor's dataset items,
-     * based on historical successful runs.
-     *
-     * The returned object uses a compact type representation, e.g.:
-     * `{ url: "string", price: "number", tags: ["string"], user: { name: "string" } }`
-     *
-     * This is the core method that performs cache lookup, API resolution, and MongoDB queries.
-     * Results are cached with TTL to avoid repeated database queries.
-     *
-     * Returns null if no schema is available (e.g., new Actor with no runs).
-     *
-     * @param actorFullName - Full Actor name in "username/name" format (e.g., "apify/rag-web-browser")
-     */
-    getActorOutputSchemaAsTypeObject(actorFullName: string): Promise<Record<string, unknown> | null>;
-
     /** Returns the Actor picture URL via the image proxy (CORS-enabled). Without it, the Store search is used. */
     getProxiedPictureUrl?(pictureUrl: string): string;
 };
@@ -716,8 +684,7 @@ export type ActorsMcpServerOptions = {
      */
     taskStore?: TaskStore;
     /**
-     * External store for Actor metadata (output schemas).
-     * When provided, Actor tools will have enriched output schemas with field-level detail.
+     * External store for Actor metadata (proxied picture URLs).
      * Only used by the streamable HTTP transport in hosted deployments.
      */
     actorStore?: ActorStore;
