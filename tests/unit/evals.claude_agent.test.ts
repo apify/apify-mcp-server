@@ -110,12 +110,27 @@ describe('runAgentConversation()', () => {
         expect(capturedOptions).toBeDefined();
         expect(capturedOptions).not.toHaveProperty('permissionMode', 'bypassPermissions');
         expect(capturedOptions).not.toHaveProperty('allowDangerouslySkipPermissions');
-        const result = await capturedOptions?.canUseTool?.('search-actors', { keywords: 'x' }, {
+        const result = await capturedOptions?.canUseTool?.('mcp__apify__search-actors', { keywords: 'x' }, {
             signal: new AbortController().signal,
             requestId: 'r1',
         } as Parameters<NonNullable<Options['canUseTool']>>[2]);
         expect(result).toEqual({ behavior: 'allow', updatedInput: { keywords: 'x' } });
         expect(run.attemptedCalls).toEqual([]);
+    });
+
+    // The agent reads Store listings and web pages anyone can write, in a process that holds CI secrets.
+    it('offers the agent no Claude Code built-in tools', async () => {
+        await runAgentConversation(baseOptions());
+        expect(capturedOptions?.tools).toEqual([]);
+    });
+
+    it('denies a tool that does not belong to the Apify MCP server', async () => {
+        await runAgentConversation(baseOptions());
+        const result = await capturedOptions?.canUseTool?.('Bash', { command: 'env' }, {
+            signal: new AbortController().signal,
+            requestId: 'r1',
+        } as Parameters<NonNullable<Options['canUseTool']>>[2]);
+        expect(result).toMatchObject({ behavior: 'deny' });
     });
 
     it('denies and records tool-call attempts with the fixed turn limit', async () => {
