@@ -40,7 +40,7 @@ import type {
     ToolTelemetryContext,
 } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
-import { logHttpError } from '../utils/logging.js';
+import { logHttpError, sanitizeMezmoValue } from '../utils/logging.js';
 import { respondOk } from '../utils/mcp.js';
 import { getRequestOriginForClient, resolveStoreSearchTracking } from '../utils/mcp_clients.js';
 import type { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
@@ -256,7 +256,7 @@ export async function prepareToolCall(params: {
             message: dedent`
                 Apify API token is required but was not provided.
                 Please set the APIFY_TOKEN environment variable or pass it as a parameter in the request header as Authorization Bearer <token>.
-                You can get your Apify token from https://console.apify.com/account/integrations.
+                Create an Apify API token at https://console.apify.com/settings/integrations (it is shown only once).
             `,
             toolStatus: TOOL_STATUS.SOFT_FAIL,
             callDiagnostics: { failure_category: FAILURE_CATEGORY.AUTH },
@@ -357,6 +357,8 @@ export async function prepareToolCall(params: {
             requestOrigin,
         });
         apifyClient.storeSearchTracking = storeSearchTracking;
+        // Only ever logged, and a tool input can hold any text.
+        logSafeArgs = sanitizeMezmoValue(logSafeArgs);
 
         log.debug('Validate arguments for tool', {
             toolName: tool.name,

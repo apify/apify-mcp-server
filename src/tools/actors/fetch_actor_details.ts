@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
 import type {
     ConsoleLinkContext,
     HelperTool,
@@ -25,7 +25,7 @@ import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunActor, getOwnServerRemedy, hasMcpInterface } from '../actor_tool_naming.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
-import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInputAndLog } from './actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInput } from './actor_tools_factory.js';
 import type { ServerInterfaceSection } from './server_interface_details.js';
 import { buildServerInterfaceDetails } from './server_interface_details.js';
 
@@ -108,6 +108,7 @@ export const fetchActorDetailsToolArgsSchema = z.object({
     actor: z
         .string()
         .min(1)
+        .max(RESOURCE_ID_OR_NAME_MAX_LENGTH)
         .describe(`Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".`),
     output: actorDetailsOutputOptionsSchema
         .optional()
@@ -281,18 +282,9 @@ export function buildActorDetailsTextResponse(options: {
  * Returns the same text + structured response in both modes.
  */
 export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): Promise<ToolResponse> {
-    const {
-        args,
-        apifyToken,
-        apifyClient,
-        actorStore,
-        paymentProvider,
-        mcpSessionId,
-        loadedToolNames,
-        loadedActorIds,
-    } = toolArgs;
+    const { args, apifyToken, apifyClient, actorStore, paymentProvider, loadedToolNames, loadedActorIds } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
-    const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HELPER_TOOLS.ACTOR_GET_DETAILS });
+    const actorName = fixActorNameInput(parsed.actor);
     if (!actorName) return respondUserError(EMPTY_ACTOR_NAME_MESSAGE);
 
     const resolvedOutput = resolveOutputOptions(parsed.output);

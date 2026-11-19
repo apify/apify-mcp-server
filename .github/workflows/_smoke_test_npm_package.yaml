@@ -20,12 +20,12 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             -   name: Use Node.js
-                uses: actions/setup-node@v6
+                uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
                 with:
                     node-version: 22
 
             -   name: Install published package
-                uses: nick-fields/retry@v4
+                uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
                 env:
                     PKG_VERSION: ${{ inputs.version || inputs.npm_tag }}
                 with:

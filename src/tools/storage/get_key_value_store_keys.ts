@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, KEY_VALUE_STORE_KEY_MAX_LENGTH, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -19,9 +19,14 @@ import {
 } from './storage_helpers.js';
 
 const getKeyValueStoreKeysArgs = z.object({
-    keyValueStoreId: z.string().min(1).describe(storageIdArgDescription('keyValueStore')),
+    keyValueStoreId: z
+        .string()
+        .min(1)
+        .max(RESOURCE_ID_OR_NAME_MAX_LENGTH)
+        .describe(storageIdArgDescription('keyValueStore')),
     exclusiveStartKey: z
         .string()
+        .max(KEY_VALUE_STORE_KEY_MAX_LENGTH)
         .optional()
         .describe('All keys up to this one (including) are skipped from the result.'),
     limit: z.number().max(10).optional().describe('Number of keys to be returned. Maximum is 10.'),

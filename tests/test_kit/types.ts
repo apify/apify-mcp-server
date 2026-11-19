@@ -21,6 +21,8 @@ export interface CaseCtx {
     transport: Transport;
     /** Register only `isDeploymentTest: true` cases. */
     isDeploymentTestOnly?: boolean;
+    /** The suite targets a local Apify platform, which has no Apify Proxy groups (UNBLOCKER, GOOGLE_SERP). */
+    isLocalPlatform?: boolean;
     /** Memoized fixture setup — once per `registerCases` call, keyed by `fixture.key`. */
     getFixture: <T>(fixture: Fixture<T>) => Promise<T>;
     /**
@@ -45,7 +47,7 @@ export interface Case {
     isDeploymentTest: boolean;
     /** Register as `it.skip` when true. */
     skipIf?: (ctx: CaseCtx) => boolean;
-    /** Forwarded to vitest `it(name, { retry }, ...)`. */
+    /** Forwarded to vitest `it(name, { retry }, ...)`; a case that sets none is retried once (`registerCases`). */
     retry?: number;
     /** Forwarded to vitest `it(name, { timeout }, ...)`, for a case that outlasts the suite's timeout. */
     timeout?: number;

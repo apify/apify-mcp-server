@@ -4,6 +4,7 @@
  * selected Server Actor's own tool description (`buildServerActorToolInfo`).
  */
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
+import { resolveOnStandbyOrigin } from '../../mcp/actors.js';
 import type { Actor, ActorTenancy, ServerActorToolInfo } from '../../types.js';
 import { ACTOR_TENANCY } from '../../types.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
@@ -133,10 +134,12 @@ function buildServerInterfaceFacts(
     canSend: boolean,
 ): ServerInterfaceDetails {
     const idleTimeoutSecs = actor.actorStandby?.idleTimeoutSecs;
+    // Shown only when it is a URL requests would be sent to, the same check as the tools that send.
+    const baseUrl = canSend ? undefined : resolveOnStandbyOrigin(actor, '/')?.standbyOrigin;
     return {
         tenancy,
         ...(tenancy === ACTOR_TENANCY.SINGLE_TENANT && idleTimeoutSecs !== undefined && { idleTimeoutSecs }),
-        ...(!canSend && actor.standbyUrl && { baseUrl: actor.standbyUrl }),
+        ...(baseUrl && { baseUrl }),
         operationCount,
     };
 }

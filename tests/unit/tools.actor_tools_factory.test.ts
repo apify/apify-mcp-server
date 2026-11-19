@@ -1,8 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
+import log from '@apify/log';
+
+import { ACTOR_LOAD_ERROR_KIND } from '../../src/errors.js';
+import { getActorsAsTools, getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import type { ActorInfo, SchemaProperties } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
+import { mockApifyClient } from './helpers/tool_context.js';
 
 type MockActorOptions = {
     actorPermissionLevel?: string;
@@ -265,5 +269,57 @@ describe('getNormalActorsAsTools()', () => {
                 expect(await getAnnotations(info)).toMatchObject({ readOnlyHint: false, destructiveHint: true });
             }
         });
+    });
+});
+
+describe('Actor loading keeps raw names out of logs', () => {
+    // A client config pasted into the connection URL arrives as an Actor name, token included.
+    it('neither looks up nor logs a name that is not an Actor name', async () => {
+        const pasted = `actors --header "Authorization: Bearer apify_api_${'x'.repeat(36)}"`;
+        const actor = vi.fn();
+        const logSpies = (['debug', 'info', 'softFail', 'warning', 'error', 'exception'] as const).map((method) =>
+            vi.spyOn(log, method).mockImplementation(() => {}),
+        );
+
+        const { tools, errors } = await getActorsAsTools([pasted], mockApifyClient({ actor }));
+        const logged = JSON.stringify(logSpies.flatMap((spy) => spy.mock.calls));
+        for (const spy of logSpies) spy.mockRestore();
+
+        expect(tools).toEqual([]);
+        expect(errors).toMatchObject([{ kind: ACTOR_LOAD_ERROR_KIND.NOT_FOUND, actorName: pasted }]);
+        expect(actor).not.toHaveBeenCalled();
+        expect(logged).not.toContain('apify_api_');
+    });
+
+    it.each([
+        ['is not found', undefined, ACTOR_LOAD_ERROR_KIND.NOT_FOUND],
+        [
+            'fails to load',
+            Object.assign(new Error('Service unavailable'), { statusCode: 503 }),
+            ACTOR_LOAD_ERROR_KIND.LOAD_FAILED,
+        ],
+    ])('does not log a raw suffix when a normalized Actor name %s', async (_label, failure, kind) => {
+        const token = `apify_api_${'x'.repeat(36)}`;
+        const actorName = 'apify/nonexistent';
+        const pasted = `${actorName}:Bearer ${token}`;
+        const get = vi.fn(async () => {
+            if (failure) throw failure;
+            return undefined;
+        });
+        const actor = vi.fn(() => ({ get }));
+        const logSpies = (['debug', 'info', 'softFail', 'warning', 'error', 'exception'] as const).map((method) =>
+            vi.spyOn(log, method).mockImplementation(() => {}),
+        );
+
+        try {
+            const { tools, errors } = await getActorsAsTools([pasted], mockApifyClient({ actor }));
+
+            expect(tools).toEqual([]);
+            expect(errors).toMatchObject([{ kind, actorName: pasted }]);
+            expect(actor).toHaveBeenCalledWith(actorName);
+            expect(JSON.stringify(logSpies.flatMap((spy) => spy.mock.calls))).not.toContain(token);
+        } finally {
+            for (const spy of logSpies) spy.mockRestore();
+        }
     });
 });

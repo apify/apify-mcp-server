@@ -137,6 +137,28 @@ describe('getActorDefinitionCached — caller-relative names', () => {
     });
 });
 
+describe('getActorDefinitionCached — names that are object keys', () => {
+    it.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty'])(
+        'looks up %s like any other name and keeps serving cached Actors',
+        async (name) => {
+            const ownNamesBefore = Object.getOwnPropertyNames(Object.prototype);
+            try {
+                const cached = seedCache(`acme/public-${name}`, true, 'owner-11');
+                getActorDefinitionMock.mockResolvedValue(null);
+
+                await expect(getActorDefinitionCached(name, client)).resolves.toBeNull();
+                expect(getActorDefinitionMock).toHaveBeenCalledWith(name, client);
+                await expect(getActorDefinitionCached(`acme/public-${name}`, client)).resolves.toBe(cached);
+                expect(Object.getOwnPropertyNames(Object.prototype)).toEqual(ownNamesBefore);
+            } finally {
+                for (const key of Object.getOwnPropertyNames(Object.prototype)) {
+                    if (!ownNamesBefore.includes(key)) delete (Object.prototype as Record<string, unknown>)[key];
+                }
+            }
+        },
+    );
+});
+
 describe('getActorToolResolutionCached()', () => {
     it('classifies a cached MCP server Actor without resolving its MCP URL, so a path off its origin does not throw', async () => {
         seedCache('acme/mcp-public', true, 'owner-6', {

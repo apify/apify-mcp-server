@@ -6,7 +6,7 @@ import {
     STORE_USE_CASE_MAX_LENGTH,
 } from '../const.js';
 import type { McpClientContext } from '../mcp/client_context.js';
-import { APIFY_TRACE_ID_META_KEY } from './mcp.js';
+import { APIFY_TRACE_ID_META_KEY, hashSessionId } from './mcp.js';
 
 const APIFY_API_TOKEN_REGEX = /apify_api_[A-Za-z0-9]+/g;
 
@@ -28,16 +28,17 @@ export function isStoreUseCaseServable(context: McpClientContext | undefined): b
     return !!name && !ANTHROPIC_CLIENT_NAMES.some((entry) => name.includes(entry));
 }
 
-/** Trace id of a call: Apify AI's `_meta` thread id, else the MCP session id; omitted over the API limit. */
+/** Trace id of a call: Apify AI's `_meta` thread id, else the hashed MCP session id; omitted over the API limit. */
 export function resolveStoreSearchTracking(
     requestOrigin: REQUEST_ORIGIN,
     meta: Record<string, unknown> | undefined,
     mcpSessionId: string | undefined,
 ): NonNullable<ApifyClient['storeSearchTracking']> {
     const asString = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+    const sessionId = asString(mcpSessionId);
     const traceId =
         (requestOrigin === REQUEST_ORIGIN.APIFY_AI && asString(meta?.[APIFY_TRACE_ID_META_KEY])) ||
-        asString(mcpSessionId);
+        (sessionId && hashSessionId(sessionId));
     return { traceId: traceId && traceId.length <= STORE_TRACE_ID_MAX_LENGTH ? traceId : undefined };
 }
 

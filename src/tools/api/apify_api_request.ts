@@ -8,7 +8,14 @@ import { z } from 'zod';
 import type { ApifyClient } from '../../apify_client.js';
 import { isMaxContentLengthAbort, sendApifyApiRequest } from '../../apify_client.js';
 import { APIFY_ERROR_TYPE_PAGE_NOT_FOUND, HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
-import { isApifyApiUri, maskSessionToken, REDACTED, redactJsonSecrets } from '../../resources/api_resources.js';
+import { InvalidRequestPathError } from '../../errors.js';
+import {
+    isApifyApiUri,
+    maskSessionToken,
+    REDACTED,
+    redactJsonSecrets,
+    redactQueryString,
+} from '../../resources/api_resources.js';
 import { toPlainError } from '../../utils/logging.js';
 import type { ToolResponse } from '../../utils/mcp.js';
 import { getHttpErrorHint, respondAborted, respondOk, respondUserError } from '../../utils/mcp.js';
@@ -66,7 +73,7 @@ export function redactApiCallArgs({ path, method, query, body }: Record<string, 
         loggedQuery = REDACTED;
     }
     let loggedPath: unknown;
-    if (typeof path === 'string') loggedPath = path.replace(/[?#][\s\S]*$/, `?${REDACTED}`);
+    if (typeof path === 'string') loggedPath = redactQueryString(path);
     else if (path !== undefined) loggedPath = REDACTED;
     return {
         path: loggedPath,
@@ -307,6 +314,8 @@ export async function callApi(params: {
     } catch (error) {
         // A cancelled call is not a tool error.
         if (params.signal?.aborted) return respondAborted();
+        // The client refused the path before sending it.
+        if (error instanceof InvalidRequestPathError) return respondUserError(error.message, { httpStatus: 400 });
         if (!isMaxContentLengthAbort(error)) throw toPlainError(error);
         const statusCode = method === 'GET' ? undefined : readAbortedResponseStatus(error);
         if (statusCode === undefined) {

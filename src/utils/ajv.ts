@@ -1,12 +1,12 @@
-import type { ValidateFunction } from 'ajv';
+import type { Options, ValidateFunction } from 'ajv';
 import Ajv from 'ajv';
 
 /**
  * Ajv with the server's validation policy. One instance per compile, never shared: Ajv caches every compiled
  * schema in a Map that is never evicted.
  */
-export function createAjv(): Ajv {
-    const instance = new Ajv({ coerceTypes: 'array', strict: false, removeAdditional: true });
+export function createAjv(options: Options = {}): Ajv {
+    const instance = new Ajv({ coerceTypes: 'array', strict: false, removeAdditional: true, ...options });
 
     // `pattern`/`patternProperties` compile a RegExp from untrusted Actor / proxied-MCP input schemas;
     // a catastrophic-backtracking pattern freezes the single-threaded event loop (ReDoS). `format` is
@@ -19,6 +19,9 @@ export function createAjv(): Ajv {
     instance.removeKeyword('pattern');
     instance.removeKeyword('patternProperties');
     instance.removeKeyword('format');
+    // `uniqueItems` compares every pair of items unless they are typed scalars, so its cost grows with the
+    // square of the array. Dropped for the same reason; the platform or the proxied MCP server enforces it.
+    instance.removeKeyword('uniqueItems');
     return instance;
 }
 

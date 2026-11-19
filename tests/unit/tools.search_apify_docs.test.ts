@@ -9,6 +9,24 @@ vi.mock('../../src/utils/apify_docs.js', () => ({
     searchDocsBySourceCached: vi.fn(),
 }));
 
+describe('search-apify-docs query length', () => {
+    it('accepts a query of 150 characters', () => {
+        expect(searchApifyDocs.ajvValidate({ query: 'a'.repeat(150) })).toBe(true);
+    });
+
+    it('rejects a query of 151 characters', () => {
+        expect(searchApifyDocs.ajvValidate({ query: 'a'.repeat(151) })).toBe(false);
+    });
+
+    // Algolia answers 400 to a query of 512 bytes or more.
+    it('keeps the longest accepted query of three-byte characters under 512 bytes', () => {
+        const query = 'あ'.repeat(150);
+
+        expect(searchApifyDocs.ajvValidate({ query })).toBe(true);
+        expect(Buffer.byteLength(query)).toBeLessThan(512);
+    });
+});
+
 describe('search-apify-docs', () => {
     it.each([
         ['results', [{ url: 'https://docs.apify.com/platform/actors', content: 'Actors are serverless programs.' }]],

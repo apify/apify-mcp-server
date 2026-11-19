@@ -1,14 +1,14 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.apify/apify-mcp-server",
-  "title": "Apify MCP Server",
+  "title": "Apify",
   "description": "Extract data from any website with thousands of scrapers, crawlers, and automations on Apify Store ⚡",
   "websiteUrl": "https://mcp.apify.com",
   "repository": {
     "url": "https://github.com/apify/apify-mcp-server",
     "source": "github"
   },
-  "version": "0.21.6",
+  "version": "0.21.13",
   "icons": [
     {
       "src": "https://mcp.apify.com/images/apify-icon.png",

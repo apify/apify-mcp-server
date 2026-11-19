@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HELPER_TOOLS } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { searchActors } from '../../src/tools/actors/search_actors.js';
-import { SERVER_MODE, type ToolEntry } from '../../src/types.js';
+import { SERVER_MODE, TOOL_TYPE, type ToolEntry } from '../../src/types.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
 import { withoutUseCaseField } from '../../src/utils/tools_loader.js';
 import { getRequestHandler } from './helpers/mcp_server.js';
@@ -144,6 +144,17 @@ describe('search-actors useCase gating', () => {
 
         const other = { ...tool, inputSchema: { type: 'object', properties: { id: { type: 'string' } } } } as ToolEntry;
         expect(withoutUseCaseField(other)).toBe(other);
+    });
+
+    it('leaves the useCase input of an Actor tool as is', () => {
+        // An Actor's own input, and its schema must not reach the uncapped `compileSchema`.
+        const actorTool = {
+            ...searchActors,
+            type: TOOL_TYPE.ACTOR,
+            inputSchema: { type: 'object', properties: { useCase: { type: 'string' } } },
+        } as ToolEntry;
+
+        expect(withoutUseCaseField(actorTool)).toBe(actorTool);
     });
 
     it('validates the use case with the one shared validator', () => {

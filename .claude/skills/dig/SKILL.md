@@ -127,7 +127,7 @@ Use the repo's `feature_spec.yml` template. Only the **Problem** and **Proposed 
 **Style** (Explore explanations and Spec issues):
 - Plain language, no fluff — see `CLAUDE.md § Communication style`
 - Skip any section that would be empty or generic
-- 10-30 lines, not 100
+- As short as the content allows
 - Concrete steps > prose
 
 (A **Plan**'s design follows its required-sections structure above — keep each section tight, but
@@ -148,8 +148,10 @@ Present issue content to the user for review before creating. Use `gh issue crea
 | **Public repo**        | `.` (this repo root)                                                | Main codebase — tools, widgets, tests                       |
 | **Internal repo**      | `../apify-mcp-server-internal` (if available)                       | Hosted server — assess impact of changes                    |
 | **MCP SDK (types)**    | `node_modules/@modelcontextprotocol/sdk`                            | Protocol types, server/client APIs (compiled only)          |
+| **MCP SDK v2 (types)** | `node_modules/@modelcontextprotocol/server`                         | 2026-07-28 stateless adapter (compiled only)                |
 | **MCP SDK (source)**   | `../typescript-sdk` (if available)                                  | Examples, tests, full source — faster than GitHub           |
 | **MCP spec**           | `https://modelcontextprotocol.io/specification/2025-11-25`          | Protocol-level features                                     |
+| **MCP spec (stateless)** | `https://modelcontextprotocol.io/specification/2026-07-28`        | 2026-07-28 revision                                         |
 | **MCP Apps SDK (types)** | `node_modules/@modelcontextprotocol/ext-apps`                     | MCP Apps types, React hooks, server helpers (compiled only) |
 | **MCP Apps SDK (source)** | `../ext-apps` (if available)                                     | Examples, tests, spec, full source — faster than GitHub     |
 | **MCP Apps spec**      | `https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx` | MCP Apps extension specification                            |

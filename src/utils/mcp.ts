@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import type { CallToolResult, ContentBlock } from '@modelcontextprotocol/sdk/types.js';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
@@ -22,6 +24,20 @@ import { classifyFailureCategory, getToolStatusFromError } from './tool_status.j
 export const APIFY_ACTOR_RUN_META_KEY = 'com.apify/ActorRun';
 /** `_meta` key Apify AI sets on `tools/call`: the chat thread id. */
 export const APIFY_TRACE_ID_META_KEY = 'com.apify/traceId';
+
+/**
+ * Hex chars kept from the session ID's sha256. Must match the session reference in the hosted
+ * server's logs (apify-mcp-server-internal), so one value finds a session everywhere.
+ */
+const SESSION_ID_HASH_LENGTH = 12;
+
+/**
+ * Identifier of a session in telemetry and Store search tracking: a truncated sha256 of the session ID.
+ * The session ID is the client's credential on a hosted server, so it must not leave the process as-is.
+ */
+export function hashSessionId(sessionId: string): string {
+    return createHash('sha256').update(sessionId).digest('hex').slice(0, SESSION_ID_HASH_LENGTH);
+}
 
 /**
  * Injects the MCP session ID into request parameters.
