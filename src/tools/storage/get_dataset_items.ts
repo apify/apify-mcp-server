@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -37,7 +37,7 @@ export function extractDotPrefixes(fields: string[]): string[] {
 }
 
 const getDatasetItemsArgs = z.object({
-    datasetId: z.string().min(1).describe(storageIdArgDescription('dataset')),
+    datasetId: z.string().min(1).max(RESOURCE_ID_OR_NAME_MAX_LENGTH).describe(storageIdArgDescription('dataset')),
     clean: z
         .boolean()
         .optional()

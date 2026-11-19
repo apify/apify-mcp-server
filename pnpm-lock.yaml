@@ -214,12 +214,6 @@ importers:
 
   .:
     dependencies:
-      '@apify/datastructures':
-        specifier: ^2.0.3
-        version: 2.0.6
-      '@apify/log':
-        specifier: ^2.5.16
-        version: 2.5.39
       '@apify/utilities':
         specifier: ^2.25.1
         version: 2.31.0
@@ -275,6 +269,9 @@ importers:
       '@anthropic-ai/claude-agent-sdk':
         specifier: 0.3.206
         version: 0.3.206(@anthropic-ai/sdk@0.125.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.1(zod@4.6.7))(zod@4.6.7)
+      '@apify/log':
+        specifier: ^2.5.16
+        version: 2.5.39
       '@apify/mcpc':
         specifier: ^0.8.0
         version: 0.8.0(zod@4.6.7)
@@ -519,9 +516,6 @@ packages:
 
   '@apify/consts@2.53.1':
     resolution: {integrity: sha512-dIapeviS1DubmhMLQVHj19nmGllgvFV8ZQTqsnYYperuKjVaTwoEs+dKoRmOnm+OvkZcVQOyDGnbQUoXsCghgw==}
-
-  '@apify/datastructures@2.0.6':
-    resolution: {integrity: sha512-hI/Q5cCjXXI/g4OPwX+/xuk+JsOtXRhKNXl2wnq/nKmdrji3nYCc9vGsAEc1iXVbs16xQMZy5uRhoY3XTABovA==}
 
   '@apify/log@2.5.39':
     resolution: {integrity: sha512-cip5u5DDBdbsKpWVWKsMS7QtIkI1pSk/E2AGi/m7EHGP4IaIBq5J/WFqlPycQ0fq385tXiNz6W4O6FO/ZWNyDg==}
@@ -4654,8 +4648,6 @@ snapshots:
       zod: 4.6.7
 
   '@apify/consts@2.53.1': {}
-
-  '@apify/datastructures@2.0.6': {}
 
   '@apify/log@2.5.39':
     dependencies:

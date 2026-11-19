@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS } from '../../const.js';
+import { HELPER_TOOLS, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -18,7 +18,7 @@ import {
 } from './storage_helpers.js';
 
 const getDatasetSchemaArgs = z.object({
-    datasetId: z.string().min(1).describe(storageIdArgDescription('dataset')),
+    datasetId: z.string().min(1).max(RESOURCE_ID_OR_NAME_MAX_LENGTH).describe(storageIdArgDescription('dataset')),
     limit: z.number().describe('Maximum number of items to use for schema generation. Default is 5.').default(5),
     clean: z
         .boolean()

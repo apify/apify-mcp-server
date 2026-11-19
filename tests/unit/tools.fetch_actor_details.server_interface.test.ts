@@ -322,6 +322,16 @@ describe('the operations in full', () => {
         expect(text).not.toContain('example-server-actor');
     });
 
+    it('gives no base URL when the Server Actor URL is outside the Server Actor domain', () => {
+        const { serverInterface, text } = sectionOf({
+            actor: serverActor({ standbyUrl: 'https://server-actor-test.example.com' }),
+            loadedToolNames: [HELPER_TOOLS.ACTOR_GET_DETAILS],
+        });
+
+        expect(serverInterface.baseUrl).toBeUndefined();
+        expect(text).not.toContain('example.com');
+    });
+
     // At the limit the operations fit in full; one byte over, the section is the index.
     it.each([0, 1])('counts the header and the operations JSON against the byte limit, %i byte over', (over) => {
         const empty = sectionOf({ schema: withDescriptionOnEmpty('') });

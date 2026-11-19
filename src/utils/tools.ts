@@ -1,3 +1,4 @@
+import { RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../const.js';
 import type {
     ActorInterfaceName,
     CallDiagnostics,
@@ -57,9 +58,10 @@ export function buildActorFields(
 export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>): string | undefined {
     if (tool.type !== TOOL_TYPE.INTERNAL) return tool.actorFullName;
 
-    // A legacy "username/name:toolName" value is logged by its Actor name.
+    // A legacy "username/name:toolName" value is logged by its Actor name. The args are read before validation,
+    // so a value longer than the argument limit is skipped.
     const actorArg = args?.actor;
-    if (typeof actorArg !== 'string') return undefined;
+    if (typeof actorArg !== 'string' || actorArg.length > RESOURCE_ID_OR_NAME_MAX_LENGTH) return undefined;
     return actorArg.split(':')[0]?.trim() || undefined;
 }
 

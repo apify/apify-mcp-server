@@ -4,18 +4,13 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
+import { logLinesSchema, readLogTail, sliceLogTail } from '../../utils/log_tail.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { getActorBuildLogToolOutputSchema } from '../structured_output_schemas.js';
 
 const getActorBuildLogArgs = z.object({
     buildId: z.string().min(1).describe('Build ID, as returned when a build is started'),
-    lines: z
-        .number()
-        .int()
-        .min(0)
-        .max(50)
-        .describe('Output the last NUM lines, instead of the last 10. Pass 0 to return the entire log.')
-        .default(10),
+    lines: logLinesSchema,
 });
 
 /**
@@ -50,20 +45,19 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client } = toolArgs;
+        const { args, apifyClient: client, signal } = toolArgs;
         const parsed = getActorBuildLogArgs.parse(args);
-        const v = await client.build(parsed.buildId).log().get();
+        const tail = await readLogTail(client, client.build(parsed.buildId).log().url, signal);
         // The log endpoint 404s only when the build itself is missing; an existing build with no
         // output yet returns an empty string. So `undefined` here means "not found"; do not
         // coalesce it back to ''.
-        if (v === undefined) {
+        if (tail === undefined) {
             return respondUserError(`Build with ID '${parsed.buildId}' not found.`);
         }
-        // Logs from the API end with a newline; drop it so the tail slice counts only content lines.
-        const lines = v.replace(/\n$/, '').split('\n');
-        const text = lines.slice(-parsed.lines).join('\n');
-        // The log goes out once, as the JSON mirror; a second raw copy would double the response.
+        const { text, note } = sliceLogTail(tail, parsed.lines);
+        // The log goes out once, as the JSON mirror; a second raw copy would double the response. The note
+        // (why the log is shorter than asked) is not in structuredContent, so it follows as text.
         const structuredContent = { log: text };
-        return respondOk(JSON.stringify(structuredContent), { structuredContent });
+        return respondOk([JSON.stringify(structuredContent), ...(note ? [note] : [])], { structuredContent });
     },
 } as const);

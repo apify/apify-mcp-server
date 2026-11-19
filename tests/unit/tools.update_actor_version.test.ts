@@ -1379,6 +1379,18 @@ describe('update-actor-version', () => {
             );
         });
 
+        it('reports an oldText longer than the file (NO_MATCH)', async () => {
+            mockFiles({ name: 'src/main.js', format: 'TEXT', content: 'x'.repeat(300) });
+
+            const text = await callToolExpectingUserError({
+                operations: [edit('src/main.js', { oldText: 'x'.repeat(301), newText: '' })],
+            });
+
+            expect(text).toBe(
+                `${failedWith(0, 'edit', 'src/main.js', 'NO_MATCH')} oldText of edits[0] is not in the file.`,
+            );
+        });
+
         it('reports an oldText that matches more than once (MULTIPLE_MATCHES)', async () => {
             const text = await callToolExpectingUserError({
                 operations: [edit('src/main.js', { oldText: 'a', newText: 'b' })],

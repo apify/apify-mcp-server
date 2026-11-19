@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { HELPER_TOOLS } from '../../src/const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { getActorBuild } from '../../src/tools/builds/get_actor_build.js';
 import { getActorBuildToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -246,7 +246,7 @@ describe('get-actor-build', () => {
                 const { content } = await callTool({ buildId: 'build-1' }, [HELPER_TOOLS.ACTOR_BUILD_LOG]);
 
                 expect(content[1].text).toBe(
-                    `Build 0.1.12 of Actor actor-1 is ${status}.\nRead the build log with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId build-1; pass lines 0 for the whole log.`,
+                    `Build 0.1.12 of Actor actor-1 is ${status}.\nRead the build log with ${HELPER_TOOLS.ACTOR_BUILD_LOG} using buildId build-1; pass lines 0 for the whole log, up to its last ${MAX_INLINE_BYTES} bytes.`,
                 );
             },
         );

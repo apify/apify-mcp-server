@@ -4,7 +4,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { gzipSync } from 'node:zlib';
 
 import Ajv from 'ajv';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import {
@@ -102,6 +102,19 @@ async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
             res.end(`{"pad":"${pad}","error":"\\u0074est-token${'b'.repeat(MAX_INLINE_BYTES)}\\u0074est-token"}`);
             return;
         }
+        case '/backslash-run-cut':
+            // The limit cuts the string after a long run of escaped backslashes.
+            res.writeHead(200, { 'content-type': 'application/json' });
+            res.end(`{"pad":"${'\\\\'.repeat(50_000)}${'a'.repeat(MAX_INLINE_BYTES)}"}`);
+            return;
+        case '/escaped-quote-run-cut':
+            // A run of escaped quotes, then a backslash before a line break, which ends no string literal, then an
+            // escaped token in a later literal.
+            res.writeHead(200, { 'content-type': 'application/json' });
+            res.end(
+                `{"pad":"${'\\"'.repeat(50_000)}\\\n, "error":"\\u0074est-token","p":"${'a'.repeat(MAX_INLINE_BYTES)}"}`,
+            );
+            return;
         case '/big-error':
             res.writeHead(400, { 'content-type': 'application/json' });
             res.end(JSON.stringify({ error: 'e'.repeat(200_000) }));
@@ -264,6 +277,14 @@ beforeAll(async () => {
     standbyUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     seedActor(SERVER_ACTOR);
 });
+
+// A loopback Server Actor URL is accepted only with a local API, as in local development.
+beforeEach(() => {
+    vi.stubEnv('APIFY_API_BASE_URL', 'http://localhost:3333');
+    vi.stubEnv('APIFY_IS_AT_HOME', '');
+});
+
+afterEach(() => vi.unstubAllEnvs());
 
 afterAll(async () => {
     server.closeAllConnections();
@@ -629,6 +650,33 @@ describe('returning an Actor Server error', () => {
         expect(JSON.stringify(result)).not.toContain(TOKEN);
     });
 
+    // Linear time takes a few milliseconds here; the bound only catches time that grows faster than the length.
+    it('checks a cut string with a 100,000-character backslash run within a second', async () => {
+        const startedAt = performance.now();
+        const result = await callTool({ path: '/backslash-run-cut' });
+
+        expect(performance.now() - startedAt).toBeLessThan(1000);
+        expect(result.structuredContent).toMatchObject({ bodyTruncated: true });
+    });
+
+    // Linear time takes a few milliseconds here; the bound only catches time that grows faster than the length.
+    it('checks a cut body with a 100,000-character run of escaped quotes within a second', async () => {
+        const startedAt = performance.now();
+        const result = await callTool({ path: '/escaped-quote-run-cut' });
+
+        expect(performance.now() - startedAt).toBeLessThan(1000);
+        expect(result.structuredContent).toMatchObject({ bodyTruncated: true });
+    });
+
+    it('masks a token that JSON escapes hide in a cut body with escaped quotes and line breaks', async () => {
+        const result = await callTool({ path: '/escaped-quote-run-cut' });
+        const { body } = result.structuredContent as { body: string };
+
+        expect(result.structuredContent).toMatchObject({ bodyTruncated: true });
+        expect(body).toContain('"error":"[REDACTED]"');
+        expect(JSON.stringify(result)).not.toContain(TOKEN);
+    });
+
     it('keeps numbers as sent when it masks a token that JSON escapes hide', async () => {
         const result = await callTool({ path: '/escaped-token-number' });
         const { body } = result.structuredContent as { body: string };
@@ -867,7 +915,21 @@ describe('rejecting a call before sending', () => {
         const result = await callTool({ actor: 'apify/no-standby-url', path: '/echo' });
 
         expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain('has no valid Actor Server URL');
         expect(result.toolTelemetry).toMatchObject({ toolStatus: TOOL_STATUS.FAILED });
+        expect(received).toHaveLength(0);
+    });
+
+    it('sends nothing to a Server Actor URL outside the Server Actor domain', async () => {
+        const received = recordRequests();
+        // With the platform API, the local server's loopback URL is outside the Server Actor domain.
+        vi.stubEnv('APIFY_API_BASE_URL', 'https://api.apify.com');
+
+        const result = await callTool({ path: '/echo' });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain(`Actor '${SERVER_ACTOR}'`);
+        expect(result.content[0].text).toContain('has no valid Actor Server URL');
         expect(received).toHaveLength(0);
     });
 

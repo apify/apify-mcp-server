@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
+import { ApifyClient } from '../../src/apify_client.js';
+import { actorDefinitionCache } from '../../src/state.js';
 import { getActorDefinitionCached } from '../../src/utils/actor.js';
 import {
     mockActorBuildClient,
@@ -49,5 +51,19 @@ describe('standby build resolution across cached callers', () => {
         expect(complete?.definition.hasWebServerSchema).toBe(true);
         expect(cached).toBe(complete);
         expect(authenticated.buildGet).not.toHaveBeenCalled();
+    });
+});
+
+describe('an invalid Actor name', () => {
+    it('returns null, sends no request and is not cached', async () => {
+        const client = new ApifyClient({ token: 'test-token', baseUrl: 'https://api.apify.com', maxRetries: 0 });
+        const adapter = vi.fn();
+        client.httpClient.axios.defaults.adapter = adapter;
+        const name = 'apify/x/../y';
+
+        await expect(getActorDefinitionCached(name, client)).resolves.toBeNull();
+
+        expect(adapter).not.toHaveBeenCalled();
+        expect(actorDefinitionCache.get(name)).toBeNull();
     });
 });

@@ -1,4 +1,4 @@
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { Client, type ClientOptions } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
@@ -68,17 +68,34 @@ async function withTimeout<T>(millis: number, promise: Promise<T>): Promise<T> {
     return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutPid));
 }
 
+/**
+ * A connection to an Actor's MCP server either lists its tools or calls one, never both.
+ * The SDK's `listTools()` compiles every listed tool's output schema, so that a later `callTool()` on the same
+ * client can check the result. We never make that call, so the compile is wasted, and it is unbounded
+ * synchronous work on a schema the Actor's author wrote. This validator compiles nothing.
+ */
+const ACCEPT_ANY_RESULT: NonNullable<ClientOptions['jsonSchemaValidator']> = {
+    getValidator: () => (input) => ({ valid: true, data: input as never, errorMessage: undefined }),
+};
+
 async function connectWithTransport(
     url: string,
     transport: SSEClientTransport | StreamableHTTPClientTransport,
 ): Promise<Client> {
-    const client = new Client({
-        name: getMCPServerID(url),
-        version: '1.0.0',
-    });
+    const client = new Client(
+        { name: getMCPServerID(url), version: '1.0.0' },
+        { jsonSchemaValidator: ACCEPT_ANY_RESULT },
+    );
     await withTimeout(ACTORIZED_MCP_CONNECTION_TIMEOUT_MSEC, client.connect(transport));
     return client;
 }
+
+/**
+ * The URL is checked against the Actor's standby origin before connecting, so a redirect that leaves that origin is
+ * not followed: it would send requests to a host nobody checked. This is the SDK default, set here so that an SDK
+ * change cannot drop it.
+ */
+const REDIRECT_POLICY = 'same-origin';
 
 /** Headers on every request to an Actor's MCP server; the request origin is the one the session's API calls carry. */
 function buildMCPRequestHeaders({ token, requestOrigin }: McpConnectionOptions): Record<string, string> {
@@ -90,6 +107,7 @@ function buildMCPRequestHeaders({ token, requestOrigin }: McpConnectionOptions):
  */
 async function createMCPSSEClient(url: string, options: McpConnectionOptions): Promise<Client> {
     const transport = new SSEClientTransport(new URL(url), {
+        redirectPolicy: REDIRECT_POLICY,
         requestInit: {
             headers: buildMCPRequestHeaders(options),
         },
@@ -116,6 +134,7 @@ async function createMCPSSEClient(url: string, options: McpConnectionOptions): P
  */
 async function createMCPStreamableClient(url: string, options: McpConnectionOptions): Promise<Client> {
     const transport = new StreamableHTTPClientTransport(new URL(url), {
+        redirectPolicy: REDIRECT_POLICY,
         requestInit: {
             headers: buildMCPRequestHeaders(options),
         },

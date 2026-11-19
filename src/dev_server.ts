@@ -90,7 +90,7 @@ const UNAUTHORIZED_RESPONSE_BODY = buildJsonRpcError(
  * `bearerAuthChallengeResponse` answers with an OAuth error body, not the JSON-RPC body production sends.
  */
 const UNAUTHORIZED_CHALLENGE =
-    'Bearer error="invalid_token", error_description="Apify API token missing. Create one at https://console.apify.com/settings/integrations"';
+    'Bearer error="invalid_token", error_description="Apify API token missing. Create one at https://console.apify.com/settings/integrations (it is shown only once)"';
 
 /**
  * Returns the resolved token for a request, or sends a 401 response.

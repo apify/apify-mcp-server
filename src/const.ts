@@ -47,7 +47,7 @@ export const SERVER_MODE_AUTO_DETECTION_ENABLED = true;
 export const MAX_REQUEST_BODY_BYTES = 9 * 1024 * 1024;
 
 export const SERVER_NAME = 'apify-mcp-server';
-export const SERVER_TITLE = 'Apify MCP Server';
+export const SERVER_TITLE = 'Apify';
 export const HELPER_TOOLS = {
     ACTOR_BUILD: 'build-actor',
     ACTOR_BUILD_GET: 'get-actor-build',
@@ -141,6 +141,14 @@ export const MAX_LIMIT_WITH_INPUT_SCHEMA = 10;
 export const STORE_USE_CASE_MAX_LENGTH = 1024;
 /** Max `_traceId` length (UTF-16 code units) the API accepts. */
 export const STORE_TRACE_ID_MAX_LENGTH = 256;
+/**
+ * Max length of an Actor or storage ID-or-name argument. The longest valid value is a full name: a username (at most
+ * 30 characters), a separator and a name (at most 63). The rest leaves room for quotes and spaces that are stripped
+ * before the lookup, and for the removed `actorName:toolName` form, which gets its own error.
+ */
+export const RESOURCE_ID_OR_NAME_MAX_LENGTH = 256;
+/** Max length of a key-value store record key, the platform's limit (`KEY_VALUE_STORE_KEY_REGEX` in `@apify/consts`). */
+export const KEY_VALUE_STORE_KEY_MAX_LENGTH = 256;
 /** Max input fields shown inline in text and structured Actor cards. */
 export const MAX_INPUT_FIELDS_IN_ACTOR_CARD = 20;
 

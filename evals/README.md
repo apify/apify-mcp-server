@@ -353,7 +353,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 ### Environment variables (required)
 
 ```bash
-export APIFY_TOKEN="your_apify_token"           # Get from https://console.apify.com/account/integrations
+export APIFY_TOKEN="your_apify_token"           # Create one at https://console.apify.com/settings/integrations?createApiToken=true&for=MCP&utm_source=mcp&utm_medium=integrations
 export ANTHROPIC_API_KEY="sk-ant-..."           # Agent, get from https://console.anthropic.com/settings/keys
 export OPENROUTER_API_KEY="your_openrouter_key" # Judge, get from https://openrouter.ai/keys
 export LANGFUSE_PUBLIC_KEY="pk-lf-..."          # Langfuse project settings

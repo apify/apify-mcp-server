@@ -46,4 +46,32 @@ describe('TTLLRUCache', () => {
         // Should not throw if called again
         expect(cache.get('a')).toBeNull();
     });
+
+    describe('accepts any string as a key', () => {
+        const KEYS = ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf', ''];
+
+        it.each(KEYS)('stores and returns a value under the key %j like any other key', (key) => {
+            const ownNamesBefore = Object.getOwnPropertyNames(Object.prototype);
+            try {
+                const cache = new TTLLRUCache<string>(10, 10);
+                cache.set('apify/rag-web-browser', 'cached');
+                expect(cache.get(key)).toBeNull();
+                cache.set(key, 'value');
+                expect(cache.get(key)).toBe('value');
+                cache.set(key, 'updated');
+                expect(cache.get(key)).toBe('updated');
+                expect(cache.get('apify/rag-web-browser')).toBe('cached');
+                expect(Object.getOwnPropertyNames(Object.prototype)).toEqual(ownNamesBefore);
+            } finally {
+                restoreObjectPrototype(ownNamesBefore);
+            }
+        });
+    });
 });
+
+/** Removes properties a failing run may have added to `Object.prototype`, so later tests are unaffected. */
+function restoreObjectPrototype(ownNamesBefore: string[]) {
+    for (const name of Object.getOwnPropertyNames(Object.prototype)) {
+        if (!ownNamesBefore.includes(name)) delete (Object.prototype as Record<string, unknown>)[name];
+    }
+}
