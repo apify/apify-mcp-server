@@ -263,8 +263,8 @@ export const actorsCases: Case[] = [
                 arguments: { keywords: 'rental', limit: MAX_LIMIT_WITH_INPUT_SCHEMA },
             });
             const content = result.content as { text: string }[];
-            expect(content.length).toBe(1);
-            const outputText = content[0].text;
+            expect(content.length).toBe(2);
+            const outputText = content[1].text;
             expect(outputText).toContain('This Actor');
             expect(outputText).not.toContain('This Actor is rental');
         }),

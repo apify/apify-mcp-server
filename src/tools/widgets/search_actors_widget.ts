@@ -86,14 +86,8 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
             // Honor the widget tool's declared outputSchema: widgetActors is required, so
             // emit an empty array rather than dropping the field.
             const instructions = buildNoActorsFoundInstructions(parsed.keywords, parsed.offset);
-            return respondOk(instructions, {
-                structuredContent: {
-                    actors: [],
-                    query: parsed.keywords,
-                    count: 0,
-                    widgetActors: [],
-                },
-            });
+            const structuredContent = { actors: [], query: parsed.keywords, count: 0, widgetActors: [] };
+            return respondOk([JSON.stringify(structuredContent), instructions], { structuredContent });
         }
 
         const { actorCardStructured } = buildSearchActorsResult(actors, userPlanTier);
@@ -106,6 +100,7 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
         };
 
         const texts = [
+            JSON.stringify(structuredContent),
             dedent`
             # Search results:
             - **Search query:** ${parsed.keywords}

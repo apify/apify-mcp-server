@@ -86,14 +86,13 @@ describe('get-dataset-items', () => {
         expect(structuredContent.itemCount).toBe(MOCK_ITEMS.length);
     });
 
-    it('encodes the data payload (without summary/nextStep) into the JSON content text', async () => {
+    it('encodes the whole structuredContent, summary and nextStep included, into the JSON content text', async () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext({ datasetId: 'DsWkzbQMuFYuam3YF' }, stubApifyClient()),
         );
         const { content, structuredContent } = result as TextToolResult;
 
-        const { summary, nextStep, ...data } = structuredContent as Record<string, unknown>;
-        expect(JSON.parse(content[0].text)).toEqual(data);
+        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
     });
 
     it('defaults `limit` to 20 when caller omits it', async () => {
@@ -225,7 +224,7 @@ describe('get-dataset-items', () => {
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET_ITEMS);
     });
 
-    it('content[0] mirrors the structuredContent data and does not echo the desc input param', async () => {
+    it('content[0] mirrors the structuredContent and does not echo the desc input param', async () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext({ datasetId: 'DsWkzbQMuFYuam3YF' }, stubApifyClient()),
         );
@@ -233,8 +232,7 @@ describe('get-dataset-items', () => {
             structuredContent: Record<string, unknown>;
         };
 
-        const { summary, nextStep, ...data } = structuredContent;
-        expect(JSON.parse(content[0].text)).toEqual(data);
+        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
         expect(structuredContent).not.toHaveProperty('desc');
     });
 });
