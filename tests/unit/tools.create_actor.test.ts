@@ -5,7 +5,7 @@ import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
-import { prepareToolCallContext } from '../../src/payments/helpers.js';
+import { prepareToolCallContext } from '../../src/mcp/tool_call_context.js';
 import { createActorToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { createActor } from '../../src/tools/versions/create_actor.js';
 import { getActorVersion } from '../../src/tools/versions/get_actor_version.js';
@@ -194,8 +194,7 @@ describe('create-actor', () => {
     describe('logged arguments', () => {
         const SECRET = 'synthetic-secret-4f2a';
         const getLoggedArgs = (args: Record<string, unknown>) =>
-            prepareToolCallContext({ provider: undefined, tool: createActor, args, apifyToken: 'test-token' })
-                .toolArgsRedacted;
+            prepareToolCallContext({ tool: createActor, args, apifyToken: 'test-token' }).toolArgsRedacted;
 
         it('keep the paths and other metadata, and replace file content with a marker', () => {
             const args = {
@@ -247,7 +246,7 @@ describe('create-actor', () => {
         });
     });
 
-    it('is a non-destructive, non-idempotent, open-world tool without payment, since autoBuild starts a build', () => {
+    it('is a non-destructive, non-idempotent, open-world tool, since autoBuild starts a build', () => {
         expect(createActor.name).toBe(HELPER_TOOLS.ACTOR_CREATE);
         expect(createActor.annotations).toEqual({
             title: 'Create Actor',
@@ -256,7 +255,6 @@ describe('create-actor', () => {
             idempotentHint: false,
             openWorldHint: true,
         });
-        expect((createActor as HelperTool).paymentRequired).toBeUndefined();
     });
 
     it('creates the Actor and version 0.0 in one POST, with no env vars and no build tag', async () => {

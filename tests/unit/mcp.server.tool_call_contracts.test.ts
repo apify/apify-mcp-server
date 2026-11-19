@@ -33,12 +33,10 @@ import {
     getTaskStore,
     makePaymentRequiredError,
     makePermissionApprovalError,
-    makePaymentProvider,
     makeRecorderTool,
     makeThrowingTool,
     PERMISSION_HTTP_STATUS,
     withServer,
-    X402_PAYMENT_DATA,
 } from './helpers/mcp_server.js';
 
 /**
@@ -49,12 +47,6 @@ import {
  * path (result shapes) and the task path (terminal status mapping) assert the same source-of-truth
  * per class.
  */
-
-/** The wire `content` `buildPaymentRequiredResponse` produces for X402_PAYMENT_DATA. */
-const X402_RESPONSE_CONTENT = [
-    { type: 'text', text: JSON.stringify(X402_PAYMENT_DATA) },
-    { type: 'text', text: 'Payment required to run this Actor or access this resource.' },
-];
 
 type FailureClass = {
     label: string;
@@ -70,9 +62,9 @@ type FailureClass = {
 const FAILURE_CLASSES: FailureClass[] = [
     {
         label: '402 payment-required',
-        makeError: () => makePaymentRequiredError(X402_PAYMENT_DATA),
+        makeError: () => makePaymentRequiredError(),
         taskStatus: 'completed',
-        storedResult: { content: X402_RESPONSE_CONTENT, isError: true, structuredContent: X402_PAYMENT_DATA },
+        storedResult: { content: [{ type: 'text', text: 'Payment required' }], isError: true },
         telemetry: {
             tool_status: TOOL_STATUS.SOFT_FAIL,
             failure_category: FAILURE_CATEGORY.INVALID_INPUT,
@@ -242,25 +234,7 @@ describe('CallToolRequestSchema handler', () => {
     afterEach(() => vi.restoreAllMocks());
 
     describe('sync failure result shapes', () => {
-        it('returns the x402 payment-required response shape for a 402 failure', async () => {
-            await withServer(async (server) => {
-                silenceLogs();
-                const result = await runSync(
-                    server,
-                    makeThrowingTool({ error: makePaymentRequiredError(X402_PAYMENT_DATA) }),
-                );
-                expect(result.isError).toBe(true);
-                // Per the x402 MCP transport spec the payload rides both structuredContent and
-                // content[0].text as JSON — payment clients parse these; pin both exactly.
-                expect(result.content).toEqual(X402_RESPONSE_CONTENT);
-                expect(result.structuredContent).toEqual(X402_PAYMENT_DATA);
-                // Server-internal telemetry/status must not leak onto the wire.
-                expect(result.toolTelemetry).toBeUndefined();
-                expect('internalToolStatus' in result).toBe(false);
-            });
-        });
-
-        it('returns the message-only payment-required response for a 402 without payment data', async () => {
+        it('returns the message-only payment-required response for a 402 failure', async () => {
             await withServer(async (server) => {
                 silenceLogs();
                 const result = await runSync(server, makeThrowingTool({ error: makePaymentRequiredError() }));
@@ -440,31 +414,6 @@ describe('CallToolRequestSchema handler', () => {
 
         expect(trackSpy.mock.calls[0][2]).toMatchObject({ mcp_url_client: '' });
     });
-
-    it.each(['skyfire', 'x402'] as const)('tags tool-call telemetry with payment_provider %s', async (id) => {
-        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
-        await withServer(
-            async (server) => {
-                // A free tool, called without any payment: the tag marks the connection's mode, not a paid call.
-                await runSync(server, makeRecorderTool('payment-provider-tool').tool);
-            },
-            { token: undefined, telemetry: { enabled: true }, paymentProvider: makePaymentProvider(id) },
-        );
-
-        expect(trackSpy.mock.calls[0][2]).toMatchObject({ payment_provider: id });
-    });
-
-    it('omits payment_provider from tool-call telemetry without a payment provider', async () => {
-        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
-        await withServer(
-            async (server) => {
-                await runSync(server, makeRecorderTool('no-payment-provider-tool').tool);
-            },
-            { token: undefined, telemetry: { enabled: true }, allowUnauthMode: true },
-        );
-
-        expect(trackSpy.mock.calls[0][2]).not.toHaveProperty('payment_provider');
-    });
 });
 
 describe('CallToolRequestSchema handler — invalid-call rejections (characterization)', () => {
@@ -590,7 +539,7 @@ describe('executeToolAndUpdateTask()', () => {
                     const { task, result } = await runTaskAndReadBack(server, tool);
 
                     expect(task.status).toBe(fc.taskStatus);
-                    // Exact-object pin: a payment client fetches this via tasks/result, so the
+                    // Exact-object pin: a client fetches this via tasks/result, so the
                     // payload must not drift, and no internal key (toolTelemetry,
                     // internalToolStatus on completed classes) may appear.
                     expect(result).toEqual(fc.storedResult);
@@ -879,7 +828,6 @@ describe('ACTOR_MCP remote-McpError containment (sync tools/call catch)', () => 
                 const result = await runSync(server, makeActorMcpTool());
                 expect(result.isError).toBe(true);
                 expect((result.content as { text: string }[])[0].text).toContain('Failed to call MCP tool');
-                // Not the x402 payment response shape (no structuredContent payload).
                 expect(result.structuredContent).toBeUndefined();
             },
             { token: undefined, telemetry: { enabled: true }, allowUnauthMode: true },
@@ -1103,326 +1051,166 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
         });
     }
 
-    it('resolves a payment pre-flight failure as a terminal completed task, one completed notification', async () => {
-        await withServer(
-            async (server) => {
-                silenceLogs();
-                const notifySpy = vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                const { tool, received } = makeRecorderTool('payment-tool', {
-                    paymentRequired: true,
-                    taskSupport: 'optional',
-                });
-                const res = await callTask(server, tool, {});
+    /** `call-actor` with the removed `actor:tool` syntax: the one pre-flight rejection `prepareToolCall` returns. */
+    const LEGACY_SYNTAX_ARGS = { actor: 'apify/example-mcp-server:add' };
 
-                // CreateTaskResult is already terminal — no observable `working` phase.
-                expect(res.task.status).toBe('completed');
-                // The tool implementation never ran.
-                expect(received.called).toBe(false);
-                // Stored result carries the x402 payload intact.
-                const stored = (await getTaskStore(server).getTaskResult(res.task.taskId)) as Record<string, unknown>;
-                expect(stored.isError).toBe(true);
-                expect(stored.structuredContent).toEqual(X402_PAYMENT_DATA);
-                // Exactly one status notification, `completed`, emitted after the response.
-                expect(statusNotificationStatuses(notifySpy)).toEqual([]);
-                await flushDeferredNotification();
-                expect(statusNotificationStatuses(notifySpy)).toEqual(['completed']);
-            },
-            { paymentProvider: makePaymentProvider() },
-        );
+    it('resolves a pre-flight rejection as a terminal completed task, one completed notification', async () => {
+        await withServer(async (server) => {
+            silenceLogs();
+            const rejectionSpy = vi.spyOn(callActor, 'buildLegacyMcpSyntaxRejection');
+            const notifySpy = vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
+            const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
+            const res = await callTask(server, tool, LEGACY_SYNTAX_ARGS);
+
+            // CreateTaskResult is already terminal — no observable `working` phase.
+            expect(res.task.status).toBe('completed');
+            // The tool implementation never ran.
+            expect(received.called).toBe(false);
+            const stored = (await getTaskStore(server).getTaskResult(res.task.taskId)) as Record<string, unknown>;
+            expect(stored.isError).toBe(true);
+            // Exactly one status notification, `completed`, emitted after the response.
+            expect(statusNotificationStatuses(notifySpy)).toEqual([]);
+            await flushDeferredNotification();
+            expect(statusNotificationStatuses(notifySpy)).toEqual(['completed']);
+            // No second, asynchronous re-evaluation of the already-known outcome (criterion 13).
+            expect(rejectionSpy).toHaveBeenCalledTimes(1);
+        });
     });
 
-    it('stores a payment pre-flight result deep-equal to the sync (non-task) path result', async () => {
-        await withServer(
-            async (server) => {
-                silenceLogs();
-                vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                const handler = getRequestHandler(server, 'tools/call');
-
-                // Non-task sync path returns the paymentRequiredResult directly.
-                const syncTool = makeRecorderTool('payment-tool-sync', { paymentRequired: true }).tool;
-                server.upsertTools([syncTool]);
-                const syncResult = await handler(
-                    {
-                        method: 'tools/call',
-                        params: { name: 'payment-tool-sync', arguments: {}, _meta: { mcpSessionId: 's1' } },
-                    },
-                    { signal: { aborted: false }, sendNotification: vi.fn() },
-                );
-
-                // Task path stores the same failure as a completed result.
-                const taskTool = makeRecorderTool('payment-tool-task', {
-                    paymentRequired: true,
-                    taskSupport: 'optional',
-                }).tool;
-                const res = await callTask(server, taskTool, {});
-                const stored = await getTaskStore(server).getTaskResult(res.task.taskId);
-
-                expect(stored).toEqual(syncResult);
-            },
-            { paymentProvider: makePaymentProvider() },
-        );
-    });
-
-    it('resolves a standby pre-flight rejection as a terminal completed task, one completed notification', async () => {
-        await withServer(
-            async (server) => {
-                silenceLogs();
-                const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
-                const standbySpy = vi
-                    .spyOn(callActor, 'checkPaymentProviderStandbyConflict')
-                    .mockResolvedValue(standbyResult);
-                const notifySpy = vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
-                    hasPaymentProviderStandbyCheck: true,
-                    taskSupport: 'optional',
-                });
-                const res = await callTask(server, tool, { actor: 'apify/some-actor' });
-
-                expect(res.task.status).toBe('completed');
-                expect(received.called).toBe(false);
-                const stored = await getTaskStore(server).getTaskResult(res.task.taskId);
-                expect(stored).toEqual(standbyResult);
-                await flushDeferredNotification();
-                expect(statusNotificationStatuses(notifySpy)).toEqual(['completed']);
-                // No second, asynchronous re-evaluation of the already-known outcome (criterion 13).
-                expect(standbySpy).toHaveBeenCalledTimes(1);
-            },
-            { paymentProvider: makePaymentProvider() },
-        );
-    });
-
-    it('prefers the standby rejection over a payment-required failure when both apply', async () => {
-        await withServer(
-            async (server) => {
-                silenceLogs();
-                const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
-                vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockResolvedValue(standbyResult);
-                vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                // paymentRequired + missing skyfire-pay-id would also yield paymentRequiredResult.
-                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
-                    paymentRequired: true,
-                    hasPaymentProviderStandbyCheck: true,
-                    taskSupport: 'optional',
-                });
-                const res = await callTask(server, tool, { actor: 'apify/some-actor' });
-
-                const stored = (await getTaskStore(server).getTaskResult(res.task.taskId)) as Record<string, unknown>;
-                // Standby result wins — not the x402 payment payload.
-                expect(stored).toEqual(standbyResult);
-                expect(stored.structuredContent).toBeUndefined();
-            },
-            { paymentProvider: makePaymentProvider() },
-        );
-    });
-
-    it('records telemetry once with the sync-path pre-flight properties, no taskId', async () => {
+    it('records pre-flight telemetry once with INVALID_INPUT, no failure_http_status and no taskId', async () => {
         const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
         await withServer(
             async (server) => {
                 silenceLogs();
                 vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                const { tool } = makeRecorderTool('payment-tool', { paymentRequired: true, taskSupport: 'optional' });
-                await callTask(server, tool, {});
+                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
+                await callTask(server, tool, LEGACY_SYNTAX_ARGS);
             },
-            {
-                token: undefined,
-                telemetry: { enabled: true },
-                allowUnauthMode: true,
-                paymentProvider: makePaymentProvider(),
-            },
-        );
-        // Same properties the sync 402 pre-flight path records (FAILURE_CLASSES[0]), plus the payment provider.
-        expectFailureClassTelemetry(trackSpy, FAILURE_CLASSES[0], ['payment_provider']);
-        expect(trackSpy.mock.calls[0][2]).toMatchObject({ payment_provider: 'skyfire' });
-        expect(trackSpy.mock.calls[0][2]).not.toHaveProperty('taskId');
-    });
-
-    it('records standby telemetry with INVALID_INPUT and no failure_http_status', async () => {
-        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
-        await withServer(
-            async (server) => {
-                silenceLogs();
-                const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
-                vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockResolvedValue(standbyResult);
-                vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
-                    hasPaymentProviderStandbyCheck: true,
-                    taskSupport: 'optional',
-                });
-                await callTask(server, tool, { actor: 'apify/some-actor' });
-            },
-            {
-                token: undefined,
-                telemetry: { enabled: true },
-                allowUnauthMode: true,
-                paymentProvider: makePaymentProvider(),
-            },
+            { token: undefined, telemetry: { enabled: true }, allowUnauthMode: true },
         );
         expect(trackSpy.mock.calls).toHaveLength(1);
         const properties = trackSpy.mock.calls[0][2] as Record<string, unknown>;
         expect(properties.tool_status).toBe(TOOL_STATUS.SOFT_FAIL);
         expect(properties.failure_category).toBe(FAILURE_CATEGORY.INVALID_INPUT);
-        // Standby is not a 402 — the sync short-circuit omits failure_http_status and so must this path.
+        // The sync short-circuit omits failure_http_status, and so must this path.
         expect(properties).not.toHaveProperty('failure_http_status');
         expect(properties).not.toHaveProperty('taskId');
     });
 
-    it('stores a standby pre-flight result deep-equal to the sync (non-task) path result', async () => {
-        await withServer(
-            async (server) => {
-                silenceLogs();
-                const standbyResult = { content: [{ type: 'text', text: 'standby not supported' }], isError: true };
-                vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockResolvedValue(standbyResult);
-                vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
-                    hasPaymentProviderStandbyCheck: true,
-                    taskSupport: 'optional',
-                });
-                server.upsertTools([tool]);
-                const handler = getRequestHandler(server, 'tools/call');
+    it('stores a pre-flight result deep-equal to the sync (non-task) path result', async () => {
+        await withServer(async (server) => {
+            silenceLogs();
+            vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
+            const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
+            server.upsertTools([tool]);
+            const handler = getRequestHandler(server, 'tools/call');
 
-                // Non-task sync path returns the standbyRejection directly.
-                const syncResult = await handler(
-                    {
-                        method: 'tools/call',
-                        params: {
-                            name: tool.name,
-                            arguments: { actor: 'apify/some-actor' },
-                            _meta: { mcpSessionId: 's1' },
-                        },
-                    },
-                    { signal: { aborted: false }, sendNotification: vi.fn() },
-                );
+            // Non-task sync path returns the rejection directly.
+            const syncResult = await handler(
+                {
+                    method: 'tools/call',
+                    params: { name: tool.name, arguments: LEGACY_SYNTAX_ARGS, _meta: { mcpSessionId: 's1' } },
+                },
+                { signal: { aborted: false }, sendNotification: vi.fn() },
+            );
 
-                // Task path stores the same failure as a completed result.
-                const res = await callTask(server, tool, { actor: 'apify/some-actor' });
-                const stored = await getTaskStore(server).getTaskResult(res.task.taskId);
+            // Task path stores the same failure as a completed result.
+            const res = await callTask(server, tool, LEGACY_SYNTAX_ARGS);
+            const stored = await getTaskStore(server).getTaskResult(res.task.taskId);
 
-                expect(stored).toEqual(syncResult);
-            },
-            { paymentProvider: makePaymentProvider() },
-        );
+            expect(stored).toEqual(syncResult);
+        });
     });
 
     it('surfaces a non-expiry store failure as an InternalError protocol error', async () => {
         // A store outage (anything but the tolerated task-not-found) must reject as a protocol
         // error — a task-less tool result would fail the client's CreateTaskResult parse opaquely.
-        await withServer(
-            async (server) => {
-                silenceLogs();
-                vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                vi.spyOn(getTaskStore(server), 'storeTaskResult').mockRejectedValue(new Error('store unavailable'));
-                const { tool } = makeRecorderTool('payment-tool', { paymentRequired: true, taskSupport: 'optional' });
-                server.upsertTools([tool]);
-                const handler = getRequestHandler(server, 'tools/call');
-                await expect(
-                    handler(
-                        {
-                            method: 'tools/call',
-                            params: {
-                                name: 'payment-tool',
-                                arguments: {},
-                                _meta: { mcpSessionId: 's1' },
-                                task: { ttl: 60_000 },
-                            },
-                        },
-                        { signal: { aborted: false }, sendNotification: vi.fn() },
-                    ),
-                ).rejects.toMatchObject({ code: ErrorCode.InternalError });
-            },
-            { paymentProvider: makePaymentProvider() },
-        );
+        await withServer(async (server) => {
+            silenceLogs();
+            vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
+            vi.spyOn(getTaskStore(server), 'storeTaskResult').mockRejectedValue(new Error('store unavailable'));
+            const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
+            await expect(callTask(server, tool, LEGACY_SYNTAX_ARGS)).rejects.toMatchObject({
+                code: ErrorCode.InternalError,
+            });
+        });
     });
 
     it('logs Tool call completed with the taskId for a pre-flight task failure', async () => {
         // The pre-flight path's telemetry rides the handler finally; the log line must keep the
         // taskId the async path logs via finishTaskTracking, so hosted log queries keep
         // classifying this class as task-mode.
-        await withServer(
-            async (server) => {
-                const infoSpy = vi.spyOn(log, 'info').mockImplementation(() => log);
-                silenceLogs();
-                vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                const { tool } = makeRecorderTool('payment-tool', { paymentRequired: true, taskSupport: 'optional' });
-                const res = await callTask(server, tool, {});
-                const completedCall = infoSpy.mock.calls.find(([message]) => message === 'Tool call completed');
-                expect(completedCall?.[1]).toMatchObject({ taskId: res.task.taskId });
-            },
-            { paymentProvider: makePaymentProvider() },
-        );
+        await withServer(async (server) => {
+            const infoSpy = vi.spyOn(log, 'info').mockImplementation(() => log);
+            silenceLogs();
+            vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
+            const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
+            const res = await callTask(server, tool, LEGACY_SYNTAX_ARGS);
+            const completedCall = infoSpy.mock.calls.find(([message]) => message === 'Tool call completed');
+            expect(completedCall?.[1]).toMatchObject({ taskId: res.task.taskId });
+        });
     });
 
     it('returns a completed task even when the task expires before the result store', async () => {
         // The one case storeTaskResultOrSkipIfExpired tolerates: TTL elapsed between createTask and
         // the result store. The store throws not-found (swallowed) and the task is gone — the wire
         // CreateTaskResult must still report `completed`, never the pre-write `working` snapshot.
-        await withServer(
-            async (server) => {
-                silenceLogs();
-                const notifySpy = vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
-                vi.spyOn(getTaskStore(server), 'storeTaskResult').mockRejectedValue(
-                    new Error('Task with ID some-task not found'),
-                );
-                vi.spyOn(getTaskStore(server), 'getTask').mockResolvedValue(null);
-                const { tool, received } = makeRecorderTool('payment-tool', {
-                    paymentRequired: true,
-                    taskSupport: 'optional',
-                });
-                const res = await callTask(server, tool, {});
+        await withServer(async (server) => {
+            silenceLogs();
+            const notifySpy = vi.spyOn(getLegacyServer(server), 'notification').mockResolvedValue(undefined);
+            vi.spyOn(getTaskStore(server), 'storeTaskResult').mockRejectedValue(
+                new Error('Task with ID some-task not found'),
+            );
+            vi.spyOn(getTaskStore(server), 'getTask').mockResolvedValue(null);
+            const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { taskSupport: 'optional' });
+            const res = await callTask(server, tool, LEGACY_SYNTAX_ARGS);
 
-                expect(res.task.status).toBe('completed');
-                expect(received.called).toBe(false);
-                // Task is gone from the store — no status notification can be emitted.
-                await flushDeferredNotification();
-                expect(statusNotificationStatuses(notifySpy)).toEqual([]);
-            },
-            { paymentProvider: makePaymentProvider() },
-        );
+            expect(res.task.status).toBe('completed');
+            expect(received.called).toBe(false);
+            // Task is gone from the store — no status notification can be emitted.
+            await flushDeferredNotification();
+            expect(statusNotificationStatuses(notifySpy)).toEqual([]);
+        });
     });
 
     it('classifies a non-McpError prep-spine throw as an EXECUTION isError result, not a raw reject', async () => {
         // Prep-spine 5xx errors must become FAILED tool results, not raw JSON-RPC errors.
         const logSpy = vi.spyOn(logging, 'logHttpError').mockImplementation(() => {});
-        await withServer(
-            async (server) => {
-                silenceLogs();
-                vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockRejectedValue(
-                    Object.assign(new Error('server error'), { statusCode: 500 }),
-                );
-                const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, {
-                    hasPaymentProviderStandbyCheck: true,
-                });
-                server.upsertTools([tool]);
-                const handler = getRequestHandler(server, 'tools/call');
-                const result = await handler(
-                    {
-                        method: 'tools/call',
-                        params: {
-                            name: HELPER_TOOLS.ACTOR_CALL,
-                            arguments: { actor: 'apify/some-actor' },
-                            _meta: { mcpSessionId: 's1' },
-                        },
+        await withServer(async (server) => {
+            silenceLogs();
+            vi.spyOn(callActor, 'buildLegacyMcpSyntaxRejection').mockImplementation(() => {
+                throw Object.assign(new Error('server error'), { statusCode: 500 });
+            });
+            const { tool, received } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL);
+            server.upsertTools([tool]);
+            const handler = getRequestHandler(server, 'tools/call');
+            const result = await handler(
+                {
+                    method: 'tools/call',
+                    params: {
+                        name: HELPER_TOOLS.ACTOR_CALL,
+                        arguments: { actor: 'apify/some-actor' },
+                        _meta: { mcpSessionId: 's1' },
                     },
-                    { signal: { aborted: false }, sendNotification: vi.fn() },
-                );
-                expect(result.isError).toBe(true);
-                expect(result.toolTelemetry).toEqual({ toolStatus: TOOL_STATUS.FAILED });
-                // Preparation failed before dispatch.
-                expect(received.called).toBe(false);
-                expect(logSpy).toHaveBeenCalledWith(
-                    expect.anything(),
-                    'Error occurred while calling tool',
-                    expect.objectContaining({ toolStatus: TOOL_STATUS.FAILED }),
-                );
-                // Actor context must survive post-resolution failures.
-                expect(logSpy).toHaveBeenCalledWith(
-                    expect.anything(),
-                    'Error occurred while calling tool',
-                    expect.objectContaining({ actorName: 'apify/some-actor', toolStatus: TOOL_STATUS.FAILED }),
-                );
-            },
-            { paymentProvider: makePaymentProvider() },
-        );
+                },
+                { signal: { aborted: false }, sendNotification: vi.fn() },
+            );
+            expect(result.isError).toBe(true);
+            expect(result.toolTelemetry).toEqual({ toolStatus: TOOL_STATUS.FAILED });
+            // Preparation failed before dispatch.
+            expect(received.called).toBe(false);
+            expect(logSpy).toHaveBeenCalledWith(
+                expect.anything(),
+                'Error occurred while calling tool',
+                expect.objectContaining({ toolStatus: TOOL_STATUS.FAILED }),
+            );
+            // Actor context must survive post-resolution failures.
+            expect(logSpy).toHaveBeenCalledWith(
+                expect.anything(),
+                'Error occurred while calling tool',
+                expect.objectContaining({ actorName: 'apify/some-actor', toolStatus: TOOL_STATUS.FAILED }),
+            );
+        });
     });
 
     it('classifies a createTask throw so telemetry is FAILED, not SUCCEEDED', async () => {
@@ -1467,10 +1255,10 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
             async (server) => {
                 silenceLogs();
                 vi.spyOn(logging, 'logHttpError').mockImplementation(() => {});
-                vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockRejectedValue(
-                    Object.assign(new Error('server error'), { statusCode: 500 }),
-                );
-                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL, { hasPaymentProviderStandbyCheck: true });
+                vi.spyOn(callActor, 'buildLegacyMcpSyntaxRejection').mockImplementation(() => {
+                    throw Object.assign(new Error('server error'), { statusCode: 500 });
+                });
+                const { tool } = makeRecorderTool(HELPER_TOOLS.ACTOR_CALL);
                 server.upsertTools([tool]);
                 const handler = getRequestHandler(server, 'tools/call');
                 await handler(
@@ -1489,12 +1277,7 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 expect(properties.actor_name).toBe('apify/some-actor');
                 expect(properties.tool_status).toBe(TOOL_STATUS.FAILED);
             },
-            {
-                token: undefined,
-                telemetry: { enabled: true },
-                allowUnauthMode: true,
-                paymentProvider: makePaymentProvider(),
-            },
+            { token: undefined, telemetry: { enabled: true }, allowUnauthMode: true },
         );
     });
 });

@@ -1,111 +1,36 @@
 /**
- * Tests for the payment/approval error-response builders. `buildPaymentRequiredResponse` covers the
- * x402 MCP transport spec requirement that PaymentRequired payloads land in both `structuredContent`
- * (preferred) and `content[0].text` as JSON (fallback). See coinbase/x402 `specs/transports-v2/mcp.md`.
+ * Tests for the 402 Payment Required and permission-approval error-response builders.
  */
 import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
     buildPaymentRequiredResponse,
     buildPermissionApprovalResponse,
-    isX402PaymentRequiredError,
-    registerPaymentRequiredInterceptor,
+    isPaymentRequiredError,
 } from '../../src/utils/payment_errors.js';
-import { mockApifyClient, textOf } from './helpers/tool_context.js';
+import { textOf } from './helpers/tool_context.js';
 
-const SAMPLE_PAYMENT_REQUIRED = {
-    x402Version: 2,
-    accepts: [
-        { scheme: 'exact', network: 'eip155:8453', amount: '100000' },
-        { scheme: 'upto', network: 'eip155:8453', amount: '500000' },
-    ],
-} as const;
-
-describe('registerPaymentRequiredInterceptor()', () => {
-    it('forwards a 402 payment-required header into the MCP response', async () => {
-        const use = vi.fn();
-        const client = mockApifyClient({ httpClient: { axios: { interceptors: { response: { use } } } } });
-        registerPaymentRequiredInterceptor(client);
-
-        const onRejected = use.mock.calls[0][1] as (error: unknown) => Promise<never>;
-        const error = Object.assign(new Error('Payment required'), {
-            response: {
-                status: 402,
-                headers: {
-                    'payment-required': Buffer.from(JSON.stringify(SAMPLE_PAYMENT_REQUIRED)).toString('base64'),
-                },
-            },
-        });
-
-        await expect(onRejected(error)).rejects.toBe(error);
-        const response = buildPaymentRequiredResponse(error);
-        expect(response.structuredContent).toEqual(SAMPLE_PAYMENT_REQUIRED);
-        expect(response.content?.[0]).toEqual({ type: 'text', text: JSON.stringify(SAMPLE_PAYMENT_REQUIRED) });
-    });
-
-    it('does not attach payment data to a non-402 response', async () => {
-        const use = vi.fn();
-        const client = mockApifyClient({ httpClient: { axios: { interceptors: { response: { use } } } } });
-        registerPaymentRequiredInterceptor(client);
-
-        const onRejected = use.mock.calls[0][1] as (error: unknown) => Promise<never>;
-        const error = Object.assign(new Error('Request failed'), {
-            response: {
-                status: 403,
-                headers: {
-                    'payment-required': Buffer.from(JSON.stringify(SAMPLE_PAYMENT_REQUIRED)).toString('base64'),
-                },
-            },
-        });
-
-        await expect(onRejected(error)).rejects.toBe(error);
-        expect(buildPaymentRequiredResponse(error).structuredContent).toBeUndefined();
-    });
-});
-
-describe('isX402PaymentRequiredError()', () => {
+describe('isPaymentRequiredError()', () => {
     it('returns true for a plain 402, false for the concurrent-run limit arriving as 402', () => {
-        expect(isX402PaymentRequiredError(Object.assign(new Error('Payment required'), { statusCode: 402 }))).toBe(
-            true,
-        );
+        expect(isPaymentRequiredError(Object.assign(new Error('Payment required'), { statusCode: 402 }))).toBe(true);
         const runLimitError = Object.assign(new Error('You will exceed your limit of 25 concurrent Actor runs.'), {
             statusCode: 402,
             type: 'concurrent-runs-limit-exceeded',
         });
-        expect(isX402PaymentRequiredError(runLimitError)).toBe(false);
+        expect(isPaymentRequiredError(runLimitError)).toBe(false);
     });
 });
 
 describe('buildPaymentRequiredResponse()', () => {
-    it('writes paymentData to both structuredContent and content[0].text', () => {
-        const result = buildPaymentRequiredResponse(new Error('Payment required'), SAMPLE_PAYMENT_REQUIRED);
-
-        expect(result.isError).toBe(true);
-        expect(result.structuredContent).toEqual(SAMPLE_PAYMENT_REQUIRED);
-        expect((result.content ?? [])[0]).toEqual({
-            type: 'text',
-            text: JSON.stringify(SAMPLE_PAYMENT_REQUIRED),
-        });
-    });
-
-    it('appends a human-readable text entry after the JSON entry when paymentData is present', () => {
-        const result = buildPaymentRequiredResponse(new Error('Payment required'), SAMPLE_PAYMENT_REQUIRED);
-
-        expect(result.content).toHaveLength(2);
-        expect((result.content ?? [])[1]).toEqual({
-            type: 'text',
-            text: 'Payment required to run this Actor or access this resource.',
-        });
-    });
-
-    it('omits structuredContent and returns only the error message when no paymentData is available', () => {
-        const result = buildPaymentRequiredResponse('plain string error');
+    it('returns the error message as an error result without structuredContent', () => {
+        const message = 'You have exceeded your monthly usage limit.';
+        const result = buildPaymentRequiredResponse(Object.assign(new Error(message), { statusCode: 402 }));
 
         expect(result.isError).toBe(true);
         expect(result.structuredContent).toBeUndefined();
-        expect(result.content).toEqual([{ type: 'text', text: 'plain string error' }]);
+        expect(result.content).toEqual([{ type: 'text', text: message }]);
     });
 });
 

@@ -204,8 +204,6 @@ export const callActorMcpTool: ToolEntry = Object.freeze({
     buildDescription,
     inputSchema: z.toJSONSchema(callActorMcpToolArgs) as ToolInputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(callActorMcpToolArgs)),
-    // A third-party payment provider cannot pay for a Server Actor run, so such a session is rejected before the call.
-    hasPaymentProviderStandbyCheck: true,
     actorInterface: 'mcp',
     // The remote tool's arguments can hold credentials, so only their key names are logged.
     redactArgs: (args: Record<string, unknown>) => ({

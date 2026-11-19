@@ -189,7 +189,6 @@ function build(params: Partial<Parameters<typeof buildServerInterfaceDetails>[0]
         schema: SCHEMA,
         serverInterface: true,
         loadedToolNames: Object.values(HELPER_TOOLS),
-        hasPaymentProvider: false,
         ...params,
     });
 }
@@ -305,14 +304,6 @@ describe('the operations in full', () => {
             isRequired: true,
             contentTypes: ['multipart/form-data'],
         });
-    });
-
-    it('says requests are not supported, without the send tool or run cost, in agentic payment mode', () => {
-        const { text } = sectionOf({ hasPaymentProvider: true });
-
-        expect(text).toContain('Requests to a server interface are not supported in agentic payment mode.\n');
-        expect(text).not.toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
-        expect(text).not.toContain('starts a run');
     });
 
     it("gives the Actor's server interface URL as the base URL instead of the send tool when the session lacks it", () => {
@@ -562,9 +553,8 @@ describe('fetching details of a Server Actor', () => {
     const call = async (
         output?: Record<string, unknown>,
         {
-            hasPaymentProvider = false,
             loadedToolNames = [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.ACTOR_SERVER_REQUEST],
-        }: { hasPaymentProvider?: boolean; loadedToolNames?: string[] } = {},
+        }: { loadedToolNames?: string[] } = {},
     ) => {
         const { apifyClient } = mockActorBuildClient({
             actor: mockActor({ id: 'server-actor-id', name: 'server-actor-test', username: 'apify', ...serverActor() }),
@@ -581,8 +571,6 @@ describe('fetching details of a Server Actor', () => {
             loadedToolNames,
         });
         context.apifyToken = '';
-        // The provider is not consumed here; only its presence disables server requests.
-        if (hasPaymentProvider) context.paymentProvider = {} as never;
         return buildFetchActorDetailsResult(context);
     };
 
@@ -627,11 +615,5 @@ describe('fetching details of a Server Actor', () => {
 
         expect(result.isError).toBe(true);
         expect(textOf(result.content![0])).toContain('3 documented operations: GET /add, POST /add, GET /empty.');
-    });
-
-    it('says requests are not supported in agentic payment mode', async () => {
-        const result = await call({ serverInterface: true }, { hasPaymentProvider: true });
-
-        expect(textOf(result.content!.at(-1)!)).toContain('not supported in agentic payment mode');
     });
 });

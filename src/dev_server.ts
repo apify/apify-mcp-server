@@ -36,8 +36,6 @@ import { MAX_REQUEST_BODY_BYTES } from './const.js';
 import { buildMcpClientContext } from './mcp/client_context.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { createStatelessServer } from './mcp/stateless_server.js';
-import type { PaymentProvider } from './payments/index.js';
-import { resolvePaymentProvider } from './payments/index.js';
 import { sanitizeMezmoMessage, toPlainError } from './utils/logging.js';
 import { injectMcpSessionId } from './utils/mcp.js';
 import { getRequestOriginForClient } from './utils/mcp_clients.js';
@@ -82,7 +80,7 @@ function buildJsonRpcError(code: number, message: string) {
 /** The 401 body both eras send for a missing token, JSON-RPC-shaped like production's. */
 const UNAUTHORIZED_RESPONSE_BODY = buildJsonRpcError(
     -32001,
-    'Unauthorized: Apify API token is missing. Pass it as `Authorization: Bearer <token>`, or set `?payment=<provider>` to use a third-party payment provider.',
+    'Unauthorized: Apify API token is missing. Pass it as `Authorization: Bearer <token>`.',
 );
 
 /**
@@ -94,15 +92,8 @@ const UNAUTHORIZED_CHALLENGE =
 
 /**
  * Returns the resolved token for a request, or sends a 401 response.
- * In payment mode, no token is required — returns `{ apifyToken: undefined }`.
  */
-function resolveRequestAuth(
-    req: Request,
-    res: Response,
-    paymentProvider: PaymentProvider | undefined,
-): { apifyToken: string | undefined } | null {
-    if (paymentProvider) return { apifyToken: undefined };
-
+function resolveRequestAuth(req: Request, res: Response): { apifyToken: string } | null {
     const apifyToken = extractApiTokenFromRequest(req);
     if (apifyToken) return { apifyToken };
 
@@ -112,7 +103,7 @@ function resolveRequestAuth(
 }
 
 /** Server settings both eras read from URL params, falling back to env vars like production does. */
-async function parseUrlParams(req: Request) {
+function parseUrlParams(req: Request) {
     const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
     const uiParam = urlParams.get('ui');
     return {
@@ -121,7 +112,6 @@ async function parseUrlParams(req: Request) {
             parseBooleanOrNull(process.env.TELEMETRY_ENABLED) ??
             true,
         serverMode: uiParam !== null ? parseServerMode(uiParam) : parseServerMode(process.env.UI_MODE),
-        paymentProvider: await resolvePaymentProvider(urlParams.get('payment')),
         // Client attribution tag (e.g. ?client=cursor), for Segment and tool wording.
         clientParam: urlParams.get('client') ?? undefined,
     };
@@ -171,10 +161,9 @@ function isSessionlessEraRequest(req: Pick<Request, 'headers'>): boolean {
  * metadata every time.
  */
 async function serveStatelessRequest(req: Request, res: Response, taskStore: InMemoryTaskStore): Promise<void> {
-    const { telemetryEnabled, serverMode, paymentProvider, clientParam } = await parseUrlParams(req);
+    const { telemetryEnabled, serverMode, clientParam } = parseUrlParams(req);
 
-    // No token required in payment mode, mirroring `resolveRequestAuth`.
-    const apifyToken = paymentProvider ? undefined : extractApiTokenFromRequest(req);
+    const apifyToken = extractApiTokenFromRequest(req);
     let unauthorized = false;
 
     const handler = createMcpHandler(
@@ -182,7 +171,7 @@ async function serveStatelessRequest(req: Request, res: Response, taskStore: InM
             // `server/discover` needs no token and no tools: it reports only capabilities and
             // instructions. The SDK has already checked the `mcp-method` header against the body.
             const isDiscoverProbe = requestInfo?.headers.get('mcp-method') === 'server/discover';
-            if (!isDiscoverProbe && !paymentProvider && !apifyToken) {
+            if (!isDiscoverProbe && !apifyToken) {
                 unauthorized = true;
                 throw new Error('Apify API token missing on unauthenticated request');
             }
@@ -192,7 +181,6 @@ async function serveStatelessRequest(req: Request, res: Response, taskStore: InM
                 transportType: 'http',
                 telemetry: { enabled: telemetryEnabled },
                 serverMode,
-                paymentProvider,
                 token: apifyToken,
                 clientParam,
             });
@@ -292,8 +280,8 @@ export function createExpressApp(): express.Express {
                 return;
             }
 
-            const { telemetryEnabled, serverMode, paymentProvider, clientParam } = await parseUrlParams(req);
-            const auth = resolveRequestAuth(req, res, paymentProvider);
+            const { telemetryEnabled, serverMode, clientParam } = parseUrlParams(req);
+            const auth = resolveRequestAuth(req, res);
             if (!auth) return;
             const { apifyToken } = auth;
 
@@ -303,7 +291,6 @@ export function createExpressApp(): express.Express {
                 transportType: 'http',
                 telemetry: { enabled: telemetryEnabled },
                 serverMode,
-                paymentProvider,
                 token: apifyToken,
                 clientParam,
             });

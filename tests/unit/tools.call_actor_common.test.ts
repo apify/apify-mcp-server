@@ -173,13 +173,13 @@ describe('call_actor_common', () => {
             );
         });
 
-        it('forwards the standby payment error message verbatim as a user error', () => {
-            const error = ActorLoadError.standbyPaymentNotSupported('apify/rag-web-browser');
+        it('forwards the server-Actor-without-MCP error message verbatim as a user error', () => {
+            const error = ActorLoadError.serverActorWithoutMcpNotSupported('apify/web-fetch');
 
             const response = buildCallActorErrorResponse({
-                actorName: 'apify/rag-web-browser',
+                actorName: 'apify/web-fetch',
                 error,
-                actorId: 'actor-standby-payment',
+                actorId: 'actor-server-without-mcp',
                 loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
             });
 
@@ -190,12 +190,12 @@ describe('call_actor_common', () => {
                     toolStatus: TOOL_STATUS.SOFT_FAIL,
                     failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
                     failureDetail: error.kind,
-                    actorId: 'actor-standby-payment',
+                    actorId: 'actor-server-without-mcp',
                 }),
             );
         });
 
-        // Only the two standby kinds take the user-error branch. LOAD_FAILED masks a backend fault,
+        // Only the server-Actor-without-MCP kind takes the user-error branch. LOAD_FAILED masks a backend fault,
         // so it must stay on the generic server-error path and keep its INTERNAL_ERROR telemetry.
         it('keeps a LOAD_FAILED Actor load failure on the generic server-error path', () => {
             const error = ActorLoadError.loadFailed('apify/rag-web-browser');

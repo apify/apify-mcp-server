@@ -23,7 +23,6 @@ export interface SuiteClientOptions {
         env?: TelemetryEnv;
     };
     serverMode?: string; // ?ui=
-    payment?: string; // ?payment=
     /** Attribution tag for `?client=`; a space encodes as `+` on the wire (e.g. 'claude connector' -> `?client=claude+connector`). */
     client?: string;
     clientCapabilities?: ClientCapabilities;
@@ -37,9 +36,8 @@ export function resolveToken(options?: SuiteClientOptions): string | undefined {
     return process.env.APIFY_TOKEN;
 }
 
-/** Require a token unless `token: null` or payment mode. */
+/** Require a token unless `token: null`. */
 export function checkToken(options?: SuiteClientOptions): void {
-    if (options?.payment) return;
     if (options?.token === null) return;
     if (!resolveToken(options)) {
         throw new Error('No token available: pass `token`, or set APIFY_TOKEN.');
@@ -47,19 +45,17 @@ export function checkToken(options?: SuiteClientOptions): void {
 }
 
 function buildAuthHeaders(options?: SuiteClientOptions): Record<string, string> {
-    if (options?.payment) return {};
     const token = resolveToken(options);
     return token ? { authorization: `Bearer ${token}` } : {};
 }
 
 function appendSearchParams(url: URL, options?: SuiteClientOptions): void {
-    const { actors, tools, telemetry, serverMode, payment, client } = options ?? {};
+    const { actors, tools, telemetry, serverMode, client } = options ?? {};
     if (actors !== undefined) url.searchParams.append('actors', actors.join(','));
     if (tools !== undefined) url.searchParams.append('tools', tools.join(','));
     // Default to false for tests when not explicitly set.
     url.searchParams.append('telemetry-enabled', (telemetry?.enabled ?? false).toString());
     if (serverMode !== undefined) url.searchParams.append('ui', serverMode);
-    if (payment) url.searchParams.append('payment', payment);
     if (client !== undefined) url.searchParams.append('client', client);
 }
 

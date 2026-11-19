@@ -36,7 +36,6 @@ USAGE EXAMPLES:
     inputSchema: fixZodSchemaRequired(z.toJSONSchema(getActorBuildLogArgs)) as ToolInputSchema,
     outputSchema: getActorBuildLogToolOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorBuildLogArgs)),
-    paymentRequired: true,
     annotations: {
         title: 'Get Actor build log',
         readOnlyHint: true,

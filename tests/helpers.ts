@@ -8,7 +8,7 @@ import { checkToken, resolveToken } from './test_kit/mcp_client.js';
 /** stdio client for this repo's dist/stdio.js. Honors the shared `options.token` contract. */
 export async function createMcpStdioClient(options?: SuiteClientOptions): Promise<Client> {
     checkToken(options);
-    const { actors, tools, useEnv, telemetry, serverMode, payment } = options || {};
+    const { actors, tools, useEnv, telemetry, serverMode } = options || {};
     const args = ['dist/stdio.js'];
     const token = resolveToken(options);
     const env: Record<string, string> = {
@@ -33,9 +33,6 @@ export async function createMcpStdioClient(options?: SuiteClientOptions): Promis
         if (serverMode !== undefined) {
             env.UI_MODE = serverMode;
         }
-        if (payment !== undefined) {
-            env.PAYMENT = payment;
-        }
     } else {
         // Use command line arguments as before
         if (actors !== undefined) {
@@ -50,9 +47,6 @@ export async function createMcpStdioClient(options?: SuiteClientOptions): Promis
         }
         if (serverMode !== undefined) {
             args.push('--ui', serverMode);
-        }
-        if (payment !== undefined) {
-            args.push('--payment', payment);
         }
     }
 
@@ -127,7 +121,7 @@ function buildSharedClient(client: Client): Client {
  * Every stdio client spawns `node dist/stdio.js`, and booting it costs more than a typical test;
  * the stdio file spawned one process per test and took five times longer than the HTTP files.
  * The tool list is fixed at boot, so tests that differ in nothing else can share a connected client.
- * Tests that pass any other option (`actors`, `payment`, `useEnv`, `clientName`, `isolated`, ...)
+ * Tests that pass any other option (`actors`, `useEnv`, `clientName`, `isolated`, ...)
  * get their own process, as before.
  *
  * `close()` on a shared client is a no-op; call `closeAll()` once the file is done.

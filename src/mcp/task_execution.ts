@@ -10,7 +10,6 @@ import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
-import type { PaymentProvider } from '../payments/types.js';
 import { withReportProblemNudge } from '../tools/dev/report_problem.js';
 import type {
     ActorStore,
@@ -81,7 +80,7 @@ export async function emitTaskStatusNotification(
  * @param params.tool - The tool to execute
  * @param params.toolArgs - Tool arguments
  * @param params.logSafeArgs - Tool arguments with sensitive fields redacted, safe for logging
- * @param params.apifyClient - ApifyClient configured with payment headers or the standard token
+ * @param params.apifyClient - ApifyClient configured with the session token
  * @param params.apifyToken - Apify API token
  * @param params.progressToken - Progress token for notifications
  * @param params.mcpSessionId - MCP session ID for telemetry
@@ -111,7 +110,6 @@ export async function executeToolAndUpdateTask(params: {
     server: Server;
     tools: Map<string, ToolEntry>;
     actorStore?: ActorStore;
-    paymentProvider?: PaymentProvider;
     telemetryData: ToolCallTelemetryProperties | null;
     userId: string | null;
     telemetryEnv: TelemetryEnv;
@@ -132,7 +130,6 @@ export async function executeToolAndUpdateTask(params: {
         server,
         tools,
         actorStore,
-        paymentProvider,
         telemetryData,
         userId,
         telemetryEnv,
@@ -277,7 +274,6 @@ export async function executeToolAndUpdateTask(params: {
             sendNotification,
             emitLog,
             actorStore,
-            paymentProvider,
             tools,
             actorName,
             actorId,
@@ -335,7 +331,7 @@ export async function executeToolAndUpdateTask(params: {
 
         switch (errorResult.kind) {
             case TOOL_CALL_ERROR_KIND.PAYMENT: {
-                // Handle 402 Payment Required — return structured x402 result so clients can auto-pay
+                // Handle 402 Payment Required (e.g. an account out of credits)
                 logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
                 // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
                 // so guard storeTaskResult against a cancel that raced with this 402.

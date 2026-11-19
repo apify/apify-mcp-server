@@ -160,8 +160,7 @@ export function formatTenancyBilling({
 }
 
 /** What a request costs, from the facts. */
-function formatCostNotice(facts: ServerInterfaceDetails, hasPaymentProvider: boolean): string {
-    if (hasPaymentProvider) return 'Requests to a server interface are not supported in agentic payment mode.';
+function formatCostNotice(facts: ServerInterfaceDetails): string {
     return formatTenancyBilling(facts);
 }
 
@@ -224,15 +223,12 @@ export function buildServerInterfaceDetails({
     schema,
     serverInterface,
     loadedToolNames,
-    hasPaymentProvider,
 }: {
     actor: Pick<Actor, 'actorStandby' | 'standbyUrl'>;
     actorFullName: string;
     schema: unknown;
     serverInterface: boolean | string;
     loadedToolNames: readonly string[];
-    /** An agentic payment provider (x402, Skyfire) cannot pay for a server-interface request. */
-    hasPaymentProvider: boolean;
 }): ServerInterfaceSection | { error: string } {
     const hasSendTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
     // The summary helps choose between call-actor and the send tool, so it follows the send tool.
@@ -256,15 +252,14 @@ export function buildServerInterfaceDetails({
         };
     }
 
-    const canSend = !hasPaymentProvider && hasSendTool;
-    const facts = buildServerInterfaceFacts(actor, tenancy, operations.length, canSend);
-    const notice = formatCostNotice(facts, hasPaymentProvider);
+    const facts = buildServerInterfaceFacts(actor, tenancy, operations.length, hasSendTool);
+    const notice = formatCostNotice(facts);
     const context: SectionContext = {
         actorFullName,
         schema,
         facts,
         formatHeader: (title, lead, operation) =>
-            `${title}\n${notice}\n${canSend ? formatSendExample(actorFullName, lead, operation) : ''}`,
+            `${title}\n${notice}\n${hasSendTool ? formatSendExample(actorFullName, lead, operation) : ''}`,
     };
     if (serverInterface === true) return buildOperationsSection(context, operations);
     const operation = findServerOperation(operations, serverInterface);
