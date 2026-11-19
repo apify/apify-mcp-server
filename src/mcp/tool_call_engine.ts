@@ -256,7 +256,7 @@ export async function prepareToolCall(params: {
             message: dedent`
                 Apify API token is required but was not provided.
                 Please set the APIFY_TOKEN environment variable or pass it as a parameter in the request header as Authorization Bearer <token>.
-                You can get your Apify token from https://console.apify.com/account/integrations.
+                Create an Apify API token at https://console.apify.com/settings/integrations (it is shown only once).
             `,
             toolStatus: TOOL_STATUS.SOFT_FAIL,
             callDiagnostics: { failure_category: FAILURE_CATEGORY.AUTH },

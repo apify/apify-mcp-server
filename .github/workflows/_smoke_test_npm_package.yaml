@@ -25,11 +25,11 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             -   name: Use Node.js
-                uses: actions/setup-node@v6
+                uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
                 with:
                     node-version: 22
 
-            -   uses: actions/checkout@v6
+            -   uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
                 if: ${{ inputs.from_source }}
             -   name: Install pnpm and dependencies
                 if: ${{ inputs.from_source }}
@@ -50,7 +50,7 @@ jobs:
                     echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
 
             -   name: Install package
-                uses: nick-fields/retry@v4
+                uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
                 env:
                     PKG_SPEC: ${{ steps.pack.outputs.tarball || format('@apify/actors-mcp-server@{0}', inputs.version || inputs.npm_tag) }}
                 with:
