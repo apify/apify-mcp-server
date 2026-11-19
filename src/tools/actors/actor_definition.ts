@@ -61,7 +61,7 @@ export function reduceToFieldNamesAndTypes(
 ): Record<string, unknown> | undefined {
     if (!properties) return undefined;
     const reduced = reduceProperties(properties, 1);
-    return JSON.stringify(reduced).length > MAX_DATASET_ITEM_PROPERTIES_BYTES ? undefined : reduced;
+    return Buffer.byteLength(JSON.stringify(reduced)) > MAX_DATASET_ITEM_PROPERTIES_BYTES ? undefined : reduced;
 }
 
 function reduceProperties(properties: Record<string, unknown>, depth: number): Record<string, unknown> {
@@ -73,7 +73,8 @@ function reduceProperties(properties: Record<string, unknown>, depth: number): R
 function reduceFieldSchema(schema: unknown, depth: number): Record<string, unknown> {
     if (!isRecord(schema)) return {};
     const reduced: Record<string, unknown> = {};
-    const types = (Array.isArray(schema.type) ? schema.type : [schema.type]).filter(
+    // A `Set`, because a validator also rejects a type list that names a type twice.
+    const types = [...new Set<unknown>(Array.isArray(schema.type) ? schema.type : [schema.type])].filter(
         (type): type is string => typeof type === 'string' && JSON_SCHEMA_TYPES.has(type),
     );
     if (types.length > 0) reduced.type = Array.isArray(schema.type) ? types : types[0];

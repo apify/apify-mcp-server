@@ -398,6 +398,12 @@ describe('reducing declared dataset fields to names and types', () => {
         expect(reduced).toEqual({ scrapedAt: {}, price: { type: ['number'] }, anything: {} });
     });
 
+    it('lists a type name the declaration repeats once', () => {
+        const reduced = reduceToFieldNamesAndTypes({ price: { type: ['number', 'number', 'null'] } });
+
+        expect(reduced).toEqual({ price: { type: ['number', 'null'] } });
+    });
+
     // A creator's schema can nest without end; the reduction must stay bounded.
     it('keeps the type of a deeply nested field and drops what lies below it', () => {
         let deepest: Record<string, unknown> = { type: 'string' };
