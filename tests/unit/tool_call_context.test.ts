@@ -3,8 +3,7 @@
  * creates the ApifyClient.
  *
  * Key invariants under test:
- * 1. toolArgs and toolArgsRedacted are separate object references
- *    (so AJV's in-place removeAdditional mutation doesn't corrupt toolArgsRedacted)
+ * 1. AJV's in-place removeAdditional mutation of toolArgs doesn't corrupt toolArgsRedacted
  * 2. requestOrigin is forwarded to ApifyClient (header wiring is covered in apify_client.test.ts)
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -46,19 +45,19 @@ function makeTool(): HelperTool {
 }
 
 describe('argument copies', () => {
-    it('returns toolArgs and logSafeArgs as separate references', () => {
-        const args = { actor: 'apify/rag-web-browser', extra: 'noise' };
+    it('keeps logSafeArgs intact when AJV strips a key from toolArgs in place', () => {
+        const args = { actor: 'apify/rag-web-browser', unknownExtra: 'should-be-stripped' };
         const result = prepareToolCallContext({
             tool: makeTool(),
             args,
             apifyToken: MOCK_APIFY_TOKEN,
         });
-
-        // logSafeArgs is the original object
-        expect(result.toolArgsRedacted).toBe(args);
-        // toolArgs is a shallow copy — different reference
-        expect(result.toolArgs).not.toBe(args);
         expect(result.toolArgs).toEqual(args);
+
+        // What AJV's removeAdditional does to the copy it validates.
+        delete result.toolArgs.unknownExtra;
+
+        expect(result.toolArgsRedacted).toEqual({ actor: 'apify/rag-web-browser', unknownExtra: 'should-be-stripped' });
     });
 
     it("applies the tool's redactArgs to logSafeArgs", () => {
