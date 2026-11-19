@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Link missing-token messages to the Console create-token form ([#1916](https://github.com/apify/apify-mcp-server/pull/1916)) ([13f0549](https://github.com/apify/apify-mcp-server/commit/13f05497046fbf13c369c0d35fef4d847a394b89)) by [@protoss70](https://github.com/protoss70), closes [#181](https://github.com/apify/apify-mcp-server/issues/181)
+- Skip the search for an oldText longer than the file ([#1937](https://github.com/apify/apify-mcp-server/pull/1937)) ([b0afc34](https://github.com/apify/apify-mcp-server/commit/b0afc344a33bd91612c2585b9e10ecdf585fe087)) by [@jirispilka](https://github.com/jirispilka)
 
 
 <!-- git-cliff-unreleased-end -->
