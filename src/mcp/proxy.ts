@@ -61,7 +61,13 @@ export async function getMCPServerTools(
         tools.some(({ name }) => `${escapedUsername}--${actorName}--${name}`.length > MAX_TOOL_NAME_LENGTH);
 
     return tools.map((tool): ActorMcpTool => {
-        const compiled = compileUntrustedSchema(tool.inputSchema, { actorName: actorFullName, toolName: tool.name });
+        // AJV here is draft-07 only. A declared `$schema` makes compile throw
+        // and drops every tool from this Actor. Copy first so the client object stays intact.
+        const inputSchema = { ...tool.inputSchema };
+        if ('$schema' in inputSchema) {
+            delete (inputSchema as { $schema?: string }).$schema;
+        }
+        const compiled = compileUntrustedSchema(inputSchema, { actorName: actorFullName, toolName: tool.name });
         return {
             type: TOOL_TYPE.ACTOR_MCP,
             actorId: actorID,
