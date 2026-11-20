@@ -159,11 +159,6 @@ export function formatTenancyBilling({
     return `${tenancy}: the first request starts a run in your account, kept for ${idleTimeout}.`;
 }
 
-/** What a request costs, from the facts. */
-function formatCostNotice(facts: ServerInterfaceDetails): string {
-    return formatTenancyBilling(facts);
-}
-
 function formatSendExample(actorFullName: string, lead: string, { method, path }: ServerOperation): string {
     return `${HELPER_TOOLS.ACTOR_SERVER_REQUEST} sends ${lead}: ${JSON.stringify({ actor: actorFullName, method, path })}\n`;
 }
@@ -253,7 +248,7 @@ export function buildServerInterfaceDetails({
     }
 
     const facts = buildServerInterfaceFacts(actor, tenancy, operations.length, hasSendTool);
-    const notice = formatCostNotice(facts);
+    const notice = formatTenancyBilling(facts);
     const context: SectionContext = {
         actorFullName,
         schema,

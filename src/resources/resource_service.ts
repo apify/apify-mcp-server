@@ -119,7 +119,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             }
         }
 
-        // A URI that is neither an http(s) URL, the usage guide, nor a served widget is not a
+        // A URI that is neither an http(s) URL nor a served widget is not a
         // readable resource — throw so the SDK returns a JSON-RPC error instead of success-shaped
         // "not found" content (see SEP-2164 and src/resources/AGENTS.md).
         throw new InvalidParamsError(`Failed to read ${uri}: not a readable resource.`, { uri });
