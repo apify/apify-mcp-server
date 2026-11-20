@@ -8,7 +8,7 @@ import {
     datasetItemsOutputSchema,
     actorRunOutputSchema,
 } from '../../src/tools/structured_output_schemas.js';
-import type { ActorInfo, ActorStore, ActorTool } from '../../src/types.js';
+import type { ActorInfo, ActorTool } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
 
 /** Helper type for navigating to `storages.datasets.default.itemsSchema` in a tool's outputSchema. */
@@ -35,10 +35,11 @@ function pickItemsSchema(schema: unknown): { type: string; properties?: Record<s
         .itemsSchema;
 }
 
-function createMockActorInfo(actorFullName: string): ActorInfo {
+function createMockActorInfo(actorFullName: string, datasetItemProperties?: Record<string, unknown>): ActorInfo {
     return {
         webServerMcpPath: null,
         definition: {
+            ...(datasetItemProperties && { datasetItemProperties }),
             id: 'test-id',
             actorFullName,
             readme: '',
@@ -64,23 +65,6 @@ function createMockActorInfo(actorFullName: string): ActorInfo {
             name: actorFullName.split('/')[1] || actorFullName,
             username: actorFullName.split('/')[0] || 'test',
         } as ActorInfo['actor'],
-    };
-}
-
-function createMockActorStore(schemas: Record<string, Record<string, unknown> | null>): ActorStore {
-    return {
-        getActorOutputSchema: async (actorFullName: string) => {
-            if (schemas[actorFullName] === undefined) {
-                return null;
-            }
-            return schemas[actorFullName];
-        },
-        getActorOutputSchemaAsTypeObject: async (actorFullName: string) => {
-            if (schemas[actorFullName] === undefined) {
-                return null;
-            }
-            return schemas[actorFullName];
-        },
     };
 }
 
@@ -183,8 +167,8 @@ describe('Structured Output Schemas', () => {
         });
     });
 
-    describe('getNormalActorsAsTools enrichment', () => {
-        it('uses the canonical RunResponse schema when no actorStore is provided', async () => {
+    describe('getNormalActorsAsTools output schema', () => {
+        it('uses the canonical RunResponse schema for an Actor that declares no dataset fields', async () => {
             const tools = await getNormalActorsAsTools([createMockActorInfo('apify/test-actor')]);
 
             expect(tools).toHaveLength(1);
@@ -208,74 +192,22 @@ describe('Structured Output Schemas', () => {
             expect(required).not.toContain('waitSecs');
         });
 
-        it('enriches outputSchema with itemsSchema when actorStore returns properties', async () => {
-            const actorName = 'apify/test-actor';
+        it('advertises the dataset fields the Actor declares as itemsSchema', async () => {
             const itemProperties = { url: { type: 'string' }, title: { type: 'string' } };
-            const store = createMockActorStore({ [actorName]: itemProperties });
 
-            const tools = await getNormalActorsAsTools([createMockActorInfo(actorName)], { actorStore: store });
-            const tool = tools[0] as ActorTool;
+            const tools = await getNormalActorsAsTools([createMockActorInfo('apify/test-actor', itemProperties)]);
 
-            expect(pickItemsSchema(tool.outputSchema)?.properties).toEqual(itemProperties);
+            expect(pickItemsSchema((tools[0] as ActorTool).outputSchema)?.properties).toEqual(itemProperties);
         });
 
-        it('falls back to the canonical schema when actorStore returns null', async () => {
-            const actorName = 'apify/test-actor';
-            const store = createMockActorStore({ [actorName]: null });
-
-            const tools = await getNormalActorsAsTools([createMockActorInfo(actorName)], { actorStore: store });
-            const tool = tools[0] as ActorTool;
-
-            expect(tool.outputSchema).toBe(actorRunOutputSchema);
-        });
-
-        it('falls back to the canonical schema when actorStore returns an empty object', async () => {
-            const actorName = 'apify/test-actor';
-            const store = createMockActorStore({ [actorName]: {} });
-
-            const tools = await getNormalActorsAsTools([createMockActorInfo(actorName)], { actorStore: store });
-            const tool = tools[0] as ActorTool;
-
-            expect(tool.outputSchema).toBe(actorRunOutputSchema);
-        });
-
-        it('falls back to the canonical schema when actorStore throws', async () => {
-            const store: ActorStore = {
-                getActorOutputSchema: async () => {
-                    throw new Error('Database connection failed');
-                },
-                getActorOutputSchemaAsTypeObject: async () => {
-                    throw new Error('Database connection failed');
-                },
-            };
-
-            const tools = await getNormalActorsAsTools([createMockActorInfo('apify/test-actor')], {
-                actorStore: store,
-            });
-            const tool = tools[0] as ActorTool;
-
-            expect(tool.outputSchema).toBe(actorRunOutputSchema);
-        });
-
-        it('mixes enriched and canonical schemas across multiple actors', async () => {
-            const actor1Name = 'apify/actor-with-schema';
-            const actor2Name = 'apify/actor-no-schema';
-            const itemProperties = { foo: { type: 'string' } };
-            const store = createMockActorStore({
-                [actor1Name]: itemProperties,
-                [actor2Name]: null,
-            });
-
+        // call-actor builds the tool only to validate input; its output is the canonical RunResponse.
+        it('keeps the canonical RunResponse schema on a tool built for call-actor', async () => {
             const tools = await getNormalActorsAsTools(
-                [createMockActorInfo(actor1Name), createMockActorInfo(actor2Name)],
-                { actorStore: store },
+                [createMockActorInfo('apify/test-actor', { url: { type: 'string' } })],
+                { isDirectTool: false },
             );
 
-            const tool1 = tools.find((t) => (t as ActorTool).actorFullName === actor1Name) as ActorTool;
-            const tool2 = tools.find((t) => (t as ActorTool).actorFullName === actor2Name) as ActorTool;
-
-            expect(pickItemsSchema(tool1.outputSchema)?.properties).toEqual(itemProperties);
-            expect(tool2.outputSchema).toBe(actorRunOutputSchema);
+            expect((tools[0] as ActorTool).outputSchema).toBe(actorRunOutputSchema);
         });
 
         it('emits no widget meta on actor tools', async () => {
