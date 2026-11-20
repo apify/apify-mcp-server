@@ -2,9 +2,11 @@
  * The agent under test: Claude Code, driven headlessly through the Claude Agent SDK.
  *
  * Each run spawns its own Apify MCP server from `dist/stdio.js` (fresh state per test)
- * and drives it with Claude Code's own system prompt and tool set, so the eval exercises
- * the server the way a real Claude Code user does. The SDK owns the MCP handshake and
- * shuts the subprocess down when the query ends.
+ * and drives it with Claude Code's own system prompt. The agent gets the server's tools and
+ * no Claude Code built-ins (Bash, Read, WebFetch, ...): it reads Store listings, Actor output
+ * and web pages that anyone can write, in a process that holds the CI secrets, so it must not
+ * have a shell or file access. The SDK owns the MCP handshake and shuts the subprocess down
+ * when the query ends.
  */
 
 import { existsSync } from 'node:fs';
@@ -15,7 +17,8 @@ import type { HookCallbackMatcher, HookInput, Options, SDKMessage } from '@anthr
 import { query } from '@anthropic-ai/claude-agent-sdk';
 
 import { REPORT_PROBLEM_NUDGE } from '../../src/tools/dev/report_problem.js';
-import { MCP_SERVER_NAME, stripToolPrefix } from '../config.js';
+import { isMcpToolName, MCP_SERVER_NAME, stripToolPrefix } from '../config.js';
+import { ENV_KEYS_TO_SANITIZE } from '../environment.js';
 import type { AttemptedToolCall } from '../runner/tool_call_mode.js';
 import { TOOL_CALL_DENY_REASON, TOOL_CALL_MAX_TURNS } from '../runner/tool_call_mode.js';
 import type { AdaptedConversation } from './conversation_adapter.js';
@@ -37,7 +40,7 @@ export type AgentRunOptions = {
     failTools?: string[];
     maxTurns?: number;
     toolTimeoutSeconds: number;
-    /** Restrict the agent to MCP tools only, dropping Claude Code's built-in toolset. */
+    /** No effect: the agent never gets Claude Code's built-in tools. Kept until the flag is removed. */
     mcpToolsOnly: boolean;
     /** `kind: "tool-call"` items: deny every tool call and record the attempts, nothing executes. */
     isToolCallMode?: boolean;
@@ -53,6 +56,19 @@ const STDIO_BIN_PATH = resolve(process.cwd(), 'dist/stdio.js');
 
 /** Number of trailing non-empty stderr lines kept to append to a thrown error. */
 const MAX_APPENDED_STDERR_LINES = 5;
+
+/**
+ * `process.env` without the eval runner's credentials (`ENV_KEYS_TO_SANITIZE`), except `keptKey`.
+ * The Claude Code and MCP server subprocesses each get only the credential they authenticate with.
+ */
+function envWithoutRunnerCredentials(keptKey?: string): Record<string, string> {
+    return Object.fromEntries(
+        Object.entries(process.env).filter(
+            (entry): entry is [string, string] =>
+                entry[1] !== undefined && (entry[0] === keptKey || !ENV_KEYS_TO_SANITIZE.includes(entry[0])),
+        ),
+    );
+}
 
 /** Throw with the fix if the MCP server has not been built yet. */
 export function assertStdioBinExists(): void {
@@ -108,8 +124,7 @@ function toolCallDenyAllHook(attemptedCalls: AttemptedToolCall[]): HookCallbackM
 
 /** Run one test case to completion and fold the whole SDK stream into the judge's shape. */
 export async function runAgentConversation(options: AgentRunOptions): Promise<AgentRunResult> {
-    const { prompt, model, apifyToken, tools, failTools, maxTurns, toolTimeoutSeconds, mcpToolsOnly, isToolCallMode } =
-        options;
+    const { prompt, model, apifyToken, tools, failTools, maxTurns, toolTimeoutSeconds, isToolCallMode } = options;
 
     const serverArgs = [STDIO_BIN_PATH];
     if (tools && tools.length > 0) {
@@ -127,27 +142,33 @@ export async function runAgentConversation(options: AgentRunOptions): Promise<Ag
     const sdkOptions: Options = {
         model,
         systemPrompt: { type: 'preset', preset: 'claude_code' },
-        tools: mcpToolsOnly ? [] : { type: 'preset', preset: 'claude_code' },
+        tools: [],
+        env: envWithoutRunnerCredentials('ANTHROPIC_API_KEY'),
         mcpServers: {
             [MCP_SERVER_NAME]: {
                 type: 'stdio',
                 command: 'node',
                 args: serverArgs,
-                env: { ...process.env, APIFY_TOKEN: apifyToken },
+                // The CLI merges its own env into the server's, so the Anthropic key is blanked, not omitted.
+                env: { ...envWithoutRunnerCredentials(), APIFY_TOKEN: apifyToken, ANTHROPIC_API_KEY: '' },
                 timeout: toolTimeoutSeconds * 1000,
                 // Keep the server's tools in the prompt instead of behind tool search, or the
                 // eval measures tool search rather than our tool descriptions.
                 alwaysLoad: true,
             },
         },
-        // Allow every call so nothing prompts; `bypassPermissions` is not an option because the
-        // CLI refuses it under root. A tool-call item's deny-all hook still fires before this.
-        canUseTool: async (_toolName, input) => ({ behavior: 'allow', updatedInput: input }),
+        // Answer every permission request so nothing prompts; `bypassPermissions` is not an option
+        // because the CLI refuses it under root. Only the server's tools are allowed, in case the
+        // CLI offers a built-in despite `tools: []`. A tool-call item's deny-all hook still fires before this.
+        canUseTool: async (toolName, input) =>
+            isMcpToolName(toolName)
+                ? { behavior: 'allow', updatedInput: input }
+                : { behavior: 'deny', message: `The ${toolName} tool is not available.` },
         // Isolation: ignore this repo's settings and .mcp.json; configure everything in code.
         settingSources: [],
         strictMcpConfig: true,
         maxTurns: isToolCallMode ? TOOL_CALL_MAX_TURNS : (maxTurns ?? MAX_CONVERSATION_TURNS),
-        // Away from the repo: the built-in tools must not read or write this checkout.
+        // Away from the repo, so the CLI does not pick up this checkout as its project.
         cwd: tmpdir(),
         abortController,
         stderr: (data: string) => {

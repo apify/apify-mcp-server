@@ -14,7 +14,6 @@
  *   pnpm run evals:mcp-agent -- --category search
  *   pnpm run evals:mcp-agent -- --dataset mcp-server-evals-merge --id '^merge/tasks/'  # one family, by its id prefix
  *   pnpm run evals:mcp-agent -- --concurrency 8
- *   pnpm run evals:mcp-agent -- --mcp-tools-only   # drop Claude Code's built-in tools
  *   pnpm run evals:mcp-agent -- --subscription     # bill the local Claude Code login, not the API
  *   pnpm run evals:mcp-agent -- --dataset mcp-server-evals-merge  # the judged agent items
  *   pnpm run evals:mcp-agent -- --iterations 3      # 3 trials per item, pass@k / pass^k in the summary
@@ -155,7 +154,7 @@ async function parseCliArgs(): Promise<ParsedCliArgs> {
             concurrency: { alias: 'c', type: 'number', description: 'Items to run in parallel', default: 8 },
             'mcp-tools-only': {
                 type: 'boolean',
-                description: "Drop Claude Code's built-in tools, leaving only the Apify MCP server's",
+                description: "No effect: the agent never gets Claude Code's built-in tools",
                 default: false,
             },
             subscription: {
@@ -277,7 +276,7 @@ async function main() {
                 `${iterations > 1 ? ` x ${iterations} iteration(s)` : ''}, concurrency ${argv.concurrency} ` +
                 `(agent: ${argv.agentModel} via Claude Agent SDK ${agentSdkVersion}` +
                 `${argv.subscription ? ', Claude Code login' : ', ANTHROPIC_API_KEY'}` +
-                `${argv.mcpToolsOnly ? ', MCP tools only' : ', +built-in tools'}` +
+                ', MCP tools only' +
                 `; judge: ${judgeModel} via ${argv.claudeJudge ? 'Claude Code login' : 'OpenRouter'})`,
         );
 
