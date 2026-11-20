@@ -56,14 +56,16 @@ Some clients render widget-backed Actor tools: the response includes a live UI t
 ${dupWarning}${pollOkLine}`;
 }
 
-/** Every cross-tool mention gates on `ctx.hasTool(...)`, so a session missing a tool is never told to call it. */
+/**
+ * Every cross-tool mention gates on `ctx.hasTool(...)`, so a session missing a tool is never told to call it.
+ * `apiPublicBaseUrl` matches the templates and the read gate.
+ */
 export function getServerInstructions(
     mode: SERVER_MODE = SERVER_MODE.DEFAULT,
     { hasTool, clientParam }: ToolDescriptionContext = ALL_TOOLS_PRESENT,
+    apiPublicBaseUrl: string = getApifyAPIPublicBaseUrl(),
 ): string {
     const isApps = mode === SERVER_MODE.APPS;
-    // Client-facing origin, matching the templates and the read gate.
-    const apiBaseUrl = getApifyAPIPublicBaseUrl();
 
     const hasSearch = hasTool(HELPER_TOOLS.STORE_SEARCH);
     const hasDetails = hasTool(HELPER_TOOLS.ACTOR_GET_DETAILS);
@@ -234,10 +236,10 @@ ${actorTasksSection}${schedulesSection}
 - Unnamed storages are deleted after the account's data-retention period; named storages are kept until deleted.
 
 ## Apify API resources
-- Any Apify API GET endpoint can be read as an MCP resource. Pass the full \`${apiBaseUrl}/v2/...\` URL to \`resources/read\`; the server injects the session's Apify token and returns the response body. Reads require an Apify token — a session without one fails with a JSON-RPC error.
-- Actor and tool results return storage IDs, not resource URLs — build the URL from the ID (e.g. a \`datasetId\` becomes \`${apiBaseUrl}/v2/datasets/{datasetId}/items\`) and read it via \`resources/read\`.
+- Any Apify API GET endpoint can be read as an MCP resource. Pass the full \`${apiPublicBaseUrl}/v2/...\` URL to \`resources/read\`; the server injects the session's Apify token and returns the response body. Reads require an Apify token — a session without one fails with a JSON-RPC error.
+- Actor and tool results return storage IDs, not resource URLs — build the URL from the ID (e.g. a \`datasetId\` becomes \`${apiPublicBaseUrl}/v2/datasets/{datasetId}/items\`) and read it via \`resources/read\`.
 - Reads inline up to ~256 KB; a larger response is not downloaded — it returns a short notice with a download URL instead of the body, so page large datasets/lists with \`limit\` and \`offset\` to stay under the cap.
-- Examples: \`${apiBaseUrl}/v2/datasets/{datasetId}/items?clean=true&format=json&limit=100\`, \`${apiBaseUrl}/v2/key-value-stores/{storeId}/records/{recordKey}\`. \`resources/templates/list\` enumerates the common shapes with their paging parameters.
+- Examples: \`${apiPublicBaseUrl}/v2/datasets/{datasetId}/items?clean=true&format=json&limit=100\`, \`${apiPublicBaseUrl}/v2/key-value-stores/{storeId}/records/{recordKey}\`. \`resources/templates/list\` enumerates the common shapes with their paging parameters.
 ${apiReadLine}${widgetWorkflowSection}${dependenciesAndDisambiguation}${
         hasTool(HELPER_TOOLS.PROBLEM_REPORT)
             ? `

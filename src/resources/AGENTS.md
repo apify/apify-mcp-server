@@ -26,8 +26,8 @@ IDs that Actors and tools return. This is a deliberate deviation from the MCP sp
 scheme guidance (SHOULD only be used for client-fetchable URLs — ours are token-gated): the
 identity with the platform's own URLs is the feature. Revisit when tools start emitting
 `resource_link`s, where clients may fetch `https://` URIs directly. `isApifyApiUri()` gates reads
-to two origins — the one clients are told to use (`getApifyAPIPublicBaseUrl()`, `../apify_client.ts`)
-and the egress one (`getApifyAPIBaseUrl()`), which differ on the hosted server — and rejects
+to two origins — the one clients are told to use (`apiPublicBaseUrl`) and the egress one (`apiBaseUrl`),
+which differ on the hosted server — and rejects
 userinfo-bearing URLs (axios drops the `Authorization` header for those, silently degrading to
 unauthenticated). An accepted URI is sent on the egress origin and returned under the URI as given;
 templates, instructions, refusals and link-out URLs name only the client-facing origin. `readApiResource()`
@@ -36,6 +36,13 @@ then refuses, without a request, what the API tools refuse (`validateApiBlocklis
 endpoints. The API tools' `callApi` (`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`,
 `maskSessionToken()`, `redactJsonSecrets()`, `redactQueryString()` and `REDACTED`, so a change to any changes the
 tools too. `get-key-value-store-record` builds its inlined-record URI with `buildUrlOnOrigin()`.
+
+Both origins come from the server's `platformUrls`, resolved once in the `ActorsMcpServer` constructor:
+the `apiBaseUrl` / `apiPublicBaseUrl` option, then `APIFY_API_BASE_URL` / `APIFY_API_PUBLIC_BASE_URL`
+(`getApifyAPIBaseUrl()` / `getApifyAPIPublicBaseUrl()` in `../apify_client.ts`), then the default. The server
+passes them to `createResourceService()` and to every `ApifyClient` it builds (`ApifyClient.platformUrls`);
+tools read them from the client. The env resolvers are only the fallback for a caller with no server
+(a default parameter, or `platformUrls` unset).
 
 `sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through
 `httpClient.axios.request` with `maxContentLength: MAX_INLINE_BYTES`; `readBodyUnderCap()` next to it reads a

@@ -32,6 +32,7 @@ import { withReportProblemNudge } from '../tools/dev/report_problem.js';
 import type {
     ActorStore,
     CallDiagnostics,
+    PlatformUrls,
     ToolCallTelemetryProperties,
     ToolEntry,
     ToolStatus,
@@ -220,10 +221,22 @@ export async function prepareToolCall(params: {
     clientContext: McpClientContext | undefined;
     tools: Map<string, ToolEntry>;
     allowUnauthMode?: boolean;
+    /** The server's resolved origins, for every Apify client the call builds. */
+    platformUrls?: PlatformUrls;
     // Used to preserve abort status for a post-resolution classified failure.
     signal?: AbortSignal;
 }): Promise<PreparedCall | InvalidToolCall | PreparedCallError> {
-    const { apifyToken, name, meta, isTaskRequest, telemetryData, clientContext, tools, allowUnauthMode } = params;
+    const {
+        platformUrls,
+        apifyToken,
+        name,
+        meta,
+        isTaskRequest,
+        telemetryData,
+        clientContext,
+        tools,
+        allowUnauthMode,
+    } = params;
     let { args } = params;
     const requestOrigin = getRequestOriginForClient(clientContext);
     const storeSearchTracking = telemetryData
@@ -253,6 +266,7 @@ export async function prepareToolCall(params: {
             tools,
             apifyToken,
             requestOrigin,
+            platformUrls,
             mcpSessionId: params.mcpSessionId,
         });
     } catch (error) {
@@ -333,6 +347,7 @@ export async function prepareToolCall(params: {
             args: args as Record<string, unknown>,
             apifyToken,
             requestOrigin,
+            platformUrls,
         });
         apifyClient.storeSearchTracking = storeSearchTracking;
         // Only ever logged, and a tool input can hold any text.

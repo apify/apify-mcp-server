@@ -15,7 +15,7 @@ import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { InvalidRequestPathError } from '../../src/errors.js';
 import { getKeyValueStoreRecord } from '../../src/tools/storage/get_key_value_store_record.js';
 import { keyValueStoreRecordOutputSchema } from '../../src/tools/structured_output_schemas.js';
-import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import type { HelperTool, InternalToolArgs, PlatformUrls } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
@@ -67,10 +67,12 @@ function stubApifyClient(opts: {
     onRequest?: (config: RequestConfig) => void;
     /** Egress base URL of the SDK client (ends with `/v2`); `url` is built on it, as apify-client does. */
     baseUrl?: string;
+    platformUrls?: PlatformUrls;
 }): InternalToolArgs['apifyClient'] {
     const { overLimit, store, onGetRecordPublicUrl, onRequest, baseUrl = 'https://api.apify.com/v2' } = opts;
     const record = opts.record as { value: unknown; contentType?: string } | undefined;
     return mockApifyClient({
+        platformUrls: opts.platformUrls,
         keyValueStore: (id: string) => ({
             url: `${baseUrl}/key-value-stores/${id}`,
             get: async () => store,
@@ -254,6 +256,29 @@ describe('get-key-value-store-record', () => {
 
         expect((content[0] as { resource: { uri: string } }).resource.uri).toBe(
             'https://api.apify.com/v2/key-value-stores/KvsWkzbQMuFYuam3Y/records/report.pdf',
+        );
+    });
+
+    it("builds the embedded-resource URI on the server's client-facing origin carried by the client", async () => {
+        const bytes = Buffer.from([0x25, 0x50, 0x44, 0x46]);
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'report.pdf' },
+                stubApifyClient({
+                    record: { key: 'report.pdf', value: bytes, contentType: 'application/pdf' },
+                    baseUrl: 'http://api.internal.example:3333/v2',
+                    platformUrls: {
+                        apiBaseUrl: 'http://api.internal.example:3333',
+                        apiPublicBaseUrl: 'https://api.example.test',
+                        consoleBaseUrl: 'https://console.example.test',
+                    },
+                }),
+            ),
+        );
+        const { content } = result as CallToolResult;
+
+        expect((content[0] as { resource: { uri: string } }).resource.uri).toBe(
+            'https://api.example.test/v2/key-value-stores/KvsWkzbQMuFYuam3Y/records/report.pdf',
         );
     });
 

@@ -186,7 +186,10 @@ async function serveStatelessRequest(req: Request, res: Response, taskStore: InM
             });
             // No initialize handshake, so this fetch carries no request-origin tag.
             if (!isDiscoverProbe) {
-                await mcpServer.loadToolsFromUrl(req.url, new ApifyClient({ token: apifyToken }));
+                await mcpServer.loadToolsFromUrl(
+                    req.url,
+                    new ApifyClient({ token: apifyToken, platformUrls: mcpServer.platformUrls }),
+                );
             }
             return createStatelessServer(mcpServer, req.url);
         },
@@ -299,7 +302,10 @@ export function createExpressApp(): express.Express {
                 buildMcpClientContext(parseInitializeParams(initializeMessage.params)),
             );
             // Tools are composed with the final server mode inside the initialize handler.
-            await mcpServer.loadToolsFromUrl(req.url, new ApifyClient({ token: apifyToken, requestOrigin }));
+            await mcpServer.loadToolsFromUrl(
+                req.url,
+                new ApifyClient({ token: apifyToken, requestOrigin, platformUrls: mcpServer.platformUrls }),
+            );
 
             // The SDK awaits onsessioninitialized before sending InitializeResult, so the session is
             // registered before any follow-up request can arrive.

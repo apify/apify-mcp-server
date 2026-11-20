@@ -11,7 +11,7 @@ import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
 
-import { ApifyClient } from '../apify_client.js';
+import { ApifyClient, getApifyAPIBaseUrl, getApifyAPIPublicBaseUrl } from '../apify_client.js';
 import { DEFAULT_TELEMETRY_ENABLED, DEFAULT_TELEMETRY_ENV, HELPER_TOOLS } from '../const.js';
 import { prompts } from '../prompts/index.js';
 import { createPromptService } from '../prompts/prompt_service.js';
@@ -24,11 +24,13 @@ import type {
     ActorStore,
     ApifyRequestParams,
     Input,
+    PlatformUrls,
     ServerModeOption,
     TelemetryEnv,
     ToolEntry,
 } from '../types.js';
 import { SERVER_MODE, TOOL_TYPE } from '../types.js';
+import { getConsoleBaseUrl } from '../utils/console_link.js';
 import {
     getRequestOriginForClient,
     isReportProblemBlockedForClient,
@@ -162,6 +164,9 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     public readonly telemetryEnabled: boolean;
     public readonly telemetryEnv: TelemetryEnv;
 
+    /** Resolved once here: option, then env var, then default. Every consumer reads these, not the env. */
+    public readonly platformUrls: PlatformUrls;
+
     // Neutral prompt/resource services; the legacy adapter wires SDK handlers to these.
     public readonly promptService: ReturnType<typeof createPromptService>;
     public readonly resourceService: ReturnType<typeof createResourceService>;
@@ -216,9 +221,15 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         this.telemetryEnabled = telemetryEnabled;
         this.telemetryEnv = telemetryEnv;
         this.tools = new Map();
+        this.platformUrls = {
+            apiBaseUrl: options.apiBaseUrl ?? getApifyAPIBaseUrl(),
+            apiPublicBaseUrl: options.apiPublicBaseUrl ?? getApifyAPIPublicBaseUrl(),
+            consoleBaseUrl: options.consoleBaseUrl ?? getConsoleBaseUrl(),
+        };
 
         this.promptService = createPromptService(prompts);
         this.resourceService = createResourceService({
+            platformUrls: this.platformUrls,
             getMode: () => this.serverMode,
             getAvailableWidgets: () => this.availableWidgets,
         });
@@ -285,10 +296,11 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      * Read by the legacy adapter after `applyInitialize`, when the tool set is final.
      */
     public getServerInstructions(): string {
-        return getServerInstructions(this.serverMode, {
-            hasTool: (name) => this.tools.has(name),
-            clientParam: this.options.clientParam,
-        });
+        return getServerInstructions(
+            this.serverMode,
+            { hasTool: (name) => this.tools.has(name), clientParam: this.options.clientParam },
+            this.platformUrls.apiPublicBaseUrl,
+        );
     }
 
     /**
@@ -305,13 +317,14 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         const mode = resolveServerMode(this.serverModeOption, false);
         const notReportProblem = (name: string) => name !== HELPER_TOOLS.PROBLEM_REPORT;
         if (requestUrl === undefined) {
-            return getServerInstructions(mode, { hasTool: notReportProblem });
+            return getServerInstructions(mode, { hasTool: notReportProblem }, this.platformUrls.apiPublicBaseUrl);
         }
         const toolNames = resolveToolNamesFromInput(parseInputParamsFromUrl(requestUrl), mode);
-        return getServerInstructions(mode, {
-            hasTool: (name) => notReportProblem(name) && toolNames.has(name),
-            clientParam: this.options.clientParam,
-        });
+        return getServerInstructions(
+            mode,
+            { hasTool: (name) => notReportProblem(name) && toolNames.has(name), clientParam: this.options.clientParam },
+            this.platformUrls.apiPublicBaseUrl,
+        );
     }
 
     /**
@@ -342,6 +355,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
             clientContext,
             tools,
             resourceService: createResourceService({
+                platformUrls: this.platformUrls,
                 getMode: () => serverMode,
                 getAvailableWidgets: () => availableWidgets,
             }),
@@ -537,7 +551,12 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         token: string | undefined,
         clientContext: McpClientContext | undefined,
     ): ApifyClient | undefined {
-        return token ? new ApifyClient({ token, requestOrigin: getRequestOriginForClient(clientContext) }) : undefined;
+        if (!token) return undefined;
+        return new ApifyClient({
+            token,
+            requestOrigin: getRequestOriginForClient(clientContext),
+            platformUrls: this.platformUrls,
+        });
     }
 
     /**

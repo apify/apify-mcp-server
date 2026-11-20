@@ -17,6 +17,7 @@ import { validateApiBlocklist } from '../tools/api/apify_api_blocklist.js';
 import { normalizeApiPath } from '../tools/api/apify_api_path.js';
 import { isRecord } from '../tools/api/apify_api_spec.js';
 import { parseBaseMimeType } from '../tools/storage/storage_helpers.js';
+import type { PlatformUrls } from '../types.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 import { getHttpErrorHint } from '../utils/mcp.js';
 
@@ -96,9 +97,17 @@ function throwReadFailure(uri: string, status: number | undefined, message: stri
     );
 }
 
+/** The API origins of a server's `PlatformUrls`. */
+export type ApiUrls = Pick<PlatformUrls, 'apiBaseUrl' | 'apiPublicBaseUrl'>;
+
+/** The env defaults, for a caller with no server. */
+function getDefaultApiUrls(): ApiUrls {
+    return { apiBaseUrl: getApifyAPIBaseUrl(), apiPublicBaseUrl: getApifyAPIPublicBaseUrl() };
+}
+
 /**
- * True when the URI is an Apify API URL: on the origin clients are told to use (`getApifyAPIPublicBaseUrl()`)
- * or on the egress origin (`getApifyAPIBaseUrl()`), which differ on the hosted server.
+ * True when the URI is an Apify API URL: on the origin clients are told to use (`apiPublicBaseUrl`)
+ * or on the egress origin (`apiBaseUrl`), which differ on the hosted server. Only the origin of each is compared.
  *
  * This is the security gate for the generic read proxy: the apify-client attaches the
  * session token as an `Authorization` header to every outbound request, so we must only
@@ -107,11 +116,11 @@ function throwReadFailure(uri: string, status: number | undefined, message: stri
  * the default `Authorization` header for credentials-bearing URLs, so the read would
  * silently run unauthenticated. The API tools' `callApi` asserts its request URL with it too.
  */
-export function isApifyApiUri(uri: string): boolean {
+export function isApifyApiUri(uri: string, apiUrls: ApiUrls = getDefaultApiUrls()): boolean {
     try {
         const url = new URL(uri);
         if (url.username || url.password) return false;
-        return [getApifyAPIPublicBaseUrl(), getApifyAPIBaseUrl()].some((base) => url.origin === new URL(base).origin);
+        return [apiUrls.apiPublicBaseUrl, apiUrls.apiBaseUrl].some((base) => url.origin === new URL(base).origin);
     } catch {
         return false;
     }
@@ -148,8 +157,12 @@ function safeDecodeURIComponent(segment: string): string {
  * store's URL signing key. Falls back to the API URL on the client-facing origin for any other
  * endpoint, or if minting the signed URL fails (fetching that link then needs a token).
  */
-async function fetchRecordDownloadUrl(uri: string, apifyClient: ApifyClient): Promise<string> {
-    const apiUrl = buildUrlOnOrigin(uri, getApifyAPIPublicBaseUrl());
+async function fetchRecordDownloadUrl(
+    uri: string,
+    apifyClient: ApifyClient,
+    apiPublicBaseUrl: string,
+): Promise<string> {
+    const apiUrl = buildUrlOnOrigin(uri, apiPublicBaseUrl);
     const match = KV_RECORD_PATH_RE.exec(new URL(uri).pathname);
     if (!match) return apiUrl;
     try {
@@ -179,8 +192,12 @@ function isKvRecordUri(uri: string): boolean {
 }
 
 /** Body too large to inline: a download-pointer text result. NOT a failure — the resource is readable, just not inline. */
-async function buildLinkOutResult(uri: string, apifyClient: ApifyClient): Promise<ReadResourceResult> {
-    const downloadUrl = await fetchRecordDownloadUrl(uri, apifyClient);
+async function buildLinkOutResult(
+    uri: string,
+    apifyClient: ApifyClient,
+    apiPublicBaseUrl: string,
+): Promise<ReadResourceResult> {
+    const downloadUrl = await fetchRecordDownloadUrl(uri, apifyClient, apiPublicBaseUrl);
     // A KVS record is a single object with no paging; only a dataset/list can shrink via limit/offset.
     const pagingHint = isKvRecordUri(uri) ? '' : ' For a dataset/list, re-read with a smaller limit/offset range.';
     return buildTextResult(
@@ -248,10 +265,14 @@ export function redactJsonSecrets(json: string): string {
  * It makes one attempt through `sendApifyApiRequest` (`../apify_client.ts`), which says why it skips
  * `httpClient.call()`.
  */
-export async function readApiResource(uri: string, apifyClient?: ApifyClient): Promise<ReadResourceResult> {
-    if (!isApifyApiUri(uri)) {
+export async function readApiResource(
+    uri: string,
+    apifyClient?: ApifyClient,
+    apiUrls: ApiUrls = getDefaultApiUrls(),
+): Promise<ReadResourceResult> {
+    if (!isApifyApiUri(uri, apiUrls)) {
         throw new InvalidParamsError(
-            `Failed to read ${uri}: only Apify API URLs (${getApifyAPIPublicBaseUrl()}) are readable as resources.`,
+            `Failed to read ${uri}: only Apify API URLs (${apiUrls.apiPublicBaseUrl}) are readable as resources.`,
             { uri },
         );
     }
@@ -279,7 +300,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     try {
         // Sent on the egress origin; the result and the errors keep the URI as given.
         response = await sendApifyApiRequest(apifyClient, {
-            url: buildUrlOnOrigin(uri, getApifyAPIBaseUrl()),
+            url: buildUrlOnOrigin(uri, apiUrls.apiBaseUrl),
             method: 'GET',
             responseType: 'stream',
         });
@@ -314,7 +335,7 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     }
 
     if (body === undefined) {
-        return buildLinkOutResult(uri, apifyClient);
+        return buildLinkOutResult(uri, apifyClient, apiUrls.apiPublicBaseUrl);
     }
 
     const contentTypeHeader = response.headers['content-type'];

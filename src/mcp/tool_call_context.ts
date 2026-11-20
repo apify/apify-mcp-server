@@ -1,7 +1,7 @@
 import type { REQUEST_ORIGIN } from '../apify_client.js';
 import { ApifyClient } from '../apify_client.js';
 import { maskLoggedValues } from '../resources/api_resources.js';
-import type { ApifyToken, ToolEntry } from '../types.js';
+import type { ApifyToken, PlatformUrls, ToolEntry } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 
 export type PrepareToolCallContextResult = {
@@ -19,8 +19,10 @@ export function prepareToolCallContext(input: {
     apifyToken: ApifyToken;
     /** Request origin to attribute started runs to (from getRequestOriginForClient). Defaults to MCP. */
     requestOrigin?: REQUEST_ORIGIN;
+    /** The server's resolved origins, for the client. */
+    platformUrls?: PlatformUrls;
 }): PrepareToolCallContextResult {
-    const { tool, args, apifyToken, requestOrigin } = input;
+    const { tool, args, apifyToken, requestOrigin, platformUrls } = input;
     // A direct Actor tool's arguments are the Actor input, and a proxied MCP tool's are the remote tool's: either can
     // hold credentials, so only their key names are logged.
     const toolArgsRedacted =
@@ -31,6 +33,6 @@ export function prepareToolCallContext(input: {
     return {
         toolArgs: { ...args },
         toolArgsRedacted,
-        apifyClient: new ApifyClient({ token: apifyToken, requestOrigin }),
+        apifyClient: new ApifyClient({ token: apifyToken, requestOrigin, platformUrls }),
     };
 }

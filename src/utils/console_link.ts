@@ -4,13 +4,14 @@ import type { ConsoleLinkContext } from '../types.js';
 import { getUserInfoCached } from './userid_cache.js';
 
 /**
- * Console origin for the current cluster: `APIFY_CONSOLE_BASE_URL` when set, staging when on the
- * staging MCP host, production otherwise. The override exists because a server pointed at a
+ * Default Console origin, when the server gets no `consoleBaseUrl` option: `APIFY_CONSOLE_BASE_URL` when set,
+ * staging when on the staging MCP host, production otherwise. The override exists because a server pointed at a
  * non-production API by `APIFY_API_BASE_URL` would otherwise hand out production Console links
  * for runs and storages that only exist on that other deployment.
  */
-function getConsoleBaseUrl(): string {
+export function getConsoleBaseUrl(): string {
     if (process.env.APIFY_CONSOLE_BASE_URL) return process.env.APIFY_CONSOLE_BASE_URL;
+    // @deprecated The HOSTNAME check goes once the hosted server passes `consoleBaseUrl` (#797).
     return process.env.HOSTNAME === STAGING_MCP_HOSTNAME ? CONSOLE_BASE_URL_STAGING : CONSOLE_BASE_URL;
 }
 
@@ -40,7 +41,10 @@ export async function getConsoleLinkContext(
 ): Promise<ConsoleLinkContext | undefined> {
     if (!apifyToken?.startsWith(UI_TOKEN_PREFIX)) return undefined;
     const userInfo = await getUserInfoCached(apifyToken, apifyClient);
-    return { organizationId: userInfo.isOrganization && userInfo.userId ? userInfo.userId : undefined };
+    return {
+        organizationId: userInfo.isOrganization && userInfo.userId ? userInfo.userId : undefined,
+        consoleBaseUrl: apifyClient.platformUrls?.consoleBaseUrl,
+    };
 }
 
 /**
@@ -51,7 +55,7 @@ export async function getConsoleLinkContext(
 function buildConsoleUrl(context: ConsoleLinkContext | undefined, path: string): string | undefined {
     if (!context) return undefined;
     const orgPrefix = context.organizationId ? `/organization/${context.organizationId}` : '';
-    return `${getConsoleBaseUrl()}${orgPrefix}${path}`;
+    return `${context.consoleBaseUrl ?? getConsoleBaseUrl()}${orgPrefix}${path}`;
 }
 
 /** Builds the Console Actor detail URL: `<consoleBaseUrl>[/organization/<orgId>]/actors/<actorId>`. */
