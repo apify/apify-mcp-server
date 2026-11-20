@@ -1,0 +1,778 @@
+[
+  {
+    "id": "merge/actors/run-and-report-output",
+    "category": "call-actor",
+    "kind": "agent",
+    "query": "i want to try apifys hello world actor, just run it and tell me what comes out",
+    "reference": "PASS only if call-actor was called for apify/hello-world and the final answer reports the Actor's actual output text (the 'Hello world!' message). The agent may obtain it from the run result, the run's dataset, or its key-value store - any of those is fine. FAIL if the answer states an output that no tool call returned, or if the agent claims it cannot run Actors.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/actors/cost-and-input-before-running",
+    "category": "fetch-actor-details",
+    "kind": "agent",
+    "query": "before i run anything - whats apidojo/tweet-scraper going to cost me and what do i actually have to give it as input",
+    "reference": "PASS only if fetch-actor-details was called for apidojo/tweet-scraper and the final answer states both a pricing fact and at least one concrete input field from the Actor's schema. FAIL if the agent runs the Actor, or answers from memory without any tool call.",
+    "maxTurns": 10,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/actors/vague-need-shortlist",
+    "category": "search-actors",
+    "kind": "agent",
+    "query": "need to get reviews off google maps, cheap as possible, i cant code",
+    "reference": "PASS only if search-actors was called and the final answer recommends at least two named Actors with something about their cost or ease of use. The judge cannot see tool results, so do NOT penalise slugs or figures for looking too specific - assume anything the agent reports after a successful search came from it. FAIL only if search-actors was never called, or the agent asked a clarifying question instead of searching.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/actors/nonexistent-actor-graceful",
+    "category": "fetch-actor-details",
+    "kind": "agent",
+    "query": "whats apify/totally-made-up-actor-xyz do",
+    "reference": "PASS only if the agent attempted to look the Actor up with a tool and then told the user plainly that it does not exist. FAIL if it fabricates a description, or silently answers about a different Actor without saying it substituted one.",
+    "maxTurns": 8,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "expectedErrors": [
+      "fetch-actor-details"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/runs/last-run-status-lazy",
+    "category": "get-actor-run-list",
+    "kind": "agent",
+    "query": "did my last run finish ok?",
+    "reference": "PASS only if the agent listed the user's runs with a tool to find the most recent one, and the final answer states that run's status and which Actor it belonged to. FAIL if the agent asks the user for a run id instead of listing runs, or states a status it never read from a tool result.",
+    "maxTurns": 10,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/runs/log-not-just-status",
+    "category": "get-actor-run-log",
+    "kind": "agent",
+    "query": "show me what my last run actually logged, not just the status",
+    "reference": "PASS only if get-actor-run-log was called for the most recent run and the final answer quotes or summarises real log content from that result. FAIL if the agent reports only the run status, or claims logs are unavailable without calling the log tool.",
+    "maxTurns": 10,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/runs/any-failures-recently",
+    "category": "get-actor-run-list",
+    "kind": "agent",
+    "query": "anything of mine failed recently?",
+    "reference": "PASS only if the run list was fetched filtered to failed runs (a FAILED status filter) and the final answer either names the failed runs or states plainly that there are none. Listing every run and leaving the user to work it out is a FAIL, as is inventing run ids.",
+    "maxTurns": 8,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/runs/start-then-abort",
+    "category": "abort-actor-run",
+    "kind": "agent",
+    "query": "start apify/rag-web-browser searching for 'apify mcp server' and then actually never mind, kill it straight away",
+    "reference": "PASS only if the run was started and abort-actor-run was then called with that same run's id. If the run had already finished before the abort landed, reporting that truthfully is also a PASS. FAIL if the agent claims to have aborted the run without calling abort-actor-run, or aborts a different run id than the one it started.",
+    "maxTurns": 14,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "expectedErrors": [
+      "abort-actor-run"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/storage/run-then-pick-fields",
+    "category": "get-dataset-items",
+    "kind": "agent",
+    "query": "run apify/rag-web-browser for 'what is the apify mcp server', i only want the page titles and urls out of it",
+    "reference": "PASS only if the Actor was run and get-dataset-items was then called with that run's datasetId AND a fields selection naming the title and url fields, and the final answer lists titles with their urls. FAIL if the agent fetches every field and narrows only in its own prose, or reports results without calling get-dataset-items.",
+    "maxTurns": 16,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/storage/what-data-do-i-have",
+    "category": "get-dataset-list",
+    "kind": "agent",
+    "query": "what data do i have sitting on apify",
+    "reference": "PASS only if the agent listed the account's storages with a tool (datasets and/or key-value stores) and the final answer summarises what came back. FAIL if the agent asks which storage the user means without listing anything first, or names storages that no tool result contained.",
+    "maxTurns": 10,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/storage/dig-out-a-run-input",
+    "category": "get-key-value-store-record",
+    "kind": "agent",
+    "query": "i need the input that was used for one of my recent runs, dig it out for me",
+    "reference": "PASS only if the agent located a recent run, then read that run's key-value store - listing its keys and/or reading the INPUT record - and reported input values that came from the tool result. FAIL if the agent reports an input it never read, or gives up without attempting the key-value store tools.",
+    "maxTurns": 14,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/storage/shape-without-dumping",
+    "category": "get-dataset-schema",
+    "kind": "agent",
+    "query": "whats the structure of the data in my newest dataset? dont dump the whole thing on me",
+    "reference": "PASS only if the agent found a dataset via a list tool and then described its field structure using the dataset schema or dataset metadata tool, without pulling the full item contents. FAIL if it fetches all items to infer the shape while a schema tool was available, or names fields no tool result contained.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/storage/count-lag-honesty",
+    "category": "get-dataset",
+    "kind": "agent",
+    "query": "how many items are in my newest dataset",
+    "reference": "PASS only if the agent read the dataset's item count with a tool and the final answer reports the count it read. A reported count of zero is NOT a failure, and an agent noting that a freshly written count can lag behind the items is a good answer, not an admission of error. FAIL only if the agent states a count that no tool result returned.",
+    "maxTurns": 10,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/tasks/save-my-setup",
+    "category": "create-actor-task",
+    "kind": "agent",
+    "query": "i keep rerunning apify/normal-mode-test-actor with 8 and 9, save that so i dont have to retype it. call it eval-sum-eight-nine",
+    "reference": "PASS only if create-actor-task created a task named eval-sum-eight-nine for apify/normal-mode-test-actor whose stored input carries the numbers 8 and 9, and the final answer confirms it was saved. FAIL if a schedule was created instead of a task, or success is claimed without a successful create call.",
+    "maxTurns": 10,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/tasks/change-stored-input",
+    "category": "update-actor-task",
+    "kind": "agent",
+    "query": "my eval-sum-nightly task should add 100 and 200 from now on",
+    "reference": "PASS only if update-actor-task was called for the existing eval-sum-nightly task with an input carrying 100 and 200, and the final answer confirms the change. FAIL if a new task was created instead of updating the existing one.",
+    "maxTurns": 10,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/tasks/publish-requirement-discovery",
+    "category": "publish-actor-task",
+    "kind": "agent",
+    "query": "put eval-sum-nightly up on its actors public page so people can see what it does",
+    "reference": "PASS if the task ends up published, by whichever route: attempting the publish, reading the missing requirements out of the error and filling them in, OR setting the requirements up front and publishing in one pass. If publishing could not be completed, PASS only if the agent names the specific requirement still missing. FAIL if the agent stops at the first error without acting on what it named, or claims the task is published without a successful publish call.",
+    "maxTurns": 16,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "expectedErrors": [
+      "publish-actor-task"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/tasks/save-publish-check-remove",
+    "category": "tasks-chain",
+    "kind": "agent",
+    "query": "make a one-click version of apify/normal-mode-test-actor called eval-nmta-cycle that adds 2 and 3, put it up publicly, check its actually live, then take it back down",
+    "reference": "PASS only if a task named eval-nmta-cycle was created for apify/normal-mode-test-actor, published, its published state then confirmed by reading the task back, and finally unpublished - with the final answer reporting all four steps. FAIL if any of the four is claimed without its tool call succeeding. If publishing cannot be completed because a requirement could not be met, saying so plainly and stopping there is also a PASS.",
+    "maxTurns": 18,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "expectedErrors": [
+      "publish-actor-task"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/schedules/weekday-morning-prague",
+    "category": "create-schedule",
+    "kind": "agent",
+    "query": "run eval-sum-nightly every weekday at 7:30 prague time, name it eval-sched-weekday",
+    "reference": "PASS only if create-schedule created a schedule named eval-sched-weekday that targets the eval-sum-nightly task and fires at 07:30 on Monday to Friday only, with the Prague time zone set (or the hour correctly converted to UTC). FAIL if the cron fires all seven days, or if the time is left at 7:30 UTC with no time zone set.",
+    "maxTurns": 10,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/schedules/pause-not-delete",
+    "category": "update-schedule",
+    "kind": "agent",
+    "query": "stop eval-nightly-sum from firing for a while, im debugging something",
+    "reference": "PASS if the agent ended with the schedule eval-nightly-sum not firing AND said so: either it called update-schedule to disable it, or it read the schedule, found it already disabled, and reported that plainly. FAIL if delete-schedule was called, or if the agent neither changed nor reported the schedule's enabled state.",
+    "maxTurns": 8,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/schedules/add-keep-existing",
+    "category": "update-schedule",
+    "kind": "agent",
+    "query": "also run apify/hello-world on the eval-sched-target schedule, keep whatever is already on it",
+    "reference": "PASS only if the agent read eval-sched-target first and then updated it with an actions list containing BOTH the action it already had AND the new apify/hello-world action. FAIL if the update sends only the new action, dropping the existing one.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/schedules/not-found-honest",
+    "category": "get-schedule",
+    "kind": "agent",
+    "query": "when does my eval-sched-does-not-exist schedule run next",
+    "reference": "PASS only if the agent looked the schedule up with a tool and then told the user it does not exist. FAIL if it invents a next-run time, or reports on a different schedule without saying it substituted one.",
+    "maxTurns": 6,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "expectedErrors": [
+      "get-schedule"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/schedules/create-then-remove",
+    "category": "delete-schedule",
+    "kind": "agent",
+    "query": "set up apify/hello-world to run daily at 4am, name it eval-sched-temp - actually, delete it again once its made, i just want to see that it works",
+    "reference": "PASS only if create-schedule created eval-sched-temp and delete-schedule then removed it, with the final answer confirming both steps. FAIL if the schedule is left in place, or merely disabled instead of deleted.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/docs/how-do-i-with-citation",
+    "category": "search-apify-docs",
+    "kind": "agent",
+    "query": "how do i make an actor run on a schedule from the api? link me the docs",
+    "reference": "PASS only if search-apify-docs was called and the final answer both answers the question and cites at least one docs.apify.com URL. The judge cannot see tool results, so do NOT penalise a URL for looking specific or for not being verifiable - assume any docs.apify.com link the agent gives after a successful search came from that search. FAIL only if no docs tool was called, or the answer cites nothing.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/docs/search-then-read-page",
+    "category": "fetch-apify-docs",
+    "kind": "agent",
+    "query": "whats the difference between actor standby and a normal run, according to the docs",
+    "reference": "PASS only if the agent searched the Apify docs and then fetched at least one docs page before answering, and the final answer describes the difference between standby and a normal run. FAIL if the agent answers from memory with no tool call, or claims to have read a page it never fetched.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/web/verbatim-single-url",
+    "category": "apify--web-fetch",
+    "kind": "agent",
+    "query": "pull up https://www.rfc-editor.org/rfc/rfc9110.html and tell me what it says about the GET method, in its own words not yours",
+    "reference": "PASS only if that exact URL was fetched with a tool and the final answer conveys what the document says about the GET method, drawing on the fetched content. The page is long, so a partial or summarised account of the GET section is fine as long as it plainly came from the fetch. FAIL if a different URL was fetched, if the answer is delivered from memory with no successful fetch, or if the agent never gives a final answer at all.",
+    "maxTurns": 16,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true,
+    "expectedErrors": [
+      "call-actor"
+    ]
+  },
+  {
+    "id": "merge/web/query-not-a-url",
+    "category": "apify--rag-web-browser",
+    "kind": "agent",
+    "query": "whats the general consensus online about apify vs scrapy",
+    "reference": "PASS only if the agent ran a web search by query rather than fetching a single guessed URL, and the final answer summarises what several sources said. FAIL if the agent invents a specific URL and fetches that instead of searching.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/web/escalate-when-blocked",
+    "category": "web-selection",
+    "kind": "agent",
+    "query": "read https://www.reddit.com/r/webscraping/ and tell me the top post titles",
+    "reference": "PASS if the page content was retrieved and real post titles reported, by whichever route worked. If the first attempt came back blocked, empty or errored, the agent must have escalated to the dedicated single-URL fetch tool rather than giving up. A truthful report that the page could not be retrieved after trying both routes is also a PASS. FAIL if the agent reports titles it never retrieved.",
+    "maxTurns": 14,
+    "expectedErrors": [
+      "apify--rag-web-browser"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/web/unsupported-scheme-honesty",
+    "category": "apify--web-fetch",
+    "kind": "agent",
+    "query": "grab ftp://ftp.rfc-editor.org/in-notes/rfc9110.txt for me",
+    "reference": "PASS only if the final answer tells the user that the ftp:// scheme is not supported by the fetch tool. Quietly rewriting the address to https:// and presenting that result as the requested fetch is a FAIL, even when the content returned is correct.",
+    "maxTurns": 12,
+    "expectedErrors": [
+      "apify--web-fetch"
+    ],
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/dev/report-after-failure",
+    "category": "report-problem",
+    "kind": "agent",
+    "query": "use the apify/website-content-crawler actor to pull https://docs.apify.com/platform and summarise it for me",
+    "reference": "PASS only if, after the Actor call failed, the agent BOTH told the user it could not complete the task AND called report-problem about that failure without being asked to. FAIL if it answered from memory as though the tool had worked, or never reported the problem.",
+    "maxTurns": 8,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "failTools": [
+      "call-actor"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/web/markup-not-cleaned-up",
+    "category": "apify--web-fetch",
+    "kind": "agent",
+    "query": "i need the actual html source of https://example.com, not a tidied up version",
+    "reference": "The user asked for the page's markup, so the fetch must request a markup-preserving output format - 'html' or 'raw' both satisfy this. PASS only if the fetch tool was called for https://example.com with such a format and the final answer shows the markup. FAIL if the page was returned only as markdown or plain text, or if no fetch was made.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/web/pdf-to-text",
+    "category": "apify--web-fetch",
+    "kind": "agent",
+    "query": "whats actually written in this pdf https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+    "reference": "The fetch Actor converts PDFs to Markdown. PASS only if the fetch tool was called with that PDF url, the output was retrieved, and the final answer states the PDF's actual text. FAIL if the agent says it cannot read PDFs without trying, or reports text it did not retrieve.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/web/list-the-links",
+    "category": "apify--web-fetch",
+    "kind": "agent",
+    "query": "list every link on https://example.com for me",
+    "reference": "PASS only if the fetch tool was called for https://example.com and the final answer lists the link(s) found on it. Requesting the 'links' output format is the direct path; extracting links from fetched page content is equally acceptable. FAIL if links are reported without any fetch, or the agent claims it cannot extract links.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/web/reports-404-truthfully",
+    "category": "apify--web-fetch",
+    "kind": "agent",
+    "query": "grab https://www.rfc-editor.org/rfc/rfc99999.txt and tell me exactly what came back",
+    "reference": "That URL returns HTTP 404. The fetch run itself still succeeds and records the status code. PASS only if the fetch tool was called with that url and the final answer reports that the page was not found / returned 404. FAIL if the agent presents unrelated content as though it were that page, or claims success without naming the error status.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/web/unreachable-host",
+    "category": "apify--web-fetch",
+    "kind": "agent",
+    "query": "whats on https://this-domain-definitely-does-not-exist-9x7q2.com",
+    "reference": "The domain does not resolve. Depending on routing the run either fails with a connection error or succeeds with an empty item carrying a proxy error - both mean the same thing. PASS only if the agent attempted the fetch and then told the user the site could not be reached. FAIL if it invents content, or silently substitutes a different domain.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true,
+    "expectedErrors": [
+      "apify--web-fetch"
+    ]
+  },
+  {
+    "id": "merge/tasks/name-collision",
+    "category": "create-actor-task",
+    "kind": "agent",
+    "query": "make me a task called eval-sum-hourly for apify/normal-mode-test-actor adding 3 and 4. then make another one, same name, same actor, adding 7 and 8. tell me exactly what happened with each",
+    "reference": "Task names are unique per account, so the second create must fail with a name conflict. PASS only if the first create succeeded, a second create with the same name was attempted and failed, and the final answer states plainly that the first was created and the second was rejected because the name is taken. FAIL if the agent silently renames the second task, or reports both as created.",
+    "maxTurns": 12,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true,
+    "expectedErrors": [
+      "create-actor-task"
+    ]
+  },
+  {
+    "id": "merge/storage/all-rows-one-call",
+    "category": "get-dataset-items",
+    "kind": "agent",
+    "query": "search the web with apify for 'apify mcp server' and give me 5 results, then pull all of them back in one go and tell me how many you got",
+    "reference": "PASS only if the Actor was run, get-dataset-items was then called with that run's datasetId in a SINGLE call carrying an explicit limit of at least the number of results requested (a limit equal to the requested count is sufficient and should PASS), and the final answer states how many rows came back. FAIL if get-dataset-items was called repeatedly to page through the dataset, if no explicit limit was passed at all, or if the reported count came from nowhere.",
+    "maxTurns": 16,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true
+  },
+  {
+    "id": "merge/schedules/name-collision",
+    "category": "create-schedule",
+    "kind": "agent",
+    "query": "set up a schedule called eval-nightly-sum that runs my task eval-sum-nightly every day at 3am utc",
+    "reference": "A schedule named eval-nightly-sum already exists, so create-schedule must fail with a name-not-unique error. PASS only if the agent attempted the create, and then told the user plainly that a schedule with that name already exists - it may stop and ask how to proceed, or propose a different name. FAIL if it silently picks another name and reports success as though the requested name was used, or claims the schedule was created.",
+    "maxTurns": 10,
+    "tools": [
+      "actors",
+      "docs",
+      "runs",
+      "storage",
+      "tasks",
+      "schedules",
+      "dev",
+      "apify/rag-web-browser",
+      "apify/web-fetch"
+    ],
+    "mcpToolsOnly": true,
+    "expectedErrors": [
+      "create-schedule"
+    ]
+  }
+]
