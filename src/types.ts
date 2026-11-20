@@ -794,14 +794,14 @@ export type StructuredActorCard = {
     id: string;
     fullName: string;
     pictureUrl?: string;
-    developer: {
+    developer?: {
         username: string;
         isOfficialApify: boolean;
         url: string;
     };
-    description: string;
-    categories: string[];
-    pricing: StructuredPricingInfo;
+    description?: string;
+    categories?: string[];
+    pricing?: StructuredPricingInfo;
     stats?: {
         totalUsers: number;
         monthlyUsers: number;
@@ -811,7 +811,7 @@ export type StructuredActorCard = {
         count: number;
     };
     modifiedAt?: string;
-    isDeprecated: boolean;
+    isDeprecated?: boolean;
     inputFields?: ActorStoreInputSchema;
     inputFieldsTruncated?: boolean;
     inputFieldsTotalCount?: number;

@@ -235,7 +235,7 @@ export const actorInfoSchema = {
                 'Total number of input fields before truncation; present only when `inputFields` was truncated.',
         },
     },
-    required: ['url', 'id', 'fullName', 'developer', 'description', 'categories', 'isDeprecated'],
+    required: ['url', 'id', 'fullName'],
 };
 
 /** Schema for fetch-actor-mcp-tool-list output: the remote tool definitions as `tools/list` returned them. */
