@@ -120,6 +120,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
                 HELPER_TOOLS.ACTOR_TASK_CREATE,
                 HELPER_TOOLS.ACTOR_TASK_GET,
                 HELPER_TOOLS.ACTOR_TASK_UPDATE,
+                HELPER_TOOLS.ACTOR_TASK_CALL,
                 HELPER_TOOLS.ACTOR_TASK_PUBLISH,
                 HELPER_TOOLS.ACTOR_TASK_UNPUBLISH,
             ];
@@ -455,7 +456,7 @@ describe('apps-mode widget pairing in getToolsForServerMode', () => {
 
 describe('taskSupport contract across tool categories', () => {
     for (const mode of SERVER_MODES) {
-        it(`declares taskSupport only on call-actor in ${mode} mode, with an allowed value`, () => {
+        it(`declares taskSupport only on call-actor and call-actor-task in ${mode} mode, with an allowed value`, () => {
             const categories = getCategoryTools(mode);
             const toolsWithTaskSupport: { name: string; value: unknown }[] = [];
 
@@ -467,10 +468,13 @@ describe('taskSupport contract across tool categories', () => {
                 }
             }
 
-            // Only call-actor is expected to declare taskSupport among static internal tools.
+            // Only the run tools call-actor and call-actor-task declare taskSupport among static internal tools.
             // (Dynamically-created Actor tools from actor_tools_factory also declare it, but those
             // are not returned by getCategoryTools.)
-            expect(toolsWithTaskSupport.map((t) => t.name)).toEqual([HELPER_TOOLS.ACTOR_CALL]);
+            expect(toolsWithTaskSupport.map((t) => t.name)).toEqual([
+                HELPER_TOOLS.ACTOR_CALL,
+                HELPER_TOOLS.ACTOR_TASK_CALL,
+            ]);
 
             for (const { value } of toolsWithTaskSupport) {
                 expect(ALLOWED_TASK_TOOL_EXECUTION_MODES).toContain(value);

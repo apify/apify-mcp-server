@@ -172,6 +172,15 @@ describe('storage tool auto-injection', () => {
         for (const name of AUTO_INJECTED_TOOL_NAMES) expect(toolNames).toContain(name);
     });
 
+    it('auto-injects the run tools when call-actor-task is present (tasks-only session)', async () => {
+        const tools = await loadToolsFromInput({ tools: ['tasks'] }, apifyClient);
+        const toolNames = tools.map((t) => t.name);
+
+        expect(toolNames).toContain(HELPER_TOOLS.ACTOR_TASK_CALL);
+        expect(toolNames).not.toContain(HELPER_TOOLS.ACTOR_CALL);
+        for (const name of AUTO_INJECTED_TOOL_NAMES) expect(toolNames).toContain(name);
+    });
+
     it.each(['default', 'apps'] as const)(
         'auto-injects get-actor-run when only direct actor tools are present (%s mode)',
         (mode) => {
