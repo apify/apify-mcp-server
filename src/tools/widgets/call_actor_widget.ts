@@ -129,7 +129,7 @@ export const callActorWidget: ToolEntry = Object.freeze({
             const response = buildStartRunWidgetResponse({ actorName, actorRun });
             return {
                 ...response,
-                toolTelemetry: { actorId: resolvedActorId },
+                toolTelemetry: { actorId: resolvedActorId, isInputCoerced: resolution.isInputCoerced },
             };
         } catch (error) {
             return buildCallActorErrorResponse({

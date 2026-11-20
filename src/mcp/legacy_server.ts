@@ -564,6 +564,7 @@ export class LegacyMcpServer {
                             mcpSessionId,
                             actorName,
                             actorId,
+                            isInputCoerced: prepared.isInputCoerced,
                             taskStore: this.taskStore,
                             server: this.server,
                             tools: this.host.tools,

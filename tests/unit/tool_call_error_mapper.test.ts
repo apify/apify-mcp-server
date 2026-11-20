@@ -50,7 +50,7 @@ const CASES: Case[] = [
         kind: TOOL_CALL_ERROR_KIND.PAYMENT,
         toolStatus: TOOL_STATUS.SOFT_FAIL,
         callDiagnostics: {
-            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+            failure_category: FAILURE_CATEGORY.BILLING,
             failure_http_status: 402,
             actor_name: ACTOR_NAME,
             actor_id: ACTOR_ID,
@@ -63,7 +63,7 @@ const CASES: Case[] = [
         kind: TOOL_CALL_ERROR_KIND.PAYMENT,
         toolStatus: TOOL_STATUS.SOFT_FAIL,
         callDiagnostics: {
-            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+            failure_category: FAILURE_CATEGORY.BILLING,
             failure_http_status: 402,
             actor_name: ACTOR_NAME,
             actor_id: ACTOR_ID,
@@ -174,7 +174,7 @@ describe('buildToolCallErrorResult()', () => {
         expect(result.kind).toBe(TOOL_CALL_ERROR_KIND.EXECUTION);
         expect(result.toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
         expect(result.callDiagnostics).toMatchObject({
-            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+            failure_category: FAILURE_CATEGORY.BILLING,
             failure_http_status: 402,
         });
         expect('userText' in result && result.userText).toContain(ACTOR_RUN_LIMIT_MESSAGE);

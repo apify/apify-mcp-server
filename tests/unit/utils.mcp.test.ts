@@ -198,11 +198,11 @@ describe('respondServerError()', () => {
         });
     });
 
-    it('derives SOFT_FAIL + INVALID_INPUT for a run-limit error wrapped as 5xx', () => {
+    it('derives SOFT_FAIL + BILLING for a run-limit error wrapped as 5xx', () => {
         const error = Object.assign(new Error('Streamable HTTP error: cannot-start-actor-runs'), { statusCode: 500 });
         expect(respondServerError('x', { error }).toolTelemetry).toMatchObject({
             toolStatus: TOOL_STATUS.SOFT_FAIL,
-            failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+            failureCategory: FAILURE_CATEGORY.BILLING,
         });
     });
 

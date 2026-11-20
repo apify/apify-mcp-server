@@ -64,7 +64,7 @@ export function buildToolCallErrorResult(error: unknown, params: ToolCallErrorPa
             kind: TOOL_CALL_ERROR_KIND.PAYMENT,
             toolStatus: TOOL_STATUS.SOFT_FAIL,
             callDiagnostics: {
-                failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                failure_category: FAILURE_CATEGORY.BILLING,
                 failure_http_status: 402,
                 ...buildActorFields(actorName, actorId),
             },

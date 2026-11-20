@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from 'node:util';
+
 import type { Options, ValidateFunction } from 'ajv';
 import Ajv from 'ajv';
 
@@ -72,4 +74,24 @@ export function fixZodSchemaRequired(schema: Record<string, unknown>): Record<st
  */
 export function compileSchema(schema: Record<string, unknown>): ValidateFunction {
     return createAjv().compile(fixZodSchemaRequired(schema));
+}
+
+/**
+ * Reports whether Ajv's type coercion changed a value. `before` is a copy taken before validation and `after` is
+ * the same data after Ajv validated it in place: `"50"` became `50`, or `"cafe"` became `["cafe"]`. A field Ajv
+ * removed does not count. The platform validates Actor input without coercion, so a call with a coerced value
+ * passes here but fails there.
+ */
+export function hasCoercedValue(before: unknown, after: unknown): boolean {
+    if (Array.isArray(before) && Array.isArray(after)) {
+        return after.some((item, index) => hasCoercedValue(before[index], item));
+    }
+    if (isObject(before) && isObject(after)) {
+        return Object.keys(after).some((key) => Object.hasOwn(before, key) && hasCoercedValue(before[key], after[key]));
+    }
+    return !isDeepStrictEqual(before, after);
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

@@ -107,6 +107,7 @@ export async function executeToolAndUpdateTask(params: {
     mcpSessionId: string | undefined;
     actorName?: string;
     actorId?: string;
+    isInputCoerced?: boolean;
     taskStore: TaskStore;
     server: Server;
     tools: Map<string, ToolEntry>;
@@ -128,6 +129,7 @@ export async function executeToolAndUpdateTask(params: {
         mcpSessionId,
         actorName,
         actorId,
+        isInputCoerced,
         taskStore,
         server,
         tools,
@@ -281,6 +283,7 @@ export async function executeToolAndUpdateTask(params: {
             tools,
             actorName,
             actorId,
+            isInputCoerced,
             taskMode: true,
             logContext: { messageSuffix: ' for task', fields: { taskId } },
         });

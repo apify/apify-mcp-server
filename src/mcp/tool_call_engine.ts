@@ -40,6 +40,7 @@ import type {
     ToolTelemetryContext,
 } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
+import { hasCoercedValue } from '../utils/ajv.js';
 import { logHttpError, sanitizeMezmoValue } from '../utils/logging.js';
 import { respondOk } from '../utils/mcp.js';
 import { getRequestOriginForClient, resolveStoreSearchTracking } from '../utils/mcp_clients.js';
@@ -161,6 +162,8 @@ export type PreparedCall = {
     decodedArgs: Record<string, unknown>;
     /** Set when a pre-0.21 tool name or run input was accepted; added to the tool result. */
     compatibilityNote?: string;
+    /** Set for an Actor tool: whether Ajv's type coercion changed a value of the input. */
+    isInputCoerced?: boolean;
 };
 
 /** Result of the synchronous dispatch tail, including the exact wire payload. */
@@ -194,7 +197,7 @@ export function buildPreflightFailureOutcome(
     return {
         toolStatus: TOOL_STATUS.SOFT_FAIL,
         callDiagnostics: {
-            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+            failure_category: standbyRejection ? FAILURE_CATEGORY.INVALID_INPUT : FAILURE_CATEGORY.BILLING,
             ...(standbyRejection ? {} : { failure_http_status: 402 }),
             ...(toolTelemetry?.failureDetail && { failure_detail: toolTelemetry.failureDetail }),
             ...buildActorFields(actorName, actorId),
@@ -390,6 +393,10 @@ export async function prepareToolCall(params: {
         });
         if (runInputRewrite) toolArgs = runInputRewrite.args;
         const compatibilityNote = [replacedToolText.trim(), runInputRewrite?.note].filter(Boolean).join('\n');
+        // An Actor tool's input, copied before Ajv coerces it in place. `waitSecs` is this server's own argument,
+        // parsed again before the run, so it is left out.
+        const { waitSecs: _waitSecs, ...actorInputBeforeValidation } =
+            tool.type === TOOL_TYPE.ACTOR ? structuredClone(toolArgs) : {};
         if (!tool.ajvValidate(toolArgs)) {
             const errors = tool.ajvValidate.errors || [];
             const exampleCall =
@@ -462,6 +469,9 @@ export async function prepareToolCall(params: {
             paymentRequiredResult,
             decodedArgs,
             compatibilityNote: compatibilityNote || undefined,
+            ...(tool.type === TOOL_TYPE.ACTOR && {
+                isInputCoerced: hasCoercedValue(actorInputBeforeValidation, toolArgs),
+            }),
         };
     } catch (error) {
         // Keep protocol errors as JSON-RPC errors; classify other failures with actor context.
@@ -555,6 +565,7 @@ export async function executeSyncToolCall(
             tools,
             actorName,
             actorId,
+            isInputCoerced: prepared.isInputCoerced,
             taskMode: false,
         });
         return {

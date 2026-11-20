@@ -507,6 +507,11 @@ export type ToolCallTelemetryProperties = {
     validation_error_count?: number;
     /** Top-level argument key names of a call that failed validation, never values: the call shape a client sends. */
     validation_arg_keys?: string;
+    /**
+     * Set on Actor input that passed validation: true when Ajv's type coercion changed a value, such as `"50"` to `50`
+     * or `"cafe"` to `["cafe"]`. The platform does not coerce, so it would reject that input.
+     */
+    input_coerced?: boolean;
 };
 
 /**
@@ -553,6 +558,7 @@ export type ToolTelemetryContext = {
     actorTenancy?: ActorTenancy;
     actorId?: string;
     ajvErrorDetails?: AjvErrorDetails;
+    isInputCoerced?: boolean;
 };
 
 export type CallDiagnostics = Pick<
@@ -575,6 +581,7 @@ export type CallDiagnostics = Pick<
     | 'validation_additional_property'
     | 'validation_error_count'
     | 'validation_arg_keys'
+    | 'input_coerced'
 >;
 
 /**
