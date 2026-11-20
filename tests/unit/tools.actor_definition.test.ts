@@ -345,10 +345,12 @@ describe('the dataset schema an Actor declares for its default dataset', () => {
         expect(getDeclaredDatasetItemsSchema({ storages: { dataset: { views: {} } } })).toBeUndefined();
     });
 
-    it('is absent when a multi-dataset Actor declares no `default` alias', () => {
-        const storages = { datasets: { errors: { fields: PROFILE_FIELDS } } };
+    // The platform makes the first alias the default dataset of a definition without a `default` alias.
+    it('is read from the first alias of a multi-dataset Actor that declares no `default` alias', () => {
+        const errorFields = { type: 'object', properties: { errorMessage: { type: 'string' } } };
+        const storages = { datasets: { results: { fields: PROFILE_FIELDS }, errors: { fields: errorFields } } };
 
-        expect(getDeclaredDatasetItemsSchema({ storages })).toBeUndefined();
+        expect(getDeclaredDatasetItemsSchema({ storages })).toBe(PROFILE_FIELDS);
     });
 
     it('is absent when the declared properties are not an object', () => {
@@ -364,7 +366,7 @@ describe('the dataset schema an Actor declares for its default dataset', () => {
     });
 
     it('is absent when the definition has no storages', () => {
-        expect(getDeclaredDatasetItemsSchema({ input: DEFAULT_INPUT })).toBeUndefined();
+        expect(getDeclaredDatasetItemsSchema({})).toBeUndefined();
     });
 });
 

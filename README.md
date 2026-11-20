@@ -207,12 +207,12 @@ You can also expose a specific Actor as its own tool, for example `apify/instagr
 The server tells the agent what an Actor returns before the Actor runs. The output schema is the `fields` definition of the [dataset schema](https://docs.apify.com/platform/storage/dataset-schema) the Actor declares for its default dataset. The server does not derive a schema from the results of past runs, so an Actor that declares no `fields` has no output schema. This works the same on the hosted and the local server.
 
 - `fetch-actor-details` returns the declared schema as JSON Schema, with field descriptions and examples, when called with `output: { "outputSchema": true }`. It is left out by default.
-- Each Actor tool, such as `apify--instagram-scraper`, lists the declared field names and types in its `outputSchema`, under `storages.datasets.default.itemsSchema`. Descriptions and examples are left out to keep `tools/list` small.
-- The result of an Actor tool call does not repeat the schema. It returns the dataset ID and `fields`, the list of fields the run produced, for use with `get-dataset-items`.
+- An Actor tool that starts a run, such as `apify--instagram-scraper`, lists the declared field names and types in its `outputSchema`, under `storages.datasets.default.itemsSchema`. Descriptions and examples are left out to keep `tools/list` small.
+- The result of an Actor tool call does not repeat the schema. It returns the dataset ID and, when the platform reports them, `fields`, the list of fields the run produced, for use with `get-dataset-items`.
 
-`fetch-actor-details` returns a declared schema of up to 64 KB in full. For a larger one it returns the field names and types only, and says so. If those are over 64 KB as well, it returns no schema.
+`fetch-actor-details` returns a declared schema of up to 64 KB in full. For a larger one it returns the field names and types only, and says so. If those are over 64 KB as well, it returns no schema, and the Actor tool lists none in its `outputSchema`.
 
-For an Actor with [multiple datasets](https://docs.apify.com/platform/storage/dataset-schema/multiple-datasets), the output schema describes the `default` dataset only.
+For an Actor with [multiple datasets](https://docs.apify.com/platform/storage/dataset-schema/multiple-datasets), the output schema describes the default dataset only.
 
 ## 🛠️ Tools, resources, and prompts
 

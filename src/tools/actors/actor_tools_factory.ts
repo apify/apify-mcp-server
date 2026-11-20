@@ -180,9 +180,10 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
             // The compile cache returns one schema object per content, so sessions share one copy.
             inputSchema: compiled.schema,
             // Canonical RunResponse shape — same as call-actor and get-actor-run — plus the row shape the Actor declares.
-            outputSchema: definition.datasetItemProperties
-                ? buildEnrichedDirectActorOutputSchema(definition.datasetItemProperties)
-                : actorRunOutputSchema,
+            outputSchema:
+                isDirectTool && definition.datasetItemProperties
+                    ? buildEnrichedDirectActorOutputSchema(definition.datasetItemProperties)
+                    : actorRunOutputSchema,
             ajvValidate: compiled.validate,
             paymentRequired: true,
             memoryMbytes,

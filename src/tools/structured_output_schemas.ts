@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { TIP_MESSAGE_LIMIT } from '../const.js';
+import { HELPER_TOOLS, TIP_MESSAGE_LIMIT } from '../const.js';
 import { ACTOR_TENANCY } from '../types.js';
 
 /**
@@ -898,9 +898,8 @@ export function buildEnrichedDirectActorOutputSchema(itemProperties: Record<stri
         type: 'object' as const,
         description:
             'JSON Schema for rows in the dataset at `storages.datasets.default.id`: the field names and types ' +
-            'the Actor declares. Describes row shape only and is not part of the response; the rows themselves ' +
-            'are NOT returned inline either. To fetch actual rows, call `get-dataset-items` with the ' +
-            'dataset id and a `fields` projection drawn from this schema.',
+            'the Actor declares. It describes the row shape and is not part of the response, which does not ' +
+            `include the rows either. Its top-level field names work in the \`fields\` selection of \`${HELPER_TOOLS.DATASET_GET_ITEMS}\`.`,
         properties: itemProperties,
     };
     const clone = structuredClone(actorRunOutputSchema);
@@ -1342,7 +1341,7 @@ export const actorDetailsOutputSchema = {
         outputSchema: {
             type: 'object' as const,
             description:
-                'JSON Schema the Actor declares for items of its default dataset: field names and types only when the declaration is over the size limit, empty when the Actor declares none.',
+                'JSON Schema the Actor declares for items of its default dataset: field names and types only when the declaration is over the size limit, empty when the Actor declares none or the names and types are over the limit too.',
         },
         serverInterface: serverInterfaceDetailsSchema,
         nextStep: nextStepProperty,

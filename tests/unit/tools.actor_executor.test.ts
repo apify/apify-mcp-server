@@ -6,11 +6,14 @@ import { describe, expect, it, vi } from 'vitest';
 import log from '@apify/log';
 
 import { ACTOR_TIP_CAVEAT } from '../../src/tools/actor_tool_naming.js';
+import { getActorDefinition } from '../../src/tools/actors/actor_definition.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import type { RunResponse } from '../../src/tools/actors/actor_run_response.js';
 import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
+import { getNormalActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import { buildEnrichedDirectActorOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { ActorExecutionParams } from '../../src/types.js';
+import { mockActor, mockActorBuildClient, mockDefaultBuild } from './helpers/actor_build_client.js';
 import { expectSchemaConformingStructuredContent, mockApifyClient, textOf } from './helpers/tool_context.js';
 
 /**
@@ -249,12 +252,25 @@ describe('actorExecutor', () => {
     describe('a tool that advertises the dataset fields its Actor declares', () => {
         // `type` is declared as a number: an `itemsSchema` copy in the result would carry `type: 'object'` and fail.
         it('returns a result without itemsSchema that fits the advertised output schema', async () => {
-            const outputSchema = buildEnrichedDirectActorOutputSchema({ type: { type: 'number' } });
+            const fields = { type: 'object', properties: { type: { type: 'number', description: 'Item type' } } };
+            const { apifyClient } = mockActorBuildClient({
+                actor: mockActor(),
+                defaultBuild: mockDefaultBuild({ storages: { dataset: { fields } } } as Parameters<
+                    typeof mockDefaultBuild
+                >[0]),
+            });
+            const actorDefinition = await getActorDefinition(ACTOR_FULL_NAME, apifyClient);
+            if (!actorDefinition) throw new Error('No definition for the mocked Actor');
+            const [tool] = await getNormalActorsAsTools([
+                { webServerMcpPath: null, definition: actorDefinition.definition, actor: actorDefinition.info },
+            ]);
             const { params } = buildParams({ query: 'foo' });
 
             const result = await actorExecutor.executeActorTool(params);
 
-            expectSchemaConformingStructuredContent(result, outputSchema);
+            // The tool advertises the declared field reduced to its name and type.
+            expect(tool.outputSchema).toEqual(buildEnrichedDirectActorOutputSchema({ type: { type: 'number' } }));
+            expectSchemaConformingStructuredContent(result, tool.outputSchema as object);
             const { structuredContent } = result as unknown as { structuredContent: RunResponse };
             expect(structuredContent.storages.datasets?.default).not.toHaveProperty('itemsSchema');
         });

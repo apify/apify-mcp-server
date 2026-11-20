@@ -55,7 +55,7 @@ export const actorDetailsOutputOptionsSchema = z.object({
         .boolean()
         .optional()
         .describe(
-            `Include the JSON Schema the Actor declares for items of its default dataset. Over ${MAX_DATASET_ITEMS_SCHEMA_BYTES} bytes it is reduced to field names and types.`,
+            `Include the JSON Schema the Actor declares for items of its default dataset. Over ${MAX_DATASET_ITEMS_SCHEMA_BYTES} bytes it is reduced to field names and types, and left out when those are over the limit too.`,
         ),
     serverInterface: z.union([z.boolean(), z.string()]).optional().describe(dedent`
             Server Actor HTTP API. true: every operation with its parameters and request body schema when they fit; otherwise an index with one entry per operation.

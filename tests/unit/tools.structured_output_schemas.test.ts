@@ -200,6 +200,16 @@ describe('Structured Output Schemas', () => {
             expect(pickItemsSchema((tools[0] as ActorTool).outputSchema)?.properties).toEqual(itemProperties);
         });
 
+        // call-actor builds the tool only to validate input; its output is the canonical RunResponse.
+        it('keeps the canonical RunResponse schema on a tool built for call-actor', async () => {
+            const tools = await getNormalActorsAsTools(
+                [createMockActorInfo('apify/test-actor', { url: { type: 'string' } })],
+                { isDirectTool: false },
+            );
+
+            expect((tools[0] as ActorTool).outputSchema).toBe(actorRunOutputSchema);
+        });
+
         it('emits no widget meta on actor tools', async () => {
             const tools = await getNormalActorsAsTools([createMockActorInfo('apify/test-actor')]);
 

@@ -413,8 +413,10 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        name: 'should return the dataset schema the Actor declares for fetch-actor-details with output={ outputSchema: true }',
+        name: 'returns the dataset schema the Actor declares for fetch-actor-details with output={ outputSchema: true }',
         isDeploymentTest: true,
+        // A local platform does not provision `apify/website-content-crawler`.
+        skipIf: skipOnLocalPlatform,
         run: withClient({ tools: ['actors'] }, async (client) => {
             const result = await client.callTool({
                 name: 'fetch-actor-details',
@@ -425,15 +427,15 @@ export const actorsCases: Case[] = [
             const { outputSchema } = result.structuredContent as {
                 outputSchema: { properties: Record<string, { type?: unknown; description?: string }> };
             };
-            // The declaration in full: the field keeps the description its creator wrote.
+            // The declaration in full: the field keeps the description its creator wrote, in both channels.
             expect(outputSchema.properties.url.description).toEqual(expect.any(String));
-            expect((result.content as { text: string }[]).map((item) => item.text).join('\n')).toContain(
-                '# Output schema',
-            );
+            const text = (result.content as { text: string }[]).map((item) => item.text).join('\n');
+            expect(text).toContain('# Output schema');
+            expect(text).toContain(JSON.stringify(outputSchema.properties.url.description));
         }),
     },
     {
-        name: 'should advertise the declared dataset fields of a direct Actor tool as names and types only',
+        name: 'advertises the declared dataset fields of a direct Actor tool as names and types only',
         isDeploymentTest: false,
         run: withClient({ tools: [ACTOR_WITH_DATASET_SCHEMA] }, async (client) => {
             const { tools } = await client.listTools();

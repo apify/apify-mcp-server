@@ -26,9 +26,9 @@ const JSON_SCHEMA_TYPES = new Set(['string', 'number', 'integer', 'boolean', 'ob
 export const MAX_DATASET_FIELD_DEPTH = 8;
 /**
  * Serialized size above which a declared dataset schema is not served. `fetch-actor-details` then falls back from
- * the full schema to `reduceToFieldNamesAndTypes`, which itself returns nothing above the limit. The largest
- * schema seen on the Store, `compass/crawler-google-places`, has 38 KB in full and 4 KB reduced; an Actor can
- * declare one of any size.
+ * the full schema to `reduceToFieldNamesAndTypes`, which itself returns nothing above the limit. Of the Store
+ * Actors measured, the largest schema, `compass/crawler-google-places`, has 38 KB in full and 4 KB reduced; an
+ * Actor can declare one of any size.
  */
 export const MAX_DATASET_ITEMS_SCHEMA_BYTES = 65_536;
 
@@ -38,12 +38,15 @@ export const MAX_DATASET_ITEMS_SCHEMA_BYTES = 65_536;
  *
  * An Actor with several datasets declares them under `storages.datasets.<alias>`, any other under
  * `storages.dataset`. The platform reads `storages.datasets` first and treats `storages.dataset` as the `default`
- * alias, so `storages.dataset` is not read when `storages.datasets` exists.
+ * alias, so `storages.dataset` is not read when `storages.datasets` exists. A definition from the brief period when
+ * `storages.datasets` did not require a `default` alias gets its first alias as the default dataset, as on the
+ * platform.
  */
-export function getDeclaredDatasetItemsSchema(actorDefinition: unknown): DatasetItemsSchema | undefined {
-    const storages = isRecord(actorDefinition) ? actorDefinition.storages : undefined;
+export function getDeclaredDatasetItemsSchema(actorDefinition: { storages?: unknown }): DatasetItemsSchema | undefined {
+    const { storages } = actorDefinition;
     if (!isRecord(storages)) return undefined;
-    const dataset = isRecord(storages.datasets) ? storages.datasets.default : storages.dataset;
+    const datasets = isRecord(storages.datasets) ? storages.datasets : { default: storages.dataset };
+    const dataset = 'default' in datasets ? datasets.default : Object.values(datasets)[0];
     const fields = isRecord(dataset) ? dataset.fields : undefined;
     if (!isRecord(fields) || !isRecord(fields.properties) || Object.keys(fields.properties).length === 0) {
         return undefined;
