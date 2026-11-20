@@ -81,10 +81,11 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             const storeInfo = await fetchStorageByIdOrName(keyValueStoreId, async (safeId) =>
                 client.keyValueStore(safeId).get(),
             );
-            const text = storeInfo
-                ? `Record '${recordKey}' not found in key-value store '${keyValueStoreId}'.`
-                : storageNotFoundText('keyValueStore', keyValueStoreId);
-            return respondUserError(text);
+            if (!storeInfo) return respondUserError(storageNotFoundText('keyValueStore', keyValueStoreId));
+            return buildStorageResponse({
+                structuredContent: { keyValueStoreId, key: recordKey, found: false },
+                summary: `No record '${recordKey}' in key-value store '${keyValueStoreId}'. Keys are case-sensitive.`,
+            });
         }
         const { result: record, safeId } = found;
         if (!record.isOverLimit && record.isUnparsable) {
@@ -112,6 +113,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                 structuredContent: {
                     keyValueStoreId,
                     key: recordKey,
+                    found: true,
                     value: `<${mimeType ?? 'application/octet-stream'}, over ${MAX_INLINE_BYTES} bytes>`,
                     ...(contentType && { contentType }),
                     summary,
@@ -146,6 +148,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             const structuredContent = {
                 keyValueStoreId,
                 key: recordKey,
+                found: true,
                 value: `<binary ${mimeType ?? 'application/octet-stream'}, ${value.length} bytes>`,
                 ...(contentType && { contentType }),
                 summary,
@@ -179,12 +182,13 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
             });
         }
         // Text/JSON values serialize cleanly — return them as structuredContent per the storage-tool contract.
-        // apify-client maps an empty record body to `undefined`, which drops the schema-required `value` on
-        // serialization; emit empty text instead (an empty OUTPUT is legitimate).
+        // apify-client maps an empty record body to `undefined`, which drops `value` on serialization;
+        // emit empty text instead (an empty OUTPUT is legitimate; only a missing record omits `value`).
         return buildStorageResponse({
             structuredContent: {
                 keyValueStoreId,
                 key: recordKey,
+                found: true,
                 value: value === undefined ? '' : value,
                 ...(contentType && { contentType }),
             },
