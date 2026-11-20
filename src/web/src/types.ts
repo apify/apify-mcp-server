@@ -12,6 +12,7 @@ export type StructuredPricingInfo = {
     model: string;
     userTier?: string;
     pricePerUnit?: number;
+    paidPlanPricePerUnit?: number;
     unitName?: string;
     trialMinutes?: number;
     tieredPricing?: {
@@ -22,10 +23,13 @@ export type StructuredPricingInfo = {
         title: string;
         description?: string;
         priceUsd?: number;
+        paidPlanPriceUsd?: number;
         tieredPricing?: {
             tier: string;
             priceUsd: number;
         }[];
+        isPrimaryEvent?: boolean;
+        isOneTimeEvent?: boolean;
     }[];
     pricingNote?: string;
     eventDescriptionsOmitted?: boolean;
