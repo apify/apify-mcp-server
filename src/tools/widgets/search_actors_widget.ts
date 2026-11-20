@@ -9,6 +9,7 @@ import { formatActorForWidget } from '../../utils/actor_card.js';
 import { searchAgentSafeActors } from '../../utils/actor_search.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk } from '../../utils/mcp.js';
+import { IS_UNSTABLE_STORE_SEARCH_ENABLED } from '../../utils/store_unstable.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunAnyActor, getActorCallabilityCaveat } from '../actor_tool_naming.js';
 import {
@@ -16,6 +17,7 @@ import {
     buildNoActorsFoundInstructions,
     buildSearchActorsResult,
     searchActorsBaseArgsSchema,
+    searchActorsPublishedArgsSchema,
 } from '../actors/search_actors.js';
 import { actorSearchWidgetOutputSchema } from '../structured_output_schemas.js';
 
@@ -41,7 +43,7 @@ function buildDescription({ hasTool, clientParam }: ToolDescriptionContext): str
         (e.g., "find me scrapers for Instagram", "show me Amazon Actors", "what tools exist for Twitter").
         The response renders as an interactive widget the user can view directly.
         ${hasTool(HELPER_TOOLS.STORE_SEARCH) ? `\n${silentSearchHint}\n` : ''}
-        Input: keywords (plus optional limit/offset). Output fields are fixed by the widget contract.
+        Input: keywords${IS_UNSTABLE_STORE_SEARCH_ENABLED ? '' : ' (plus optional limit/offset)'}. Output fields are fixed by the widget contract.
     ` + runLimitation
     );
 }
@@ -52,9 +54,9 @@ export const searchActorsWidget: ToolEntry = Object.freeze({
     title: 'Search Actors (widget)',
     description: buildDescription(ALL_TOOLS_PRESENT),
     buildDescription,
-    inputSchema: z.toJSONSchema(searchActorsWidgetArgsSchema) as ToolInputSchema,
+    inputSchema: z.toJSONSchema(searchActorsPublishedArgsSchema.strict()) as ToolInputSchema,
     outputSchema: actorSearchWidgetOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(searchActorsWidgetArgsSchema)),
+    ajvValidate: compileSchema(z.toJSONSchema(searchActorsPublishedArgsSchema.strict())),
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS)?.meta,
     },

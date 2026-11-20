@@ -1,4 +1,11 @@
-import { APIFY_STORE_URL, MAX_INPUT_FIELDS_IN_ACTOR_CARD, OFFICIAL_APIFY_USERNAMES } from '../const.js';
+import { truncate } from '@apify/utilities';
+
+import {
+    APIFY_STORE_URL,
+    MAX_EXTRA_FIELD_VALUE_LENGTH,
+    MAX_INPUT_FIELDS_IN_ACTOR_CARD,
+    OFFICIAL_APIFY_USERNAMES,
+} from '../const.js';
 import type { Actor, ActorCardOptions, ActorStoreInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
 import { buildConsoleActorUrl } from './console_link.js';
 import {
@@ -135,7 +142,7 @@ function extractActorData(actor: Actor | ActorStoreList, options: ActorCardOptio
     if (options.includeStats && 'stats' in actor) {
         const { stats } = actor;
 
-        if ('totalUsers' in stats && 'totalUsers30Days' in stats) {
+        if (stats.totalUsers !== undefined && stats.totalUsers30Days !== undefined) {
             data.stats = {
                 totalUsers: stats.totalUsers,
                 monthlyUsers: stats.totalUsers30Days,
@@ -176,6 +183,24 @@ function extractActorData(actor: Actor | ActorStoreList, options: ActorCardOptio
     return data;
 }
 
+const getExtraFields = (actor: Actor | ActorStoreList) => ('extraFields' in actor ? actor.extraFields : undefined);
+
+// `agentHint` → `Agent hint`
+const formatFieldLabel = (key: string) => {
+    const words = key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
+    return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+const stringifyFieldValue = (value: unknown) => {
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value) && value.every((entry) => typeof entry !== 'object')) return value.join(', ');
+    return typeof value === 'object' ? JSON.stringify(value) : String(value);
+};
+
+// One capped line: a newline in Store text would let it open its own markdown section in the card.
+const formatFieldValue = (value: unknown) =>
+    truncate(stringifyFieldValue(value).replace(/\s+/g, ' ').trim(), MAX_EXTRA_FIELD_VALUE_LENGTH, '…');
+
 /**
  * Formats Actor details into a markdown Actor card.
  * Used in both default (text-only) and OpenAI (widget) modes as the LLM-facing text content.
@@ -186,13 +211,15 @@ export function formatActorToActorCard(
 ): string {
     const data = extractActorData(actor, options);
     const userTier = options.userTier ?? 'FREE';
+    // A known field in a shape the card does not know comes as an extra field; it replaces the card's fallback line.
+    const extraFields = getExtraFields(actor) ?? {};
 
     const markdownLines = [
         `## [${data.title}](${data.actorUrl}) (\`${data.actorFullName}\`)`,
         `- **URL:** ${data.actorUrl}`,
     ];
 
-    if (options.includeDescription) {
+    if (options.includeDescription && !('description' in extraFields)) {
         markdownLines.push(`- **Description:** ${data.description}`);
     }
 
@@ -219,15 +246,20 @@ export function formatActorToActorCard(
         markdownLines.push(
             `- **Developed by:** [${data.developer.username}](${data.developer.url}) ${data.developer.isOfficialApify ? '(Apify)' : '(community)'}`,
         );
-        markdownLines.push(
-            `- **Categories:** ${data.categories.length ? data.categories.join(', ') : 'Uncategorized'}`,
-        );
+        if (!('categories' in extraFields)) {
+            markdownLines.push(
+                `- **Categories:** ${data.categories.length ? data.categories.join(', ') : 'Uncategorized'}`,
+            );
+        }
         if (data.modifiedAt) {
             markdownLines.push(`- **Last modified:** ${data.modifiedAt}`);
         }
         if (data.isDeprecated) {
             markdownLines.push('\n>This Actor is deprecated and may not be maintained anymore.');
         }
+    }
+    for (const [key, value] of Object.entries(extraFields)) {
+        markdownLines.push(`- **${formatFieldLabel(key)}:** ${formatFieldValue(value)}`);
     }
     const inputSchema = getInputSchema(actor);
     if (inputSchema) {
@@ -254,6 +286,7 @@ export function formatActorToStructuredCard(
     const inputSchema = getInputSchema(actor);
     const inputFieldsTotalCount = inputSchema ? Object.keys(inputSchema.properties).length : 0;
     const isInputFieldsTruncated = inputFieldsTotalCount > MAX_INPUT_FIELDS_IN_ACTOR_CARD;
+    const extraFields = getExtraFields(actor);
 
     return {
         title: data.title,
@@ -262,7 +295,8 @@ export function formatActorToStructuredCard(
         fullName: data.actorFullName,
         pictureUrl: data.pictureUrl,
         developer: data.developer,
-        description: data.description,
+        // The fallback text would contradict a description that came in a shape the card does not know.
+        description: extraFields && 'description' in extraFields ? '' : data.description,
         categories: data.categories,
         pricing,
         stats: data.stats,
@@ -274,6 +308,7 @@ export function formatActorToStructuredCard(
             inputFieldsTruncated: true,
             inputFieldsTotalCount,
         }),
+        ...(extraFields && { extraFields }),
     };
 }
 
