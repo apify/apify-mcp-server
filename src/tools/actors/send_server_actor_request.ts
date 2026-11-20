@@ -258,11 +258,13 @@ async function sendRequest({
  * literals holding it are rewritten, so numbers and formatting stay as sent. A body cut at the limit no longer
  * parses whole, so its literals are checked one by one, the unterminated last one included.
  *
- * Masking keeps an echoed token out of the model's context. It is not what keeps the token from the Actor: the
- * Apify platform removes the token from the request before the Actor's server sees it, so a server can echo it only
- * when the caller put it in the request path, query or body. A plain echo is always masked. A server that encodes
- * the token on purpose (another encoding, or a string that is not valid JSON, see `maskJsonStringLiterals`) is not
- * covered: it already holds the token, and returning it to the caller gains it nothing.
+ * Masking covers a response that contains the token, for example a debug endpoint that returns the request it
+ * received. It keeps the token out of the model's context. It is not what keeps the token from the Actor: the
+ * Apify platform removes the token from the request before the Actor's server sees it, so a response can contain
+ * it only when the caller put it in the request path, query or body. A token returned as sent is always masked.
+ * A server that encodes the token on purpose (another encoding, or a string that is not valid JSON, see
+ * `maskJsonStringLiterals`) is not covered: it already holds the token, and returning it to the caller gains it
+ * nothing.
  */
 function decodeBody(body: Buffer, charset: string, token: string, isTruncated: boolean): string | undefined {
     let text: string;
