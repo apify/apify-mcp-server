@@ -9,7 +9,7 @@ import {
     getActorDefinition,
     getDeclaredDatasetItemsSchema,
     MAX_DATASET_FIELD_DEPTH,
-    MAX_DATASET_ITEM_PROPERTIES_BYTES,
+    MAX_DATASET_ITEMS_SCHEMA_BYTES,
     reduceToFieldNamesAndTypes,
 } from '../../src/tools/actors/actor_definition.js';
 import {
@@ -457,7 +457,7 @@ describe('reducing declared dataset fields to names and types', () => {
     });
 
     it('returns nothing when the reduced fields exceed the size limit', () => {
-        const fieldCount = MAX_DATASET_ITEM_PROPERTIES_BYTES / 10;
+        const fieldCount = MAX_DATASET_ITEMS_SCHEMA_BYTES / 10;
         const properties = Object.fromEntries(
             Array.from({ length: fieldCount }, (_, index) => [`field${index}`, { type: 'string' }]),
         );

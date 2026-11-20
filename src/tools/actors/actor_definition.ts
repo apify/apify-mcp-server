@@ -24,8 +24,13 @@ const BUILD_NUMBER_PATTERN = /^\d+\.\d+\.\d+$/;
 const JSON_SCHEMA_TYPES = new Set(['string', 'number', 'integer', 'boolean', 'object', 'array', 'null']);
 /** Nesting of declared dataset fields kept by `reduceToFieldNamesAndTypes`; a deeper field keeps no shape. */
 export const MAX_DATASET_FIELD_DEPTH = 8;
-/** Serialized size above which `reduceToFieldNamesAndTypes` returns nothing; `compass/crawler-google-places` has 4 KB. */
-export const MAX_DATASET_ITEM_PROPERTIES_BYTES = 65_536;
+/**
+ * Serialized size above which a declared dataset schema is not served. `fetch-actor-details` then falls back from
+ * the full schema to `reduceToFieldNamesAndTypes`, which itself returns nothing above the limit. The largest
+ * schema seen on the Store, `compass/crawler-google-places`, has 38 KB in full and 4 KB reduced; an Actor can
+ * declare one of any size.
+ */
+export const MAX_DATASET_ITEMS_SCHEMA_BYTES = 65_536;
 
 /**
  * Returns the JSON Schema an Actor declares for the items of its default dataset: the `fields` of its dataset
@@ -56,14 +61,14 @@ export function getDeclaredDatasetItemsSchema(actorDefinition: unknown): Dataset
  * the tool's `outputSchema` rejects the tool on a keyword or type its validator does not know. A field typed only
  * through `$ref`, `anyOf` or `oneOf` therefore keeps its name and no type. OpenAPI's `nullable: true` is kept as
  * the `null` type. Nesting stops at `MAX_DATASET_FIELD_DEPTH`, and a result over
- * `MAX_DATASET_ITEM_PROPERTIES_BYTES` is not returned. The full schema is served by `fetch-actor-details`.
+ * `MAX_DATASET_ITEMS_SCHEMA_BYTES` is not returned. The full schema is served by `fetch-actor-details`.
  */
 export function reduceToFieldNamesAndTypes(
     properties: Record<string, unknown> | undefined,
 ): Record<string, unknown> | undefined {
     if (!properties) return undefined;
     const reduced = reduceProperties(properties, 1);
-    return Buffer.byteLength(JSON.stringify(reduced)) > MAX_DATASET_ITEM_PROPERTIES_BYTES ? undefined : reduced;
+    return Buffer.byteLength(JSON.stringify(reduced)) > MAX_DATASET_ITEMS_SCHEMA_BYTES ? undefined : reduced;
 }
 
 function reduceProperties(properties: Record<string, unknown>, depth: number): Record<string, unknown> {

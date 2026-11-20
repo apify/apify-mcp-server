@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { HELPER_TOOLS, MAX_INLINE_BYTES, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
 import type {
     ConsoleLinkContext,
+    DatasetItemsSchema,
     HelperTool,
     InternalToolArgs,
     ToolDescriptionContext,
@@ -24,6 +25,7 @@ import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunActor, getOwnServerRemedy, hasMcpInterface } from '../actor_tool_naming.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
+import { MAX_DATASET_ITEMS_SCHEMA_BYTES, reduceToFieldNamesAndTypes } from './actor_definition.js';
 import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInput } from './actor_tools_factory.js';
 import type { ServerInterfaceSection } from './server_interface_details.js';
 import { buildServerInterfaceDetails } from './server_interface_details.js';
@@ -52,7 +54,9 @@ export const actorDetailsOutputOptionsSchema = z.object({
     outputSchema: z
         .boolean()
         .optional()
-        .describe('Include the JSON Schema the Actor declares for items of its default dataset.'),
+        .describe(
+            `Include the JSON Schema the Actor declares for items of its default dataset. Over ${MAX_DATASET_ITEMS_SCHEMA_BYTES} bytes it is reduced to field names and types.`,
+        ),
     serverInterface: z.union([z.boolean(), z.string()]).optional().describe(dedent`
             Server Actor HTTP API. true: every operation with its parameters and request body schema when they fit; otherwise an index with one entry per operation.
             "METHOD /path" (e.g. "GET /search"): that one operation in full.
@@ -201,6 +205,34 @@ function buildMcpServerNextStep(
     return `This Actor is an MCP server. Its MCP tools cannot be listed or called in this configuration. ${remedy}`;
 }
 
+/**
+ * The dataset schema an Actor declares, as `fetch-actor-details` returns it: in full up to
+ * `MAX_DATASET_ITEMS_SCHEMA_BYTES`, above that reduced to field names and types, and not at all when the reduced
+ * one is over the limit too. The schema is written by the Actor's creator and is returned twice, in the text and
+ * in `structuredContent`, so without the limit one Actor can fill the caller's context.
+ */
+function resolveOutputSchema(declared: DatasetItemsSchema | undefined): {
+    schema?: Record<string, unknown>;
+    text: string;
+} {
+    if (!declared) return { text: 'The Actor declares no schema for items of its default dataset.' };
+    const declaredBytes = Buffer.byteLength(JSON.stringify(declared));
+    if (declaredBytes <= MAX_DATASET_ITEMS_SCHEMA_BYTES) {
+        return {
+            schema: declared,
+            text: `JSON Schema the Actor declares for items of its default dataset:\n${wrapJsonText(declared)}`,
+        };
+    }
+    const tooLarge = `The JSON Schema the Actor declares for items of its default dataset has ${declaredBytes} bytes, over the ${MAX_DATASET_ITEMS_SCHEMA_BYTES}-byte limit.`;
+    const properties = reduceToFieldNamesAndTypes(declared.properties);
+    if (!properties) return { text: `${tooLarge} It was not returned.` };
+    const schema = { type: 'object', properties };
+    return {
+        schema,
+        text: `${tooLarge} Field names and types only, without descriptions and examples:\n${wrapJsonText(schema)}`,
+    };
+}
+
 /** Build text and structured response for actor details. */
 export function buildActorDetailsTextResponse(options: {
     details: ActorDetailsResult;
@@ -237,13 +269,8 @@ export function buildActorDetailsTextResponse(options: {
         texts.push(`# [Input schema](${inputSchemaUrl})\n${wrapJsonText(details.inputSchema)}`);
     }
 
-    if (output.outputSchema) {
-        texts.push(
-            details.outputSchema
-                ? `# Output schema\nJSON Schema the Actor declares for items of its default dataset:\n${wrapJsonText(details.outputSchema)}`
-                : '# Output schema\nThe Actor declares no schema for items of its default dataset.',
-        );
-    }
+    const outputSchema = output.outputSchema ? resolveOutputSchema(details.outputSchema) : undefined;
+    if (outputSchema) texts.push(`# Output schema\n${outputSchema.text}`);
 
     if (serverInterface?.text) texts.push(serverInterface.text);
 
@@ -257,7 +284,7 @@ export function buildActorDetailsTextResponse(options: {
         actorInfo: needsCard ? details.actorCardStructured : undefined,
         readme: resolvedReadme?.content,
         inputSchema: output.inputSchema ? details.inputSchema : undefined,
-        outputSchema: output.outputSchema ? (details.outputSchema ?? {}) : undefined,
+        outputSchema: outputSchema && (outputSchema.schema ?? {}),
         serverInterface: serverInterface?.serverInterface,
         ...(nextStep && { nextStep }),
     };

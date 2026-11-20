@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { MAX_DATASET_ITEMS_SCHEMA_BYTES } from '../../src/tools/actors/actor_definition.js';
 import { buildFetchActorDetailsResult, fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
 import { mockActor, mockActorBuildClient, mockDefaultBuild } from './helpers/actor_build_client.js';
 import {
@@ -60,6 +61,44 @@ describe('fetch-actor-details output schema', () => {
 
         expect(text).toContain('declares no schema');
         expect(structuredContent.outputSchema).toEqual({});
+    });
+
+    // A creator can declare a schema of any size, and it is returned in the text and in structuredContent.
+    it('returns field names and types only when the declared schema is over the size limit', async () => {
+        const longDescription = 'x'.repeat(MAX_DATASET_ITEMS_SCHEMA_BYTES);
+        const fields = { type: 'object', properties: { username: { type: 'string', description: longDescription } } };
+
+        const { result, text, structuredContent } = await callFetchActorDetails(
+            { outputSchema: true },
+            { dataset: { fields } },
+        );
+
+        expect(structuredContent.outputSchema).toEqual({
+            type: 'object',
+            properties: { username: { type: 'string' } },
+        });
+        expect(text).toContain(`over the ${MAX_DATASET_ITEMS_SCHEMA_BYTES}-byte limit`);
+        expect(text).toContain('{"type":"object","properties":{"username":{"type":"string"}}}');
+        expect(text).not.toContain(longDescription);
+        expectSchemaConformingStructuredContent(result, fetchActorDetails.outputSchema as object);
+    });
+
+    it('returns no schema when the field names and types alone are over the size limit', async () => {
+        const properties = Object.fromEntries(
+            Array.from({ length: MAX_DATASET_ITEMS_SCHEMA_BYTES / 10 }, (_, index) => [
+                `field${index}`,
+                { type: 'string' },
+            ]),
+        );
+
+        const { text, structuredContent } = await callFetchActorDetails(
+            { outputSchema: true },
+            { dataset: { fields: { type: 'object', properties } } },
+        );
+
+        expect(structuredContent.outputSchema).toEqual({});
+        expect(text).toContain('It was not returned.');
+        expect(text).not.toContain('field0');
     });
 
     it('leaves the output schema out unless it is requested', async () => {

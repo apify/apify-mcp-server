@@ -1342,7 +1342,7 @@ export const actorDetailsOutputSchema = {
         outputSchema: {
             type: 'object' as const,
             description:
-                'JSON Schema the Actor declares for items of its default dataset; empty when it declares none.',
+                'JSON Schema the Actor declares for items of its default dataset: field names and types only when the declaration is over the size limit, empty when the Actor declares none.',
         },
         serverInterface: serverInterfaceDetailsSchema,
         nextStep: nextStepProperty,

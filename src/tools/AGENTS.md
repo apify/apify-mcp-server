@@ -40,7 +40,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     list fills comma-joined, `explode: false`, per operation, looked up by the path as sent; absent when none
     need joining; a list fills any other as a repeated parameter, and an empty list nothing; an Actor's output
     schema is the `fields` it declares for its default dataset, `getDeclaredDatasetItemsSchema`, never inferred
-    from runs: `fetch-actor-details` returns it in full on `outputSchema: true`, and a direct Actor tool advertises
+    from runs: `fetch-actor-details` returns it on `outputSchema: true`, in full up to
+    `MAX_DATASET_ITEMS_SCHEMA_BYTES` and reduced to field names and types above that, and a direct Actor tool advertises
     its field names and types, `reduceToFieldNamesAndTypes`, as `itemsSchema` in its `outputSchema`, which a run
     result does not repeat),
     `server_interface_schema.ts` (the operations a Server Actor's `webServerSchema` documents, in the
