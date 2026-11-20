@@ -202,6 +202,18 @@ You can also expose a specific Actor as its own tool, for example `apify/instagr
 
 **Actors that run their own MCP server.** Some Actors are MCP servers themselves. `fetch-actor-mcp-tool-list` lists their tools, and `call-actor-mcp-tool` calls one. When such an Actor is loaded as a tool source and has no API schema, its tools are exposed under names in the form `username--actor-name--tool-name`; an Actor with an API schema, such as `apify/web-search`, gets its server tool instead, and `call-actor-mcp-tool` reaches its MCP tools. Apify Store also lists MCP-related Actors from independent creators; those are separate products with their own READMEs and pricing.
 
+### Actor output schemas
+
+The server tells the agent what an Actor returns before the Actor runs. The output schema is the `fields` definition of the [dataset schema](https://docs.apify.com/platform/storage/dataset-schema) the Actor declares for its default dataset. The server does not derive a schema from the results of past runs, so an Actor that declares no `fields` has no output schema. This works the same on the hosted and the local server.
+
+- `fetch-actor-details` returns the declared schema as JSON Schema, with field descriptions and examples, when called with `output: { "outputSchema": true }`. It is left out by default.
+- Each Actor tool, such as `apify--instagram-scraper`, lists the declared field names and types in its `outputSchema`, under `storages.datasets.default.itemsSchema`. Descriptions and examples are left out to keep `tools/list` small.
+- The result of an Actor tool call does not repeat the schema. It returns the dataset ID and `fields`, the list of fields the run produced, for use with `get-dataset-items`.
+
+`fetch-actor-details` returns a declared schema of up to 64 KB in full. For a larger one it returns the field names and types only, and says so. If those are over 64 KB as well, it returns no schema.
+
+For an Actor with [multiple datasets](https://docs.apify.com/platform/storage/dataset-schema/multiple-datasets), the output schema describes the `default` dataset only.
+
 ## 🛠️ Tools, resources, and prompts
 
 Any [Actor](https://apify.com/store) can be a tool, and agents discover new ones as they work. By default, the server loads the `actors` and `docs` categories, two Actor tools ([Web Search](https://apify.com/apify/web-search) and [Web Fetch](https://apify.com/apify/web-fetch)), and `report-problem`. Everything else is opt-in by category or by tool name.
@@ -228,7 +240,7 @@ Legend for the **Enabled by default** column:
 | Tool name | Category | Description | Enabled by default |
 | :--- | :--- | :--- | :---: |
 | `search-actors` | actors | Search for Actors in Apify Store. | ✅ |
-| `fetch-actor-details` | actors | Get an Actor's input schema, README (summary when available, full otherwise), pricing, and a Server Actor's HTTP operations. The output schema is opt-in: the dataset schema the Actor declares (field names and types only above 64 KB), none when it declares no fields. | ✅ |
+| `fetch-actor-details` | actors | Get an Actor's input schema, README (summary when available, full otherwise), pricing, and a Server Actor's HTTP operations. The [output schema](#actor-output-schemas) is opt-in. | ✅ |
 | `call-actor` | actors | Run an Actor and return its run status and storage IDs. Use `fetch-actor-details` first to get the input schema. | ✅ |
 | `fetch-actor-mcp-tool-list` | actors | List the tools of an Actor that runs an MCP server, with their schemas, annotations, and metadata. | ✅ |
 | `call-actor-mcp-tool` | actors | Call one tool on an Actor's MCP server and return its result. | ✅ |
