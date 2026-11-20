@@ -2,7 +2,10 @@ import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/
 import { ApifyClient } from 'apify-client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { HELPER_TOOLS } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
+import { SkyfirePaymentProvider } from '../../src/payments/skyfire.js';
+import { X402PaymentProvider } from '../../src/payments/x402.js';
 import { getServerActorsAsTools } from '../../src/tools/actors/actor_tools_factory.js';
 import type { ActorDefinitionPruned, Input } from '../../src/types.js';
 import { SERVER_MODE } from '../../src/types.js';
@@ -52,6 +55,19 @@ function makeServer(options: Partial<ConstructorParameters<typeof ActorsMcpServe
     servers.push(server);
     return server;
 }
+
+/** Telemetry on and a known, non-blocklisted client: the conditions under which report-problem is otherwise served. */
+const REPORT_PROBLEM_SERVABLE_OPTIONS = {
+    telemetry: { enabled: true },
+    initializeRequestData: {
+        method: 'initialize',
+        params: {
+            protocolVersion: '2025-06-18',
+            clientInfo: { name: 'test-client', version: '1.0.0' },
+            capabilities: {},
+        },
+    },
+} satisfies Partial<ConstructorParameters<typeof ActorsMcpServer>[0]>;
 
 const load = async (server: ActorsMcpServer, input: Input) =>
     server.loadToolsFromInput(input, new ApifyClient({ token: 'test-token' }));
@@ -115,6 +131,52 @@ describe('composing tools in a payment-provider session', () => {
         await load(server, { actors: ['apify/server-actor-test'] });
 
         expect(server.listToolNames()).not.toContain('apify--server-actor-test');
+    });
+
+    const DEFAULT_SET: Input = {};
+    const EXPLICIT_SELECTION: Input = { tools: [HELPER_TOOLS.PROBLEM_REPORT] };
+
+    it.each([
+        { provider: 'x402', paymentProvider: new X402PaymentProvider(), selection: 'default set', input: DEFAULT_SET },
+        {
+            provider: 'x402',
+            paymentProvider: new X402PaymentProvider(),
+            selection: 'explicit selection',
+            input: EXPLICIT_SELECTION,
+        },
+        {
+            provider: 'skyfire',
+            paymentProvider: new SkyfirePaymentProvider(),
+            selection: 'default set',
+            input: DEFAULT_SET,
+        },
+        {
+            provider: 'skyfire',
+            paymentProvider: new SkyfirePaymentProvider(),
+            selection: 'explicit selection',
+            input: EXPLICIT_SELECTION,
+        },
+    ])('does not serve report-problem in a $provider session ($selection)', async ({ paymentProvider, input }) => {
+        const server = makeServer({ paymentProvider, ...REPORT_PROBLEM_SERVABLE_OPTIONS });
+
+        await load(server, input);
+
+        expect(server.listToolNames()).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+        const snapshot = await server.createRequestSnapshot(server.clientContext);
+        expect([...snapshot.tools.keys()]).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+    });
+
+    it.each([
+        { session: 'token', options: { token: 'test-token' } },
+        { session: 'token-less non-payment', options: { allowUnauthMode: true } },
+    ])('serves a selected report-problem in a $session session', async ({ options }) => {
+        const server = makeServer({ ...options, ...REPORT_PROBLEM_SERVABLE_OPTIONS });
+
+        await load(server, { tools: [HELPER_TOOLS.PROBLEM_REPORT] });
+
+        expect(server.listToolNames()).toContain(HELPER_TOOLS.PROBLEM_REPORT);
+        const snapshot = await server.createRequestSnapshot(server.clientContext);
+        expect([...snapshot.tools.keys()]).toContain(HELPER_TOOLS.PROBLEM_REPORT);
     });
 });
 
