@@ -10,6 +10,7 @@ import log from '@apify/log';
 import { defaults, HELPER_TOOLS, type HelperToolName, RETIRED_SELECTOR_NAMES } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { actorNameToToolName } from '../tools/actor_tool_naming.js';
+import { fixActorNameInput } from '../tools/actors/actor_tools_factory.js';
 import { reportProblem } from '../tools/dev/report_problem.js';
 import { getActorsAsTools } from '../tools/index.js';
 import {
@@ -136,6 +137,9 @@ export function resolveActorsToLoad(input: Input): string[] {
  * Pass `paymentProvider` for sessions authenticated via an external payment
  * provider (x402, Skyfire) so standby/MCP-server Actors are filtered out —
  * see `getActorsAsTools` for the full rationale.
+ *
+ * Tools of different Actors that share a name are left out (see {@link withoutCollidingActorTools}); a requested
+ * `username/name` Actor that loaded no tool still claims its tool name.
  */
 export async function getActors(
     input: Input,
@@ -145,7 +149,44 @@ export async function getActors(
     const actorNames = resolveActorsToLoad(input);
     if (actorNames.length === 0) return [];
     const { tools } = await getActorsAsTools(actorNames, apifyClient, options);
-    return tools;
+    return withoutCollidingActorTools(tools, getUnloadedActorNames(actorNames, tools));
+}
+
+/** Requested Actors given as `username/name` or `username~name` that contributed no tool, as `username/name`. */
+function getUnloadedActorNames(actorNames: string[], tools: ToolEntry[]): string[] {
+    const loadedActorNames = new Set(
+        tools.flatMap((tool) => ('actorFullName' in tool ? [tool.actorFullName.toLowerCase()] : [])),
+    );
+    return actorNames
+        .map((actorName) => fixActorNameInput(actorName).replace(/^([^~/]+)~/, '$1/'))
+        .filter((actorName) => actorName.indexOf('/') > 0 && !loadedActorNames.has(actorName.toLowerCase()));
+}
+
+/**
+ * Drops every Actor tool whose name is also used by a tool of a different Actor, or by the tool an
+ * Actor in `unloadedActorNames` would have, so one tool name never stands for two Actors. Logs a
+ * warning per dropped name. Other tools pass through.
+ */
+export function withoutCollidingActorTools(tools: ToolEntry[], unloadedActorNames: string[] = []): ToolEntry[] {
+    const actorNamesByToolName = new Map<string, Set<string>>();
+    for (const tool of tools) {
+        if (!('actorFullName' in tool)) continue;
+        const actorNames = actorNamesByToolName.get(tool.name) ?? new Set<string>();
+        actorNamesByToolName.set(tool.name, actorNames.add(tool.actorFullName));
+    }
+    for (const actorName of unloadedActorNames) {
+        actorNamesByToolName.get(actorNameToToolName(actorName))?.add(actorName);
+    }
+    const collidingToolNames = new Set<string>();
+    for (const [toolName, actorNames] of actorNamesByToolName) {
+        if (actorNames.size < 2) continue;
+        collidingToolNames.add(toolName);
+        log.warning('Skipping Actors whose tools have the same name', {
+            toolName,
+            actorNames: [...actorNames].sort(),
+        });
+    }
+    return tools.filter((tool) => !('actorFullName' in tool && collidingToolNames.has(tool.name)));
 }
 
 /** Build a restore {@link Input} from concrete tool names: internal names → `tools`, actor names → `actors`. */
