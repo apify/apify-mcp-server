@@ -801,7 +801,8 @@ export type StructuredActorCard = {
     };
     description: string;
     categories: string[];
-    pricing: StructuredPricingInfo;
+    // Absent when the card was built without pricing.
+    pricing?: StructuredPricingInfo;
     stats?: {
         totalUsers: number;
         monthlyUsers: number;

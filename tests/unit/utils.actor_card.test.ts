@@ -350,7 +350,7 @@ describe('formatActorToStructuredCard', () => {
 
             // Should include pricing
             expect(result.pricing).toBeDefined();
-            expect(result.pricing.model).toBe('PER_ACTOR_RUN');
+            expect(result.pricing?.model).toBe('PER_ACTOR_RUN');
 
             // Should include stats
             expect(result.stats).toBeDefined();
@@ -454,7 +454,7 @@ describe('formatActorToStructuredCard', () => {
     });
 
     describe('granular options - includePricing', () => {
-        it('includes default pricing when includePricing is false', () => {
+        it('omits pricing when includePricing is false', () => {
             const result = formatActorToStructuredCard(mockActor, {
                 includeDescription: false,
                 includeStats: false,
@@ -463,8 +463,8 @@ describe('formatActorToStructuredCard', () => {
                 includeMetadata: false,
             });
 
-            // Should have default pricing
-            expect(result.pricing.model).toBe('FREE');
+            // mockActor is paid: a default pricing object would report it as free
+            expect(result.pricing).toBeUndefined();
         });
 
         it('includes actual pricing when includePricing is true', () => {
@@ -476,7 +476,7 @@ describe('formatActorToStructuredCard', () => {
                 includeMetadata: false,
             });
 
-            expect(result.pricing.model).toBe('PER_ACTOR_RUN');
+            expect(result.pricing?.model).toBe('PER_ACTOR_RUN');
         });
     });
 
@@ -548,7 +548,7 @@ describe('formatActorToStructuredCard', () => {
             });
 
             expect(result.description).toContain('Web browser for OpenAI Assistants');
-            expect(result.pricing.model).toBe('PER_ACTOR_RUN');
+            expect(result.pricing?.model).toBe('PER_ACTOR_RUN');
             expect(result.developer.username).toBe(''); // Not included (metadata is false)
             expect(result.categories).toEqual([]); // Not included (metadata is false)
             expect(result.stats).toBeUndefined();

@@ -22,7 +22,7 @@ export const getActorBuildLog: ToolEntry = Object.freeze({
     name: HELPER_TOOLS.ACTOR_BUILD_LOG,
     title: 'Get Actor build log',
     description: `Retrieve recent log lines for a specific Actor build.
-The results will include the last N lines of the build log output (plain text).
+The results will include the last N lines of the build log output as plain text in the \`log\` field.
 
 USAGE:
 - Use when a build failed and you need the build log to find the error.
@@ -55,6 +55,9 @@ USAGE EXAMPLES:
             return respondUserError(`Build with ID '${parsed.buildId}' not found.`);
         }
         const { text, note } = sliceLogTail(tail, parsed.lines);
-        return respondOk(note ? [text, note] : text, { structuredContent: { log: text } });
+        // The log goes out once, as the JSON mirror; a second raw copy would double the response. The note
+        // (why the log is shorter than asked) is not in structuredContent, so it follows as text.
+        const structuredContent = { log: text };
+        return respondOk([JSON.stringify(structuredContent), ...(note ? [note] : [])], { structuredContent });
     },
 } as const);

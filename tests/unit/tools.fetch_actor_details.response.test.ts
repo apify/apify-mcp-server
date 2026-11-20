@@ -64,49 +64,34 @@ describe('buildActorDetailsTextResponse()', () => {
             readme: false,
         };
 
-        it('links the input schema to the Console Actor detail page (Console has no /input sub-page)', () => {
+        // Console links come only from the Actor card; without it the response has no URL to keep verbatim.
+        it('returns no text for an input-schema-only result, which carries no URL', () => {
             const { texts } = buildActorDetailsTextResponse({
                 details: MOCK_DETAILS,
                 output: inputSchemaOnlyOutput,
                 linkContext,
             });
 
-            expect(texts[0]).toContain('# [Input schema](https://console.apify.com/actors/actor-id-1)');
-            expect(texts[0]).not.toContain('/input)');
+            expect(texts).toEqual([]);
         });
 
-        // Byte-identity guard for #937: the embedded ```json fence (formerly hand-rolled via
-        // ['```json', JSON.stringify(...), '```'].join('\n')) now comes from wrapJsonText — the
-        // exact same bytes. The fence must stay embedded in the text element, not become respondJson.
-        it('embeds the input schema in an unchanged ```json fence (R5)', () => {
+        it('appends the verbatim-links nudge as the last text when the Actor card is returned', () => {
             const { texts } = buildActorDetailsTextResponse({
                 details: MOCK_DETAILS,
-                output: inputSchemaOnlyOutput,
-                linkContext,
-            });
-            expect(texts[0]).toBe(
-                `# [Input schema](https://console.apify.com/actors/actor-id-1)\n\`\`\`json\n${JSON.stringify(MOCK_DETAILS.inputSchema)}\n\`\`\``,
-            );
-        });
-
-        it('appends the verbatim-links nudge as the last text', () => {
-            const { texts } = buildActorDetailsTextResponse({
-                details: MOCK_DETAILS,
-                output: inputSchemaOnlyOutput,
+                output: { ...inputSchemaOnlyOutput, metadata: true },
                 linkContext,
             });
 
             expect(texts.at(-1)).toBe(VERBATIM_LINKS_NUDGE);
         });
 
-        it('keeps the public /input link and omits the nudge without a link context', () => {
+        it('omits the nudge without a link context', () => {
             const { texts } = buildActorDetailsTextResponse({
                 details: MOCK_DETAILS,
-                output: inputSchemaOnlyOutput,
+                output: { ...inputSchemaOnlyOutput, metadata: true },
             });
 
-            expect(texts[0]).toContain('# [Input schema](https://apify.com/apify/example-mcp-server/input)');
-            expect(texts.at(-1)).not.toBe(VERBATIM_LINKS_NUDGE);
+            expect(texts).toEqual([]);
         });
     });
 });
@@ -136,7 +121,9 @@ describe('buildFetchActorDetailsResult()', () => {
         const { content } = await callWithToken('apify_api_test');
 
         expect(getUserInfoCached).not.toHaveBeenCalled();
-        expect(content[0].text).toContain('https://apify.com/apify/example-mcp-server/input');
+        // No link context, so the card formatters keep the public apify.com links.
+        expect(vi.mocked(fetchActorDetails).mock.calls[0][2]?.cardOptions?.linkContext).toBeUndefined();
+        expect(content.at(-1)?.text).not.toBe(VERBATIM_LINKS_NUDGE);
     });
 
     it('performs the lookup for Console UI tokens and mints Console links', async () => {
@@ -149,8 +136,8 @@ describe('buildFetchActorDetailsResult()', () => {
         expect(vi.mocked(fetchActorDetails).mock.calls[0][2]?.cardOptions).toMatchObject({
             linkContext: {},
         });
-        expect(content[0].text).toContain('# [Input schema](https://console.apify.com/actors/actor-id-1)');
-        expect(content.at(-1)?.text).toBe(VERBATIM_LINKS_NUDGE);
+        // Input schema only: no card, so no Console URL in the result to keep verbatim.
+        expect(content.at(-1)?.text).not.toBe(VERBATIM_LINKS_NUDGE);
     });
 
     // The direct buildActorNotFoundResponse() tests below cannot see whether this function
@@ -183,6 +170,39 @@ describe('buildFetchActorDetailsResult()', () => {
         );
 
         await expect(callWithToken('apify_api_test')).rejects.toMatchObject({ statusCode: 401 });
+    });
+
+    it('returns the details only as the JSON mirror of structuredContent', async () => {
+        const result = await buildFetchActorDetailsResult(
+            stubToolCallContext(
+                { actor: 'apify/example-mcp-server', output: { inputSchema: true } },
+                mockApifyClient(),
+                { loadedToolNames: [HELPER_TOOLS.ACTOR_CALL] },
+            ),
+        );
+        const content = (result.content ?? []).map(textOf);
+
+        expect(content).toHaveLength(1);
+        expect(JSON.parse(content[0])).toEqual(result.structuredContent);
+    });
+
+    it('keeps only the links nudge and the not-runnable guidance after the mirror', async () => {
+        vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
+        const result = await buildFetchActorDetailsResult({
+            ...stubToolCallContext(
+                { actor: 'apify/example-mcp-server', output: { metadata: true } },
+                mockApifyClient(),
+                { loadedToolNames: [] },
+            ),
+            apifyToken: 'apify_ui_test',
+        });
+        const content = (result.content ?? []).map(textOf);
+
+        expect(JSON.parse(content[0])).toEqual(result.structuredContent);
+        expect(content.slice(1)).toEqual([
+            VERBATIM_LINKS_NUDGE,
+            buildActorNotRunnableGuidance(MOCK_DETAILS.actorInfo.id, [], new Set()),
+        ]);
     });
 
     it('appends not-runnable guidance when neither call-actor nor a dedicated tool is loaded', async () => {
