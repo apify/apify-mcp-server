@@ -489,7 +489,6 @@ export async function getActorsAsTools(
     const clonedActors = structuredClone(actorsInfo);
     const nonNullActors = clonedActors.filter((actorInfo): actorInfo is ActorInfo => Boolean(actorInfo));
 
-    // Split server-interface vs MCP-server vs normal Actors.
     const serverActorsInfo: ActorInfo[] = [];
     const actorMCPServersInfo: ActorInfo[] = [];
     const normalActorsInfo: ActorInfo[] = [];

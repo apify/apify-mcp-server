@@ -36,7 +36,6 @@ export function resolveToken(options?: SuiteClientOptions): string | undefined {
     return process.env.APIFY_TOKEN;
 }
 
-/** Require a token unless `token: null`. */
 export function checkToken(options?: SuiteClientOptions): void {
     if (options?.token === null) return;
     if (!resolveToken(options)) {

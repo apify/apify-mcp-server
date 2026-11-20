@@ -1,6 +1,3 @@
-/**
- * Tests for the 402 Payment Required and permission-approval error-response builders.
- */
 import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';

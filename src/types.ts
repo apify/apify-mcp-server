@@ -229,13 +229,11 @@ export type ActorTool = ToolBase & {
  * no v1 SDK request context or facade reference.
  */
 export type InternalToolArgs = {
-    /** Arguments passed to the tool */
     args: Record<string, unknown>;
     /** Abort signal for the call: the request signal for sync calls, the cancel-watcher signal for tasks. */
     signal: AbortSignal;
     /** Apify API token */
     apifyToken: string;
-    /** ApifyClient pre-configured with the session token. */
     apifyClient: ApifyClient;
     /** External store for Actor metadata (output schemas); only set in hosted deployments. */
     actorStore?: ActorStore;
@@ -599,9 +597,7 @@ export type ActorExecutionParams = {
     actorFullName: string;
     /** Actor's platform ID — echoed into telemetry on a platform input-validation error. */
     actorId?: string;
-    /** Input to pass to the Actor */
     input: Record<string, unknown>;
-    /** Apify client */
     apifyClient: ApifyClient;
     /** Call options forwarded to apifyClient.actor(...).start(input, callOptions) */
     callOptions: {

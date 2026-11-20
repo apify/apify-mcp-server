@@ -1064,7 +1064,6 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
 
             // CreateTaskResult is already terminal — no observable `working` phase.
             expect(res.task.status).toBe('completed');
-            // The tool implementation never ran.
             expect(received.called).toBe(false);
             const stored = (await getTaskStore(server).getTaskResult(res.task.taskId)) as Record<string, unknown>;
             expect(stored.isError).toBe(true);
@@ -1105,7 +1104,6 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
             server.upsertTools([tool]);
             const handler = getRequestHandler(server, 'tools/call');
 
-            // Non-task sync path returns the rejection directly.
             const syncResult = await handler(
                 {
                     method: 'tools/call',
@@ -1114,7 +1112,6 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
                 { signal: { aborted: false }, sendNotification: vi.fn() },
             );
 
-            // Task path stores the same failure as a completed result.
             const res = await callTask(server, tool, LEGACY_SYNTAX_ARGS);
             const stored = await getTaskStore(server).getTaskResult(res.task.taskId);
 
@@ -1197,7 +1194,6 @@ describe('CallToolRequestSchema handler — task-augmented pre-flight failures',
             );
             expect(result.isError).toBe(true);
             expect(result.toolTelemetry).toEqual({ toolStatus: TOOL_STATUS.FAILED });
-            // Preparation failed before dispatch.
             expect(received.called).toBe(false);
             expect(logSpy).toHaveBeenCalledWith(
                 expect.anything(),

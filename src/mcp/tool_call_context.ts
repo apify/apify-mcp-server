@@ -4,24 +4,15 @@ import { maskLoggedValues } from '../resources/api_resources.js';
 import type { ApifyToken, ToolEntry } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
 
-/**
- * Result of preparing tool-call context: argument copies for validation and logging, and the client.
- */
 export type PrepareToolCallContextResult = {
     /** A copy of the tool args, safe for AJV validation (which mutates it) and Actor input. */
     toolArgs: Record<string, unknown>;
     /** Tool args with sensitive fields redacted (e.g. `[REDACTED]`) — safe for logging. */
     toolArgsRedacted: unknown;
-    /** ApifyClient configured with the session token. */
     apifyClient: ApifyClient;
 };
 
-/**
- * Prepares tool-call context before validation and execution:
- * 1. Copies the args, so AJV's in-place `removeAdditional` does not change the logged copy
- * 2. Redacts sensitive fields for logging: the tool's own `redactArgs` (every value for an Actor or Actor MCP tool)
- * 3. Creates an ApifyClient with the session token
- */
+/** Runs before validation: AJV's in-place `removeAdditional` must not change the copy that is logged. */
 export function prepareToolCallContext(input: {
     tool: ToolEntry;
     args: Record<string, unknown>;

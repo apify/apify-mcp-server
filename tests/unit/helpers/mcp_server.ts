@@ -223,7 +223,6 @@ export function listStatelessHandlerMethods(server: StatelessServer): string[] {
 /** HTTP status of a full-permission-not-approved error, shared by the fabricator and its pins. */
 export const PERMISSION_HTTP_STATUS = 403;
 
-/** A 402 Payment Required from the Apify API, e.g. an account out of credits. */
 export function makePaymentRequiredError(): Error {
     return Object.assign(new Error('Payment required'), { statusCode: 402 });
 }

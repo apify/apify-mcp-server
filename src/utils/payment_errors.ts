@@ -13,7 +13,6 @@ export function isPaymentRequiredError(error: unknown): boolean {
     return getHttpStatusCode(error) === HTTP_PAYMENT_REQUIRED && !isActorRunLimitError(error);
 }
 
-/** Builds an MCP error response for a 402 Payment Required error: the error message. */
 export function buildPaymentRequiredResponse(errorOrMessage: unknown): ToolResponse {
     const message = errorOrMessage instanceof Error ? errorOrMessage.message : String(errorOrMessage);
     return respondErrorNoTelemetry([message]);

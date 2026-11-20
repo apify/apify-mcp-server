@@ -1,11 +1,3 @@
-/**
- * Tests for prepareToolCallContext — the function that copies and redacts the tool args before AJV validation and
- * creates the ApifyClient.
- *
- * Key invariants under test:
- * 1. AJV's in-place removeAdditional mutation of toolArgs doesn't corrupt toolArgsRedacted
- * 2. requestOrigin is forwarded to ApifyClient (header wiring is covered in apify_client.test.ts)
- */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { prepareToolCallContext } from '../../src/mcp/tool_call_context.js';
@@ -22,10 +14,6 @@ vi.mock('../../src/apify_client.js', () => ({
         }
     },
 }));
-
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
 
 const MOCK_APIFY_TOKEN = 'apify_api_test_token' as const;
 
@@ -69,7 +57,6 @@ describe('argument copies', () => {
         const result = prepareToolCallContext({ tool, args, apifyToken: MOCK_APIFY_TOKEN });
 
         expect(result.toolArgsRedacted).toEqual({ actor: 'apify/rag-web-browser', secret: '[REDACTED]' });
-        // The tool still gets the real value.
         expect(result.toolArgs).toEqual({ actor: 'apify/rag-web-browser', secret: 'hide-me' });
     });
 });

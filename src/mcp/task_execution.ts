@@ -331,7 +331,6 @@ export async function executeToolAndUpdateTask(params: {
 
         switch (errorResult.kind) {
             case TOOL_CALL_ERROR_KIND.PAYMENT: {
-                // Handle 402 Payment Required (e.g. an account out of credits)
                 logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
                 // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
                 // so guard storeTaskResult against a cancel that raced with this 402.
