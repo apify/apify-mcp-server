@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.22.1 - **not yet released**
+
+### 🚀 Features
+
+- Add Claude and Cursor setup links, match claude ?client= tags ([#1789](https://github.com/apify/apify-mcp-server/pull/1789)) ([ce157ae](https://github.com/apify/apify-mcp-server/commit/ce157ae924fdccc067decb190a103e0059b5f8c8)) by [@jancurn](https://github.com/jancurn)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.22.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.22.0) (2026-11-20)
 
 ### 🚀 Features
