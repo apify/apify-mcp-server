@@ -65,10 +65,6 @@ export function fixZodSchemaRequired(schema: Record<string, unknown>): Record<st
  * (client metadata, duplicated hints, transport leftovers) that would otherwise cause validation
  * failures. Stripping them is safer than allowing them through with `additionalProperties: true`,
  * because no downstream code should rely on undeclared properties.
- *
- * **Payment fields** (e.g. Skyfire's `skyfire-pay-id`) are removed by the payment provider's
- * `removePaymentFields()` *before* AJV validation runs (see `prepareToolCallContext()`),
- * so they are never subject to this stripping.
  */
 export function compileSchema(schema: Record<string, unknown>): ValidateFunction {
     return createAjv().compile(fixZodSchemaRequired(schema));

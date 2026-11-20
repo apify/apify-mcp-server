@@ -14,7 +14,6 @@ import type z from 'zod';
 
 import type { ApifyClient } from './apify_client.js';
 import type { FAILURE_CATEGORY, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
-import type { PaymentProvider, PaymentProviderId } from './payments/types.js';
 import type { ApiMethod } from './tools/api/apify_api_spec.js';
 import type { CATEGORY_NAMES } from './tools/registry.js';
 import type { ToolResponse } from './utils/mcp.js';
@@ -139,14 +138,6 @@ export const ALL_TOOLS_PRESENT: ToolDescriptionContext = { hasTool: () => true }
 export type ToolBase = z.infer<typeof ToolSchema> & {
     /** AJV validation function for the input schema */
     ajvValidate: ValidateFunction;
-    /** Whether this tool requires payment validation before execution */
-    paymentRequired?: boolean;
-    /**
-     * Whether a third-party payment-provider session is rejected before the call when the Actor named in
-     * `args.actor`, or the fixed Actor of an {@link ActorServerTool}, has Actor Standby enabled; see
-     * `checkPaymentProviderStandbyConflict`.
-     */
-    hasPaymentProviderStandbyCheck?: boolean;
     /**
      * Session-exact description builder for descriptions that reference sibling tools.
      * `description` must hold the {@link ALL_TOOLS_PRESENT} render for consumers without a
@@ -238,18 +229,14 @@ export type ActorTool = ToolBase & {
  * no v1 SDK request context or facade reference.
  */
 export type InternalToolArgs = {
-    /** Arguments passed to the tool (payment fields already stripped by the server) */
     args: Record<string, unknown>;
     /** Abort signal for the call: the request signal for sync calls, the cancel-watcher signal for tasks. */
     signal: AbortSignal;
     /** Apify API token */
     apifyToken: string;
-    /** ApifyClient pre-configured with payment headers (if applicable) or standard token. */
     apifyClient: ApifyClient;
     /** External store for Actor metadata (output schemas); only set in hosted deployments. */
     actorStore?: ActorStore;
-    /** Payment provider for agentic payment modes (Skyfire, x402), when configured. */
-    paymentProvider?: PaymentProvider;
     /** Names of all currently loaded tools. */
     loadedToolNames: readonly string[];
     /** IDs of Actors backing all currently loaded Actor / Actor-MCP tools. */
@@ -277,7 +264,7 @@ export type HelperTool = ToolBase & {
     call: (toolArgs: InternalToolArgs) => Promise<ToolResponse>;
     /**
      * Returns the copy of the arguments that is logged, for a tool whose arguments carry secrets. It runs in
-     * `prepareToolCallContext`, before AJV validation, so it must accept any shape and not mutate the
+     * `prepareToolCallContext` (`mcp/tool_call_context.ts`), before AJV validation, so it must accept any shape and not mutate the
      * arguments; it also sees undeclared keys, so build the copy as an allowlist.
      */
     redactArgs?: (args: Record<string, unknown>) => Record<string, unknown>;
@@ -388,7 +375,6 @@ export type ActorStoreList = ActorStoreListOutdated & {
     badge?: string | null;
     categories?: string[];
     currentPricingInfo: ActorRunPricingInfo;
-    isWhiteListedForAgenticPayments?: boolean;
     notice?: string | null;
     userFullName?: string;
     /** Populated when the search call is made with `includeInputSchema=true`. */
@@ -444,7 +430,7 @@ export type PromptBase = Prompt & {
 /**
  * Apify token type.
  *
- * Can be null or undefined when a payment provider allows unauthenticated access.
+ * Can be null or undefined when the session has no token (e.g. `allowUnauthMode`).
  */
 export type ApifyToken = string | null | undefined;
 
@@ -472,8 +458,6 @@ export type ToolCallTelemetryProperties = {
     transport_type: string;
     /** Raw `?client=` URL query-param value, when the connecting request carried one. */
     mcp_url_client: string;
-    /** Payment provider the connection was opened with (`?payment=`), absent without one. Marks the mode, not that this call was paid. */
-    payment_provider?: PaymentProviderId;
     tool_name: string;
     tool_status: ToolStatus;
     tool_exec_time_ms: number;
@@ -613,9 +597,7 @@ export type ActorExecutionParams = {
     actorFullName: string;
     /** Actor's platform ID — echoed into telemetry on a platform input-validation error. */
     actorId?: string;
-    /** Input to pass to the Actor (payment fields already stripped) */
     input: Record<string, unknown>;
-    /** Apify client (may include payment headers) */
     apifyClient: ApifyClient;
     /** Call options forwarded to apifyClient.actor(...).start(input, callOptions) */
     callOptions: {
@@ -722,11 +704,6 @@ export type ActorsMcpServerOptions = {
      */
     actorStore?: ActorStore;
     setupSigintHandler?: boolean;
-    /**
-     * Payment provider for agentic payment modes (e.g., Skyfire, x402).
-     * When set, enables payment-gated tool execution.
-     */
-    paymentProvider?: PaymentProvider;
     /**
      * Allow unauthenticated mode - tools can be called without an Apify API token.
      * This is primarily used for making documentation tools available without authentication.

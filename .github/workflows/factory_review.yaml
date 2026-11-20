@@ -52,7 +52,6 @@ jobs:
       policy: |
         {
           "denyGlobs": [
-            "src/payments/**",
             "src/utils/auth.ts",
             "src/tools/api/apify_api_blocklist.ts"
           ]
