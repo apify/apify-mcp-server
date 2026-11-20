@@ -8,7 +8,6 @@ import type { ApifyClient } from 'apify-client';
 import log from '@apify/log';
 
 import { defaults, HELPER_TOOLS, type HelperToolName, RETIRED_SELECTOR_NAMES } from '../const.js';
-import type { PaymentProvider } from '../payments/types.js';
 import { actorNameToToolName } from '../tools/actor_tool_naming.js';
 import { reportProblem } from '../tools/dev/report_problem.js';
 import { getActorsAsTools } from '../tools/index.js';
@@ -132,15 +131,11 @@ export function resolveActorsToLoad(input: Input): string[] {
 
 /**
  * Fetch Actor tool entries for all Actor names in `input`.
- *
- * Pass `paymentProvider` for sessions authenticated via an external payment
- * provider (x402, Skyfire) so standby/MCP-server Actors are filtered out —
- * see `getActorsAsTools` for the full rationale.
  */
 export async function getActors(
     input: Input,
     apifyClient: ApifyClient,
-    options?: { actorStore?: ActorStore; paymentProvider?: PaymentProvider },
+    options?: { actorStore?: ActorStore },
 ): Promise<ToolEntry[]> {
     const actorNames = resolveActorsToLoad(input);
     if (actorNames.length === 0) return [];
@@ -184,7 +179,8 @@ const WITHOUT_USE_CASE_FIELD = new WeakMap<ToolEntry, ToolEntry>();
  */
 export function withoutUseCaseField(tool: ToolEntry): ToolEntry {
     const { useCase, ...properties } = tool.inputSchema.properties ?? {};
-    if (!useCase) return tool;
+    // A `useCase` of an Actor or proxied MCP tool is its own input, and `compileSchema` is not for untrusted schemas.
+    if (!useCase || tool.type !== TOOL_TYPE.INTERNAL) return tool;
     let served = WITHOUT_USE_CASE_FIELD.get(tool);
     if (!served) {
         const inputSchema = { ...tool.inputSchema, properties };

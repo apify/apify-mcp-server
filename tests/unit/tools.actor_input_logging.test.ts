@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { prepareToolCallContext } from '../../src/payments/helpers.js';
+import { prepareToolCallContext } from '../../src/mcp/tool_call_context.js';
 import { callActor } from '../../src/tools/actors/call_actor.js';
 import { callActorMcpTool } from '../../src/tools/actors/call_actor_mcp_tool.js';
 import { ALL_WIDGET_TOOLS, toolCategories, UNCATEGORIZED_TOOLS } from '../../src/tools/registry.js';
@@ -15,7 +15,7 @@ import { TOOL_TYPE } from '../../src/types.js';
 const SECRET = 'synthetic-secret-4f2a';
 
 function prepareLoggedArgs(tool: ToolEntry, args: Record<string, unknown>) {
-    return prepareToolCallContext({ provider: undefined, tool, args, apifyToken: 'test-token' });
+    return prepareToolCallContext({ tool, args, apifyToken: 'test-token' });
 }
 
 function makeActorTool(): ActorTool {
@@ -153,10 +153,10 @@ describe('Actor input stays out of the logged arguments', () => {
     ])('%s logs the control arguments and only the key names of the input', (_, tool, args, expected) => {
         const argsBefore = structuredClone(args);
 
-        const { toolArgsRedacted, toolArgsWithoutPayment } = prepareLoggedArgs(tool, args);
+        const { toolArgsRedacted, toolArgs } = prepareLoggedArgs(tool, args);
 
         expect(toolArgsRedacted).toStrictEqual(expected);
-        expect(toolArgsWithoutPayment).toStrictEqual(argsBefore);
+        expect(toolArgs).toStrictEqual(argsBefore);
         expect(args).toStrictEqual(argsBefore);
     });
 

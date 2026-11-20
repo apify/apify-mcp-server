@@ -410,7 +410,7 @@ export class LegacyMcpServer {
             let actorName: string | undefined;
             let actorId: string | undefined;
             const { clientContext, actorStore } = this.host;
-            const { paymentProvider, allowUnauthMode } = this.host.options;
+            const { allowUnauthMode } = this.host.options;
             // Plain values pulled from the host/request, threaded into the shared engine.
             const { signal, sendNotification } = extra;
             const emitLog = async (msg: { level: string; data?: unknown }) =>
@@ -423,7 +423,6 @@ export class LegacyMcpServer {
                 apifyToken,
                 clientContext,
                 clientParam: this.host.options.clientParam,
-                paymentProvider,
                 telemetryEnabled: this.host.telemetryEnabled,
                 transportType: this.host.options.transportType,
                 platformUrls: this.host.platformUrls,
@@ -435,13 +434,11 @@ export class LegacyMcpServer {
                     name,
                     args,
                     meta,
-                    requestHeaders: extra.requestInfo?.headers,
                     isTaskRequest: Boolean(request.params.task),
                     mcpSessionId,
                     telemetryData,
                     clientContext,
                     tools: this.host.tools,
-                    paymentProvider,
                     allowUnauthMode,
                     platformUrls: this.host.platformUrls,
                     signal,
@@ -477,7 +474,7 @@ export class LegacyMcpServer {
                     throw new McpError(ErrorCode.InvalidParams, prepared.message);
                 }
 
-                const { tool, toolArgs, logSafeArgs, apifyClient, standbyRejection, paymentRequiredResult } = prepared;
+                const { tool, toolArgs, logSafeArgs, apifyClient, standbyRejection } = prepared;
                 actorName = prepared.actorName;
                 actorId = prepared.actorId;
                 resolvedToolName = getToolFullName(tool);
@@ -503,16 +500,9 @@ export class LegacyMcpServer {
 
                     // Pre-flight failure is already known — resolve the task synchronously: store
                     // the failure as the terminal `completed` result and emit exactly one status
-                    // notification. Standby rejection wins over payment-required, matching the sync
-                    // path. Telemetry rides the handler's outer `finally`.
-                    const preflightResult = standbyRejection ?? paymentRequiredResult;
-                    if (preflightResult) {
-                        const outcome = buildPreflightFailureOutcome(
-                            standbyRejection,
-                            paymentRequiredResult,
-                            actorName,
-                            actorId,
-                        );
+                    // notification. Telemetry rides the handler's outer `finally`.
+                    if (standbyRejection) {
+                        const outcome = buildPreflightFailureOutcome(standbyRejection, actorName, actorId);
                         toolStatus = outcome.toolStatus;
                         callDiagnostics = outcome.callDiagnostics;
                         preflightTaskId = task.taskId;
@@ -576,7 +566,6 @@ export class LegacyMcpServer {
                             server: this.server,
                             tools: this.host.tools,
                             actorStore,
-                            paymentProvider,
                             telemetryData,
                             userId,
                             telemetryEnv: this.host.telemetryEnv,
@@ -601,7 +590,6 @@ export class LegacyMcpServer {
                     progressToken,
                     tools: this.host.tools,
                     actorStore,
-                    paymentProvider,
                     signal,
                     sendNotification,
                     emitLog,

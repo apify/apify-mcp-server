@@ -3,14 +3,36 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.21.11 - **not yet released**
+## 0.21.13 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Link missing-token messages to the Console create-token form ([#1916](https://github.com/apify/apify-mcp-server/pull/1916)) ([13f0549](https://github.com/apify/apify-mcp-server/commit/13f05497046fbf13c369c0d35fef4d847a394b89)) by [@protoss70](https://github.com/protoss70), closes [#181](https://github.com/apify/apify-mcp-server/issues/181)
+- Skip the search for an oldText longer than the file ([#1937](https://github.com/apify/apify-mcp-server/pull/1937)) ([b0afc34](https://github.com/apify/apify-mcp-server/commit/b0afc344a33bd91612c2585b9e10ecdf585fe087)) by [@jirispilka](https://github.com/jirispilka)
+- Use PNG icon from server.json instead of hardcoded favicon URL ([#1938](https://github.com/apify/apify-mcp-server/pull/1938)) ([27123db](https://github.com/apify/apify-mcp-server/commit/27123db2bdc4c6168e9b173177cbfe37566885c3)) by [@jancurn](https://github.com/jancurn)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.21.12](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.12) (2026-11-17)
+
+### 🐛 Bug Fixes
+
+- Validate synchronously when an input schema sets $async ([#1917](https://github.com/apify/apify-mcp-server/pull/1917)) ([5bb5c0c](https://github.com/apify/apify-mcp-server/commit/5bb5c0cc3f6be7d3876454b25063b7cf24ff0853)) by [@vojtechj-apify](https://github.com/vojtechj-apify)
+- Do not compile the output schemas of an Actor&#x27;s MCP tools ([#1919](https://github.com/apify/apify-mcp-server/pull/1919)) ([60e10ff](https://github.com/apify/apify-mcp-server/commit/60e10ff748230a8758c741c627142f6e30471ed2)) by [@vojtechj-apify](https://github.com/vojtechj-apify)
+- Skip the uniqueItems check in local input validation ([#1918](https://github.com/apify/apify-mcp-server/pull/1918)) ([e04a25e](https://github.com/apify/apify-mcp-server/commit/e04a25e7ca2d32d182d2bbbe85da7567aef1494c)) by [@vojtechj-apify](https://github.com/vojtechj-apify)
+- Skip local validation for costly Actor input schemas ([#1914](https://github.com/apify/apify-mcp-server/pull/1914)) ([2a7f0c5](https://github.com/apify/apify-mcp-server/commit/2a7f0c5a8f8f8f42dcb6714be8b60ab0035318b3)) by [@jirispilka](https://github.com/jirispilka)
+- Show a UserInputError message as is, not wrapped again ([#1921](https://github.com/apify/apify-mcp-server/pull/1921)) ([34f8efa](https://github.com/apify/apify-mcp-server/commit/34f8efafa8ac2be5463b594136dbdc4eda641a6a)) by [@jirispilka](https://github.com/jirispilka)
+
+
+## [0.21.11](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.11) (2026-11-16)
 
 ### 🐛 Bug Fixes
 
 - Return a user error for a key-value record whose body does not match its Content-Type ([#1909](https://github.com/apify/apify-mcp-server/pull/1909)) ([756ce6e](https://github.com/apify/apify-mcp-server/commit/756ce6e5aefc554e2ed0eca2b675a471fd4d33a9)) by [@jirispilka](https://github.com/jirispilka), closes [#1907](https://github.com/apify/apify-mcp-server/issues/1907)
+- Send Server Actor requests only to the platform domain ([#1886](https://github.com/apify/apify-mcp-server/pull/1886)) ([3e414ca](https://github.com/apify/apify-mcp-server/commit/3e414ca794edd669be9b306c7b9a33be87c1f6ea)) by [@RobertCrupa](https://github.com/RobertCrupa)
+- Keep the word &quot;error&quot; in tool input from raising a false alert ([#1911](https://github.com/apify/apify-mcp-server/pull/1911)) ([6a557c5](https://github.com/apify/apify-mcp-server/commit/6a557c5397495f9cb9c5d2c7846d1731ae796cd9)) by [@jirispilka](https://github.com/jirispilka), closes [#1908](https://github.com/apify/apify-mcp-server/issues/1908)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.21.10](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.10) (2026-11-13)
 
 ### 🐛 Bug Fixes

@@ -14,7 +14,6 @@ import log from '@apify/log';
 import type { ApifyClient } from '../apify_client.js';
 import { getApifyAPIPublicBaseUrl } from '../apify_client.js';
 import { InternalError, InvalidParamsError } from '../mcp/errors.js';
-import type { PaymentProvider } from '../payments/types.js';
 import { SERVER_MODE } from '../types.js';
 import type { ApiUrls } from './api_resources.js';
 import { readApiResource } from './api_resources.js';
@@ -40,7 +39,6 @@ type ResourceService = {
 type ResourceServiceOptions = {
     /** The server's resolved origins; the env defaults apply when omitted. */
     platformUrls?: ApiUrls;
-    paymentProvider?: PaymentProvider;
     /**
      * Read the current server mode at call time. Callers must pass a getter rather
      * than a value: `serverMode` can flip from the preliminary DEFAULT to APPS when
@@ -53,21 +51,10 @@ type ResourceServiceOptions = {
 };
 
 export function createResourceService(options: ResourceServiceOptions): ResourceService {
-    const { platformUrls, paymentProvider, getMode, getAvailableWidgets } = options;
+    const { platformUrls, getMode, getAvailableWidgets } = options;
 
     const listResources = async (): Promise<ListResourcesResult> => {
         const resources: Resource[] = [];
-
-        if (paymentProvider?.getUsageGuide?.()) {
-            resources.push({
-                uri: 'file://readme.md',
-                name: 'readme',
-                description:
-                    'Apify MCP Server usage guide. Read this to understand how to use the server ' +
-                    'before interacting with it.',
-                mimeType: 'text/markdown',
-            });
-        }
 
         if (getMode() === SERVER_MODE.APPS) {
             for (const widget of getAvailableWidgets().values()) {
@@ -93,19 +80,6 @@ export function createResourceService(options: ResourceServiceOptions): Resource
         if (/^https?:\/\//i.test(uri)) {
             // API contents carry no widget `_meta`/`html`; the extended shape only adds optional fields.
             return (await readApiResource(uri, apifyClient, platformUrls)) as ExtendedReadResourceResult;
-        }
-
-        const usageGuide = paymentProvider?.getUsageGuide?.();
-        if (usageGuide && uri === 'file://readme.md') {
-            return {
-                contents: [
-                    {
-                        uri: 'file://readme.md',
-                        mimeType: 'text/markdown',
-                        text: usageGuide,
-                    },
-                ],
-            };
         }
 
         const widget = getMode() === SERVER_MODE.APPS ? getAvailableWidgets().get(uri) : undefined;
@@ -148,7 +122,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             }
         }
 
-        // A URI that is neither an http(s) URL, the usage guide, nor a served widget is not a
+        // A URI that is neither an http(s) URL nor a served widget is not a
         // readable resource — throw so the SDK returns a JSON-RPC error instead of success-shaped
         // "not found" content (see SEP-2164 and src/resources/AGENTS.md).
         throw new InvalidParamsError(`Failed to read ${uri}: not a readable resource.`, { uri });

@@ -106,7 +106,7 @@ export function mockActorBuildClient({
     builds?: Record<string, Build | undefined>;
     buildList?: FakeBuildListItem[];
     buildListFailure?: unknown;
-    /** `false` is a token-less (payment provider) session. */
+    /** `false` is a session with no token. */
     hasToken?: boolean;
 }) {
     const pulledBuildIds: string[] = [];

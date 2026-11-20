@@ -53,6 +53,17 @@ export function sanitizeMezmoMessage(message: string): string {
     return message.replace(/\berror\b/gi, 'failure');
 }
 
+/**
+ * `sanitizeMezmoMessage` for every string inside a logged value. Mezmo also promotes on data values, so
+ * an info line that logs a tool input such as the search query "proxy error codes" would raise an alert.
+ */
+export function sanitizeMezmoValue(value: unknown): unknown {
+    if (typeof value === 'string') return sanitizeMezmoMessage(value);
+    if (Array.isArray(value)) return value.map(sanitizeMezmoValue);
+    if (typeof value !== 'object' || value === null) return value;
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizeMezmoValue(item)]));
+}
+
 // Client faults surfaced by the MCP SDK's `onerror` — expected noise, not server bugs.
 // Pinned to @modelcontextprotocol/sdk@1.29.0 — server/webStandardStreamableHttp.js. The SDK calls
 // onerror with a bare `new Error(message)` (no JSON-RPC code, no HTTP status — those go only into

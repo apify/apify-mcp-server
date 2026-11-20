@@ -10,7 +10,7 @@ Three files serving the MCP `resources/*` surface:
   token (`_meta.apifyToken || options.token`). Token-only by design — a session without a
   token gets no client, and every read fails with `InvalidParamsError`.
   Routes every http(s) URI to `readApiResource()`, which owns the single origin gate; non-http
-  schemes fall through to widgets/usage-guide/fallback. Throws protocol-neutral domain errors
+  schemes fall through to widgets/fallback. Throws protocol-neutral domain errors
   (`InvalidParamsError`/`InternalError` from `src/mcp/errors.ts`), never `McpError`. The protocol
   adapters map them 1:1 before serialization: `legacy_server.ts` to v1 `McpError`,
   `stateless_server.ts` to v2 `ProtocolError`.

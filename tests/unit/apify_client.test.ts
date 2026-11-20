@@ -57,15 +57,6 @@ describe('ApifyClient', () => {
         expect(headers['X-Apify-Request-Origin']).toBe('APIFY_AI');
     });
 
-    it('keeps payment headers alongside origin', () => {
-        const headers = buildStaticHeaders({
-            paymentHeaders: { 'skyfire-pay-id': 'jwt-token-123' },
-            requestOrigin: REQUEST_ORIGIN.APIFY_AI,
-        });
-        expect(headers['skyfire-pay-id']).toBe('jwt-token-123');
-        expect(headers['X-Apify-Request-Origin']).toBe('APIFY_AI');
-    });
-
     it('sends forwarded headers only inside runWithForwardedApiHeaders', () => {
         const forwarded = { 'x-apify-admin-ip-proof': 'proof' };
         // The request goes to the client's API origin, whatever APIFY_API_BASE_URL is.

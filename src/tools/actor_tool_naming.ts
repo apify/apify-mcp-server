@@ -82,16 +82,6 @@ export function resolveActorTenancy(actor: Pick<Actor, 'actorStandby'>): ActorTe
     return actor.actorStandby?.tenancy === 'MULTI_TENANT' ? ACTOR_TENANCY.MULTI_TENANT : ACTOR_TENANCY.SINGLE_TENANT;
 }
 
-/**
- * Whether this Actor must be excluded from tool surfaces and rejected on
- * `call-actor` when the session uses a third-party payment provider (x402, Skyfire).
- * List-time filtering in `getActorsAsTools` and the call-time guard in
- * `checkPaymentProviderStandbyConflict` must use this — not MCP URL presence alone.
- */
-export function isActorBlockedUnderPaymentProvider(actor: Pick<ActorInfo['actor'], 'actorStandby'>): boolean {
-    return actor.actorStandby?.isEnabled === true;
-}
-
 /** Splits an Actor full name; a missing slash yields a null username. */
 export function parseActorFullName(actorFullName: string): { escapedUsername: string | null; actorName: string } {
     const slashIndex = actorFullName.indexOf('/');

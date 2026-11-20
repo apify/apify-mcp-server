@@ -8,6 +8,7 @@ import log from '@apify/log';
 import { ACTOR_TIP_CAVEAT } from '../../src/tools/actor_tool_naming.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import type { RunResponse } from '../../src/tools/actors/actor_run_response.js';
+import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
 import type { ActorExecutionParams } from '../../src/types.js';
 import { mockApifyClient, textOf } from './helpers/tool_context.js';
 
@@ -140,6 +141,26 @@ describe('actorExecutor', () => {
 
             expect(spies.waitForFinishOpts).toEqual({ waitSecs: 30 });
             expect(spies.startInput).toEqual({ query: 'foo' });
+        });
+
+        // A schema that is costly to compile skips AJV, so the executor is the only check of waitSecs.
+        it.each([WAIT_SECS_MAX + 1, -5, 1.5, 'soon', '', null])(
+            'falls back to the default wait when waitSecs is %j',
+            async (waitSecs) => {
+                const { params, spies } = buildParams({ query: 'foo', waitSecs });
+
+                await actorExecutor.executeActorTool(params);
+
+                expect(spies.waitForFinishOpts).toEqual({ waitSecs: CALL_ACTOR_WAIT_SECS_DEFAULT });
+            },
+        );
+
+        it('reads a numeric string waitSecs as a number, as AJV does on a validated schema', async () => {
+            const { params, spies } = buildParams({ query: 'foo', waitSecs: '10' });
+
+            await actorExecutor.executeActorTool(params);
+
+            expect(spies.waitForFinishOpts).toEqual({ waitSecs: 10 });
         });
 
         it('ignores waitSecs in task mode and waits until terminal', async () => {

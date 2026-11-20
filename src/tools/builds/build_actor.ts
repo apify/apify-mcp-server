@@ -68,7 +68,6 @@ export const buildActor: ToolEntry = Object.freeze({
     inputSchema: fixZodSchemaRequired(z.toJSONSchema(buildActorArgs)) as ToolInputSchema,
     outputSchema: buildActorToolOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(buildActorArgs)),
-    paymentRequired: true,
     annotations: {
         title: 'Build Actor',
         readOnlyHint: false,

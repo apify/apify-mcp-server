@@ -106,7 +106,7 @@ describe('get-actor-version', () => {
         actorGetMock.mockResolvedValue(mockActor());
     });
 
-    it('is a read-only, idempotent, closed-world tool without payment', () => {
+    it('is a read-only, idempotent, closed-world tool', () => {
         expect(getActorVersion.name).toBe(HELPER_TOOLS.ACTOR_VERSION_GET);
         expect(getActorVersion.annotations).toEqual({
             title: 'Get Actor version',
@@ -115,7 +115,6 @@ describe('get-actor-version', () => {
             idempotentHint: true,
             openWorldHint: false,
         });
-        expect((getActorVersion as HelperTool).paymentRequired).toBeUndefined();
     });
 
     it('states the 256 KiB limit of the spec in its description and in the paths description', () => {

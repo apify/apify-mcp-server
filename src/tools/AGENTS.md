@@ -148,6 +148,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 
 - **Validate inputs with Zod**; no ad-hoc shape checks. AJV + Zod already validate
   before a tool runs — don't re-check the same constraint inside the tool body.
+  Exception: `compileUntrustedSchema` (`actor_input_schema.ts`) skips AJV for an Actor or proxied MCP input
+  schema that is costly to compile, so `actor_executor.ts` checks the injected `waitSecs` itself.
 - **Reference tool names via the `HELPER_TOOLS` `as const` object**, never hardcoded strings
   (exception: the integration suite, `tests/integration/` and the shared `tests/test_kit/` cases and helpers, which hardcode them so a renamed tool fails).
 - Keep a new tool mode-agnostic unless it is genuinely a widget variant.
@@ -158,7 +160,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   log only its key names, each value as `REDACTED`, through `pickLoggedValues` and `maskLoggedInputs` in
   `../resources/api_resources.ts`.
   A direct Actor tool or a proxied Actor MCP tool has no `redactArgs`: `prepareToolCallContext`
-  (`../payments/helpers.ts`) logs its argument names only, each value as `REDACTED`.
+  (`../mcp/tool_call_context.ts`) logs its argument names only, each value as `REDACTED`.
 - Descriptions, result text, annotations and the tool set follow [TOOL_GUIDELINES.md](../../TOOL_GUIDELINES.md); the gating mechanics below implement its "name only what the session has" rule.
 
 **Storage tool description skeleton** (`storage/`, all 8 tools): lead sentence stating what the tool
