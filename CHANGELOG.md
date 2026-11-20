@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.21.13 - **not yet released**
 
+### 🚀 Features
+
+- [**breaking**] Remove agentic payment mode (Skyfire, x402) ([#1940](https://github.com/apify/apify-mcp-server/pull/1940)) ([574808d](https://github.com/apify/apify-mcp-server/commit/574808d9e873e2825142e81a9d7bbbc8562a6e20)) by [@RobertCrupa](https://github.com/RobertCrupa)
+
 ### 🐛 Bug Fixes
 
 - Link missing-token messages to the Console create-token form ([#1916](https://github.com/apify/apify-mcp-server/pull/1916)) ([13f0549](https://github.com/apify/apify-mcp-server/commit/13f05497046fbf13c369c0d35fef4d847a394b89)) by [@protoss70](https://github.com/protoss70), closes [#181](https://github.com/apify/apify-mcp-server/issues/181)
