@@ -80,12 +80,17 @@ function getApiOrigin(ctx: CaseCtx): string {
 /** Dataset/KV read tools. */
 export const storageCases: Case[] = [
     {
-        name: 'rejects get-key-value-store-record when required keyValueStoreId is missing',
+        name: 'returns a tool error for get-key-value-store-record when required keyValueStoreId is missing',
         isDeploymentTest: false,
         run: withClient({ tools: ['storage'] }, async (client) => {
-            await expect(
-                client.callTool({ name: 'get-key-value-store-record', arguments: { recordKey: 'INPUT' } }),
-            ).rejects.toThrow(/must have required property 'keyValueStoreId'/);
+            const result = await client.callTool({
+                name: 'get-key-value-store-record',
+                arguments: { recordKey: 'INPUT' },
+            });
+            expect(result.isError).toBe(true);
+            expect((result.content as { text: string }[])[0].text).toMatch(
+                /must have required property 'keyValueStoreId'/,
+            );
         }),
     },
     {

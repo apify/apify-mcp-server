@@ -441,6 +441,26 @@ describe('createStatelessServer() tools/call', () => {
         }, options);
     });
 
+    it('answers arguments failing the input schema with an isError tool result', async () => {
+        const schema = { type: 'object', properties: { x: { type: 'string' } }, required: ['x'] };
+        const tool = {
+            type: TOOL_TYPE.INTERNAL,
+            name: 'strict-schema-tool',
+            description: 'requires x',
+            inputSchema: schema as ToolInputSchema,
+            ajvValidate: compileSchema(schema),
+            call: async () => respondRaw({ content: [] }),
+        } as ToolEntry;
+
+        await withStatelessServer(async ({ server, call }) => {
+            await loadSource(server, [tool]);
+
+            const response = await call('tools/call', { name: tool.name, arguments: {} });
+
+            expect(response.result?.isError).toBe(true);
+        });
+    });
+
     it('answers an unknown tool name with an invalid-params protocol error', async () => {
         await withStatelessServer(async ({ server, call }) => {
             await loadSource(server, []);
