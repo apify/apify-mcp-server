@@ -1,4 +1,4 @@
-import { ApifyApiError } from 'apify-client';
+import { ApifyApiError, type DatasetClientListItemOptions } from 'apify-client';
 import { isAxiosError } from 'axios';
 
 import type { ApifyClient } from '../../apify_client.js';
@@ -344,4 +344,37 @@ export async function fetchRecordUnderCap(
     if (response.status >= 300) throw new ApifyApiError(response, 1);
     const contentType = response.headers['content-type'];
     return { isOverLimit: false, value: response.data, ...(typeof contentType === 'string' && { contentType }) };
+}
+
+/** A page of dataset items, or `isOverLimit` when the response body passed `MAX_INLINE_BYTES`. */
+export type FetchedDatasetItems = { isOverLimit: false; items: unknown[]; total: number } | { isOverLimit: true };
+
+/**
+ * Reads one page of dataset items without holding more than `MAX_INLINE_BYTES` of it: `listItems()` buffers
+ * a page of any size whole. It sends the query params `listItems()` sends, through `sendApifyApiRequest`: one
+ * attempt, without apify-client's User-Agent, and an unparsable body is read once more. axios stops at the
+ * limit whatever the status, so an error body over it also returns `isOverLimit`. `undefined` on a 404, as
+ * `catchNotFound` reads one.
+ */
+export async function fetchDatasetItemsUnderCap(
+    client: ApifyClient,
+    safeId: string,
+    params: DatasetClientListItemOptions,
+): Promise<FetchedDatasetItems | undefined> {
+    // Built outside the `try`: an invalid dataset name must surface as it is thrown.
+    const url = `${client.dataset(safeId).url}/items`;
+    let response: Awaited<ReturnType<typeof sendApifyApiRequest>>;
+    try {
+        response = await sendWithParseRetry(async () => sendApifyApiRequest(client, { url, method: 'GET', params }));
+    } catch (error) {
+        if (isMaxContentLengthAbort(error)) return { isOverLimit: true };
+        throw toPlainError(error);
+    }
+    if (response.status === HTTP_NOT_FOUND) return undefined;
+    if (response.status >= 300) throw new ApifyApiError(response, 1);
+    return {
+        isOverLimit: false,
+        items: response.data as unknown[],
+        total: Number(response.headers['x-apify-pagination-total']),
+    };
 }

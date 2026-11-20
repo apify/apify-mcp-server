@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -12,6 +12,7 @@ import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
 import {
     buildDatasetItemsSummaryNextStep,
     buildStorageResponse,
+    fetchDatasetItemsUnderCap,
     fetchStorageByIdOrName,
     resolveStorageId,
     storageIdArgDescription,
@@ -108,7 +109,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         const effectiveLimit = parsed.limit ?? DEFAULT_DATASET_ITEMS_LIMIT;
         const datasetId = stripQuoteWrappers(parsed.datasetId);
         const found = await fetchStorageByIdOrName(datasetId, async (safeId) =>
-            client.dataset(safeId).listItems({
+            fetchDatasetItemsUnderCap(client, safeId, {
                 clean: parsed.clean,
                 offset: parsed.offset,
                 limit: effectiveLimit,
@@ -122,6 +123,11 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             return respondUserError(storageNotFoundText('dataset', datasetId));
         }
         const { result: v, safeId } = found;
+        if (v.isOverLimit) {
+            return respondUserError(
+                `This page of dataset '${datasetId}' is over the ${MAX_INLINE_BYTES}-byte response limit. Lower \`limit\`, or use \`fields\` or \`omit\`.`,
+            );
+        }
 
         const offset = parsed.offset ?? 0;
         const linkContext = await getConsoleLinkContext(apifyToken, client);
