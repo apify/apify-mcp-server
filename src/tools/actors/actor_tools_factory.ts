@@ -14,7 +14,6 @@ import { ActorLoadError } from '../../errors.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
 import { connectMCPClient } from '../../mcp/client.js';
 import { getMCPServerTools } from '../../mcp/proxy.js';
-import type { PaymentProvider } from '../../payments/types.js';
 import {
     type ActorDefinitionWithInfo,
     type ActorInfo,
@@ -33,7 +32,6 @@ import { buildActorInputSchema, compileUntrustedSchema } from '../actor_input_sc
 import {
     actorNameToToolName,
     getActorToolModeFromInterfaces,
-    isActorBlockedUnderPaymentProvider,
     resolveActorInterfaces,
     resolveActorTenancy,
     resolveActorToolMode,
@@ -185,7 +183,6 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
                     ? buildEnrichedDirectActorOutputSchema(definition.datasetItemProperties)
                     : actorRunOutputSchema,
             ajvValidate: compiled.validate,
-            paymentRequired: true,
             memoryMbytes,
             icons: definition.pictureUrl ? [{ src: definition.pictureUrl, mimeType: 'image/png' }] : undefined,
             annotations: {
@@ -262,9 +259,6 @@ export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
                 openWorldHint: true,
             },
             redactArgs: redactServerActorRequestArgs,
-            // Composition drops the tool in a payment-provider session, but a tool upserted before composition
-            // (auto mode before initialize, `processParamsGetTools`) is still rejected here before any request.
-            hasPaymentProviderStandbyCheck: true,
             call: async (toolArgs) =>
                 executeSendServerActorRequest({ ...toolArgs, args: { ...toolArgs.args, actor: actorFullName } }),
         });
@@ -278,8 +272,8 @@ export async function getMCPServersAsTools(
     mcpSessionId?: string,
 ): Promise<ToolEntry[]> {
     const { token, requestOrigin } = apifyClient;
-    // Payment-provider request with no Apify token: standby Actors aren't supported here, so
-    // MCP servers — which are always standby Actors — are skipped since they'd fail anyway.
+    // No Apify token: a connection to an MCP server, which is always a standby Actor, needs one, so
+    // MCP servers are skipped since they'd fail anyway.
     if (token === null || token === undefined) {
         return [];
     }
@@ -391,28 +385,19 @@ export type ActorsAsToolsResult = {
  * callers can surface precise reasons when needed (a single-Actor flow like
  * `call-actor`) or just ignore failures (bulk session-boot flows that build
  * the initial tool surface).
- *
- * When `paymentProvider` is set, standby and MCP-server Actors are reported
- * as `STANDBY_PAYMENT_NOT_SUPPORTED` errors instead of contributing tools.
- * External payment providers (x402, Skyfire) cannot pay for standby Actor
- * runs — the call-time guard in `call_actor.ts` rejects any such
- * tool call. Filtering at list time keeps the advertised tool surface
- * honest so agents never discover a tool that can only fail later.
  */
 export async function getActorsAsTools(
     actorIdsOrNames: string[],
     apifyClient: ApifyClient,
     options?: {
         mcpSessionId?: string;
-        paymentProvider?: PaymentProvider;
         isDirectTool?: boolean;
     },
 ): Promise<ActorsAsToolsResult> {
-    const { mcpSessionId, paymentProvider, isDirectTool = true } = options ?? {};
+    const { mcpSessionId, isDirectTool = true } = options ?? {};
     log.debug('Fetching Actors as tools', {
         actorCount: actorIdsOrNames.length,
         mcpSessionId,
-        paymentProviderId: paymentProvider?.id,
     });
 
     const errors: ActorLoadError[] = [];
@@ -466,18 +451,10 @@ export async function getActorsAsTools(
     const clonedActors = structuredClone(actorsInfo);
     const nonNullActors = clonedActors.filter((actorInfo): actorInfo is ActorInfo => Boolean(actorInfo));
 
-    // Split server-interface vs MCP-server vs normal Actors. Under `paymentProvider`, standby/MCP-server
-    // Actors are reported as STANDBY_PAYMENT_NOT_SUPPORTED errors instead of contributing
-    // tools — the platform API hard-rejects standby runs under third-party providers.
     const serverActorsInfo: ActorInfo[] = [];
     const actorMCPServersInfo: ActorInfo[] = [];
     const normalActorsInfo: ActorInfo[] = [];
     for (const actorInfo of nonNullActors) {
-        if (paymentProvider && isActorBlockedUnderPaymentProvider(actorInfo.actor)) {
-            errors.push(ActorLoadError.standbyPaymentNotSupported(actorInfo.definition.actorFullName));
-            continue;
-        }
-
         // `call-actor` starts runs, so only an Actor's own tool takes the server interface.
         const toolMode = isDirectTool
             ? resolveActorToolMode(actorInfo)

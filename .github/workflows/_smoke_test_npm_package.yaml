@@ -4,7 +4,7 @@ on:
     workflow_call:
         inputs:
             npm_tag:
-                description: NPM dist-tag to install (e.g. "beta", "latest"). Ignored when version is set.
+                description: NPM dist-tag to install (e.g. "beta", "latest"). Ignored when version or from_source is set.
                 required: false
                 type: string
                 default: latest
@@ -13,10 +13,15 @@ on:
                 required: false
                 type: string
                 default: ""
+            from_source:
+                description: Build and pack the checked-out commit, then install that tarball instead of a version from the registry.
+                required: false
+                type: boolean
+                default: false
 
 jobs:
     smoke_test:
-        name: Smoke test published package
+        name: Smoke test npm package
         runs-on: ubuntu-latest
         steps:
             -   name: Use Node.js
@@ -24,21 +29,43 @@ jobs:
                 with:
                     node-version: 22
 
-            -   name: Install published package
+            -   uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+                if: ${{ inputs.from_source }}
+            -   name: Install pnpm and dependencies
+                if: ${{ inputs.from_source }}
+                uses: apify/actions/pnpm-install@v1.1.2
+            -   name: Build and pack
+                # `pnpm pack` keeps only what package.json#files lists, the same
+                # content `pnpm publish` uploads, so the install below sees what
+                # users would get from the registry.
+                id: pack
+                if: ${{ inputs.from_source }}
+                # `shell: bash` turns on pipefail. Without it a failed `pnpm pack` is
+                # hidden by `tail`, the output stays empty, and the install step falls
+                # back to the registry version instead of this commit.
+                shell: bash
+                run: |
+                    pnpm run build
+                    tarball=$(pnpm pack --pack-destination "$RUNNER_TEMP" | tail -n1)
+                    echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+
+            -   name: Install package
                 uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
                 env:
-                    PKG_VERSION: ${{ inputs.version || inputs.npm_tag }}
+                    PKG_SPEC: ${{ steps.pack.outputs.tarball || format('@apify/actors-mcp-server@{0}', inputs.version || inputs.npm_tag) }}
                 with:
                     timeout_minutes: 5
                     max_attempts: 3
                     retry_wait_seconds: 30
+                    # Outside the checkout: inside it, npm finds the repo's package.json,
+                    # whose devEngines pin to pnpm makes npm fail with EBADDEVENGINES.
                     command: |
-                        mkdir -p smoke-test && cd smoke-test
+                        mkdir -p "$RUNNER_TEMP/smoke-test" && cd "$RUNNER_TEMP/smoke-test"
                         npm init -y
-                        npm install "@apify/actors-mcp-server@${PKG_VERSION}" @apify/mcpc
+                        npm install "${PKG_SPEC}" @apify/mcpc
 
             -   name: Smoke test MCP server via mcpc
-                working-directory: smoke-test
+                working-directory: ${{ runner.temp }}/smoke-test
                 run: |
                     echo '{"mcpServers":{"dev":{"command":"npx","args":["actors-mcp-server","--tools","docs,search-actors,fetch-actor-details","--telemetry-enabled","false"]}}}' > .mcp.json
                     npx mcpc connect .mcp.json:dev @dev

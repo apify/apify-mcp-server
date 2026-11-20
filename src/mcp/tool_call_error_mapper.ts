@@ -8,7 +8,7 @@ import { getToolCallErrorUserText } from '../utils/mcp.js';
 import {
     buildPaymentRequiredResponse,
     buildPermissionApprovalResponse,
-    isX402PaymentRequiredError,
+    isPaymentRequiredError,
 } from '../utils/payment_errors.js';
 import { buildExecutionDiagnostics, formatZodIssues } from '../utils/tool_status.js';
 import { buildActorFields } from '../utils/tools.js';
@@ -59,7 +59,7 @@ export type ToolCallErrorResult =
 export function buildToolCallErrorResult(error: unknown, params: ToolCallErrorParams): ToolCallErrorResult {
     const { toolName, actorName, actorId, isAborted } = params;
 
-    if (isX402PaymentRequiredError(error)) {
+    if (isPaymentRequiredError(error)) {
         return {
             kind: TOOL_CALL_ERROR_KIND.PAYMENT,
             toolStatus: TOOL_STATUS.SOFT_FAIL,

@@ -24,7 +24,6 @@ import {
     shortenProperties,
     transformActorInputSchemaProperties,
 } from '../../src/tools/actor_input_schema.js';
-import { isActorBlockedUnderPaymentProvider } from '../../src/tools/actor_tool_naming.js';
 import { callActor } from '../../src/tools/actors/call_actor.js';
 import { callActorMcpTool } from '../../src/tools/actors/call_actor_mcp_tool.js';
 import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
@@ -1510,19 +1509,5 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
         // A value that a partial enum would have cut is now accepted; only `type` is enforced.
         const { validate } = compileUntrustedSchema(inputSchema);
         expect(validate({ categoryFilterWords: [droppedValue] })).toBe(true);
-    });
-});
-
-describe('isActorBlockedUnderPaymentProvider', () => {
-    const actor = (standby: boolean) => ({
-        actorStandby: standby ? { isEnabled: true } : undefined,
-    });
-
-    it('blocks standby Actors', () => {
-        expect(isActorBlockedUnderPaymentProvider(actor(true))).toBe(true);
-    });
-
-    it('does not block normal Actors', () => {
-        expect(isActorBlockedUnderPaymentProvider(actor(false))).toBe(false);
     });
 });
