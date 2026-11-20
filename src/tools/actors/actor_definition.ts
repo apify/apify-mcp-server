@@ -201,7 +201,7 @@ async function resolveStandbyBuildId(
     if (taggedBuildId) return taggedBuildId;
 
     if (!buildNumber) return undefined;
-    // Unlike the Actor and build reads, listing builds needs a token. Without one (payment-provider sessions),
+    // Unlike the Actor and build reads, listing builds needs a token. Without one (a session with no token),
     // leave an untagged build number unresolved rather than fail the whole read with a 401.
     if (!apifyClient.token) return undefined;
     for await (const build of apifyClient.actor(actor.id).builds().list({ desc: true })) {

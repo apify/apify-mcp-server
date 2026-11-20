@@ -220,16 +220,13 @@ export function respondServerError(
 }
 
 /**
- * Error response for framework paths (native-tool handling and the outer catch in `server.ts`, the
- * x402 path) that record telemetry on local vars and bypass `extractToolTelemetry`. Carries no
+ * Error response for framework paths (native-tool handling, the outer catch in `server.ts` and the
+ * 402 path) that record telemetry on local vars and bypass `extractToolTelemetry`. Carries no
  * `toolTelemetry` key, so nothing leaks onto the wire. Tool handlers must NOT use this — they return
  * a `respond*` error so telemetry is attached and then stripped by `extractToolTelemetry`.
  */
-export function respondErrorNoTelemetry(
-    texts: string | string[],
-    opts?: { structuredContent?: unknown },
-): ToolResponse {
-    return { ...respondOk(texts, opts), isError: true };
+export function respondErrorNoTelemetry(texts: string | string[]): ToolResponse {
+    return { ...respondOk(texts), isError: true };
 }
 
 /**

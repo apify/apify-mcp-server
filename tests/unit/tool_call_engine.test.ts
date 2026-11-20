@@ -45,7 +45,6 @@ function makeSignal(aborted = false): AbortSignal {
 function prepareFields(server: ActorsMcpServer) {
     return {
         tools: server.tools,
-        paymentProvider: server.options.paymentProvider,
         allowUnauthMode: server.options.allowUnauthMode,
     };
 }
@@ -70,7 +69,6 @@ describe('prepareToolCall()', () => {
                 name: 'anything',
                 args: {},
                 meta: undefined,
-                requestHeaders: undefined,
                 isTaskRequest: false,
                 mcpSessionId: 's1',
                 telemetryData,
@@ -94,7 +92,6 @@ describe('prepareToolCall()', () => {
                 name: 'does-not-exist',
                 args: {},
                 meta: undefined,
-                requestHeaders: undefined,
                 isTaskRequest: false,
                 mcpSessionId: 's1',
                 telemetryData,
@@ -117,7 +114,6 @@ describe('prepareToolCall()', () => {
             name: actorNameToToolName(RAG_WEB_BROWSER),
             args: { query: 'AI news' },
             meta: undefined,
-            requestHeaders: undefined,
             isTaskRequest: false,
             mcpSessionId: 's1',
             telemetryData: null,
@@ -139,7 +135,6 @@ describe('prepareToolCall()', () => {
                 name: 'recorder-tool',
                 args: undefined,
                 meta: undefined,
-                requestHeaders: undefined,
                 isTaskRequest: false,
                 mcpSessionId: 's1',
                 telemetryData: null,
@@ -162,7 +157,6 @@ describe('prepareToolCall()', () => {
                 name: 'recorder-tool',
                 args: {},
                 meta: undefined,
-                requestHeaders: undefined,
                 isTaskRequest: false,
                 mcpSessionId: 's1',
                 telemetryData,
@@ -172,7 +166,6 @@ describe('prepareToolCall()', () => {
             const prepared = result as PreparedCall;
             expect(prepared.tool.name).toBe('recorder-tool');
             expect(prepared.standbyRejection).toBeNull();
-            expect(prepared.paymentRequiredResult).toBeUndefined();
             expect(telemetryData.tool_name).toBe('recorder-tool');
         });
     });
@@ -184,7 +177,6 @@ describe('prepareToolCall()', () => {
             name: HELPER_TOOLS.DOCS_SEARCH,
             args: { query: 'proxy error status code 597' },
             meta: undefined,
-            requestHeaders: undefined,
             isTaskRequest: false,
             mcpSessionId: 's1',
             telemetryData: null,
@@ -209,7 +201,6 @@ describe('prepareToolCall()', () => {
                     name,
                     args,
                     meta: undefined,
-                    requestHeaders: undefined,
                     isTaskRequest: false,
                     mcpSessionId: 's1',
                     telemetryData,
@@ -235,7 +226,6 @@ describe('prepareToolCall()', () => {
                     name: 'recorder-tool',
                     args: {},
                     meta: { 'com.apify/traceId': 'thread-1', 'com.apify/useCase': 'find a scraper' },
-                    requestHeaders: undefined,
                     isTaskRequest: false,
                     mcpSessionId: 's1',
                     telemetryData,
@@ -290,7 +280,6 @@ describe('prepareToolCall()', () => {
                 name: tool.name,
                 args,
                 meta: undefined,
-                requestHeaders: undefined,
                 isTaskRequest: false,
                 mcpSessionId: 's1',
                 telemetryData: null,
@@ -359,7 +348,6 @@ describe('prepareToolCall()', () => {
                 name: selectedTool.name,
                 args,
                 meta: undefined,
-                requestHeaders: undefined,
                 isTaskRequest: false,
                 mcpSessionId: 's1',
                 telemetryData: null,
@@ -421,7 +409,6 @@ describe('executeSyncToolCall()', () => {
             name,
             args: {},
             meta: undefined,
-            requestHeaders: undefined,
             isTaskRequest: false,
             mcpSessionId: 's1',
             telemetryData: null,
@@ -439,7 +426,6 @@ describe('executeSyncToolCall()', () => {
             progressToken: undefined,
             tools: server.tools,
             actorStore: server.actorStore,
-            paymentProvider: server.options.paymentProvider,
             signal: makeSignal(aborted),
             sendNotification: vi.fn(),
             emitLog: vi.fn(),
@@ -508,13 +494,12 @@ describe('classifyToolCallError()', () => {
     });
 });
 
-describe('standby rejection outcome', () => {
+describe('pre-flight rejection outcome', () => {
     it('keeps the internal telemetry off the wire and records its failure detail', () => {
         const outcome = buildPreflightFailureOutcome(
-            respondUserError('Actor apify/example-mcp-server is not supported in agentic payment mode.', {
-                detail: 'standby-payment-not-supported',
+            respondUserError('The "actor:tool" syntax is no longer supported by call-actor.', {
+                detail: 'legacy MCP call syntax',
             }),
-            undefined,
             'apify/example-mcp-server',
             undefined,
         );
@@ -522,7 +507,7 @@ describe('standby rejection outcome', () => {
         expect(outcome.result).not.toHaveProperty('toolTelemetry');
         expect(outcome.callDiagnostics).toEqual({
             failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-            failure_detail: 'standby-payment-not-supported',
+            failure_detail: 'legacy MCP call syntax',
             actor_name: 'apify/example-mcp-server',
         });
     });

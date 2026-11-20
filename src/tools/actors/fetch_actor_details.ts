@@ -297,7 +297,7 @@ export function buildActorDetailsTextResponse(options: {
  * Returns the same text + structured response in both modes.
  */
 export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): Promise<ToolResponse> {
-    const { args, apifyToken, apifyClient, actorStore, paymentProvider, loadedToolNames, loadedActorIds } = toolArgs;
+    const { args, apifyToken, apifyClient, actorStore, loadedToolNames, loadedActorIds } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
     const actorName = fixActorNameInput(parsed.actor);
     if (!actorName) return respondUserError(EMPTY_ACTOR_NAME_MESSAGE);
@@ -323,7 +323,6 @@ export async function buildFetchActorDetailsResult(toolArgs: InternalToolArgs): 
         schema: details.webServerSchema,
         serverInterface: resolvedOutput.serverInterface,
         loadedToolNames,
-        hasPaymentProvider: paymentProvider !== undefined,
     });
     if ('error' in serverInterface) return respondUserError(serverInterface.error);
 

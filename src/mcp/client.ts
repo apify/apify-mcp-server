@@ -97,7 +97,14 @@ async function connectWithTransport(
  */
 const REDIRECT_POLICY = 'same-origin';
 
-/** Headers on every request to an Actor's MCP server; the request origin is the one the session's API calls carry. */
+/**
+ * Headers on every request to an Actor's MCP server; the request origin is the one the session's API calls carry.
+ *
+ * The token does not reach the Actor. The Apify platform serves the Actor's standby host: it authenticates the
+ * caller with the `authorization` header and removes the header before it passes the request to the Actor's
+ * container. Without the token the platform answers 401. This holds only on a standby host, so the URL must come
+ * from `getActorMCPServerURL`.
+ */
 function buildMCPRequestHeaders({ token, requestOrigin }: McpConnectionOptions): Record<string, string> {
     return { authorization: `Bearer ${token}`, [REQUEST_ORIGIN_HEADER]: requestOrigin ?? REQUEST_ORIGIN.MCP };
 }

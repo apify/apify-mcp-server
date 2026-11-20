@@ -393,24 +393,6 @@ describe('createExpressApp() era routing', () => {
         });
     });
 
-    it('sends no auth info in payment mode, so the client-supplied token is used', async () => {
-        const { tool, received } = makeArgsRecorderTool();
-        getActorsMock.mockResolvedValue([tool]);
-
-        await withDevServer(async (post) => {
-            const { body, headers } = statelessRequest(
-                'tools/call',
-                { name: tool.name, arguments: {} },
-                { apifyToken: 'client-supplied-token' },
-            );
-
-            const response = await post(`${DEV_URL}&payment=skyfire`, body, headers);
-
-            expect(response.status).toBe(200);
-            expect(received.apifyToken).toBe('client-supplied-token');
-        });
-    });
-
     it('rejects a header-mismatched request 400/-32020 even without a token', async () => {
         // SEP-2243: a framing rejection outranks auth. The body names `tools/list` while the
         // `Mcp-Method` header claims `tools/call`, and the request carries no token — the

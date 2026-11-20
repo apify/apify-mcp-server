@@ -5,7 +5,7 @@ import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
-import { prepareToolCallContext } from '../../src/payments/helpers.js';
+import { prepareToolCallContext } from '../../src/mcp/tool_call_context.js';
 import { updateActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { getActorVersion } from '../../src/tools/versions/get_actor_version.js';
 import { buildFilesRevision } from '../../src/tools/versions/source_files.js';
@@ -168,7 +168,7 @@ describe('update-actor-version', () => {
         });
     });
 
-    it('is a destructive, non-idempotent, open-world tool without payment, since autoBuild starts a build', () => {
+    it('is a destructive, non-idempotent, open-world tool, since autoBuild starts a build', () => {
         expect(updateActorVersion.name).toBe(HELPER_TOOLS.ACTOR_VERSION_UPDATE);
         expect(updateActorVersion.annotations).toEqual({
             title: 'Update Actor version',
@@ -177,7 +177,6 @@ describe('update-actor-version', () => {
             idempotentHint: false,
             openWorldHint: true,
         });
-        expect((updateActorVersion as HelperTool).paymentRequired).toBeUndefined();
     });
 
     it('names the reason codes of a failed check in its description without asking for a retry', () => {
@@ -476,8 +475,7 @@ describe('update-actor-version', () => {
     describe('logged arguments', () => {
         const SECRET = 'synthetic-secret-4f2a';
         const getLoggedArgs = (args: Record<string, unknown>) =>
-            prepareToolCallContext({ provider: undefined, tool: updateActorVersion, args, apifyToken: 'test-token' })
-                .toolArgsRedacted;
+            prepareToolCallContext({ tool: updateActorVersion, args, apifyToken: 'test-token' }).toolArgsRedacted;
 
         it('keep the paths, operation types, and hashes, and replace content and edit texts with a marker', () => {
             const args = {
@@ -1376,6 +1374,18 @@ describe('update-actor-version', () => {
 
             expect(text).toBe(
                 'Nothing was written: operations[0] (edit src/main.js) failed with NO_MATCH. oldText of edits[0] is not in the file.',
+            );
+        });
+
+        it('reports an oldText longer than the file (NO_MATCH)', async () => {
+            mockFiles({ name: 'src/main.js', format: 'TEXT', content: 'x'.repeat(300) });
+
+            const text = await callToolExpectingUserError({
+                operations: [edit('src/main.js', { oldText: 'x'.repeat(301), newText: '' })],
+            });
+
+            expect(text).toBe(
+                `${failedWith(0, 'edit', 'src/main.js', 'NO_MATCH')} oldText of edits[0] is not in the file.`,
             );
         });
 

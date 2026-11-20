@@ -1,15 +1,13 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import Ajv from 'ajv';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
 
 import type * as ApifyClientModule from '../../src/apify_client.js';
 import { REQUEST_ORIGIN } from '../../src/apify_client.js';
-import { APIFY_AI_CLIENT_NAME, HELPER_TOOLS } from '../../src/const.js';
+import { APIFY_AI_CLIENT_NAME, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
 import * as mcpClient from '../../src/mcp/client.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
-import { X402PaymentProvider } from '../../src/payments/x402.js';
 import * as telemetry from '../../src/telemetry.js';
 import { getOwnServerRemedy } from '../../src/tools/actor_tool_naming.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
@@ -24,12 +22,10 @@ import {
     getRequestHandler,
     makeActorTool,
     makeArgsRecorderTool,
-    makePaymentRequiredError,
     makeThrowingTool,
     STATELESS_PROTOCOL_VERSION,
     withServer,
     withStatelessServer,
-    X402_PAYMENT_DATA,
 } from './helpers/mcp_server.js';
 import { mockApifyClient } from './helpers/tool_context.js';
 
@@ -66,24 +62,6 @@ function makeActorMcpTool(): ToolEntry {
         originToolName: 'origin-tool',
         actorId: 'test/actor',
         serverUrl: 'https://example.invalid/mcp',
-    } as ToolEntry;
-}
-
-/**
- * A paid `call-actor` whose declared success shape the payment provider widens with the x402
- * PaymentRequired branch — the schema a strict client validates `structuredContent` against.
- */
-function makePaidCallActorTool(): ToolEntry {
-    return {
-        type: TOOL_TYPE.INTERNAL,
-        name: HELPER_TOOLS.ACTOR_CALL,
-        description: 'calls an Actor',
-        inputSchema: { type: 'object', properties: { actor: { type: 'string' } } } as ToolInputSchema,
-        ajvValidate: compileSchema({ type: 'object', properties: { actor: { type: 'string' } } }),
-        paymentRequired: true,
-        hasPaymentProviderStandbyCheck: true,
-        outputSchema: { type: 'object', properties: { runId: { type: 'string' } }, required: ['runId'] },
-        call: async () => respondRaw({ content: [{ type: 'text', text: 'dispatch is never reached' }] }),
     } as ToolEntry;
 }
 
@@ -411,34 +389,31 @@ describe('createStatelessServer() tools/call', () => {
         });
     });
 
-    it('projects a payment-classified pre-dispatch failure against the tool it named', async () => {
-        // The standby check runs inside `prepareToolCall`, before dispatch; a 402 from it is
-        // classified there and comes back as an already-built result, so the handler returns through
-        // its `'result' in prepared` branch — the one return path that skipped the tool's schema.
-        // The payload rides `structuredContent`, which is exactly what a paid tool's widened
-        // outputSchema exists to keep valid for strict clients (#917).
-        vi.spyOn(callActor, 'checkPaymentProviderStandbyConflict').mockRejectedValue(
-            makePaymentRequiredError(X402_PAYMENT_DATA),
-        );
-        const args = { actor: 'apify/rag-web-browser' };
-        const options = { paymentProvider: new X402PaymentProvider() };
-        const legacy = await callViaLegacy(() => [makePaidCallActorTool()], HELPER_TOOLS.ACTOR_CALL, options, args);
+    it('returns a failure classified after name resolution as the projected tool result', async () => {
+        // A non-protocol throw while preparing a resolved tool is classified by the engine, so the handler
+        // returns through its `'result' in prepared` branch instead of dispatching.
+        vi.spyOn(log, 'exception').mockImplementation(() => log);
+        vi.spyOn(callActor, 'buildLegacyMcpSyntaxRejection').mockImplementation(() => {
+            throw Object.assign(new Error('server error'), { statusCode: 500 });
+        });
+        const trackSpy = vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        const options = { token: undefined, allowUnauthMode: true, telemetry: { enabled: true } };
+        const legacy = await callViaLegacy(() => [makeArgsRecorderTool().tool], 'recorder-tool', options);
+        trackSpy.mockClear();
 
         await withStatelessServer(async ({ server, call }) => {
-            await loadSource(server, [makePaidCallActorTool()]);
+            await loadSource(server, [makeArgsRecorderTool().tool]);
 
-            const response = await call('tools/call', { name: HELPER_TOOLS.ACTOR_CALL, arguments: args });
+            const response = await call('tools/call', { name: 'recorder-tool', arguments: {} });
 
             expect(response.result?.isError).toBe(true);
-            expect(response.result?.structuredContent).toEqual(X402_PAYMENT_DATA);
-            // The projected payload validates against the schema this request advertised for the
-            // tool — the widened `anyOf`, read back off the served tool set.
-            const outputSchema = server.tools.get(HELPER_TOOLS.ACTOR_CALL)?.outputSchema as object;
-            const validate = new Ajv({ strict: false, allErrors: true }).compile(outputSchema);
-            expect(validate(response.result?.structuredContent)).toBe(true);
-            // Byte-for-byte what the stateful path returns for the same failure.
             expect(response.result).toMatchObject(asWire(legacy) as Record<string, unknown>);
         }, options);
+        expect(trackSpy.mock.calls).toHaveLength(1);
+        expect(trackSpy.mock.calls[0][2]).toMatchObject({
+            tool_name: 'recorder-tool',
+            tool_status: TOOL_STATUS.FAILED,
+        });
     });
 
     it('answers an unknown tool name with an invalid-params protocol error', async () => {

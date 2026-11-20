@@ -129,7 +129,6 @@ export const getActorRun: ToolEntry = Object.freeze({
     inputSchema: fixZodSchemaRequired(z.toJSONSchema(getActorRunArgs)) as ToolInputSchema,
     outputSchema: actorRunOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorRunArgs)),
-    paymentRequired: true,
     annotations: {
         title: 'Get Actor run',
         readOnlyHint: true,

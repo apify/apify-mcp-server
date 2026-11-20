@@ -5,8 +5,6 @@
 import { ApifyClient, runWithForwardedApiHeaders } from './apify_client.js';
 import { defaults, HELPER_TOOLS, type HelperToolName } from './const.js';
 import { processParamsGetTools } from './mcp/utils.js';
-import { resolvePaymentProvider } from './payments/index.js';
-import type { PaymentProvider } from './payments/types.js';
 import { getServerCard } from './server_card.js';
 import { actorNameToToolName } from './tools/actor_tool_naming.js';
 import {
@@ -39,9 +37,7 @@ export {
     getUnauthEnabledToolCategories,
     unauthEnabledTools,
     parseQueryParamList,
-    resolvePaymentProvider,
     runWithForwardedApiHeaders,
-    type PaymentProvider,
 };
 
 /** @deprecated Use HELPER_TOOLS / HelperToolName. Kept for backward compatibility with apify-mcp-server-internal. */

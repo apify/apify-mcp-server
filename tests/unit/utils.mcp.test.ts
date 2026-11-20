@@ -114,13 +114,6 @@ describe('respondErrorNoTelemetry()', () => {
         expect(result).toEqual({ content: [{ type: 'text', text: 'failed' }], isError: true });
         expect('toolTelemetry' in result).toBe(false);
     });
-
-    it('carries structuredContent when provided, still no telemetry', () => {
-        const result = respondErrorNoTelemetry(['{"x":1}', 'note'], { structuredContent: { x: 1 } });
-        expect(result.isError).toBe(true);
-        expect(result.structuredContent).toEqual({ x: 1 });
-        expect('toolTelemetry' in result).toBe(false);
-    });
 });
 
 describe('respondUserError()', () => {

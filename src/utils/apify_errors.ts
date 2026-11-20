@@ -11,8 +11,8 @@ import {
 } from '../const.js';
 
 // Helpers that read or classify an error received from the Apify API by its `type`. Kept in one leaf
-// module (imports only const and external packages) so logging, telemetry, payments, and the tool layer
-// can share them without import cycles.
+// module (imports only const and external packages) so logging, telemetry, the 402 handling and the tool
+// layer can share them without import cycles.
 
 /** The API's machine-readable error type (e.g. `actor-task-name-not-unique`), if the error carries one. */
 export function getApifyErrorType(error: unknown): string | undefined {
