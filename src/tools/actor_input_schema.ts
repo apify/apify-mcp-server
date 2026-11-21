@@ -352,13 +352,28 @@ function getEnumIfFits(enumList: string[]): string[] | undefined {
     return charCount <= ACTOR_ENUM_MAX_LENGTH ? nonEmpty : undefined;
 }
 
-/** Cut at the last complete sentence in the cap, or the last complete word if there is none. */
-function shortenDescription(description: string): string {
-    const truncated = description.slice(0, ACTOR_MAX_DESCRIPTION_LENGTH);
-    const remainder = description.slice(ACTOR_MAX_DESCRIPTION_LENGTH);
+const ARABIC_COMBINING_MARK_RE = /^[\u064B-\u065F\u0670\u06D6-\u06ED]/;
+
+/** Cut at the last complete sentence in the cap (including Arabic ؟), or the last complete word if there is none. */
+export function shortenDescription(description: string): string {
+    let cutIndex = ACTOR_MAX_DESCRIPTION_LENGTH;
+    // Never split a UTF-16 surrogate pair
+    if (
+        cutIndex < description.length &&
+        description.charCodeAt(cutIndex - 1) >= 0xd800 &&
+        description.charCodeAt(cutIndex - 1) <= 0xdbff
+    ) {
+        cutIndex -= 1;
+    }
+    // Never slice an Arabic combining mark (Tashkeel) off its base letter
+    while (cutIndex > 0 && cutIndex < description.length && ARABIC_COMBINING_MARK_RE.test(description.slice(cutIndex))) {
+        cutIndex -= 1;
+    }
+    const truncated = description.slice(0, cutIndex);
+    const remainder = description.slice(cutIndex);
     const sentenceEnd =
-        [...truncated.matchAll(/[.!?](?=\s)/g)].at(-1)?.index ??
-        (/[.!?]$/.test(truncated) && /^\s/.test(remainder) ? truncated.length - 1 : undefined);
+        [...truncated.matchAll(/[.!?؟](?=\s)/g)].at(-1)?.index ??
+        (/[.!?؟]$/.test(truncated) && /^\s/.test(remainder) ? truncated.length - 1 : undefined);
     const shortened =
         sentenceEnd === undefined
             ? `${/^\s/.test(remainder) ? truncated.trimEnd() : truncated.replace(/\s+\S*$/, '')}…`

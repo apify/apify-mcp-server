@@ -27,12 +27,15 @@ export function readJsonFile<T = unknown>(importMetaUrl: string, relativePath: s
  * parseCommaSeparatedList("a, b, c"); // ["a", "b", "c"]
  * parseCommaSeparatedList("a, , b"); // ["a", "b"]
  */
+const BIDI_ZERO_WIDTH_RE = /[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g;
+
 export function parseCommaSeparatedList(input?: string): string[] {
     if (!input) {
         return [];
     }
     return input
-        .split(',')
+        .replace(BIDI_ZERO_WIDTH_RE, '')
+        .split(/[,،]/)
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
 }
@@ -64,10 +67,10 @@ export function parseQueryParamList(param?: string | string[]): string[] {
  * and `normalizeRecordKey` (which preserves apostrophes in KV record keys).
  * Single source of truth: extend here and both call sites pick it up.
  */
-export const QUOTE_WRAPPER_CHARS = '`"“”‘’';
+export const QUOTE_WRAPPER_CHARS = '`"“”‘’«»‹›';
 
 /**
- * Strip surrounding quote/backtick wrappers and whitespace from an LLM-supplied id.
+ * Strip surrounding quote/backtick wrappers, Arabic guillemets, invisible BiDi controls, and whitespace from an LLM-supplied id.
  *
  * LLMs paste names wrapped in markdown backticks or smart quotes; the Apify API
  * treats those as distinct strings and 404s. Strips any leading/trailing run of
@@ -75,7 +78,8 @@ export const QUOTE_WRAPPER_CHARS = '`"“”‘’';
  * and nested wrappers (`` `"id"` ``) uniformly.
  */
 export function stripQuoteWrappers(s: string): string {
-    return stripEdgeChars(s.trim(), `${QUOTE_WRAPPER_CHARS}'`).trim();
+    const cleaned = s.replace(BIDI_ZERO_WIDTH_RE, '').trim();
+    return stripEdgeChars(cleaned, `${QUOTE_WRAPPER_CHARS}'`).replace(BIDI_ZERO_WIDTH_RE, '').trim();
 }
 
 /**
