@@ -81,7 +81,8 @@ export function buildRebuildNote(versionNumber: string, loadedToolNames: readonl
 
 /**
  * The response to an error of an env-vars write tool. A 4xx from the API is answered here: a 401 or 403 as an auth
- * failure with the token hint, except a duplicate create, which the API also answers with 403. The API's message is
+ * failure with the token hint, except a duplicate create, which the API also answers with 403 and which, on a retried
+ * attempt, may be this call's own earlier attempt. The API's message is
  * left out when it contains `secretValue`, so the value never reaches the result. Anything else goes to
  * `respondToSourceToolError`, which answers a `UserInputError` and rethrows the rest; a rethrown error whose message
  * contains `secretValue` is replaced by one without it.
@@ -97,8 +98,14 @@ export function respondToEnvVarWriteError(error: unknown, secretValue?: string):
             ? 'The API refused the variable; its message is left out because it contained the value'
             : error.message.replace(/\.$/, '');
         const typeNote = error.type ? ` (API error type: ${error.type})` : '';
+        // apify-client retries a create after a network error, a timeout, a 429, or a 5xx: an attempt the platform
+        // saved but did not answer makes the retry look like a duplicate.
+        const retryNote =
+            error.type === APIFY_ERROR_TYPE_ENV_VAR_ALREADY_EXISTS && error.attempt > 1
+                ? ' The request was retried, so an earlier attempt of this call may have created the variable; calling again replaces it.'
+                : '';
         const hint = isAuthFailure ? ` ${getHttpErrorHint(error.statusCode)}` : '';
-        return respondUserError(`${message}${typeNote}.${hint}`, {
+        return respondUserError(`${message}${typeNote}.${retryNote}${hint}`, {
             category: isAuthFailure ? FAILURE_CATEGORY.AUTH : FAILURE_CATEGORY.INVALID_INPUT,
             httpStatus: error.statusCode,
         });

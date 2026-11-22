@@ -49,14 +49,14 @@ function mockEnvVarItems() {
     ];
 }
 
-function mockApiError(status: number, type: string, message: string) {
+function mockApiError(status: number, type: string, message: string, attempt = 1) {
     return new ApifyApiError(
         {
             status,
             data: { error: { type, message } },
             config: { method: 'POST', url: 'https://api.apify.com/v2/acts/actor-1/versions/0.1/env-vars' },
         } as AxiosResponse,
-        1,
+        attempt,
     );
 }
 
@@ -251,6 +251,16 @@ describe('set-actor-env-var', () => {
             const result = await callTool({ name: 'DEBUG', value: 'true' });
 
             expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).not.toContain('retried');
+        });
+
+        it('says a duplicate refused on a retried attempt may be this call’s own earlier attempt', async () => {
+            envVarCreateMock.mockRejectedValue(mockApiError(403, 'env-var-already-exists', 'Already exists', 2));
+
+            const result = await callTool({ name: 'DEBUG', value: 'true' });
+
+            expectSoftFailInvalidInput(result);
+            expect(result.content[0].text).toContain('an earlier attempt of this call may have created the variable');
         });
 
         it('leaves out an API message that contains the value', async () => {
