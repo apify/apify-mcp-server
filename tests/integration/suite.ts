@@ -4,6 +4,7 @@ import { ApifyClient } from '../../src/apify_client.js';
 import {
     actorsCases,
     appsCases,
+    envVarsCases,
     registerCases,
     registrationCases,
     schedulesCases,
@@ -59,6 +60,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             registerCases('storage', storageCases, ctx);
             registerCases('schedules', schedulesCases, ctx);
             registerCases('versions', versionsCases, ctx);
+            registerCases('env-vars', envVarsCases, ctx);
         },
     );
 }

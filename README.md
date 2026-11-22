@@ -223,6 +223,7 @@ Besides Actor tools, the server provides helper tools for the Apify platform:
 - **Runs and storage:** list runs, inspect them, read their logs, and read datasets and key-value stores.
 - **Tasks and schedules:** manage saved Actor tasks and their public landing pages, and schedules that run Actors and tasks automatically.
 - **Builds and versions:** build Actors, read build logs, and create, read, change, copy, and delete versions from files.
+- **Environment variables:** list an Actor version's environment variables, without secret values.
 - **Apify API:** search the API reference, inspect an operation, and send requests to read or change data.
 
 ### Available tools
@@ -279,6 +280,7 @@ Legend for the **Enabled by default** column:
 | `update-actor-version` | versions | Write, edit, or delete files of an Actor version in one all-or-nothing write. | |
 | `create-actor-version` | versions | Add a version to an Actor, from files or as a copy of another version, optionally starting a build. | |
 | `delete-actor-version` | versions | Delete an Actor version. Its builds and their tags stay. | |
+| `get-actor-env-var-list` | env-vars | List an Actor version's environment variables, with the values of the plain ones. Secret values are never returned. | |
 | `apify-api-search` | api | Search the Apify API reference by keywords. Returns each operation's method, path, and docs page. | |
 | `apify-api-details` | api | Get the parameters and request body schema of the Apify API operations on a path. | |
 | `apify-api-read` | api | Send a GET request to an Apify API path, like `apify api` in the Apify CLI. It refuses GETs to the synchronous run endpoints, which start a paid run. | |

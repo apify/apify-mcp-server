@@ -105,6 +105,10 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     copy in create-actor-version refuse a version not stored as files (Git repository, gist, or zip);
     create-actor-version from files and delete-actor-version work whatever the Actor's versions are
     stored as, but delete-actor-version takes expectedRevision only for a version stored as files.
+  - `env_vars/`: the `env-vars` category, not served by default. `get-actor-env-var-list` resolves the Actor and
+    version with `fetchActor` and `resolveVersion` from `versions/source_helpers.ts` and reads the variables from
+    their own endpoint. It returns each variable's name and isSecret, field by field, and the value of plain
+    variables only, up to `MAX_INLINE_BYTES` in total; a secret's value and every `valueHash` stay out.
   - `api/` — the generic Apify API tools: search the operations of the published OpenAPI spec, get the
     operations on a path, and send a GET, or a POST, PUT, PATCH, or DELETE, to a path. All four are in the
     `api` category, which is not served by default, so a session gets the write tool only with `tools=api`

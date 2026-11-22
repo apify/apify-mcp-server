@@ -36,6 +36,7 @@ import { getActorBuildLog } from './builds/get_actor_build_log.js';
 import { reportProblem } from './dev/report_problem.js';
 import { fetchApifyDocs } from './docs/fetch_apify_docs.js';
 import { searchApifyDocs } from './docs/search_apify_docs.js';
+import { getActorEnvVarList } from './env_vars/get_actor_env_var_list.js';
 import { abortActorRun } from './runs/abort_actor_run.js';
 import { getActorRun } from './runs/get_actor_run.js';
 import { getActorRunList } from './runs/get_actor_run_list.js';
@@ -93,6 +94,7 @@ export const toolCategories = {
     schedules: [createSchedule, getSchedule, updateSchedule, deleteSchedule],
     builds: [getActorBuild, getActorBuildLog, getActorBuildList, buildActor],
     versions: [getActorVersion, createActor, updateActorVersion, createActorVersion, deleteActorVersion],
+    'env-vars': [getActorEnvVarList],
     api: [apifyApiSearch, apifyApiDetails, apifyApiRead, apifyApiWrite],
     dev: [reportProblem],
 } satisfies Record<string, ToolEntry[]>;
