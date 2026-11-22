@@ -109,13 +109,15 @@ describe('get-actor-env-var-list', () => {
     it.each([
         {
             outcome: 'several versions and no versionNumber',
+            args: {},
             setup: () => actorGetMock.mockResolvedValue(mockActor(['0.1', '0.2'])),
         },
-        { outcome: 'a missing Actor', setup: () => actorGetMock.mockResolvedValue(undefined) },
-    ])('soft-fails without reading variables for $outcome', async ({ setup }) => {
+        { outcome: 'a version the Actor does not have', args: { versionNumber: '9.9' }, setup: () => {} },
+        { outcome: 'a missing Actor', args: {}, setup: () => actorGetMock.mockResolvedValue(undefined) },
+    ])('soft-fails without reading variables for $outcome', async ({ args, setup }) => {
         setup();
 
-        const result = await callTool({});
+        const result = await callTool(args);
 
         expectSoftFailInvalidInput(result);
         expect(envVarListMock).not.toHaveBeenCalled();
