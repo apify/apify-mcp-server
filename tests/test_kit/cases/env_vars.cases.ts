@@ -76,4 +76,68 @@ export const envVarsCases: Case[] = [
             }
         }),
     },
+    {
+        name: 'set-actor-env-var and delete-actor-env-var round-trip with get-actor-env-var-list, never returning a secret value',
+        isDeploymentTest: false,
+        run: withClient({ tools: ['env-vars'] }, async (client, ctx) => {
+            const api = ctx.createApifyClient();
+            const name = buildUniqueActorName('set-delete');
+            const { username } = await api.user().get();
+            const selector = `${username}~${name}`;
+            const secretValue = `secret-${Math.random().toString(36).slice(2)}`;
+            const callTool = async (toolName: string, args: Record<string, unknown>) => {
+                const result = (await client.callTool({
+                    name: toolName,
+                    arguments: { actor: selector, ...args },
+                })) as ToolCallResult;
+                expect(result.isError, JSON.stringify(result.content)).not.toBe(true);
+                validateStructuredOutputForTool(result, toolName, 'default');
+                expect(JSON.stringify(result)).not.toContain(secretValue);
+                return result.structuredContent as Record<string, unknown>;
+            };
+            const listEnvVars = async () => {
+                const { envVars } = (await callTool('get-actor-env-var-list', {})) as {
+                    envVars: { name: string }[];
+                };
+                return [...envVars].sort((a, b) => (a.name < b.name ? -1 : 1));
+            };
+            try {
+                await api.actors().create({
+                    name,
+                    versions: [
+                        {
+                            versionNumber: '0.0',
+                            sourceType: ActorSourceType.SourceFiles,
+                            sourceFiles: [{ name: 'src/main.js', format: 'TEXT', content: 'console.log("env");\n' }],
+                        },
+                    ],
+                });
+
+                expect(await callTool('set-actor-env-var', { name: 'MODE', value: 'test' })).toMatchObject({
+                    name: 'MODE',
+                    isSecret: false,
+                    created: true,
+                });
+                expect(
+                    await callTool('set-actor-env-var', { name: 'API_KEY', value: secretValue, isSecret: true }),
+                ).toMatchObject({ name: 'API_KEY', isSecret: true, created: true });
+                // An update without isSecret keeps the variable secret.
+                expect(
+                    await callTool('set-actor-env-var', { name: 'API_KEY', value: `${secretValue}-rotated` }),
+                ).toMatchObject({ name: 'API_KEY', isSecret: true, created: false });
+                expect(await listEnvVars()).toEqual([
+                    { name: 'API_KEY', isSecret: true },
+                    { name: 'MODE', isSecret: false, value: 'test' },
+                ]);
+
+                expect(await callTool('delete-actor-env-var', { name: 'MODE' })).toMatchObject({
+                    name: 'MODE',
+                    deleted: true,
+                });
+                expect(await listEnvVars()).toEqual([{ name: 'API_KEY', isSecret: true }]);
+            } finally {
+                await api.actor(selector).delete();
+            }
+        }),
+    },
 ];

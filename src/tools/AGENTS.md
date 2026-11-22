@@ -109,6 +109,12 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     version with `fetchActor` and `resolveVersion` from `versions/source_helpers.ts` and reads the variables from
     their own endpoint. It returns each variable's name and isSecret, field by field, and the value of plain
     variables only, up to `MAX_INLINE_BYTES` in total; a secret's value and every `valueHash` stay out.
+    `set-actor-env-var` and `delete-actor-env-var` resolve the Actor and version the same way and read the variables
+    first (`fetchEnvVarTarget` in `env_vars/env_var_helpers.ts`): set uses them to choose create or update, to keep a
+    replaced variable's isSecret when the call omits it, and to refuse a create over `ENV_VARS_MAX_COUNT`; delete uses
+    them to refuse a missing name, since apify-client swallows a 404 on delete. Both write through the variable's own
+    route with the name URL-encoded, refuse `.` and `..`, and end the result with the rebuild note. set redacts
+    `value` with `redactArgs` and never puts it in a result or an error (`respondToEnvVarWriteError`).
   - `api/` — the generic Apify API tools: search the operations of the published OpenAPI spec, get the
     operations on a path, and send a GET, or a POST, PUT, PATCH, or DELETE, to a path. All four are in the
     `api` category, which is not served by default, so a session gets the write tool only with `tools=api`

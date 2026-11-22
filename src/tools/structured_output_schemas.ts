@@ -743,6 +743,36 @@ export const getActorEnvVarListToolOutputSchema = {
     required: ['actorId', 'fullName', 'versionNumber', 'envVars'],
 };
 
+/** Schema for set-actor-env-var: the variable's name and isSecret, never its value. */
+export const setActorEnvVarToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'Actor ID' },
+        fullName: { type: 'string', description: 'Actor full name, username/name' },
+        versionNumber: { type: 'string', description: 'Version number, e.g. 0.1' },
+        name: { type: 'string', description: 'Variable name' },
+        isSecret: { type: 'boolean', description: 'Whether the value is stored encrypted' },
+        created: {
+            type: 'boolean',
+            description: 'true when the version had no variable of this name, false when the call replaced one',
+        },
+    },
+    required: ['actorId', 'fullName', 'versionNumber', 'name', 'isSecret', 'created'],
+};
+
+/** Schema for delete-actor-env-var. */
+export const deleteActorEnvVarToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'Actor ID' },
+        fullName: { type: 'string', description: 'Actor full name, username/name' },
+        versionNumber: { type: 'string', description: 'Version number, e.g. 0.1' },
+        name: { type: 'string', description: 'Name of the deleted variable' },
+        deleted: { type: 'boolean', description: 'Always true; a missing variable is an error' },
+    },
+    required: ['actorId', 'fullName', 'versionNumber', 'name', 'deleted'],
+};
+
 /** Schema for update-actor-version: the new revision and what changed. */
 export const updateActorVersionToolOutputSchema = {
     type: 'object' as const,

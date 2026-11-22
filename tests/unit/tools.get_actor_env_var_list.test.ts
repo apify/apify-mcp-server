@@ -69,7 +69,7 @@ describe('get-actor-env-var-list', () => {
     it('is a read-only tool in the env-vars category, which is not enabled by default', () => {
         expect(getActorEnvVarList.name).toBe(HELPER_TOOLS.ACTOR_ENV_VAR_LIST_GET);
         expect(getActorEnvVarList.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
-        expect(getCategoryTools()['env-vars']).toEqual([getActorEnvVarList]);
+        expect(getCategoryTools()['env-vars']).toContain(getActorEnvVarList);
         expect(toolCategoriesEnabledByDefault).not.toContain('env-vars');
     });
 
