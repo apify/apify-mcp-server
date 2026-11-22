@@ -162,7 +162,11 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         });
 
         it('has correct tools in env-vars category (both modes)', () => {
-            const expected = [HELPER_TOOLS.ACTOR_ENV_VAR_LIST_GET];
+            const expected = [
+                HELPER_TOOLS.ACTOR_ENV_VAR_LIST_GET,
+                HELPER_TOOLS.ACTOR_ENV_VAR_SET,
+                HELPER_TOOLS.ACTOR_ENV_VAR_DELETE,
+            ];
             expect(toolNames(defaultCategories['env-vars'])).toEqual(expected);
             expect(toolNames(appsCategories['env-vars'])).toEqual(expected);
         });
