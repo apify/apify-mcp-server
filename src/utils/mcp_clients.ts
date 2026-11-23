@@ -6,14 +6,8 @@ import {
     STORE_USE_CASE_MAX_LENGTH,
 } from '../const.js';
 import type { McpClientContext } from '../mcp/client_context.js';
+import { redactApiTokens } from './generic.js';
 import { APIFY_TRACE_ID_META_KEY, hashSessionId } from './mcp.js';
-
-const APIFY_API_TOKEN_REGEX = /apify_api_[A-Za-z0-9]+/g;
-
-/** `text` with every Apify API token replaced by `apify_api_***`. */
-export function redactApiTokens(text: string): string {
-    return text.replace(APIFY_API_TOKEN_REGEX, 'apify_api_***');
-}
 
 /** True when `report-problem` is blocklisted for the connecting client (substring match on {@link ANTHROPIC_CLIENT_NAMES}). */
 export function isReportProblemBlockedForClient(context: McpClientContext | undefined): boolean {

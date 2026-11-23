@@ -107,3 +107,10 @@ export function computeValueBytes(value: unknown): number | undefined {
         return undefined;
     }
 }
+
+const APIFY_API_TOKEN_REGEX = /apify_api_[A-Za-z0-9]+/g;
+
+/** `text` with every Apify API token replaced by `apify_api_***`. */
+export function redactApiTokens(text: string): string {
+    return text.replace(APIFY_API_TOKEN_REGEX, 'apify_api_***');
+}

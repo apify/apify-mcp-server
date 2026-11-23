@@ -17,6 +17,7 @@ import { maskLoggedInputs, pickLoggedValues, REDACTED } from '../../resources/ap
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ACTOR_TOOL_MODE, ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorToolResolutionCached } from '../../utils/actor.js';
+import { fixActorNameInput, getMcpToolNameSuffixIndex, normalizeActorNameInput } from '../../utils/actor_name.js';
 import { compileSchema } from '../../utils/ajv.js';
 import {
     ACTOR_RUN_LIMIT_MESSAGE,
@@ -50,13 +51,7 @@ import {
     CALL_ACTOR_WAIT_SECS_DEFAULT,
     fetchActorRunData,
 } from './actor_run_response.js';
-import {
-    EMPTY_ACTOR_NAME_MESSAGE,
-    fixActorNameInput,
-    getActorsAsTools,
-    getMcpToolNameSuffixIndex,
-    normalizeActorNameInput,
-} from './actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE, getActorsAsTools } from './actor_tools_factory.js';
 
 // ---------------------------------------------------------------------------
 // Shared call-actor description building blocks

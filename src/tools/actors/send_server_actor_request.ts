@@ -31,6 +31,7 @@ import type {
 } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
+import { fixActorNameInput } from '../../utils/actor_name.js';
 import { fixZodSchemaRequired } from '../../utils/ajv.js';
 import { stripTrailingChars } from '../../utils/generic.js';
 import { toPlainError } from '../../utils/logging.js';
@@ -41,7 +42,7 @@ import { redactApiCallArgs } from '../api/apify_api_request.js';
 import { API_METHODS, type ApiMethod, isRecord } from '../api/apify_api_spec.js';
 import { parseBaseMimeType } from '../storage/storage_helpers.js';
 import { anyJsonBodySchema, serverActorRequestOutputSchema } from '../structured_output_schemas.js';
-import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInput } from './actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 
 const queryValue = z.union([z.string(), z.number(), z.boolean()]);

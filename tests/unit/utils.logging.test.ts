@@ -10,6 +10,7 @@ import { MAX_UNTRUSTED_SCHEMA_BYTES } from '../../src/tools/actor_input_schema.j
 import {
     isMcpClientFaultMessage,
     logHttpError,
+    redactApiTokensInLogs,
     sanitizeMezmoMessage,
     sanitizeMezmoValue,
 } from '../../src/utils/logging.js';
@@ -270,5 +271,23 @@ describe('sanitizeMezmoValue', () => {
             limit: 5,
             tags: ['failure handling', 'INTERNAL_ERROR'],
         });
+    });
+});
+
+describe('API tokens are redacted from log lines', () => {
+    it('replaces a token in the message and in the data of a line written after the call', () => {
+        const token = `apify_api_${'a1B2'.repeat(9)}`;
+        const lines: string[] = [];
+        const spies = (['log', 'error'] as const).map((method) =>
+            vi.spyOn(console, method).mockImplementation((line) => void lines.push(String(line))),
+        );
+        redactApiTokensInLogs();
+
+        log.error(`Actor '${token}' was not found`, { actorName: token });
+
+        for (const spy of spies) spy.mockRestore();
+        expect(lines).toHaveLength(1);
+        expect(lines[0]).not.toContain(token);
+        expect(lines[0].split('apify_api_***')).toHaveLength(3);
     });
 });

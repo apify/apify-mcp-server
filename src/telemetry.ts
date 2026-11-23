@@ -8,7 +8,7 @@ import log from '@apify/log';
 import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV } from './const.js';
 import type { reportProblemArgsSchema } from './tools/dev/report_problem.js';
 import type { ReportedProblemTelemetryProperties, TelemetryEnv, ToolCallTelemetryProperties } from './types.js';
-import { redactApiTokens } from './utils/mcp_clients.js';
+import { redactApiTokens } from './utils/generic.js';
 
 type ReportProblemArgs = z.infer<typeof reportProblemArgsSchema>;
 

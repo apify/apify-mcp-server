@@ -1,6 +1,7 @@
 import { RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../const.js';
 import type { ActorInterfaceName, CallDiagnostics, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
+import { fixActorNameInput } from './actor_name.js';
 import { fixZodSchemaRequired } from './ajv.js';
 import { isValidResourceId } from './apify_resource_id.js';
 
@@ -57,7 +58,7 @@ export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>
     // so a value longer than the argument limit is skipped.
     const actorArg = args?.actor;
     if (typeof actorArg !== 'string' || actorArg.length > RESOURCE_ID_OR_NAME_MAX_LENGTH) return undefined;
-    const actorName = actorArg.split(':')[0].trim();
+    const actorName = fixActorNameInput(actorArg);
     return isValidResourceId(actorName) ? actorName : undefined;
 }
 

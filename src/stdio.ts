@@ -24,6 +24,7 @@ import { getTelemetryEnv } from './telemetry.js';
 import type { ApifyRequestParams, Input, ServerModeOption, TelemetryEnv, ToolSelector } from './types.js';
 import { isApiTokenRequired } from './utils/auth.js';
 import { parseQueryParamList } from './utils/generic.js';
+import { redactApiTokensInLogs } from './utils/logging.js';
 import { injectMcpSessionId } from './utils/mcp.js';
 import { parseServerMode } from './utils/server_mode.js';
 import { getPackageVersion } from './utils/version.js';
@@ -50,6 +51,7 @@ function getTokenFromAuthFile(): string | undefined {
 }
 
 log.setLevel(log.LEVELS.ERROR);
+redactApiTokensInLogs();
 const packageVersion = getPackageVersion() ?? '0.0.0';
 
 const argv = yargs(hideBin(process.argv))

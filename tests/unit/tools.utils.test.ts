@@ -1322,6 +1322,12 @@ describe('extractActorName', () => {
         expect(extractActorName(tool, { actor: 'apify/example-mcp-server:add' })).toBe('apify/example-mcp-server');
     });
 
+    // call-actor runs the name after the same clean-up, so telemetry records the Actor that ran.
+    it('returns the cleaned-up name for a quoted actor arg', () => {
+        const tool = { type: TOOL_TYPE.INTERNAL, name: 'call-actor' } as unknown as ToolEntry;
+        expect(extractActorName(tool, { actor: '"apify / web-scraper"' })).toBe('apify/web-scraper');
+    });
+
     // The args are read before validation.
     it('returns undefined for an actor arg longer than the argument limit', () => {
         const tool = { type: TOOL_TYPE.INTERNAL, name: 'call-actor' } as unknown as ToolEntry;
