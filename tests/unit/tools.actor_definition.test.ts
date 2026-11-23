@@ -334,7 +334,7 @@ describe('the dataset schema an Actor declares for its default dataset', () => {
         expect(getDeclaredDatasetItemsSchema({ storages })).toBe(PROFILE_FIELDS);
     });
 
-    // The platform ignores `storages.dataset` once `storages.datasets` exists, so its fields describe no dataset.
+    // The platform ignores `storages.dataset` once `storages.datasets` is an object, so its fields describe no dataset.
     it('ignores `storages.dataset` when `storages.datasets` declares no default fields', () => {
         const storages = { dataset: { fields: PROFILE_FIELDS }, datasets: { default: { fields: {} } } };
 

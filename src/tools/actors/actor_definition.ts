@@ -38,8 +38,8 @@ export const MAX_DATASET_ITEMS_SCHEMA_BYTES = 65_536;
  *
  * An Actor with several datasets declares them under `storages.datasets.<alias>`, any other under
  * `storages.dataset`. The platform reads `storages.datasets` first and treats `storages.dataset` as the `default`
- * alias, so `storages.dataset` is not read when `storages.datasets` exists. A definition from the brief period when
- * `storages.datasets` did not require a `default` alias gets its first alias as the default dataset, as on the
+ * alias, so `storages.dataset` is not read when `storages.datasets` is an object. A definition from the brief period
+ * when `storages.datasets` did not require a `default` alias gets its first alias as the default dataset, as on the
  * platform.
  */
 export function getDeclaredDatasetItemsSchema(actorDefinition: { storages?: unknown }): DatasetItemsSchema | undefined {
