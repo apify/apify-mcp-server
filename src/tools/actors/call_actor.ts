@@ -199,7 +199,8 @@ function respondActorNotFound(actorName: string, loadedToolNames: readonly strin
             Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
         ` + recovery,
         // The name is the caller's input. One that is not shaped like an Actor ID or name can be a pasted secret, so
-        // the telemetry detail redacts it. A bare access token has a valid shape; the telemetry sender masks that.
+        // the telemetry detail redacts it. Best effort: a bare secret has a valid shape, and of those only Apify
+        // tokens are masked, by the telemetry sender.
         {
             httpStatus: 404,
             detail: `Actor '${isValidResourceId(actorName) ? actorName : REDACTION_PLACEHOLDER}' was not found`,

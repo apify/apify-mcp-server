@@ -68,11 +68,7 @@ export function getOrInitAnalyticsClient(telemetryEnv: TelemetryEnv): Analytics 
     return analyticsClient;
 }
 
-/**
- * Returns `properties` with every access token masked, at any depth. Event properties carry caller input (an Actor
- * name, an error message, a problem report), and a caller can paste a token into any of them. Both track functions
- * send their properties through here, so no event field needs its own check.
- */
+/** `properties` with every access token masked, at any depth: a caller can paste a token into any text they send. */
 function maskEventProperties<T extends object>(properties: T): T {
     return JSON.parse(maskAccessKeyTokens(JSON.stringify(properties)));
 }

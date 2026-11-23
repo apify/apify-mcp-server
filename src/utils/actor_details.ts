@@ -15,6 +15,7 @@ import type {
 } from '../types.js';
 import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from './actor_card.js';
 import { searchActorsByKeywords } from './actor_search.js';
+import { isValidResourceId } from './apify_resource_id.js';
 import { getHttpStatusCode, logHttpError } from './logging.js';
 import type { PricingTier } from './pricing_info.js';
 
@@ -148,7 +149,8 @@ export async function fetchActorDetails(
         // (e.g. invalid token) the caller should surface as such, not as "not found".
         const statusCode = getHttpStatusCode(error);
         if (statusCode === 404 || statusCode === 400) {
-            logHttpError(error, `Failed to fetch actor details for '${actorName}'`, { actorName });
+            // The name is the caller's input, so it is logged only when it is shaped like an Actor ID or name.
+            logHttpError(error, 'Failed to fetch Actor details', isValidResourceId(actorName) ? { actorName } : {});
             return null;
         }
         throw error;

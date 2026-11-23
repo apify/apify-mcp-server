@@ -3,7 +3,7 @@ import { ApifyClient } from '../apify_client.js';
 import { maskLoggedValues, REDACTION_PLACEHOLDER } from '../resources/api_resources.js';
 import type { ApifyToken, ToolEntry } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
-import { extractActorName } from '../utils/tools.js';
+import { isValidResourceId } from '../utils/apify_resource_id.js';
 
 export type PrepareToolCallContextResult = {
     /** A copy of the tool args, safe for AJV validation (which mutates it) and Actor input. */
@@ -14,17 +14,14 @@ export type PrepareToolCallContextResult = {
 };
 
 /**
- * `loggedArgs` with its `actor` as the name the tool looks up, or `REDACTION_PLACEHOLDER` when the caller's value is
- * not an Actor ID or name. Such a value is whatever the caller sent, a pasted `Authorization` header included.
+ * `loggedArgs` with its `actor` replaced by `REDACTION_PLACEHOLDER` unless it is shaped like an Actor ID or name.
+ * Any other value is whatever the caller sent, a pasted `Authorization` header included. The shape check cannot tell
+ * a name from a bare secret made of the same characters; Apify tokens of that kind are masked in the finished log line.
  */
-function redactLoggedActorName(
-    tool: ToolEntry,
-    args: Record<string, unknown>,
-    loggedArgs: Record<string, unknown>,
-): Record<string, unknown> {
-    if (typeof loggedArgs.actor !== 'string') return loggedArgs;
-    const actorName = tool.type === TOOL_TYPE.INTERNAL ? extractActorName(tool, args) : undefined;
-    return { ...loggedArgs, actor: actorName ?? REDACTION_PLACEHOLDER };
+function redactLoggedActorName(loggedArgs: Record<string, unknown>): Record<string, unknown> {
+    const { actor } = loggedArgs;
+    if (typeof actor !== 'string' || isValidResourceId(actor.trim())) return loggedArgs;
+    return { ...loggedArgs, actor: REDACTION_PLACEHOLDER };
 }
 
 /** Runs before validation: AJV's in-place `removeAdditional` must not change the copy that is logged. */
@@ -41,7 +38,7 @@ export function prepareToolCallContext(input: {
     const toolArgsRedacted =
         tool.type === TOOL_TYPE.ACTOR || tool.type === TOOL_TYPE.ACTOR_MCP
             ? maskLoggedValues(args, Object.keys(args))
-            : redactLoggedActorName(tool, args, tool.redactArgs?.(args) ?? args);
+            : redactLoggedActorName(tool.redactArgs?.(args) ?? args);
 
     return {
         toolArgs: { ...args },

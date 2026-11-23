@@ -19,6 +19,12 @@ export class InvalidRequestPathError extends UserInputError {
 }
 
 /**
+ * What telemetry and logs record for an `InvalidRequestPathError` in place of its message. The message is for the
+ * caller and quotes the value they sent, which can be a pasted secret.
+ */
+export const INVALID_REQUEST_PATH_DETAIL = 'Invalid identifier, record key or request path';
+
+/**
  * Thrown by `compileUntrustedSchema` when an untrusted Actor / proxied-MCP input schema exceeds the byte
  * cap that bounds AJV's synchronous codegen. It's a property of the schema, not a server fault, so
  * `logHttpError` logs it as a soft fail and the caller drops just that one tool.

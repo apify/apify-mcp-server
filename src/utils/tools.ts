@@ -50,6 +50,8 @@ export function buildActorFields(
  * For actor tools, read from the tool entry. For call-actor, parse from the `actor` arg.
  * Returns undefined for other internal tools or when the arg is missing/invalid. A value that is not shaped like an
  * Actor ID or name is whatever the caller sent, a pasted `Authorization` header included, so it is not returned.
+ * `isValidResourceId` checks the shape only, so a bare secret made of the same characters, such as another service's
+ * token, passes and is returned. Apify tokens of that kind are masked where telemetry and logs are written.
  */
 export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>): string | undefined {
     if (tool.type !== TOOL_TYPE.INTERNAL) return tool.actorFullName;

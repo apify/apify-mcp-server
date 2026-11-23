@@ -13,8 +13,9 @@ const TOKEN_SECRET_LENGTH = 36;
 const MIN_MASKED_TOKEN_SECRET_LENGTH = 20;
 
 // A token is `apify_`, one to four lower-case words that name its type, and the secret, e.g. `apify_api_<secret>`.
-// The types are not listed, so a new one is masked too. The match ends at the full token length and never runs into
-// the next token, so that a token pasted right behind another one, or behind a cut-off one, is masked too.
+// The types are not listed, so a new type with that shape is masked too; a token without the `apify_` prefix is not.
+// The match ends at the full token length and never runs into the next token, so that a token pasted right behind
+// another one, or behind a cut-off one, is masked too.
 const ACCESS_KEY_TOKEN_REGEX = new RegExp(
     `(apify(?:_[a-z]{1,16}){1,4}_)(?:(?!apify_)[a-zA-Z0-9]){${MIN_MASKED_TOKEN_SECRET_LENGTH},${TOKEN_SECRET_LENGTH}}`,
     'g',
