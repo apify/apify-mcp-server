@@ -475,7 +475,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         if (missingToolNames.length === 0) return;
 
         const restoreInput = toolNamesToInput(missingToolNames);
-        const actorTools = await getActors(restoreInput, apifyClient, { actorStore: this.actorStore });
+        const actorTools = await getActors(restoreInput, apifyClient);
 
         this.registerFetchedActorTools(restoreInput, actorTools);
     }
@@ -483,7 +483,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     /** Load tools from URL params. Used by SSE and HTTP entry points. */
     public async loadToolsFromUrl(url: string, apifyClient: ApifyClient) {
         const input = parseInputParamsFromUrl(url);
-        const actorTools = await getActors(input, apifyClient, { actorStore: this.actorStore });
+        const actorTools = await getActors(input, apifyClient);
 
         log.debug('Loading tools from query parameters');
         this.registerFetchedActorTools(input, actorTools);
@@ -495,7 +495,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      * InitializeResult; the queue buffers already-fetched data, not network work. See #721.
      */
     public async loadToolsFromInput(input: Input, apifyClient: ApifyClient): Promise<void> {
-        const actorTools = await getActors(input, apifyClient, { actorStore: this.actorStore });
+        const actorTools = await getActors(input, apifyClient);
         this.registerFetchedActorTools(input, actorTools);
     }
 

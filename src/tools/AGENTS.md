@@ -38,7 +38,12 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     can call in the publisher's schema; `webServerOperations` caches each operation with its required inputs, which
     the send tool lists after a 400/404/405/422, and `webServerCommaJoinedQueryParameters` the query parameters a
     list fills comma-joined, `explode: false`, per operation, looked up by the path as sent; absent when none
-    need joining; a list fills any other as a repeated parameter, and an empty list nothing),
+    need joining; a list fills any other as a repeated parameter, and an empty list nothing; an Actor's output
+    schema is the `fields` it declares for its default dataset, `getDeclaredDatasetItemsSchema`, never inferred
+    from runs: `fetch-actor-details` returns it on `output.outputSchema`, in full up to
+    `MAX_DATASET_ITEMS_SCHEMA_BYTES`, reduced to field names and types above that, and not at all when those are over
+    the limit too, and a direct Actor tool advertises its field names and types, `reduceToFieldNamesAndTypes`, as
+    `itemsSchema` in its `outputSchema`, which a run result does not repeat),
     `server_interface_schema.ts` (the operations a Server Actor's `webServerSchema` documents, in the
     `get-apify-api-details` shape through the API tools' `dereference`; no prose),
     `server_interface_details.ts` (the server-interface section of `fetch-actor-details`: the

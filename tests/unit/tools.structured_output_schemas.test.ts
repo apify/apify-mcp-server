@@ -8,7 +8,7 @@ import {
     datasetItemsOutputSchema,
     actorRunOutputSchema,
 } from '../../src/tools/structured_output_schemas.js';
-import type { ActorInfo, ActorStore, ActorTool } from '../../src/types.js';
+import type { ActorInfo, ActorTool } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
 
 /** Helper type for navigating to `storages.datasets.default.itemsSchema` in a tool's outputSchema. */
@@ -35,10 +35,11 @@ function pickItemsSchema(schema: unknown): { type: string; properties?: Record<s
         .itemsSchema;
 }
 
-function createMockActorInfo(actorFullName: string): ActorInfo {
+function createMockActorInfo(actorFullName: string, datasetItemProperties?: Record<string, unknown>): ActorInfo {
     return {
         webServerMcpPath: null,
         definition: {
+            ...(datasetItemProperties && { datasetItemProperties }),
             id: 'test-id',
             actorFullName,
             readme: '',
@@ -67,27 +68,14 @@ function createMockActorInfo(actorFullName: string): ActorInfo {
     };
 }
 
-function createMockActorStore(schemas: Record<string, Record<string, unknown> | null>): ActorStore {
-    return {
-        getActorOutputSchema: async (actorFullName: string) => {
-            if (schemas[actorFullName] === undefined) {
-                return null;
-            }
-            return schemas[actorFullName];
-        },
-        getActorOutputSchemaAsTypeObject: async (actorFullName: string) => {
-            if (schemas[actorFullName] === undefined) {
-                return null;
-            }
-            return schemas[actorFullName];
-        },
-    };
-}
-
 describe('Structured Output Schemas', () => {
     describe('buildEnrichedDirectActorOutputSchema', () => {
         it('injects itemsSchema with the supplied row properties', () => {
-            const itemProperties = { url: { type: 'string' }, price: { type: 'number' } };
+            const itemProperties = {
+                url: { type: 'string' },
+                user: { type: 'object', properties: { name: { type: 'string' } } },
+                tags: { type: 'array', items: { type: 'string' } },
+            };
             const enriched = buildEnrichedDirectActorOutputSchema(itemProperties);
 
             const itemsSchema = pickItemsSchema(enriched);
@@ -99,16 +87,6 @@ describe('Structured Output Schemas', () => {
             buildEnrichedDirectActorOutputSchema({ url: { type: 'string' } });
 
             expect(pickItemsSchema(actorRunOutputSchema)).toBeUndefined();
-        });
-
-        it('handles nested item properties', () => {
-            const itemProperties = {
-                user: { type: 'object', properties: { name: { type: 'string' } } },
-                tags: { type: 'array', items: { type: 'string' } },
-            };
-            const enriched = buildEnrichedDirectActorOutputSchema(itemProperties);
-
-            expect(pickItemsSchema(enriched)?.properties).toEqual(itemProperties);
         });
     });
 
@@ -183,8 +161,8 @@ describe('Structured Output Schemas', () => {
         });
     });
 
-    describe('getNormalActorsAsTools enrichment', () => {
-        it('uses the canonical RunResponse schema when no actorStore is provided', async () => {
+    describe('getNormalActorsAsTools output schema', () => {
+        it('uses the canonical RunResponse schema for an Actor that declares no dataset fields', async () => {
             const tools = await getNormalActorsAsTools([createMockActorInfo('apify/test-actor')]);
 
             expect(tools).toHaveLength(1);
@@ -208,91 +186,16 @@ describe('Structured Output Schemas', () => {
             expect(required).not.toContain('waitSecs');
         });
 
-        it('enriches outputSchema with itemsSchema when actorStore returns properties', async () => {
-            const actorName = 'apify/test-actor';
+        it('advertises the dataset fields the Actor declares as itemsSchema', async () => {
             const itemProperties = { url: { type: 'string' }, title: { type: 'string' } };
-            const store = createMockActorStore({ [actorName]: itemProperties });
 
-            const tools = await getNormalActorsAsTools([createMockActorInfo(actorName)], { actorStore: store });
-            const tool = tools[0] as ActorTool;
+            const tools = await getNormalActorsAsTools([createMockActorInfo('apify/test-actor', itemProperties)]);
 
-            expect(pickItemsSchema(tool.outputSchema)?.properties).toEqual(itemProperties);
-        });
-
-        it('falls back to the canonical schema when actorStore returns null', async () => {
-            const actorName = 'apify/test-actor';
-            const store = createMockActorStore({ [actorName]: null });
-
-            const tools = await getNormalActorsAsTools([createMockActorInfo(actorName)], { actorStore: store });
-            const tool = tools[0] as ActorTool;
-
-            expect(tool.outputSchema).toBe(actorRunOutputSchema);
-        });
-
-        it('falls back to the canonical schema when actorStore returns an empty object', async () => {
-            const actorName = 'apify/test-actor';
-            const store = createMockActorStore({ [actorName]: {} });
-
-            const tools = await getNormalActorsAsTools([createMockActorInfo(actorName)], { actorStore: store });
-            const tool = tools[0] as ActorTool;
-
-            expect(tool.outputSchema).toBe(actorRunOutputSchema);
-        });
-
-        it('falls back to the canonical schema when actorStore throws', async () => {
-            const store: ActorStore = {
-                getActorOutputSchema: async () => {
-                    throw new Error('Database connection failed');
-                },
-                getActorOutputSchemaAsTypeObject: async () => {
-                    throw new Error('Database connection failed');
-                },
-            };
-
-            const tools = await getNormalActorsAsTools([createMockActorInfo('apify/test-actor')], {
-                actorStore: store,
-            });
-            const tool = tools[0] as ActorTool;
-
-            expect(tool.outputSchema).toBe(actorRunOutputSchema);
-        });
-
-        it('mixes enriched and canonical schemas across multiple actors', async () => {
-            const actor1Name = 'apify/actor-with-schema';
-            const actor2Name = 'apify/actor-no-schema';
-            const itemProperties = { foo: { type: 'string' } };
-            const store = createMockActorStore({
-                [actor1Name]: itemProperties,
-                [actor2Name]: null,
-            });
-
-            const tools = await getNormalActorsAsTools(
-                [createMockActorInfo(actor1Name), createMockActorInfo(actor2Name)],
-                { actorStore: store },
-            );
-
-            const tool1 = tools.find((t) => (t as ActorTool).actorFullName === actor1Name) as ActorTool;
-            const tool2 = tools.find((t) => (t as ActorTool).actorFullName === actor2Name) as ActorTool;
-
-            expect(pickItemsSchema(tool1.outputSchema)?.properties).toEqual(itemProperties);
-            expect(tool2.outputSchema).toBe(actorRunOutputSchema);
+            expect(pickItemsSchema((tools[0] as ActorTool).outputSchema)?.properties).toEqual(itemProperties);
         });
 
         it('emits no widget meta on actor tools', async () => {
             const tools = await getNormalActorsAsTools([createMockActorInfo('apify/test-actor')]);
-
-            expect(tools).toHaveLength(1);
-            const meta = tools[0]._meta ?? {};
-            for (const key of Object.keys(meta)) {
-                expect(key).not.toMatch(/^openai\//);
-                expect(key).not.toBe('ui');
-                expect(key).not.toBe('ui/resourceUri');
-            }
-        });
-
-        it('emits no widget meta on actor tools', async () => {
-            const actorInfo = createMockActorInfo('apify/test-actor');
-            const tools = await getNormalActorsAsTools([actorInfo]);
 
             expect(tools).toHaveLength(1);
             const meta = tools[0]._meta ?? {};

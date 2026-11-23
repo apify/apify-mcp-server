@@ -9,8 +9,9 @@ import { ACTOR_TIP_CAVEAT } from '../../src/tools/actor_tool_naming.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import type { RunResponse } from '../../src/tools/actors/actor_run_response.js';
 import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from '../../src/tools/actors/actor_run_response.js';
+import { buildEnrichedDirectActorOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { ActorExecutionParams } from '../../src/types.js';
-import { mockApifyClient, textOf } from './helpers/tool_context.js';
+import { expectSchemaConformingStructuredContent, mockApifyClient, textOf } from './helpers/tool_context.js';
 
 /**
  * The executor's three migration-specific responsibilities:
@@ -245,37 +246,17 @@ describe('actorExecutor', () => {
         });
     });
 
-    describe('itemsSchema injection', () => {
-        it('injects datasetItemsSchema into storages.datasets.default.itemsSchema when provided', async () => {
-            const itemProperties = { url: { type: 'string' }, price: { type: 'number' } };
-            const { params } = buildParams({ query: 'foo' }, { datasetItemsSchema: itemProperties });
-
-            const result = await actorExecutor.executeActorTool(params);
-
-            const { structuredContent } = result as { structuredContent?: Record<string, unknown> };
-            const storages = structuredContent?.storages as
-                | {
-                      datasets?: {
-                          default?: { itemsSchema?: { type?: string; properties?: Record<string, unknown> } };
-                      };
-                  }
-                | undefined;
-            expect(storages?.datasets?.default?.itemsSchema?.type).toBe('object');
-            expect(storages?.datasets?.default?.itemsSchema?.properties).toEqual(itemProperties);
-        });
-
-        it('omits itemsSchema when datasetItemsSchema is not provided', async () => {
+    describe('a tool that advertises the dataset fields its Actor declares', () => {
+        // `type` is declared as a number: an `itemsSchema` copy in the result would carry `type: 'object'` and fail.
+        it('returns a result without itemsSchema that fits the advertised output schema', async () => {
+            const outputSchema = buildEnrichedDirectActorOutputSchema({ type: { type: 'number' } });
             const { params } = buildParams({ query: 'foo' });
 
             const result = await actorExecutor.executeActorTool(params);
 
-            const { structuredContent } = result as { structuredContent?: Record<string, unknown> };
-            const storages = structuredContent?.storages as
-                | {
-                      datasets?: { default?: { itemsSchema?: unknown } };
-                  }
-                | undefined;
-            expect(storages?.datasets?.default?.itemsSchema).toBeUndefined();
+            expectSchemaConformingStructuredContent(result, outputSchema);
+            const { structuredContent } = result as unknown as { structuredContent: RunResponse };
+            expect(structuredContent.storages.datasets?.default).not.toHaveProperty('itemsSchema');
         });
     });
 

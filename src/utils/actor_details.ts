@@ -4,13 +4,14 @@ import type { ApifyClient } from '../apify_client.js';
 import { CODE_RUNTIME_ACTOR_NAME } from '../const.js';
 import { getActorMCPServerPath } from '../mcp/actors.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/actor_input_schema.js';
-import { resolveServerInterfaceDefinition } from '../tools/actors/actor_definition.js';
+import { getDeclaredDatasetItemsSchema, resolveServerInterfaceDefinition } from '../tools/actors/actor_definition.js';
 import type {
     Actor,
     ActorCardOptions,
     ActorInputSchema,
     ActorStore,
     ActorStoreList,
+    DatasetItemsSchema,
     StructuredActorCard,
 } from '../types.js';
 import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from './actor_card.js';
@@ -20,30 +21,6 @@ import { getHttpStatusCode, logHttpError } from './logging.js';
 import type { PricingTier } from './pricing_info.js';
 
 const ACTOR_DETAILS_PICTURE_SEARCH_LIMIT = 5;
-
-/**
- * Convert a type object to TypeScript-like string representation.
- * Used for human-readable text output.
- *
- * Example:
- * Input:  { first_number: "number", tags: ["string"], user: { name: "string" } }
- * Output: "{ first_number: number, tags: string[], user: { name: string } }"
- *
- * Values that are not string / object / array are skipped (not rendered) at every nesting level.
- */
-export function typeObjectToString(obj: Record<string, unknown>): string {
-    const pairs = Object.entries(obj)
-        .filter(([, v]) => Array.isArray(v) || (v !== null && typeof v === 'object') || typeof v === 'string')
-        .map(([k, v]) => `${k}: ${typeValueToString(v)}`);
-    return `{ ${pairs.join(', ')} }`;
-}
-
-function typeValueToString(value: unknown): string {
-    if (Array.isArray(value)) return `${typeValueToString(value[0])}[]`;
-    if (value !== null && typeof value === 'object') return typeObjectToString(value as Record<string, unknown>);
-    if (typeof value === 'string') return value;
-    return 'unknown';
-}
 
 /**
  * Resolve README content with fallback: prefer readmeSummary, fall back to full readme.
@@ -77,6 +54,8 @@ export type ActorDetailsResult = {
     actorCard: string;
     actorCardStructured: StructuredActorCard;
     inputSchema: ActorInputSchema;
+    /** JSON Schema the Actor declares for items of its default dataset, in full; absent when it declares none. */
+    outputSchema?: DatasetItemsSchema;
     readme: string;
     readmeSummary?: string;
     /** API schema of the build standby serves (`resolveServerInterfaceDefinition`); absent when unresolved. */
@@ -138,6 +117,7 @@ export async function fetchActorDetails(
             actorCard,
             actorCardStructured,
             inputSchema,
+            outputSchema: getDeclaredDatasetItemsSchema(buildInfo.actorDefinition),
             readme: buildInfo.actorDefinition.readme || 'No README provided.',
             readmeSummary: actorInfo.readmeSummary,
             webServerSchema: serverDefinition?.webServerSchema,
