@@ -5,7 +5,7 @@ import { ZodError } from 'zod';
 
 import log, { LoggerJson } from '@apify/log';
 
-import { SchemaTooLargeError } from '../../src/errors.js';
+import { INVALID_REQUEST_PATH_DETAIL, InvalidRequestPathError, SchemaTooLargeError } from '../../src/errors.js';
 import { MAX_UNTRUSTED_SCHEMA_BYTES } from '../../src/tools/actor_input_schema.js';
 import {
     isMcpClientFaultMessage,
@@ -90,6 +90,18 @@ describe('logHttpError', () => {
 
         expect(exception).not.toHaveBeenCalled();
         expect(softFail).toHaveBeenCalledTimes(1);
+    });
+
+    // The message of this error quotes the identifier the caller sent, which can be a pasted secret.
+    it('logs a fixed message for an invalid identifier or request path', () => {
+        const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
+
+        logHttpError(new InvalidRequestPathError('Invalid Actor ID or name "Bearer secret-value"'), 'Failed to fetch');
+
+        expect(softFail).toHaveBeenCalledWith('Failed to fetch', {
+            errMessage: INVALID_REQUEST_PATH_DETAIL,
+            statusCode: 400,
+        });
     });
 
     it('soft-fails an oversized input schema (SchemaTooLargeError), not a server error', () => {

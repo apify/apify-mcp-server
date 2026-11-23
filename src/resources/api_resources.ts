@@ -23,39 +23,41 @@ import { getHttpErrorHint } from '../utils/mcp.js';
 
 const TEXT_MIME_TYPE = 'text/plain';
 
-export const REDACTED = '[REDACTED]';
+export const REDACTION_PLACEHOLDER = '[REDACTED]';
 
 /** `value` with its query string and fragment cut to `?[REDACTED]`, for logging. */
 export function redactQueryString(value: string): string {
-    return value.replace(/[?#][\s\S]*$/, `?${REDACTED}`);
+    return value.replace(/[?#][\s\S]*$/, `?${REDACTION_PLACEHOLDER}`);
 }
 
-/** `keys` of `record` that are set: a string, number, or boolean as is, any other value as `REDACTED`. */
+/** `keys` of `record` that are set: a string, number, or boolean as is, any other value as `REDACTION_PLACEHOLDER`. */
 export function pickLoggedValues(record: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
     return Object.fromEntries(
         keys.flatMap((key) => {
             const value = record[key];
             if (value === undefined) return [];
-            return [[key, ['string', 'number', 'boolean'].includes(typeof value) ? value : REDACTED]];
+            return [[key, ['string', 'number', 'boolean'].includes(typeof value) ? value : REDACTION_PLACEHOLDER]];
         }),
     );
 }
 
-/** `keys` of `record` that are set, each as `REDACTED`. */
+/** `keys` of `record` that are set, each as `REDACTION_PLACEHOLDER`. */
 export function maskLoggedValues(record: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
-    return Object.fromEntries(keys.filter((key) => record[key] !== undefined).map((key) => [key, REDACTED]));
+    return Object.fromEntries(
+        keys.filter((key) => record[key] !== undefined).map((key) => [key, REDACTION_PLACEHOLDER]),
+    );
 }
 
 /**
  * `keys` of `record` that are set, for Actor input and other caller-defined objects: an object keeps its own key
- * names with each value as `REDACTED`, so a wrong or missing key shows in the log; any other value is `REDACTED`.
+ * names with each value as `REDACTION_PLACEHOLDER`, so a wrong or missing key shows in the log; any other value is `REDACTION_PLACEHOLDER`.
  */
 export function maskLoggedInputs(record: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
     return Object.fromEntries(
         keys.flatMap((key) => {
             const value = record[key];
             if (value === undefined) return [];
-            return [[key, isRecord(value) ? maskLoggedValues(value, Object.keys(value)) : REDACTED]];
+            return [[key, isRecord(value) ? maskLoggedValues(value, Object.keys(value)) : REDACTION_PLACEHOLDER]];
         }),
     );
 }
@@ -229,7 +231,7 @@ export function maskSessionToken(body: Buffer, token: string | undefined): Buffe
     if (!token) return body;
     // The token is ASCII, so a latin1 round trip keeps every other byte as it is.
     const bytes = body.toString('latin1');
-    return bytes.includes(token) ? Buffer.from(bytes.replaceAll(token, REDACTED), 'latin1') : body;
+    return bytes.includes(token) ? Buffer.from(bytes.replaceAll(token, REDACTION_PLACEHOLDER), 'latin1') : body;
 }
 
 /**
@@ -244,7 +246,7 @@ const SECRET_VALUE_RE = /("(?:urlSigningSecretKey|password)"\s*:\s*)"(?:[^"\\]|\
  * Parsing and re-indenting deeply nested bodies can exhaust memory. Null values and escaped key names stay as is.
  */
 export function redactJsonSecrets(json: string): string {
-    return json.replace(SECRET_VALUE_RE, `$1"${REDACTED}"`);
+    return json.replace(SECRET_VALUE_RE, `$1"${REDACTION_PLACEHOLDER}"`);
 }
 
 /**

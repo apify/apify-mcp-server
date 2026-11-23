@@ -24,7 +24,7 @@ import { abortActorRun } from '../tools/runs/abort_actor_run.js';
 import { getActorRun } from '../tools/runs/get_actor_run.js';
 import { getDatasetItems } from '../tools/storage/get_dataset_items.js';
 import { getKeyValueStoreRecord } from '../tools/storage/get_key_value_store_record.js';
-import type { ActorStore, Input, ToolCategory, ToolEntry } from '../types.js';
+import type { Input, ToolCategory, ToolEntry } from '../types.js';
 import { SERVER_MODE, TOOL_TYPE } from '../types.js';
 import { compileSchema } from './ajv.js';
 
@@ -132,14 +132,10 @@ export function resolveActorsToLoad(input: Input): string[] {
 /**
  * Fetch Actor tool entries for all Actor names in `input`.
  */
-export async function getActors(
-    input: Input,
-    apifyClient: ApifyClient,
-    options?: { actorStore?: ActorStore },
-): Promise<ToolEntry[]> {
+export async function getActors(input: Input, apifyClient: ApifyClient): Promise<ToolEntry[]> {
     const actorNames = resolveActorsToLoad(input);
     if (actorNames.length === 0) return [];
-    const { tools } = await getActorsAsTools(actorNames, apifyClient, options);
+    const { tools } = await getActorsAsTools(actorNames, apifyClient);
     return tools;
 }
 
@@ -340,8 +336,7 @@ export async function loadToolsFromInput(
     input: Input,
     apifyClient: ApifyClient,
     mode: SERVER_MODE = SERVER_MODE.DEFAULT,
-    actorStore?: ActorStore,
 ): Promise<ToolEntry[]> {
-    const actorTools = await getActors(input, apifyClient, { actorStore });
+    const actorTools = await getActors(input, apifyClient);
     return getToolsForServerMode(input, actorTools, mode);
 }

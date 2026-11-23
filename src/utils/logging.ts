@@ -3,7 +3,7 @@ import { ZodError } from 'zod';
 
 import log from '@apify/log';
 
-import { SchemaTooLargeError } from '../errors.js';
+import { INVALID_REQUEST_PATH_DETAIL, InvalidRequestPathError, SchemaTooLargeError } from '../errors.js';
 import { isActorRunLimitError } from './apify_errors.js';
 
 /**
@@ -182,7 +182,8 @@ export function toPlainError(error: unknown, causeDepth = 3): Error {
  */
 export function logHttpError<T extends object>(error: unknown, message: string, data?: T): void {
     const statusCode = getHttpStatusCode(error);
-    const rawErrorMessage = error instanceof Error ? error.message : String(error);
+    let rawErrorMessage = error instanceof Error ? error.message : String(error);
+    if (error instanceof InvalidRequestPathError) rawErrorMessage = INVALID_REQUEST_PATH_DETAIL;
     const softErrMessage = sanitizeMezmoMessage(rawErrorMessage);
 
     // User concurrent-run / quota limit — arrives wrapped as a 500 but is a user billing condition.

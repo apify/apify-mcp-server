@@ -260,7 +260,6 @@ export async function dispatchToolCall(params: {
                     progressTracker,
                     abortSignal: signal,
                     mcpSessionId,
-                    datasetItemsSchema: tool.datasetItemsSchema,
                     taskMode,
                     canRunTipActor: (recommendedActorId) =>
                         canRunActor(recommendedActorId, loadedToolNames, loadedActorIds),

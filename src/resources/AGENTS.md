@@ -34,7 +34,7 @@ templates, instructions, refusals and link-out URLs name only the client-facing 
 then refuses, without a request, what the API tools refuse (`validateApiBlocklist` in
 `../tools/api/apify_api_blocklist.ts`): the `method` query parameter and a GET to the synchronous run
 endpoints. The API tools' `callApi` (`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`,
-`maskSessionToken()`, `redactJsonSecrets()`, `redactQueryString()` and `REDACTED`, so a change to any changes the
+`maskSessionToken()`, `redactJsonSecrets()`, `redactQueryString()` and `REDACTION_PLACEHOLDER`, so a change to any changes the
 tools too. `get-key-value-store-record` builds its inlined-record URI with `buildUrlOnOrigin()`.
 
 Both origins come from the server's `platformUrls`, resolved once in the `ActorsMcpServer` constructor:

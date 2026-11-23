@@ -1,7 +1,9 @@
 import { RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../const.js';
 import type { ActorInterfaceName, CallDiagnostics, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
+import { fixActorNameInput } from './actor_name_normalization.js';
 import { fixZodSchemaRequired } from './ajv.js';
+import { isValidResourceId } from './apify_resource_id.js';
 
 /**
  * Returns the canonical full name for a tool.
@@ -46,7 +48,9 @@ export function buildActorFields(
 /**
  * Extract actor name for telemetry from the tool entry or call-actor args.
  * For actor tools, read from the tool entry. For call-actor, parse from the `actor` arg.
- * Returns undefined for other internal tools or when the arg is missing/invalid.
+ * Returns undefined for other internal tools or when the arg is missing/invalid. A value that is not shaped like an
+ * Actor ID or name can be a pasted secret, so it is not returned. The check is on shape only: a bare secret made of
+ * the same characters passes.
  */
 export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>): string | undefined {
     if (tool.type !== TOOL_TYPE.INTERNAL) return tool.actorFullName;
@@ -55,7 +59,8 @@ export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>
     // so a value longer than the argument limit is skipped.
     const actorArg = args?.actor;
     if (typeof actorArg !== 'string' || actorArg.length > RESOURCE_ID_OR_NAME_MAX_LENGTH) return undefined;
-    return actorArg.split(':')[0]?.trim() || undefined;
+    const actorName = fixActorNameInput(actorArg);
+    return isValidResourceId(actorName) ? actorName : undefined;
 }
 
 /**

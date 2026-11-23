@@ -18,6 +18,7 @@ import type {
 } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
+import { fixActorNameInput } from '../../utils/actor_name_normalization.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { remoteMcpFailureDetail } from '../../utils/apify_errors.js';
 import { logHttpError } from '../../utils/logging.js';
@@ -25,7 +26,7 @@ import type { ToolResponse } from '../../utils/mcp.js';
 import { respondAborted, respondRaw, respondServerError, respondUserError } from '../../utils/mcp.js';
 import { findServerTool, resolveActorInterfaces } from '../actor_tool_naming.js';
 import { anyJsonObjectSchema } from '../structured_output_schemas.js';
-import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInput } from './actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 
 /** The MCP spec's upper bound for a tool name. */
