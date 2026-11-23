@@ -3,7 +3,19 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.21.13 - **not yet released**
+## 0.22.1 - **not yet released**
+
+### 🚀 Features
+
+- Add Claude and Cursor setup links, match claude ?client= tags ([#1789](https://github.com/apify/apify-mcp-server/pull/1789)) ([ce157ae](https://github.com/apify/apify-mcp-server/commit/ce157ae924fdccc067decb190a103e0059b5f8c8)) by [@jancurn](https://github.com/jancurn)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.22.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.22.0) (2026-11-20)
+
+### 🚀 Features
+
+- [**breaking**] Remove agentic payment mode (Skyfire, x402) ([#1940](https://github.com/apify/apify-mcp-server/pull/1940)) ([574808d](https://github.com/apify/apify-mcp-server/commit/574808d9e873e2825142e81a9d7bbbc8562a6e20)) by [@RobertCrupa](https://github.com/RobertCrupa)
 
 ### 🐛 Bug Fixes
 
@@ -12,7 +24,6 @@ All notable changes to this project will be documented in this file.
 - Use PNG icon from server.json instead of hardcoded favicon URL ([#1938](https://github.com/apify/apify-mcp-server/pull/1938)) ([27123db](https://github.com/apify/apify-mcp-server/commit/27123db2bdc4c6168e9b173177cbfe37566885c3)) by [@jancurn](https://github.com/jancurn)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.21.12](https://github.com/apify/apify-mcp-server/releases/tag/v0.21.12) (2026-11-17)
 
 ### 🐛 Bug Fixes
