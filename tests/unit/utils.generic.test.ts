@@ -13,6 +13,11 @@ describe('API tokens are redacted from text', () => {
         expect(redactApiTokens(`Bearer apify_api_${'a1B2'.repeat(9)} failed`)).toBe('Bearer apify_api_*** failed');
     });
 
+    // The server accepts a Console UI token as the Apify token, and it has the same shape as an Actor name.
+    it('replaces a Console UI token', () => {
+        expect(redactApiTokens(`Bearer apify_ui_${'a1B2'.repeat(9)} failed`)).toBe('Bearer apify_ui_*** failed');
+    });
+
     // Stack traces in log lines name files such as `src/tools/api/apify_api_request.ts`.
     it('keeps a file name that starts like a token', () => {
         const stack = 'at callApi (/app/dist/tools/api/apify_api_request.js:42:7)';
@@ -23,6 +28,12 @@ describe('API tokens are redacted from text', () => {
     it('replaces two tokens joined with no separator', () => {
         const token = `apify_api_${'a1B2'.repeat(9)}`;
         expect(redactApiTokens(`${token}${token}`)).toBe('apify_api_***apify_api_***');
+    });
+
+    // A cut-off token is too short to match alone; the match must not start there and run into the next prefix.
+    it('replaces a token that directly follows a cut-off token', () => {
+        const cutOffToken = `apify_api_${'x'.repeat(15)}`;
+        expect(redactApiTokens(`${cutOffToken}apify_api_${'a1B2'.repeat(9)}`)).toBe(`${cutOffToken}apify_api_***`);
     });
 
     // Log lines and telemetry carry caller input of any length; the redaction must not throw on it.
