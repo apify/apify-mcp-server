@@ -9,11 +9,13 @@ describe('Apify tokens are redacted from text', () => {
         expect(redactApifyTokens(`Bearer apify_api_${'a1B2'.repeat(9)} failed`)).toBe('Bearer apify_api_*** failed');
     });
 
-    // The Apify API accepts each of these as the Apify token, so a client can send any of them.
-    it('replaces a token of every other type the Apify API accepts', () => {
+    // The same list as `ACCESS_KEY_TYPE_TOKEN_PREFIXES` in apify-core: API tokens of every type and proxy passwords.
+    it('replaces a token of every other type the platform issues', () => {
         const prefixes = [
+            'apify_proxy_',
             'apify_ui_',
             'apify_actor_run_api_',
+            'apify_actor_run_proxy_',
             'apify_webhook_dispatch_',
             'apify_adhoc_api_',
             'integration_api_token_',
