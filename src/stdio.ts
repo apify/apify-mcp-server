@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { format } from 'node:util';
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import yargs from 'yargs';
@@ -23,7 +24,7 @@ import { ActorsMcpServer } from './mcp/server.js';
 import { getTelemetryEnv } from './telemetry.js';
 import type { ApifyRequestParams, Input, ServerModeOption, TelemetryEnv, ToolSelector } from './types.js';
 import { isApiTokenRequired } from './utils/auth.js';
-import { parseQueryParamList } from './utils/generic.js';
+import { parseQueryParamList, redactApiTokens } from './utils/generic.js';
 import { redactApiTokensInLogs } from './utils/logging.js';
 import { injectMcpSessionId } from './utils/mcp.js';
 import { parseServerMode } from './utils/server_mode.js';
@@ -117,8 +118,9 @@ const toolCategoryKeys = argv.tools !== undefined ? parseQueryParamList(argv.too
 const originalError = log.error.bind(log);
 log.error = (...args: Parameters<typeof log.error>) => {
     originalError(...args);
+    // This copy bypasses the logger, so it is redacted here.
     // eslint-disable-next-line no-console
-    console.error(...args);
+    console.error(redactApiTokens(format(...args)));
 };
 
 const apifyToken = process.env.APIFY_TOKEN || getTokenFromAuthFile();

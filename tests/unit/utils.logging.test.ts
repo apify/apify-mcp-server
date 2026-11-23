@@ -281,10 +281,13 @@ describe('API tokens are redacted from log lines', () => {
         const spies = (['log', 'error'] as const).map((method) =>
             vi.spyOn(console, method).mockImplementation((line) => void lines.push(String(line))),
         );
+        const { logger } = log.getOptions();
+        const writeLine = logger._outputWithConsole;
         redactApiTokensInLogs();
 
         log.error(`Actor '${token}' was not found`, { actorName: token });
 
+        logger._outputWithConsole = writeLine;
         for (const spy of spies) spy.mockRestore();
         expect(lines).toHaveLength(1);
         expect(lines[0]).not.toContain(token);

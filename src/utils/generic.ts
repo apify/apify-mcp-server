@@ -108,7 +108,10 @@ export function computeValueBytes(value: unknown): number | undefined {
     }
 }
 
-const APIFY_API_TOKEN_REGEX = /apify_api_[A-Za-z0-9]+/g;
+// A token has 36 alphanumerics after the prefix. 16 or more keeps file names such as `apify_api_request.js` in stacks.
+// Not `{16,}`: V8 overflows its stack on that for a multi-megabyte run of alphanumerics, but not on `*?`.
+// The match ends where the alphanumerics end or the next token starts, so two joined tokens are both replaced.
+const APIFY_API_TOKEN_REGEX = /apify_api_[A-Za-z0-9]{16}[A-Za-z0-9]*?(?=apify_api_|[^A-Za-z0-9]|$)/g;
 
 /** `text` with every Apify API token replaced by `apify_api_***`. */
 export function redactApiTokens(text: string): string {
