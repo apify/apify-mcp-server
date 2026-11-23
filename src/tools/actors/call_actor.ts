@@ -26,6 +26,7 @@ import {
     isMemoryQuotaError,
     isPermissionApprovalError,
 } from '../../utils/apify_errors.js';
+import { isValidResourceId } from '../../utils/apify_resource_id.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { logHttpError } from '../../utils/logging.js';
@@ -198,8 +199,12 @@ function respondActorNotFound(actorName: string, loadedToolNames: readonly strin
             Actor '${actorName}' was not found.
             Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
         ` + recovery,
-        // The name is the caller's input, which can be a pasted API token, so the telemetry detail omits it.
-        { httpStatus: 404, detail: 'Actor not found' },
+        // The name is the caller's input. One that is not shaped like an Actor ID or name can be a pasted secret, so
+        // the telemetry detail redacts it. A bare API token has a valid shape; the telemetry sender redacts that.
+        {
+            httpStatus: 404,
+            detail: `Actor '${isValidResourceId(actorName) ? actorName : REDACTED}' was not found`,
+        },
     );
 }
 
