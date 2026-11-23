@@ -13,10 +13,15 @@ import {
     RESOURCE_ID_OR_NAME_MAX_LENGTH,
 } from '../../const.js';
 import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
-import { maskLoggedInputs, pickLoggedValues, REDACTED } from '../../resources/api_resources.js';
+import { maskLoggedInputs, pickLoggedValues, REDACTION_PLACEHOLDER } from '../../resources/api_resources.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ACTOR_TOOL_MODE, ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorToolResolutionCached } from '../../utils/actor.js';
+import {
+    fixActorNameInput,
+    getMcpToolNameSuffixIndex,
+    normalizeActorNameInput,
+} from '../../utils/actor_name_normalization.js';
 import { compileSchema } from '../../utils/ajv.js';
 import {
     ACTOR_RUN_LIMIT_MESSAGE,
@@ -26,6 +31,7 @@ import {
     isMemoryQuotaError,
     isPermissionApprovalError,
 } from '../../utils/apify_errors.js';
+import { isValidResourceId } from '../../utils/apify_resource_id.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { logHttpError } from '../../utils/logging.js';
@@ -49,13 +55,7 @@ import {
     CALL_ACTOR_WAIT_SECS_DEFAULT,
     fetchActorRunData,
 } from './actor_run_response.js';
-import {
-    EMPTY_ACTOR_NAME_MESSAGE,
-    fixActorNameInput,
-    getActorsAsTools,
-    getMcpToolNameSuffixIndex,
-    normalizeActorNameInput,
-} from './actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE, getActorsAsTools } from './actor_tools_factory.js';
 
 // ---------------------------------------------------------------------------
 // Shared call-actor description building blocks
@@ -198,7 +198,11 @@ function respondActorNotFound(actorName: string, loadedToolNames: readonly strin
             Actor '${actorName}' was not found.
             Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
         ` + recovery,
-        { httpStatus: 404, detail: `Actor '${actorName}' was not found` },
+        // Best effort: a name that is not shaped like an Actor ID or name can be a pasted secret.
+        {
+            httpStatus: 404,
+            detail: `Actor '${isValidResourceId(actorName) ? actorName : REDACTION_PLACEHOLDER}' was not found`,
+        },
     );
 }
 
@@ -343,7 +347,7 @@ export function redactCallActorArgs(args: Record<string, unknown>, keys: readonl
         ...(callOptions !== undefined && {
             callOptions: isRecord(callOptions)
                 ? pickLoggedValues(callOptions, Object.keys(callOptionsSchema.shape))
-                : REDACTED,
+                : REDACTION_PLACEHOLDER,
         }),
     };
 }

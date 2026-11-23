@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { prepareToolCallContext } from '../../src/mcp/tool_call_context.js';
+import { REDACTION_PLACEHOLDER } from '../../src/resources/api_resources.js';
 import type { HelperTool } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { respondRaw } from '../../src/utils/mcp.js';
@@ -58,6 +59,30 @@ describe('argument copies', () => {
 
         expect(result.toolArgsRedacted).toEqual({ actor: 'apify/rag-web-browser', secret: '[REDACTED]' });
         expect(result.toolArgs).toEqual({ actor: 'apify/rag-web-browser', secret: 'hide-me' });
+    });
+});
+
+describe('the logged Actor name', () => {
+    // The `actor` argument is whatever the caller sent, so a value that is no Actor name can be a pasted secret.
+    it('is replaced when the argument is not an Actor ID or name', () => {
+        const result = prepareToolCallContext({
+            tool: makeTool(),
+            args: { actor: '--header "Authorization: Bearer secret-value"', input: {} },
+            apifyToken: MOCK_APIFY_TOKEN,
+        });
+
+        expect(result.toolArgsRedacted).toEqual({ actor: REDACTION_PLACEHOLDER, input: {} });
+    });
+
+    it("is replaced in the copy the tool's redactArgs returns", () => {
+        const tool = { ...makeTool(), redactArgs: (args: Record<string, unknown>) => ({ actor: args.actor }) };
+        const result = prepareToolCallContext({
+            tool,
+            args: { actor: 'Bearer secret-value' },
+            apifyToken: MOCK_APIFY_TOKEN,
+        });
+
+        expect(result.toolArgsRedacted).toEqual({ actor: REDACTION_PLACEHOLDER });
     });
 });
 

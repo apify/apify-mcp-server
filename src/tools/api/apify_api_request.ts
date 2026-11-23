@@ -12,7 +12,7 @@ import { InvalidRequestPathError } from '../../errors.js';
 import {
     isApifyApiUri,
     maskSessionToken,
-    REDACTED,
+    REDACTION_PLACEHOLDER,
     redactJsonSecrets,
     redactQueryString,
 } from '../../resources/api_resources.js';
@@ -67,19 +67,22 @@ export function redactApiCallArgs({ path, method, query, body }: Record<string, 
     let loggedQuery: unknown;
     if (isRecord(query)) {
         loggedQuery = Object.fromEntries(
-            Object.entries(query).map(([name, value]) => [name, SECRET_QUERY_PARAMS.includes(name) ? REDACTED : value]),
+            Object.entries(query).map(([name, value]) => [
+                name,
+                SECRET_QUERY_PARAMS.includes(name) ? REDACTION_PLACEHOLDER : value,
+            ]),
         );
     } else if (query !== undefined) {
-        loggedQuery = REDACTED;
+        loggedQuery = REDACTION_PLACEHOLDER;
     }
     let loggedPath: unknown;
     if (typeof path === 'string') loggedPath = redactQueryString(path);
-    else if (path !== undefined) loggedPath = REDACTED;
+    else if (path !== undefined) loggedPath = REDACTION_PLACEHOLDER;
     return {
         path: loggedPath,
         method,
         query: loggedQuery,
-        ...(body !== undefined && { body: REDACTED }),
+        ...(body !== undefined && { body: REDACTION_PLACEHOLDER }),
     };
 }
 
@@ -250,7 +253,7 @@ function maskToken(data: unknown, token: string | undefined): unknown {
     const text = JSON.stringify(data);
     // The token as it appears inside a JSON string.
     const escapedToken = JSON.stringify(token).slice(1, -1);
-    return text.includes(escapedToken) ? JSON.parse(text.replaceAll(escapedToken, REDACTED)) : data;
+    return text.includes(escapedToken) ? JSON.parse(text.replaceAll(escapedToken, REDACTION_PLACEHOLDER)) : data;
 }
 
 /**

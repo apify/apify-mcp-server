@@ -18,6 +18,9 @@ export class InvalidRequestPathError extends UserInputError {
     readonly statusCode = 400;
 }
 
+/** Recorded in telemetry and logs for an `InvalidRequestPathError`: its message quotes the caller's value. */
+export const INVALID_REQUEST_PATH_DETAIL = 'Invalid identifier, record key or request path';
+
 /**
  * Thrown by `compileUntrustedSchema` when an untrusted Actor / proxied-MCP input schema exceeds the byte
  * cap that bounds AJV's synchronous codegen. It's a property of the schema, not a server fault, so

@@ -10,6 +10,7 @@ import {
     TOOL_STATUS,
 } from '../../src/const.js';
 import { ActorLoadError } from '../../src/errors.js';
+import { REDACTION_PLACEHOLDER } from '../../src/resources/api_resources.js';
 import {
     buildCallActorDescription,
     buildCallActorErrorResponse,
@@ -483,6 +484,22 @@ describe('call_actor_common', () => {
                 failureHttpStatus: 404,
                 failureDetail: "Actor 'apify/missing' was not found",
             });
+        });
+
+        // The name is whatever the caller sent, so one that is not an Actor ID or name can be a pasted secret.
+        it('redacts a name that is not an Actor ID or name in the not-found telemetry detail', async () => {
+            vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [], errors: [] });
+
+            const resolution = await resolveAndValidateActor({
+                actorName: '--header "Authorization: Bearer secret-value"',
+                input: { query: 'x' },
+                toolArgs: stubToolArgs,
+            });
+
+            const { error } = resolution as { error: TextToolResult & { toolTelemetry?: unknown } };
+            expect(error.toolTelemetry).toEqual(
+                expect.objectContaining({ failureDetail: `Actor '${REDACTION_PLACEHOLDER}' was not found` }),
+            );
         });
 
         // Result text has no `hasTool`, so tools.mode_contract.test.ts cannot see it: it renders

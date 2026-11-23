@@ -25,8 +25,8 @@ import {
     TOOL_TYPE,
 } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
+import { fixActorNameInput } from '../../utils/actor_name_normalization.js';
 import { isValidResourceId } from '../../utils/apify_resource_id.js';
-import { stripQuoteWrappers } from '../../utils/generic.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildActorInputSchema, compileUntrustedSchema } from '../actor_input_schema.js';
 import {
@@ -285,34 +285,6 @@ export async function getMCPServersAsTools(
 
 export const EMPTY_ACTOR_NAME_MESSAGE =
     '"actor" must not be empty. Give the Actor ID or its name in the "username/name" form.';
-
-/**
- * Finds the legacy `:toolName` suffix while skipping URL scheme colons.
- * Index lookups keep this linear (apify/apify-mcp-server-internal#973).
- */
-export function getMcpToolNameSuffixIndex(actorName: string): number {
-    return actorName.indexOf(':', actorName.lastIndexOf('/') + 1);
-}
-
-/** Normalizes names before lookup to avoid 404s from stray quotes, spaces, or legacy suffixes. */
-export function fixActorNameInput(actorName: string): string {
-    const normalized = normalizeActorNameInput(actorName);
-    const suffixIndex = getMcpToolNameSuffixIndex(normalized);
-    return suffixIndex === -1 ? normalized : normalized.slice(0, suffixIndex).trimEnd();
-}
-
-/** Keeps `:toolName` available for the legacy syntax check. */
-export function normalizeActorNameInput(actorName: string): string {
-    const s = stripQuoteWrappers(actorName)
-        .replace(/\s+/g, ' ')
-        .replace(/ ?\/ ?/g, '/');
-    return (
-        s
-            .trim()
-            // The lookbehind starts a trailing match only at the start of a slash run, so long runs stay linear.
-            .replace(/^\/+|(?<!\/)\/+$/g, '')
-    );
-}
 
 export type ActorsAsToolsResult = {
     tools: ToolEntry[];

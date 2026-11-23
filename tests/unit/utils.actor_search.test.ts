@@ -119,7 +119,7 @@ describe('searchAgentSafeActors', () => {
             apifyClient,
             limit: 5,
             offset: 0,
-            useCase: ' compare prices for apify_api_SECRET123 ',
+            useCase: ` compare prices for apify_api_${'x'.repeat(36)} `,
         });
         expect(paramsHolder.params).toMatchObject({
             _traceId: 'thread-1',

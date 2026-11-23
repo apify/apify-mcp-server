@@ -18,6 +18,7 @@ import {
     fetchActorDetails as fetchActorDetailsFromApi,
     resolveReadmeContent,
 } from '../../utils/actor_details.js';
+import { fixActorNameInput } from '../../utils/actor_name_normalization.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleActorUrl, getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
@@ -26,7 +27,7 @@ import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { canRunActor, getOwnServerRemedy, hasMcpInterface } from '../actor_tool_naming.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 import { MAX_DATASET_ITEMS_SCHEMA_BYTES, reduceToFieldNamesAndTypes } from './actor_definition.js';
-import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInput } from './actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE } from './actor_tools_factory.js';
 import type { ServerInterfaceSection } from './server_interface_details.js';
 import { buildServerInterfaceDetails } from './server_interface_details.js';
 

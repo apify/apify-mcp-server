@@ -9,7 +9,7 @@ import {
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { maskLoggedInputs, pickLoggedValues, REDACTED } from '../../resources/api_resources.js';
+import { maskLoggedInputs, pickLoggedValues, REDACTION_PLACEHOLDER } from '../../resources/api_resources.js';
 import { getResourceByIdOrName } from '../../utils/apify_resource_id.js';
 import { toIsoString } from '../actors/actor_run_response.js';
 import { isRecord } from '../api/apify_api_spec.js';
@@ -110,10 +110,12 @@ export function redactScheduleToolArgs(
                   ...pickLoggedValues(action, Object.keys(scheduleActionSchema.shape)),
                   ...maskLoggedInputs(action, ['input']),
               }
-            : REDACTED;
+            : REDACTION_PLACEHOLDER;
     return {
         ...pickLoggedValues(args, keys),
-        ...(actions !== undefined && { actions: Array.isArray(actions) ? actions.map(redactAction) : REDACTED }),
+        ...(actions !== undefined && {
+            actions: Array.isArray(actions) ? actions.map(redactAction) : REDACTION_PLACEHOLDER,
+        }),
     };
 }
 
