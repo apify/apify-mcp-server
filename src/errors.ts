@@ -18,10 +18,7 @@ export class InvalidRequestPathError extends UserInputError {
     readonly statusCode = 400;
 }
 
-/**
- * What telemetry and logs record for an `InvalidRequestPathError` in place of its message. The message is for the
- * caller and quotes the value they sent, which can be a pasted secret.
- */
+/** Recorded in telemetry and logs for an `InvalidRequestPathError`: its message quotes the caller's value. */
 export const INVALID_REQUEST_PATH_DETAIL = 'Invalid identifier, record key or request path';
 
 /**

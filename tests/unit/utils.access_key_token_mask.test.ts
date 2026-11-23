@@ -16,6 +16,11 @@ describe('access tokens are masked in text', () => {
         expect(maskAccessKeyTokens(`apify_some_other_type_${TOKEN_SECRET}`)).toBe('apify_some_other_type_***');
     });
 
+    // The token an OAuth client holds is the one type without the `apify_` prefix.
+    it('masks an OAuth access token', () => {
+        expect(maskAccessKeyTokens(`integration_api_token_${TOKEN_SECRET}`)).toBe('integration_api_token_***');
+    });
+
     // Stack traces in log lines name files such as `src/tools/api/apify_api_request.ts`.
     it('keeps a file name that starts like a token', () => {
         const stack = 'at callApi (/app/dist/tools/api/apify_api_request.js:42:7)';

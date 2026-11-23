@@ -13,11 +13,7 @@ export type PrepareToolCallContextResult = {
     apifyClient: ApifyClient;
 };
 
-/**
- * `loggedArgs` with its `actor` replaced by `REDACTION_PLACEHOLDER` unless it is shaped like an Actor ID or name.
- * Any other value is whatever the caller sent, a pasted `Authorization` header included. The shape check cannot tell
- * a name from a bare secret made of the same characters; Apify tokens of that kind are masked in the finished log line.
- */
+/** Replaces a logged `actor` that is not shaped like an Actor ID or name: it can be a pasted secret. */
 function redactLoggedActorName(loggedArgs: Record<string, unknown>): Record<string, unknown> {
     const { actor } = loggedArgs;
     if (typeof actor !== 'string' || isValidResourceId(actor.trim())) return loggedArgs;
