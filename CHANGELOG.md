@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Run the eval agent with MCP tools only ([#1939](https://github.com/apify/apify-mcp-server/pull/1939)) ([4a66955](https://github.com/apify/apify-mcp-server/commit/4a66955cd9538b09a535ffa2ec033b4c27548345)) by [@jirispilka](https://github.com/jirispilka), closes [#33163](https://github.com/apify/apify-mcp-server/issues/33163)
+- Sanitize Actor names in telemetry and log output ([#1944](https://github.com/apify/apify-mcp-server/pull/1944)) ([3638c80](https://github.com/apify/apify-mcp-server/commit/3638c80f13444a18bea208dff2622592ffed7372)) by [@jirispilka](https://github.com/jirispilka), closes [#353](https://github.com/apify/apify-mcp-server/issues/353)
 
 
 <!-- git-cliff-unreleased-end -->
