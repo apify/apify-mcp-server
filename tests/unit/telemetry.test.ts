@@ -177,7 +177,7 @@ describe('telemetry', () => {
     });
 });
 
-describe('API tokens are redacted from telemetry', () => {
+describe('Apify tokens are redacted from telemetry', () => {
     const API_TOKEN = `apify_api_${'a1B2'.repeat(9)}`;
 
     beforeEach(() => {

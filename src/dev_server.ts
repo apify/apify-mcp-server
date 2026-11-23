@@ -36,7 +36,8 @@ import { MAX_REQUEST_BODY_BYTES } from './const.js';
 import { buildMcpClientContext } from './mcp/client_context.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { createStatelessServer } from './mcp/stateless_server.js';
-import { redactApiTokensInLogs, sanitizeMezmoMessage, toPlainError } from './utils/logging.js';
+import { redactApifyTokensInLogs } from './utils/apify_token_redaction.js';
+import { sanitizeMezmoMessage, toPlainError } from './utils/logging.js';
 import { injectMcpSessionId } from './utils/mcp.js';
 import { getRequestOriginForClient } from './utils/mcp_clients.js';
 import { parseServerMode } from './utils/server_mode.js';
@@ -51,7 +52,7 @@ import { parseServerMode } from './utils/server_mode.js';
 // analytics. Still overridable by an explicit TELEMETRY_ENV (e.g. PROD) in the env.
 process.env.TELEMETRY_ENV ??= 'DEV';
 
-redactApiTokensInLogs();
+redactApifyTokensInLogs();
 
 /**
  * Mirrors `apify-mcp-server-internal`'s `extractApiTokenFromRequest`: the `Authorization: Bearer`

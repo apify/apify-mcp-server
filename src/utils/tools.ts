@@ -1,7 +1,7 @@
 import { RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../const.js';
 import type { ActorInterfaceName, CallDiagnostics, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
-import { fixActorNameInput } from './actor_name.js';
+import { fixActorNameInput } from './actor_name_normalization.js';
 import { fixZodSchemaRequired } from './ajv.js';
 import { isValidResourceId } from './apify_resource_id.js';
 

@@ -107,19 +107,3 @@ export function computeValueBytes(value: unknown): number | undefined {
         return undefined;
     }
 }
-
-// The server accepts both API tokens and Console UI tokens (`apify_ui_`) as the Apify token.
-const APIFY_TOKEN_PREFIX = 'apify_(?:api|ui)_';
-
-// A token has 36 alphanumerics after the prefix. 16 or more keeps file names such as `apify_api_request.js` in stacks.
-// Not `{16,}`: V8 overflows its stack on that for a multi-megabyte run of alphanumerics, but not on `*?`.
-// The match never runs into the next prefix, so tokens joined with no separator are each replaced.
-const APIFY_TOKEN_REGEX = new RegExp(
-    `(${APIFY_TOKEN_PREFIX})(?:(?!${APIFY_TOKEN_PREFIX})[A-Za-z0-9]){16}[A-Za-z0-9]*?(?=${APIFY_TOKEN_PREFIX}|[^A-Za-z0-9]|$)`,
-    'g',
-);
-
-/** `text` with every Apify API or Console UI token replaced by its prefix and `***`, e.g. `apify_api_***`. */
-export function redactApiTokens(text: string): string {
-    return text.replace(APIFY_TOKEN_REGEX, '$1***');
-}

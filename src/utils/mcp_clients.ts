@@ -6,7 +6,7 @@ import {
     STORE_USE_CASE_MAX_LENGTH,
 } from '../const.js';
 import type { McpClientContext } from '../mcp/client_context.js';
-import { redactApiTokens } from './generic.js';
+import { redactApifyTokens } from './apify_token_redaction.js';
 import { APIFY_TRACE_ID_META_KEY, hashSessionId } from './mcp.js';
 
 /** True when `report-problem` is blocklisted for the connecting client (substring match on {@link ANTHROPIC_CLIENT_NAMES}). */
@@ -41,10 +41,10 @@ export function resolveStoreSearchTracking(
     return { traceId: traceId && traceId.length <= STORE_TRACE_ID_MAX_LENGTH ? traceId : undefined };
 }
 
-/** Trimmed, API tokens redacted, cut to the API limit (not mid surrogate pair). */
+/** Trimmed, Apify tokens redacted, cut to the API limit (not mid surrogate pair). */
 export function sanitizeUseCase(value: unknown): string | undefined {
     if (typeof value !== 'string') return undefined;
-    let useCase = redactApiTokens(value.trim()).slice(0, STORE_USE_CASE_MAX_LENGTH);
+    let useCase = redactApifyTokens(value.trim()).slice(0, STORE_USE_CASE_MAX_LENGTH);
     if (/[\uD800-\uDBFF]$/.test(useCase)) useCase = useCase.slice(0, -1);
     return useCase || undefined;
 }

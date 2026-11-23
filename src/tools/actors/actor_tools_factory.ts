@@ -27,7 +27,7 @@ import {
     TOOL_TYPE,
 } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
-import { fixActorNameInput } from '../../utils/actor_name.js';
+import { fixActorNameInput } from '../../utils/actor_name_normalization.js';
 import { isValidResourceId } from '../../utils/apify_resource_id.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildActorInputSchema, compileUntrustedSchema } from '../actor_input_schema.js';

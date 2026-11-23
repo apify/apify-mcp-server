@@ -23,9 +23,9 @@ import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { getTelemetryEnv } from './telemetry.js';
 import type { ApifyRequestParams, Input, ServerModeOption, TelemetryEnv, ToolSelector } from './types.js';
+import { redactApifyTokens, redactApifyTokensInLogs } from './utils/apify_token_redaction.js';
 import { isApiTokenRequired } from './utils/auth.js';
-import { parseQueryParamList, redactApiTokens } from './utils/generic.js';
-import { redactApiTokensInLogs } from './utils/logging.js';
+import { parseQueryParamList } from './utils/generic.js';
 import { injectMcpSessionId } from './utils/mcp.js';
 import { parseServerMode } from './utils/server_mode.js';
 import { getPackageVersion } from './utils/version.js';
@@ -52,7 +52,7 @@ function getTokenFromAuthFile(): string | undefined {
 }
 
 log.setLevel(log.LEVELS.ERROR);
-redactApiTokensInLogs();
+redactApifyTokensInLogs();
 const packageVersion = getPackageVersion() ?? '0.0.0';
 
 const argv = yargs(hideBin(process.argv))
@@ -120,7 +120,7 @@ log.error = (...args: Parameters<typeof log.error>) => {
     originalError(...args);
     // This copy bypasses the logger, so it is redacted here.
     // eslint-disable-next-line no-console
-    console.error(redactApiTokens(format(...args)));
+    console.error(redactApifyTokens(format(...args)));
 };
 
 const apifyToken = process.env.APIFY_TOKEN || getTokenFromAuthFile();

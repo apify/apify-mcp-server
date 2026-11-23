@@ -17,7 +17,11 @@ import { maskLoggedInputs, pickLoggedValues, REDACTED } from '../../resources/ap
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ACTOR_TOOL_MODE, ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorToolResolutionCached } from '../../utils/actor.js';
-import { fixActorNameInput, getMcpToolNameSuffixIndex, normalizeActorNameInput } from '../../utils/actor_name.js';
+import {
+    fixActorNameInput,
+    getMcpToolNameSuffixIndex,
+    normalizeActorNameInput,
+} from '../../utils/actor_name_normalization.js';
 import { compileSchema } from '../../utils/ajv.js';
 import {
     ACTOR_RUN_LIMIT_MESSAGE,
@@ -195,7 +199,7 @@ function respondActorNotFound(actorName: string, loadedToolNames: readonly strin
             Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
         ` + recovery,
         // The name is the caller's input. One that is not shaped like an Actor ID or name can be a pasted secret, so
-        // the telemetry detail redacts it. A bare API token has a valid shape; the telemetry sender redacts that.
+        // the telemetry detail redacts it. A bare Apify token has a valid shape; the telemetry sender redacts that.
         {
             httpStatus: 404,
             detail: `Actor '${isValidResourceId(actorName) ? actorName : REDACTED}' was not found`,

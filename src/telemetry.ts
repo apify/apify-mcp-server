@@ -8,7 +8,7 @@ import log from '@apify/log';
 import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV } from './const.js';
 import type { reportProblemArgsSchema } from './tools/dev/report_problem.js';
 import type { ReportedProblemTelemetryProperties, TelemetryEnv, ToolCallTelemetryProperties } from './types.js';
-import { redactApiTokens } from './utils/generic.js';
+import { redactApifyTokens } from './utils/apify_token_redaction.js';
 
 type ReportProblemArgs = z.infer<typeof reportProblemArgsSchema>;
 
@@ -69,12 +69,12 @@ export function getOrInitAnalyticsClient(telemetryEnv: TelemetryEnv): Analytics 
 }
 
 /**
- * Returns `properties` with every API token replaced, at any depth. Event properties carry caller input (an Actor
+ * Returns `properties` with every Apify token replaced, at any depth. Event properties carry caller input (an Actor
  * name, an error message, a problem report), and a caller can paste a token into any of them. Both track functions
  * send their properties through here, so no event field needs its own check.
  */
 function redactEventProperties<T extends object>(properties: T): T {
-    return JSON.parse(redactApiTokens(JSON.stringify(properties)));
+    return JSON.parse(redactApifyTokens(JSON.stringify(properties)));
 }
 
 /**

@@ -18,7 +18,7 @@ import type {
 } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
-import { fixActorNameInput } from '../../utils/actor_name.js';
+import { fixActorNameInput } from '../../utils/actor_name_normalization.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { remoteMcpFailureDetail } from '../../utils/apify_errors.js';
 import { logHttpError } from '../../utils/logging.js';

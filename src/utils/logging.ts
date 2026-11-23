@@ -5,7 +5,6 @@ import log from '@apify/log';
 
 import { SchemaTooLargeError } from '../errors.js';
 import { isActorRunLimitError } from './apify_errors.js';
-import { redactApiTokens } from './generic.js';
 
 /**
  * Safely extract HTTP status code from errors.
@@ -237,15 +236,4 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
 
     // No status code available - log as error
     log.error(message, { error: toPlainError(error), ...data });
-}
-
-/**
- * Replaces every Apify API token in every log line the process writes from now on. A caller can send a token as any
- * argument, an Actor name included, and many log statements write arguments as given. The token is replaced in the
- * finished line, which covers the message, the data and the exception alike. Call once, from the process entry point.
- */
-export function redactApiTokensInLogs(): void {
-    const { logger } = log.getOptions();
-    const writeLine = logger._outputWithConsole.bind(logger);
-    logger._outputWithConsole = (level, line) => writeLine(level, redactApiTokens(line));
 }

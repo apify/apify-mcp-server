@@ -18,7 +18,7 @@ import {
     resolveReadmeContent,
     typeObjectToString,
 } from '../../utils/actor_details.js';
-import { fixActorNameInput } from '../../utils/actor_name.js';
+import { fixActorNameInput } from '../../utils/actor_name_normalization.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildConsoleActorUrl, getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { wrapJsonText } from '../../utils/encode_text.js';

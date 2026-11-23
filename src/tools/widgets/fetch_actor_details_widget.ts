@@ -6,7 +6,7 @@ import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { buildActorDetailsForWidget, buildCardOptions, fetchActorDetails } from '../../utils/actor_details.js';
-import { fixActorNameInput } from '../../utils/actor_name.js';
+import { fixActorNameInput } from '../../utils/actor_name_normalization.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { respondOk, respondUserError } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
