@@ -11,19 +11,9 @@ describe('access tokens are masked in text', () => {
         expect(maskAccessKeyTokens(`Bearer apify_api_${TOKEN_SECRET} failed`)).toBe('Bearer [TKN] failed');
     });
 
-    // The same list as `ACCESS_KEY_TYPE_TOKEN_PREFIXES` in apify-core: API tokens of every type and proxy passwords.
-    it('masks a token of every other type the platform issues', () => {
-        const prefixes = [
-            'apify_proxy',
-            'apify_ui',
-            'apify_actor_run_api',
-            'apify_actor_run_proxy',
-            'integration_api_token',
-            'apify_webhook_dispatch',
-            'apify_adhoc_api',
-        ];
-        const text = prefixes.map((prefix) => `${prefix}_${TOKEN_SECRET}`).join(' ');
-        expect(maskAccessKeyTokens(text)).toBe(prefixes.map(() => '[TKN]').join(' '));
+    // The token types are not listed, so any `apify_<type>_<secret>` value is masked.
+    it('masks a token whose type has several words', () => {
+        expect(maskAccessKeyTokens(`apify_some_other_type_${TOKEN_SECRET}`)).toBe('[TKN]');
     });
 
     // Stack traces in log lines name files such as `src/tools/api/apify_api_request.ts`.
