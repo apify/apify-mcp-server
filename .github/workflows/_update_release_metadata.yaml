@@ -36,6 +36,7 @@ jobs:
     release_metadata:
         name: Prepare release metadata
         runs-on: ubuntu-latest
+        environment: npm
         outputs:
             version_number: ${{ steps.release_metadata.outputs.version_number }}
             tag_name: ${{ steps.release_metadata.outputs.tag_name }}
@@ -55,6 +56,7 @@ jobs:
         needs: [ release_metadata ]
         name: Update changelog
         runs-on: ubuntu-latest
+        environment: npm
         outputs:
             changelog_commitish: ${{ steps.commit.outputs.commit_long_sha }}
 
