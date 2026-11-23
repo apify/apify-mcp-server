@@ -8,6 +8,11 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Add Claude and Cursor setup links, match claude ?client= tags ([#1789](https://github.com/apify/apify-mcp-server/pull/1789)) ([ce157ae](https://github.com/apify/apify-mcp-server/commit/ce157ae924fdccc067decb190a103e0059b5f8c8)) by [@jancurn](https://github.com/jancurn)
+- [**breaking**] Use the dataset schema an Actor declares as its output schema ([#1934](https://github.com/apify/apify-mcp-server/pull/1934)) ([7cab0fa](https://github.com/apify/apify-mcp-server/commit/7cab0fa6e4bf415395ffc05b404d51419ff1c8a6)) by [@jirispilka](https://github.com/jirispilka), closes [#1401](https://github.com/apify/apify-mcp-server/issues/1401)
+
+### 🐛 Bug Fixes
+
+- Run the eval agent with MCP tools only ([#1939](https://github.com/apify/apify-mcp-server/pull/1939)) ([4a66955](https://github.com/apify/apify-mcp-server/commit/4a66955cd9538b09a535ffa2ec033b4c27548345)) by [@jirispilka](https://github.com/jirispilka), closes [#33163](https://github.com/apify/apify-mcp-server/issues/33163)
 
 
 <!-- git-cliff-unreleased-end -->
