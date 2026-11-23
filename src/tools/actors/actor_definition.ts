@@ -22,7 +22,7 @@ import { listCommaJoinedQueryParameters, listDocumentedOperations } from './serv
 const BUILD_NUMBER_PATTERN = /^\d+\.\d+\.\d+$/;
 
 const JSON_SCHEMA_TYPES = new Set(['string', 'number', 'integer', 'boolean', 'object', 'array', 'null']);
-/** Nesting of declared dataset fields kept by `reduceToFieldNamesAndTypes`; a deeper field keeps no shape. */
+/** Levels of nested dataset fields `reduceToFieldNamesAndTypes` keeps; a field on the last level keeps its type only. */
 export const MAX_DATASET_FIELD_DEPTH = 8;
 /**
  * Serialized size above which a declared dataset schema is not served. `fetch-actor-details` then falls back from
@@ -62,8 +62,8 @@ export function getDeclaredDatasetItemsSchema(actorDefinition: { storages?: unkn
  * size (38 KB against 4 KB for `compass/crawler-google-places`). The schema is written by the Actor's creator, so
  * any other keyword is dropped as well, and a type name JSON Schema does not define with it: a client that compiles
  * the tool's `outputSchema` rejects the tool on a keyword or type its validator does not know. A field typed only
- * through `$ref`, `anyOf` or `oneOf` therefore keeps its name and no type. OpenAPI's `nullable: true` is kept as
- * the `null` type. Nesting stops at `MAX_DATASET_FIELD_DEPTH`, and a result over
+ * through `$ref`, `anyOf` or `oneOf` therefore keeps its name and no type. OpenAPI's `nullable: true` adds the
+ * `null` type to the types a field declares. Nesting stops at `MAX_DATASET_FIELD_DEPTH`, and a result over
  * `MAX_DATASET_ITEMS_SCHEMA_BYTES` is not returned. The full schema is served by `fetch-actor-details`.
  */
 export function reduceToFieldNamesAndTypes(

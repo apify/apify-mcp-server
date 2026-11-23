@@ -436,6 +436,13 @@ describe('reducing declared dataset fields to names and types', () => {
         });
     });
 
+    // A field with no type takes any value; the `null` type alone would make it accept only null.
+    it('keeps no type for a field marked `nullable: true` that declares no type', () => {
+        const reduced = reduceToFieldNamesAndTypes({ location: { $ref: '#/definitions/location', nullable: true } });
+
+        expect(reduced).toStrictEqual({ location: {} });
+    });
+
     // A creator's schema can nest without end; the reduction must stay bounded.
     it('keeps the type of a deeply nested field and drops what lies below it', () => {
         // Nests through `properties` and `items` in turn: both count as a level.
