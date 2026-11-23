@@ -172,8 +172,8 @@ describe('API tokens are redacted from telemetry', () => {
 
         expect(mockTrack.mock.calls[0][0].properties).toEqual({
             ...properties,
-            actor_name: 'apify_api_[REDACTED]',
-            failure_detail: 'Request with token apify_api_[REDACTED] failed',
+            actor_name: 'apify_api_***',
+            failure_detail: 'Request with token apify_api_*** failed',
         });
     });
 
@@ -194,7 +194,7 @@ describe('API tokens are redacted from telemetry', () => {
 
         expect(mockTrack.mock.calls[0][0].properties).toEqual({
             ...properties,
-            message: 'My token apify_api_[REDACTED] does not work',
+            message: 'My token apify_api_*** does not work',
         });
     });
 });
