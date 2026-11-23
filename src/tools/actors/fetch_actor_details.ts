@@ -225,8 +225,10 @@ function resolveOutputSchema(declared: DatasetItemsSchema | undefined): {
     }
     const tooLarge = `The JSON Schema the Actor declares for items of its default dataset has ${declaredBytes} bytes, over the ${MAX_DATASET_ITEMS_SCHEMA_BYTES}-byte limit.`;
     const properties = reduceToFieldNamesAndTypes(declared.properties);
-    if (!properties) return { text: `${tooLarge} It was not returned.` };
-    const schema = { type: 'object', properties };
+    const schema = properties && { type: 'object', properties };
+    if (!schema || Buffer.byteLength(JSON.stringify(schema)) > MAX_DATASET_ITEMS_SCHEMA_BYTES) {
+        return { text: `${tooLarge} It was not returned.` };
+    }
     return {
         schema,
         text: `${tooLarge} Field names and types only, without descriptions and examples:\n${wrapJsonText(schema)}`,

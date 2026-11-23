@@ -83,22 +83,20 @@ describe('fetch-actor-details output schema', () => {
         expectSchemaConformingStructuredContent(result, fetchActorDetails.outputSchema as object);
     });
 
-    it('returns no schema when the field names and types alone are over the size limit', async () => {
-        const properties = Object.fromEntries(
-            Array.from({ length: MAX_DATASET_ITEMS_SCHEMA_BYTES / 10 }, (_, index) => [
-                `field${index}`,
-                { type: 'string' },
-            ]),
-        );
+    it('omits a reduced schema when its properties fit but the full object exceeds the byte limit', async () => {
+        const field = { type: 'string' };
+        const overhead = Buffer.byteLength(JSON.stringify({ '': field }));
+        const fieldName = 'fieldOverLimit'.padEnd(MAX_DATASET_ITEMS_SCHEMA_BYTES - overhead, 'x');
+        const properties = { [fieldName]: field };
 
         const { text, structuredContent } = await callFetchActorDetails(
             { outputSchema: true },
             { dataset: { fields: { type: 'object', properties } } },
         );
 
-        expect(structuredContent.outputSchema).toEqual({});
+        expect(Object.keys(structuredContent.outputSchema as object)).toEqual([]);
         expect(text).toContain(`over the ${MAX_DATASET_ITEMS_SCHEMA_BYTES}-byte limit`);
-        expect(text).not.toContain('field0');
+        expect(text).not.toContain('fieldOverLimit');
     });
 
     it('leaves the output schema out unless it is requested', async () => {
