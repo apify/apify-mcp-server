@@ -131,6 +131,7 @@ jobs:
         name: Bump dependency in apify-mcp-server-internal
         needs: [ release_metadata, publish_to_npm ]
         runs-on: ubuntu-latest
+        environment: npm
         env:
             GH_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
         steps:
