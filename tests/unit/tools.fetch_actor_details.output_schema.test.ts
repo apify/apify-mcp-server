@@ -97,7 +97,7 @@ describe('fetch-actor-details output schema', () => {
         );
 
         expect(structuredContent.outputSchema).toEqual({});
-        expect(text).toContain('It was not returned.');
+        expect(text).toContain(`over the ${MAX_DATASET_ITEMS_SCHEMA_BYTES}-byte limit`);
         expect(text).not.toContain('field0');
     });
 
