@@ -123,7 +123,7 @@ describe('searchAgentSafeActors', () => {
         });
         expect(paramsHolder.params).toMatchObject({
             _traceId: 'thread-1',
-            _useCase: 'compare prices for apify_api_***',
+            _useCase: 'compare prices for [TKN]',
         });
     });
 

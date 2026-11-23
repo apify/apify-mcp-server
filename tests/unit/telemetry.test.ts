@@ -177,7 +177,7 @@ describe('telemetry', () => {
     });
 });
 
-describe('Apify tokens are redacted from telemetry', () => {
+describe('access tokens are masked in telemetry', () => {
     const API_TOKEN = `apify_api_${'a1B2'.repeat(9)}`;
 
     beforeEach(() => {
@@ -185,7 +185,7 @@ describe('Apify tokens are redacted from telemetry', () => {
     });
 
     // A bare token has the shape of an Actor name, so it passes every name check on the way here.
-    it('redacts a token in any property of the tool call event', () => {
+    it('masks a token in any property of the tool call event', () => {
         const properties = mockToolCallProperties({
             actor_name: API_TOKEN,
             failure_detail: `Request with token ${API_TOKEN} failed`,
@@ -195,19 +195,19 @@ describe('Apify tokens are redacted from telemetry', () => {
 
         expect(mockTrack.mock.calls[0][0].properties).toEqual({
             ...properties,
-            actor_name: 'apify_api_***',
-            failure_detail: 'Request with token apify_api_*** failed',
+            actor_name: '[TKN]',
+            failure_detail: 'Request with token [TKN] failed',
         });
     });
 
-    it('redacts a token in the reported problem event', () => {
+    it('masks a token in the reported problem event', () => {
         const properties = mockReportedProblemProperties({ message: `My token ${API_TOKEN} does not work` });
 
         trackReportedProblem('test-user-123', 'DEV', properties);
 
         expect(mockTrack.mock.calls[0][0].properties).toEqual({
             ...properties,
-            message: 'My token apify_api_*** does not work',
+            message: 'My token [TKN] does not work',
         });
     });
 });
