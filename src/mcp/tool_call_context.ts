@@ -1,8 +1,9 @@
 import type { REQUEST_ORIGIN } from '../apify_client.js';
 import { ApifyClient } from '../apify_client.js';
-import { maskLoggedValues } from '../resources/api_resources.js';
+import { maskLoggedValues, REDACTION_PLACEHOLDER } from '../resources/api_resources.js';
 import type { ApifyToken, ToolEntry } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
+import { extractActorName } from '../utils/tools.js';
 
 export type PrepareToolCallContextResult = {
     /** A copy of the tool args, safe for AJV validation (which mutates it) and Actor input. */
@@ -11,6 +12,20 @@ export type PrepareToolCallContextResult = {
     toolArgsRedacted: unknown;
     apifyClient: ApifyClient;
 };
+
+/**
+ * `loggedArgs` with its `actor` as the name the tool looks up, or `REDACTION_PLACEHOLDER` when the caller's value is
+ * not an Actor ID or name. Such a value is whatever the caller sent, a pasted `Authorization` header included.
+ */
+function redactLoggedActorName(
+    tool: ToolEntry,
+    args: Record<string, unknown>,
+    loggedArgs: Record<string, unknown>,
+): Record<string, unknown> {
+    if (typeof loggedArgs.actor !== 'string') return loggedArgs;
+    const actorName = tool.type === TOOL_TYPE.INTERNAL ? extractActorName(tool, args) : undefined;
+    return { ...loggedArgs, actor: actorName ?? REDACTION_PLACEHOLDER };
+}
 
 /** Runs before validation: AJV's in-place `removeAdditional` must not change the copy that is logged. */
 export function prepareToolCallContext(input: {
@@ -26,7 +41,7 @@ export function prepareToolCallContext(input: {
     const toolArgsRedacted =
         tool.type === TOOL_TYPE.ACTOR || tool.type === TOOL_TYPE.ACTOR_MCP
             ? maskLoggedValues(args, Object.keys(args))
-            : (tool.redactArgs?.(args) ?? args);
+            : redactLoggedActorName(tool, args, tool.redactArgs?.(args) ?? args);
 
     return {
         toolArgs: { ...args },
