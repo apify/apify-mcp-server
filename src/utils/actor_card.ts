@@ -248,9 +248,13 @@ export function formatActorToStructuredCard(
     const data = extractActorData(actor, options);
     const userTier = options.userTier ?? 'FREE';
 
-    const pricing = options.simplifyPricingForUserTier
-        ? pricingInfoToSimplifiedStructured(data.pricingInfo, userTier)
-        : pricingInfoToStructured(data.pricingInfo, userTier);
+    // Excluded pricing has no pricing info, which the converters would report as a free Actor.
+    let pricing: StructuredActorCard['pricing'];
+    if (options.includePricing) {
+        pricing = options.simplifyPricingForUserTier
+            ? pricingInfoToSimplifiedStructured(data.pricingInfo, userTier)
+            : pricingInfoToStructured(data.pricingInfo, userTier);
+    }
     const inputSchema = getInputSchema(actor);
     const inputFieldsTotalCount = inputSchema ? Object.keys(inputSchema.properties).length : 0;
     const isInputFieldsTruncated = inputFieldsTotalCount > MAX_INPUT_FIELDS_IN_ACTOR_CARD;

@@ -21,32 +21,7 @@ import type { PricingTier } from './pricing_info.js';
 const ACTOR_DETAILS_PICTURE_SEARCH_LIMIT = 5;
 
 /**
- * Convert a type object to TypeScript-like string representation.
- * Used for human-readable text output.
- *
- * Example:
- * Input:  { first_number: "number", tags: ["string"], user: { name: "string" } }
- * Output: "{ first_number: number, tags: string[], user: { name: string } }"
- *
- * Values that are not string / object / array are skipped (not rendered) at every nesting level.
- */
-export function typeObjectToString(obj: Record<string, unknown>): string {
-    const pairs = Object.entries(obj)
-        .filter(([, v]) => Array.isArray(v) || (v !== null && typeof v === 'object') || typeof v === 'string')
-        .map(([k, v]) => `${k}: ${typeValueToString(v)}`);
-    return `{ ${pairs.join(', ')} }`;
-}
-
-function typeValueToString(value: unknown): string {
-    if (Array.isArray(value)) return `${typeValueToString(value[0])}[]`;
-    if (value !== null && typeof value === 'object') return typeObjectToString(value as Record<string, unknown>);
-    if (typeof value === 'string') return value;
-    return 'unknown';
-}
-
-/**
  * Resolve README content with fallback: prefer readmeSummary, fall back to full readme.
- * Returns the content string and appropriate heading for text output.
  *
  * apify/code-runtime is hardcoded to always get its full README (see CODE_RUNTIME_ACTOR_NAME) —
  * its README documents an exact API contract (method names/shapes) that the auto-generated
@@ -56,18 +31,11 @@ export function resolveReadmeContent(details: {
     actorInfo: { username: string; name: string };
     readmeSummary?: string;
     readme: string;
-}): {
-    content: string;
-    heading: string;
-} {
+}): string {
     const actorName = `${details.actorInfo.username}/${details.actorInfo.name}`;
-    if (actorName === CODE_RUNTIME_ACTOR_NAME) {
-        return { content: details.readme, heading: '# README' };
-    }
-    if (details.readmeSummary?.trim()) {
-        return { content: details.readmeSummary, heading: '# README summary' };
-    }
-    return { content: details.readme, heading: '# README' };
+    if (actorName === CODE_RUNTIME_ACTOR_NAME) return details.readme;
+    if (details.readmeSummary?.trim()) return details.readmeSummary;
+    return details.readme;
 }
 
 // Keep the type here since it is a self-contained module

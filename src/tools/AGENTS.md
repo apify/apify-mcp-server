@@ -42,7 +42,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `server_interface_schema.ts` (the operations a Server Actor's `webServerSchema` documents, in the
     `get-apify-api-details` shape through the API tools' `dereference`; no prose),
     `server_interface_details.ts` (the server-interface section of `fetch-actor-details`: the
-    `structuredContent.serverInterface` object, and the text derived from it; the summary is served only with
+    `structuredContent.serverInterface` object, and a text on how to use it that does not repeat the object, which
+    reaches text-only clients through the JSON mirror; the summary is served only with
     `send-server-actor-request`, and the operations in full give way to `operationIndex` over `MAX_INLINE_BYTES`,
     with a byte budget on reference expansion since a creator schema can expand exponentially; also a selected
     Server Actor's tool description, within `CLIENT_DESCRIPTION_MAX_LENGTH` (4,096 characters, the Claude Code cut):

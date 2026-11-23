@@ -23,14 +23,18 @@ const callTool = async (log: string, args: Record<string, unknown> = {}) =>
         stubToolCallContext({ runId: logServer.serveLog(log), ...args }, logServer.client),
     )) as TextToolResult;
 
+// The log as the tool returns it: in structuredContent, mirrored as JSON in content[0].
+const callForLog = async (log: string, args: Record<string, unknown> = {}) =>
+    ((await callTool(log, args)).structuredContent as { log: string }).log;
+
 describe('get-actor-run-log', () => {
     it('has the expected tool name', () => {
         expect(getActorRunLog.name).toBe(HELPER_TOOLS.ACTOR_RUNS_LOG);
     });
 
     it('returns exactly the requested number of trailing lines', async () => {
-        const { content } = await callTool(numberedLog(20), { lines: 10 });
-        const returned = content[0].text.split('\n');
+        const log = await callForLog(numberedLog(20), { lines: 10 });
+        const returned = log.split('\n');
 
         expect(returned).toHaveLength(10);
         expect(returned).toEqual([
@@ -48,40 +52,40 @@ describe('get-actor-run-log', () => {
     });
 
     it('returns a single line when one line is requested', async () => {
-        const { content } = await callTool(numberedLog(20), { lines: 1 });
+        const log = await callForLog(numberedLog(20), { lines: 1 });
 
-        expect(content[0].text).toBe('line 20');
+        expect(log).toBe('line 20');
     });
 
     it('returns exactly the default 10 lines when lines is omitted', async () => {
-        const { content } = await callTool(numberedLog(50));
+        const log = await callForLog(numberedLog(50));
 
-        expect(content[0].text.split('\n')).toHaveLength(10);
+        expect(log.split('\n')).toHaveLength(10);
     });
 
     it('returns only content lines when the log ends with a newline', async () => {
-        const { content } = await callTool(`${numberedLog(20)}\n`, { lines: 3 });
-        const returned = content[0].text.split('\n');
+        const log = await callForLog(`${numberedLog(20)}\n`, { lines: 3 });
+        const returned = log.split('\n');
 
         expect(returned).toEqual(['line 18', 'line 19', 'line 20']);
     });
 
     it('returns the last content line when one line is requested and the log ends with a newline', async () => {
-        const { content } = await callTool(`${numberedLog(20)}\n`, { lines: 1 });
+        const log = await callForLog(`${numberedLog(20)}\n`, { lines: 1 });
 
-        expect(content[0].text).toBe('line 20');
+        expect(log).toBe('line 20');
     });
 
     it('keeps a trailing blank line that is followed by nothing but one newline', async () => {
-        const { content } = await callTool(`${numberedLog(3)}\n\n`, { lines: 2 });
+        const log = await callForLog(`${numberedLog(3)}\n\n`, { lines: 2 });
 
-        expect(content[0].text.split('\n')).toEqual(['line 3', '']);
+        expect(log.split('\n')).toEqual(['line 3', '']);
     });
 
     it('returns the whole log when it is shorter than the requested number of lines', async () => {
-        const { content } = await callTool(numberedLog(3), { lines: 10 });
+        const log = await callForLog(numberedLog(3), { lines: 10 });
 
-        expect(content[0].text).toBe('line 1\nline 2\nline 3');
+        expect(log).toBe('line 1\nline 2\nline 3');
     });
 
     describe('log over the inline limit', () => {
@@ -90,34 +94,43 @@ describe('get-actor-run-log', () => {
 
         it('returns the full lines of the last MAX_INLINE_BYTES and says the start is cut when lines is 0', async () => {
             const result = await callTool(longLog, { lines: 0 });
-            const returned = result.content[0].text.split('\n');
+            const { log } = result.structuredContent as { log: string };
+            const returned = log.split('\n');
 
-            expect(Buffer.byteLength(result.content[0].text)).toBeLessThanOrEqual(MAX_INLINE_BYTES);
+            expect(Buffer.byteLength(log)).toBeLessThanOrEqual(MAX_INLINE_BYTES);
             expect(returned).toEqual(longLog.split('\n').slice(-returned.length));
+            // The note follows the JSON mirror: it is not in structuredContent.
+            expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
             expect(result.content[1].text).toContain(`${MAX_INLINE_BYTES} bytes`);
-            expect(result.structuredContent).toEqual({ log: result.content[0].text });
         });
 
         it('returns the requested trailing lines without a note when they fit', async () => {
-            const { content } = await callTool(longLog, { lines: 2 });
+            const result = await callTool(longLog, { lines: 2 });
 
-            expect(content).toHaveLength(1);
-            expect(content[0].text).toBe(longLog.split('\n').slice(-2).join('\n'));
+            expect(result.content).toHaveLength(1);
+            expect(result.structuredContent).toEqual({ log: longLog.split('\n').slice(-2).join('\n') });
         });
     });
 
-    it('mirrors the log text in structuredContent and declares an outputSchema', async () => {
+    it('returns the requested lines in structuredContent and declares an outputSchema', async () => {
         const result = await callTool(numberedLog(20), { lines: 10 });
 
-        expect(result.structuredContent).toEqual({ log: result.content[0].text });
+        expect(result.structuredContent).toEqual({ log: numberedLog(20).split('\n').slice(-10).join('\n') });
         expect((getActorRunLog as HelperTool).outputSchema).toBe(getActorRunLogToolOutputSchema);
         expectSchemaConformingStructuredContent(result, getActorRunLogToolOutputSchema);
+    });
+
+    it('returns the log only as the JSON mirror of structuredContent', async () => {
+        const result = await callTool(numberedLog(20), { lines: 10 });
+
+        expect(result.content).toHaveLength(1);
+        expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
     });
 
     it('returns conforming structuredContent for an empty log', async () => {
         const result = await callTool('', { lines: 10 });
 
-        expect(result.content[0].text).toBe('');
+        expect(result.content[0].text).toBe(JSON.stringify({ log: '' }));
         expect(result.structuredContent).toEqual({ log: '' });
         expectSchemaConformingStructuredContent(result, getActorRunLogToolOutputSchema);
     });
