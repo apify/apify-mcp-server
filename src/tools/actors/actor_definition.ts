@@ -22,25 +22,16 @@ import { listCommaJoinedQueryParameters, listDocumentedOperations } from './serv
 const BUILD_NUMBER_PATTERN = /^\d+\.\d+\.\d+$/;
 
 const JSON_SCHEMA_TYPES = new Set(['string', 'number', 'integer', 'boolean', 'object', 'array', 'null']);
-/** Levels of nested dataset fields `reduceToFieldNamesAndTypes` keeps; a field on the last level keeps its type only. */
 export const MAX_DATASET_FIELD_DEPTH = 8;
 /**
- * Serialized size above which a declared dataset schema is not served. `fetch-actor-details` then falls back from
- * the full schema to `reduceToFieldNamesAndTypes`, which itself returns nothing above the limit. Of the Store
- * Actors measured, the largest schema, `compass/crawler-google-places`, has 38 KB in full and 4 KB reduced; an
- * Actor can declare one of any size.
+ * Caps both full and reduced dataset schemas. The largest measured Store schema was 38 KB
+ * before reduction and 4 KB after (`compass/crawler-google-places`).
  */
 export const MAX_DATASET_ITEMS_SCHEMA_BYTES = 65_536;
 
 /**
- * Returns the JSON Schema an Actor declares for the items of its default dataset: the `fields` of its dataset
- * schema. `undefined` when the Actor declares no fields.
- *
- * An Actor with several datasets declares them under `storages.datasets.<alias>`, any other under
- * `storages.dataset`. The platform reads `storages.datasets` first and treats `storages.dataset` as the `default`
- * alias, so `storages.dataset` is not read when `storages.datasets` is an object. A definition from the brief period
- * when `storages.datasets` did not require a `default` alias gets its first alias as the default dataset, as on the
- * platform.
+ * Follows the platform's dataset precedence. Legacy `storages.datasets` definitions without a
+ * `default` alias use the first alias.
  */
 export function getDeclaredDatasetItemsSchema(actorDefinition: { storages?: unknown }): DatasetItemsSchema | undefined {
     const { storages } = actorDefinition;
@@ -55,16 +46,8 @@ export function getDeclaredDatasetItemsSchema(actorDefinition: { storages?: unkn
 }
 
 /**
- * Reduces the `properties` of a declared dataset schema to field names and types: per field only `type`, and
- * recursively `properties` and `items`. Returns `undefined` for no properties.
- *
- * The result goes into `tools/list` for every selected Actor, where descriptions and examples would multiply its
- * size (38 KB against 4 KB for `compass/crawler-google-places`). The schema is written by the Actor's creator, so
- * any other keyword is dropped as well, and a type name JSON Schema does not define with it: a client that compiles
- * the tool's `outputSchema` rejects the tool on a keyword or type its validator does not know. A field typed only
- * through `$ref`, `anyOf` or `oneOf` therefore keeps its name and no type. OpenAPI's `nullable: true` adds the
- * `null` type to the types a field declares. Nesting stops at `MAX_DATASET_FIELD_DEPTH`, and a result over
- * `MAX_DATASET_ITEMS_SCHEMA_BYTES` is not returned. The full schema is served by `fetch-actor-details`.
+ * Keeps `tools/list` small and prevents strict client validators from rejecting publisher-defined
+ * keywords or types. Fields typed only through `$ref`, `anyOf`, or `oneOf` keep their names.
  */
 export function reduceToFieldNamesAndTypes(
     properties: Record<string, unknown> | undefined,
@@ -80,10 +63,14 @@ function reduceProperties(properties: Record<string, unknown>, depth: number): R
     );
 }
 
+/**
+ * Converts OpenAPI's `nullable` flag to a JSON Schema `null` type when the field has a recognized type.
+ * At the depth limit, keep the field's type and drop its children to bound the schema sent to clients.
+ */
 function reduceFieldSchema(schema: unknown, depth: number): Record<string, unknown> {
     if (!isRecord(schema)) return {};
     const reduced: Record<string, unknown> = {};
-    // A `Set`, because a validator also rejects a type list that names a type twice.
+    // JSON Schema requires unique entries in a type array.
     const types = [...new Set<unknown>(Array.isArray(schema.type) ? schema.type : [schema.type])].filter(
         (type): type is string => typeof type === 'string' && JSON_SCHEMA_TYPES.has(type),
     );
@@ -96,16 +83,8 @@ function reduceFieldSchema(schema: unknown, depth: number): Record<string, unkno
 }
 
 /**
- * Get an Actor's pruned definition by Actor ID or name.
- * Input schema and README come from the default build; `webServerMcpPath`, `hasWebServerSchema` and
- * `webServerOperations` come from the build Actor Standby runs, which can be a different one (see
- * `resolveServerInterfaceDefinition`).
- * @param {string} actorIdOrName - Actor ID or Actor full name.
- * @param {ApifyClient} apifyClient - The Apify client instance.
- * @param {number} limit - Truncate the README to this limit.
- * @returns {Promise<ActorDefinitionWithInfo | null>} - null when the Actor is not found (API 404 or 400, or a name
- * the client refuses) or its default build has no definition. Other API failures, including 401 and 403, are thrown;
- * the caller logs them.
+ * Uses the default build for run inputs and the README, and the Standby build for the server interface.
+ * Returns `null` for a missing Actor, a missing default build definition, or an API 400 or 404.
  */
 export async function getActorDefinition(
     actorIdOrName: string,
@@ -151,12 +130,8 @@ export async function getActorDefinition(
 }
 
 /**
- * Returns the definition to read `webServerMcpPath` and `webServerSchema` from: the build named by
- * `actorStandby.build` when Actor Standby is on, otherwise the default build.
- *
- * Returns `undefined` when the Standby build cannot be resolved (unknown reference, deleted build, build without
- * a definition). Falling back to the default build would advertise an interface the running server may not have.
- * Authentication, permission and service failures propagate.
+ * Returns `undefined` for an unresolved Standby build to avoid advertising the default build's
+ * interface for a different server. API failures propagate.
  */
 export async function resolveServerInterfaceDefinition(
     actor: Pick<Actor, 'id' | 'username' | 'name' | 'actorStandby' | 'taggedBuilds'>,
@@ -184,11 +159,8 @@ export async function resolveServerInterfaceDefinition(
 }
 
 /**
- * Turns `actorStandby.build` into a build ID, the only key the API reads a build (and its definition) by.
- * The API resolves the default build's tag or number itself (`builds/default`) but has no equivalent for the
- * Standby build, so this repeats the platform's lookup. `reference` is a build tag or a `MAJOR.MINOR.BUILD`
- * number; Console accepts both. A number is first matched against the tagged builds, then searched for in the
- * build list newest first, because the API has no lookup by build number.
+ * Resolves the tag or build number accepted by Apify Console because the API has no Standby
+ * equivalent to `builds/default`.
  */
 async function resolveStandbyBuildId(
     actor: Pick<Actor, 'id' | 'taggedBuilds'>,
@@ -204,8 +176,7 @@ async function resolveStandbyBuildId(
     if (taggedBuildId) return taggedBuildId;
 
     if (!buildNumber) return undefined;
-    // Unlike the Actor and build reads, listing builds needs a token. Without one (a session with no token),
-    // leave an untagged build number unresolved rather than fail the whole read with a 401.
+    // Listing builds requires a token, so anonymous reads can only resolve tagged builds.
     if (!apifyClient.token) return undefined;
     for await (const build of apifyClient.actor(actor.id).builds().list({ desc: true })) {
         if ((build as BuildListItem).buildNumber === buildNumber) return build.id;
@@ -213,10 +184,7 @@ async function resolveStandbyBuildId(
     return undefined;
 }
 
-/**
- * True when the schema declares an operation the send tool can call: an object under a lowercase `API_METHODS` key.
- * The schema is publisher-written and unvalidated, so any level that is not an object counts as absent.
- */
+// Publisher schemas are unvalidated. Only object-valued operations count.
 function hasWebServerSchemaOperations(schema: unknown): boolean {
     if (!isRecord(schema) || !isRecord(schema.paths)) return false;
     return Object.values(schema.paths).some(
@@ -257,10 +225,6 @@ function pruneActorDefinition(
         ...(datasetItemProperties && { datasetItemProperties }),
     };
 }
-/**
- * Prune Actor README if it exceeds `limit`: keep it as-is up to the limit, keep only headings
- * after that, and append a note that the README was truncated.
- */
 function truncateActorReadme(readme: string, limit = ACTOR_README_MAX_LENGTH): string {
     if (readme.length <= limit) {
         return readme;

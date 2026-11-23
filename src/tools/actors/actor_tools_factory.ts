@@ -51,11 +51,7 @@ import {
 } from './send_server_actor_request.js';
 import { buildServerActorToolDescription, formatTenancyBilling } from './server_interface_details.js';
 
-/**
- * MCP-only opt-in injected next to the Actor's own input fields. Same contract as `call-actor`'s
- * `waitSecs`: default 30, max 45. If the Actor's own input schema happens to declare `waitSecs`,
- * this property overrides it — the field is reserved for the MCP server's wait control.
- */
+// MCP reserves `waitSecs` for run wait control, even if the Actor declares the same field.
 const WAIT_SECS_INPUT_PROPERTY = {
     type: 'integer',
     minimum: 0,
@@ -68,11 +64,8 @@ const WAIT_SECS_INPUT_PROPERTY = {
 } as const;
 
 /**
- * Clients such as Claude run read-only tools without asking each time (see apify/apify-mcp-server#973).
- * An Actor counts as read-only only when Apify maintains it and nothing lets it act outside its run
- * storages: limited permissions keep it out of the user's other Apify data, and it has no secret input
- * (credentials for other services), writable storage input (writes to the user's existing storages),
- * MCP connector input (writes to connected apps) or code input.
+ * Clients such as Claude can skip confirmation for read-only tools (apify/apify-mcp-server#973).
+ * Reserve the hint for Apify-maintained Actors whose writes are confined to their run storages.
  */
 function isReadOnlyActor({ actor, definition }: ActorInfo): boolean {
     if (!OFFICIAL_APIFY_USERNAMES.has(actor.username)) return false;
@@ -91,22 +84,6 @@ function isReadOnlyActor({ actor, definition }: ActorInfo): boolean {
     );
 }
 
-/**
- * Fetches input schemas for normal (non-MCP-server) Actors by ID or full name and compiles them
- * into MCP tools, using AJV to validate the input schemas. Tool name can't contain /, so it is
- * replaced with _.
- *
- * The input schema processing workflow:
- * 1. Properties are marked as required using markInputPropertiesAsRequired() to add "REQUIRED" prefix to descriptions
- * 2. Nested properties are built by analyzing editor type (proxy, requestListSources) using buildNestedProperties()
- * 3. Properties are filtered using filterSchemaProperties()
- * 4. Properties are shortened using shortenProperties()
- * 5. Prefill/default values are added to descriptions as examples using addExampleValuesToDescriptions()
- *
- * @param {ActorInfo[]} actorsInfo - An array of ActorInfo objects with webServerMcpPath, definition, and Actor.
- * @param options - Optional settings: mcpSessionId for telemetry correlation.
- * @returns {Promise<ToolEntry[]>} - A promise that resolves to an array of MCP tools.
- */
 export async function getNormalActorsAsTools(
     actorsInfo: ActorInfo[],
     options?: { mcpSessionId?: string; isDirectTool?: boolean },
@@ -126,17 +103,14 @@ export async function getNormalActorsAsTools(
         const isReadOnly = isReadOnlyActor({ ...actorInfo, definition: { ...definition, input: contract.input } });
         const { inputSchema } = buildActorInputSchema(definition.actorFullName, contract.input);
 
-        // Inject the MCP-only `waitSecs` opt-in before AJV compile so the LLM can cap the wait.
         const inputSchemaWithWaitSecs = inputSchema as { properties?: Record<string, unknown> };
         inputSchemaWithWaitSecs.properties = {
             ...(inputSchemaWithWaitSecs.properties ?? {}),
             waitSecs: WAIT_SECS_INPUT_PROPERTY,
         };
 
-        // The closure below must capture only the note, not `contract`: that would keep the
-        // per-call copy of the input schema alive for the session's lifetime.
+        // Capturing `contract` would retain a per-call input schema for the life of the session.
         const contractDescription = contract.description;
-        // Names call-actor only when the session actually has it.
         const buildDescription = ({ hasTool }: ToolDescriptionContext): string => {
             let description = `This tool calls the Actor "${actorFullName}" and retrieves its output results.
 ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOOLS.ACTOR_CALL}" if user requests this specific Actor.\n` : ''}Actor description: ${actorDescription}`;
@@ -151,15 +125,12 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
 
         let compiled;
         try {
-            // Unknown properties are silently stripped by AJV's removeAdditional option.
-            // Dynamic Actor input fields are part of the Actor's own inputSchema, so they
-            // are declared properties and won't be stripped.
             compiled = compileUntrustedSchema(inputSchema as ToolInputSchema, {
                 actorName: definition.actorFullName,
                 mcpSessionId,
             });
         } catch (e) {
-            // SchemaTooLargeError logs as a soft fail; a genuine AJV compile error stays an error.
+            // `logHttpError` logs `SchemaTooLargeError` as a soft fail.
             logHttpError(e, 'Failed to compile schema', {
                 actorName: definition.actorFullName,
                 mcpSessionId,
@@ -175,9 +146,8 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
             actorFullName: definition.actorFullName,
             description: buildDescription(ALL_TOOLS_PRESENT),
             buildDescription,
-            // The compile cache returns one schema object per content, so sessions share one copy.
+            // Sessions share the cached schema object.
             inputSchema: compiled.schema,
-            // Canonical RunResponse shape — same as call-actor and get-actor-run — plus the row shape the Actor declares.
             outputSchema:
                 isDirectTool && definition.datasetItemProperties
                     ? buildEnrichedDirectActorOutputSchema(definition.datasetItemProperties)
@@ -191,7 +161,6 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
                 destructiveHint: !isReadOnly,
                 openWorldHint: true,
             },
-            // Allow long-running tasks for Actor tools, make it optional for now
             execution: {
                 taskSupport: 'optional',
             },
@@ -201,19 +170,13 @@ ${hasTool(HELPER_TOOLS.ACTOR_CALL) ? `Use this tool instead of the "${HELPER_TOO
     return tools;
 }
 
-/**
- * Builds the own tool of each Actor served through its server interface: `send-server-actor-request` with the Actor
- * fixed, its documented operations in the description and its methods and paths in the input schema.
- * `readOnlyHint` is the Actor's, as for a run tool. The policy's `serverTool` (`getActorToolPolicy`), when the Actor
- * has one, replaces the generic opening and the Actor description with its own text and the generic input
- * descriptions with its own.
- */
+/** Builds a `send-server-actor-request` tool bound to each Actor. */
 export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
     const tools: ToolEntry[] = [];
     for (const actorInfo of actorsInfo) {
         const { definition, actor } = actorInfo;
         const toolInfo = definition.webServerToolInfo;
-        // `getActorsAsTools` reports an Actor without it.
+        // `getActorsAsTools` reports missing tool info as a load failure.
         if (!toolInfo) continue;
         const { actorFullName, description } = definition;
         const isReadOnly = isReadOnlyActor(actorInfo);
@@ -227,7 +190,6 @@ export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
             const property = schemas.inputSchema.properties?.[name] as { description?: string } | undefined;
             if (property) property.description = text;
         }
-        // Names fetch-actor-details only when the session has it, and only when the operations are not in full.
         const buildDescription = (context: ToolDescriptionContext): string => {
             const { hasTool } = context;
             const about =
@@ -272,13 +234,11 @@ export async function getMCPServersAsTools(
     mcpSessionId?: string,
 ): Promise<ToolEntry[]> {
     const { token, requestOrigin } = apifyClient;
-    // No Apify token: a connection to an MCP server, which is always a standby Actor, needs one, so
-    // MCP servers are skipped since they'd fail anyway.
+    // Connecting to an Actor's Standby MCP server requires an Apify token.
     if (token === null || token === undefined) {
         return [];
     }
 
-    // Process all actors in parallel
     const actorToolPromises = actorsInfo.map(async (actorInfo) => {
         const actorId = actorInfo.definition.id;
         if (!actorInfo.webServerMcpPath) {
@@ -292,8 +252,7 @@ export async function getMCPServersAsTools(
 
         let client: Client | null = null;
         try {
-            // getActorMCPServerURL rejects a webServerMcpPath that escapes the Actor's standby origin.
-            // Resolve it inside the try so one Actor's bad path skips only that Actor, not the whole batch.
+            // Resolve inside the try so an invalid MCP path cannot fail the whole batch.
             const mcpServerUrl = await getActorMCPServerURL(actorInfo.actor, actorInfo.webServerMcpPath);
             log.debug('Retrieved MCP server URL for Actor', {
                 actorFullName: actorInfo.definition.actorFullName,
@@ -304,7 +263,7 @@ export async function getMCPServersAsTools(
 
             client = await connectMCPClient(mcpServerUrl, { token, requestOrigin }, mcpSessionId);
             if (!client) {
-                // Skip this Actor, connectMCPClient will log the error
+                // `connectMCPClient` logs the failure.
                 return [];
             }
             return await getMCPServerTools(actorId, client, mcpServerUrl, actorInfo.definition.actorFullName);
@@ -320,7 +279,6 @@ export async function getMCPServersAsTools(
         }
     });
 
-    // Wait for all actors to be processed in parallel
     const actorToolsArrays = await Promise.all(actorToolPromises);
     return actorToolsArrays.flat();
 }
@@ -329,29 +287,21 @@ export const EMPTY_ACTOR_NAME_MESSAGE =
     '"actor" must not be empty. Give the Actor ID or its name in the "username/name" form.';
 
 /**
- * Where the `:toolName` of the removed `actorName:toolName` form starts: the first colon after the last slash, so a
- * URL's `scheme://` is not one. -1 when there is none. Index lookups rather than `/:[^/]*$/`, so the time stays
- * linear in the length of the name (see apify/apify-mcp-server-internal#973).
+ * Finds the legacy `:toolName` suffix while skipping URL scheme colons.
+ * Index lookups keep this linear (apify/apify-mcp-server-internal#973).
  */
 export function getMcpToolNameSuffixIndex(actorName: string): number {
     return actorName.indexOf(':', actorName.lastIndexOf('/') + 1);
 }
 
-/**
- * Fixes Actor name strings (`username/name`) before cache + Apify API lookup.
- *
- * LLMs often wrap values in markdown quotes or smart quotes, insert spaces around `/`, and pad the name with `/`.
- * The Apify API treats those as distinct strings → avoidable 404 SOFT_FAIL. This only trims
- * and strips common wrappers / spacing / slash padding noise; valid names pass through unchanged.
- * It also drops the `:toolName` of the removed `actorName:toolName` form, since a name never contains a colon.
- */
+/** Normalizes names before lookup to avoid 404s from stray quotes, spaces, or legacy suffixes. */
 export function fixActorNameInput(actorName: string): string {
     const normalized = normalizeActorNameInput(actorName);
     const suffixIndex = getMcpToolNameSuffixIndex(normalized);
     return suffixIndex === -1 ? normalized : normalized.slice(0, suffixIndex).trimEnd();
 }
 
-/** {@link fixActorNameInput} without dropping the `:toolName` suffix, so the legacy-syntax check sees the same name. */
+/** Keeps `:toolName` available for the legacy syntax check. */
 export function normalizeActorNameInput(actorName: string): string {
     const s = stripQuoteWrappers(actorName)
         .replace(/\s+/g, ' ')
@@ -364,28 +314,12 @@ export function normalizeActorNameInput(actorName: string): string {
     );
 }
 
-/**
- * Result type for {@link getActorsAsTools}: every requested name produces
- * either a successful load (contributing to `tools` — a single Actor can fan
- * out into multiple tools for MCP-server Actors) or an `ActorLoadError`
- * describing why the load failed.
- *
- * Bulk callers (`getActors`, server load-helpers) typically only read
- * `tools`. The single-Actor caller (`call-actor`) reads `errors[0]` to surface
- * the precise reason back to the agent.
- */
 export type ActorsAsToolsResult = {
     tools: ToolEntry[];
     errors: ActorLoadError[];
 };
 
-/**
- * Loads Actor metadata + builds MCP tool entries for the requested Actor
- * names. Returns both successful tools and `ActorLoadError` entries so
- * callers can surface precise reasons when needed (a single-Actor flow like
- * `call-actor`) or just ignore failures (bulk session-boot flows that build
- * the initial tool surface).
- */
+/** Returns tools from successful loads and errors that `call-actor` can surface for a single Actor. */
 export async function getActorsAsTools(
     actorIdsOrNames: string[],
     apifyClient: ApifyClient,
@@ -405,8 +339,7 @@ export async function getActorsAsTools(
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
             const actorName = fixActorNameInput(actorIdOrName);
-            // A name of any other shape is not an Actor name but whatever the caller sent, a pasted `Authorization`
-            // header included, so it is neither looked up nor logged.
+            // Invalid names can contain pasted credentials. Keep them out of lookups and logs.
             if (!isValidResourceId(actorName)) {
                 log.softFail('Actor name is not valid', {
                     mcpSessionId,
