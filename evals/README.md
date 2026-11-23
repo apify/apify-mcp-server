@@ -242,9 +242,9 @@ Every active item is validated when the dataset is fetched, so a bad UI edit fai
 
 ### 3. The agent is Claude Code, not a hand-rolled loop
 
-**Decision:** Run each case through the Claude Agent SDK's `query()` with the `claude_code` system-prompt and tool presets, and register the Apify MCP server alongside them — so the eval measures what a real client does with our tool descriptions, not a custom harness. See `agent/claude_agent.ts` for the run settings (`canUseTool`, `settingSources`, `strictMcpConfig`, `alwaysLoad`) and why each one is set that way.
+**Decision:** Run each case through the Claude Agent SDK's `query()` with the `claude_code` system-prompt preset and no built-in tools (`tools: []`), and register the Apify MCP server as the agent's only tools — so the eval measures what a real client's model does with our tool descriptions, not a custom harness. The built-ins are off because the agent reads Store listings, Actor output and web pages that anyone can write, and it must not have a shell or file access next to them. See `agent/claude_agent.ts` for the run settings (`canUseTool`, `settingSources`, `strictMcpConfig`, `alwaysLoad`) and why each one is set that way.
 
-**Trade-off:** the harness is a moving target - a Claude Code release can shift results, so `agentSdkVersion` is recorded in the run metadata.
+**Trade-off:** the harness is a moving target - a Claude Code release can shift results, so `agentSdkVersion` is recorded in the run metadata. Without built-ins, the evals no longer measure how the agent chooses between our tools and a client's own `WebFetch` and `WebSearch`; they compare our tools with each other only.
 
 **Location:** `agent/claude_agent.ts`, `agent/conversation_adapter.ts`
 

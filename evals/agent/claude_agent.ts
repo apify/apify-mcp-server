@@ -18,7 +18,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 
 import { REPORT_PROBLEM_NUDGE } from '../../src/tools/dev/report_problem.js';
 import { isMcpToolName, MCP_SERVER_NAME, stripToolPrefix } from '../config.js';
-import { ENV_KEYS_TO_SANITIZE } from '../environment.js';
+import { LANGFUSE_ENV_VARS } from '../environment.js';
 import type { AttemptedToolCall } from '../runner/tool_call_mode.js';
 import { TOOL_CALL_DENY_REASON, TOOL_CALL_MAX_TURNS } from '../runner/tool_call_mode.js';
 import type { AdaptedConversation } from './conversation_adapter.js';
@@ -57,15 +57,20 @@ const STDIO_BIN_PATH = resolve(process.cwd(), 'dist/stdio.js');
 /** Number of trailing non-empty stderr lines kept to append to a thrown error. */
 const MAX_APPENDED_STDERR_LINES = 5;
 
+/** Credentials only the eval runner uses (tracing and the judge). Neither subprocess gets them. */
+const RUNNER_CREDENTIAL_ENV_KEYS: readonly string[] = [...LANGFUSE_ENV_VARS, 'OPENROUTER_API_KEY'];
+
+/** Credentials the Claude Code CLI authenticates to the model with. The MCP server does not get them. */
+const AGENT_CREDENTIAL_ENV_KEYS = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN'];
+
 /**
- * `process.env` without the eval runner's credentials (`ENV_KEYS_TO_SANITIZE`), except `keptKey`.
- * The Claude Code and MCP server subprocesses each get only the credential they authenticate with.
+ * `process.env` without the named variables. This removes only the listed names; any other
+ * variable, including a credential that is not listed above, still reaches the subprocess.
  */
-function envWithoutRunnerCredentials(keptKey?: string): Record<string, string> {
+function envWithout(keys: readonly string[]): Record<string, string> {
     return Object.fromEntries(
         Object.entries(process.env).filter(
-            (entry): entry is [string, string] =>
-                entry[1] !== undefined && (entry[0] === keptKey || !ENV_KEYS_TO_SANITIZE.includes(entry[0])),
+            (entry): entry is [string, string] => entry[1] !== undefined && !keys.includes(entry[0]),
         ),
     );
 }
@@ -143,14 +148,18 @@ export async function runAgentConversation(options: AgentRunOptions): Promise<Ag
         model,
         systemPrompt: { type: 'preset', preset: 'claude_code' },
         tools: [],
-        env: envWithoutRunnerCredentials('ANTHROPIC_API_KEY'),
+        env: envWithout([...RUNNER_CREDENTIAL_ENV_KEYS, 'APIFY_TOKEN']),
         mcpServers: {
             [MCP_SERVER_NAME]: {
                 type: 'stdio',
                 command: 'node',
                 args: serverArgs,
-                // The CLI merges its own env into the server's, so the Anthropic key is blanked, not omitted.
-                env: { ...envWithoutRunnerCredentials(), APIFY_TOKEN: apifyToken, ANTHROPIC_API_KEY: '' },
+                // The CLI merges its own env into the server's, so its credentials are blanked, not omitted.
+                env: {
+                    ...envWithout(RUNNER_CREDENTIAL_ENV_KEYS),
+                    ...Object.fromEntries(AGENT_CREDENTIAL_ENV_KEYS.map((key) => [key, ''])),
+                    APIFY_TOKEN: apifyToken,
+                },
                 timeout: toolTimeoutSeconds * 1000,
                 // Keep the server's tools in the prompt instead of behind tool search, or the
                 // eval measures tool search rather than our tool descriptions.

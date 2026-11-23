@@ -135,6 +135,8 @@ describe('runAgentConversation()', () => {
 
     it('keeps the eval runner credentials out of the agent and MCP server subprocesses', async () => {
         vi.stubEnv('ANTHROPIC_API_KEY', 'anthropic-key');
+        vi.stubEnv('ANTHROPIC_AUTH_TOKEN', 'anthropic-auth-token');
+        vi.stubEnv('CLAUDE_CODE_OAUTH_TOKEN', 'claude-login-token');
         vi.stubEnv('LANGFUSE_SECRET_KEY', 'langfuse-key');
         vi.stubEnv('OPENROUTER_API_KEY', 'openrouter-key');
         vi.stubEnv('APIFY_TOKEN', 'runner-token');
@@ -143,14 +145,25 @@ describe('runAgentConversation()', () => {
         vi.unstubAllEnvs();
 
         // The CLI authenticates with the Anthropic key; the server only with the token it serves.
-        expect(capturedOptions?.env).toMatchObject({ ANTHROPIC_API_KEY: 'anthropic-key', PATH: process.env.PATH });
+        expect(capturedOptions?.env).toMatchObject({
+            ANTHROPIC_API_KEY: 'anthropic-key',
+            ANTHROPIC_AUTH_TOKEN: 'anthropic-auth-token',
+            CLAUDE_CODE_OAUTH_TOKEN: 'claude-login-token',
+            PATH: process.env.PATH,
+        });
         expect(capturedOptions?.env).not.toHaveProperty('LANGFUSE_SECRET_KEY');
         expect(capturedOptions?.env).not.toHaveProperty('OPENROUTER_API_KEY');
         expect(capturedOptions?.env).not.toHaveProperty('APIFY_TOKEN');
 
         const serverEnv = (capturedOptions?.mcpServers?.apify as { env: Record<string, string> } | undefined)?.env;
         // Blank, not absent: the CLI would otherwise hand its own Anthropic key down to the server.
-        expect(serverEnv).toMatchObject({ APIFY_TOKEN: 'item-token', ANTHROPIC_API_KEY: '', PATH: process.env.PATH });
+        expect(serverEnv).toMatchObject({
+            APIFY_TOKEN: 'item-token',
+            ANTHROPIC_API_KEY: '',
+            ANTHROPIC_AUTH_TOKEN: '',
+            CLAUDE_CODE_OAUTH_TOKEN: '',
+            PATH: process.env.PATH,
+        });
         expect(serverEnv).not.toHaveProperty('LANGFUSE_SECRET_KEY');
         expect(serverEnv).not.toHaveProperty('OPENROUTER_API_KEY');
     });
