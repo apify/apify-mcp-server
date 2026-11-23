@@ -113,7 +113,9 @@ describe('sanitizeUseCase()', () => {
     });
 
     it('masks access tokens before cutting', () => {
-        expect(sanitizeUseCase(`${'a'.repeat(1020)} apify_api_${'x'.repeat(36)}`)).toBe(`${'a'.repeat(1020)} [TK`);
+        expect(sanitizeUseCase(`${'a'.repeat(1011)} apify_api_${'x'.repeat(36)}`)).toBe(
+            `${'a'.repeat(1011)} apify_api_**`,
+        );
     });
 });
 

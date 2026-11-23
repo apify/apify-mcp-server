@@ -195,8 +195,8 @@ describe('access tokens are masked in telemetry', () => {
 
         expect(mockTrack.mock.calls[0][0].properties).toEqual({
             ...properties,
-            actor_name: '[TKN]',
-            failure_detail: 'Request with token [TKN] failed',
+            actor_name: 'apify_api_***',
+            failure_detail: 'Request with token apify_api_*** failed',
         });
     });
 
@@ -207,7 +207,7 @@ describe('access tokens are masked in telemetry', () => {
 
         expect(mockTrack.mock.calls[0][0].properties).toEqual({
             ...properties,
-            message: 'My token [TKN] does not work',
+            message: 'My token apify_api_*** does not work',
         });
     });
 });

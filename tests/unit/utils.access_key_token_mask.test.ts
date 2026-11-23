@@ -8,12 +8,12 @@ const TOKEN_SECRET = 'a1B2'.repeat(9);
 
 describe('access tokens are masked in text', () => {
     it('masks a token', () => {
-        expect(maskAccessKeyTokens(`Bearer apify_api_${TOKEN_SECRET} failed`)).toBe('Bearer [TKN] failed');
+        expect(maskAccessKeyTokens(`Bearer apify_api_${TOKEN_SECRET} failed`)).toBe('Bearer apify_api_*** failed');
     });
 
     // The token types are not listed, so any `apify_<type>_<secret>` value is masked.
     it('masks a token whose type has several words', () => {
-        expect(maskAccessKeyTokens(`apify_some_other_type_${TOKEN_SECRET}`)).toBe('[TKN]');
+        expect(maskAccessKeyTokens(`apify_some_other_type_${TOKEN_SECRET}`)).toBe('apify_some_other_type_***');
     });
 
     // Stack traces in log lines name files such as `src/tools/api/apify_api_request.ts`.
@@ -24,13 +24,13 @@ describe('access tokens are masked in text', () => {
 
     it('masks two tokens joined with no separator', () => {
         const token = `apify_api_${TOKEN_SECRET}`;
-        expect(maskAccessKeyTokens(`${token}${token}`)).toBe('[TKN][TKN]');
+        expect(maskAccessKeyTokens(`${token}${token}`)).toBe('apify_api_***apify_api_***');
     });
 
     // A cut-off token is too short to match alone; the match must not start there and run into the next prefix.
     it('masks a token that directly follows a cut-off token', () => {
         const cutOffToken = `apify_api_${'x'.repeat(15)}`;
-        expect(maskAccessKeyTokens(`${cutOffToken}apify_api_${TOKEN_SECRET}`)).toBe(`${cutOffToken}[TKN]`);
+        expect(maskAccessKeyTokens(`${cutOffToken}apify_api_${TOKEN_SECRET}`)).toBe(`${cutOffToken}apify_api_***`);
     });
 });
 
@@ -51,6 +51,6 @@ describe('access tokens are masked in log lines', () => {
         for (const spy of spies) spy.mockRestore();
         expect(lines).toHaveLength(1);
         expect(lines[0]).not.toContain(token);
-        expect(lines[0].split('[TKN]')).toHaveLength(3);
+        expect(lines[0].split('apify_api_***')).toHaveLength(3);
     });
 });

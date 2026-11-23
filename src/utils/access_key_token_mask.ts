@@ -1,6 +1,7 @@
 import log from '@apify/log';
 
-const ACCESS_KEY_TOKEN_MASK = '[TKN]';
+/** Replaces the secret. The token's own prefix stays in the text, e.g. `apify_api_***`. */
+const ACCESS_KEY_TOKEN_MASK = '***';
 
 /** The number of characters that a token has after its prefix. */
 const TOKEN_SECRET_LENGTH = 36;
@@ -15,16 +16,16 @@ const MIN_MASKED_TOKEN_SECRET_LENGTH = 20;
 // The types are not listed, so a new one is masked too. The match ends at the full token length and never runs into
 // the next token, so that a token pasted right behind another one, or behind a cut-off one, is masked too.
 const ACCESS_KEY_TOKEN_REGEX = new RegExp(
-    `apify(?:_[a-z]{1,16}){1,4}_(?:(?!apify_)[a-zA-Z0-9]){${MIN_MASKED_TOKEN_SECRET_LENGTH},${TOKEN_SECRET_LENGTH}}`,
+    `(apify(?:_[a-z]{1,16}){1,4}_)(?:(?!apify_)[a-zA-Z0-9]){${MIN_MASKED_TOKEN_SECRET_LENGTH},${TOKEN_SECRET_LENGTH}}`,
     'g',
 );
 
 /**
- * Replaces every access token found in the text. Finds only tokens with a type prefix: version 1 tokens
+ * Masks the secret of every access token found in the text. Finds only tokens with a type prefix: version 1 tokens
  * have none and cannot be told from other text.
  */
 export function maskAccessKeyTokens(text: string): string {
-    return text.replace(ACCESS_KEY_TOKEN_REGEX, ACCESS_KEY_TOKEN_MASK);
+    return text.replace(ACCESS_KEY_TOKEN_REGEX, `$1${ACCESS_KEY_TOKEN_MASK}`);
 }
 
 /**
