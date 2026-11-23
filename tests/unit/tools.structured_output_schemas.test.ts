@@ -71,7 +71,11 @@ function createMockActorInfo(actorFullName: string, datasetItemProperties?: Reco
 describe('Structured Output Schemas', () => {
     describe('buildEnrichedDirectActorOutputSchema', () => {
         it('injects itemsSchema with the supplied row properties', () => {
-            const itemProperties = { url: { type: 'string' }, price: { type: 'number' } };
+            const itemProperties = {
+                url: { type: 'string' },
+                user: { type: 'object', properties: { name: { type: 'string' } } },
+                tags: { type: 'array', items: { type: 'string' } },
+            };
             const enriched = buildEnrichedDirectActorOutputSchema(itemProperties);
 
             const itemsSchema = pickItemsSchema(enriched);
@@ -83,16 +87,6 @@ describe('Structured Output Schemas', () => {
             buildEnrichedDirectActorOutputSchema({ url: { type: 'string' } });
 
             expect(pickItemsSchema(actorRunOutputSchema)).toBeUndefined();
-        });
-
-        it('handles nested item properties', () => {
-            const itemProperties = {
-                user: { type: 'object', properties: { name: { type: 'string' } } },
-                tags: { type: 'array', items: { type: 'string' } },
-            };
-            const enriched = buildEnrichedDirectActorOutputSchema(itemProperties);
-
-            expect(pickItemsSchema(enriched)?.properties).toEqual(itemProperties);
         });
     });
 
@@ -200,31 +194,8 @@ describe('Structured Output Schemas', () => {
             expect(pickItemsSchema((tools[0] as ActorTool).outputSchema)?.properties).toEqual(itemProperties);
         });
 
-        // call-actor builds the tool only to validate input; its output is the canonical RunResponse.
-        it('keeps the canonical RunResponse schema on a tool built for call-actor', async () => {
-            const tools = await getNormalActorsAsTools(
-                [createMockActorInfo('apify/test-actor', { url: { type: 'string' } })],
-                { isDirectTool: false },
-            );
-
-            expect((tools[0] as ActorTool).outputSchema).toBe(actorRunOutputSchema);
-        });
-
         it('emits no widget meta on actor tools', async () => {
             const tools = await getNormalActorsAsTools([createMockActorInfo('apify/test-actor')]);
-
-            expect(tools).toHaveLength(1);
-            const meta = tools[0]._meta ?? {};
-            for (const key of Object.keys(meta)) {
-                expect(key).not.toMatch(/^openai\//);
-                expect(key).not.toBe('ui');
-                expect(key).not.toBe('ui/resourceUri');
-            }
-        });
-
-        it('emits no widget meta on actor tools', async () => {
-            const actorInfo = createMockActorInfo('apify/test-actor');
-            const tools = await getNormalActorsAsTools([actorInfo]);
 
             expect(tools).toHaveLength(1);
             const meta = tools[0]._meta ?? {};

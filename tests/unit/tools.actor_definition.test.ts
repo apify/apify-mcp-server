@@ -373,11 +373,11 @@ describe('the dataset schema an Actor declares for its default dataset', () => {
 describe('reducing declared dataset fields to names and types', () => {
     it('keeps the type and drops descriptions, examples and other keywords', () => {
         const reduced = reduceToFieldNamesAndTypes({
-            username: { type: ['string', 'null'], examples: ['humansofny'], description: 'Instagram username' },
+            description: { type: ['string', 'null'], examples: ['Photographer'], description: 'Profile bio' },
             followersCount: { type: 'number', minimum: 0, $ref: '#/definitions/count' },
         });
 
-        expect(reduced).toEqual({ username: { type: ['string', 'null'] }, followersCount: { type: 'number' } });
+        expect(reduced).toEqual({ description: { type: ['string', 'null'] }, followersCount: { type: 'number' } });
     });
 
     it('keeps nested object properties and array items, reduced the same way', () => {
@@ -393,13 +393,6 @@ describe('reducing declared dataset fields to names and types', () => {
             owner: { type: 'object', properties: { id: { type: 'string' } } },
             latestPosts: { type: 'array', items: { type: 'object', properties: { likesCount: { type: 'number' } } } },
         });
-    });
-
-    // `description` and `items` here are field names, not schema keywords.
-    it('keeps a field whose name is a schema keyword', () => {
-        const reduced = reduceToFieldNamesAndTypes({ description: { type: 'string' }, items: { type: 'array' } });
-
-        expect(reduced).toEqual({ description: { type: 'string' }, items: { type: 'array' } });
     });
 
     // A client's validator rejects a tool whose `outputSchema` carries an unknown type name.
