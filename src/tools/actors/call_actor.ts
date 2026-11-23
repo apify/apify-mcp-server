@@ -13,7 +13,7 @@ import {
     RESOURCE_ID_OR_NAME_MAX_LENGTH,
 } from '../../const.js';
 import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
-import { maskLoggedInputs, pickLoggedValues, REDACTED } from '../../resources/api_resources.js';
+import { maskLoggedInputs, pickLoggedValues, REDACTION_PLACEHOLDER } from '../../resources/api_resources.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ACTOR_TOOL_MODE, ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorToolResolutionCached } from '../../utils/actor.js';
@@ -202,7 +202,7 @@ function respondActorNotFound(actorName: string, loadedToolNames: readonly strin
         // the telemetry detail redacts it. A bare Apify token has a valid shape; the telemetry sender redacts that.
         {
             httpStatus: 404,
-            detail: `Actor '${isValidResourceId(actorName) ? actorName : REDACTED}' was not found`,
+            detail: `Actor '${isValidResourceId(actorName) ? actorName : REDACTION_PLACEHOLDER}' was not found`,
         },
     );
 }
@@ -348,7 +348,7 @@ export function redactCallActorArgs(args: Record<string, unknown>, keys: readonl
         ...(callOptions !== undefined && {
             callOptions: isRecord(callOptions)
                 ? pickLoggedValues(callOptions, Object.keys(callOptionsSchema.shape))
-                : REDACTED,
+                : REDACTION_PLACEHOLDER,
         }),
     };
 }

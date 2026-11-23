@@ -10,7 +10,7 @@ import {
     TOOL_STATUS,
 } from '../../src/const.js';
 import { ActorLoadError } from '../../src/errors.js';
-import { REDACTED } from '../../src/resources/api_resources.js';
+import { REDACTION_PLACEHOLDER } from '../../src/resources/api_resources.js';
 import {
     buildCallActorDescription,
     buildCallActorErrorResponse,
@@ -498,7 +498,7 @@ describe('call_actor_common', () => {
 
             const { error } = resolution as { error: TextToolResult & { toolTelemetry?: unknown } };
             expect(error.toolTelemetry).toEqual(
-                expect.objectContaining({ failureDetail: `Actor '${REDACTED}' was not found` }),
+                expect.objectContaining({ failureDetail: `Actor '${REDACTION_PLACEHOLDER}' was not found` }),
             );
         });
 
