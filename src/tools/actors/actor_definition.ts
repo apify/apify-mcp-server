@@ -54,7 +54,9 @@ export function reduceToFieldNamesAndTypes(
 ): Record<string, unknown> | undefined {
     if (!properties) return undefined;
     const reduced = reduceProperties(properties, 1);
-    return Buffer.byteLength(JSON.stringify(reduced)) > MAX_DATASET_ITEMS_SCHEMA_BYTES ? undefined : reduced;
+    // Measured as the schema both callers serve, so a direct Actor tool and `fetch-actor-details` cut off at the same size.
+    const schemaBytes = Buffer.byteLength(JSON.stringify({ type: 'object', properties: reduced }));
+    return schemaBytes > MAX_DATASET_ITEMS_SCHEMA_BYTES ? undefined : reduced;
 }
 
 function reduceProperties(properties: Record<string, unknown>, depth: number): Record<string, unknown> {

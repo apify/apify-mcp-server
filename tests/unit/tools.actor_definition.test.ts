@@ -466,6 +466,15 @@ describe('reducing declared dataset fields to names and types', () => {
 
         expect(reduceToFieldNamesAndTypes(properties)).toBeUndefined();
     });
+
+    // The limit applies to `{ type: 'object', properties }`, the schema a client receives, not to the properties alone.
+    it('returns nothing when the fields fit the size limit but the schema around them does not', () => {
+        const overhead = Buffer.byteLength(JSON.stringify({ '': { type: 'string' } }));
+        const properties = { ['x'.repeat(MAX_DATASET_ITEMS_SCHEMA_BYTES - overhead)]: { type: 'string' } };
+
+        expect(Buffer.byteLength(JSON.stringify(properties))).toBe(MAX_DATASET_ITEMS_SCHEMA_BYTES);
+        expect(reduceToFieldNamesAndTypes(properties)).toBeUndefined();
+    });
 });
 
 describe('declared dataset fields on the pruned definition', () => {
