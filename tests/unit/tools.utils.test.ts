@@ -1328,6 +1328,12 @@ describe('extractActorName', () => {
         expect(extractActorName(tool, { actor: 'a'.repeat(RESOURCE_ID_OR_NAME_MAX_LENGTH + 1) })).toBeUndefined();
     });
 
+    // A client config pasted as the Actor name reaches telemetry and the logs unless it is dropped here.
+    it('returns undefined for an actor arg that is not an Actor ID or name', () => {
+        const tool = { type: TOOL_TYPE.INTERNAL, name: 'call-actor' } as unknown as ToolEntry;
+        expect(extractActorName(tool, { actor: '--header "Authorization: Bearer secret-value"' })).toBeUndefined();
+    });
+
     it('returns undefined for internal tools without actor arg', () => {
         const tool = { type: TOOL_TYPE.INTERNAL, name: 'store-search' } as unknown as ToolEntry;
         expect(extractActorName(tool)).toBeUndefined();

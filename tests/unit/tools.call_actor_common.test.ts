@@ -481,7 +481,8 @@ describe('call_actor_common', () => {
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
                 failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
                 failureHttpStatus: 404,
-                failureDetail: "Actor 'apify/missing' was not found",
+                // The name is whatever the caller sent, an API token included, so the telemetry detail omits it.
+                failureDetail: 'Actor not found',
             });
         });
 

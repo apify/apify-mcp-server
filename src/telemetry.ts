@@ -68,6 +68,20 @@ export function getOrInitAnalyticsClient(telemetryEnv: TelemetryEnv): Analytics 
 }
 
 /**
+ * An Apify API token has 36 alphanumerics after the prefix. 16 or more skips names such as `apify_api_request`.
+ */
+const API_TOKEN_REGEX = /apify_api_[a-zA-Z0-9]{16,36}/g;
+
+/**
+ * Returns `properties` with every API token replaced, at any depth. Event properties carry caller input (an Actor
+ * name, an error message, a problem report), and a caller can paste a token into any of them. Both track functions
+ * send their properties through here, so no event field needs its own check.
+ */
+function redactApiTokens<T extends object>(properties: T): T {
+    return JSON.parse(JSON.stringify(properties).replace(API_TOKEN_REGEX, 'apify_api_[REDACTED]'));
+}
+
+/**
  * Tracks a tool call event to Segment.
  * Segment requires either userId OR anonymousId, but not both. When the Apify user is known, use
  * userId; otherwise fall back to mcp_session_id so every unauthenticated call in the same session
@@ -89,7 +103,7 @@ export function trackToolCall(
         client?.track({
             ...(userId ? { userId } : { anonymousId: properties.mcp_session_id || crypto.randomUUID() }),
             event: SEGMENT_EVENTS.TOOL_CALL,
-            properties,
+            properties: redactApiTokens(properties),
         });
     } catch (error) {
         log.error('Failed to track tool call event', { error, userId, toolName: properties.tool_name });
@@ -140,7 +154,7 @@ export function trackReportedProblem(
         client?.track({
             ...(userId ? { userId } : { anonymousId: properties.mcp_session_id || crypto.randomUUID() }),
             event: SEGMENT_EVENTS.REPORTED_PROBLEM,
-            properties,
+            properties: redactApiTokens(properties),
         });
     } catch (error) {
         log.error('Failed to track reported problem event', { error, userId });

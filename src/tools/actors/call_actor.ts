@@ -198,7 +198,8 @@ function respondActorNotFound(actorName: string, loadedToolNames: readonly strin
             Actor '${actorName}' was not found.
             Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
         ` + recovery,
-        { httpStatus: 404, detail: `Actor '${actorName}' was not found` },
+        // The name is the caller's input, which can be a pasted API token, so the telemetry detail omits it.
+        { httpStatus: 404, detail: 'Actor not found' },
     );
 }
 
