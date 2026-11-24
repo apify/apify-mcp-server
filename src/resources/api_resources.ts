@@ -1,3 +1,5 @@
+import { stripVTControlCharacters } from 'node:util';
+
 import type {
     BlobResourceContents,
     ReadResourceResult,
@@ -264,8 +266,19 @@ const INSPECTED_PASSWORD_RE = /(\bpassword\s*:\s*)('(?:[^'\\\n]|\\.)*'|"(?:[^"\\
 export function redactLogSecrets(text: string, sessionToken: string | undefined): string {
     return text
         .split('\n')
-        .map((line) => redactLogLine(line, sessionToken))
+        .map((line) => redactColoredLogLine(line, sessionToken))
         .join('\n');
+}
+
+/**
+ * A `?raw=1` log keeps its ANSI color codes. A code between a key and its value stops the patterns from
+ * matching, so a colored line is redacted without its codes. It keeps them when it holds no secret.
+ */
+function redactColoredLogLine(line: string, sessionToken: string | undefined): string {
+    const plain = stripVTControlCharacters(line);
+    if (plain === line) return redactLogLine(line, sessionToken);
+    const redacted = redactLogLine(plain, sessionToken);
+    return redacted === plain ? line : redacted;
 }
 
 function redactLogLine(line: string, sessionToken: string | undefined): string {
@@ -280,13 +293,26 @@ function redactLogLine(line: string, sessionToken: string | undefined): string {
 }
 
 /**
+ * True when a URL path reads a run or build log: `/v2/logs/{id}`, `/v2/actor-runs/{id}/log`,
+ * `/v2/actor-builds/{id}/log`, or `/v2/{actors|acts|actor-tasks}/{id}/runs/{runId|last}/log`. Case, repeated
+ * slashes and a trailing slash do not matter. Other paths that end in `/log`, such as a key-value store
+ * record with the key `log`, are not logs.
+ */
+export function isApiLogPath(pathname: string): boolean {
+    return /^\/v2\/(?:logs\/[^/]+|actor-(?:runs|builds)\/[^/]+\/log|(?:actors|acts|actor-tasks)\/[^/]+\/runs\/[^/]+\/log)\/?$/i.test(
+        pathname.replace(/\/+/g, '/'),
+    );
+}
+
+/**
  * Read any Apify API GET endpoint as an MCP resource.
  *
  * A thin streaming proxy: the apify-client injects the session token (and the MCP-origin header),
  * the body streams in and is returned by its declared Content-Type — textual types
  * (text/*, JSON, XML) as `text`, anything else as a base64 `blob`. The body is never parsed, so
- * JSON primitives, formatting, and bytes round-trip exactly, except that the session token and
- * `urlSigningSecretKey` and `password` values in JSON become `[REDACTED]`.
+ * JSON primitives, formatting, and bytes round-trip exactly, except that the session token,
+ * `urlSigningSecretKey` and `password` values in JSON, and the secrets `redactLogSecrets` finds in a log
+ * become `[REDACTED]`.
  *
  * Genuine failures (no token, bad origin, a request the API tools refuse, a missing resource, a bad token,
  * a 5xx, a network error) throw a domain error (`InvalidParamsError`/`InternalError`) that the protocol adapters
@@ -382,9 +408,12 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     // base64 beats text in a wrong encoding), the same rule as apify-client's body_parser. The full
     // Content-Type — charset included — rides along on the text result.
     if (isTextualMimeType(baseMimeType) && Buffer.isEncoding(charset)) {
-        const text = body.toString(charset);
+        let text = body.toString(charset);
+        // A log is text/plain, and the Actor or build can print secrets into it.
+        if (isApiLogPath(pathname)) text = redactLogSecrets(text, apifyClient.token);
         // apify-client parses only `application/json`, so both proxies redact the same bodies.
-        return buildTextResult(uri, baseMimeType === 'application/json' ? redactJsonSecrets(text) : text, contentType);
+        else if (baseMimeType === 'application/json') text = redactJsonSecrets(text);
+        return buildTextResult(uri, text, contentType);
     }
     // Binary or undecodable text: base MIME type only (parameters are meaningless for a blob).
     return {

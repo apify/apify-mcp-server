@@ -131,7 +131,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     `/v2/actors` are the same), sends it as written with the query added after any query string in
     it, and looks up a legacy `acts` path as `actors`, the prefix the spec lists. It asserts that the
     URL stays on the API origin, sends one request with no retries, masks the session token in the
-    response, redacts the `urlSigningSecretKey` and `password` values in a JSON body, keeps a query in
+    response, redacts the `urlSigningSecretKey` and `password` values in a JSON body, redacts a log body
+    (`isApiLogPath`, read on the resolved path) with `redactLogSecrets`, keeps a query in
     the path out of the error it throws, and adds the closest spec paths to a `page-not-found` 404 (a
     wrong path), not to a missing record.
     The one capped request (`sendApifyApiRequest`) and the detection of a body over `MAX_INLINE_BYTES`

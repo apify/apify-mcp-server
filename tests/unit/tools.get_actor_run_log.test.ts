@@ -207,6 +207,17 @@ describe('secrets in a run log are redacted', () => {
         ],
         ['a printed password that holds a single quote', `{ password: "it's-SECRETPW123" }`, 'SECRETPW123'],
         ['a printed password that holds both quote types', '{ password: `it\'s "SECRETPW123"` }', 'SECRETPW123'],
+        [
+            'a colored proxy password in a printed env object',
+            "{ APIFY_PROXY_PASSWORD: \u001b[32m'SECRETPW123'\u001b[39m }",
+            'SECRETPW123',
+        ],
+        ['a colored password in a printed object', "{ password: \u001b[32m'SECRETPW123'\u001b[39m }", 'SECRETPW123'],
+        [
+            'a password in colored JSON',
+            '\u001b[1;34m"password"\u001b[0m: \u001b[0;32m"SECRETPW123"\u001b[0m',
+            'SECRETPW123',
+        ],
     ])('hides %s', (_name, line, secret) => {
         const redacted = redactLogSecrets(line, 's3ss10nT0ken');
 
@@ -221,6 +232,12 @@ describe('secrets in a run log are redacted', () => {
         const [, nextLine] = text.split('\n');
 
         expect(redactLogSecrets(text, undefined).split('\n')[1]).toBe(nextLine);
+    });
+
+    it('keeps the color codes of a line without a secret', () => {
+        const line = '\u001b[32mINFO\u001b[39m Crawler started';
+
+        expect(redactLogSecrets(line, undefined)).toBe(line);
     });
 
     it('leaves a password prompt in prose unchanged', () => {
