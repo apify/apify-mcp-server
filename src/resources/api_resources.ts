@@ -1,3 +1,5 @@
+import { stripVTControlCharacters } from 'node:util';
+
 import type {
     BlobResourceContents,
     ReadResourceResult,
@@ -264,8 +266,19 @@ const INSPECTED_PASSWORD_RE = /(\bpassword\s*:\s*)('(?:[^'\\\n]|\\.)*'|"(?:[^"\\
 export function redactLogSecrets(text: string, sessionToken: string | undefined): string {
     return text
         .split('\n')
-        .map((line) => redactLogLine(line, sessionToken))
+        .map((line) => redactColoredLogLine(line, sessionToken))
         .join('\n');
+}
+
+/**
+ * A `?raw=1` log keeps its ANSI color codes. A code between a key and its value stops the patterns from
+ * matching, so a colored line is redacted without its codes. It keeps them when it holds no secret.
+ */
+function redactColoredLogLine(line: string, sessionToken: string | undefined): string {
+    const plain = stripVTControlCharacters(line);
+    if (plain === line) return redactLogLine(line, sessionToken);
+    const redacted = redactLogLine(plain, sessionToken);
+    return redacted === plain ? line : redacted;
 }
 
 function redactLogLine(line: string, sessionToken: string | undefined): string {
