@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
+import { REDACTION_PLACEHOLDER } from '../../src/resources/api_resources.js';
 import { getActorBuild } from '../../src/tools/builds/get_actor_build.js';
 import { getActorBuildLog } from '../../src/tools/builds/get_actor_build_log.js';
 import { getActorBuildLogToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
@@ -87,6 +88,15 @@ describe('get-actor-build-log', () => {
         expect(result.structuredContent).toEqual({ log: result.content[0].text });
         expect((getActorBuildLog as HelperTool).outputSchema).toBe(getActorBuildLogToolOutputSchema);
         expectSchemaConformingStructuredContent(result, getActorBuildLogToolOutputSchema);
+    });
+
+    it('redacts secrets the build printed in the text and structuredContent', async () => {
+        const result = await callTool(`Build started\nAPIFY_TOKEN=apify_api_AbC123xYz789 loaded\nBuild finished\n`, {
+            lines: 2,
+        });
+
+        expect(result.content[0].text).toBe(`APIFY_TOKEN=${REDACTION_PLACEHOLDER} loaded\nBuild finished`);
+        expect(result.structuredContent).toEqual({ log: result.content[0].text });
     });
 
     it('returns conforming structuredContent for an empty log', async () => {

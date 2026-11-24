@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
+import { redactLogSecrets } from '../../resources/api_resources.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
@@ -53,7 +54,8 @@ USAGE EXAMPLES:
         if (tail === undefined) {
             return respondUserError(`Build with ID '${parsed.buildId}' not found.`);
         }
-        const { text, note } = sliceLogTail(tail, parsed.lines);
+        // Redaction works one line at a time, so redacting before the slice gives the same lines as after it.
+        const { text, note } = sliceLogTail({ ...tail, text: redactLogSecrets(tail.text, client.token) }, parsed.lines);
         return respondOk(note ? [text, note] : text, { structuredContent: { log: text } });
     },
 } as const);

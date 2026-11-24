@@ -72,7 +72,8 @@ USAGE EXAMPLES:
         if (tail === undefined) {
             return respondUserError(`Run with ID '${parsed.runId}' not found.`);
         }
-        const { text, note } = sliceLogTail(tail, parsed.lines);
+        // Redaction works one line at a time, so redacting before the slice gives the same lines as after it.
+        const { text, note } = sliceLogTail({ ...tail, text: redactLogSecrets(tail.text, client.token) }, parsed.lines);
         return respondOk(note ? [text, note] : text, { structuredContent: { log: text } });
     },
 } as const);
