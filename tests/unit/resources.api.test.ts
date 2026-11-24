@@ -7,7 +7,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApifyClient } from '../../src/apify_client.js';
 import { MAX_INLINE_BYTES } from '../../src/const.js';
 import { InternalError, InvalidParamsError } from '../../src/mcp/errors.js';
-import { isApifyApiUri, readApiResource, redactJsonSecrets } from '../../src/resources/api_resources.js';
+import {
+    isApifyApiUri,
+    isApiLogPath,
+    readApiResource,
+    REDACTION_PLACEHOLDER,
+    redactJsonSecrets,
+} from '../../src/resources/api_resources.js';
 import { mockApifyClient } from './helpers/tool_context.js';
 
 const API = 'https://api.apify.com';
@@ -199,6 +205,27 @@ describe('redactJsonSecrets()', () => {
         ['the name inside a string value', '{"note":"\\"urlSigningSecretKey\\": \\"s\\""}'],
     ])('returns JSON with %s as it is', (_kind, json) => {
         expect(redactJsonSecrets(json)).toBe(json);
+    });
+});
+
+describe('isApiLogPath()', () => {
+    it.each([
+        ['a run log', '/v2/actor-runs/run-1/log'],
+        ['the last run log of an Actor, with a trailing slash', '/v2/acts/apify~hello-world/runs/last/log/'],
+        ['the last run log of a task', '/v2/actor-tasks/user~task/runs/last/log'],
+        ['the logs endpoint', '/v2/logs/run-1'],
+        ['a path in another case', '/v2/actor-builds/build-1/LOG'],
+        ['a path with repeated slashes', '/v2//logs//run-1'],
+    ])('matches %s', (_kind, pathname) => {
+        expect(isApiLogPath(pathname)).toBe(true);
+    });
+
+    it.each([
+        ['a run', '/v2/actor-runs/run-1'],
+        ['a record whose key ends in log', '/v2/key-value-stores/kv-1/records/changelog'],
+        ['a record whose key is log', '/v2/key-value-stores/kv-1/records/log'],
+    ])('does not match %s', (_kind, pathname) => {
+        expect(isApiLogPath(pathname)).toBe(false);
     });
 });
 
@@ -647,6 +674,18 @@ describe('readApiResource()', () => {
 
         expect(firstContent(result).text).toBe(body.replace('"fake-proxy-password"', '"[REDACTED]"'));
         expect(JSON.stringify(result)).not.toContain('fake-proxy-password');
+    });
+
+    it('redacts the secrets an Actor printed in a run log', async () => {
+        const log = 'Proxy: http://auto:apify_proxy_Xk29fLq@proxy.apify.com:8000\nAPIFY_TOKEN=apify_api_AbC123xYz789\n';
+        const { request } = requestReturning(streamOf(log), 'text/plain; charset=utf-8');
+
+        const result = await readApiResource(`${API}/v2/actor-runs/run-1/log?raw=1`, stubApifyClient({ request }));
+
+        expect(firstContent(result).mimeType).toBe('text/plain; charset=utf-8');
+        expect(firstContent(result).text).toBe(
+            `Proxy: http://auto:${REDACTION_PLACEHOLDER}@proxy.apify.com:8000\nAPIFY_TOKEN=${REDACTION_PLACEHOLDER}\n`,
+        );
     });
 
     it('keeps the URL signing key in a binary body', async () => {

@@ -11,9 +11,11 @@ import { APIFY_ERROR_TYPE_PAGE_NOT_FOUND, HELPER_TOOLS, MAX_INLINE_BYTES } from 
 import { InvalidRequestPathError } from '../../errors.js';
 import {
     isApifyApiUri,
+    isApiLogPath,
     maskSessionToken,
     REDACTION_PLACEHOLDER,
     redactJsonSecrets,
+    redactLogSecrets,
     redactQueryString,
 } from '../../resources/api_resources.js';
 import { toPlainError } from '../../utils/logging.js';
@@ -346,7 +348,12 @@ export async function callApi(params: {
                 `${MAX_INLINE_BYTES} bytes, so it is not returned.${hint ? ` ${hint}` : ''}`,
         );
     }
-    const data = maskToken(response.data, params.token);
+    const maskedData = maskToken(response.data, params.token);
+    // A log is text, which redactJsonSecrets never reaches; the URL resolves dot segments as the request does.
+    const data =
+        typeof maskedData === 'string' && isApiLogPath(new URL(url).pathname)
+            ? redactLogSecrets(maskedData, params.token)
+            : maskedData;
     if (response.status >= 300) {
         // Without the query in the path: apify-client puts the URL into the error, and a 5xx error is logged.
         const error = new ApifyApiError({ ...response, data, config: { ...response.config, url: stripQuery(url) } }, 1);

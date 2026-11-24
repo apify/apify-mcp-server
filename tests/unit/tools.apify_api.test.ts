@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApifyClient } from '../../src/apify_client.js';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { InvalidRequestPathError } from '../../src/errors.js';
+import { REDACTION_PLACEHOLDER } from '../../src/resources/api_resources.js';
 import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
 import { API_BLOCK_RULES } from '../../src/tools/api/apify_api_blocklist.js';
 import { apifyApiDetails } from '../../src/tools/api/apify_api_details.js';
@@ -561,6 +562,22 @@ describe('apify-api-read', () => {
         expect(result.structuredContent).toMatchObject({ data: 'Authorization: Bearer [REDACTED]' });
         expect(JSON.stringify(result)).not.toContain('test-token');
     });
+
+    it.each(['acts/apify~hello-world/runs/last/log', 'actor-runs/run-1/log/raw/..?raw=1'])(
+        'redacts the secrets an Actor printed in the log at %s',
+        async (path) => {
+            requestMock.mockResolvedValue(
+                mockResponse(200, 'APIFY_TOKEN=apify_api_AbC123xYz789\nAPIFY_PROXY_PASSWORD=SECRETPW123', 'text/plain'),
+            );
+
+            const result = await callTool(apifyApiRead, { path });
+
+            expect(result.structuredContent).toMatchObject({
+                data: `APIFY_TOKEN=${REDACTION_PLACEHOLDER}\nAPIFY_PROXY_PASSWORD=${REDACTION_PLACEHOLDER}`,
+            });
+            expect(result.content[0].text).toBe(JSON.stringify(result.structuredContent));
+        },
+    );
 
     it.each([
         ['JSON', { error: { type: 'invalid-input', message: 'Bearer test-token rejected' } }, 'application/json'],

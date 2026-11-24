@@ -34,9 +34,10 @@ templates, instructions, refusals and link-out URLs name only the client-facing 
 then refuses, without a request, what the API tools refuse (`validateApiBlocklist` in
 `../tools/api/apify_api_blocklist.ts`): the `method` query parameter and a GET to the synchronous run
 endpoints. The API tools' `callApi` (`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`,
-`maskSessionToken()`, `redactJsonSecrets()`, `redactQueryString()` and `REDACTION_PLACEHOLDER`, so a change to any changes the
-tools too. `redactLogSecrets()` hides the secrets an Actor prints to its run log; the run log tail
-(`buildLogTail`) uses it. `get-key-value-store-record` builds its inlined-record URI with `buildUrlOnOrigin()`.
+`maskSessionToken()`, `redactJsonSecrets()`, `isApiLogPath()`, `redactLogSecrets()`, `redactQueryString()` and
+`REDACTION_PLACEHOLDER`, so a change to any changes the tools too; the run and build log tools and the run log
+tail (`buildLogTail`) use `redactLogSecrets()` as well. `get-key-value-store-record` builds its inlined-record URI
+with `buildUrlOnOrigin()`.
 
 `sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through
 `httpClient.axios.request` with `maxContentLength: MAX_INLINE_BYTES`; `readBodyUnderCap()` next to it reads a
@@ -50,7 +51,8 @@ everything else (including no Content-Type) as a base64 `blob` with the base MIM
 as empty text preserving the Content-Type. The body is never parsed, so bytes round-trip exactly,
 except: the session token becomes `[REDACTED]` (`maskSessionToken()`; `/v2/browser-info` echoes the
 `Authorization` header), and so do the `urlSigningSecretKey` and `password` values in an
-`application/json` body (`redactJsonSecrets()`). The values are redacted, not removed: removal means
+`application/json` body (`redactJsonSecrets()`). A run or build log (`isApiLogPath()`) is text/plain, so its
+text goes through `redactLogSecrets()` instead. The values are redacted, not removed: removal means
 re-serializing, which loses formatting and big-number precision and cost about 1 GB on a crafted deep body.
 axios enforces `MAX_INLINE_BYTES` (256 KB) mid-consumption on streamed
 responses (axios ≥1.16: byte-counting wrapper throws `ERR_BAD_RESPONSE`, counting decoded bytes) —
