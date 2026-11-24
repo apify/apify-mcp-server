@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.22.1 - **not yet released**
+## [0.23.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.23.0) (2026-11-24)
 
 ### 🚀 Features
 
@@ -16,7 +15,6 @@ All notable changes to this project will be documented in this file.
 - Sanitize Actor names in telemetry and log output ([#1944](https://github.com/apify/apify-mcp-server/pull/1944)) ([3638c80](https://github.com/apify/apify-mcp-server/commit/3638c80f13444a18bea208dff2622592ffed7372)) by [@jirispilka](https://github.com/jirispilka), closes [#353](https://github.com/apify/apify-mcp-server/issues/353)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.22.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.22.0) (2026-11-20)
 
 ### 🚀 Features
