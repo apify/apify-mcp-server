@@ -80,7 +80,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     the one canonical run shape `call-actor` and `get-actor-run` share across sync, task
     and wait-timeout modes: storage IDs plus a `summary` (past) / `nextStep` (one primary
     action) pair, never inline dataset items or KV bodies — except the reserved `TIP` key,
-    inlined as `tip` on terminal RAG Web Browser runs only.
+    inlined as `tip` on terminal RAG Web Browser runs only. A FAILED run that wrote no statusMessage
+    also carries `logTail`, the redacted end of its run log.
   - `runs/` — get/abort runs, run logs, run list. The run and build log tools read the log through
     `readLogTail` (`../utils/log_tail.ts`), which streams it and keeps only its last `MAX_INLINE_BYTES`.
     `get_actor_run_log.ts` also holds the run log tail (`buildLogTail`) helper that the run response uses.

@@ -20,11 +20,12 @@ import {
     VERBATIM_LINKS_NUDGE,
 } from '../../utils/console_link.js';
 import { stripTrailingChars } from '../../utils/generic.js';
-import { LOG_LINES_MAX } from '../../utils/log_tail.js';
+import { LOG_LINES_MAX, readLogTail } from '../../utils/log_tail.js';
 import { logHttpError } from '../../utils/logging.js';
 import { respondOk, respondUserError, type ToolResponse } from '../../utils/mcp.js';
 import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 import { cleanEmptyProperties } from '../../utils/schema_generation.js';
+import { buildLogTail } from '../runs/get_actor_run_log.js';
 import { DEFAULT_DATASET_ITEMS_LIMIT } from '../storage/get_dataset_items.js';
 
 /** Reserved key-value store key some Actors use to advertise advisory guidance about the run. */
@@ -41,6 +42,9 @@ export const WAIT_SECS_MAX = 45;
 export const CALL_ACTOR_WAIT_SECS_DEFAULT = 30;
 
 const POLL_HINT_WAIT_SECS = 30;
+
+/** How long a run response waits for the run log before it omits `logTail`. */
+export const RUN_LOG_TAIL_TIMEOUT_MS = 3_000;
 
 /** Limit for the dataset metadata `itemCount=0` lag-fallback probe. */
 const ITEM_COUNT_PROBE_LIMIT = 1;
@@ -137,6 +141,8 @@ export type RunResponse = {
     status: string;
     statusMessage?: string;
     exitCode?: number;
+    /** End of the run log, redacted; set only for a FAILED run that wrote no statusMessage. */
+    logTail?: string;
     startedAt?: string;
     finishedAt?: string;
     stats?: {
@@ -457,6 +463,40 @@ async function actorNameForActorId(
     }
 }
 
+/**
+ * Fetch the end of the run log (`readLogTail`). The read stops after {@link RUN_LOG_TAIL_TIMEOUT_MS} or when the
+ * tool call is cancelled. A timeout, a cancelled call, a failure, or a missing or blank log yields undefined, so
+ * the response omits `logTail`. The timer is the global `setTimeout`, not `AbortSignal.timeout`, so fake timers
+ * in tests can drive it.
+ */
+async function fetchRunLogTail(params: {
+    client: ApifyClient;
+    runId: string;
+    abortSignal?: AbortSignal;
+    mcpSessionId?: string;
+}): Promise<string | undefined> {
+    const { client, runId, abortSignal, mcpSessionId } = params;
+    const timeoutController = new AbortController();
+    const timer = setTimeout(() => timeoutController.abort(), RUN_LOG_TAIL_TIMEOUT_MS);
+    const signal = abortSignal ? AbortSignal.any([abortSignal, timeoutController.signal]) : timeoutController.signal;
+    try {
+        const tail = await readLogTail(client, client.run(runId).log().url, signal);
+        const logTail = tail ? buildLogTail(tail, client.token) : '';
+        if (logTail.trim()) return logTail;
+        log.warning('Run log is missing or blank', { runId, mcpSessionId });
+    } catch (error) {
+        if (abortSignal?.aborted) return undefined;
+        if (timeoutController.signal.aborted) {
+            log.warning('Run log read timed out', { runId, mcpSessionId, timeoutMs: RUN_LOG_TAIL_TIMEOUT_MS });
+        } else {
+            log.warning('Failed to fetch run log tail', { runId, mcpSessionId, errMessage: errMessage(error) });
+        }
+    } finally {
+        clearTimeout(timer);
+    }
+    return undefined;
+}
+
 // -----------------------------------------------------------------------------
 // Status templates — one summary + nextStep per Apify status
 // -----------------------------------------------------------------------------
@@ -558,18 +598,23 @@ export function datasetSizeNextStepHint(inflatedBytes: number | undefined): stri
  * apify/apify-mcp-server#1698). Without the tool, the log is still stated as the source, so the text
  * is never a dead end.
  */
-function buildFailedNextStep(
-    runId: string,
-    statusMessage: string | null | undefined,
-    loadedToolNames: readonly string[],
-): string {
+function buildFailedNextStep(params: {
+    runId: string;
+    statusMessage: string | null | undefined;
+    loadedToolNames: readonly string[];
+    hasLogTail: boolean;
+}): string {
+    const { runId, statusMessage, loadedToolNames, hasLogTail } = params;
     const statusPart = statusMessageLine(statusMessage)
         ? 'Diagnose using the Actor status in the summary.'
         : 'The run wrote no status message.';
-    const logPart = loadedToolNames.includes(HELPER_TOOLS.ACTOR_RUNS_LOG)
-        ? ` The run log has the error details; ${HELPER_TOOLS.ACTOR_RUNS_LOG} with runId ${runId} returns its last lines (lines takes up to ${LOG_LINES_MAX}).`
-        : ' The run log has the error details.';
-    return `${statusPart}${logPart} If the user wants another attempt, fix the cause before retrying.`;
+    const logSource = hasLogTail
+        ? ' The logTail field has the last lines of the run log'
+        : ' The run log has the error details';
+    const logTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_RUNS_LOG)
+        ? `; ${HELPER_TOOLS.ACTOR_RUNS_LOG} with runId ${runId} returns ${hasLogTail ? 'more' : 'its last lines'} (lines takes up to ${LOG_LINES_MAX})`
+        : '';
+    return `${statusPart}${logSource}${logTool}. If the user wants another attempt, fix the cause before retrying.`;
 }
 
 function buildSucceededSummaryNextStep(
@@ -671,8 +716,18 @@ export function buildStatusSummaryNextStep(params: {
     datasetMetadataFetched?: boolean;
     /** Raw metadata `fields`: the hint needs the array indices that `dataset.fields` drops. */
     datasetFields?: string[];
+    /** True when the response carries `logTail`; only `fetchActorRunData` sets both. */
+    hasLogTail?: boolean;
 }): { summary: string; nextStep: string } {
-    const { run, loadedToolNames, dataset, keyValueStore, datasetMetadataFetched = true, datasetFields } = params;
+    const {
+        run,
+        loadedToolNames,
+        dataset,
+        keyValueStore,
+        datasetMetadataFetched = true,
+        datasetFields,
+        hasLogTail = false,
+    } = params;
     const { id: runId, status, statusMessage } = run;
     // The platform usually populates stats.runTimeSecs on terminal runs, but not always (e.g.
     // ABORTED before stats flushed). Fall back to `elapsedSecs(run)` so summaries don't render
@@ -712,7 +767,7 @@ export function buildStatusSummaryNextStep(params: {
         case 'FAILED':
             return {
                 summary: `FAILED after ${runTimeSecs}s.${statusMessageLine(statusMessage)}`,
-                nextStep: buildFailedNextStep(runId, statusMessage, loadedToolNames),
+                nextStep: buildFailedNextStep({ runId, statusMessage, loadedToolNames, hasLogTail }),
             };
         case 'ABORTED':
             return {
@@ -987,8 +1042,11 @@ export async function fetchActorRunData(params: {
     const datasetIds = buildStorageAliasIds(run.storageIds?.datasets, run.defaultDatasetId ?? undefined);
     const kvIds = buildStorageAliasIds(run.storageIds?.keyValueStores, run.defaultKeyValueStoreId ?? undefined);
 
+    // A run that fails before it writes a statusMessage has its cause only in the run log (#1698).
+    const shouldFetchLogTail = run.status === 'FAILED' && !statusMessageLine(run.statusMessage);
+
     let defaultDatasetFields: string[] | undefined;
-    const [datasets, keyValueStores] = await Promise.all([
+    const [datasets, keyValueStores, logTail] = await Promise.all([
         buildStorageEntriesFromIds(datasetIds, async (id) => {
             const meta = await fetchDatasetMeta(client, id, mcpSessionId);
             if (id === datasetIds.default) defaultDatasetFields = meta?.fields;
@@ -1002,6 +1060,7 @@ export async function fetchActorRunData(params: {
             const keys = isTerminal ? await fetchKvKeys(client, id, mcpSessionId) : null;
             return buildRunKeyValueStore(id, keys);
         }),
+        shouldFetchLogTail ? fetchRunLogTail({ client, runId: run.id, abortSignal, mcpSessionId }) : undefined,
     ]);
 
     // Narrative summarizes the default storages only; aliases are surfaced in structured output.
@@ -1011,6 +1070,7 @@ export async function fetchActorRunData(params: {
         keyValueStore: keyValueStores?.default,
         datasetFields: defaultDatasetFields,
         loadedToolNames,
+        hasLogTail: logTail !== undefined,
     });
 
     const defaultKv = keyValueStores?.default;
@@ -1026,6 +1086,7 @@ export async function fetchActorRunData(params: {
         status: run.status,
         statusMessage: run.statusMessage ?? undefined,
         exitCode: run.exitCode ?? undefined,
+        logTail,
         startedAt: toIsoString(run.startedAt),
         finishedAt: toIsoString(run.finishedAt),
         stats: buildStats(run),
