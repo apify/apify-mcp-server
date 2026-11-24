@@ -1,7 +1,8 @@
 import type { ActorRun } from 'apify-client';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS, KV_KEYS_LIMIT, TIP_MESSAGE_LIMIT } from '../../src/const.js';
+import { REDACTION_PLACEHOLDER } from '../../src/resources/api_resources.js';
 import { ACTOR_TIP_CAVEAT } from '../../src/tools/actor_tool_naming.js';
 import {
     buildStartRunResponse,
@@ -9,16 +10,25 @@ import {
     buildStatusSummaryNextStep,
     collapseArrayPaths,
     fieldsProjectionHint,
+    RUN_LOG_TAIL_TIMEOUT_MS,
     type RunDataset,
     type RunKeyValueStore,
     type RunResponse,
 } from '../../src/tools/actors/actor_run_response.js';
 import { getActorRun } from '../../src/tools/runs/get_actor_run.js';
+import { actorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { LOG_LINES_MAX } from '../../src/utils/log_tail.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockApifyClient, mockUserInfo, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import { startLogServer } from './helpers/log_server.js';
+import {
+    expectSchemaConformingStructuredContent,
+    mockApifyClient,
+    mockUserInfo,
+    stubToolCallContext,
+    type TextToolResult,
+} from './helpers/tool_context.js';
 
 // Only Console UI token sessions reach the users/me lookup; the default 'test-token'
 // stub never triggers it.
@@ -67,17 +77,30 @@ function mockDataset(overrides: Record<string, unknown> = {}) {
     };
 }
 
+const logServer = await startLogServer();
+
+afterAll(async () => logServer.close());
+
+/**
+ * `logId` is the run's log on the log server; without it the log is missing (404). `logHttpClient`
+ * replaces the log server's HTTP client.
+ */
 function stubClient(opts: {
     run: unknown;
     dataset?: unknown;
     listKeys?: { items: { key: string }[]; isTruncated: boolean; count?: number };
     listItemsProbe?: { items: unknown[]; total?: number };
+    logId?: string;
+    logHttpClient?: unknown;
 }): InternalToolArgs['apifyClient'] {
-    const { run, dataset, listKeys, listItemsProbe } = opts;
+    const { run, dataset, listKeys, listItemsProbe, logId = 'missing-log', logHttpClient } = opts;
     return mockApifyClient({
+        token: logServer.client.token,
+        httpClient: logHttpClient ?? logServer.client.httpClient,
         run: (_id: string) => ({
             get: async () => run,
             waitForFinish: async () => run,
+            log: () => logServer.client.run(logId).log(),
         }),
         actor: (_id: string) => ({ get: async () => ACTOR }),
         dataset: (_id: string) => ({
@@ -1039,6 +1062,126 @@ describe('get-actor-run default response', () => {
 
 // Shared by buildStartRunResponse() and buildStartRunWidgetResponse() below — both builders
 // consume the same ActorRun shape.
+/** An HTTP client whose log request never answers; it rejects when its signal aborts, as axios does. */
+function stalledHttpClient(onRequest: () => void = () => {}) {
+    return {
+        maxRetries: 0,
+        minDelayBetweenRetriesMillis: 0,
+        axios: {
+            request: async ({ signal }: { signal: AbortSignal }) => {
+                onRequest();
+                return new Promise((_resolve, reject) => {
+                    if (signal.aborted) reject(signal.reason);
+                    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+                });
+            },
+        },
+    };
+}
+
+describe('a FAILED run with no status message carries the end of its log', () => {
+    const failedRun = () => mockSucceededRun({ status: 'FAILED', exitCode: 91 });
+    const runLog = [
+        `2026-10-26T14:54:17.514Z Using token ${logServer.client.token}`,
+        '2026-10-26T14:54:17.631Z   ApifyApiError: Insufficient permissions for the dataset.',
+        '2026-10-26T14:54:17.634Z     statusCode: 403',
+        '',
+    ].join('\n');
+
+    const callGetActorRun = async (client: InternalToolArgs['apifyClient']) =>
+        (await (getActorRun as HelperTool).call(stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client))) as {
+            structuredContent: RunResponse;
+        };
+
+    it('adds the redacted log tail and points nextStep at it', async () => {
+        const result = await callGetActorRun(stubClient({ run: failedRun(), logId: logServer.serveLog(runLog) }));
+        const { logTail, nextStep } = result.structuredContent;
+
+        expect(logTail).toContain('ApifyApiError: Insufficient permissions');
+        expect(logTail).toContain(REDACTION_PLACEHOLDER);
+        expect(logTail).not.toContain(logServer.client.token);
+        expect(nextStep).toContain('logTail');
+        expect(nextStep).toContain(`${HELPER_TOOLS.ACTOR_RUNS_LOG} with runId run-1`);
+        expectSchemaConformingStructuredContent(result, actorRunOutputSchema);
+    });
+
+    it('omits the log tail and keeps the run log nextStep when the log read fails', async () => {
+        const logId = logServer.serveResponses([
+            {
+                status: 500,
+                contentType: 'application/json',
+                body: JSON.stringify({ error: { type: 'internal-server-error', message: 'Internal error' } }),
+            },
+        ]);
+
+        const result = await callGetActorRun(stubClient({ run: failedRun(), logId }));
+
+        expect(result.structuredContent.logTail).toBeUndefined();
+        expect(result.structuredContent.nextStep).toContain('The run log has the error details');
+    });
+
+    it('omits the log tail when the log read does not finish in time', async () => {
+        vi.useFakeTimers();
+        try {
+            const callPromise = callGetActorRun(stubClient({ run: failedRun(), logHttpClient: stalledHttpClient() }));
+            await vi.advanceTimersByTimeAsync(RUN_LOG_TAIL_TIMEOUT_MS);
+            const result = await callPromise;
+
+            expect(result.structuredContent.logTail).toBeUndefined();
+            expect(result.structuredContent.nextStep).toContain('The run log has the error details');
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it.each([
+        ['missing', undefined],
+        ['empty', ''],
+        ['blank', ' \n  \n'],
+    ])('omits the log tail when the log is %s', async (_name, body) => {
+        const logId = body === undefined ? undefined : logServer.serveLog(body);
+
+        const result = await callGetActorRun(stubClient({ run: failedRun(), logId }));
+
+        expect(result.structuredContent.logTail).toBeUndefined();
+        expect(result.structuredContent.nextStep).toContain('The run log has the error details');
+    });
+
+    it('does not wait for the log when the call is cancelled', async () => {
+        // Fake timers are never advanced: if the cancel did not stop the read, the call would wait for the timeout forever.
+        vi.useFakeTimers();
+        try {
+            const controller = new AbortController();
+            const client = stubClient({
+                run: failedRun(),
+                logHttpClient: stalledHttpClient(() => controller.abort()),
+            });
+            const context = {
+                ...stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
+                signal: controller.signal,
+            };
+
+            const result = (await (getActorRun as HelperTool).call(context)) as { structuredContent?: RunResponse };
+
+            expect(result.structuredContent?.logTail).toBeUndefined();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it.each([
+        ['FAILED with a status message', { status: 'FAILED', statusMessage: 'Input URL is not valid.' }],
+        ['SUCCEEDED', {}],
+    ])('does not read the log for a run that is %s', async (_name, overrides) => {
+        const logId = logServer.serveLog(runLog);
+
+        const result = await callGetActorRun(stubClient({ run: mockSucceededRun(overrides), logId }));
+
+        expect(logServer.requestCount(logId)).toBe(0);
+        expect(result.structuredContent.logTail).toBeUndefined();
+    });
+});
+
 const actorRun = {
     id: 'run-abc',
     actId: 'actor-xyz',
@@ -1278,6 +1421,13 @@ describe('buildStatusTemplate', () => {
         });
         expect(t.nextStep).toContain('no status message');
         expect(t.nextStep).toContain('run log');
+        expect(t.nextStep).toContain('the user wants');
+        expect(Object.values(HELPER_TOOLS).filter((name) => t.nextStep.includes(name))).toEqual([]);
+    });
+
+    it('FAILED nextStep points at the log tail without the log tool and names no tool', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('FAILED'), loadedToolNames: [], hasLogTail: true });
+        expect(t.nextStep).toContain('logTail');
         expect(t.nextStep).toContain('the user wants');
         expect(Object.values(HELPER_TOOLS).filter((name) => t.nextStep.includes(name))).toEqual([]);
     });

@@ -1,10 +1,17 @@
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
+import { REDACTION_PLACEHOLDER, redactLogSecrets } from '../../src/resources/api_resources.js';
 import { getActorRun } from '../../src/tools/runs/get_actor_run.js';
-import { getActorRunLog } from '../../src/tools/runs/get_actor_run_log.js';
+import {
+    buildLogTail,
+    getActorRunLog,
+    RUN_LOG_TAIL_LINES,
+    RUN_LOG_TAIL_MAX_CHARS,
+} from '../../src/tools/runs/get_actor_run_log.js';
 import { getActorRunLogToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool } from '../../src/types.js';
+import type { LogTail } from '../../src/utils/log_tail.js';
 import { numberedLog, startLogServer } from './helpers/log_server.js';
 import {
     expectSchemaConformingStructuredContent,
@@ -166,5 +173,104 @@ describe('get-actor-run-log', () => {
         expect(logResult.isError).toBe(true);
         expect(runResult.isError).toBe(true);
         expect(logResult.content[0].text).toBe(runResult.content[0].text);
+    });
+});
+
+describe('secrets in a run log are redacted', () => {
+    it.each([
+        ['the session token', 'Using token s3ss10nT0ken for the request', 's3ss10nT0ken'],
+        ['an Apify API token', 'APIFY_TOKEN=apify_api_AbC123xYz789 loaded', 'apify_api_AbC123xYz789'],
+        [
+            'an Apify Proxy password',
+            'Proxy: http://groups-RESIDENTIAL:apify_proxy_Xk29fLq@proxy.apify.com:8000',
+            'apify_proxy_Xk29fLq',
+        ],
+        ['a proxy password with no user', 'Proxy: http://:Xk29fLqPass@proxy.apify.com:8000', 'Xk29fLqPass'],
+        ['a URL password with no user', 'Connecting to redis://:pw0rdSecret@cache:6379', 'pw0rdSecret'],
+        ['a URL password that holds an @', 'Proxy: http://auto:p@ssw0rd@proxy.apify.com:8000', 'ssw0rd'],
+        ['the proxy password in an env line', 'APIFY_PROXY_PASSWORD=SECRETPW123', 'SECRETPW123'],
+        ['the proxy password in a printed env object', "  APIFY_PROXY_PASSWORD: 'SECRETPW123',", 'SECRETPW123'],
+        ['a password in JSON', 'Config: {"proxy":{"password":"SECRETPW123"}}', 'SECRETPW123'],
+        [
+            'a password in a printed object',
+            "ProxyConfiguration { groups: [], password: 'SECRETPW123', hostname: 'proxy.apify.com' }",
+            'SECRETPW123',
+        ],
+        ['a printed password that holds a single quote', `{ password: "it's-SECRETPW123" }`, 'SECRETPW123'],
+        ['a printed password that holds both quote types', '{ password: `it\'s "SECRETPW123"` }', 'SECRETPW123'],
+    ])('hides %s', (_name, line, secret) => {
+        const redacted = redactLogSecrets(line, 's3ss10nT0ken');
+
+        expect(redacted).not.toContain(secret);
+        expect(redacted).toContain(REDACTION_PLACEHOLDER);
+    });
+
+    it.each([
+        ['an empty proxy password env var', 'APIFY_PROXY_PASSWORD:\n  Error: boom'],
+        ['an unclosed JSON password', '{"password":"abc\n  ApifyApiError: Insufficient permissions'],
+    ])('keeps the next line intact after %s', (_name, text) => {
+        const [, nextLine] = text.split('\n');
+
+        expect(redactLogSecrets(text, undefined).split('\n')[1]).toBe(nextLine);
+    });
+
+    it('leaves a password prompt in prose unchanged', () => {
+        expect(redactLogSecrets('Enter password: hunter2', undefined)).toBe('Enter password: hunter2');
+    });
+
+    it('leaves the text unchanged when the session token is empty', () => {
+        expect(redactLogSecrets('Run started', '')).toBe('Run started');
+    });
+
+    it('keeps the proxy host and user so the line stays useful', () => {
+        const redacted = redactLogSecrets(
+            'http://groups-RESIDENTIAL:apify_proxy_Xk29fLq@proxy.apify.com:8000',
+            undefined,
+        );
+
+        expect(redacted).toBe(`http://groups-RESIDENTIAL:${REDACTION_PLACEHOLDER}@proxy.apify.com:8000`);
+    });
+});
+
+describe('the log tail keeps the end of the log within its limits', () => {
+    /** A log tail as `readLogTail` returns it for a log that was not cut. */
+    const wholeLog = (text: string): LogTail => ({ text, isTruncated: false, startsMidLine: false });
+
+    it('keeps only the last lines of the log', () => {
+        const tail = buildLogTail(wholeLog(`${numberedLog(RUN_LOG_TAIL_LINES + 5)}\n`), undefined);
+
+        expect(tail.split('\n')).toEqual(
+            numberedLog(RUN_LOG_TAIL_LINES + 5)
+                .split('\n')
+                .slice(-RUN_LOG_TAIL_LINES),
+        );
+    });
+
+    it('drops whole leading lines while the tail is over the character limit', () => {
+        const longLine = 'x'.repeat(RUN_LOG_TAIL_MAX_CHARS - 10);
+        const tail = buildLogTail(
+            wholeLog(`${longLine}\nApifyApiError: Insufficient permissions\n  statusCode: 403`),
+            undefined,
+        );
+
+        expect(tail).toBe('ApifyApiError: Insufficient permissions\n  statusCode: 403');
+    });
+
+    it('keeps the end of a last line that is longer than the character limit', () => {
+        const tail = buildLogTail(wholeLog(`first line\n${'y'.repeat(RUN_LOG_TAIL_MAX_CHARS * 2)}`), undefined);
+
+        expect(tail).toBe('y'.repeat(RUN_LOG_TAIL_MAX_CHARS));
+    });
+
+    it('redacts a token before the cut, so no part of it is kept', () => {
+        // The cut falls inside the token: without redaction first, a fragment that no pattern matches would remain.
+        const token = 'apify_api_AbC123xYz789';
+        const line = `${'z'.repeat(RUN_LOG_TAIL_MAX_CHARS)}${token}${'z'.repeat(RUN_LOG_TAIL_MAX_CHARS - 10)}`;
+
+        const tail = buildLogTail(wholeLog(line), undefined);
+
+        expect(tail).toHaveLength(RUN_LOG_TAIL_MAX_CHARS);
+        expect(tail).not.toContain('xYz789');
+        expect(tail).toContain(REDACTION_PLACEHOLDER);
     });
 });

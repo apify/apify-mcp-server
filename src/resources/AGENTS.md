@@ -35,7 +35,8 @@ then refuses, without a request, what the API tools refuse (`validateApiBlocklis
 `../tools/api/apify_api_blocklist.ts`): the `method` query parameter and a GET to the synchronous run
 endpoints. The API tools' `callApi` (`../tools/api/apify_api_request.ts`) reuses `isApifyApiUri()`,
 `maskSessionToken()`, `redactJsonSecrets()`, `redactQueryString()` and `REDACTION_PLACEHOLDER`, so a change to any changes the
-tools too. `get-key-value-store-record` builds its inlined-record URI with `buildUrlOnOrigin()`.
+tools too. `redactLogSecrets()` hides the secrets an Actor prints to its run log; the run log tail
+(`buildLogTail`) uses it. `get-key-value-store-record` builds its inlined-record URI with `buildUrlOnOrigin()`.
 
 `sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through
 `httpClient.axios.request` with `maxContentLength: MAX_INLINE_BYTES`; `readBodyUnderCap()` next to it reads a

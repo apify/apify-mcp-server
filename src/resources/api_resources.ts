@@ -232,6 +232,53 @@ export function redactJsonSecrets(json: string): string {
     return json.replace(SECRET_VALUE_RE, `$1"${REDACTION_PLACEHOLDER}"`);
 }
 
+const APIFY_API_TOKEN_RE = /apify_api_[A-Za-z0-9]+/g;
+
+/**
+ * The password of `scheme://user:password@host`, for example an Apify Proxy URL. The user can be
+ * empty, and the greedy password runs to the last `@` before whitespace or `/`, so a raw `@` in the
+ * password is hidden too.
+ */
+const URL_PASSWORD_RE = /(:\/\/[^\s:/@]*:)[^\s/]+@/g;
+
+/**
+ * The Apify Proxy password as an env var line or a printed `process.env` entry. Only spaces and tabs
+ * may surround the separator, so an empty value never takes the first word of the next line.
+ */
+const PROXY_PASSWORD_ENV_RE = /(APIFY_PROXY_PASSWORD['"]?[ \t]*[:=][ \t]*['"]?)[^\s'",]+/g;
+
+/**
+ * A quoted value of an unquoted `password` key, as `util.inspect` prints it: `{ password: 'x' }`,
+ * `{ password: "it's" }` when the value holds a single quote, or backticks when it holds both.
+ */
+const INSPECTED_PASSWORD_RE = /(\bpassword\s*:\s*)('(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\\n]|\\.)*`)/g;
+
+/**
+ * Hide the secrets an Actor can print to its log: the session token, any Apify API token, a password
+ * in a URL such as an Apify Proxy URL, the Apify Proxy password env var, and `password` values in
+ * JSON or in a printed object. Other secrets an Actor prints cannot be detected.
+ *
+ * It works one line at a time, so no pattern can match across a line break: an empty or unclosed
+ * value never takes in the next line, and a caller can slice the log by lines before it redacts.
+ */
+export function redactLogSecrets(text: string, sessionToken: string | undefined): string {
+    return text
+        .split('\n')
+        .map((line) => redactLogLine(line, sessionToken))
+        .join('\n');
+}
+
+function redactLogLine(line: string, sessionToken: string | undefined): string {
+    const masked = (sessionToken ? line.replaceAll(sessionToken, REDACTION_PLACEHOLDER) : line)
+        .replace(APIFY_API_TOKEN_RE, REDACTION_PLACEHOLDER)
+        .replace(URL_PASSWORD_RE, `$1${REDACTION_PLACEHOLDER}@`)
+        .replace(PROXY_PASSWORD_ENV_RE, `$1${REDACTION_PLACEHOLDER}`);
+    return redactJsonSecrets(masked).replace(
+        INSPECTED_PASSWORD_RE,
+        (_match, key: string, value: string) => `${key}${value[0]}${REDACTION_PLACEHOLDER}${value[0]}`,
+    );
+}
+
 /**
  * Read any Apify API GET endpoint as an MCP resource.
  *
