@@ -40,7 +40,7 @@ concurrency:
 
 jobs:
   factory-review:
-    uses: apify/workflows/.github/workflows/factory_review.yaml@0a1eaf3d3b67be2e8c15b2fc989168721809c8e2 # v1.4.1
+    uses: apify/workflows/.github/workflows/factory_review.yaml@62a92bea1d4637c502de92651eb58ea4b70f4c66 # v2.0.1
     # The three secrets the pipeline declares, instead of every secret this repository can read.
     secrets:
       APIFY_FACTORY_GITHUB_TOKEN: ${{ secrets.APIFY_FACTORY_GITHUB_TOKEN }}
