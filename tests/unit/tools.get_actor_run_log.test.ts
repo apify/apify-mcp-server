@@ -121,6 +121,15 @@ describe('get-actor-run-log', () => {
         expectSchemaConformingStructuredContent(result, getActorRunLogToolOutputSchema);
     });
 
+    it('redacts secrets the Actor printed in the text and structuredContent', async () => {
+        const result = await callTool(`Run started\nAPIFY_TOKEN=apify_api_AbC123xYz789 loaded\nRun finished\n`, {
+            lines: 2,
+        });
+
+        expect(result.content[0].text).toBe(`APIFY_TOKEN=${REDACTION_PLACEHOLDER} loaded\nRun finished`);
+        expect(result.structuredContent).toEqual({ log: result.content[0].text });
+    });
+
     it('returns conforming structuredContent for an empty log', async () => {
         const result = await callTool('', { lines: 10 });
 
