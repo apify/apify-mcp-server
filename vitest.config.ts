@@ -12,6 +12,8 @@ export default defineConfig({
                     name: 'unit',
                     include: ['tests/unit/**/*.test.ts'],
                     testTimeout: 30_000,
+                    // The suite tests the `/v2/store` path; tests of `/unstable/store` turn the flag on themselves.
+                    env: { APIFY_STORE_UNSTABLE_ENDPOINT: '' },
                 },
             },
             {
