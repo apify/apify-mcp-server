@@ -1,4 +1,3 @@
-/.github/workflows/factory_review.yaml @mtrunkat
 
 # Copy review for text that agents read
 /src/utils/server-instructions/ @jgagne

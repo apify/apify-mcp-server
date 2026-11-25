@@ -221,9 +221,7 @@ export const appsCases: Case[] = [
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'], serverMode: 'default' }, async (client) => {
             const { resources } = await client.listResources();
-            // Filtered rather than asserted empty: apify-mcp-server-internal's payment provider
-            // adds `file://readme.md` to this same listing.
-            expect(resources.filter((r) => r.uri.startsWith('ui://'))).toEqual([]);
+            expect(resources).toEqual([]);
         }),
     },
     {

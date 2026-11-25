@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 
 import type { ValidateFunction } from 'ajv';
 
+import log from '@apify/log';
+
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../const.js';
 import { SchemaTooLargeError } from '../errors.js';
 import type { ActorInputSchema, SchemaProperties } from '../types.js';
@@ -25,34 +27,110 @@ type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 // is intentionally uncapped.
 export const MAX_UNTRUSTED_SCHEMA_BYTES = 262_144;
 
+// Ajv compile time does not follow schema size, so a schema over any of these limits is served without
+// local validation; the platform or the proxied MCP server validates the input.
+export const MAX_VALIDATED_SCHEMA_BYTES = 65_536;
+export const MAX_VALIDATED_SCHEMA_OBJECTS = 300;
+export const MAX_VALIDATED_SCHEMA_DEPTH = 32;
+
+// Only a definition is compiled once. Ajv compiles any other `$ref` target again inside the schema around
+// it, and compiles a target once per spelling of its ref; `%` and `~` escapes spell one name many ways.
+const DEFINITION_REF_PATTERN = /^#\/(?:definitions|\$defs)\/[^/%~]+$/;
+
+type ExceededCompileLimit = 'bytes' | 'nested-objects' | 'depth' | '$ref' | '$id';
+type CompiledSchema = {
+    validate: ValidateFunction<unknown>;
+    schema: object;
+    exceededLimit: ExceededCompileLimit | null;
+};
+
 const UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE = 1000;
-const untrustedValidatorCache = new LruCache<{ validate: ValidateFunction<unknown>; schema: object }>(
-    UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE,
-);
+const untrustedValidatorCache = new LruCache<CompiledSchema>(UNTRUSTED_VALIDATOR_CACHE_MAX_SIZE);
+
+// Ajv does not compile what these keywords hold, so example data does not count toward the limits.
+const DATA_KEYWORDS = new Set(['default', 'prefill', 'examples', 'enum', 'const']);
+// These keywords hold schemas by name: a key inside them is a name, not a keyword.
+const SCHEMA_MAP_KEYWORDS = new Set(['properties', 'patternProperties', 'definitions', '$defs', 'dependencies']);
+
+/** Returns the limit that makes the schema too costly to compile, or null when Ajv may compile it. */
+function findExceededCompileLimit(schema: object, serializedBytes: number): ExceededCompileLimit | null {
+    if (serializedBytes > MAX_VALIDATED_SCHEMA_BYTES) return 'bytes';
+
+    // The root is not a nested object.
+    let nestedObjectCount = -1;
+    const pending: [node: unknown, depth: number, isSchemaMap: boolean][] = [[schema, 0, false]];
+    for (let entry = pending.pop(); entry; entry = pending.pop()) {
+        const [node, depth, isSchemaMap] = entry;
+        if (typeof node !== 'object' || node === null) continue;
+        if (depth > MAX_VALIDATED_SCHEMA_DEPTH) return 'depth';
+        if (Array.isArray(node)) {
+            // A boolean in `anyOf`, `oneOf`, `allOf` or `items` is a schema, and costs like an object there.
+            nestedObjectCount += node.filter((item) => typeof item === 'boolean').length;
+            pending.push(...node.map((child): [unknown, number, boolean] => [child, depth + 1, false]));
+        } else if (isSchemaMap) {
+            nestedObjectCount++;
+            pending.push(...Object.values(node).map((child): [unknown, number, boolean] => [child, depth + 1, false]));
+        } else {
+            const { $ref, $id, dependencies } = node as Record<string, unknown>;
+            if (typeof $ref === 'string' && !DEFINITION_REF_PATTERN.test($ref)) return '$ref';
+            // A nested `$id` can give a schema that is not a definition the name of one.
+            if (depth > 0 && typeof $id === 'string') return '$id';
+            nestedObjectCount++;
+            // Ajv's code for a list of dependency names grows faster than the list.
+            for (const names of Object.values(dependencies ?? {})) {
+                if (Array.isArray(names)) nestedObjectCount += names.length;
+            }
+            for (const [keyword, child] of Object.entries(node)) {
+                if (!DATA_KEYWORDS.has(keyword)) pending.push([child, depth + 1, SCHEMA_MAP_KEYWORDS.has(keyword)]);
+            }
+        }
+        if (nestedObjectCount > MAX_VALIDATED_SCHEMA_OBJECTS) return 'nested-objects';
+    }
+    return null;
+}
 
 /**
  * Compiles an Actor or proxied-MCP input schema, one validator per schema content.
+ * Returns the schema to serve: a copy without Ajv's root `$async`, which is what the validator is compiled from.
+ * A schema that is costly to compile gets a validator that accepts every input and leaves it unchanged.
  *
  * Create a fresh Ajv instance per compilation to avoid unbounded memory growth.
  * Ajv internally caches every compiled schema in a Map that is never evicted.
  */
 export function compileUntrustedSchema<T extends object>(
     schema: T,
+    logContext: Record<string, unknown> = {},
 ): { validate: ValidateFunction<unknown>; schema: T } {
-    const serialized = JSON.stringify(schema);
+    // Validators are called synchronously, so the schema is compiled without Ajv's root `$async`.
+    // Below the root Ajv ignores the keyword or fails the compile.
+    const syncSchema = { ...schema };
+    delete (syncSchema as { $async?: unknown }).$async;
+
+    const serialized = JSON.stringify(syncSchema);
+    const serializedBytes = Buffer.byteLength(serialized);
     // Ajv codegen is synchronous; an oversized untrusted schema would freeze the event loop.
-    if (Buffer.byteLength(serialized) > MAX_UNTRUSTED_SCHEMA_BYTES) {
+    if (serializedBytes > MAX_UNTRUSTED_SCHEMA_BYTES) {
         throw new SchemaTooLargeError(MAX_UNTRUSTED_SCHEMA_BYTES);
     }
 
     const cacheKey = createHash('sha256').update(serialized).digest('base64');
-    // A hit holds a schema with the same content as `schema`, so it is still a T.
-    const cached = untrustedValidatorCache.get(cacheKey) as { validate: ValidateFunction<unknown>; schema: T } | null;
-    if (cached) return cached;
-
-    const compiled = { validate: createAjv().compile(schema), schema };
-    untrustedValidatorCache.set(cacheKey, compiled);
-    return compiled;
+    let compiled = untrustedValidatorCache.get(cacheKey);
+    if (!compiled) {
+        const exceededLimit = findExceededCompileLimit(syncSchema, serializedBytes);
+        // An inlined `$ref` is compiled again at every place that refers to it.
+        const ajv = createAjv({ inlineRefs: false });
+        compiled = { validate: ajv.compile(exceededLimit ? {} : syncSchema), schema: syncSchema, exceededLimit };
+        untrustedValidatorCache.set(cacheKey, compiled);
+    }
+    if (compiled.exceededLimit) {
+        log.info('Skipped input validation, schema is costly to compile', {
+            ...logContext,
+            exceededLimit: compiled.exceededLimit,
+            schemaBytes: serializedBytes,
+        });
+    }
+    // A hit holds a schema with the same content as `syncSchema`, so it is still a T.
+    return compiled as CompiledSchema & { schema: T };
 }
 
 /**

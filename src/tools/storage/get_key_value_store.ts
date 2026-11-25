@@ -50,7 +50,6 @@ export const getKeyValueStore: ToolEntry = Object.freeze({
     inputSchema: z.toJSONSchema(getKeyValueStoreArgs) as ToolInputSchema,
     outputSchema: keyValueStoreOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreArgs)),
-    paymentRequired: true,
     annotations: {
         title: 'Get key-value store',
         readOnlyHint: true,

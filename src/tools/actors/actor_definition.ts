@@ -10,6 +10,7 @@ import type {
     ActorDefinitionWithDesc,
     ActorDefinitionWithInfo,
     ActorDefinitionWithServerInterface,
+    DatasetItemsSchema,
     SchemaProperties,
 } from '../../types.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
@@ -20,17 +21,72 @@ import { listCommaJoinedQueryParameters, listDocumentedOperations } from './serv
 
 const BUILD_NUMBER_PATTERN = /^\d+\.\d+\.\d+$/;
 
+const JSON_SCHEMA_TYPES = new Set(['string', 'number', 'integer', 'boolean', 'object', 'array', 'null']);
+export const MAX_DATASET_FIELD_DEPTH = 8;
 /**
- * Get an Actor's pruned definition by Actor ID or name.
- * Input schema and README come from the default build; `webServerMcpPath`, `hasWebServerSchema` and
- * `webServerOperations` come from the build Actor Standby runs, which can be a different one (see
- * `resolveServerInterfaceDefinition`).
- * @param {string} actorIdOrName - Actor ID or Actor full name.
- * @param {ApifyClient} apifyClient - The Apify client instance.
- * @param {number} limit - Truncate the README to this limit.
- * @returns {Promise<ActorDefinitionWithInfo | null>} - null when the Actor is not found (API 404 or 400, or a name
- * the client refuses) or its default build has no definition. Other API failures, including 401 and 403, are thrown;
- * the caller logs them.
+ * Caps both full and reduced dataset schemas. The largest measured Store schema was 38 KB
+ * before reduction and 4 KB after (`compass/crawler-google-places`).
+ */
+export const MAX_DATASET_ITEMS_SCHEMA_BYTES = 65_536;
+
+/**
+ * Follows the platform's dataset precedence. Legacy `storages.datasets` definitions without a
+ * `default` alias use the first alias.
+ */
+export function getDeclaredDatasetItemsSchema(actorDefinition: { storages?: unknown }): DatasetItemsSchema | undefined {
+    const { storages } = actorDefinition;
+    if (!isRecord(storages)) return undefined;
+    const datasets = isRecord(storages.datasets) ? storages.datasets : { default: storages.dataset };
+    const dataset = 'default' in datasets ? datasets.default : Object.values(datasets)[0];
+    const fields = isRecord(dataset) ? dataset.fields : undefined;
+    if (!isRecord(fields) || !isRecord(fields.properties) || Object.keys(fields.properties).length === 0) {
+        return undefined;
+    }
+    return fields as DatasetItemsSchema;
+}
+
+/**
+ * Keeps `tools/list` small and prevents strict client validators from rejecting publisher-defined
+ * keywords or types. Fields typed only through `$ref`, `anyOf`, or `oneOf` keep their names.
+ */
+export function reduceToFieldNamesAndTypes(
+    properties: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+    if (!properties) return undefined;
+    const reduced = reduceProperties(properties, 1);
+    // Measured as the schema both callers serve, so a direct Actor tool and `fetch-actor-details` cut off at the same size.
+    const schemaBytes = Buffer.byteLength(JSON.stringify({ type: 'object', properties: reduced }));
+    return schemaBytes > MAX_DATASET_ITEMS_SCHEMA_BYTES ? undefined : reduced;
+}
+
+function reduceProperties(properties: Record<string, unknown>, depth: number): Record<string, unknown> {
+    return Object.fromEntries(
+        Object.entries(properties).map(([name, schema]) => [name, reduceFieldSchema(schema, depth)]),
+    );
+}
+
+/**
+ * Converts OpenAPI's `nullable` flag to a JSON Schema `null` type when the field has a recognized type.
+ * At the depth limit, keep the field's type and drop its children to bound the schema sent to clients.
+ */
+function reduceFieldSchema(schema: unknown, depth: number): Record<string, unknown> {
+    if (!isRecord(schema)) return {};
+    const reduced: Record<string, unknown> = {};
+    // JSON Schema requires unique entries in a type array.
+    const types = [...new Set<unknown>(Array.isArray(schema.type) ? schema.type : [schema.type])].filter(
+        (type): type is string => typeof type === 'string' && JSON_SCHEMA_TYPES.has(type),
+    );
+    if (schema.nullable === true && types.length > 0 && !types.includes('null')) types.push('null');
+    if (types.length > 0) reduced.type = types.length > 1 || Array.isArray(schema.type) ? types : types[0];
+    if (depth >= MAX_DATASET_FIELD_DEPTH) return reduced;
+    if (isRecord(schema.properties)) reduced.properties = reduceProperties(schema.properties, depth + 1);
+    if (isRecord(schema.items)) reduced.items = reduceFieldSchema(schema.items, depth + 1);
+    return reduced;
+}
+
+/**
+ * Uses the default build for run inputs and the README, and the Standby build for the server interface.
+ * Returns `null` for a missing Actor, a missing default build definition, or an API 400 or 404.
  */
 export async function getActorDefinition(
     actorIdOrName: string,
@@ -76,12 +132,8 @@ export async function getActorDefinition(
 }
 
 /**
- * Returns the definition to read `webServerMcpPath` and `webServerSchema` from: the build named by
- * `actorStandby.build` when Actor Standby is on, otherwise the default build.
- *
- * Returns `undefined` when the Standby build cannot be resolved (unknown reference, deleted build, build without
- * a definition). Falling back to the default build would advertise an interface the running server may not have.
- * Authentication, permission and service failures propagate.
+ * Returns `undefined` for an unresolved Standby build to avoid advertising the default build's
+ * interface for a different server. API failures propagate.
  */
 export async function resolveServerInterfaceDefinition(
     actor: Pick<Actor, 'id' | 'username' | 'name' | 'actorStandby' | 'taggedBuilds'>,
@@ -109,11 +161,8 @@ export async function resolveServerInterfaceDefinition(
 }
 
 /**
- * Turns `actorStandby.build` into a build ID, the only key the API reads a build (and its definition) by.
- * The API resolves the default build's tag or number itself (`builds/default`) but has no equivalent for the
- * Standby build, so this repeats the platform's lookup. `reference` is a build tag or a `MAJOR.MINOR.BUILD`
- * number; Console accepts both. A number is first matched against the tagged builds, then searched for in the
- * build list newest first, because the API has no lookup by build number.
+ * Resolves the tag or build number accepted by Apify Console because the API has no Standby
+ * equivalent to `builds/default`.
  */
 async function resolveStandbyBuildId(
     actor: Pick<Actor, 'id' | 'taggedBuilds'>,
@@ -129,8 +178,7 @@ async function resolveStandbyBuildId(
     if (taggedBuildId) return taggedBuildId;
 
     if (!buildNumber) return undefined;
-    // Unlike the Actor and build reads, listing builds needs a token. Without one (payment-provider sessions),
-    // leave an untagged build number unresolved rather than fail the whole read with a 401.
+    // Listing builds requires a token, so anonymous reads can only resolve tagged builds.
     if (!apifyClient.token) return undefined;
     for await (const build of apifyClient.actor(actor.id).builds().list({ desc: true })) {
         if ((build as BuildListItem).buildNumber === buildNumber) return build.id;
@@ -138,10 +186,7 @@ async function resolveStandbyBuildId(
     return undefined;
 }
 
-/**
- * True when the schema declares an operation the send tool can call: an object under a lowercase `API_METHODS` key.
- * The schema is publisher-written and unvalidated, so any level that is not an object counts as absent.
- */
+// Publisher schemas are unvalidated. Only object-valued operations count.
 function hasWebServerSchemaOperations(schema: unknown): boolean {
     if (!isRecord(schema) || !isRecord(schema.paths)) return false;
     return Object.values(schema.paths).some(
@@ -154,6 +199,7 @@ function pruneActorDefinition(
     serverDefinition: ActorDefinitionWithServerInterface | undefined,
 ): ActorDefinitionPruned {
     const commaJoinedQueryParameters = listCommaJoinedQueryParameters(serverDefinition?.webServerSchema);
+    const datasetItemProperties = reduceToFieldNamesAndTypes(getDeclaredDatasetItemsSchema(response)?.properties);
     return {
         id: response.id,
         actorFullName: response.actorFullName || '',
@@ -178,12 +224,9 @@ function pruneActorDefinition(
         }),
         webServerToolInfo: buildServerActorToolInfo(serverDefinition?.webServerSchema, response.actorFullName || ''),
         pictureUrl: 'pictureUrl' in response ? (response.pictureUrl as string | undefined) : undefined,
+        ...(datasetItemProperties && { datasetItemProperties }),
     };
 }
-/**
- * Prune Actor README if it exceeds `limit`: keep it as-is up to the limit, keep only headings
- * after that, and append a note that the README was truncated.
- */
 function truncateActorReadme(readme: string, limit = ACTOR_README_MAX_LENGTH): string {
     if (readme.length <= limit) {
         return readme;

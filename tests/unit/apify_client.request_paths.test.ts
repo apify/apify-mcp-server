@@ -214,15 +214,15 @@ describe('request URLs', () => {
 
 describe('a refused request', () => {
     it('reaches the caller as a soft-failed input error', () => {
-        const result = buildToolCallErrorResult(new InvalidRequestPathError('Invalid record key "a?x=1".'), {
-            toolName: 'get-key-value-store-record',
-            isAborted: false,
-        });
+        const error = new InvalidRequestPathError('Invalid record key "a?x=1".');
+        const result = buildToolCallErrorResult(error, { toolName: 'get-key-value-store-record', isAborted: false });
 
         expect(result.toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
         expect(result.callDiagnostics).toMatchObject({
             failure_category: FAILURE_CATEGORY.INVALID_INPUT,
             failure_http_status: 400,
         });
+        // The message is already the text to show, so it is not wrapped again.
+        expect(result).toMatchObject({ userText: error.message });
     });
 });

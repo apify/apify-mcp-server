@@ -8,7 +8,6 @@ import type { ApifyClient } from 'apify-client';
 import log from '@apify/log';
 
 import { defaults, HELPER_TOOLS, type HelperToolName, RETIRED_SELECTOR_NAMES } from '../const.js';
-import type { PaymentProvider } from '../payments/types.js';
 import { actorNameToToolName } from '../tools/actor_tool_naming.js';
 import { reportProblem } from '../tools/dev/report_problem.js';
 import { getActorsAsTools } from '../tools/index.js';
@@ -25,7 +24,7 @@ import { abortActorRun } from '../tools/runs/abort_actor_run.js';
 import { getActorRun } from '../tools/runs/get_actor_run.js';
 import { getDatasetItems } from '../tools/storage/get_dataset_items.js';
 import { getKeyValueStoreRecord } from '../tools/storage/get_key_value_store_record.js';
-import type { ActorStore, Input, ToolCategory, ToolEntry } from '../types.js';
+import type { Input, ToolCategory, ToolEntry } from '../types.js';
 import { SERVER_MODE, TOOL_TYPE } from '../types.js';
 import { compileSchema } from './ajv.js';
 
@@ -132,19 +131,11 @@ export function resolveActorsToLoad(input: Input): string[] {
 
 /**
  * Fetch Actor tool entries for all Actor names in `input`.
- *
- * Pass `paymentProvider` for sessions authenticated via an external payment
- * provider (x402, Skyfire) so standby/MCP-server Actors are filtered out —
- * see `getActorsAsTools` for the full rationale.
  */
-export async function getActors(
-    input: Input,
-    apifyClient: ApifyClient,
-    options?: { actorStore?: ActorStore; paymentProvider?: PaymentProvider },
-): Promise<ToolEntry[]> {
+export async function getActors(input: Input, apifyClient: ApifyClient): Promise<ToolEntry[]> {
     const actorNames = resolveActorsToLoad(input);
     if (actorNames.length === 0) return [];
-    const { tools } = await getActorsAsTools(actorNames, apifyClient, options);
+    const { tools } = await getActorsAsTools(actorNames, apifyClient);
     return tools;
 }
 
@@ -184,7 +175,8 @@ const WITHOUT_USE_CASE_FIELD = new WeakMap<ToolEntry, ToolEntry>();
  */
 export function withoutUseCaseField(tool: ToolEntry): ToolEntry {
     const { useCase, ...properties } = tool.inputSchema.properties ?? {};
-    if (!useCase) return tool;
+    // A `useCase` of an Actor or proxied MCP tool is its own input, and `compileSchema` is not for untrusted schemas.
+    if (!useCase || tool.type !== TOOL_TYPE.INTERNAL) return tool;
     let served = WITHOUT_USE_CASE_FIELD.get(tool);
     if (!served) {
         const inputSchema = { ...tool.inputSchema, properties };
@@ -344,8 +336,7 @@ export async function loadToolsFromInput(
     input: Input,
     apifyClient: ApifyClient,
     mode: SERVER_MODE = SERVER_MODE.DEFAULT,
-    actorStore?: ActorStore,
 ): Promise<ToolEntry[]> {
-    const actorTools = await getActors(input, apifyClient, { actorStore });
+    const actorTools = await getActors(input, apifyClient);
     return getToolsForServerMode(input, actorTools, mode);
 }

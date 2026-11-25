@@ -44,11 +44,11 @@ jobs:
         needs: [release_metadata]
         runs-on: ubuntu-latest
         steps:
-            -   uses: actions/checkout@v6
+            -   uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
                 with:
                     ref: ${{ needs.release_metadata.outputs.changelog_commitish }}
             -   name: Use Node.js
-                uses: actions/setup-node@v6
+                uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
                 with:
                     node-version-file: '.nvmrc'
             -   name: Install pnpm and dependencies
@@ -75,7 +75,7 @@ jobs:
             -   name: Create MCPB package
                 run: pnpm dlx @anthropic-ai/mcpb@2.1.2 pack mcpb/ apify-mcp-server.mcpb
             -   name: Upload MCPB artifacts
-                uses: actions/upload-artifact@v4
+                uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
                 with:
                     name: mcpb-packages
                     path: apify-mcp-server.mcpb
@@ -93,11 +93,11 @@ jobs:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         steps:
             -   name: Download MCPB artifacts
-                uses: actions/download-artifact@v4
+                uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
                 with:
                     name: mcpb-packages
             -   name: Create release
-                uses: softprops/action-gh-release@v2
+                uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
                 with:
                     tag_name: ${{ needs.release_metadata.outputs.tag_name }}
                     name: ${{ needs.release_metadata.outputs.version_number }}
@@ -131,11 +131,12 @@ jobs:
         name: Bump dependency in apify-mcp-server-internal
         needs: [ release_metadata, publish_to_npm ]
         runs-on: ubuntu-latest
+        environment: npm
         env:
             GH_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
         steps:
             -   name: Checkout internal repo
-                uses: actions/checkout@v6
+                uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
                 with:
                     repository: apify/apify-mcp-server-internal
                     token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
@@ -153,11 +154,11 @@ jobs:
                 # Exact patch pin (vs. floating `v6`) sidesteps the unmarked
                 # pre-releases in the v6 line (pnpm/action-setup#236) and lets
                 # newer patches age 14 days before adoption.
-                uses: pnpm/action-setup@v6.0.5
+                uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
                 with:
                     version: ${{ steps.pnpm-version.outputs.version }}
             -   name: Use Node.js
-                uses: actions/setup-node@v6
+                uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
                 with:
                     node-version-file: '.nvmrc'
                     cache: 'pnpm'
@@ -172,7 +173,7 @@ jobs:
             -   name: Configure GitHub Packages auth
                 run: pnpm config set //npm.pkg.github.com/:_authToken ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
             -   name: Install updated dependency
-                uses: nick-fields/retry@v3 # Retry to compensate for npm registry propagation lag
+                uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3 Retry to compensate for npm registry propagation lag
                 with:
                     timeout_minutes: 10
                     max_attempts: 3
@@ -211,7 +212,7 @@ jobs:
         needs: [ release_metadata ]
         runs-on: ubuntu-latest
         steps:
-            -   uses: actions/checkout@v6
+            -   uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
                 with:
                     ref: ${{ needs.release_metadata.outputs.changelog_commitish }}
             -   name: Install mcp-publisher
