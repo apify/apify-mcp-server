@@ -1,11 +1,16 @@
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
+import type { Dataset } from 'apify-client';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ApifyClient } from '../../src/apify_client.js';
+import { ApifyClient, getApifyAPIPublicBaseUrl } from '../../src/apify_client.js';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
-import { extractDotPrefixes, getDatasetItems } from '../../src/tools/storage/get_dataset_items.js';
+import {
+    DEFAULT_DATASET_ITEMS_LIMIT,
+    extractDotPrefixes,
+    getDatasetItems,
+} from '../../src/tools/storage/get_dataset_items.js';
 import { datasetItemsOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
@@ -287,14 +292,124 @@ describe('get-dataset-items with a bare dataset name', () => {
     });
 });
 
+const SIGNED_ITEMS_URL = 'https://api.apify.com/v2/datasets/DsWkzbQMuFYuam3YF/items?signature=MC4xNzQ2NzU3MjAw';
+
+/** A client whose items page is over the limit, with `get` answering the dataset read. */
+function stubOverLimitClient(
+    // apify-client types `itemsPublicUrl` as required; the API schema marks it optional.
+    get: () => Promise<(Pick<Dataset, 'id'> & Partial<Pick<Dataset, 'itemsPublicUrl'>>) | undefined>,
+    apiBaseUrl = 'https://api.apify.com/v2',
+): InternalToolArgs['apifyClient'] {
+    return mockDatasetItemsClient(() => 'overLimit', {
+        dataset: (id: string) => ({ url: `${apiBaseUrl}/datasets/${id}`, get }),
+    });
+}
+
+/** The one URL in an error result's text. */
+function extractLink(result: unknown): URL {
+    const { content } = result as TextToolResult;
+    return new URL(/https?:\/\/\S+/.exec(content[0].text)![0]);
+}
+
+describe('get-dataset-items with a page over the size limit', () => {
+    it("links the page through the dataset's signed itemsPublicUrl, with the page's query", async () => {
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext(
+                {
+                    datasetId: 'DsWkzbQMuFYuam3YF',
+                    offset: 40,
+                    limit: 50,
+                    fields: 'title,metadata.url',
+                    omit: 'html',
+                    desc: true,
+                },
+                stubOverLimitClient(async () => ({ id: 'DsWkzbQMuFYuam3YF', itemsPublicUrl: SIGNED_ITEMS_URL })),
+            ),
+        );
+        const { content } = result as TextToolResult;
+        const link = extractLink(result);
+
+        expectSoftFailInvalidInput(result);
+        expect(content[0].text).toContain('Lower `limit`, or use `fields` or `omit`');
+        expect(content[0].text).not.toContain('may require your Apify API token');
+        expect(`${link.origin}${link.pathname}`).toBe(SIGNED_ITEMS_URL.split('?')[0]);
+        expect(Object.fromEntries(link.searchParams)).toEqual({
+            signature: new URL(SIGNED_ITEMS_URL).searchParams.get('signature'),
+            offset: '40',
+            limit: '50',
+            fields: 'title,metadata.url',
+            omit: 'html',
+            desc: 'true',
+            flatten: 'metadata',
+        });
+    });
+
+    it('links the page by dataset ID when the dataset is given by name', async () => {
+        const get = vi.fn(async () => ({
+            id: 'WkzbQMuFYuamGv3YF',
+            itemsPublicUrl: 'https://api.apify.com/v2/datasets/WkzbQMuFYuamGv3YF/items?signature=MC4xNzQ2',
+        }));
+
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext({ datasetId: 'eval-ai-items' }, stubOverLimitClient(get)),
+        );
+
+        expect(get).toHaveBeenCalledTimes(1);
+        expect(extractLink(result).pathname).toBe('/v2/datasets/WkzbQMuFYuamGv3YF/items');
+    });
+
+    it('falls back to the items API URL on the client-facing origin when the dataset has no itemsPublicUrl', async () => {
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'DsWkzbQMuFYuam3YF' },
+                stubOverLimitClient(async () => ({ id: 'DsWkzbQMuFYuam3YF' }), 'http://apify-api.internal:8080/v2'),
+            ),
+        );
+        const { content } = result as TextToolResult;
+        const link = extractLink(result);
+
+        expectSoftFailInvalidInput(result);
+        expect(content[0].text).toContain('may require your Apify API token');
+        expect(`${link.origin}${link.pathname}`).toBe(
+            `${getApifyAPIPublicBaseUrl()}/v2/datasets/DsWkzbQMuFYuam3YF/items`,
+        );
+        // Unset params and the empty `fields`/`omit`/`flatten` lists stay out of the query.
+        expect(Object.fromEntries(link.searchParams)).toEqual({ limit: String(DEFAULT_DATASET_ITEMS_LIMIT) });
+    });
+
+    // The link is extra to the input error, so a failed dataset read must not replace the error.
+    it('falls back to the items API URL when the dataset read fails', async () => {
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'DsWkzbQMuFYuam3YF' },
+                stubOverLimitClient(async () => {
+                    throw Object.assign(new Error('Internal server error'), { statusCode: 500 });
+                }),
+            ),
+        );
+        const { content } = result as TextToolResult;
+
+        expectSoftFailInvalidInput(result);
+        expect(content[0].text).toContain('may require your Apify API token');
+        expect(extractLink(result).pathname).toBe('/v2/datasets/DsWkzbQMuFYuam3YF/items');
+    });
+});
+
 // The real client against a local server: the stubs above cannot show that the download stops.
 describe('get-dataset-items with a page far over the size limit', () => {
     const PAGE_BYTES = 64 * 1024 * 1024;
 
-    it('stops the download near the limit and returns an input error naming limit, fields and omit', async () => {
+    it('stops the download near the limit and returns an input error with a signed link and no token', async () => {
         let sentBytes = 0;
         let requestUrl: string | undefined;
+        let baseUrl = '';
         const server = createServer((req, res) => {
+            if (req.url === '/v2/datasets/DsWkzbQMuFYuam3YF') {
+                const itemsPublicUrl = `${baseUrl}/v2/datasets/DsWkzbQMuFYuam3YF/items?signature=MC4xNzQ2`;
+                res.writeHead(200, { 'content-type': 'application/json' });
+                res.end(JSON.stringify({ data: { id: 'DsWkzbQMuFYuam3YF', itemsPublicUrl } }));
+                return;
+            }
             requestUrl = req.url;
             res.writeHead(200, { 'content-type': 'application/json', 'x-apify-pagination-total': '1' });
             res.write('[');
@@ -312,7 +427,7 @@ describe('get-dataset-items with a page far over the size limit', () => {
             write();
         });
         await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-        const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+        baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
         try {
             const result = await (getDatasetItems as HelperTool).call(
@@ -327,6 +442,9 @@ describe('get-dataset-items with a page far over the size limit', () => {
             expect(content[0].text).toContain(`${MAX_INLINE_BYTES}-byte response limit`);
             expect(content[0].text).toContain('Lower `limit`, or use `fields` or `omit`');
             expect(requestUrl).toMatch(/^\/v2\/datasets\/DsWkzbQMuFYuam3YF\/items\?/);
+            expect(extractLink(result).searchParams.get('signature')).toBe('MC4xNzQ2');
+            // The client holds a token; neither the link nor the rest of the result may carry it.
+            expect(JSON.stringify(result)).not.toContain('test-token');
             // Socket buffers hold some bytes past the limit; a full read would send all of them.
             expect(sentBytes).toBeLessThan(PAGE_BYTES / 4);
         } finally {
