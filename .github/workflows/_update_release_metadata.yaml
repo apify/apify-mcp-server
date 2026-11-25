@@ -36,6 +36,7 @@ jobs:
     release_metadata:
         name: Prepare release metadata
         runs-on: ubuntu-latest
+        environment: npm
         outputs:
             version_number: ${{ steps.release_metadata.outputs.version_number }}
             tag_name: ${{ steps.release_metadata.outputs.tag_name }}
@@ -55,12 +56,13 @@ jobs:
         needs: [ release_metadata ]
         name: Update changelog
         runs-on: ubuntu-latest
+        environment: npm
         outputs:
             changelog_commitish: ${{ steps.commit.outputs.commit_long_sha }}
 
         steps:
             -   name: Checkout repository
-                uses: actions/checkout@v6
+                uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
                 with:
                     token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
 
@@ -78,11 +80,15 @@ jobs:
             # Written via heredoc, not an action `with:` input: action inputs become env vars,
             # and Linux caps a single env var at 128 KiB (MAX_ARG_STRLEN) — the changelog
             # already exceeds that, which crashed write-file-action with "Argument list too long".
+            # GitHub pastes the changelog into this script before Bash reads it, so a raw changelog
+            # line equal to the delimiter would end the heredoc and run the lines after it.
+            # `toJSON` puts the whole changelog on one quoted line, which cannot match the
+            # delimiter; `jq -r .` decodes it back.
             -   name: Update CHANGELOG.md
                 run: |
-                    cat > CHANGELOG.md << 'CHANGELOG_EOF'
-                    ${{ needs.release_metadata.outputs.changelog }}
-                    CHANGELOG_EOF
+                    jq -r . > CHANGELOG.md << 'CHANGELOG_JSON'
+                    ${{ toJSON(needs.release_metadata.outputs.changelog) }}
+                    CHANGELOG_JSON
 
             -   name: Commit changes
                 id: commit

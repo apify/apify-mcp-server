@@ -48,7 +48,6 @@ USAGE EXAMPLES:
     inputSchema: fixZodSchemaRequired(z.toJSONSchema(getActorBuildArgs)) as ToolInputSchema,
     outputSchema: getActorBuildToolOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorBuildArgs)),
-    paymentRequired: true,
     annotations: {
         title: 'Get Actor build',
         readOnlyHint: true,

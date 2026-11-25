@@ -54,7 +54,7 @@ describe('searchActorsByKeywords', () => {
         paramsHolder.params = {};
     });
 
-    it('forwards `includeInputSchema` and `allowsAgenticUsers` as store-client params', async () => {
+    it('forwards `includeInputSchema` as a store-client param', async () => {
         listMock.mockResolvedValueOnce({ items: [] });
         await searchActorsByKeywords({
             search: 'foo',
@@ -62,9 +62,8 @@ describe('searchActorsByKeywords', () => {
             limit: 5,
             offset: 0,
             includeInputSchema: true,
-            allowsAgenticUsers: true,
         });
-        expect(paramsHolder.params).toMatchObject({ includeInputSchema: true, allowsAgenticUsers: true });
+        expect(paramsHolder.params).toMatchObject({ includeInputSchema: true });
         expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: 5, offset: 0 });
     });
 
@@ -80,11 +79,10 @@ describe('searchActorsByKeywords', () => {
         expect(paramsHolder.params).toMatchObject({ _useNewStoreBackend: true });
     });
 
-    it('omits both flags when not provided', async () => {
+    it('omits `includeInputSchema` when not provided', async () => {
         listMock.mockResolvedValueOnce({ items: [] });
         await searchActorsByKeywords({ search: 'foo', apifyClient: stubApifyClient, limit: 5 });
         expect(paramsHolder.params).not.toHaveProperty('includeInputSchema');
-        expect(paramsHolder.params).not.toHaveProperty('allowsAgenticUsers');
     });
 });
 
@@ -113,19 +111,6 @@ describe('searchAgentSafeActors', () => {
         expect(listMock).toHaveBeenCalledWith({ search: '', limit: 5, offset: 0 });
     });
 
-    it('forwards allowsAgenticUsers when paymentProvider is set', async () => {
-        listMock.mockResolvedValueOnce({ items: [makeActor()] });
-        await searchAgentSafeActors({
-            keywords: 'foo',
-            apifyClient: stubApifyClient,
-            limit: 1,
-            offset: 0,
-            // The actual provider is not consumed here; only its presence flips the flag.
-            paymentProvider: {} as never,
-        });
-        expect(paramsHolder.params).toMatchObject({ allowsAgenticUsers: true, includeInputSchema: true });
-    });
-
     it('forwards the trace id of the client and the use case of the call, sanitized', async () => {
         listMock.mockResolvedValueOnce({ items: [] });
         const apifyClient = mockApifyClient({ store: stubApifyClient.store, storeSearchTracking: TRACKING });
@@ -134,7 +119,7 @@ describe('searchAgentSafeActors', () => {
             apifyClient,
             limit: 5,
             offset: 0,
-            useCase: ' compare prices for apify_api_SECRET123 ',
+            useCase: ` compare prices for apify_api_${'x'.repeat(36)} `,
         });
         expect(paramsHolder.params).toMatchObject({
             _traceId: 'thread-1',

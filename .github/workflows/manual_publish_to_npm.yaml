@@ -25,11 +25,11 @@ jobs:
         name: Publish to NPM
         runs-on: ubuntu-latest
         steps:
-            -   uses: actions/checkout@v6
+            -   uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
                 with:
                     ref: ${{ inputs.ref }}
             -   name: Use Node.js
-                uses: actions/setup-node@v6
+                uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
                 with:
                     node-version-file: .nvmrc
                     registry-url: 'https://registry.npmjs.org'
@@ -56,12 +56,29 @@ jobs:
                 # devEngines `onFail: error` pin (`npm publish` would be rejected).
                 # `--no-git-checks` skips pnpm's working-tree/branch guards — release
                 # tags & branches are validated upstream by the release workflow.
-                run: pnpm publish --tag ${{ inputs.tag }} --no-git-checks
+                #
+                # A beta publish that fails is retried with the next beta number.
+                # `before-beta-release.js` picks the number from the versions the
+                # registry lists, and a beta that npm is still scanning is not listed
+                # yet, so two merges close together can pick the same number.
+                run: |
+                    for _ in 1 2 3; do
+                        pnpm publish --tag ${{ inputs.tag }} --no-git-checks && exit 0
+                        [ "${{ inputs.tag }}" = "beta" ] || exit 1
+                        jq '.version |= (capture("^(?<base>.*-beta\\.)(?<n>\\d+)$") | "\(.base)\(.n | tonumber + 1)")' package.json > package.json.tmp
+                        mv package.json.tmp package.json
+                        echo "Publish failed, retrying as $(jq -r '.version' package.json)"
+                    done
+                    exit 1
             -   name: Wait until the version is on the registry
                 # npm scans each version before it becomes installable: "typically around five
                 # minutes ... up to 15 minutes or more" (https://github.blog/changelog/2026-07-28-npm-publish-time-malware-scanning-and-dual-use-metadata/).
-                # Jobs that run after this workflow (smoke test, internal repo bump) install
+                # After a stable release, the smoke test and the internal repo bump install
                 # the version right away, so don't finish until the registry serves it.
+                # Nothing installs a beta right after publishing, so beta skips the wait
+                # and releases the `release` concurrency group sooner. The next beta
+                # publish may not see this version yet; its publish step retries.
+                if: ${{ inputs.tag == 'latest' }}
                 run: |
                     version=$(jq -r '.version' package.json)
                     for _ in $(seq 1 80); do

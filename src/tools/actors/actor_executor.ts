@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import log from '@apify/log';
 
 import { FAILURE_CATEGORY } from '../../const.js';
@@ -6,8 +8,21 @@ import { isActorInputValidationError } from '../../utils/apify_errors.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { buildInvalidInputTexts, respondUserError } from '../../utils/mcp.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
-import { abortRunOnSignal, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './actor_run_response.js';
+import {
+    abortRunOnSignal,
+    CALL_ACTOR_WAIT_SECS_DEFAULT,
+    fetchActorRunData,
+    WAIT_SECS_MAX,
+} from './actor_run_response.js';
 import { buildDirectActorRunInput } from './actor_tool_contract.js';
+
+// AJV coerces a numeric string on a validated schema; a schema that skips AJV gets the same here.
+const waitSecsSchema = z
+    .preprocess(
+        (value) => (typeof value === 'string' && value.trim() !== '' ? Number(value) : value),
+        z.number().int().min(0).max(WAIT_SECS_MAX),
+    )
+    .catch(CALL_ACTOR_WAIT_SECS_DEFAULT);
 
 /**
  * Direct actor tool executor. Mode-agnostic — used in both default and apps modes.
@@ -22,14 +37,12 @@ export const actorExecutor: ActorExecutor = {
             params;
         // Strip `waitSecs` from the Actor's input — it's an MCP-injected opt-in, not an
         // Actor field — so `actor.start()` doesn't reject or silently pass it through.
-        const { waitSecs: argsWaitSecs, ...actorInput } = params.input as { waitSecs?: number } & Record<
-            string,
-            unknown
-        >;
+        const { waitSecs: argsWaitSecs, ...actorInput } = params.input;
         // Task mode waits until terminal; honoring waitSecs would let the task complete
         // before the Actor produced output. Mirrors executeCallActor.
-        // AJV doesn't fill `default` values, so apply the 30 s default here when the LLM omits waitSecs.
-        const waitSecs = taskMode ? undefined : (argsWaitSecs ?? CALL_ACTOR_WAIT_SECS_DEFAULT);
+        // AJV doesn't fill `default` values, and it does not validate a schema that is costly to compile,
+        // so an omitted or invalid waitSecs gets the 30 s default here.
+        const waitSecs = taskMode ? undefined : waitSecsSchema.parse(argsWaitSecs);
 
         if (abortSignal?.aborted) {
             log.info('Actor run aborted by client before start', {
@@ -95,13 +108,6 @@ export const actorExecutor: ActorExecutor = {
             return null;
         }
         if ('error' in fetchResult) return fetchResult.error as ActorExecutionResult;
-
-        // Mirror the tool's declared `itemsSchema` into the runtime response so the response
-        // matches its outputSchema. Only direct actor tools know the row shape up front.
-        const dataset = fetchResult.result.structuredContent.storages?.datasets?.default;
-        if (dataset && params.datasetItemsSchema) {
-            dataset.itemsSchema = { type: 'object', properties: params.datasetItemsSchema };
-        }
 
         return buildGetActorRunResponse({
             ...fetchResult.result,

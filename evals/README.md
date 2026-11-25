@@ -41,7 +41,7 @@ pnpm run build
 pnpm run evals:mcp-agent
 ```
 
-Run `pnpm run evals:mcp-agent --help` for all options. `--dataset` selects the dataset, `--id` and `--category` filter it, `--concurrency` controls parallel agents, and `--iterations` repeats cases. `--pass-threshold` gates the aggregate pass rate (default `0.9`); `--tool-timeout` caps each MCP tool call (default 60 s); `--mcp-tools-only` removes Claude Code built-ins; `--run-id` names the resources this run creates (below). Use `--subscription` for local Claude Code credentials and `--claude-judge` to avoid an OpenRouter key.
+Run `pnpm run evals:mcp-agent --help` for all options. `--dataset` selects the dataset, `--id` and `--category` filter it, `--concurrency` controls parallel agents, and `--iterations` repeats cases. `--pass-threshold` gates the aggregate pass rate (default `0.9`); `--tool-timeout` caps each MCP tool call (default 60 s); `--mcp-tools-only` has no effect, because the agent never gets Claude Code built-ins; `--run-id` names the resources this run creates (below). Use `--subscription` for local Claude Code credentials and `--claude-judge` to avoid an OpenRouter key.
 
 ### Two datasets: kind, id scheme, and expectedErrors
 
@@ -150,8 +150,7 @@ HTTP 502 `UPSTREAM_FETCH_ERROR`, a failed call.
 The web-selection family (`merge/web-selection/*`, 9 items: 7 proper + 2 with `expectedErrors`) covers
 the clash between the default web tools: web search by query (`apify/web-search`) vs
 single-URL verbatim fetch (`apify/web-fetch`) vs Actor discovery (`search-actors`) vs a
-specialized Actor for structured platform data, plus coexistence with a client's built-in,
-summarizing fetch. Also stateless — no fixtures script.
+specialized Actor for structured platform data. Also stateless — no fixtures script.
 Known residual (2026-08-21): on `merge/web-fetch/unsupported-protocol`,
 claude-haiku-4-5 reproducibly rewrites the ftp:// URL to https:// without telling the user,
 despite the scheme note in both the tool description and the `url` parameter — a model-level
@@ -162,7 +161,7 @@ input and in the description.
 
 A `kind: "tool-call"` item records the first attempted call and its arguments. A `PreToolUse` hook denies every call with `TOOL_CALL_DENY_REASON` (`runner/tool_call_mode.ts`), so no tool executes and the agent stops after reporting what it would have called. Tool-call items have a fixed `maxTurns` of 2.
 
-The scorer skips Claude Code's `ToolSearch` meta-tool. Set `mcpToolsOnly: true` (or `--mcp-tools-only`) to remove built-ins when a case must compare MCP tools only.
+The scorer skips Claude Code's `ToolSearch` meta-tool. The agent has no Claude Code built-ins (`agent/claude_agent.ts` sets `tools: []`), so every case compares MCP tools only.
 
 Scoring (`first_tool_match`, 1 or 0):
 - The tool name must be in `expectedTools`.
@@ -243,9 +242,9 @@ Every active item is validated when the dataset is fetched, so a bad UI edit fai
 
 ### 3. The agent is Claude Code, not a hand-rolled loop
 
-**Decision:** Run each case through the Claude Agent SDK's `query()` with the `claude_code` system-prompt and tool presets, and register the Apify MCP server alongside them — so the eval measures what a real client does with our tool descriptions, not a custom harness. See `agent/claude_agent.ts` for the run settings (`canUseTool`, `settingSources`, `strictMcpConfig`, `alwaysLoad`) and why each one is set that way.
+**Decision:** Run each case through the Claude Agent SDK's `query()` with the `claude_code` system-prompt preset and no built-in tools (`tools: []`), and register the Apify MCP server as the agent's only tools — so the eval measures what a real client's model does with our tool descriptions, not a custom harness. The built-ins are off because the agent reads Store listings, Actor output and web pages that anyone can write, and it must not have a shell or file access next to them. See `agent/claude_agent.ts` for the run settings (`canUseTool`, `settingSources`, `strictMcpConfig`, `alwaysLoad`) and why each one is set that way.
 
-**Trade-off:** the harness is a moving target - a Claude Code release can shift results, so `agentSdkVersion` is recorded in the run metadata.
+**Trade-off:** the harness is a moving target - a Claude Code release can shift results, so `agentSdkVersion` is recorded in the run metadata. Without built-ins, the evals no longer measure how the agent chooses between our tools and a client's own `WebFetch` and `WebSearch`; they compare our tools with each other only.
 
 **Location:** `agent/claude_agent.ts`, `agent/conversation_adapter.ts`
 
@@ -353,7 +352,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 ### Environment variables (required)
 
 ```bash
-export APIFY_TOKEN="your_apify_token"           # Get from https://console.apify.com/account/integrations
+export APIFY_TOKEN="your_apify_token"           # Create one at https://console.apify.com/settings/integrations?createApiToken=true&for=MCP&utm_source=mcp&utm_medium=integrations
 export ANTHROPIC_API_KEY="sk-ant-..."           # Agent, get from https://console.anthropic.com/settings/keys
 export OPENROUTER_API_KEY="your_openrouter_key" # Judge, get from https://openrouter.ai/keys
 export LANGFUSE_PUBLIC_KEY="pk-lf-..."          # Langfuse project settings
@@ -428,7 +427,7 @@ above). The snapshot holds the same fields flattened, one object per case, in th
 - `expectedErrors` - `kind: "agent"` only: tool names allowed to fail on this item without failing the zero-tool-error gate (see "Tool-call mode" above and the "Two datasets" section). Not accepted on `kind: "tool-call"`
 - `maxTurns` - `kind: "agent"` only: override the default (10). Not accepted on `kind: "tool-call"`, which is fixed at 2
 - `tools` - List of tools to enable for this test (e.g., `["actors", "docs", "apify/rag-web-browser"]`). If omitted, all default tools are enabled. Passed to MCP server as `--tools` argument.
-- `mcpToolsOnly` - Force MCP-tools-only for this item, dropping Claude Code's built-ins (OR-ed with the run-wide `--mcp-tools-only`). Useful on a tool-call item that must isolate MCP-vs-MCP tool choice
+- `mcpToolsOnly` - No effect: the agent never gets Claude Code's built-ins. Still accepted so existing items parse
 - `failTools` - `kind: "agent"` only: tool names the harness force-fails before they reach the server (e.g. `["call-actor"]`), with a message carrying the real `report-problem` nudge. Use it to deterministically produce a nudge-eligible failure that the live server + API cannot reproduce on demand, e.g. to test that the agent proactively calls `report-problem` after one. Injected as a `PreToolUse` deny (the same hook mechanism the tool-call-mode deny-all uses, with different wording), so the agent sees a refused call rather than an `INTERNAL_ERROR` tool result. See `agent/claude_agent.ts`. Not accepted on `kind: "tool-call"`.
 
 ## Common issues
@@ -442,11 +441,10 @@ above). The snapshot holds the same fields flattened, one object per case, in th
 **Cause:** The CLI waits 5 s (`MCP_CONNECT_TIMEOUT_MS`) for the server, then emits `init` with it `pending` and runs the first turn without its tools. Common on a loaded machine (high `--concurrency`, few CPUs).<br>
 **Solution:** Automatic: the run aborts at `init`; `pending`/`failed` retry once, other statuses fail at once. If it recurs, lower `--concurrency`.
 
-### Agent answers from memory or shells out instead of using our tools
-**Symptom:** The judge reports the agent used `Bash`, `WebSearch`, or its own knowledge.<br>
+### Agent answers from memory instead of using our tools
+**Symptom:** The judge reports the agent used its own knowledge.<br>
 **Solutions:**
 - Check the server is registered with `alwaysLoad: true`, or its tools sit behind tool search
-- Run with `--mcp-tools-only` to confirm the case passes when the built-ins are gone
 
 ### Judge too strict/lenient
 **Symptom:** Incorrect verdicts.<br>

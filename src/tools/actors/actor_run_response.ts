@@ -97,12 +97,6 @@ export type RunDataset = {
     inflatedBytes?: number;
     /** Dot-notation paths that work as a `fields` selection; a field holding an array appears by its top-level name. */
     fields?: string[];
-    /**
-     * JSON Schema fragment for each dataset row. Populated only by direct actor tools (where
-     * the target Actor is known at tools/list time, so historical row shape can be looked up
-     * via `actorStore`). Absent for `call-actor` / `get-actor-run` (dynamic target).
-     */
-    itemsSchema?: { type: 'object'; properties: Record<string, unknown> };
 };
 
 export type RunKeyValueStore = {

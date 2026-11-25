@@ -60,7 +60,6 @@ export const getDataset: ToolEntry = Object.freeze({
     inputSchema: z.toJSONSchema(getDatasetArgs) as ToolInputSchema,
     outputSchema: datasetMetadataOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getDatasetArgs)),
-    paymentRequired: true,
     annotations: {
         title: 'Get dataset',
         readOnlyHint: true,

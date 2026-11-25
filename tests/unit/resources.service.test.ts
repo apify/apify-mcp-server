@@ -3,9 +3,6 @@ import { Readable } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
 
 import { InternalError, InvalidParamsError } from '../../src/mcp/errors.js';
-import { SKYFIRE_README_CONTENT } from '../../src/payments/const.js';
-import { resolvePaymentProvider } from '../../src/payments/index.js';
-import type { PaymentProvider } from '../../src/payments/types.js';
 import { createResourceService } from '../../src/resources/resource_service.js';
 import type { AvailableWidget } from '../../src/resources/widgets.js';
 import { WIDGET_REGISTRY, WIDGET_URIS } from '../../src/resources/widgets.js';
@@ -31,38 +28,6 @@ function firstContent(result: { contents: unknown[] }): { mimeType?: string; tex
 
 describe('createResourceService()', () => {
     describe('listResources()', () => {
-        it('lists the Skyfire readme only when enabled', async () => {
-            const skyfireService = createResourceService({
-                getMode: () => 'default',
-                paymentProvider: await resolvePaymentProvider('skyfire'),
-                getAvailableWidgets: () => new Map(),
-            });
-            const defaultService = createResourceService({
-                getMode: () => 'default',
-                paymentProvider: undefined,
-                getAvailableWidgets: () => new Map(),
-            });
-
-            const skyfireResources = await skyfireService.listResources();
-            const defaultResources = await defaultService.listResources();
-
-            expect(skyfireResources.resources.some((resource) => resource.uri === 'file://readme.md')).toBe(true);
-            expect(defaultResources.resources.some((resource) => resource.uri === 'file://readme.md')).toBe(false);
-        });
-
-        it('does not list the readme when the provider returns no usage guide', async () => {
-            const provider = { getUsageGuide: () => null } as unknown as PaymentProvider;
-            const service = createResourceService({
-                getMode: () => 'default',
-                paymentProvider: provider,
-                getAvailableWidgets: () => new Map(),
-            });
-
-            const { resources } = await service.listResources();
-
-            expect(resources.some((resource) => resource.uri === 'file://readme.md')).toBe(false);
-        });
-
         it('lists apps widgets only when their files exist', async () => {
             const widgets = new Map<string, AvailableWidget>([
                 [WIDGET_URIS.SEARCH_ACTORS, buildAvailableWidget(WIDGET_URIS.SEARCH_ACTORS, true)],
@@ -80,19 +45,6 @@ describe('createResourceService()', () => {
     });
 
     describe('readResource()', () => {
-        it('returns the Skyfire readme content', async () => {
-            const service = createResourceService({
-                getMode: () => 'default',
-                paymentProvider: await resolvePaymentProvider('skyfire'),
-                getAvailableWidgets: () => new Map(),
-            });
-
-            const result = await service.readResource('file://readme.md');
-
-            expect(firstContent(result).text).toBe(SKYFIRE_README_CONTENT);
-            expect(firstContent(result).mimeType).toBe('text/markdown');
-        });
-
         it('throws InvalidParams for an unknown URI', async () => {
             const service = createResourceService({
                 getMode: () => 'default',

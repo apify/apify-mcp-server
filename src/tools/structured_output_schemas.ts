@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { TIP_MESSAGE_LIMIT } from '../const.js';
+import { HELPER_TOOLS, TIP_MESSAGE_LIMIT } from '../const.js';
 import { ACTOR_TENANCY } from '../types.js';
 
 /**
@@ -881,26 +881,25 @@ export const actorRunOutputSchema = {
 
 /**
  * Returns a per-tool clone of {@link actorRunOutputSchema} with `storages.datasets.default.itemsSchema`
- * declared as a JSON Schema describing each dataset row, inferred from historical successful runs.
+ * declared as a JSON Schema describing each dataset row, from the dataset schema the Actor declares.
  *
  * Used for direct actor tools (e.g. `apify--instagram-scraper`) where the target Actor is known
- * at `tools/list` time, so the LLM can plan field projection before calling the tool. The same
- * shape is injected into `structuredContent.storages.datasets.default.itemsSchema` by the direct
- * actor executors so the declared schema matches the runtime response.
+ * at `tools/list` time, so a client can show the row shape before the tool is called. A run result
+ * does not carry `itemsSchema`: it would repeat `tools/list` on every call, and the result's `fields`
+ * already lists the columns the run produced.
  *
  * `call-actor` and `get-actor-run` cannot use this because their target Actor is dynamic.
  *
- * @param itemProperties - JSON Schema properties for dataset item fields
+ * @param itemProperties - Names and types of the dataset item fields, from `reduceToFieldNamesAndTypes`
  *   (e.g. `{ url: { type: 'string' }, price: { type: 'number' } }`).
  */
 export function buildEnrichedDirectActorOutputSchema(itemProperties: Record<string, unknown>) {
     const itemsSchema = {
         type: 'object' as const,
         description:
-            'JSON Schema for rows in the dataset at `storages.datasets.default.id` — describes row ' +
-            'shape only; the rows themselves are NOT returned inline in this response. Inferred from this ' +
-            "Actor's historical successful runs. To fetch actual rows, call `get-dataset-items` with the " +
-            'dataset id and a `fields` projection drawn from this schema.',
+            'JSON Schema for rows in the dataset at `storages.datasets.default.id`: the field names and types ' +
+            'the Actor declares. It describes the row shape and is not part of the response, which does not ' +
+            `include the rows either. Its top-level field names work in the \`fields\` selection of \`${HELPER_TOOLS.DATASET_GET_ITEMS}\`.`,
         properties: itemProperties,
     };
     const clone = structuredClone(actorRunOutputSchema);
@@ -1340,7 +1339,11 @@ export const actorDetailsOutputSchema = {
             description: 'Actor README summary when available, otherwise the full README documentation.',
         },
         inputSchema: { type: 'object' as const, description: 'Actor input schema.' },
-        outputSchema: { type: 'object' as const, description: 'Output schema inferred from successful runs.' },
+        outputSchema: {
+            type: 'object' as const,
+            description:
+                'JSON Schema the Actor declares for items of its default dataset: field names and types only when the declaration is over the size limit, empty when the Actor declares none or the names and types are over the limit too.',
+        },
         serverInterface: serverInterfaceDetailsSchema,
         nextStep: nextStepProperty,
     },

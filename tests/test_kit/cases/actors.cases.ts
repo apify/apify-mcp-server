@@ -411,6 +411,55 @@ export const actorsCases: Case[] = [
         }),
     },
     {
+        name: 'returns the dataset schema the Actor declares for fetch-actor-details with output={ outputSchema: true }',
+        isDeploymentTest: true,
+        run: withClient({ tools: ['actors'] }, async (client) => {
+            const result = await client.callTool({
+                name: 'fetch-actor-details',
+                arguments: { actor: ACTOR_SERVER_ACTOR_TEST, output: { outputSchema: true } },
+            });
+
+            validateStructuredOutputForTool(result, 'fetch-actor-details', 'default');
+            const { outputSchema } = result.structuredContent as {
+                outputSchema: { properties: Record<string, { type?: unknown; description?: string }> };
+            };
+            // The declaration in full: the field keeps the description its creator wrote, in both channels.
+            expect(outputSchema.properties.sum.description).toEqual(expect.any(String));
+            const text = (result.content as { text: string }[]).map((item) => item.text).join('\n');
+            expect(text).toContain('# Output schema');
+            expect(text).toContain(JSON.stringify(outputSchema.properties.sum.description));
+        }),
+    },
+    {
+        name: 'advertises the declared dataset fields of a direct Actor tool as names and types only',
+        isDeploymentTest: false,
+        run: withClient({ tools: [ACTOR_NORMAL_MODE] }, async (client) => {
+            const { tools } = await client.listTools();
+            const tool = tools.find((item) => item.name === NORMAL_MODE_TOOL_NAME);
+
+            if (!tool) throw new Error(`Tool for ${ACTOR_NORMAL_MODE} is not listed`);
+
+            const { itemsSchema } = (
+                tool.outputSchema as unknown as {
+                    properties: {
+                        storages: {
+                            properties: {
+                                datasets: {
+                                    properties: {
+                                        default: {
+                                            properties: { itemsSchema: { properties: Record<string, unknown> } };
+                                        };
+                                    };
+                                };
+                            };
+                        };
+                    };
+                }
+            ).properties.storages.properties.datasets.properties.default.properties;
+            expect(itemsSchema.properties.sum).toEqual({ type: 'integer' });
+        }),
+    },
+    {
         name: 'should return only pricing when output={ pricing: true }',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors'] }, async (client) => {

@@ -12,7 +12,7 @@ import {
     HELPER_TOOLS,
 } from '../../const.js';
 import { UserInputError } from '../../errors.js';
-import { maskLoggedValues, pickLoggedValues, REDACTED } from '../../resources/api_resources.js';
+import { maskLoggedValues, pickLoggedValues, REDACTION_PLACEHOLDER } from '../../resources/api_resources.js';
 import type { ConsoleLinkContext, InternalToolArgs } from '../../types.js';
 import { getResourceByIdOrName } from '../../utils/apify_resource_id.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
@@ -36,17 +36,17 @@ export const sourceFileArgs = z.object({
         ),
 });
 
-/** The logged copy of an entry's edits, each with its oldText and newText as `REDACTED`. */
+/** The logged copy of an entry's edits, each with its oldText and newText as `REDACTION_PLACEHOLDER`. */
 function redactEdits(edits: unknown): unknown {
-    if (!Array.isArray(edits)) return REDACTED;
+    if (!Array.isArray(edits)) return REDACTION_PLACEHOLDER;
     return edits.map((textEdit) =>
-        isRecord(textEdit) ? maskLoggedValues(textEdit, ['oldText', 'newText']) : REDACTED,
+        isRecord(textEdit) ? maskLoggedValues(textEdit, ['oldText', 'newText']) : REDACTION_PLACEHOLDER,
     );
 }
 
 /**
  * The logged copy of a source tool's arguments (`redactArgs`), built as an allowlist: `keys`, and each entry of the
- * list under `listKey` with its `entryKeys`, and with its content and its edits' oldText and newText as `REDACTED`.
+ * list under `listKey` with its `entryKeys`, and with its content and its edits' oldText and newText as `REDACTION_PLACEHOLDER`.
  * File content can hold secrets, such as an API key written into the code.
  */
 export function redactSourceToolArgs(
@@ -55,7 +55,7 @@ export function redactSourceToolArgs(
 ): Record<string, unknown> {
     const { keys, listKey, entryKeys } = fields;
     const redactEntry = (entry: unknown) => {
-        if (!isRecord(entry)) return REDACTED;
+        if (!isRecord(entry)) return REDACTION_PLACEHOLDER;
         const { edits } = entry;
         return {
             ...pickLoggedValues(entry, entryKeys),
@@ -66,7 +66,7 @@ export function redactSourceToolArgs(
     const list = args[listKey];
     return {
         ...pickLoggedValues(args, keys),
-        ...(list !== undefined && { [listKey]: Array.isArray(list) ? list.map(redactEntry) : REDACTED }),
+        ...(list !== undefined && { [listKey]: Array.isArray(list) ? list.map(redactEntry) : REDACTION_PLACEHOLDER }),
     };
 }
 

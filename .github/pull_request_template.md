@@ -10,6 +10,8 @@
 
 <!-- Opener, 1–3 sentences: what changes for the user or agent, and why. "Closes #123". Every PR links an issue, except a documentation fix or, in exceptional cases, a maintainer change labelled `adhoc`; then state the problem in one line, evidence beats adjectives. If a decision needs the reviewer's judgement, or you're unsure about a part, add it as one line after the opener. -->
 
+<!-- If the change depends on behavior the diff does not show, explain it here: what happens today, naming the function; why it matters; what the change does; what stays the same. -->
+
 ## Before / after
 <!-- A real tool call with its real result text, or a screenshot. -->
 
