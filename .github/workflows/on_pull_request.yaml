@@ -22,7 +22,7 @@ jobs:
         outputs:
             run_integration: ${{ steps.filter.outputs.code }}
         steps:
-            -   uses: dorny/paths-filter@v3
+            -   uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3
                 id: filter
                 with:
                     filters: |

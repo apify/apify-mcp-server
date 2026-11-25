@@ -4,6 +4,7 @@
  * selected Server Actor's own tool description (`buildServerActorToolInfo`).
  */
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
+import { resolveOnStandbyOrigin } from '../../mcp/actors.js';
 import type { Actor, ActorTenancy, ServerActorToolInfo } from '../../types.js';
 import { ACTOR_TENANCY } from '../../types.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
@@ -133,10 +134,12 @@ function buildServerInterfaceFacts(
     canSend: boolean,
 ): ServerInterfaceDetails {
     const idleTimeoutSecs = actor.actorStandby?.idleTimeoutSecs;
+    // Shown only when it is a URL requests would be sent to, the same check as the tools that send.
+    const baseUrl = canSend ? undefined : resolveOnStandbyOrigin(actor, '/')?.standbyOrigin;
     return {
         tenancy,
         ...(tenancy === ACTOR_TENANCY.SINGLE_TENANT && idleTimeoutSecs !== undefined && { idleTimeoutSecs }),
-        ...(!canSend && actor.standbyUrl && { baseUrl: actor.standbyUrl }),
+        ...(baseUrl && { baseUrl }),
         operationCount,
     };
 }
@@ -154,12 +157,6 @@ export function formatTenancyBilling({
     }
     const idleTimeout = idleTimeoutSecs === undefined ? 'its idle timeout' : `its idle timeout of ${idleTimeoutSecs} s`;
     return `${tenancy}: the first request starts a run in your account, kept for ${idleTimeout}.`;
-}
-
-/** What a request costs, from the facts. */
-function formatCostNotice(facts: ServerInterfaceDetails, hasPaymentProvider: boolean): string {
-    if (hasPaymentProvider) return 'Requests to a server interface are not supported in agentic payment mode.';
-    return formatTenancyBilling(facts);
 }
 
 function formatSendExample(actorFullName: string, lead: string, { method, path }: ServerOperation): string {
@@ -221,15 +218,12 @@ export function buildServerInterfaceDetails({
     schema,
     serverInterface,
     loadedToolNames,
-    hasPaymentProvider,
 }: {
     actor: Pick<Actor, 'actorStandby' | 'standbyUrl'>;
     actorFullName: string;
     schema: unknown;
     serverInterface: boolean | string;
     loadedToolNames: readonly string[];
-    /** An agentic payment provider (x402, Skyfire) cannot pay for a server-interface request. */
-    hasPaymentProvider: boolean;
 }): ServerInterfaceSection | { error: string } {
     const hasSendTool = loadedToolNames.includes(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
     // The summary helps choose between call-actor and the send tool, so it follows the send tool.
@@ -253,15 +247,14 @@ export function buildServerInterfaceDetails({
         };
     }
 
-    const canSend = !hasPaymentProvider && hasSendTool;
-    const facts = buildServerInterfaceFacts(actor, tenancy, operations.length, canSend);
-    const notice = formatCostNotice(facts, hasPaymentProvider);
+    const facts = buildServerInterfaceFacts(actor, tenancy, operations.length, hasSendTool);
+    const notice = formatTenancyBilling(facts);
     const context: SectionContext = {
         actorFullName,
         schema,
         facts,
         formatHeader: (title, lead, operation) =>
-            `${title}\n${notice}\n${canSend ? formatSendExample(actorFullName, lead, operation) : ''}`,
+            `${title}\n${notice}\n${hasSendTool ? formatSendExample(actorFullName, lead, operation) : ''}`,
     };
     if (serverInterface === true) return buildOperationsSection(context, operations);
     const operation = findServerOperation(operations, serverInterface);

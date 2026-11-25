@@ -10,6 +10,7 @@ import {
     TOOL_STATUS,
 } from '../../src/const.js';
 import { ActorLoadError } from '../../src/errors.js';
+import { REDACTION_PLACEHOLDER } from '../../src/resources/api_resources.js';
 import {
     buildCallActorDescription,
     buildCallActorErrorResponse,
@@ -173,13 +174,13 @@ describe('call_actor_common', () => {
             );
         });
 
-        it('forwards the standby payment error message verbatim as a user error', () => {
-            const error = ActorLoadError.standbyPaymentNotSupported('apify/rag-web-browser');
+        it('forwards the server-Actor-without-MCP error message verbatim as a user error', () => {
+            const error = ActorLoadError.serverActorWithoutMcpNotSupported('apify/web-fetch');
 
             const response = buildCallActorErrorResponse({
-                actorName: 'apify/rag-web-browser',
+                actorName: 'apify/web-fetch',
                 error,
-                actorId: 'actor-standby-payment',
+                actorId: 'actor-server-without-mcp',
                 loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
             });
 
@@ -190,12 +191,12 @@ describe('call_actor_common', () => {
                     toolStatus: TOOL_STATUS.SOFT_FAIL,
                     failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
                     failureDetail: error.kind,
-                    actorId: 'actor-standby-payment',
+                    actorId: 'actor-server-without-mcp',
                 }),
             );
         });
 
-        // Only the two standby kinds take the user-error branch. LOAD_FAILED masks a backend fault,
+        // Only the server-Actor-without-MCP kind takes the user-error branch. LOAD_FAILED masks a backend fault,
         // so it must stay on the generic server-error path and keep its INTERNAL_ERROR telemetry.
         it('keeps a LOAD_FAILED Actor load failure on the generic server-error path', () => {
             const error = ActorLoadError.loadFailed('apify/rag-web-browser');
@@ -483,6 +484,22 @@ describe('call_actor_common', () => {
                 failureHttpStatus: 404,
                 failureDetail: "Actor 'apify/missing' was not found",
             });
+        });
+
+        // The name is whatever the caller sent, so one that is not an Actor ID or name can be a pasted secret.
+        it('redacts a name that is not an Actor ID or name in the not-found telemetry detail', async () => {
+            vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [], errors: [] });
+
+            const resolution = await resolveAndValidateActor({
+                actorName: '--header "Authorization: Bearer secret-value"',
+                input: { query: 'x' },
+                toolArgs: stubToolArgs,
+            });
+
+            const { error } = resolution as { error: TextToolResult & { toolTelemetry?: unknown } };
+            expect(error.toolTelemetry).toEqual(
+                expect.objectContaining({ failureDetail: `Actor '${REDACTION_PLACEHOLDER}' was not found` }),
+            );
         });
 
         // Result text has no `hasTool`, so tools.mode_contract.test.ts cannot see it: it renders

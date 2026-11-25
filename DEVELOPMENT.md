@@ -124,7 +124,7 @@ Starts the web widgets builder in watch mode and the MCP server in standby mode 
 Editing `src/web/src/widgets/*.tsx` triggers a hot-reload — the next widget render uses updated code without restarting the server. Adding new widget filenames requires reconnecting the MCP client to pick them up.
 
 - The repo's [`.mcp.json`](./.mcp.json) ships a `dev` entry wired with `Authorization: Bearer ${APIFY_TOKEN}` — `${APIFY_TOKEN}` is populated via [Claude Code setup](#configuring-apify_token-for-claude-code) below.
-- Get your Apify API token from [Apify Console](https://console.apify.com/settings/integrations)
+- Create an Apify API token in [Apify Console](https://console.apify.com/settings/integrations) and copy it right after creating it. It is shown only once.
 - Preview widgets via the local esbuild dev server at `http://localhost:3226/index.html`
 
 The MCP server listens on port `3001`. The HTTP server implementation is in `src/dev_server.ts`. The hosted production server behind [mcp.apify.com](https://mcp.apify.com) is located in the internal Apify repository.
@@ -201,7 +201,7 @@ Marking a case `isDeploymentTest: true` is a one-line edit on its existing defin
 
 This is a real execution decision, not a visibility flag: internal's `isDeploymentTestOnly` `registerCases` call runs as part of its release pipeline — against **staging** when a release PR opens, against **production** when it merges to `master` (real API calls, real Actor runs, billed and user-visible). Mark a case `isDeploymentTest: true` only if it earns that.
 
-Internal also runs the deployment-test cases against a local Apify platform and sets `isLocalPlatform: true` there. A local platform has no Apify Proxy groups (`UNBLOCKER`, `GOOGLE_SERP`), so a case whose Actor needs them takes `skipIf: skipOnLocalPlatform` (the `apify/web-fetch` and `apify/web-search` cases). This repo never sets the flag, so those cases still run here and on internal's staging/prod.
+Internal also runs the deployment-test cases against a local Apify platform and sets `isLocalPlatform: true` there. A local platform has no Apify Proxy groups (`UNBLOCKER`, `GOOGLE_SERP`) and does not provision every Store Actor, so a case whose Actor needs those groups or is missing there takes `skipIf: skipOnLocalPlatform` (the `apify/web-fetch` and `apify/web-search` cases). This repo never sets the flag, so those cases still run here and on internal's staging/prod.
 
 **Tests in this repo** cover the package's MCP and library surface. They live in `tests/test_kit/cases/*.cases.ts` (registered through `tests/integration/suite.ts`) and `tests/unit/`:
 

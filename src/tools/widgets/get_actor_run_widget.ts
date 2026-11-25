@@ -45,7 +45,6 @@ export const getActorRunWidget: ToolEntry = Object.freeze({
     inputSchema: z.toJSONSchema(getActorRunWidgetArgsSchema) as ToolInputSchema,
     outputSchema: actorRunOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorRunWidgetArgsSchema)),
-    paymentRequired: true,
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
         'openai/toolInvocation/invoking': 'Checking Actor run...',

@@ -69,7 +69,6 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
     inputSchema: z.toJSONSchema(getKeyValueStoreRecordArgs) as ToolInputSchema,
     outputSchema: keyValueStoreRecordOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreRecordArgs)),
-    paymentRequired: true,
     annotations: {
         title: 'Get key-value store record',
         readOnlyHint: true,

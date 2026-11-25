@@ -18,6 +18,9 @@ export class InvalidRequestPathError extends UserInputError {
     readonly statusCode = 400;
 }
 
+/** Recorded in telemetry and logs for an `InvalidRequestPathError`: its message quotes the caller's value. */
+export const INVALID_REQUEST_PATH_DETAIL = 'Invalid identifier, record key or request path';
+
 /**
  * Thrown by `compileUntrustedSchema` when an untrusted Actor / proxied-MCP input schema exceeds the byte
  * cap that bounds AJV's synchronous codegen. It's a property of the schema, not a server fault, so
@@ -34,7 +37,6 @@ export class SchemaTooLargeError extends Error {
 export const ACTOR_LOAD_ERROR_KIND = {
     NOT_FOUND: 'not-found',
     LOAD_FAILED: 'load-failed',
-    STANDBY_PAYMENT_NOT_SUPPORTED: 'standby-payment-not-supported',
     SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED: 'server-actor-without-mcp-not-supported',
 } as const;
 export type ActorLoadErrorKind = (typeof ACTOR_LOAD_ERROR_KIND)[keyof typeof ACTOR_LOAD_ERROR_KIND];
@@ -50,8 +52,7 @@ export type ActorLoadErrorKind = (typeof ACTOR_LOAD_ERROR_KIND)[keyof typeof ACT
  * surfaced as `ActorLoadError` of kind `LOAD_FAILED` with a generic masked
  * message — never with the original error's text.
  *
- * Use the static factories so canonical messages stay in one place — the
- * call-time standby guard and the list-time filter both reuse them.
+ * Use the static factories so canonical messages stay in one place.
  */
 export class ActorLoadError extends Error {
     override readonly name = 'ActorLoadError';
@@ -85,15 +86,6 @@ export class ActorLoadError extends Error {
             ACTOR_LOAD_ERROR_KIND.SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED,
             actorName,
             `Actor "${actorName}" has no MCP tools or input interface.`,
-        );
-    }
-
-    static standbyPaymentNotSupported(actorName: string): ActorLoadError {
-        return new ActorLoadError(
-            ACTOR_LOAD_ERROR_KIND.STANDBY_PAYMENT_NOT_SUPPORTED,
-            actorName,
-            `Actor "${actorName}" is a standby Actor, which is not supported in agentic payment mode.` +
-                ' Please use OAuth or direct Apify token authentication in order to use standby Actors.',
         );
     }
 }
