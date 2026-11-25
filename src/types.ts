@@ -14,7 +14,6 @@ import type z from 'zod';
 
 import type { ApifyClient } from './apify_client.js';
 import type { FAILURE_CATEGORY, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
-import type { PaymentProvider, PaymentProviderId } from './payments/types.js';
 import type { ApiMethod } from './tools/api/apify_api_spec.js';
 import type { CATEGORY_NAMES } from './tools/registry.js';
 import type { ToolResponse } from './utils/mcp.js';
@@ -90,7 +89,16 @@ export type ActorDefinitionPruned = Pick<
     /** What the Actor's own tool is built from when it is served through its server interface. */
     webServerToolInfo?: ServerActorToolInfo;
     pictureUrl?: string; // Optional, URL to the Actor's icon/picture
+    /**
+     * Names and types of the fields the Actor declares for items of its default dataset (`reduceToFieldNamesAndTypes`),
+     * e.g. `{ url: { type: 'string' } }`; absent when it declares none or they are too large. A direct Actor tool
+     * advertises them in its `outputSchema`.
+     */
+    datasetItemProperties?: Record<string, unknown>;
 };
+
+/** JSON Schema an Actor declares for the items of its default dataset: the `fields` of its dataset schema. */
+export type DatasetItemsSchema = Record<string, unknown> & { properties: Record<string, unknown> };
 
 /** A selected Server Actor's tool, as `buildServerActorToolInfo` renders it from the API schema. */
 export type ServerActorToolInfo = {
@@ -139,14 +147,6 @@ export const ALL_TOOLS_PRESENT: ToolDescriptionContext = { hasTool: () => true }
 export type ToolBase = z.infer<typeof ToolSchema> & {
     /** AJV validation function for the input schema */
     ajvValidate: ValidateFunction;
-    /** Whether this tool requires payment validation before execution */
-    paymentRequired?: boolean;
-    /**
-     * Whether a third-party payment-provider session is rejected before the call when the Actor named in
-     * `args.actor`, or the fixed Actor of an {@link ActorServerTool}, has Actor Standby enabled; see
-     * `checkPaymentProviderStandbyConflict`.
-     */
-    hasPaymentProviderStandbyCheck?: boolean;
     /**
      * Session-exact description builder for descriptions that reference sibling tools.
      * `description` must hold the {@link ALL_TOOLS_PRESENT} render for consumers without a
@@ -224,13 +224,6 @@ export type ActorTool = ToolBase & {
     actorFullName: string;
     /** Optional memory limit in MB for the Actor execution */
     memoryMbytes?: number;
-    /**
-     * Per-Actor dataset row properties (e.g. `{ url: { type: 'string' } }`) from the actorStore.
-     * Stashed at tools/list time and injected by the executor into
-     * `structuredContent.storages.datasets.default.itemsSchema` so the declared outputSchema
-     * matches the response. Stripped before the public tools/list wire output.
-     */
-    datasetItemsSchema?: Record<string, unknown>;
 };
 
 /**
@@ -238,18 +231,14 @@ export type ActorTool = ToolBase & {
  * no v1 SDK request context or facade reference.
  */
 export type InternalToolArgs = {
-    /** Arguments passed to the tool (payment fields already stripped by the server) */
     args: Record<string, unknown>;
     /** Abort signal for the call: the request signal for sync calls, the cancel-watcher signal for tasks. */
     signal: AbortSignal;
     /** Apify API token */
     apifyToken: string;
-    /** ApifyClient pre-configured with payment headers (if applicable) or standard token. */
     apifyClient: ApifyClient;
-    /** External store for Actor metadata (output schemas); only set in hosted deployments. */
+    /** External store for Actor metadata; only set in hosted deployments. */
     actorStore?: ActorStore;
-    /** Payment provider for agentic payment modes (Skyfire, x402), when configured. */
-    paymentProvider?: PaymentProvider;
     /** Names of all currently loaded tools. */
     loadedToolNames: readonly string[];
     /** IDs of Actors backing all currently loaded Actor / Actor-MCP tools. */
@@ -277,7 +266,7 @@ export type HelperTool = ToolBase & {
     call: (toolArgs: InternalToolArgs) => Promise<ToolResponse>;
     /**
      * Returns the copy of the arguments that is logged, for a tool whose arguments carry secrets. It runs in
-     * `prepareToolCallContext`, before AJV validation, so it must accept any shape and not mutate the
+     * `prepareToolCallContext` (`mcp/tool_call_context.ts`), before AJV validation, so it must accept any shape and not mutate the
      * arguments; it also sees undeclared keys, so build the copy as an allowlist.
      */
     redactArgs?: (args: Record<string, unknown>) => Record<string, unknown>;
@@ -388,7 +377,6 @@ export type ActorStoreList = ActorStoreListOutdated & {
     badge?: string | null;
     categories?: string[];
     currentPricingInfo: ActorRunPricingInfo;
-    isWhiteListedForAgenticPayments?: boolean;
     notice?: string | null;
     userFullName?: string;
     /** Populated when the search call is made with `includeInputSchema=true`. */
@@ -444,7 +432,7 @@ export type PromptBase = Prompt & {
 /**
  * Apify token type.
  *
- * Can be null or undefined when a payment provider allows unauthenticated access.
+ * Can be null or undefined when the session has no token (e.g. `allowUnauthMode`).
  */
 export type ApifyToken = string | null | undefined;
 
@@ -472,8 +460,6 @@ export type ToolCallTelemetryProperties = {
     transport_type: string;
     /** Raw `?client=` URL query-param value, when the connecting request carried one. */
     mcp_url_client: string;
-    /** Payment provider the connection was opened with (`?payment=`), absent without one. Marks the mode, not that this call was paid. */
-    payment_provider?: PaymentProviderId;
     tool_name: string;
     tool_status: ToolStatus;
     tool_exec_time_ms: number;
@@ -619,9 +605,7 @@ export type ActorExecutionParams = {
     actorFullName: string;
     /** Actor's platform ID — echoed into telemetry on a platform input-validation error. */
     actorId?: string;
-    /** Input to pass to the Actor (payment fields already stripped) */
     input: Record<string, unknown>;
-    /** Apify client (may include payment headers) */
     apifyClient: ApifyClient;
     /** Call options forwarded to apifyClient.actor(...).start(input, callOptions) */
     callOptions: {
@@ -637,11 +621,6 @@ export type ActorExecutionParams = {
     abortSignal?: AbortSignal;
     /** MCP session ID for logging */
     mcpSessionId?: string;
-    /**
-     * Per-Actor dataset row properties from {@link ActorTool.datasetItemsSchema}. Forwarded
-     * by the request handler so the executor can inject `itemsSchema` into the response.
-     */
-    datasetItemsSchema?: Record<string, unknown>;
     /**
      * When true, the call is wrapped in an MCP task. The executor ignores the LLM-provided
      * `waitSecs` and waits until the run reaches a terminal status — honoring `waitSecs` in
@@ -673,37 +652,8 @@ export type ActorExecutor = {
 
 /**
  * External store for Actor metadata that can be injected by the hosting environment.
- * Provides access to Actor output schemas inferred from historical run data.
- * When not provided, tools use generic output schemas without field-level detail.
  */
 export type ActorStore = {
-    /**
-     * Returns the inferred JSON Schema `properties` object for an Actor's dataset items, e.g.:
-     * `{ url: { type: 'string' }, price: { type: 'number' } }`
-     *
-     * Converts the result of {@link ActorStore.getActorOutputSchemaAsTypeObject} — same source
-     * (historical successful runs) and same null contract.
-     *
-     * @param actorFullName - Full Actor name in "username/name" format (e.g., "apify/rag-web-browser")
-     */
-    getActorOutputSchema(actorFullName: string): Promise<Record<string, unknown> | null>;
-
-    /**
-     * Returns the inferred output schema as a simplified type object for an Actor's dataset items,
-     * based on historical successful runs.
-     *
-     * The returned object uses a compact type representation, e.g.:
-     * `{ url: "string", price: "number", tags: ["string"], user: { name: "string" } }`
-     *
-     * This is the core method that performs cache lookup, API resolution, and MongoDB queries.
-     * Results are cached with TTL to avoid repeated database queries.
-     *
-     * Returns null if no schema is available (e.g., new Actor with no runs).
-     *
-     * @param actorFullName - Full Actor name in "username/name" format (e.g., "apify/rag-web-browser")
-     */
-    getActorOutputSchemaAsTypeObject(actorFullName: string): Promise<Record<string, unknown> | null>;
-
     /** Returns the Actor picture URL via the image proxy (CORS-enabled). Without it, the Store search is used. */
     getProxiedPictureUrl?(pictureUrl: string): string;
 };
@@ -722,17 +672,11 @@ export type ActorsMcpServerOptions = {
      */
     taskStore?: TaskStore;
     /**
-     * External store for Actor metadata (output schemas).
-     * When provided, Actor tools will have enriched output schemas with field-level detail.
+     * External store for Actor metadata (proxied picture URLs).
      * Only used by the streamable HTTP transport in hosted deployments.
      */
     actorStore?: ActorStore;
     setupSigintHandler?: boolean;
-    /**
-     * Payment provider for agentic payment modes (e.g., Skyfire, x402).
-     * When set, enables payment-gated tool execution.
-     */
-    paymentProvider?: PaymentProvider;
     /**
      * Allow unauthenticated mode - tools can be called without an Apify API token.
      * This is primarily used for making documentation tools available without authentication.

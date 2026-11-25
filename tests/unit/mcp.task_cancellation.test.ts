@@ -21,7 +21,6 @@ import {
     makePaymentRequiredError,
     makePermissionApprovalError,
     withServer,
-    X402_PAYMENT_DATA,
 } from './helpers/mcp_server.js';
 
 /**
@@ -140,7 +139,7 @@ describe('executeToolAndUpdateTask()', () => {
     });
 
     it('stores no result when a 402 lands after the task was cancelled', async () => {
-        const properties = await runCancelledTask({ error: makePaymentRequiredError(X402_PAYMENT_DATA) });
+        const properties = await runCancelledTask({ error: makePaymentRequiredError() });
 
         expect(properties.tool_status).toBe(TOOL_STATUS.ABORTED);
     });

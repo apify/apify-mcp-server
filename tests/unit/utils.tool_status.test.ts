@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { FAILURE_CATEGORY, RESOURCE_ID_OR_NAME_MAX_LENGTH, TOOL_STATUS } from '../../src/const.js';
+import { INVALID_REQUEST_PATH_DETAIL, InvalidRequestPathError } from '../../src/errors.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from '../../src/mcp/tool_call_error_mapper.js';
 import { buildStartRunResponse } from '../../src/tools/actors/actor_run_response.js';
 import {
@@ -116,6 +117,19 @@ describe('buildExecutionDiagnostics', () => {
         expect(toolStatus).toBe(TOOL_STATUS.FAILED);
         expect(callDiagnostics.failure_http_status).toBe(500);
         expect(callDiagnostics.failure_detail).toBe('server exploded');
+    });
+
+    // The message of this error quotes the identifier the caller sent, which can be a pasted secret.
+    it('records a fixed failure_detail for an invalid identifier or request path', () => {
+        const { callDiagnostics } = buildExecutionDiagnostics({
+            error: new InvalidRequestPathError('Invalid Actor ID or name "Bearer secret-value"'),
+            isAborted: false,
+            actorName: undefined,
+            actorId: undefined,
+        });
+
+        expect(callDiagnostics.failure_detail).toBe(INVALID_REQUEST_PATH_DETAIL);
+        expect(callDiagnostics.failure_http_status).toBe(400);
     });
 
     it('omits failure_http_status when the error carries no HTTP status', () => {

@@ -10,6 +10,7 @@ import {
     RESOURCE_ID_OR_NAME_MAX_LENGTH,
     TOOL_STATUS,
 } from '../const.js';
+import { INVALID_REQUEST_PATH_DETAIL, InvalidRequestPathError } from '../errors.js';
 import type { RunResponse } from '../tools/actors/actor_run_response.js';
 import type {
     AjvErrorDetails,
@@ -150,7 +151,10 @@ export function buildExecutionDiagnostics(params: ExecutionDiagnosticsParams): {
 } {
     const { error, isAborted, actorName, actorId } = params;
     const httpStatus = getHttpStatusCode(error);
-    const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
+    const failureDetail =
+        error instanceof InvalidRequestPathError
+            ? INVALID_REQUEST_PATH_DETAIL
+            : (error instanceof Error ? error.message : String(error)).slice(0, 200);
     return {
         toolStatus: getToolStatusFromError(error, isAborted),
         callDiagnostics: {

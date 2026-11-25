@@ -13,12 +13,7 @@ import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from '../../src/mcp/to
 import type { CallDiagnostics } from '../../src/types.js';
 import { ACTOR_RUN_LIMIT_MESSAGE } from '../../src/utils/apify_errors.js';
 import { getToolCallErrorUserText } from '../../src/utils/mcp.js';
-import {
-    makePaymentRequiredError,
-    makePermissionApprovalError,
-    PERMISSION_HTTP_STATUS,
-    X402_PAYMENT_DATA,
-} from './helpers/mcp_server.js';
+import { makePaymentRequiredError, makePermissionApprovalError, PERMISSION_HTTP_STATUS } from './helpers/mcp_server.js';
 
 const TOOL_NAME = 'test-tool';
 const ACTOR_NAME = 'apify/web-scraper';
@@ -45,7 +40,7 @@ type Case = {
 
 const CASES: Case[] = [
     {
-        label: '402 payment-required without payment data',
+        label: '402 payment-required',
         makeError: () => makePaymentRequiredError(),
         kind: TOOL_CALL_ERROR_KIND.PAYMENT,
         toolStatus: TOOL_STATUS.SOFT_FAIL,
@@ -56,27 +51,6 @@ const CASES: Case[] = [
             actor_id: ACTOR_ID,
         },
         response: { content: [{ type: 'text', text: 'Payment required' }], isError: true },
-    },
-    {
-        label: '402 payment-required with an x402 payload',
-        makeError: () => makePaymentRequiredError(X402_PAYMENT_DATA),
-        kind: TOOL_CALL_ERROR_KIND.PAYMENT,
-        toolStatus: TOOL_STATUS.SOFT_FAIL,
-        callDiagnostics: {
-            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-            failure_http_status: 402,
-            actor_name: ACTOR_NAME,
-            actor_id: ACTOR_ID,
-        },
-        // Payment clients parse both carriers — pin the exact x402 shape.
-        response: {
-            content: [
-                { type: 'text', text: JSON.stringify(X402_PAYMENT_DATA) },
-                { type: 'text', text: 'Payment required to run this Actor or access this resource.' },
-            ],
-            isError: true,
-            structuredContent: X402_PAYMENT_DATA,
-        },
     },
     {
         label: 'permission-approval',

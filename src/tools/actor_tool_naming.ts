@@ -82,16 +82,6 @@ export function resolveActorTenancy(actor: Pick<Actor, 'actorStandby'>): ActorTe
     return actor.actorStandby?.tenancy === 'MULTI_TENANT' ? ACTOR_TENANCY.MULTI_TENANT : ACTOR_TENANCY.SINGLE_TENANT;
 }
 
-/**
- * Whether this Actor must be excluded from tool surfaces and rejected on
- * `call-actor` when the session uses a third-party payment provider (x402, Skyfire).
- * List-time filtering in `getActorsAsTools` and the call-time guard in
- * `checkPaymentProviderStandbyConflict` must use this — not MCP URL presence alone.
- */
-export function isActorBlockedUnderPaymentProvider(actor: Pick<ActorInfo['actor'], 'actorStandby'>): boolean {
-    return actor.actorStandby?.isEnabled === true;
-}
-
 /** Splits an Actor full name; a missing slash yields a null username. */
 export function parseActorFullName(actorFullName: string): { escapedUsername: string | null; actorName: string } {
     const slashIndex = actorFullName.indexOf('/');
@@ -133,9 +123,12 @@ export function getToolSchemaID(actorName: string): string {
     return `https://apify.com/mcp/${actorNameToToolName(actorName)}/schema.json`;
 }
 
-/** `?client=claude` is the Claude connector URL; the only client whose add-a-server flow has a name. */
+/**
+ * `?client=claude` is the Claude connector URL; the only client whose add-a-server flow has a name.
+ * Matches any tag containing `claude` (e.g. `apify-web-hero-claude`), except `claude-code`, which has no connector.
+ */
 export function isClaudeClient(clientParam?: string): boolean {
-    return clientParam === 'claude';
+    return !!clientParam?.includes('claude') && !clientParam.includes('claude-code');
 }
 
 /** How to get an Actor this session cannot run. Tool results use the neutral wording; descriptions and instructions see `clientParam`. */

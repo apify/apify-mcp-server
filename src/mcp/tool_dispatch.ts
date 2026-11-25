@@ -6,7 +6,6 @@ import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
-import type { PaymentProvider } from '../payments/types.js';
 import { canRunActor } from '../tools/actor_tool_naming.js';
 import { actorExecutor } from '../tools/actors/actor_executor.js';
 import type { ActorStore, CallDiagnostics, ToolEntry, ToolStatus } from '../types.js';
@@ -55,7 +54,6 @@ export async function dispatchToolCall(params: {
     sendNotification: (notification: ServerNotification) => Promise<void>;
     emitLog: (msg: { level: string; data?: unknown }) => Promise<void>;
     actorStore?: ActorStore;
-    paymentProvider?: PaymentProvider;
     /** The live tool registry; tool args derive `loadedToolNames` from it at call time. */
     tools: Map<string, ToolEntry>;
     actorName?: string;
@@ -79,7 +77,6 @@ export async function dispatchToolCall(params: {
         sendNotification,
         emitLog,
         actorStore,
-        paymentProvider,
         tools,
         actorName,
         actorId,
@@ -114,7 +111,6 @@ export async function dispatchToolCall(params: {
                     apifyToken,
                     apifyClient,
                     actorStore,
-                    paymentProvider,
                     loadedToolNames,
                     loadedActorIds,
                     progressTracker,
@@ -264,7 +260,6 @@ export async function dispatchToolCall(params: {
                     progressTracker,
                     abortSignal: signal,
                     mcpSessionId,
-                    datasetItemsSchema: tool.datasetItemsSchema,
                     taskMode,
                     canRunTipActor: (recommendedActorId) =>
                         canRunActor(recommendedActorId, loadedToolNames, loadedActorIds),

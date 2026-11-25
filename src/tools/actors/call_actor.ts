@@ -13,10 +13,8 @@ import {
     RESOURCE_ID_OR_NAME_MAX_LENGTH,
 } from '../../const.js';
 import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
-import type { PaymentProvider } from '../../payments/types.js';
-import { maskLoggedInputs, pickLoggedValues, REDACTED } from '../../resources/api_resources.js';
+import { maskLoggedInputs, pickLoggedValues, REDACTION_PLACEHOLDER } from '../../resources/api_resources.js';
 import type {
-    ApifyToken,
     InternalToolArgs,
     ToolDescriptionContext,
     ToolEntry,
@@ -24,7 +22,12 @@ import type {
     ValidationInputChange,
 } from '../../types.js';
 import { ACTOR_TOOL_MODE, ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
-import { getActorDefinitionCached, getActorToolResolutionCached } from '../../utils/actor.js';
+import { getActorToolResolutionCached } from '../../utils/actor.js';
+import {
+    fixActorNameInput,
+    getMcpToolNameSuffixIndex,
+    normalizeActorNameInput,
+} from '../../utils/actor_name_normalization.js';
 import { compileSchema, getValidationInputChange } from '../../utils/ajv.js';
 import {
     ACTOR_RUN_LIMIT_MESSAGE,
@@ -34,6 +37,7 @@ import {
     isMemoryQuotaError,
     isPermissionApprovalError,
 } from '../../utils/apify_errors.js';
+import { isValidResourceId } from '../../utils/apify_resource_id.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { wrapJsonText } from '../../utils/encode_text.js';
 import { logHttpError } from '../../utils/logging.js';
@@ -47,7 +51,7 @@ import {
 import { buildPermissionApprovalTexts } from '../../utils/payment_errors.js';
 import { classifyFailureCategory, extractAjvErrorDetails } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
-import { findServerTool, getOwnServerRemedy, isActorBlockedUnderPaymentProvider } from '../actor_tool_naming.js';
+import { findServerTool, getOwnServerRemedy } from '../actor_tool_naming.js';
 import { isRecord } from '../api/apify_api_spec.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
 import { actorRunOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
@@ -57,13 +61,7 @@ import {
     CALL_ACTOR_WAIT_SECS_DEFAULT,
     fetchActorRunData,
 } from './actor_run_response.js';
-import {
-    EMPTY_ACTOR_NAME_MESSAGE,
-    fixActorNameInput,
-    getActorsAsTools,
-    getMcpToolNameSuffixIndex,
-    normalizeActorNameInput,
-} from './actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE, getActorsAsTools } from './actor_tools_factory.js';
 
 // ---------------------------------------------------------------------------
 // Shared call-actor description building blocks
@@ -180,14 +178,13 @@ export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOL
  */
 function respondStandbyRejection(
     error: ActorLoadError,
-    opts: { mcpSessionId?: string; actorId?: string; paymentProviderId?: string },
+    opts: { mcpSessionId?: string; actorId?: string },
 ): ToolResponse {
     log.softFail('Rejecting a tool call for an unsupported standby Actor', {
         // The error's canonical Actor name, not the caller's identifier, which may be an Actor ID.
         // `actorLoadErrorKind` distinguishes which cell rejected it.
         actorName: error.actorName,
         mcpSessionId: opts.mcpSessionId,
-        paymentProviderId: opts.paymentProviderId,
         actorLoadErrorKind: error.kind,
         failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
     });
@@ -207,7 +204,11 @@ function respondActorNotFound(actorName: string, loadedToolNames: readonly strin
             Actor '${actorName}' was not found.
             Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
         ` + recovery,
-        { httpStatus: 404, detail: `Actor '${actorName}' was not found` },
+        // Best effort: a name that is not shaped like an Actor ID or name can be a pasted secret.
+        {
+            httpStatus: 404,
+            detail: `Actor '${isValidResourceId(actorName) ? actorName : REDACTION_PLACEHOLDER}' was not found`,
+        },
     );
 }
 
@@ -228,13 +229,11 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         });
     }
 
-    // These two kinds (a server Actor without MCP, and a standby Actor under a payment provider) are sanitized,
-    // user-facing reasons: forward them verbatim instead of wrapping them in the generic server-error text.
-    // LOAD_FAILED masks a backend fault and stays below.
+    // A server Actor without MCP is a sanitized, user-facing reason: forward it verbatim instead of wrapping it in the
+    // generic server-error text. LOAD_FAILED masks a backend fault and stays below.
     if (
         error instanceof ActorLoadError &&
-        (error.kind === ACTOR_LOAD_ERROR_KIND.SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED ||
-            error.kind === ACTOR_LOAD_ERROR_KIND.STANDBY_PAYMENT_NOT_SUPPORTED)
+        error.kind === ACTOR_LOAD_ERROR_KIND.SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED
     ) {
         return respondStandbyRejection(error, { mcpSessionId, actorId });
     }
@@ -354,7 +353,7 @@ export function redactCallActorArgs(args: Record<string, unknown>, keys: readonl
         ...(callOptions !== undefined && {
             callOptions: isRecord(callOptions)
                 ? pickLoggedValues(callOptions, Object.keys(callOptionsSchema.shape))
-                : REDACTED,
+                : REDACTION_PLACEHOLDER,
         }),
     };
 }
@@ -363,49 +362,6 @@ export function redactCallActorArgs(args: Record<string, unknown>, keys: readonl
  * Parsed call-actor arguments.
  */
 export type CallActorParsedArgs = z.infer<typeof callActorArgs>;
-
-/**
- * Returns a rejection MCP response when the requested Actor is a standby
- * (or MCP-server) Actor AND the session uses a third-party payment provider.
- * Otherwise returns `null`.
- *
- * Standby Actors cannot be paid for via x402 / Skyfire — calling them in
- * payment mode is a hard input error, so this guard must run BEFORE the
- * generic payment-required short-circuit in the tool-call handler so the
- * agent receives the precise reason instead of a generic 402.
- *
- * Uses `actorDefinitionCache` — one definition fetch on a cold cache.
- */
-export async function checkPaymentProviderStandbyConflict(params: {
-    tool: ToolEntry;
-    args: Record<string, unknown>;
-    paymentProvider: PaymentProvider | undefined;
-    apifyToken: ApifyToken;
-    mcpSessionId?: string;
-}): Promise<Record<string, unknown> | null> {
-    const { tool, args, paymentProvider, apifyToken, mcpSessionId } = params;
-    if (!paymentProvider || !tool.hasPaymentProviderStandbyCheck) return null;
-    // A Server Actor's own tool takes no `actor` argument: its Actor is fixed.
-    const actorName = tool.type === TOOL_TYPE.ACTOR_SERVER ? tool.actorFullName : args.actor;
-    if (typeof actorName !== 'string' || !actorName) return null;
-
-    const normalizedActorName = fixActorNameInput(actorName);
-
-    // Token-based client — payment headers are only relevant for actual Actor runs.
-    const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
-    const actorDefinitionWithInfo = await getActorDefinitionCached(normalizedActorName, apifyClientForDefinition);
-    if (!actorDefinitionWithInfo) {
-        return null;
-    }
-
-    if (!isActorBlockedUnderPaymentProvider(actorDefinitionWithInfo.info)) {
-        return null;
-    }
-
-    // Canonical name, not the caller's identifier, which may be an Actor ID.
-    const error = ActorLoadError.standbyPaymentNotSupported(actorDefinitionWithInfo.definition.actorFullName);
-    return respondStandbyRejection(error, { mcpSessionId, paymentProviderId: paymentProvider.id });
-}
 
 /** Rejection for an MCP server Actor with no input schema: there is nothing to run. */
 function respondMcpServerActor(actorFullName: string, loadedToolNames: readonly string[]): ToolResponse {
@@ -417,7 +373,7 @@ function respondMcpServerActor(actorFullName: string, loadedToolNames: readonly 
     });
 }
 
-/** Rejects removed MCP call syntax before Actor or payment metadata is fetched. */
+/** Rejects removed MCP call syntax before Actor metadata is fetched. */
 export function buildLegacyMcpSyntaxRejection(
     toolName: string,
     actor: unknown,
@@ -451,11 +407,8 @@ export async function resolveAndValidateActor(params: {
     });
 
     // NOT_FOUND falls through to the structured "Actor not found" response below.
-    // Any other error (LOAD_FAILED / STANDBY_PAYMENT_NOT_SUPPORTED /
-    // SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED) is rethrown so the outer call-actor handler reports it.
-    // STANDBY_PAYMENT_NOT_SUPPORTED cannot actually appear here: the call above passes no
-    // `paymentProvider`, so `getActorsAsTools`' payment gate never fires. Kept in the list because
-    // the rethrow is keyed on "not NOT_FOUND", not on an enumeration of kinds.
+    // Any other error (LOAD_FAILED / SERVER_ACTOR_WITHOUT_MCP_NOT_SUPPORTED) is rethrown so the outer call-actor
+    // handler reports it.
     if (errors[0] && errors[0].kind !== ACTOR_LOAD_ERROR_KIND.NOT_FOUND) {
         throw errors[0];
     }
@@ -547,9 +500,6 @@ export async function callActorPreExecute(
     const actorName = fixActorNameInput(parsedArgs.actor);
     if (!actorName) return { earlyResponse: respondUserError(EMPTY_ACTOR_NAME_MESSAGE) };
 
-    // For definition resolution we always use a token-based client; payment provider is only for actual Actor runs.
-    // Standby/MCP-server Actors under a third-party payment provider are rejected upstream by
-    // `checkPaymentProviderStandbyConflict` — see src/mcp/tool_call_engine.ts.
     const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
     const resolution = await getActorToolResolutionCached(actorName, apifyClientForDefinition);
 
@@ -669,8 +619,6 @@ export const callActor: ToolEntry = Object.freeze({
     inputSchema: callActorInputSchema,
     outputSchema: actorRunOutputSchema,
     ajvValidate: callActorAjvValidate,
-    paymentRequired: true,
-    hasPaymentProviderStandbyCheck: true,
     actorInterface: 'input',
     redactArgs: (args: Record<string, unknown>) => redactCallActorArgs(args, Object.keys(callActorArgs.shape)),
     annotations: {

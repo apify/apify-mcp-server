@@ -4,7 +4,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { gzipSync } from 'node:zlib';
 
 import Ajv from 'ajv';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import {
@@ -32,9 +32,9 @@ import type {
     ServerActorToolInfo,
     ToolTelemetryContext,
 } from '../../src/types.js';
-import { ACTOR_TENANCY, SERVER_MODE } from '../../src/types.js';
+import { ACTOR_TENANCY } from '../../src/types.js';
 import { mockActor } from './helpers/actor_build_client.js';
-import { getRequestHandler, makePaymentProvider, withServer } from './helpers/mcp_server.js';
+import { getRequestHandler, withServer } from './helpers/mcp_server.js';
 import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
@@ -277,6 +277,14 @@ beforeAll(async () => {
     standbyUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     seedActor(SERVER_ACTOR);
 });
+
+// A loopback Server Actor URL is accepted only with a local API, as in local development.
+beforeEach(() => {
+    vi.stubEnv('APIFY_API_BASE_URL', 'http://localhost:3333');
+    vi.stubEnv('APIFY_IS_AT_HOME', '');
+});
+
+afterEach(() => vi.unstubAllEnvs());
 
 afterAll(async () => {
     server.closeAllConnections();
@@ -907,52 +915,22 @@ describe('rejecting a call before sending', () => {
         const result = await callTool({ actor: 'apify/no-standby-url', path: '/echo' });
 
         expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain('has no valid Actor Server URL');
         expect(result.toolTelemetry).toMatchObject({ toolStatus: TOOL_STATUS.FAILED });
         expect(received).toHaveLength(0);
     });
 
-    it('rejects a payment-provider session before any request reaches the Actor server', async () => {
+    it('sends nothing to a Server Actor URL outside the Server Actor domain', async () => {
         const received = recordRequests();
-        const result = await dispatchTool({ method: 'GET' }, { paymentProvider: makePaymentProvider() });
+        // With the platform API, the local server's loopback URL is outside the Server Actor domain.
+        vi.stubEnv('APIFY_API_BASE_URL', 'https://api.apify.com');
+
+        const result = await callTool({ path: '/echo' });
 
         expect(result.isError).toBe(true);
-        expect((result.content as { text: string }[])[0].text).toContain('is not supported in agentic payment mode');
+        expect(result.content[0].text).toContain(`Actor '${SERVER_ACTOR}'`);
+        expect(result.content[0].text).toContain('has no valid Actor Server URL');
         expect(received).toHaveLength(0);
-    });
-
-    it('is not listed in a payment-provider session, even when requested by name', async () => {
-        const listRequestedTools = async (options: Parameters<typeof withServer>[1]) =>
-            withServer(
-                async (server) => {
-                    await server.loadToolsFromInput(
-                        { tools: ['actors', HELPER_TOOLS.ACTOR_SERVER_REQUEST] },
-                        mockApifyClient(),
-                    );
-                    return server.listToolNames();
-                },
-                { serverMode: SERVER_MODE.DEFAULT, ...options },
-            );
-
-        expect(await listRequestedTools({})).toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
-        expect(await listRequestedTools({ paymentProvider: makePaymentProvider() })).not.toContain(
-            HELPER_TOOLS.ACTOR_SERVER_REQUEST,
-        );
-    });
-
-    it.each(['x402', 'skyfire'] as const)('is not listed in a default %s session', async (providerId) => {
-        const listDefaultTools = async (options: Parameters<typeof withServer>[1]) =>
-            withServer(
-                async (server) => {
-                    await server.loadToolsFromInput({}, mockApifyClient());
-                    return server.listToolNames();
-                },
-                { serverMode: SERVER_MODE.DEFAULT, ...options },
-            );
-
-        expect(await listDefaultTools({})).toContain(HELPER_TOOLS.ACTOR_SERVER_REQUEST);
-        expect(await listDefaultTools({ paymentProvider: makePaymentProvider(providerId) })).not.toContain(
-            HELPER_TOOLS.ACTOR_SERVER_REQUEST,
-        );
     });
 });
 
@@ -1063,17 +1041,6 @@ describe("a selected Server Actor's own tool", () => {
             { token: TOKEN, ...options },
         );
     }
-
-    it('rejects a payment-provider session before any request, even when the tool was listed', async () => {
-        const received = recordRequests();
-
-        // Upserted directly, as a loader without the provider or the pre-initialize path of auto mode does.
-        const result = await callOwnTool({ path: '/echo', body: { a: 1 } }, { paymentProvider: makePaymentProvider() });
-
-        expect(result.isError).toBe(true);
-        expect((result.content as { text: string }[])[0].text).toContain('is not supported in agentic payment mode');
-        expect(received).toHaveLength(0);
-    });
 
     it('sends the request to its Actor through the same execution, filling a single method', async () => {
         const received = recordRequests();

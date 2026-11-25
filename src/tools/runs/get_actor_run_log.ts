@@ -33,7 +33,6 @@ USAGE EXAMPLES:
     inputSchema: z.toJSONSchema(GetRunLogArgs) as ToolInputSchema,
     outputSchema: getActorRunLogToolOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(GetRunLogArgs)),
-    paymentRequired: true,
     annotations: {
         title: 'Get Actor run log',
         readOnlyHint: true,

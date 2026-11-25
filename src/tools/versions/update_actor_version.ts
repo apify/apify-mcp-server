@@ -178,6 +178,9 @@ const MAX_INDEX_OF_PATTERN_LENGTH = 250;
  * https://en.wikipedia.org/wiki/Knuth%E2%80%93Morris%E2%80%93Pratt_algorithm
  */
 function findMatchOffsets(text: string, pattern: string): [] | [number] | [number, number] {
+    // No match is possible, and this keeps the table below within the length of a file: the caller's oldText has no
+    // length limit of its own.
+    if (pattern.length > text.length) return [];
     if (pattern.length <= MAX_INDEX_OF_PATTERN_LENGTH) {
         const offset = text.indexOf(pattern);
         if (offset === -1) return [];

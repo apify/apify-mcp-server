@@ -24,7 +24,6 @@ import { ProxyAgent } from 'proxy-agent';
 
 import { API_PUBLIC_BASE_URL, API_PUBLIC_BASE_URL_STAGING, MAX_INLINE_BYTES, STAGING_MCP_HOSTNAME } from './const.js';
 import { InvalidRequestPathError } from './errors.js';
-import type { PaymentHeaders } from './payments/types.js';
 import { assertValidRecordKey, assertValidResourceId } from './utils/apify_resource_id.js';
 
 // Appended to the client's User-Agent via apify-client's userAgentSuffix option.
@@ -145,8 +144,6 @@ function getForwardedApiHeaders(
 
 type ExtendedApifyClientOptions = Omit<ApifyClientOptions, 'token'> & {
     token?: string | null | undefined;
-    /** Payment headers to forward on outbound API requests (from PaymentProvider.getPaymentHeaders) */
-    paymentHeaders?: PaymentHeaders;
     /** Value for the X-Apify-Request-Origin header. Defaults to MCP. */
     requestOrigin?: REQUEST_ORIGIN;
 };
@@ -189,11 +186,9 @@ export class ApifyClient extends _ApifyClient {
             delete options.token;
         }
 
-        const { paymentHeaders, requestOrigin, ...clientOptions } = options;
-        // Static headers: request origin plus any payment headers from a PaymentProvider.
+        const { requestOrigin, ...clientOptions } = options;
         const staticHeaders = {
             [REQUEST_ORIGIN_HEADER]: requestOrigin ?? REQUEST_ORIGIN.MCP,
-            ...paymentHeaders,
         };
 
         // Explicit baseUrl wins over env default.
@@ -276,7 +271,7 @@ export class ApifyClient extends _ApifyClient {
 
 /**
  * Sends one request, with no retries, through apify-client's axios instance, which adds the token and the
- * request-origin and payment headers. Check the URL first, with `isApifyApiUri` (`resources/api_resources.ts`)
+ * request-origin header. Check the URL first, with `isApifyApiUri` (`resources/api_resources.ts`)
  * for the API or against the Actor's standby origin (`tools/actors/send_server_actor_request.ts`), and the
  * status after: a non-2xx response resolves, and so does a 3xx with `maxRedirects: 0`. It skips
  * `httpClient.call()`, which retries (a write could apply twice, and a body over the size cap is downloaded

@@ -219,7 +219,6 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
 
         this.promptService = createPromptService(prompts);
         this.resourceService = createResourceService({
-            paymentProvider: this.options.paymentProvider,
             getMode: () => this.serverMode,
             getAvailableWidgets: () => this.availableWidgets,
         });
@@ -333,8 +332,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         const tools = new Map<string, ToolEntry>();
         for (const source of this.toolSources.values()) {
             for (const tool of this.composeToolsForClient(source, view)) {
-                const stored = this.toStoredTool(tool);
-                tools.set(stored.name, stored);
+                tools.set(tool.name, tool);
             }
         }
 
@@ -344,7 +342,6 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
             clientContext,
             tools,
             resourceService: createResourceService({
-                paymentProvider: this.options.paymentProvider,
                 getMode: () => serverMode,
                 getAvailableWidgets: () => availableWidgets,
             }),
@@ -366,17 +363,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      * report-problem opt-in in `source.input` applies to every request reusing the source.
      */
     private composeToolsForClient(source: ToolSource, view: ServingContext): ToolEntry[] {
-        let tools = getToolsForServerMode(source.input, source.actorTools, view.serverMode);
-        // A payment provider cannot pay for an Actor Server or MCP server run, so every call would be rejected.
-        if (this.options.paymentProvider) {
-            tools = tools.filter(
-                (tool) =>
-                    tool.name !== HELPER_TOOLS.ACTOR_SERVER_REQUEST &&
-                    tool.name !== HELPER_TOOLS.ACTOR_MCP_TOOL_CALL &&
-                    tool.name !== HELPER_TOOLS.ACTOR_MCP_TOOL_LIST &&
-                    tool.type !== TOOL_TYPE.ACTOR_SERVER,
-            );
-        }
+        const tools = getToolsForServerMode(source.input, source.actorTools, view.serverMode);
         const served = this.isReportProblemServable(view, source.input)
             ? tools
             : tools.filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT);
@@ -488,10 +475,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         if (missingToolNames.length === 0) return;
 
         const restoreInput = toolNamesToInput(missingToolNames);
-        const actorTools = await getActors(restoreInput, apifyClient, {
-            actorStore: this.actorStore,
-            paymentProvider: this.options.paymentProvider,
-        });
+        const actorTools = await getActors(restoreInput, apifyClient);
 
         this.registerFetchedActorTools(restoreInput, actorTools);
     }
@@ -499,10 +483,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     /** Load tools from URL params. Used by SSE and HTTP entry points. */
     public async loadToolsFromUrl(url: string, apifyClient: ApifyClient) {
         const input = parseInputParamsFromUrl(url);
-        const actorTools = await getActors(input, apifyClient, {
-            actorStore: this.actorStore,
-            paymentProvider: this.options.paymentProvider,
-        });
+        const actorTools = await getActors(input, apifyClient);
 
         log.debug('Loading tools from query parameters');
         this.registerFetchedActorTools(input, actorTools);
@@ -514,10 +495,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      * InitializeResult; the queue buffers already-fetched data, not network work. See #721.
      */
     public async loadToolsFromInput(input: Input, apifyClient: ApifyClient): Promise<void> {
-        const actorTools = await getActors(input, apifyClient, {
-            actorStore: this.actorStore,
-            paymentProvider: this.options.paymentProvider,
-        });
+        const actorTools = await getActors(input, apifyClient);
         this.registerFetchedActorTools(input, actorTools);
     }
 
@@ -530,30 +508,24 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         // Client gating happens earlier, in composeToolsForClient. Do not filter here: this is a
         // low-level commit point reached before the client is known too.
         for (const tool of tools) {
-            const stored = this.toStoredTool(tool);
-            this.tools.set(stored.name, stored);
+            this.tools.set(tool.name, tool);
         }
         return tools;
-    }
-
-    private toStoredTool(tool: ToolEntry): ToolEntry {
-        return this.options.paymentProvider ? this.options.paymentProvider.decorateToolSchema(tool) : tool;
     }
 
     /**
      * Token sources in order: per-request `_meta.apifyToken` (stdio inline) > server-instance
      * option (set by the transport from `Authorization` header or stdio env). No env fallback:
-     * dev_server / production must extract the token from request headers so payment
-     * mode (no token) behaves identically to production.
+     * dev_server / production must extract the token from request headers, so a request without
+     * one behaves identically to production.
      */
     public resolveApifyToken(meta?: ApifyRequestParams['_meta']): string | undefined {
         return meta?.apifyToken || this.options.token;
     }
 
     /**
-     * Token-scoped client for resources/read (the API proxy needs auth). Deliberately token-only:
-     * unlike the CallTool path it does NOT forward provider/payment headers, so a payment-only
-     * session (x402/Skyfire, no Apify token) has no client and every read fails by design.
+     * Token-scoped client for resources/read (the API proxy needs auth). A session without an Apify
+     * token has no client and every read fails by design.
      * Still carries the request-origin tag from the client context captured by this point.
      */
     public resolveApifyClient(params: ApifyRequestParams): ApifyClient | undefined {

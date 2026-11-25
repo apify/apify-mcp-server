@@ -15,7 +15,6 @@ import type { ALLOWED_TASK_TOOL_EXECUTION_MODES } from '../../../src/const.js';
 import { APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED } from '../../../src/const.js';
 import { ActorsMcpServer } from '../../../src/mcp/server.js';
 import { createStatelessServer } from '../../../src/mcp/stateless_server.js';
-import type { PaymentProvider, PaymentProviderId } from '../../../src/payments/types.js';
 import { RESOURCE_MIME_TYPE } from '../../../src/resources/widgets.js';
 import type { ActorsMcpServerOptions, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../../src/types.js';
 import { TOOL_TYPE } from '../../../src/types.js';
@@ -224,23 +223,8 @@ export function listStatelessHandlerMethods(server: StatelessServer): string[] {
 /** HTTP status of a full-permission-not-approved error, shared by the fabricator and its pins. */
 export const PERMISSION_HTTP_STATUS = 403;
 
-/** x402 payload as the axios interceptor decodes it from the `payment-required` header. */
-export const X402_PAYMENT_DATA = {
-    x402Version: 1,
-    accepts: [{ scheme: 'exact', network: 'base-sepolia', maxAmountRequired: '10000' }],
-};
-
-/**
- * A 402 x402 payment-required condition. Any object with `statusCode: 402` satisfies the predicate;
- * pass `paymentData` to attach the payload the production axios interceptor stores under
- * `Symbol.for('paymentRequiredData')`, so the full x402 response build is exercised. Called with no
- * argument it yields the bare 402 (no payload).
- */
-export function makePaymentRequiredError(paymentData?: Record<string, unknown>): Error {
-    return Object.assign(new Error('Payment required'), {
-        statusCode: 402,
-        ...(paymentData ? { [Symbol.for('paymentRequiredData')]: paymentData } : {}),
-    });
+export function makePaymentRequiredError(): Error {
+    return Object.assign(new Error('Payment required'), { statusCode: 402 });
 }
 
 /** A real full-permission-not-approved `ApifyApiError`, built against the src/const.ts type constant. */
@@ -358,20 +342,18 @@ export function makeArgsRecorderTool(name = 'recorder-tool'): {
 /**
  * A synthetic internal tool that records what the server passed into `call` (whether it ran, and the
  * `progressTracker` it received). Generalizes to any "did the server pass X to the tool?" assertion.
- * `paymentRequired`/`taskSupport` let a caller drive the pre-flight payment/task paths.
+ * `taskSupport` lets a caller drive the pre-flight task path.
  */
 export function makeRecorderTool(
     name: string,
     options: {
-        paymentRequired?: boolean;
-        hasPaymentProviderStandbyCheck?: boolean;
         taskSupport?: (typeof ALLOWED_TASK_TOOL_EXECUTION_MODES)[number];
     } = {},
 ): {
     tool: ToolEntry;
     received: { called: boolean; progressTracker: InternalToolArgs['progressTracker'] | undefined };
 } {
-    const { paymentRequired = false, hasPaymentProviderStandbyCheck = false, taskSupport } = options;
+    const { taskSupport } = options;
     const received: { called: boolean; progressTracker: InternalToolArgs['progressTracker'] | undefined } = {
         called: false,
         progressTracker: undefined,
@@ -382,8 +364,6 @@ export function makeRecorderTool(
         description: 'recorder tool for progress wiring tests',
         inputSchema: { type: 'object', properties: {}, additionalProperties: true },
         ajvValidate: Object.assign(() => true, { errors: null }) as unknown as ToolEntry['ajvValidate'],
-        paymentRequired,
-        hasPaymentProviderStandbyCheck,
         annotations: {},
         ...(taskSupport ? { execution: { taskSupport } } : {}),
         call: async (toolArgs: InternalToolArgs) => {
@@ -393,22 +373,4 @@ export function makeRecorderTool(
         },
     } as ToolEntry;
     return { tool, received };
-}
-
-/** Provider that reads `skyfire-pay-id` whatever its `id`; only `id` varies. Its 402 data is `X402_PAYMENT_DATA`. */
-export function makePaymentProvider(id: PaymentProviderId = 'skyfire'): PaymentProvider {
-    return {
-        id,
-        allowsUnauthenticated: true,
-        decorateToolSchema: (tool) => tool,
-        validatePayment: (args) => (args['skyfire-pay-id'] ? null : 'Missing skyfire-pay-id'),
-        getPaymentRequiredData: () => X402_PAYMENT_DATA,
-        getPaymentHeaders: (args): Record<string, string> =>
-            args['skyfire-pay-id'] ? { 'skyfire-pay-id': args['skyfire-pay-id'] as string } : {},
-        removePaymentFields: (args) => {
-            const { 'skyfire-pay-id': _removed, ...rest } = args;
-            return rest;
-        },
-        redactForLogging: (args) => ({ ...(args as Record<string, unknown>), 'skyfire-pay-id': '[REDACTED]' }),
-    };
 }
