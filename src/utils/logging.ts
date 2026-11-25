@@ -4,7 +4,7 @@ import { ZodError } from 'zod';
 import log from '@apify/log';
 
 import { INVALID_REQUEST_PATH_DETAIL, InvalidRequestPathError, SchemaTooLargeError } from '../errors.js';
-import { isActorRunLimitError } from './apify_errors.js';
+import { isActorRunLimitError, isUsageLimitError } from './apify_errors.js';
 
 /**
  * Safely extract HTTP status code from errors.
@@ -186,8 +186,8 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
     if (error instanceof InvalidRequestPathError) rawErrorMessage = INVALID_REQUEST_PATH_DETAIL;
     const softErrMessage = sanitizeMezmoMessage(rawErrorMessage);
 
-    // User concurrent-run / quota limit — arrives wrapped as a 500 but is a user billing condition.
-    if (isActorRunLimitError(error)) {
+    // User concurrent-run / usage limit — can arrive wrapped as a 500 but is a user billing condition.
+    if (isActorRunLimitError(error) || isUsageLimitError(error)) {
         log.softFail(message, { errMessage: softErrMessage, ...data });
         return;
     }

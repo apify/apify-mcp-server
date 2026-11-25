@@ -157,6 +157,7 @@ describe('reportProblem', () => {
         it.each([
             ['PERMISSION_APPROVAL_REQUIRED', FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED],
             ['AUTH', FAILURE_CATEGORY.AUTH],
+            ['USAGE_LIMIT', FAILURE_CATEGORY.USAGE_LIMIT],
         ])('does not append for the user-resolvable category %s', (_label, failureCategory) => {
             const result = appendReportProblemNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,

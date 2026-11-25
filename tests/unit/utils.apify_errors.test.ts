@@ -9,6 +9,7 @@ import {
     isActorRunLimitError,
     isMemoryQuotaError,
     isPermissionApprovalError,
+    isUsageLimitError,
     remoteMcpFailureDetail,
 } from '../../src/utils/apify_errors.js';
 
@@ -16,7 +17,39 @@ function apifyApiError(type: string, status = 402): ApifyApiError {
     return new ApifyApiError({ data: { error: { type, message: type } }, status } as AxiosResponse, 1);
 }
 
+/** The Standby controller's run-start failure as the MCP SDK client throws it: only the inner message survives. */
+function standbyRunStartError(underlyingMessage: string): StreamableHTTPError {
+    const body = {
+        error: {
+            type: 'cannot-start-actor-runs',
+            message: `Cannot start new Actor runs. Underlying error: ${underlyingMessage}`,
+        },
+    };
+    return new StreamableHTTPError(500, `Error POSTing to endpoint: ${JSON.stringify(body)}`);
+}
+
+describe('isUsageLimitError', () => {
+    it('matches both billing-block types, not an ordinary permission error', () => {
+        expect(isUsageLimitError(apifyApiError('platform-feature-disabled', 403))).toBe(true);
+        expect(isUsageLimitError(apifyApiError('actor-disabled', 403))).toBe(true);
+        expect(isUsageLimitError(apifyApiError('insufficient-permissions', 403))).toBe(false);
+    });
+
+    it('matches a Standby run start blocked by the monthly usage limit, not one blocked by another limit', () => {
+        expect(isUsageLimitError(standbyRunStartError('Monthly usage hard limit exceeded'))).toBe(true);
+        expect(
+            isUsageLimitError(
+                standbyRunStartError('By launching this job you will exceed your limit of 25 concurrent Actor runs.'),
+            ),
+        ).toBe(false);
+    });
+});
+
 describe('isActorRunLimitError', () => {
+    it('does not match a Standby run start blocked by the monthly usage limit', () => {
+        expect(isActorRunLimitError(standbyRunStartError('Monthly usage hard limit exceeded'))).toBe(false);
+    });
+
     it('matches by `type` field (direct run or Standby) or message substring (wrapped MCP error), not unrelated errors', () => {
         expect(isActorRunLimitError(apifyApiError('concurrent-runs-limit-exceeded'))).toBe(true);
         expect(isActorRunLimitError({ type: 'cannot-start-actor-runs', message: 'Cannot start new Actor runs.' })).toBe(
@@ -61,6 +94,11 @@ describe('remoteMcpFailureDetail', () => {
         );
         expect(detail).toContain('concurrent Actor runs');
         expect(detail).toContain('console.apify.com/billing/subscription');
+    });
+
+    it('passes a usage-limit block through without the run-limit or availability hint', () => {
+        const error = standbyRunStartError('Monthly usage hard limit exceeded');
+        expect(remoteMcpFailureDetail(error)).toBe(`${error.message}.`);
     });
 
     it.each([

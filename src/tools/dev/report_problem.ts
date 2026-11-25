@@ -25,10 +25,11 @@ ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and this error).`;
 export const REPORT_PROBLEM_INVALID_INPUT_NUDGE = `If this error looks like a bug, or was unclear or took several attempts to get \
 past, you can report it to the Apify team with ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and what went wrong).`;
 
-/** Auth and approval failures are expected states the user resolves, not problems to report. */
+/** Auth, approval and usage-limit failures are expected states the user resolves, not problems to report. */
 const NON_NUDGE_FAILURE_CATEGORIES = new Set<string>([
     FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
     FAILURE_CATEGORY.AUTH,
+    FAILURE_CATEGORY.USAGE_LIMIT,
 ]);
 
 /** Returns a copy so appending the sentence does not mutate the original tool result. */

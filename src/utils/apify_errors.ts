@@ -2,12 +2,14 @@ import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { ApifyApiError } from 'apify-client';
 
 import {
+    APIFY_ERROR_TYPE_ACTOR_DISABLED,
     APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK,
     APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS,
     APIFY_ERROR_TYPE_CONCURRENT_RUNS_LIMIT_EXCEEDED,
     APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED,
     APIFY_ERROR_TYPE_INVALID_INPUT,
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
+    APIFY_ERROR_TYPE_PLATFORM_FEATURE_DISABLED,
 } from '../const.js';
 
 // Helpers that read or classify an error received from the Apify API by its `type`. Kept in one leaf
@@ -42,15 +44,39 @@ export function isActorInputValidationError(error: unknown): error is ApifyApiEr
     return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_INVALID_INPUT;
 }
 
+/** Matches the monthly usage limit in every copy of the API message, e.g. "Monthly usage hard limit exceeded". */
+const MONTHLY_USAGE_LIMIT_MESSAGE_PATTERN = /monthly usage/i;
+
 /**
- * The Apify platform refuses to start a run when the user hits their concurrent-run / usage limit.
+ * True when billing blocks the account: the monthly usage hard limit, a per-service limit, unpaid
+ * invoices, or a plan without the feature. The API answers `platform-feature-disabled` (HTTP 403), or
+ * `actor-disabled` on a run start while its cached copy of the account still has Actors enabled. The
+ * message names the reason, so callers pass it through as is.
+ *
+ * The Actor Standby controller wraps a failed run start as `cannot-start-actor-runs` (HTTP 500) and keeps
+ * only the inner message, so a wrapped block is recognized by its usage-limit message alone.
+ */
+export function isUsageLimitError(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) return false;
+    const { type } = error as { type?: unknown };
+    if (type === APIFY_ERROR_TYPE_PLATFORM_FEATURE_DISABLED || type === APIFY_ERROR_TYPE_ACTOR_DISABLED) return true;
+    const message = error instanceof Error ? error.message : '';
+    const isWrappedRunStart =
+        type === APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS || message.includes(APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS);
+    return isWrappedRunStart && MONTHLY_USAGE_LIMIT_MESSAGE_PATTERN.test(message);
+}
+
+/**
+ * The Apify platform refuses to start a run when the user hits their concurrent-run limit.
  * A direct Actor run surfaces it as an `ApifyApiError` whose `type` is `concurrent-runs-limit-exceeded`
  * (HTTP 402). The Actor Standby controller wraps a failed run start as `cannot-start-actor-runs`
  * (HTTP 500); a remote MCP-server Actor passes that on as a plain Error whose message carries the type.
  * Either way it's a user billing condition, not a server fault — hence the duck-typed `type` check
- * plus a message-substring fallback for the wrapped case.
+ * plus a message-substring fallback for the wrapped case. A wrapped usage-limit block is not a run
+ * limit: {@link isUsageLimitError} owns it, so its message is not replaced with the run-limit text.
  */
 export function isActorRunLimitError(error: unknown): boolean {
+    if (isUsageLimitError(error)) return false;
     if (
         typeof error === 'object' &&
         error !== null &&
@@ -86,6 +112,7 @@ function isMcpServerUnavailableError(error: unknown): boolean {
 export function remoteMcpFailureDetail(error: unknown): string {
     if (isActorRunLimitError(error)) return ACTOR_RUN_LIMIT_MESSAGE;
     const message = error instanceof Error ? error.message : String(error);
-    if (!isMcpServerUnavailableError(error)) return `${message}.`;
+    // A wrapped usage-limit block arrives as a 5xx, but the server answered.
+    if (isUsageLimitError(error) || !isMcpServerUnavailableError(error)) return `${message}.`;
     return `${message}. The MCP server may be temporarily unavailable.`;
 }
