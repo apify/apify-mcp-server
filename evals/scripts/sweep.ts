@@ -8,7 +8,7 @@ import { isNameFromRun } from '../run_id.js';
 /** Only schedules and tasks with this prefix are ever deleted. */
 export const EVAL_PREFIX = 'eval-';
 
-/** Permanent read-only fixture task, target of pure get-actor-task cases. Reset every run, never deleted. */
+/** Permanent read-only fixture task, target of the get-actor-task and call-actor-task cases. Reset every run, never deleted. */
 export const FIXTURE_TASK_NAME = 'eval-sum-nightly';
 
 /** Permanent read-only fixture schedule: reset every run, never deleted, never modified by a case. */
