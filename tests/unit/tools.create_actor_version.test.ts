@@ -5,7 +5,7 @@ import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
-import { prepareToolCallContext } from '../../src/payments/helpers.js';
+import { prepareToolCallContext } from '../../src/mcp/tool_call_context.js';
 import { createActorVersionToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { createActorVersion } from '../../src/tools/versions/create_actor_version.js';
 import { getActorVersion } from '../../src/tools/versions/get_actor_version.js';
@@ -145,7 +145,7 @@ describe('create-actor-version', () => {
         });
     });
 
-    it('is a destructive, non-idempotent, open-world tool without payment, since autoBuild starts a build that can move an existing tag', () => {
+    it('is a destructive, non-idempotent, open-world tool, since autoBuild starts a build that can move an existing tag', () => {
         expect(createActorVersion.name).toBe(HELPER_TOOLS.ACTOR_VERSION_CREATE);
         expect(createActorVersion.annotations).toEqual({
             title: 'Create Actor version',
@@ -154,7 +154,6 @@ describe('create-actor-version', () => {
             idempotentHint: false,
             openWorldHint: true,
         });
-        expect((createActorVersion as HelperTool).paymentRequired).toBeUndefined();
     });
 
     it('requires the actor and versionNumber, and refuses an empty files list or copyFromVersion', () => {
@@ -170,8 +169,7 @@ describe('create-actor-version', () => {
     describe('logged arguments', () => {
         const SECRET = 'synthetic-secret-4f2a';
         const getLoggedArgs = (args: Record<string, unknown>) =>
-            prepareToolCallContext({ provider: undefined, tool: createActorVersion, args, apifyToken: 'test-token' })
-                .toolArgsRedacted;
+            prepareToolCallContext({ tool: createActorVersion, args, apifyToken: 'test-token' }).toolArgsRedacted;
 
         it('keep the paths and other metadata, and replace file content with a marker', () => {
             const args = {

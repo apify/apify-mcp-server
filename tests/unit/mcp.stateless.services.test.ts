@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { InternalError } from '../../src/mcp/errors.js';
-import { resolvePaymentProvider } from '../../src/payments/index.js';
 import type * as ApiResourcesModule from '../../src/resources/api_resources.js';
 import type { ActorsMcpServerOptions } from '../../src/types.js';
 import { getRequestHandler, withServer, withStatelessServer, withTestPrompt } from './helpers/mcp_server.js';
@@ -78,21 +77,6 @@ describe('createStatelessServer() prompts and resources', () => {
     });
 
     describe('resources', () => {
-        it('lists the same resources as the stateful path', async () => {
-            // A usage-guide-carrying payment provider is what makes the list non-empty outside apps
-            // mode; without one both paths return `[]` and the comparison would prove nothing.
-            const options = { paymentProvider: await resolvePaymentProvider('skyfire') };
-            const legacy = await callViaLegacy('resources/list', {}, options);
-
-            await withStatelessServer(async ({ call }) => {
-                const response = await call('resources/list');
-
-                const resources = (response.result?.resources ?? []) as { uri: string }[];
-                expect(response.result?.resources).toEqual((legacy as { resources: unknown }).resources);
-                expect(resources.map((resource) => resource.uri)).toEqual(['file://readme.md']);
-            }, options);
-        });
-
         it('lists the same resource templates as the stateful path', async () => {
             const legacy = await callViaLegacy('resources/templates/list');
 
@@ -127,8 +111,8 @@ describe('createStatelessServer() prompts and resources', () => {
         });
 
         it('reads with no Apify client when the request carries no token', async () => {
-            // Deliberate: a payment-only session (x402/Skyfire, no Apify token) gets no client, so
-            // the proxy refuses the read. Same rule as the stateful `resolveApifyClient`.
+            // Deliberate: a session without an Apify token gets no client, so the proxy refuses the
+            // read. Same rule as the stateful `resolveApifyClient`.
             const uri = 'https://api.apify.com/v2/datasets/d1/items';
             readApiResourceMock.mockResolvedValue({ contents: [] } as never);
 

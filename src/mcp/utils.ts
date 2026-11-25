@@ -6,7 +6,7 @@ import type { ApifyClient } from 'apify-client';
 import log from '@apify/log';
 
 import { processInput } from '../input.js';
-import type { ActorStore, Input } from '../types.js';
+import type { Input } from '../types.js';
 import { SERVER_MODE } from '../types.js';
 import { loadToolsFromInput } from '../utils/tools_loader.js';
 
@@ -15,16 +15,14 @@ import { loadToolsFromInput } from '../utils/tools_loader.js';
  * @param url The URL to process
  * @param apifyClient The Apify client instance
  * @param mode Server mode for tool variant resolution
- * @param actorStore Optional store used to enrich direct actor tools' outputSchema with per-Actor itemsSchema.
  */
 export async function processParamsGetTools(
     url: string,
     apifyClient: ApifyClient,
     mode: SERVER_MODE = SERVER_MODE.DEFAULT,
-    actorStore?: ActorStore,
 ) {
     const input = parseInputParamsFromUrl(url);
-    return await loadToolsFromInput(input, apifyClient, mode, actorStore);
+    return await loadToolsFromInput(input, apifyClient, mode);
 }
 
 export function parseInputParamsFromUrl(url: string): Input {

@@ -56,7 +56,6 @@ export function stubToolCallContext(
         apifyToken: 'test-token',
         apifyClient: client,
         signal: new AbortController().signal,
-        paymentProvider: undefined,
         actorStore: undefined,
         loadedToolNames,
         loadedActorIds: new Set(loadedActorIds),

@@ -199,7 +199,7 @@ class StatelessMcpServer {
             // which no tool emits.
             const outputSchema = resolveToolEntry(name, snapshot.tools)?.outputSchema;
             const { clientContext } = snapshot;
-            const { paymentProvider, allowUnauthMode } = this.host.options;
+            const { allowUnauthMode } = this.host.options;
             const { signal } = ctx.mcpReq;
 
             // Start with the raw name so early failures still have telemetry.
@@ -209,7 +209,6 @@ class StatelessMcpServer {
                 apifyToken,
                 clientContext,
                 clientParam: this.host.options.clientParam,
-                paymentProvider,
                 telemetryEnabled: this.host.telemetryEnabled,
                 transportType: this.host.options.transportType,
             });
@@ -220,14 +219,12 @@ class StatelessMcpServer {
                     name,
                     args,
                     meta,
-                    requestHeaders: Object.fromEntries(ctx.http?.req?.headers ?? []),
                     // The 2026-07-28 revision has no task requests; this path is always synchronous.
                     isTaskRequest: false,
                     mcpSessionId,
                     telemetryData,
                     clientContext,
                     tools: snapshot.tools,
-                    paymentProvider,
                     allowUnauthMode,
                     signal,
                 });
@@ -273,7 +270,6 @@ class StatelessMcpServer {
                     progressToken,
                     tools: snapshot.tools,
                     actorStore: this.host.actorStore,
-                    paymentProvider,
                     signal,
                     sendNotification: this.buildNotificationForwarder(ctx),
                     emitLog: emitLogServerSide,

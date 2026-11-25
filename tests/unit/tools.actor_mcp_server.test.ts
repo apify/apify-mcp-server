@@ -32,9 +32,9 @@ import {
     MAX_TOOL_LIST_PAGES,
 } from '../../src/tools/actors/fetch_actor_mcp_tool_list.js';
 import type { Actor, ActorDefinitionPruned, HelperTool, ToolEntry, ToolTelemetryContext } from '../../src/types.js';
-import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../src/types.js';
+import { ALL_TOOLS_PRESENT } from '../../src/types.js';
 import { mockActor } from './helpers/actor_build_client.js';
-import { getRequestHandler, makePaymentProvider, withServer } from './helpers/mcp_server.js';
+import { getRequestHandler, withServer } from './helpers/mcp_server.js';
 import { expectSoftFailInvalidInput, mockApifyClient, only, stubToolCallContext } from './helpers/tool_context.js';
 
 const TOKEN = 'test-token';
@@ -204,9 +204,13 @@ afterAll(async () => {
 
 afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
 });
 
 beforeEach(() => {
+    // A loopback Server Actor URL is accepted only with a local API, as in local development.
+    vi.stubEnv('APIFY_API_BASE_URL', 'http://localhost:3333');
+    vi.stubEnv('APIFY_IS_AT_HOME', '');
     requestHeaders = [];
     remoteCalls = [];
     listCursors = [];
@@ -362,6 +366,17 @@ describe('call-actor-mcp-tool', () => {
         expect(JSON.stringify(result.content)).toContain('Failed to connect to MCP server');
     });
 
+    it('connects to nothing when the Server Actor URL is outside the Server Actor domain', async () => {
+        // With the platform API, the local server's loopback URL is outside the Server Actor domain.
+        vi.stubEnv('APIFY_API_BASE_URL', 'https://api.apify.com');
+
+        const result = await execute(executeCallActorMcpTool, { tool: 'add' });
+
+        expect(result.isError).toBe(true);
+        expect(JSON.stringify(result.content)).toContain('has no valid standby URL');
+        expect(requestHeaders).toHaveLength(0);
+    });
+
     it('reports a JSON-RPC error from the remote server as a failed call of that tool', async () => {
         const result = await execute(executeCallActorMcpTool, { tool: 'subtract' });
 
@@ -513,7 +528,7 @@ describe('fetch-actor-mcp-tool-list', () => {
 describe.each([
     { tool: callActorMcpTool, run: executeCallActorMcpTool, args: { tool: 'add' } },
     { tool: fetchActorMcpToolList, run: executeFetchActorMcpToolList, args: {} },
-])('$tool.name before and during the connection', ({ tool, run, args }) => {
+])('$tool.name before and during the connection', ({ run, args }) => {
     it('returns the empty aborted response when the client cancels mid-request', async () => {
         seedActor('apify/slow-mcp-server', { definition: { webServerMcpPath: '/mcp-slow' } });
         const controller = new AbortController();
@@ -540,35 +555,6 @@ describe.each([
             expect(remoteCancellations).toContainEqual(expect.stringContaining('Request timed out')),
         );
     });
-
-    it.each([
-        ['with a token', { token: TOKEN }],
-        ['without a token', { token: undefined }],
-    ])('is rejected before connecting in a payment-provider session %s', async (_label, tokenOptions) => {
-        const result = await dispatch(
-            tool,
-            { actor: MCP_ACTOR, ...args },
-            { ...tokenOptions, paymentProvider: makePaymentProvider() },
-        );
-
-        expect(result.isError).toBe(true);
-        expect(JSON.stringify(result.content)).toContain('is not supported in agentic payment mode');
-        expect(requestHeaders).toHaveLength(0);
-    });
-
-    it('is not listed in a payment-provider session', async () => {
-        const listActorsTools = async (options: Parameters<typeof withServer>[1]) =>
-            withServer(
-                async (server) => {
-                    await server.loadToolsFromInput({ tools: ['actors'] }, mockApifyClient());
-                    return server.listToolNames();
-                },
-                { serverMode: SERVER_MODE.DEFAULT, ...options },
-            );
-
-        expect(await listActorsTools({})).toContain(tool.name);
-        expect(await listActorsTools({ paymentProvider: makePaymentProvider() })).not.toContain(tool.name);
-    });
 });
 
 describe('MCP connection headers', () => {
@@ -591,6 +577,18 @@ describe('MCP connection headers', () => {
         for (const { headers } of seen) {
             expect(headers).toMatchObject({ authorization: `Bearer ${TOKEN}`, 'x-apify-request-origin': 'APIFY_AI' });
         }
+    });
+});
+
+describe('MCP connection output schemas', () => {
+    it('lists a tool whose output schema does not compile', async () => {
+        const client = await connectMCPClient(`${standbyUrl}/mcp`, { token: TOKEN });
+
+        // `subtract`, on the second page, has an output schema with a `$ref` that does not resolve.
+        const page = await client?.listTools({ cursor: 'page-2' });
+        await client?.close();
+
+        expect(page?.tools.map(({ name }) => name)).toEqual(['subtract']);
     });
 });
 

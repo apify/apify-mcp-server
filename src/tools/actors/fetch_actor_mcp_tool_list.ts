@@ -54,7 +54,6 @@ export async function executeFetchActorMcpToolList(toolArgs: InternalToolArgs): 
     return runOnActorMcpServer(toolArgs, {
         actor,
         operation: 'list the MCP tools',
-        // Not `client.listTools`: it compiles every remote output schema, so one that does not compile would fail it.
         run: async (client) => {
             const tools: Tool[] = [];
             let cursor: string | undefined;
@@ -88,8 +87,6 @@ export const fetchActorMcpToolList: ToolEntry = Object.freeze({
     inputSchema: z.toJSONSchema(fetchActorMcpToolListArgs) as ToolInputSchema,
     outputSchema: actorMcpToolListOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(fetchActorMcpToolListArgs)),
-    // A third-party payment provider cannot pay for a Server Actor run, so such a session is rejected before the call.
-    hasPaymentProviderStandbyCheck: true,
     actorInterface: 'mcp',
     annotations: {
         title: 'Fetch Actor MCP tool list',
