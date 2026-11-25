@@ -38,7 +38,12 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     can call in the publisher's schema; `webServerOperations` caches each operation with its required inputs, which
     the send tool lists after a 400/404/405/422, and `webServerCommaJoinedQueryParameters` the query parameters a
     list fills comma-joined, `explode: false`, per operation, looked up by the path as sent; absent when none
-    need joining; a list fills any other as a repeated parameter, and an empty list nothing),
+    need joining; a list fills any other as a repeated parameter, and an empty list nothing; an Actor's output
+    schema is the `fields` it declares for its default dataset, `getDeclaredDatasetItemsSchema`, never inferred
+    from runs: `fetch-actor-details` returns it on `output.outputSchema`, in full up to
+    `MAX_DATASET_ITEMS_SCHEMA_BYTES`, reduced to field names and types above that, and not at all when those are over
+    the limit too, and a direct Actor tool advertises its field names and types, `reduceToFieldNamesAndTypes`, as
+    `itemsSchema` in its `outputSchema`, which a run result does not repeat),
     `server_interface_schema.ts` (the operations a Server Actor's `webServerSchema` documents, in the
     `get-apify-api-details` shape through the API tools' `dereference`; no prose),
     `server_interface_details.ts` (the server-interface section of `fetch-actor-details`: the
@@ -129,7 +134,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     The one capped request (`sendApifyApiRequest`) and the detection of a body over `MAX_INLINE_BYTES`
     (`isMaxContentLengthAbort`) are in `../apify_client.ts`. The origin check (`isApifyApiUri`),
     the binary token mask (`maskSessionToken`), the secret redaction (`redactJsonSecrets`) and
-    `REDACTED` are the API resource's own, imported from `../resources/api_resources.ts`
+    `REDACTION_PLACEHOLDER` are the API resource's own, imported from `../resources/api_resources.ts`
     ([`../resources/AGENTS.md`](../resources/AGENTS.md#api-resources-api_resourcests)).
     A request failure is thrown as `toPlainError` (`../utils/logging.ts`), without the axios config.
     The details and call tools log their arguments through `redactApiCallArgs` (`redactArgs`): an
@@ -148,6 +153,8 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
 
 - **Validate inputs with Zod**; no ad-hoc shape checks. AJV + Zod already validate
   before a tool runs — don't re-check the same constraint inside the tool body.
+  Exception: `compileUntrustedSchema` (`actor_input_schema.ts`) skips AJV for an Actor or proxied MCP input
+  schema that is costly to compile, so `actor_executor.ts` checks the injected `waitSecs` itself.
 - **Reference tool names via the `HELPER_TOOLS` `as const` object**, never hardcoded strings
   (exception: the integration suite, `tests/integration/` and the shared `tests/test_kit/` cases and helpers, which hardcode them so a renamed tool fails).
 - Keep a new tool mode-agnostic unless it is genuinely a widget variant.
@@ -155,10 +162,12 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
   It runs before AJV validation, so it must accept any shape, must not mutate the arguments, and must
   be an allowlist: the logged copy keeps the undeclared keys AJV strips only from the tool's copy.
   Actor input counts as a secret: `call-actor`, its widget, the task and schedule tools and `call-actor-mcp-tool`
-  log only its key names, each value as `REDACTED`, through `pickLoggedValues` and `maskLoggedInputs` in
+  log only its key names, each value as `REDACTION_PLACEHOLDER`, through `pickLoggedValues` and `maskLoggedInputs` in
   `../resources/api_resources.ts`.
   A direct Actor tool or a proxied Actor MCP tool has no `redactArgs`: `prepareToolCallContext`
-  (`../payments/helpers.ts`) logs its argument names only, each value as `REDACTED`.
+  (`../mcp/tool_call_context.ts`) logs its argument names only, each value as `REDACTION_PLACEHOLDER`.
+  For every other tool, `prepareToolCallContext` then overwrites a string `actor` in the logged copy, whatever
+  `redactArgs` returned, with `REDACTION_PLACEHOLDER` unless `isValidResourceId` accepts it.
 - Descriptions, result text, annotations and the tool set follow [TOOL_GUIDELINES.md](../../TOOL_GUIDELINES.md); the gating mechanics below implement its "name only what the session has" rule.
 
 **Storage tool description skeleton** (`storage/`, all 8 tools): lead sentence stating what the tool

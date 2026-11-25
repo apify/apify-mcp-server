@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { format } from 'node:util';
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import yargs from 'yargs';
@@ -22,6 +23,7 @@ import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { getTelemetryEnv } from './telemetry.js';
 import type { ApifyRequestParams, Input, ServerModeOption, TelemetryEnv, ToolSelector } from './types.js';
+import { maskAccessKeyTokens, maskAccessKeyTokensInLogs } from './utils/access_key_token_mask.js';
 import { isApiTokenRequired } from './utils/auth.js';
 import { parseQueryParamList } from './utils/generic.js';
 import { injectMcpSessionId } from './utils/mcp.js';
@@ -50,6 +52,7 @@ function getTokenFromAuthFile(): string | undefined {
 }
 
 log.setLevel(log.LEVELS.ERROR);
+maskAccessKeyTokensInLogs();
 const packageVersion = getPackageVersion() ?? '0.0.0';
 
 const argv = yargs(hideBin(process.argv))
@@ -103,7 +106,8 @@ Only used when --telemetry-enabled is true`,
     .version(packageVersion)
     .epilogue(
         'To connect, set your MCP client server command to `npx @apify/actors-mcp-server`' +
-            ' and set the environment variable `APIFY_TOKEN` to your Apify API token.\n',
+            ' and set the environment variable `APIFY_TOKEN` to your Apify API token.' +
+            ` Create one at https://console.apify.com/settings/integrations?createApiToken=true&for=MCP&utm_source=mcp&utm_medium=integrations (it is shown only once).\n`,
     )
     .epilogue('For more information, visit https://mcp.apify.com or https://github.com/apify/apify-mcp-server')
     .parseSync() as CliArgs;
@@ -114,8 +118,9 @@ const toolCategoryKeys = argv.tools !== undefined ? parseQueryParamList(argv.too
 const originalError = log.error.bind(log);
 log.error = (...args: Parameters<typeof log.error>) => {
     originalError(...args);
+    // This copy bypasses the logger, so its tokens are masked here.
     // eslint-disable-next-line no-console
-    console.error(...args);
+    console.error(maskAccessKeyTokens(format(...args)));
 };
 
 const apifyToken = process.env.APIFY_TOKEN || getTokenFromAuthFile();

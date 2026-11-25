@@ -9,6 +9,7 @@ TypeScript, ES modules. Runs in two modes: **stdio** (local CLI clients, `stdio.
 **This applies to ALL written output: code comments, commit messages, PR descriptions, issue specs**
 
 - **Plain language, no fluff.** Say what you mean in the fewest words. No filler phrases, no motivational preambles, no "this will improve the developer experience."
+- **Write for a reader who was not there.** They have the diff open, not your session. Say what the code does today, naming the function, before you say what changes. No claim without its reason, no shorthand they have to decode. Keep sentences short; do not drop steps.
 
 ## Scope discipline
 

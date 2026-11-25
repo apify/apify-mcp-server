@@ -112,7 +112,7 @@ describe('sanitizeUseCase()', () => {
         expect(sanitizeUseCase('a'.repeat(2000))).toBe('a'.repeat(1024));
     });
 
-    it('redacts Apify API tokens before cutting', () => {
+    it('masks access tokens before cutting', () => {
         expect(sanitizeUseCase(`${'a'.repeat(1011)} apify_api_${'x'.repeat(36)}`)).toBe(
             `${'a'.repeat(1011)} apify_api_**`,
         );

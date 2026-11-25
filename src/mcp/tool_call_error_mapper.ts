@@ -1,4 +1,5 @@
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
+import { UserInputError } from '../errors.js';
 import type { CallDiagnostics, ToolStatus } from '../types.js';
 import { isPermissionApprovalError } from '../utils/apify_errors.js';
 import { isZodValidationError } from '../utils/logging.js';
@@ -7,7 +8,7 @@ import { getToolCallErrorUserText } from '../utils/mcp.js';
 import {
     buildPaymentRequiredResponse,
     buildPermissionApprovalResponse,
-    isX402PaymentRequiredError,
+    isPaymentRequiredError,
 } from '../utils/payment_errors.js';
 import { buildExecutionDiagnostics, formatZodIssues } from '../utils/tool_status.js';
 import { buildActorFields } from '../utils/tools.js';
@@ -58,7 +59,7 @@ export type ToolCallErrorResult =
 export function buildToolCallErrorResult(error: unknown, params: ToolCallErrorParams): ToolCallErrorResult {
     const { toolName, actorName, actorId, isAborted } = params;
 
-    if (isX402PaymentRequiredError(error)) {
+    if (isPaymentRequiredError(error)) {
         return {
             kind: TOOL_CALL_ERROR_KIND.PAYMENT,
             toolStatus: TOOL_STATUS.SOFT_FAIL,
@@ -103,6 +104,7 @@ export function buildToolCallErrorResult(error: unknown, params: ToolCallErrorPa
         kind: TOOL_CALL_ERROR_KIND.EXECUTION,
         toolStatus,
         callDiagnostics,
-        userText: getToolCallErrorUserText(toolName, error),
+        // A UserInputError message is the full text to show; wrapping it adds a second period.
+        userText: error instanceof UserInputError ? error.message : getToolCallErrorUserText(toolName, error),
     };
 }

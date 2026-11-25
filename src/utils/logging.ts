@@ -3,7 +3,7 @@ import { ZodError } from 'zod';
 
 import log from '@apify/log';
 
-import { SchemaTooLargeError } from '../errors.js';
+import { INVALID_REQUEST_PATH_DETAIL, InvalidRequestPathError, SchemaTooLargeError } from '../errors.js';
 import { isActorRunLimitError } from './apify_errors.js';
 
 /**
@@ -51,6 +51,17 @@ export function getHttpStatusCode(error: unknown): number | undefined {
  */
 export function sanitizeMezmoMessage(message: string): string {
     return message.replace(/\berror\b/gi, 'failure');
+}
+
+/**
+ * `sanitizeMezmoMessage` for every string inside a logged value. Mezmo also promotes on data values, so
+ * an info line that logs a tool input such as the search query "proxy error codes" would raise an alert.
+ */
+export function sanitizeMezmoValue(value: unknown): unknown {
+    if (typeof value === 'string') return sanitizeMezmoMessage(value);
+    if (Array.isArray(value)) return value.map(sanitizeMezmoValue);
+    if (typeof value !== 'object' || value === null) return value;
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizeMezmoValue(item)]));
 }
 
 // Client faults surfaced by the MCP SDK's `onerror` — expected noise, not server bugs.
@@ -171,7 +182,8 @@ export function toPlainError(error: unknown, causeDepth = 3): Error {
  */
 export function logHttpError<T extends object>(error: unknown, message: string, data?: T): void {
     const statusCode = getHttpStatusCode(error);
-    const rawErrorMessage = error instanceof Error ? error.message : String(error);
+    let rawErrorMessage = error instanceof Error ? error.message : String(error);
+    if (error instanceof InvalidRequestPathError) rawErrorMessage = INVALID_REQUEST_PATH_DETAIL;
     const softErrMessage = sanitizeMezmoMessage(rawErrorMessage);
 
     // User concurrent-run / quota limit — arrives wrapped as a 500 but is a user billing condition.

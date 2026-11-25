@@ -19,7 +19,6 @@ import type { Actor, ServerActorToolInfo, ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { resolveToolNamesFromInput } from '../../src/utils/tools_loader.js';
 import { mockActor, mockActorBuildClient, mockDefaultBuild } from './helpers/actor_build_client.js';
-import { makePaymentProvider } from './helpers/mcp_server.js';
 import { only } from './helpers/tool_context.js';
 
 /** Shaped like apify/server-actor-test: query parameters, a JSON body behind a reference, and a templated path. */
@@ -395,7 +394,6 @@ async function loadTools(
         actor?: Partial<Actor>;
         webServerMcpPath?: string;
         isDirectTool?: boolean;
-        hasPaymentProvider?: boolean;
     } = {},
 ) {
     actorCount += 1;
@@ -410,10 +408,7 @@ async function loadTools(
         actor,
         defaultBuild: mockDefaultBuild({ webServerMcpPath: options.webServerMcpPath, webServerSchema: schema }),
     });
-    return getActorsAsTools([`${actor.username}/${actor.name}`], apifyClient, {
-        isDirectTool: options.isDirectTool,
-        paymentProvider: options.hasPaymentProvider ? makePaymentProvider() : undefined,
-    });
+    return getActorsAsTools([`${actor.username}/${actor.name}`], apifyClient, { isDirectTool: options.isDirectTool });
 }
 
 async function loadServerTool(schema: unknown, actor?: Partial<Actor>): Promise<ToolEntry> {
@@ -494,13 +489,6 @@ describe('serving a selected Server Actor through its server interface', () => {
 
         expect(tools).toEqual([]);
         expect(errors).toMatchObject([{ kind: ACTOR_LOAD_ERROR_KIND.LOAD_FAILED, actorName }]);
-    });
-
-    it('is not served in a payment-provider session', async () => {
-        const { tools, errors } = await loadTools(SCHEMA, { hasPaymentProvider: true });
-
-        expect(tools).toEqual([]);
-        expect(errors.map((error) => error.kind)).toEqual([ACTOR_LOAD_ERROR_KIND.STANDBY_PAYMENT_NOT_SUPPORTED]);
     });
 });
 
@@ -913,7 +901,6 @@ describe('a call to the removed default apify--rag-web-browser', () => {
             name: actorNameToToolName(RAG_WEB_BROWSER),
             args,
             meta: undefined,
-            requestHeaders: undefined,
             isTaskRequest: false,
             mcpSessionId: 's1',
             telemetryData: null,

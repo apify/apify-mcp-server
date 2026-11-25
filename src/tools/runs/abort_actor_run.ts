@@ -37,7 +37,6 @@ USAGE EXAMPLES:
     inputSchema: z.toJSONSchema(abortRunArgs) as ToolInputSchema,
     outputSchema: actorRunOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(abortRunArgs)),
-    paymentRequired: true,
     annotations: {
         title: 'Abort Actor run',
         readOnlyHint: false,
