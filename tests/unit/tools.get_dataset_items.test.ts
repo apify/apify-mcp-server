@@ -331,7 +331,7 @@ describe('get-dataset-items with a page over the size limit', () => {
 
         expectSoftFailInvalidInput(result);
         expect(content[0].text).toContain('Lower `limit`, or use `fields` or `omit`');
-        expect(content[0].text).not.toContain('may require your Apify API token');
+        expect(content[0].text).toContain('Download link for the user: ');
         expect(`${link.origin}${link.pathname}`).toBe(SIGNED_ITEMS_URL.split('?')[0]);
         expect(Object.fromEntries(link.searchParams)).toEqual({
             signature: new URL(SIGNED_ITEMS_URL).searchParams.get('signature'),
@@ -369,7 +369,7 @@ describe('get-dataset-items with a page over the size limit', () => {
         const link = extractLink(result);
 
         expectSoftFailInvalidInput(result);
-        expect(content[0].text).toContain('may require your Apify API token');
+        expect(content[0].text).toContain('may require an Apify API token');
         expect(`${link.origin}${link.pathname}`).toBe(
             `${getApifyAPIPublicBaseUrl()}/v2/datasets/DsWkzbQMuFYuam3YF/items`,
         );
@@ -390,7 +390,7 @@ describe('get-dataset-items with a page over the size limit', () => {
         const { content } = result as TextToolResult;
 
         expectSoftFailInvalidInput(result);
-        expect(content[0].text).toContain('may require your Apify API token');
+        expect(content[0].text).toContain('may require an Apify API token');
         expect(extractLink(result).pathname).toBe('/v2/datasets/DsWkzbQMuFYuam3YF/items');
     });
 });

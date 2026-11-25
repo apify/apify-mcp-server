@@ -162,7 +162,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             const link = await fetchDatasetItemsDownloadLink(client, safeId, params);
             return respondUserError(
                 `This page of dataset '${datasetId}' is over the ${MAX_INLINE_BYTES}-byte response limit. Lower \`limit\`, or use \`fields\` or \`omit\`.\n` +
-                    `Download link${link.isPublic ? '' : ' (may require your Apify API token)'}: ${link.url}\n${VERBATIM_LINKS_NUDGE}`,
+                    `Download link for the user${link.isPublic ? '' : ' (may require an Apify API token)'}: ${link.url}\n${VERBATIM_LINKS_NUDGE}`,
             );
         }
 
