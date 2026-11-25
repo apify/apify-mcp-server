@@ -370,9 +370,15 @@ describe('call_actor_common', () => {
             );
         });
 
-        it('reports cannot-start-actor-runs as failureDetail for a run-limit error without a type', () => {
+        it.each([
+            ['a run-limit error', 'Cannot start new Actor runs (cannot-start-actor-runs).'],
+            [
+                'a usage-limit block',
+                'Cannot start new Actor runs (cannot-start-actor-runs). Underlying error: Monthly usage hard limit exceeded',
+            ],
+        ])('reports cannot-start-actor-runs as failureDetail for %s without a type', (_label, message) => {
             // The Standby controller's wrapper reaches us as a plain Error; only its message names the type.
-            const error = new Error('Cannot start new Actor runs (cannot-start-actor-runs).');
+            const error = new Error(message);
 
             const response = buildCallActorErrorResponse({
                 actorName: 'apify/instagram-scraper',

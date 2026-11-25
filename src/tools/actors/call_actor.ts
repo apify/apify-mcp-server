@@ -207,6 +207,7 @@ function respondActorNotFound(actorName: string, loadedToolNames: readonly strin
     );
 }
 
+/** The call-actor response when running the Actor throws: a specific text per known failure, else a generic one. */
 export function buildCallActorErrorResponse(params: CallActorErrorResponseParams): ToolResponse {
     const { actorName, error, actorId, mcpSessionId, loadedToolNames, inputSchema } = params;
 

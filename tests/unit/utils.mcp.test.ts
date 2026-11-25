@@ -272,7 +272,6 @@ describe('getToolCallErrorUserText()', () => {
         expect(text).toContain(ACTOR_RUN_LIMIT_MESSAGE);
     });
 
-    // The API message names the reason; the 403 hint would blame access instead.
     it('passes a usage-limit block through without the 403 hint', () => {
         const error = new ApifyApiError(
             {

@@ -171,7 +171,7 @@ export function toPlainError(error: unknown, causeDepth = 3): Error {
 /**
  * Logs HTTP or MCP errors at the appropriate level:
  * - Client errors (HTTP < 500, or JSON-RPC client/transient codes) → softFail (no stack).
- * - Zod validation / SchemaTooLarge / Actor run-limit → softFail (untrusted input or billing).
+ * - Zod validation / SchemaTooLarge / Actor run or usage limit → softFail (untrusted input or billing).
  * - Transient upstream (socket hang up, gateway timeout) → softFail.
  * - Server errors (HTTP >= 500, or JSON-RPC server codes) → exception (with stack).
  * - Anything unclassifiable → error.
