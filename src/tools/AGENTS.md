@@ -84,8 +84,9 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     the tool returns a link, whatever the content type. `get-dataset-items` and `get-dataset-schema` read
     items through `fetchDatasetItemsUnderCap` the same way, not `listItems()`: a page over the limit is an
     input error that tells the agent to lower `limit` (or use `fields` or `omit`), with no partial page.
-    `get-dataset-items` adds a link to the page: the dataset's signed `itemsPublicUrl` with the page's query
-    (one dataset read, on this path only), or the items API URL when the dataset has none or the read fails.
+    `get-dataset-items` adds a link to the page: the dataset's `itemsPublicUrl` (signed under restricted access)
+    with the page's query (one dataset read, on this path only), or the items API URL when the dataset has none
+    or the read fails.
   - `tasks/` — Actor task create/get/update plus publish/unpublish of the task's public
     landing page (`task_helpers.ts` holds the shared task response shape and the publication call).
   - `schedules/` — schedule create/get/update/delete for Actors and tasks; `schedule_helpers.ts`
