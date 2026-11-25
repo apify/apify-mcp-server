@@ -6,9 +6,8 @@ import {
     STORE_USE_CASE_MAX_LENGTH,
 } from '../const.js';
 import type { McpClientContext } from '../mcp/client_context.js';
+import { maskAccessKeyTokens } from './access_key_token_mask.js';
 import { APIFY_TRACE_ID_META_KEY, hashSessionId } from './mcp.js';
-
-const APIFY_API_TOKEN_REGEX = /apify_api_[A-Za-z0-9]+/g;
 
 /** True when `report-problem` is blocklisted for the connecting client (substring match on {@link ANTHROPIC_CLIENT_NAMES}). */
 export function isReportProblemBlockedForClient(context: McpClientContext | undefined): boolean {
@@ -42,10 +41,10 @@ export function resolveStoreSearchTracking(
     return { traceId: traceId && traceId.length <= STORE_TRACE_ID_MAX_LENGTH ? traceId : undefined };
 }
 
-/** Trimmed, API tokens redacted, cut to the API limit (not mid surrogate pair). */
+/** Trimmed, access tokens masked, cut to the API limit (not mid surrogate pair). */
 export function sanitizeUseCase(value: unknown): string | undefined {
     if (typeof value !== 'string') return undefined;
-    let useCase = value.trim().replace(APIFY_API_TOKEN_REGEX, 'apify_api_***').slice(0, STORE_USE_CASE_MAX_LENGTH);
+    let useCase = maskAccessKeyTokens(value.trim()).slice(0, STORE_USE_CASE_MAX_LENGTH);
     if (/[\uD800-\uDBFF]$/.test(useCase)) useCase = useCase.slice(0, -1);
     return useCase || undefined;
 }

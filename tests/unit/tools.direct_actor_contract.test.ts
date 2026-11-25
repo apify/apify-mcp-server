@@ -122,7 +122,6 @@ describe('direct tool call', () => {
             name: tool.name,
             args,
             meta: undefined,
-            requestHeaders: undefined,
             isTaskRequest: false,
             mcpSessionId: 'test-session',
             telemetryData: null,

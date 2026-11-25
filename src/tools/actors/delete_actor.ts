@@ -66,7 +66,7 @@ export const deleteActor: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client, apifyToken } = toolArgs;
         const parsed = deleteActorArgs.parse(args);
-        // Without a token (a payment-only session) the account cannot be checked, so stop before any request.
+        // Without a token the account cannot be checked, so stop before any request.
         if (!apifyToken) {
             return respondUserError('Deleting an Actor needs an Apify API token, and this session has none.', {
                 category: FAILURE_CATEGORY.AUTH,

@@ -1,5 +1,5 @@
 /**
- * Shared tools/call spine: gate, resolve, prepare payment/validation context, then dispatch.
+ * Shared tools/call spine: gate, resolve, prepare validation context, then dispatch.
  * Returns neutral outcomes; the shell constructs protocol errors and side-channel notifications.
  */
 
@@ -19,8 +19,6 @@ import {
     WEB_FETCH,
     WEB_SEARCH,
 } from '../const.js';
-import { prepareToolCallContext } from '../payments/helpers.js';
-import type { PaymentMeta, PaymentProvider, RequestHeaders } from '../payments/types.js';
 import { decodeDotPropertyNames } from '../tools/actor_input_schema.js';
 import { actorNameToToolName, legacyToolNameToNew } from '../tools/actor_tool_naming.js';
 import {
@@ -29,7 +27,7 @@ import {
     getDeniedDirectActorInputs,
     getDirectActorPolicy,
 } from '../tools/actors/actor_tool_contract.js';
-import { buildLegacyMcpSyntaxRejection, checkPaymentProviderStandbyConflict } from '../tools/actors/call_actor.js';
+import { buildLegacyMcpSyntaxRejection } from '../tools/actors/call_actor.js';
 import { withReportProblemNudge } from '../tools/dev/report_problem.js';
 import type {
     ActorStore,
@@ -40,10 +38,9 @@ import type {
     ToolTelemetryContext,
 } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
-import { logHttpError } from '../utils/logging.js';
+import { logHttpError, sanitizeMezmoValue } from '../utils/logging.js';
 import { respondOk } from '../utils/mcp.js';
 import { getRequestOriginForClient, resolveStoreSearchTracking } from '../utils/mcp_clients.js';
-import type { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { extractAjvErrorDetails, isMcpError } from '../utils/tool_status.js';
 import {
@@ -55,6 +52,7 @@ import {
 } from '../utils/tools.js';
 import type { McpClientContext } from './client_context.js';
 import { addCompatibilityNote, loadReplacedDefaultTool, rewriteRunInputAsServerRequest } from './run_input_rewrite.js';
+import { prepareToolCallContext } from './tool_call_context.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
 import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
 import { dispatchToolCall } from './tool_dispatch.js';
@@ -157,7 +155,6 @@ export type PreparedCall = {
     actorName: string | undefined;
     actorId: string | undefined;
     standbyRejection: Record<string, unknown> | null;
-    paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined;
     // The shell uses this decoded copy for telemetry.
     decodedArgs: Record<string, unknown>;
     /** Set when a pre-0.21 tool name or run input was accepted; added to the tool result. */
@@ -178,29 +175,27 @@ export type PreparedCallError = ToolCallOutcome & {
 };
 
 /**
- * Builds the pre-flight result; standby rejection takes precedence over 402. The rejection skipped dispatch, which
- * strips `toolTelemetry` from a tool response, so it is stripped here and its failure detail recorded.
+ * Builds the pre-flight result. The rejection skipped dispatch, which strips `toolTelemetry` from a tool response,
+ * so it is stripped here and its failure detail recorded.
  */
 export function buildPreflightFailureOutcome(
-    standbyRejection: Record<string, unknown> | null,
-    paymentRequiredResult: ReturnType<typeof buildPaymentRequiredResponse> | undefined,
+    standbyRejection: Record<string, unknown>,
     actorName: string | undefined,
     actorId: string | undefined,
 ): {
     toolStatus: ToolStatus;
     callDiagnostics: CallDiagnostics;
-    result: Record<string, unknown> | ReturnType<typeof buildPaymentRequiredResponse>;
+    result: Record<string, unknown>;
 } {
-    const { toolTelemetry, ...rejection } = (standbyRejection ?? {}) as { toolTelemetry?: ToolTelemetryContext };
+    const { toolTelemetry, ...rejection } = standbyRejection as { toolTelemetry?: ToolTelemetryContext };
     return {
         toolStatus: TOOL_STATUS.SOFT_FAIL,
         callDiagnostics: {
             failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-            ...(standbyRejection ? {} : { failure_http_status: 402 }),
             ...(toolTelemetry?.failureDetail && { failure_detail: toolTelemetry.failureDetail }),
             ...buildActorFields(actorName, actorId),
         },
-        result: standbyRejection ? rejection : paymentRequiredResult!,
+        result: rejection,
     };
 }
 
@@ -219,30 +214,17 @@ export async function prepareToolCall(params: {
     apifyToken: string;
     name: string;
     args: Record<string, unknown> | undefined;
-    meta: PaymentMeta;
-    requestHeaders: RequestHeaders;
+    meta: Record<string, unknown> | undefined;
     isTaskRequest: boolean;
     mcpSessionId: string | undefined;
     telemetryData: ToolCallTelemetryProperties | null;
     clientContext: McpClientContext | undefined;
     tools: Map<string, ToolEntry>;
-    paymentProvider?: PaymentProvider;
     allowUnauthMode?: boolean;
     // Used to preserve abort status for a post-resolution classified failure.
     signal?: AbortSignal;
 }): Promise<PreparedCall | InvalidToolCall | PreparedCallError> {
-    const {
-        apifyToken,
-        name,
-        meta,
-        requestHeaders,
-        isTaskRequest,
-        telemetryData,
-        clientContext,
-        tools,
-        paymentProvider,
-        allowUnauthMode,
-    } = params;
+    const { apifyToken, name, meta, isTaskRequest, telemetryData, clientContext, tools, allowUnauthMode } = params;
     let { args } = params;
     const requestOrigin = getRequestOriginForClient(clientContext);
     const storeSearchTracking = telemetryData
@@ -252,12 +234,12 @@ export async function prepareToolCall(params: {
         telemetryData.trace_id = storeSearchTracking.traceId;
     }
 
-    if (!apifyToken && !paymentProvider?.allowsUnauthenticated && !allowUnauthMode) {
+    if (!apifyToken && !allowUnauthMode) {
         return {
             message: dedent`
                 Apify API token is required but was not provided.
                 Please set the APIFY_TOKEN environment variable or pass it as a parameter in the request header as Authorization Bearer <token>.
-                You can get your Apify token from https://console.apify.com/account/integrations.
+                Create an Apify API token at https://console.apify.com/settings/integrations (it is shown only once).
             `,
             toolStatus: TOOL_STATUS.SOFT_FAIL,
             callDiagnostics: { failure_category: FAILURE_CATEGORY.AUTH },
@@ -344,20 +326,18 @@ export async function prepareToolCall(params: {
         decodedArgs = args as Record<string, unknown>;
 
         let {
-            toolArgsWithoutPayment: toolArgs,
+            toolArgs,
             toolArgsRedacted: logSafeArgs,
             apifyClient,
-            paymentRequiredResult,
         } = prepareToolCallContext({
-            provider: paymentProvider,
             tool,
             args: args as Record<string, unknown>,
             apifyToken,
-            meta,
-            requestHeaders,
             requestOrigin,
         });
         apifyClient.storeSearchTracking = storeSearchTracking;
+        // Only ever logged, and a tool input can hold any text.
+        logSafeArgs = sanitizeMezmoValue(logSafeArgs);
 
         log.debug('Validate arguments for tool', {
             toolName: tool.name,
@@ -378,8 +358,7 @@ export async function prepareToolCall(params: {
                 decodedArgs,
             };
         }
-        // Key names only, never values: they show which call shape a rejected client sends. Read before validation,
-        // since AJV removes unknown keys and `toolArgs` can be `decodedArgs` itself (a payment provider may return it).
+        // Key names only, never values: they show which call shape a rejected client sends.
         const argKeys = Object.keys(decodedArgs).slice(0, 20).join(',').slice(0, 200);
         const runInputRewrite = rewriteRunInputAsServerRequest({
             tool,
@@ -440,15 +419,7 @@ export async function prepareToolCall(params: {
             };
         }
 
-        const standbyRejection =
-            buildLegacyMcpSyntaxRejection(tool.name, toolArgs.actor, Array.from(tools.keys())) ??
-            (await checkPaymentProviderStandbyConflict({
-                tool,
-                args: toolArgs,
-                paymentProvider,
-                apifyToken,
-                mcpSessionId: params.mcpSessionId,
-            }));
+        const standbyRejection = buildLegacyMcpSyntaxRejection(tool.name, toolArgs.actor, Array.from(tools.keys()));
 
         return {
             tool,
@@ -458,7 +429,6 @@ export async function prepareToolCall(params: {
             actorName,
             actorId,
             standbyRejection,
-            paymentRequiredResult,
             decodedArgs,
             compatibilityNote: compatibilityNote || undefined,
         };
@@ -488,26 +458,14 @@ export async function executeSyncToolCall(
         progressToken: string | number | undefined;
         tools: Map<string, ToolEntry>;
         actorStore?: ActorStore;
-        paymentProvider?: PaymentProvider;
         signal: AbortSignal;
         sendNotification: (notification: ServerNotification) => Promise<void>;
         emitLog: (msg: { level: string; data?: unknown }) => Promise<void>;
     },
 ): Promise<ToolCallOutcome> {
-    const {
-        apifyToken,
-        toolName,
-        mcpSessionId,
-        progressToken,
-        tools,
-        actorStore,
-        paymentProvider,
-        signal,
-        sendNotification,
-        emitLog,
-    } = params;
-    const { tool, toolArgs, logSafeArgs, apifyClient, actorName, actorId, standbyRejection, paymentRequiredResult } =
-        prepared;
+    const { apifyToken, toolName, mcpSessionId, progressToken, tools, actorStore, signal, sendNotification, emitLog } =
+        params;
+    const { tool, toolArgs, logSafeArgs, apifyClient, actorName, actorId, standbyRejection } = prepared;
     const resolvedToolName = getToolFullName(tool);
 
     const nudge = (result: unknown, callDiagnostics: CallDiagnostics): Record<string, unknown> =>
@@ -519,8 +477,8 @@ export async function executeSyncToolCall(
             failureHttpStatus: callDiagnostics.failure_http_status,
         }) as Record<string, unknown>;
 
-    if (standbyRejection || paymentRequiredResult) {
-        const outcome = buildPreflightFailureOutcome(standbyRejection, paymentRequiredResult, actorName, actorId);
+    if (standbyRejection) {
+        const outcome = buildPreflightFailureOutcome(standbyRejection, actorName, actorId);
         return {
             result: nudge(outcome.result, outcome.callDiagnostics),
             toolStatus: outcome.toolStatus,
@@ -550,7 +508,6 @@ export async function executeSyncToolCall(
             sendNotification,
             emitLog,
             actorStore,
-            paymentProvider,
             tools,
             actorName,
             actorId,

@@ -1,8 +1,8 @@
 /**
  * Configuration shared across the eval harness's responsibilities.
  *
- * The agent's system prompt and tools come from the SDK's `claude_code` presets, so
- * nothing here defines them. The judge runs on OpenRouter (temperature 0.15, see
+ * The agent's system prompt comes from the SDK's `claude_code` preset and its tools from the
+ * Apify MCP server, so nothing here defines them. The judge runs on OpenRouter (temperature 0.15, see
  * judge/openrouter_client.ts) by default, or on the Claude Agent SDK with
  * `--claude-judge` (see judge/claude_client.ts).
  */

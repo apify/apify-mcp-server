@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildReportedProblemProperties, trackReportedProblem, trackToolCall } from '../../src/telemetry.js';
-import type { ToolCallTelemetryProperties } from '../../src/types.js';
+import type { ReportedProblemTelemetryProperties, ToolCallTelemetryProperties } from '../../src/types.js';
 
 // Mock the Segment Analytics client
 const mockTrack = vi.fn();
@@ -15,6 +15,41 @@ vi.mock('@segment/analytics-node', () => ({
         };
     }),
 }));
+
+function mockToolCallProperties(overrides: Partial<ToolCallTelemetryProperties> = {}): ToolCallTelemetryProperties {
+    return {
+        app: 'mcp',
+        app_version: '0.5.6',
+        mcp_client_name: 'test-client',
+        mcp_client_version: '1.0.0',
+        mcp_protocol_version: '2024-11-05',
+        mcp_client_capabilities: {},
+        mcp_session_id: 'session-123',
+        transport_type: 'stdio',
+        mcp_url_client: 'cursor',
+        tool_name: 'call-actor',
+        tool_status: 'SOFT_FAIL',
+        tool_exec_time_ms: 100,
+        ...overrides,
+    };
+}
+
+function mockReportedProblemProperties(
+    overrides: Partial<ReportedProblemTelemetryProperties> = {},
+): ReportedProblemTelemetryProperties {
+    return {
+        app: 'mcp',
+        app_version: '0.5.6',
+        mcp_client_name: 'test-client',
+        mcp_client_version: '1.0.0',
+        mcp_protocol_version: '2024-11-05',
+        mcp_session_id: 'session-123',
+        transport_type: 'stdio',
+        mcp_url_client: 'cursor',
+        message: 'stuck on call-actor',
+        ...overrides,
+    };
+}
 
 describe('telemetry', () => {
     beforeEach(() => {
@@ -138,6 +173,41 @@ describe('telemetry', () => {
             userId: 'test-user-123',
             event: 'MCP Tool Call',
             properties,
+        });
+    });
+});
+
+describe('access tokens are masked in telemetry', () => {
+    const API_TOKEN = `apify_api_${'a1B2'.repeat(9)}`;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    // A bare token has the shape of an Actor name, so it passes every name check on the way here.
+    it('masks a token in any property of the tool call event', () => {
+        const properties = mockToolCallProperties({
+            actor_name: API_TOKEN,
+            failure_detail: `Request with token ${API_TOKEN} failed`,
+        });
+
+        trackToolCall('test-user-123', 'DEV', properties);
+
+        expect(mockTrack.mock.calls[0][0].properties).toEqual({
+            ...properties,
+            actor_name: 'apify_api_***',
+            failure_detail: 'Request with token apify_api_*** failed',
+        });
+    });
+
+    it('masks a token in the reported problem event', () => {
+        const properties = mockReportedProblemProperties({ message: `My token ${API_TOKEN} does not work` });
+
+        trackReportedProblem('test-user-123', 'DEV', properties);
+
+        expect(mockTrack.mock.calls[0][0].properties).toEqual({
+            ...properties,
+            message: 'My token apify_api_*** does not work',
         });
     });
 });

@@ -5,7 +5,6 @@ import {
     actorsCases,
     actorTasksCases,
     appsCases,
-    paymentsCases,
     registerCases,
     registrationCases,
     schedulesCases,
@@ -62,7 +61,6 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             registerCases('storage', storageCases, ctx);
             registerCases('schedules', schedulesCases, ctx);
             registerCases('versions', versionsCases, ctx);
-            registerCases('payments', paymentsCases, ctx);
         },
     );
 }

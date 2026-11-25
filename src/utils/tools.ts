@@ -1,14 +1,9 @@
 import { RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../const.js';
-import type {
-    ActorInterfaceName,
-    CallDiagnostics,
-    HelperTool,
-    ToolBase,
-    ToolEntry,
-    ToolInputSchema,
-} from '../types.js';
+import type { ActorInterfaceName, CallDiagnostics, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
 import { TOOL_TYPE } from '../types.js';
+import { fixActorNameInput } from './actor_name_normalization.js';
 import { fixZodSchemaRequired } from './ajv.js';
+import { isValidResourceId } from './apify_resource_id.js';
 
 /**
  * Returns the canonical full name for a tool.
@@ -53,7 +48,9 @@ export function buildActorFields(
 /**
  * Extract actor name for telemetry from the tool entry or call-actor args.
  * For actor tools, read from the tool entry. For call-actor, parse from the `actor` arg.
- * Returns undefined for other internal tools or when the arg is missing/invalid.
+ * Returns undefined for other internal tools or when the arg is missing/invalid. A value that is not shaped like an
+ * Actor ID or name can be a pasted secret, so it is not returned. The check is on shape only: a bare secret made of
+ * the same characters passes.
  */
 export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>): string | undefined {
     if (tool.type !== TOOL_TYPE.INTERNAL) return tool.actorFullName;
@@ -62,7 +59,8 @@ export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>
     // so a value longer than the argument limit is skipped.
     const actorArg = args?.actor;
     if (typeof actorArg !== 'string' || actorArg.length > RESOURCE_ID_OR_NAME_MAX_LENGTH) return undefined;
-    return actorArg.split(':')[0]?.trim() || undefined;
+    const actorName = fixActorNameInput(actorArg);
+    return isValidResourceId(actorName) ? actorName : undefined;
 }
 
 /**
@@ -119,48 +117,4 @@ export function getToolPublicFieldOnly(tool: ToolBase, options: ToolPublicFieldO
         execution: tool.execution,
         _meta: tool._meta,
     };
-}
-
-export function appendToolDescription(tool: ToolBase, instructions: string): void {
-    if (!tool.description || tool.description.includes(instructions)) return;
-
-    const { buildDescription } = tool;
-    tool.description += `\n\n${instructions}`;
-    if (buildDescription) {
-        tool.buildDescription = (ctx) => `${buildDescription(ctx)}\n\n${instructions}`;
-    }
-}
-
-/**
- * Creates a deep copy of a tool entry, preserving functions like ajvValidate and call
- * while cloning all other properties to avoid shared state mutations.
- */
-export function cloneToolEntry(toolEntry: ToolEntry): ToolEntry {
-    // Store the original functions
-    const originalAjvValidate = toolEntry.ajvValidate;
-    const originalCall = toolEntry.type === TOOL_TYPE.INTERNAL ? toolEntry.call : undefined;
-    const originalRedactArgs = toolEntry.type === TOOL_TYPE.INTERNAL ? toolEntry.redactArgs : undefined;
-    const originalBuildDescription = toolEntry.buildDescription;
-
-    // Create a deep copy using JSON serialization (excluding functions)
-    const cloned = JSON.parse(
-        JSON.stringify(toolEntry, (key, value) => {
-            if (key === 'ajvValidate' || key === 'call') return undefined;
-            return value;
-        }),
-    ) as ToolEntry;
-
-    // Restore the original functions
-    cloned.ajvValidate = originalAjvValidate;
-    if (toolEntry.type === TOOL_TYPE.INTERNAL && originalCall) {
-        (cloned as HelperTool).call = originalCall;
-    }
-    if (originalRedactArgs) {
-        (cloned as HelperTool).redactArgs = originalRedactArgs;
-    }
-    if (originalBuildDescription) {
-        cloned.buildDescription = originalBuildDescription;
-    }
-
-    return cloned;
 }

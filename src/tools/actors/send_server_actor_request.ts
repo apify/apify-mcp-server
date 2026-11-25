@@ -17,7 +17,12 @@ import {
 } from '../../const.js';
 import { getActorMCPServerPath, resolveOnStandbyOrigin } from '../../mcp/actors.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from '../../mcp/const.js';
-import { isTextualMimeType, maskSessionToken, parseCharset, REDACTED } from '../../resources/api_resources.js';
+import {
+    isTextualMimeType,
+    maskSessionToken,
+    parseCharset,
+    REDACTION_PLACEHOLDER,
+} from '../../resources/api_resources.js';
 import type {
     Actor,
     ActorDefinitionPruned,
@@ -31,6 +36,7 @@ import type {
 } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
+import { fixActorNameInput } from '../../utils/actor_name_normalization.js';
 import { fixZodSchemaRequired } from '../../utils/ajv.js';
 import { stripTrailingChars } from '../../utils/generic.js';
 import { toPlainError } from '../../utils/logging.js';
@@ -41,7 +47,7 @@ import { redactApiCallArgs } from '../api/apify_api_request.js';
 import { API_METHODS, type ApiMethod, isRecord } from '../api/apify_api_spec.js';
 import { parseBaseMimeType } from '../storage/storage_helpers.js';
 import { anyJsonBodySchema, serverActorRequestOutputSchema } from '../structured_output_schemas.js';
-import { EMPTY_ACTOR_NAME_MESSAGE, fixActorNameInput } from './actor_tools_factory.js';
+import { EMPTY_ACTOR_NAME_MESSAGE } from './actor_tools_factory.js';
 import { buildActorNotFoundResponse } from './fetch_actor_details.js';
 
 const queryValue = z.union([z.string(), z.number(), z.boolean()]);
@@ -257,11 +263,19 @@ async function sendRequest({
  * `TextDecoder` does not support the charset. In a JSON body whose escapes hide the token, only the string
  * literals holding it are rewritten, so numbers and formatting stay as sent. A body cut at the limit no longer
  * parses whole, so its literals are checked one by one, the unterminated last one included.
+ *
+ * Masking covers a response that contains the token, for example a debug endpoint that returns the request it
+ * received. It keeps the token out of the model's context. It is not what keeps the token from the Actor: the
+ * Apify platform removes the token from the request before the Actor's server sees it, so a response can contain
+ * it only when the caller put it in the request path, query or body. A token returned as sent is always masked.
+ * A server that encodes the token on purpose (another encoding, or a string that is not valid JSON, see
+ * `maskJsonStringLiterals`) is not covered: it already holds the token, and returning it to the caller gains it
+ * nothing.
  */
 function decodeBody(body: Buffer, charset: string, token: string, isTruncated: boolean): string | undefined {
     let text: string;
     try {
-        text = new TextDecoder(charset).decode(maskSessionToken(body, token)).replaceAll(token, REDACTED);
+        text = new TextDecoder(charset).decode(maskSessionToken(body, token)).replaceAll(token, REDACTION_PLACEHOLDER);
     } catch {
         return undefined;
     }
@@ -297,10 +311,12 @@ const LINE_TERMINATORS = new Set(['\n', '\r', '\u2028', '\u2029']);
 function maskStringLiteral(literal: string, token: string, isComplete: boolean): string {
     if (isComplete) {
         const value = parseStringLiteral(literal);
-        return value?.includes(token) ? JSON.stringify(value.replaceAll(token, REDACTED)) : literal;
+        return value?.includes(token) ? JSON.stringify(value.replaceAll(token, REDACTION_PLACEHOLDER)) : literal;
     }
     const value = parseStringLiteral(`${dropCutEscape(literal)}"`);
-    return value?.includes(token) ? JSON.stringify(value.replaceAll(token, REDACTED)).slice(0, -1) : literal;
+    return value?.includes(token)
+        ? JSON.stringify(value.replaceAll(token, REDACTION_PLACEHOLDER)).slice(0, -1)
+        : literal;
 }
 
 /**
@@ -404,8 +420,8 @@ function buildResponse(
     }: Pick<InternalToolArgs, 'apifyToken' | 'loadedToolNames'> & { operations?: readonly string[] },
 ): ToolResponse {
     const { status } = response;
-    const contentType = response.contentType?.replaceAll(token, REDACTED);
-    const location = response.location?.replaceAll(token, REDACTED);
+    const contentType = response.contentType?.replaceAll(token, REDACTION_PLACEHOLDER);
+    const location = response.location?.replaceAll(token, REDACTION_PLACEHOLDER);
     const outcome = `${request.method} ${request.path} on ${request.actorName} returned HTTP ${status}`;
     // A 5xx is a failure, as an Apify API 5xx is in the API tools; any other refusal is the caller's.
     const respondError = (texts: string[], structuredContent?: Record<string, unknown>) =>
@@ -558,7 +574,7 @@ export async function executeSendServerActorRequest(
         interface: 'server',
         tenancy,
         method: args.method,
-        path: `${url.pathname}${url.search}`.replaceAll(apifyToken, REDACTED),
+        path: `${url.pathname}${url.search}`.replaceAll(apifyToken, REDACTION_PLACEHOLDER),
     };
     try {
         const response = await sendRequest({
@@ -590,7 +606,9 @@ export function redactServerActorRequestArgs({ actor, query, ...rest }: Record<s
         actor,
         ...redactApiCallArgs(rest),
         ...(query !== undefined && {
-            query: isRecord(query) ? Object.fromEntries(Object.keys(query).map((name) => [name, REDACTED])) : REDACTED,
+            query: isRecord(query)
+                ? Object.fromEntries(Object.keys(query).map((name) => [name, REDACTION_PLACEHOLDER]))
+                : REDACTION_PLACEHOLDER,
         }),
     };
 }
@@ -657,8 +675,6 @@ export const sendServerActorRequest: ToolEntry = Object.freeze({
     ajvValidate: new Ajv({ coerceTypes: false, strict: false, removeAdditional: true }).compile(
         fixZodSchemaRequired(z.toJSONSchema(sendServerActorRequestArgs)),
     ),
-    // A third-party payment provider cannot pay for an Actor Server run, so such a session is rejected before the call.
-    hasPaymentProviderStandbyCheck: true,
     actorInterface: 'server',
     annotations: {
         title: 'Send Server Actor request',

@@ -92,7 +92,7 @@ describe('delete-actor-version', () => {
         versionDeleteMock.mockResolvedValue(undefined);
     });
 
-    it('is a destructive, idempotent, closed-world tool without payment', () => {
+    it('is a destructive, idempotent, closed-world tool', () => {
         expect(deleteActorVersion.name).toBe(HELPER_TOOLS.ACTOR_VERSION_DELETE);
         expect(deleteActorVersion.annotations).toEqual({
             title: 'Delete Actor version',
@@ -101,7 +101,6 @@ describe('delete-actor-version', () => {
             idempotentHint: true,
             openWorldHint: false,
         });
-        expect((deleteActorVersion as HelperTool).paymentRequired).toBeUndefined();
     });
 
     it('says in its description that a deleted version cannot be restored, and to delete only on request', () => {

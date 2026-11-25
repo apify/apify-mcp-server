@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { fixActorNameInput } from '../../src/tools/actors/actor_tools_factory.js';
+import { fixActorNameInput } from '../../src/utils/actor_name_normalization.js';
 
 describe('fixActorNameInput', () => {
     it('passes clean ids through unchanged', () => {

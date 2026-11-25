@@ -101,7 +101,6 @@ export const reportProblem: ToolEntry = Object.freeze({
     inputSchema: reportProblemInputSchema,
     outputSchema: reportProblemToolOutputSchema,
     ajvValidate: compileSchema(reportProblemInputSchema),
-    paymentRequired: false,
     annotations: {
         title: 'Report a problem',
         readOnlyHint: false,
