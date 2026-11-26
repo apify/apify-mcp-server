@@ -15,6 +15,7 @@ import {
     getApifyErrorType,
     isActorRunLimitError,
     isCannotPublishTaskError,
+    isUsageLimitError,
 } from './apify_errors.js';
 import { wrapJsonText } from './encode_text.js';
 import { getHttpStatusCode } from './logging.js';
@@ -322,6 +323,10 @@ export function getToolCallErrorUserText(toolName: string, error: unknown): stri
     }
     if (isActorRunLimitError(error)) {
         return `Error calling tool "${toolName}": ${msg}. ${ACTOR_RUN_LIMIT_MESSAGE}`;
+    }
+    // No 403 access hint: the API message says why.
+    if (isUsageLimitError(error)) {
+        return `Error calling tool "${toolName}": ${msg}.`;
     }
     if (isCannotPublishTaskError(error)) {
         return (

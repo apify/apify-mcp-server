@@ -30,6 +30,7 @@ import {
     isActorRunLimitError,
     isMemoryQuotaError,
     isPermissionApprovalError,
+    isUsageLimitError,
 } from '../../utils/apify_errors.js';
 import { isValidResourceId } from '../../utils/apify_resource_id.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
@@ -238,6 +239,14 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         mcpSessionId,
         failureCategory: classifyFailureCategory(error),
     });
+
+    if (isUsageLimitError(error)) {
+        return respondServerError(`Failed to call Actor '${actorName}': ${errMsg}`, {
+            error,
+            detail: getApifyErrorType(error) ?? APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS,
+            actorId,
+        });
+    }
 
     if (isMemoryQuotaError(error)) {
         // Deliberately do NOT mention actor-runs-abort as a recovery path — nudging the LLM

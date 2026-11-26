@@ -4,7 +4,7 @@ import { ZodError } from 'zod';
 import log from '@apify/log';
 
 import { INVALID_REQUEST_PATH_DETAIL, InvalidRequestPathError, SchemaTooLargeError } from '../errors.js';
-import { isActorRunLimitError } from './apify_errors.js';
+import { isActorRunLimitError, isUsageLimitError } from './apify_errors.js';
 
 /**
  * Safely extract HTTP status code from errors.
@@ -171,7 +171,7 @@ export function toPlainError(error: unknown, causeDepth = 3): Error {
 /**
  * Logs HTTP or MCP errors at the appropriate level:
  * - Client errors (HTTP < 500, or JSON-RPC client/transient codes) → softFail (no stack).
- * - Zod validation / SchemaTooLarge / Actor run-limit → softFail (untrusted input or billing).
+ * - Zod validation / SchemaTooLarge / Actor run or usage limit → softFail (untrusted input or billing).
  * - Transient upstream (socket hang up, gateway timeout) → softFail.
  * - Server errors (HTTP >= 500, or JSON-RPC server codes) → exception (with stack).
  * - Anything unclassifiable → error.
@@ -187,8 +187,12 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
     const softErrMessage = sanitizeMezmoMessage(rawErrorMessage);
 
     // User concurrent-run / quota limit — arrives wrapped as a 500 but is a user billing condition.
-    if (isActorRunLimitError(error)) {
-        log.softFail(message, { errMessage: softErrMessage, ...data });
+    if (isActorRunLimitError(error) || isUsageLimitError(error)) {
+        log.softFail(message, {
+            errMessage: softErrMessage,
+            ...(statusCode !== undefined ? { statusCode } : {}),
+            ...data,
+        });
         return;
     }
 

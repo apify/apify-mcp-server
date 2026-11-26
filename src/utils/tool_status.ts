@@ -20,7 +20,7 @@ import type {
     ToolStatus,
     ToolTelemetryContext,
 } from '../types.js';
-import { isActorRunLimitError } from './apify_errors.js';
+import { isActorRunLimitError, isUsageLimitError } from './apify_errors.js';
 import { stripQuoteWrappers } from './generic.js';
 import { getHttpStatusCode } from './logging.js';
 import { buildActorFields } from './tools.js';
@@ -90,8 +90,8 @@ export function getToolStatusFromError(error: unknown, isAborted: boolean): Tool
         return TOOL_STATUS.ABORTED;
     }
 
-    // Account run-limit is a user billing condition even when it arrives wrapped as a 5xx.
-    if (isActorRunLimitError(error)) {
+    // Account run and usage limits are billing conditions even when wrapped as a 5xx.
+    if (isActorRunLimitError(error) || isUsageLimitError(error)) {
         return TOOL_STATUS.SOFT_FAIL;
     }
 
@@ -114,6 +114,11 @@ export function getToolStatusFromError(error: unknown, isAborted: boolean): Tool
 export function classifyFailureCategory(error: unknown): FailureCategory {
     if (error instanceof McpError && error.code === ErrorCode.InvalidParams) {
         return FAILURE_CATEGORY.INVALID_INPUT;
+    }
+
+    // Before the 403 → AUTH check.
+    if (isUsageLimitError(error)) {
+        return FAILURE_CATEGORY.USAGE_LIMIT;
     }
 
     // Account run-limit is a user billing condition even when it arrives wrapped as a 5xx.

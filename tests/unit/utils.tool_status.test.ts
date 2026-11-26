@@ -1,5 +1,6 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import type { ActorRun } from 'apify-client';
+import { type ActorRun, ApifyApiError } from 'apify-client';
+import type { AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
@@ -17,6 +18,21 @@ import {
     formatZodIssues,
     getToolStatusFromError,
 } from '../../src/utils/tool_status.js';
+
+const USAGE_LIMIT_403 = new ApifyApiError(
+    {
+        data: { error: { type: 'platform-feature-disabled', message: 'Monthly usage hard limit exceeded' } },
+        status: 403,
+    } as AxiosResponse,
+    1,
+);
+const USAGE_LIMIT_WRAPPED_500 = Object.assign(
+    new Error(
+        'Streamable HTTP error: Error POSTing to endpoint: {"error":{"type":"cannot-start-actor-runs",' +
+            '"message":"Cannot start new Actor runs. Underlying error: Monthly usage hard limit exceeded"}}',
+    ),
+    { statusCode: 500 },
+);
 
 describe('getToolStatusFromError', () => {
     it('returns aborted when isAborted is true', () => {
@@ -51,6 +67,10 @@ describe('getToolStatusFromError', () => {
     it('classifies the concurrent-run limit as soft_fail even when wrapped as a 5xx', () => {
         const error = Object.assign(new Error('Streamable HTTP error: cannot-start-actor-runs'), { statusCode: 500 });
         expect(getToolStatusFromError(error, false)).toBe(TOOL_STATUS.SOFT_FAIL);
+    });
+
+    it('classifies a usage-limit block as soft_fail even when wrapped as a 5xx', () => {
+        expect(getToolStatusFromError(USAGE_LIMIT_WRAPPED_500, false)).toBe(TOOL_STATUS.SOFT_FAIL);
     });
 
     it('classifies unknown errors without status code as failed', () => {
@@ -98,6 +118,13 @@ describe('classifyFailureCategory', () => {
     it('classifies the concurrent-run limit as INVALID_INPUT even when wrapped as a 5xx', () => {
         const error = Object.assign(new Error('Streamable HTTP error: cannot-start-actor-runs'), { statusCode: 500 });
         expect(classifyFailureCategory(error)).toBe(FAILURE_CATEGORY.INVALID_INPUT);
+    });
+
+    it.each([
+        ['a direct 403', USAGE_LIMIT_403],
+        ['a Standby run start wrapped as a 5xx', USAGE_LIMIT_WRAPPED_500],
+    ])('classifies a usage-limit block arriving as %s as USAGE_LIMIT', (_label, error) => {
+        expect(classifyFailureCategory(error)).toBe(FAILURE_CATEGORY.USAGE_LIMIT);
     });
 });
 

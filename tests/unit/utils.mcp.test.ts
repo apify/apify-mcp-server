@@ -272,6 +272,21 @@ describe('getToolCallErrorUserText()', () => {
         expect(text).toContain(ACTOR_RUN_LIMIT_MESSAGE);
     });
 
+    it('passes a usage-limit block through without the 403 hint', () => {
+        const error = new ApifyApiError(
+            {
+                data: { error: { type: 'platform-feature-disabled', message: 'Monthly usage hard limit exceeded' } },
+                status: 403,
+            } as never,
+            1,
+        );
+        const text = getToolCallErrorUserText('apify/instagram-scraper', error);
+        expect(text).toBe(
+            'Error calling tool "apify/instagram-scraper": Monthly usage hard limit exceeded ' +
+                '(API error type: platform-feature-disabled).',
+        );
+    });
+
     it('sources the 401 hint from getHttpErrorHint', () => {
         const error = Object.assign(new Error('Unauthorized'), { statusCode: 401 });
         const text = getToolCallErrorUserText('apify/instagram-scraper', error);

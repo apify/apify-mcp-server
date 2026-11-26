@@ -338,9 +338,47 @@ describe('call_actor_common', () => {
             );
         });
 
-        it('reports cannot-start-actor-runs as failureDetail for a run-limit error without a type', () => {
+        it('passes a usage-limit block through as a USAGE_LIMIT soft fail, without the "verify the Actor name" hint', () => {
+            const error = new ApifyApiError(
+                {
+                    data: {
+                        error: { type: 'platform-feature-disabled', message: 'Monthly usage hard limit exceeded' },
+                    },
+                    status: 403,
+                } as AxiosResponse,
+                1,
+            );
+
+            const response = buildCallActorErrorResponse({
+                actorName: 'apify/instagram-scraper',
+                error,
+                actorId: 'actor-999',
+                loadedToolNames: [HELPER_TOOLS.STORE_SEARCH, HELPER_TOOLS.ACTOR_GET_DETAILS],
+            });
+
+            expect((response.content ?? []).map(textOf)).toEqual([
+                "Failed to call Actor 'apify/instagram-scraper': Monthly usage hard limit exceeded",
+            ]);
+            expect(response.toolTelemetry).toEqual(
+                expect.objectContaining({
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.USAGE_LIMIT,
+                    failureHttpStatus: 403,
+                    failureDetail: 'platform-feature-disabled',
+                    actorId: 'actor-999',
+                }),
+            );
+        });
+
+        it.each([
+            ['a run-limit error', 'Cannot start new Actor runs (cannot-start-actor-runs).'],
+            [
+                'a usage-limit block',
+                'Cannot start new Actor runs (cannot-start-actor-runs). Underlying error: Monthly usage hard limit exceeded',
+            ],
+        ])('reports cannot-start-actor-runs as failureDetail for %s without a type', (_label, message) => {
             // The Standby controller's wrapper reaches us as a plain Error; only its message names the type.
-            const error = new Error('Cannot start new Actor runs (cannot-start-actor-runs).');
+            const error = new Error(message);
 
             const response = buildCallActorErrorResponse({
                 actorName: 'apify/instagram-scraper',

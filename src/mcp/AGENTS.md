@@ -97,8 +97,9 @@ Two MCP protocol revisions are served, each by its own adapter:
 - **Transport negotiation is streamable-first, SSE-fallback** (`client.ts`): try
   streamable HTTP, fall back to SSE on a protocol failure — but a connection
   **timeout** returns `null` with no SSE fallback (a timeout means unreachable, not
-  the wrong transport). `getActorMCPServerPath()` prioritizes the `/mcp` streamable
-  endpoint when an Actor lists several.
+  the wrong transport), and a usage-limit block (`isUsageLimitError`) is thrown with
+  no SSE fallback, so the caller can show the API's message. `getActorMCPServerPath()`
+  prioritizes the `/mcp` streamable endpoint when an Actor lists several.
 - **Two-phase tool loading** (mode-agnostic `getActors()` vs mode-dependent
   `getToolsForServerMode()`) is documented once in
   [`../../DEVELOPMENT.md`](../../DEVELOPMENT.md) — read it before changing

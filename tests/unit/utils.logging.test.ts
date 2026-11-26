@@ -1,5 +1,6 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import { AxiosError, AxiosHeaders } from 'axios';
+import { ApifyApiError } from 'apify-client';
+import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
 
@@ -81,15 +82,37 @@ describe('sanitizeMezmoMessage', () => {
 describe('logHttpError', () => {
     afterEach(() => vi.restoreAllMocks());
 
-    it('soft-fails the run-limit condition even though it arrives wrapped as a 500', () => {
+    it.each([
+        ['the run-limit condition', 'Streamable HTTP error: cannot-start-actor-runs'],
+        [
+            'a usage-limit block',
+            'Streamable HTTP error: Error POSTing to endpoint: {"error":{"type":"cannot-start-actor-runs",' +
+                '"message":"Cannot start new Actor runs. Underlying error: Monthly usage hard limit exceeded"}}',
+        ],
+    ])('soft-fails %s even though it arrives wrapped as a 500', (_label, message) => {
         const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
         const exception = vi.spyOn(log, 'exception').mockImplementation(() => log);
-        const error = Object.assign(new Error('Streamable HTTP error: cannot-start-actor-runs'), { statusCode: 500 });
+        const error = Object.assign(new Error(message), { statusCode: 500 });
 
         logHttpError(error, 'Failed to load tools from MCP server');
 
         expect(exception).not.toHaveBeenCalled();
         expect(softFail).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the HTTP status of a usage-limit block in the log', () => {
+        const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
+        const error = new ApifyApiError(
+            {
+                data: { error: { type: 'platform-feature-disabled', message: 'blocked' } },
+                status: 403,
+            } as AxiosResponse,
+            1,
+        );
+
+        logHttpError(error, 'Failed to call Actor');
+
+        expect(softFail).toHaveBeenCalledWith('Failed to call Actor', expect.objectContaining({ statusCode: 403 }));
     });
 
     // The message of this error quotes the identifier the caller sent, which can be a pasted secret.

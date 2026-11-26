@@ -284,10 +284,12 @@ export const TOOL_STATUS = {
     SOFT_FAIL: 'SOFT_FAIL',
 } as const;
 
+/** `USAGE_LIMIT` also counts unpaid invoices and missing plan features: the API reports them the same way. */
 export const FAILURE_CATEGORY = {
     INVALID_INPUT: 'INVALID_INPUT',
     AUTH: 'AUTH',
     PERMISSION_APPROVAL_REQUIRED: 'PERMISSION_APPROVAL_REQUIRED',
+    USAGE_LIMIT: 'USAGE_LIMIT',
     INTERNAL_ERROR: 'INTERNAL_ERROR',
 } as const;
 
@@ -298,6 +300,8 @@ export const APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS = 'cannot-start-actor-runs
 export const APIFY_ERROR_TYPE_CONCURRENT_RUNS_LIMIT_EXCEEDED = 'concurrent-runs-limit-exceeded';
 export const APIFY_ERROR_TYPE_CANNOT_PUBLISH_ACTOR_TASK = 'cannot-publish-actor-task';
 export const APIFY_ERROR_TYPE_INVALID_INPUT = 'invalid-input';
+export const APIFY_ERROR_TYPE_PLATFORM_FEATURE_DISABLED = 'platform-feature-disabled';
+export const APIFY_ERROR_TYPE_ACTOR_DISABLED = 'actor-disabled';
 export const APIFY_ERROR_TYPE_ACTOR_NAME_NOT_UNIQUE = 'actor-name-not-unique';
 export const APIFY_ERROR_TYPE_VERSION_ALREADY_EXISTS = 'version-already-exists';
 export const APIFY_ERROR_TYPE_TOO_FEW_VERSIONS = 'too-few-versions';
