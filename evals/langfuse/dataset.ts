@@ -52,11 +52,31 @@ const McpAgentMetadataValidator = z.strictObject({
     mcpToolsOnly: z.boolean().optional(),
     /** Runner-injected `--iterations` trial index (1-based). Never hand-authored, never exported. */
     iteration: z.number().int().positive().optional(),
+    /**
+     * Where the case came from: a sanitised production trace, a bug report or issue, a person
+     * who can say why it is hard, or generated. Required in case files; items of the hosted
+     * datasets were written before the field existed.
+     */
+    source: z.enum(['production', 'bug', 'hand', 'synthetic']).optional(),
+    /** The issue link or the one-line reason behind `source`. */
+    sourceNote: z.string().min(1).optional(),
+    /**
+     * `blocking`: a case a release must not break. `tracked`: reported but tolerated, e.g. a
+     * known failure waiting for a fix. Required in case files; a hosted item without it
+     * counts as tracked.
+     */
+    gate: z.enum(['blocking', 'tracked']).optional(),
+    /**
+     * Runner-injected id of a case-file item in a run that is not linked to a dataset. Such an
+     * item must not carry `id`: the Langfuse client reads `id` as a hosted dataset item id and
+     * tries to link the run to it. Never hand-authored, never exported.
+     */
+    caseId: z.string().min(1).optional(),
 });
 
 const McpAgentItemValidator = z
     .object({
-        id: z.string().min(1),
+        id: z.string().min(1).optional(),
         input: z.object({ query: z.string().min(1) }),
         /**
          * Required for `kind: "agent"` (the judge's reference); absent for `kind: "tool-call"`.
@@ -71,6 +91,13 @@ const McpAgentItemValidator = z
         metadata: McpAgentMetadataValidator,
     })
     .superRefine((item, ctx) => {
+        if (item.id === undefined && item.metadata.caseId === undefined) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'an item needs an "id" or a "metadata.caseId"',
+                path: ['id'],
+            });
+        }
         if (item.metadata.kind === 'tool-call' && (item.metadata.expectedTools?.length ?? 0) === 0) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
@@ -129,7 +156,9 @@ const McpAgentItemValidator = z
                 path: ['metadata', 'expectedErrors'],
             });
         }
-    });
+    })
+    // The check above guarantees one of the two; a transform does not run on an item with issues.
+    .transform((item) => ({ ...item, id: item.id ?? (item.metadata.caseId as string) }));
 
 /** The parts of a dataset item a run reads. */
 export type McpAgentItem = z.infer<typeof McpAgentItemValidator>;
@@ -152,7 +181,8 @@ export type McpAgentCase = McpAgentTestCase & { item: DatasetItem };
 export function parseMcpAgentItem(item: unknown): McpAgentItem {
     const parsed = McpAgentItemValidator.safeParse(item);
     if (!parsed.success) {
-        const id = (item as { id?: string } | null)?.id ?? '(unknown)';
+        const raw = item as { id?: string; metadata?: { caseId?: string } } | null;
+        const id = raw?.id ?? raw?.metadata?.caseId ?? '(unknown)';
         throw new Error(`Dataset item "${id}" is not a usable MCP agent test case: ${parsed.error.message}`);
     }
     return parsed.data;
@@ -177,8 +207,11 @@ export function toMcpAgentTestCase(item: unknown): McpAgentTestCase {
         ...(metadata.tools !== undefined && { tools: metadata.tools }),
         ...(metadata.failTools !== undefined && { failTools: metadata.failTools }),
         ...(metadata.mcpToolsOnly !== undefined && { mcpToolsOnly: metadata.mcpToolsOnly }),
-        // metadata.iteration is runner-injected, never hand-authored in the dataset: left out
-        // here so the committed snapshot (built from toMcpAgentTestCase) stays byte-stable.
+        ...(metadata.source !== undefined && { source: metadata.source }),
+        ...(metadata.sourceNote !== undefined && { sourceNote: metadata.sourceNote }),
+        ...(metadata.gate !== undefined && { gate: metadata.gate }),
+        // metadata.iteration and metadata.caseId are runner-injected, never hand-authored: left
+        // out here so the committed snapshot (built from toMcpAgentTestCase) stays byte-stable.
     };
 }
 

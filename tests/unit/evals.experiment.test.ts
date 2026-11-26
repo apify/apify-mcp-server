@@ -2,16 +2,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { JudgeClient } from '../../evals/judge/client.js';
 import {
+    buildExperimentUrl,
+    buildGateBreakdown,
     buildRunSummary,
     createExperimentTask,
     EVALUATORS,
     expandIterations,
+    formatGateBreakdown,
     formatRunSummary,
+    formatStepSummary,
     formatTeardownHint,
     isTransientAgentError,
     resolveExitCode,
     resolveGitBranch,
     substituteUniqMarker,
+    validateCaseSource,
     validateConcurrency,
     validateIterations,
     validatePassThreshold,
@@ -703,6 +708,91 @@ describe('formatRunSummary()', () => {
         expect(texts).toContain('❌ a (iteration 2): missed X');
         expect(texts).toContain('📊 1/2 trials passed (pass_rate 0.50, threshold 0.80)');
         expect(texts).toContain('📈 pass@2 1/1 items · pass^2 0/1 items');
+    });
+});
+
+describe('the gate breakdown of a run', () => {
+    const summary = buildRunSummary(
+        ['pr/call-actor/blocking-pass', 'pr/call-actor/blocking-fail', 'pr/call-actor/tracked-pass'],
+        [
+            makeScoredToolCallItem('pr/call-actor/blocking-pass', 1),
+            makeScoredToolCallItem('pr/call-actor/blocking-fail', 0),
+            makeScoredToolCallItem('pr/call-actor/tracked-pass', 1),
+        ],
+        1,
+    );
+    const blockingIds = new Set(['pr/call-actor/blocking-pass', 'pr/call-actor/blocking-fail']);
+
+    it('counts the trials of blocking cases apart from all other cases', () => {
+        expect(buildGateBreakdown(summary, blockingIds)).toEqual({
+            blocking: { passedTrials: 1, requestedTrials: 2 },
+            tracked: { passedTrials: 1, requestedTrials: 1 },
+        });
+    });
+
+    it('counts a dropped trial as requested and not passed', () => {
+        const dropped = buildRunSummary(['pr/call-actor/blocking-pass'], [], 1);
+        expect(buildGateBreakdown(dropped, blockingIds).blocking).toEqual({ passedTrials: 0, requestedTrials: 1 });
+    });
+
+    it('prints each gate with its rate, and no rate for a gate without cases', () => {
+        expect(formatGateBreakdown(buildGateBreakdown(summary, new Set()))).toBe('blocking 0/0, tracked 2/3 (0.67)');
+    });
+});
+
+describe('the step summary of a run', () => {
+    const summary = buildRunSummary(['pr/call-actor/run'], [makeScoredToolCallItem('pr/call-actor/run', 1)], 1);
+    const options = {
+        runName: 'pr-master-16b7979',
+        summary,
+        passThreshold: 0.9,
+        gateBreakdown: buildGateBreakdown(summary, new Set<string>()),
+    };
+
+    it('reports the pass rate, the split by gate and the experiment link', () => {
+        const experimentUrl = 'https://langfuse.example/project/p1/experiments/results?baseline=e1';
+        const text = formatStepSummary({ ...options, experimentUrl });
+
+        expect(text).toContain('pr-master-16b7979');
+        expect(text).toContain('1/1 trials (1.00, threshold 0.90)');
+        expect(text).toContain(formatGateBreakdown(options.gateBreakdown));
+        expect(text).toContain(experimentUrl);
+    });
+
+    it('leaves the link line out when the run has no URL', () => {
+        expect(formatStepSummary(options)).not.toContain('Langfuse');
+    });
+});
+
+describe('buildExperimentUrl()', () => {
+    it('addresses the experiment in its project, whether or not the base URL ends with a slash', () => {
+        const expected = 'https://langfuse.example/project/p1/experiments/results?baseline=e1';
+        expect(buildExperimentUrl('https://langfuse.example', 'p1', 'e1')).toBe(expected);
+        expect(buildExperimentUrl('https://langfuse.example/', 'p1', 'e1')).toBe(expected);
+    });
+});
+
+describe('validateCaseSource()', () => {
+    it('accepts --cases alone, --dataset alone, neither, and --cases with --link-dataset', () => {
+        expect(() => validateCaseSource({ cases: 'evals/cases/pr' })).not.toThrow();
+        expect(() => validateCaseSource({ dataset: 'mcp-server-evals-pr' })).not.toThrow();
+        expect(() => validateCaseSource({})).not.toThrow();
+        expect(() => validateCaseSource({ cases: 'evals/cases/pr', linkDataset: 'mcp-server-evals-pr' })).not.toThrow();
+    });
+
+    it('rejects --cases together with --dataset', () => {
+        expect(() => validateCaseSource({ cases: 'evals/cases/pr', dataset: 'mcp-server-evals-pr' })).toThrow(
+            /--cases and --dataset/,
+        );
+    });
+
+    it('rejects --link-dataset without --cases', () => {
+        expect(() => validateCaseSource({ linkDataset: 'mcp-server-evals-pr' })).toThrow(
+            /--link-dataset needs --cases/,
+        );
+        expect(() =>
+            validateCaseSource({ dataset: 'mcp-server-evals-pr', linkDataset: 'mcp-server-evals-pr' }),
+        ).toThrow(/--link-dataset needs --cases/);
     });
 });
 
