@@ -10,6 +10,7 @@
 import type { ApifyClient } from '../apify_client.js';
 import type { ActorStoreList } from '../types.js';
 import { sanitizeUseCase } from './mcp_clients.js';
+import { IS_UNSTABLE_STORE_SEARCH_ENABLED, searchActorsViaUnstableEndpoint } from './store_unstable.js';
 
 export type SearchActorsByKeywordsOptions = {
     search: string;
@@ -26,6 +27,7 @@ export type SearchActorsByKeywordsOptions = {
 export type SearchAgentSafeActorsOptions = {
     keywords: string;
     apifyClient: ApifyClient;
+    /** `limit` and `offset` page `GET /v2/store`; `/unstable/store` ignores them and decides the count itself. */
     limit: number;
     offset: number;
     /** Why the user is searching, as the model wrote it; sent as `_useCase` after {@link sanitizeUseCase}. */
@@ -46,20 +48,27 @@ export async function searchActorsByKeywords(options: SearchActorsByKeywordsOpti
 }
 
 /**
- * Store search used by the `search-actors` tools (plain and widget).
+ * Store search used by the `search-actors` tools (plain and widget), on `/unstable/store` when
+ * `APIFY_STORE_UNSTABLE_ENDPOINT` is on.
  * Always requests input schemas, so `limit` must stay within `MAX_LIMIT_WITH_INPUT_SCHEMA` (the tool's arg schema enforces it).
  */
 export async function searchAgentSafeActors(options: SearchAgentSafeActorsOptions): Promise<ActorStoreList[]> {
     const { keywords, apifyClient, limit, offset, useCase } = options;
+    // The Store returns no Actors for keywords without letters or digits (" ", "%", "..."),
+    // so send them as empty keywords.
+    const search = /[\p{L}\p{N}]/u.test(keywords) ? keywords : '';
+    const tracking = { ...apifyClient.storeSearchTracking, useCase: sanitizeUseCase(useCase) };
+
+    if (IS_UNSTABLE_STORE_SEARCH_ENABLED) {
+        return searchActorsViaUnstableEndpoint({ search, apifyClient, tracking });
+    }
 
     return searchActorsByKeywords({
-        // The Store returns no Actors for keywords without letters or digits (" ", "%", "..."),
-        // so send them as empty keywords.
-        search: /[\p{L}\p{N}]/u.test(keywords) ? keywords : '',
+        search,
         apifyClient,
         limit,
         offset,
-        tracking: { ...apifyClient.storeSearchTracking, useCase: sanitizeUseCase(useCase) },
+        tracking,
         includeInputSchema: true,
     });
 }

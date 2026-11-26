@@ -234,6 +234,11 @@ export const actorInfoSchema = {
             description:
                 'Total number of input fields before truncation; present only when `inputFields` was truncated.',
         },
+        extraFields: {
+            type: 'object' as const,
+            additionalProperties: true,
+            description: 'Further Actor data from the Store, as it comes.',
+        },
     },
     required: ['url', 'id', 'fullName', 'developer', 'description', 'categories', 'isDeprecated'],
 };
