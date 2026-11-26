@@ -345,11 +345,11 @@ importers:
         specifier: ^0.3.4
         version: 0.3.4(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(styled-components@6.4.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))
       '@apify/ui-icons':
-        specifier: ^1.54.0
-        version: 1.54.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        specifier: ^1.61.3
+        version: 1.61.3(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@apify/ui-library':
-        specifier: ^1.168.1
-        version: 1.168.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(styled-components@6.4.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))
+        specifier: ^1.176.7
+        version: 1.176.7(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(styled-components@6.4.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))
       '@modelcontextprotocol/ext-apps':
         specifier: ^1.1.2
         version: 1.7.2(@modelcontextprotocol/sdk@1.32.1(zod@4.6.7))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(zod@4.6.7)
@@ -540,14 +540,14 @@ packages:
   '@apify/tsconfig@0.1.2':
     resolution: {integrity: sha512-9dzEI1ZQ5+iM0k0fmPJrpdSSPUolVdeI1nDGFZMjD9UabTmIvjQrzui+1a25uy913AUEBrKTojEPj87pU9/Ekg==}
 
-  '@apify/ui-icons@1.54.0':
-    resolution: {integrity: sha512-GooiK7N7+r4OQIpGbbJ2QkdVljfXScp9oBn3W/0L1DeLpDjp1o788wzlk92KqseGC5oYru43mJny4dEuzGZMFA==}
+  '@apify/ui-icons@1.61.3':
+    resolution: {integrity: sha512-io9U2THUnHCcjpyRfzKaJdFhdyFotm7xRLWtmz8Yo0DsDMrtJFOlopvB7RokdPaoGrB1pMqbAmyFrJ4qJBPy3A==}
     peerDependencies:
       react: 17.x || 18.x || 19.x
       react-dom: 17.x || 18.x || 19.x
 
-  '@apify/ui-library@1.168.1':
-    resolution: {integrity: sha512-AVw+KCpnCIBgKqyV6cszL0AxBwt0YxFihZNuoCX2RdQGsL97VWie4nbB+6JtjeRQvHNmHEZta1kVkabyhs18VQ==}
+  '@apify/ui-library@1.176.7':
+    resolution: {integrity: sha512-zlS9wkzh3OT/OPLP++2+DfnH2K/clSc1KRfmwijV3m5on7mgZltiDmjlcPODG+qoXWyI2IA87fu2Io/2iXd4Jg==}
     peerDependencies:
       react: 17.x || 18.x || 19.x
       react-dom: 17.x || 18.x || 19.x
@@ -2732,10 +2732,6 @@ packages:
   decode-named-character-reference@1.3.0:
     resolution: {integrity: sha512-GtpQYB283KrPp6nRw50q3U9/VfOutZOe103qlN7BPP6Ad27xYnOIWv4lPzo8HCAL+mMZofJ9KEy30fq6MfaK6Q==}
 
-  decode-uri-component@0.5.1:
-    resolution: {integrity: sha512-vWHQkXgg2cE3BB4rR0c+PYw9BCQzLoNIRMI7AunIkZst74tw/vpPp7VLoYtsR/cy1f55g3XDWUslfeCZjiZJyA==}
-    engines: {node: '>=14.16'}
-
   dedent@1.7.2:
     resolution: {integrity: sha512-WzMx3mW98SN+zn3hgemf4OzdmyNhhhKz5Ay0pUfQiMQ3e1g+xmTJWp/pKdwKVXhdSkAEGIIzqeuWrL3mV/AXbA==}
     peerDependencies:
@@ -2951,9 +2947,9 @@ packages:
     resolution: {integrity: sha512-YsGpe3WHLK8ZYi4tWDg2Jy3ebRz2rXowDxnld4bkQB00cc/1Zw9AWnC0i9ztDJitivtQvaI9KaLyKrc+hBW0yg==}
     engines: {node: '>=8'}
 
-  filter-obj@5.1.0:
-    resolution: {integrity: sha512-qWeTREPoT7I0bifpPUXtxkZJ1XJzxWtfoWWkdVGqa+eCr3SHW/Ocp89o8vLvbUuQnadybJpjOKu4V+RwO6sGng==}
-    engines: {node: '>=14.16'}
+  filter-obj@6.1.0:
+    resolution: {integrity: sha512-xdMtCAODmPloU9qtmPcdBV9Kd27NtMse+4ayThxqIHUES5Z2S6bGpap5PpdmNM56ub7y3i1eyr+vJJIIgWGKmA==}
+    engines: {node: '>=18'}
 
   finalhandler@1.3.2:
     resolution: {integrity: sha512-aA4RyPcd3badbdABGDuTXCMTtOneUCAYH/gxoYRTZlIJdF0YPWuGqiAsIrhNnnqdXGswYk6dGujem4w80UJFhg==}
@@ -3860,9 +3856,9 @@ packages:
     resolution: {integrity: sha512-jd3COkaKVgGUW+ZHyEHCG9bH7RoaaiWuMgzsIBjUMVjLAaWGWpoUAVwljVvBHxRu/2qEHnadLGZrkutYUBPQJA==}
     engines: {node: '>=0.6'}
 
-  query-string@8.2.0:
-    resolution: {integrity: sha512-tUZIw8J0CawM5wyGBiDOAp7ObdRQh4uBor/fUR9ZjmbZVvw95OD9If4w3MQxr99rg0DJZ/9CIORcpEqU5hQG7g==}
-    engines: {node: '>=14.16'}
+  query-string@10.0.0:
+    resolution: {integrity: sha512-QYodx/Ywk8lCcOmsyupXVN91yWPAdjq0xVqE2FE2BHFYnma71C8txR8JCBptjzoUpkfAK7Qjua9VjYRTru4LYg==}
+    engines: {node: '>=22'}
 
   queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
@@ -4109,9 +4105,9 @@ packages:
   space-separated-tokens@2.0.2:
     resolution: {integrity: sha512-PEGlAwrG8yXGXRjW32fGbg66JAlOAwbObuqVoJpv/mRgoWDQfgH1wDPvtzWyUSNAXBGSk8h755YDbbcEy3SH2Q==}
 
-  split-on-first@3.0.0:
-    resolution: {integrity: sha512-qxQJTx2ryR0Dw0ITYyekNQWpz6f8dGd7vffGNflQQ3Iqj9NJ6qiZ7ELpZsJ/QBhIVAiDfXdag3+Gp8RvWa62AA==}
-    engines: {node: '>=12'}
+  split-on-first@4.0.0:
+    resolution: {integrity: sha512-pyrgNqiEBHA9KlEtg9quYGagtrlTyukL3ryQ+RmjRn9SYmcNQmfa+sWIsI+hlcL4WrmFdrt7IfM6o8ktBAooDQ==}
+    engines: {node: '>=20'}
 
   stackback@0.0.2:
     resolution: {integrity: sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==}
@@ -4656,8 +4652,8 @@ snapshots:
 
   '@apify/mcp-widgets@0.3.4(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(styled-components@6.4.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))':
     dependencies:
-      '@apify/ui-icons': 1.54.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@apify/ui-library': 1.168.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(styled-components@6.4.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))
+      '@apify/ui-icons': 1.61.3(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@apify/ui-library': 1.176.7(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(styled-components@6.4.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))
       pluralize: 8.0.0
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
@@ -4690,15 +4686,15 @@ snapshots:
 
   '@apify/tsconfig@0.1.2': {}
 
-  '@apify/ui-icons@1.54.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
+  '@apify/ui-icons@1.61.3(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
       clsx: 2.1.1
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
 
-  '@apify/ui-library@1.168.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(styled-components@6.4.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))':
+  '@apify/ui-library@1.176.7(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(styled-components@6.4.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))':
     dependencies:
-      '@apify/ui-icons': 1.54.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@apify/ui-icons': 1.61.3(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@floating-ui/react': 0.27.19(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@floating-ui/react-dom': 2.1.8(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@radix-ui/react-checkbox': 1.3.3(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -4715,7 +4711,7 @@ snapshots:
       lodash: 4.18.1
       prism-react-renderer: 2.4.1(react@19.3.1)
       prismjs: 1.30.0
-      query-string: 8.2.0
+      query-string: 10.0.0
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
       react-markdown: 10.1.0(@types/react@19.3.0)(react@19.3.1)
@@ -4725,6 +4721,7 @@ snapshots:
       remark-gfm: 4.0.1
       remark-toc: 9.0.0
       slugify: 1.6.9
+      style-to-object: 1.0.14
       styled-components: 6.4.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       unist-util-visit: 5.1.0
     transitivePeerDependencies:
@@ -6718,8 +6715,6 @@ snapshots:
     dependencies:
       character-entities: 2.0.2
 
-  decode-uri-component@0.5.1: {}
-
   dedent@1.7.2(babel-plugin-macros@3.1.0):
     optionalDependencies:
       babel-plugin-macros: 3.1.0
@@ -6977,7 +6972,7 @@ snapshots:
     dependencies:
       to-regex-range: 5.0.1
 
-  filter-obj@5.1.0: {}
+  filter-obj@6.1.0: {}
 
   finalhandler@1.3.2:
     dependencies:
@@ -8093,11 +8088,10 @@ snapshots:
       es-define-property: 1.0.1
       side-channel: 1.1.1
 
-  query-string@8.2.0:
+  query-string@10.0.0:
     dependencies:
-      decode-uri-component: 0.5.1
-      filter-obj: 5.1.0
-      split-on-first: 3.0.0
+      filter-obj: 6.1.0
+      split-on-first: 4.0.0
 
   queue-microtask@1.2.3: {}
 
@@ -8447,7 +8441,7 @@ snapshots:
 
   space-separated-tokens@2.0.2: {}
 
-  split-on-first@3.0.0: {}
+  split-on-first@4.0.0: {}
 
   stackback@0.0.2: {}
 

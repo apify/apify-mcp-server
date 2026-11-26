@@ -12,8 +12,8 @@
     "description": "",
     "dependencies": {
         "@apify/mcp-widgets": "^0.3.4",
-        "@apify/ui-icons": "^1.54.0",
-        "@apify/ui-library": "^1.168.1",
+        "@apify/ui-icons": "^1.61.3",
+        "@apify/ui-library": "^1.176.7",
         "@modelcontextprotocol/ext-apps": "^1.1.2",
         "pluralize": "^8.0.0",
         "react": "^19.3.1",
