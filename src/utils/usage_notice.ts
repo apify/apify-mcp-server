@@ -6,6 +6,7 @@ import { type ApifyClient, getApifyAPIBaseUrl, sendApifyApiRequest } from '../ap
 import { HELPER_TOOLS } from '../const.js';
 import type { McpClientContext } from '../mcp/client_context.js';
 import { TOOL_TYPE, type ToolEntry } from '../types.js';
+import { sanitizeMezmoMessage } from './logging.js';
 import { getToolFullName } from './tools.js';
 import { TTLLRUCache } from './ttl_lru.js';
 
@@ -31,6 +32,8 @@ const NO_NOTICE_CACHE_MAX_SIZE = 10_000;
 const NO_NOTICE_CACHE_TTL_SECS = 5 * 60;
 /** How long a finished tool call waits for the notice; after that it returns without one. */
 const USAGE_NOTICE_TIMEOUT_MS = 2_000;
+/** The API answers a longer client name with a 400, which would count as "no notice" on every call. */
+export const MCP_CLIENT_NAME_MAX_LENGTH = 200;
 
 export type UsageNoticeOptions = {
     mcpClientName: string;
@@ -55,7 +58,7 @@ export function getUsageNoticeOptions(
     clientContext: McpClientContext | undefined,
 ): UsageNoticeOptions | undefined {
     if (!host.telemetryEnabled) return undefined;
-    return { mcpClientName: clientContext?.clientInfo?.name ?? '' };
+    return { mcpClientName: (clientContext?.clientInfo?.name ?? '').slice(0, MCP_CLIENT_NAME_MAX_LENGTH) };
 }
 
 /**
@@ -115,7 +118,7 @@ export async function appendUsageNotice(
         return { ...result, content: [...content, { type: 'text', text: notice }] };
     } catch (error) {
         log.softFail('Failed to get the usage notice', {
-            errMessage: error instanceof Error ? error.message : String(error),
+            errMessage: sanitizeMezmoMessage(error instanceof Error ? error.message : String(error)),
         });
         return result;
     }

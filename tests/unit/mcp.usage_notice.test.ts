@@ -99,6 +99,11 @@ describe('usage notice on an Actor tool result', () => {
             );
 
             expect(result.content).toEqual([...ACTOR_RESULT.content, { type: 'text', text: NOTICE }]);
+            expect(requestApi).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: { toolName: 'test/actor', mcpClientName: initialize.clientInfo.name },
+                }),
+            );
         }, serverOptions());
     });
 
