@@ -22,10 +22,14 @@ const nudgeCount = (r: { content: { text: string }[] }) =>
 
 describe('sendFeedback', () => {
     describe('call()', () => {
-        it('acknowledges a submission that has a message', async () => {
-            const result = await (sendFeedback as HelperTool).call(
-                stubToolCallContext({ message: 'The search-actors results were unclear.' }, mockApifyClient()),
-            );
+        const SUBMISSION = {
+            message: 'The search-actors results were unclear.',
+            sentiment: 'negative',
+            category: 'other',
+        };
+
+        it('acknowledges a submission', async () => {
+            const result = await (sendFeedback as HelperTool).call(stubToolCallContext(SUBMISSION, mockApifyClient()));
             const { content, isError } = result as TextToolResult;
 
             expect(isError).toBe(false);
@@ -33,9 +37,7 @@ describe('sendFeedback', () => {
         });
 
         it('returns structuredContent conforming to the declared outputSchema', async () => {
-            const result = await (sendFeedback as HelperTool).call(
-                stubToolCallContext({ message: 'The search-actors results were unclear.' }, mockApifyClient()),
-            );
+            const result = await (sendFeedback as HelperTool).call(stubToolCallContext(SUBMISSION, mockApifyClient()));
 
             expect((result as TextToolResult).structuredContent).toEqual({ reported: true });
             expect((sendFeedback as HelperTool).outputSchema).toBe(sendFeedbackToolOutputSchema);
@@ -63,20 +65,15 @@ describe('sendFeedback', () => {
 
     describe('input validation', () => {
         const validate = (sendFeedback as HelperTool).ajvValidate;
-        // AJV strips undeclared keys from the object it validates (removeAdditional), so tests pass a copy.
         const VALID_ARGS = { message: 'stuck', sentiment: 'negative', category: 'bug' } as const;
 
-        it('requires a message', () => {
-            const { message: _message, ...withoutMessage } = VALID_ARGS;
-            expect(validate(withoutMessage)).toBe(false);
+        it.each(['message', 'sentiment', 'category'] as const)('requires %s', (field) => {
+            const { [field]: _omitted, ...withoutField } = VALID_ARGS;
+            expect(validate(withoutField)).toBe(false);
         });
 
-        it('rejects a call with only a message', () => {
-            expect(validate({ message: 'stuck' })).toBe(false);
-        });
-
-        it('rejects a category outside the list', () => {
-            expect(validate({ ...VALID_ARGS, category: 'praise' })).toBe(false);
+        it.each(['sentiment', 'category', 'source'] as const)('rejects a %s outside the list', (field) => {
+            expect(validate({ ...VALID_ARGS, [field]: 'praise' })).toBe(false);
         });
 
         it('accepts a message at the 2000-character cap', () => {

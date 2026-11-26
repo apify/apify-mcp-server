@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { HELPER_TOOLS, RAG_WEB_BROWSER, RENAMED_SELECTOR_NAMES, WEB_FETCH } from '../../src/const.js';
+import { HELPER_TOOLS, RAG_WEB_BROWSER, WEB_FETCH } from '../../src/const.js';
 import { parseInputParamsFromUrl } from '../../src/mcp/utils.js';
 import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { ALL_TOOLS_PRESENT, SERVER_MODE } from '../../src/types.js';
@@ -424,9 +424,10 @@ describe('Claude-connector tool surface (no call-actor)', () => {
     const listedUrl = `https://mcp.apify.com/?tools=${CLAUDE_CONNECTOR_TOOLS.join(',')}&client=claude`;
 
     // Internal-tool subset of the fixture: Actor selectors (contain '/') resolve only with pre-fetched Actor tools.
-    // A renamed selector is served under its current name.
-    const expectedInternalToolNames = CLAUDE_CONNECTOR_TOOLS.filter((tool) => !tool.includes('/')).map(
-        (tool) => RENAMED_SELECTOR_NAMES.get(tool) ?? tool,
+    // The old `report-problem` selector is served as `send-feedback`. Spelled out, not read from
+    // `RENAMED_SELECTOR_NAMES`, so a change to that map cannot change this pinned surface unnoticed.
+    const expectedInternalToolNames = CLAUDE_CONNECTOR_TOOLS.filter((tool) => !tool.includes('/')).map((tool) =>
+        tool === 'report-problem' ? HELPER_TOOLS.FEEDBACK_SEND : tool,
     );
 
     const resolveToolNames = (url: string) =>
