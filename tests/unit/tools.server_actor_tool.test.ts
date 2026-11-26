@@ -406,7 +406,11 @@ async function loadTools(
     });
     const { apifyClient } = mockActorBuildClient({
         actor,
-        defaultBuild: mockDefaultBuild({ webServerMcpPath: options.webServerMcpPath, webServerSchema: schema }),
+        defaultBuild: mockDefaultBuild({
+            webServerMcpPath: options.webServerMcpPath,
+            // Cast: publisher schemas are unvalidated, so the tests also pass values the type rules out.
+            webServerSchema: schema as Record<string, unknown>,
+        }),
     });
     return getActorsAsTools([`${actor.username}/${actor.name}`], apifyClient, { isDirectTool: options.isDirectTool });
 }

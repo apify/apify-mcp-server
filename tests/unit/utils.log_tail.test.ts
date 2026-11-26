@@ -1,8 +1,8 @@
 import { ApifyApiError } from 'apify-client';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import { MAX_INLINE_BYTES } from '../../src/const.js';
-import { ERROR_BODY_MAX_BYTES, readLogTail, sliceLogTail, TailBuffer } from '../../src/utils/log_tail.js';
+import { readLogTail, sliceLogTail, TailBuffer } from '../../src/utils/log_tail.js';
 import { startLogServer } from './helpers/log_server.js';
 
 const logServer = await startLogServer();
@@ -118,17 +118,6 @@ describe('readLogTail', () => {
         expect(logServer.userAgent(id)).toMatch(/^ApifyClient\//);
     });
 
-    it('reads an error body only up to ERROR_BODY_MAX_BYTES', async () => {
-        const fillerBytes = 64 * 1024 * 1024;
-        const id = logServer.serveResponses([{ status: 400, contentType: 'text/plain', fillerBytes }]);
-
-        const error = await readLogTail(logServer.client, logUrl(id)).catch((err: unknown) => err);
-
-        expect((error as ApifyApiError).message.length).toBeLessThan(ERROR_BODY_MAX_BYTES + 100);
-        // Socket buffers take some bytes the reader never asks for, far fewer than the body.
-        expect(logServer.bytesWritten(id)).toBeLessThan(fillerBytes / 4);
-    });
-
     describe('retries', () => {
         const retryingClient = () => logServer.createClient({ maxRetries: 2, minDelayBetweenRetriesMillis: 1 });
 
@@ -147,12 +136,13 @@ describe('readLogTail', () => {
         it('throws an error that is not a network failure unchanged, without retrying', async () => {
             const id = logServer.serveLog('line\n');
             const client = retryingClient();
-            const bug = new TypeError('interceptor failed');
-            client.httpClient.axios.interceptors.request.use(() => {
+            const bug = new TypeError('fetch wrapper failed');
+            vi.stubGlobal('fetch', async () => {
                 throw bug;
             });
 
             await expect(readLogTail(client, client.run(id).log().url)).rejects.toBe(bug);
+            vi.unstubAllGlobals();
             expect(logServer.requestCount(id)).toBe(0);
         });
     });

@@ -2,7 +2,6 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { ApifyClient as ApifyClientBase } from 'apify-client';
-import { AxiosError } from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
@@ -630,10 +629,11 @@ describe('executeToolAndUpdateTask()', () => {
 
     it('logs a failed Apify API request without its headers or body', async () => {
         const client = new ApifyClientBase({ token: 'test-token', maxRetries: 0 });
-        // axios rejects a connection failure with the request config attached.
-        client.httpClient.axios.defaults.adapter = async (config) => {
-            throw new AxiosError('read ECONNRESET', 'ECONNRESET', config);
-        };
+        // `fetch` rejects a connection failure with the network error as its cause.
+        vi.stubGlobal('fetch', async () => {
+            const cause = Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' });
+            throw new TypeError('fetch failed', { cause });
+        });
         const error = await client
             .actor('apify/rag-web-browser')
             .start({ query: 'input-value' })

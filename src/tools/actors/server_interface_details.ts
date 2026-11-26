@@ -133,7 +133,7 @@ function buildServerInterfaceFacts(
     operationCount: number,
     canSend: boolean,
 ): ServerInterfaceDetails {
-    const idleTimeoutSecs = actor.actorStandby?.idleTimeoutSecs;
+    const idleTimeoutSecs = actor.actorStandby?.idleTimeoutSecs ?? undefined;
     // Shown only when it is a URL requests would be sent to, the same check as the tools that send.
     const baseUrl = canSend ? undefined : resolveOnStandbyOrigin(actor, '/')?.standbyOrigin;
     return {

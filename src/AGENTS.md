@@ -22,8 +22,11 @@ directory you're editing.
   envelope) traffic to the stateless adapter, everything else to the stateful flow.
 - `input.ts` — input processing (`processInput`, used by `stdio.ts` and the HTTP URL-param parser in `mcp/utils.ts`).
 - `apify_client.ts` — the Apify API client wrapper; use it rather than calling the
-  API directly. Every instance sends through one process-wide keep-alive `ProxyAgent`
-  (`sharedAgent`), so constructing a client per request costs no sockets. `state.ts` — TTL caches. `const.ts`, `errors.ts`,
+  API directly. It runs on apify-client's `fetch` transport: every instance sends through the global `fetch`
+  (one connection pool per process, so constructing a client per request costs no sockets), or through undici
+  with an `EnvHttpProxyAgent` when a proxy variable is set that Node.js is not reading (`sendThroughTransport`).
+  The client's `fetch` wrapper (`buildClientFetch`) does what a request interceptor did before: the URL check,
+  the forwarded headers, and the response cap of `sendApifyApiRequest`. `state.ts` — TTL caches. `const.ts`, `errors.ts`,
   `types.ts`, `telemetry.ts`, `instrument.ts`, `server_card.ts` — shared spine.
 
 ## Subdirectories

@@ -1,4 +1,4 @@
-import type { ActorRun } from 'apify-client';
+import type { Run } from 'apify-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS, KV_KEYS_LIMIT, TIP_MESSAGE_LIMIT } from '../../src/const.js';
@@ -1027,7 +1027,7 @@ describe('get-actor-run default response', () => {
 // -----------------------------------------------------------------------------
 
 // Shared by buildStartRunResponse() and buildStartRunWidgetResponse() below — both builders
-// consume the same ActorRun shape.
+// consume the same Run shape.
 const actorRun = {
     id: 'run-abc',
     actId: 'actor-xyz',
@@ -1035,7 +1035,7 @@ const actorRun = {
     startedAt: new Date('2026-01-02T03:04:05.000Z'),
     defaultDatasetId: 'dataset-abc',
     defaultKeyValueStoreId: 'kv-abc',
-} as unknown as ActorRun;
+} as unknown as Run;
 
 describe('buildStartRunResponse()', () => {
     it('builds correct RunResponse shape without widget metadata', () => {
@@ -1072,7 +1072,7 @@ describe('buildStartRunResponse()', () => {
                 datasets: { default: 'dataset-abc', errors: 'dataset-errors' },
                 keyValueStores: { default: 'kv-abc', debug: 'kv-debug' },
             },
-        } as unknown as ActorRun;
+        } as unknown as Run;
 
         const result = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun: runWithAliases });
         const { structuredContent } = result as { structuredContent: RunResponse };

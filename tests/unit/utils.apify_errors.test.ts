@@ -1,7 +1,7 @@
 import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import type { ApifyResponse } from 'apify-client';
 import { ApifyApiError } from 'apify-client';
-import type { AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -13,7 +13,7 @@ import {
 } from '../../src/utils/apify_errors.js';
 
 function apifyApiError(type: string, status = 402): ApifyApiError {
-    return new ApifyApiError({ data: { error: { type, message: type } }, status } as AxiosResponse, 1);
+    return new ApifyApiError({ data: { error: { type, message: type } }, status } as ApifyResponse, 1);
 }
 
 describe('isActorRunLimitError', () => {

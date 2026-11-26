@@ -3,8 +3,12 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import type {
     ActorClient,
     ApifyClientOptions,
+    ApifyRequestConfig,
+    ApifyResponse,
     BuildClient,
     DatasetClient,
+    FetchFunction,
+    HttpResponseHeaders,
     KeyValueClientGetRecordOptions,
     KeyValueStoreClient,
     LogClient,
@@ -17,10 +21,8 @@ import type {
     WebhookClient,
     WebhookDispatchClient,
 } from 'apify-client';
-import { ApifyClient as _ApifyClient } from 'apify-client';
-import type { AxiosRequestConfig, AxiosResponse } from 'axios';
-import { isAxiosError } from 'axios';
-import { ProxyAgent } from 'proxy-agent';
+import { ApifyClient as _ApifyClient, FetchHttpClient } from 'apify-client';
+import type { RequestInit as UndiciRequestInit } from 'undici';
 
 import { API_PUBLIC_BASE_URL, API_PUBLIC_BASE_URL_STAGING, MAX_INLINE_BYTES, STAGING_MCP_HOSTNAME } from './const.js';
 import { InvalidRequestPathError } from './errors.js';
@@ -39,52 +41,46 @@ export const REQUEST_ORIGIN = {
 } as const;
 export type REQUEST_ORIGIN = (typeof REQUEST_ORIGIN)[keyof typeof REQUEST_ORIGIN];
 
-/**
- * How long an idle keep-alive socket stays open. apify-client builds a private agent per `ApifyClient` and
- * keeps a free socket for the whole request timeout (360 s), so a server that constructs a client per session
- * and per tool call accumulates idle TLS sockets for minutes after each call. An in-flight request
- * is unaffected: axios sets `config.timeout` on the active socket, and the agent timeout applies once it is free.
- */
-const FREE_SOCKET_TIMEOUT_MILLIS = 15_000;
+const PROXY_ENV_VARS = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy'];
+
+/** `fetch` narrowed to what this file calls it with: apify-client passes the URL as a string. */
+type TransportFetch = (url: string, init: RequestInit) => Promise<Response>;
+
+let proxyFetch: Promise<TransportFetch> | undefined;
+
+/** undici's `fetch` through the proxy the environment names; `NO_PROXY` is honored. One connection pool per process. */
+async function loadProxyFetch(): Promise<TransportFetch> {
+    const { EnvHttpProxyAgent, fetch: undiciFetch } = await import('undici');
+    const dispatcher = new EnvHttpProxyAgent();
+    // Cast: `RequestInit` here is undici's too, from the copy of its types that `@types/node` ships.
+    return async (url, init) => undiciFetch(url, { ...(init as UndiciRequestInit), dispatcher });
+}
 
 /**
- * One keep-alive pool for every client in the process, so sockets are reused across instances and closed
- * when idle. A `ProxyAgent`, like apify-client's own, so `HTTPS_PROXY` and `NO_PROXY` keep working.
+ * The `fetch` every client sends through. apify-client v3 does not read `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY`
+ * on its own, and Node.js reads them only when started with `NODE_USE_ENV_PROXY=1` (22.21 and newer). So when one
+ * is set and Node.js is not reading it, requests go through undici with an `EnvHttpProxyAgent`. Otherwise this is
+ * the global `fetch`, whose connections are pooled per process and closed a few seconds after they go idle.
  */
-const sharedAgent = new ProxyAgent({ keepAlive: true, timeout: FREE_SOCKET_TIMEOUT_MILLIS, scheduling: 'lifo' });
+const sendThroughTransport: TransportFetch = async (url, init) => {
+    const isProxyUnread = process.env.NODE_USE_ENV_PROXY !== '1' && PROXY_ENV_VARS.some((name) => process.env[name]);
+    if (!isProxyUnread) return fetch(url, init);
+    proxyFetch ??= loadProxyFetch();
+    return (await proxyFetch)(url, init);
+};
 
 /** An absolute URL as written, before a URL parser resolves it: its path, then its query and fragment. */
 const RAW_URL_REGEX = /^[a-z][a-z\d+.-]*:\/\/[^/?#\\]*([^?#]*)(.*)$/is;
 
 /**
- * Set on the config by `sendApifyApiRequest`, whose callers pass a URL with its query string in it. Every other request
- * comes from apify-client, which puts the query in `params`, so its URL may hold no `?` or `#`.
- */
-const URL_QUERY_ALLOWED_KEY = 'isUrlQueryAllowed';
-
-type InterceptedRequestConfig = { url?: string; baseURL?: string; [URL_QUERY_ALLOWED_KEY]?: boolean };
-
-/** The URL axios sends to: `url`, joined to `baseURL` unless absolute or protocol-relative, as axios joins them. */
-function resolveRequestUrl({ url, baseURL }: InterceptedRequestConfig): string | undefined {
-    if (url === undefined || !baseURL || /^([a-z][a-z\d+.-]*:)?\/\//i.test(url)) return url;
-    return `${baseURL.replace(/\/+$/, '')}/${url.replace(/^\/+/, '')}`;
-}
-
-/**
  * Throws unless the request goes to the URL as written: an absolute URL whose path a URL parser leaves unchanged (no
- * dot segment, also percent-encoded, no backslash, tab or newline, no character it percent-encodes) and, outside
- * `sendApifyApiRequest`, with no query or fragment. apify-client puts IDs and record keys into the path as given.
+ * dot segment, also percent-encoded, no backslash, tab or newline, no character it percent-encodes). apify-client
+ * percent-encodes IDs and record keys; a URL passed to `sendApifyApiRequest` is sent as its caller built it.
  */
-function assertRequestUrlAsWritten(config: InterceptedRequestConfig): void {
-    const url = resolveRequestUrl(config);
-    const match = url !== undefined && URL.canParse(url) ? RAW_URL_REGEX.exec(url) : null;
-    if (!url || !match) throw new InvalidRequestPathError(`The request URL ${url} is not a valid absolute URL.`);
-    const [, rawPath, queryAndFragment] = match;
-    if (queryAndFragment && !config[URL_QUERY_ALLOWED_KEY]) {
-        throw new InvalidRequestPathError(
-            `The request path ${rawPath}${queryAndFragment} is not valid: a resource ID or record key cannot contain "?" or "#".`,
-        );
-    }
+function assertRequestUrlAsWritten(url: string): void {
+    const match = URL.canParse(url) ? RAW_URL_REGEX.exec(url) : null;
+    if (!match) throw new InvalidRequestPathError(`The request URL ${url} is not a valid absolute URL.`);
+    const [, rawPath] = match;
     if ((rawPath || '/') !== new URL(url).pathname) {
         throw new InvalidRequestPathError(
             `The request path ${rawPath} is not valid: it has a "." or ".." segment, a backslash, or a character a URL path cannot hold unencoded.`,
@@ -92,7 +88,7 @@ function assertRequestUrlAsWritten(config: InterceptedRequestConfig): void {
     }
 }
 
-/** `store` with each record method checking its key first; apify-client writes the key unencoded. */
+/** `store` with each record method checking its key first, before apify-client percent-encodes it. */
 function withRecordKeyChecks(store: KeyValueStoreClient): KeyValueStoreClient {
     const { getRecord, recordExists, setRecord, deleteRecord, getRecordPublicUrl } = store;
     return Object.assign(store, {
@@ -131,15 +127,79 @@ export function runWithForwardedApiHeaders<T>(headers: Record<string, string>, f
     return forwardedHeadersStorage.run(headers, fn);
 }
 
-/** The headers of the `runWithForwardedApiHeaders` call the request is made in, when it goes to the API origin. */
-function getForwardedApiHeaders(
-    config: InterceptedRequestConfig,
-    apiBaseUrl: string,
-): Record<string, string> | undefined {
-    const headers = forwardedHeadersStorage.getStore();
-    const url = resolveRequestUrl(config);
-    if (!headers || !url) return undefined;
-    return new URL(url).origin === new URL(apiBaseUrl).origin ? headers : undefined;
+/** Set by `sendApifyApiRequest`: the response body of a request made inside it errors once it passes this many bytes. */
+const responseCapStorage = new AsyncLocalStorage<number>();
+
+/** Thrown by the body of a `sendApifyApiRequest` response once it passes `MAX_INLINE_BYTES`, after decompression. */
+export class ResponseTooLargeError extends Error {
+    override readonly name = 'ResponseTooLargeError';
+
+    constructor(
+        readonly responseStatus: number,
+        readonly responseHeaders: HttpResponseHeaders,
+    ) {
+        super(`The response body is larger than ${MAX_INLINE_BYTES} bytes.`);
+    }
+}
+
+/**
+ * `response` with a body that yields its first `maxBytes` and then errors with `ResponseTooLargeError`, which
+ * also stops the download. A body of exactly `maxBytes` is read whole.
+ */
+function capResponseBody(response: Response, maxBytes: number): Response {
+    if (!response.body) return response;
+    const { status, statusText, headers } = response;
+    const reader = response.body.getReader();
+    let remaining = maxBytes;
+    let isOverLimit = false;
+    const fail = async (controller: ReadableStreamDefaultController<Uint8Array>) => {
+        await reader.cancel();
+        controller.error(new ResponseTooLargeError(status, Object.fromEntries(headers)));
+    };
+    const body = new ReadableStream<Uint8Array>(
+        {
+            async pull(controller) {
+                if (isOverLimit) return fail(controller);
+                const { done, value } = await reader.read();
+                if (done) return controller.close();
+                if (value.byteLength <= remaining) {
+                    remaining -= value.byteLength;
+                    return controller.enqueue(value);
+                }
+                isOverLimit = true;
+                if (remaining === 0) return fail(controller);
+                // The stream errors on the next read, so the bytes up to the cap are delivered first.
+                return controller.enqueue(value.subarray(0, remaining));
+            },
+            cancel: async (reason) => reader.cancel(reason),
+        },
+        // Reads a chunk only once the consumer asks for it, so an error never drops chunks already queued.
+        { highWaterMark: 0 },
+    );
+    return new Response(body, { status, statusText, headers });
+}
+
+/**
+ * The `fetch` of one client, in place of the request interceptor of apify-client v2. It refuses a URL that is not
+ * sent as written, adds the `runWithForwardedApiHeaders` headers to a request to the API origin, and caps the
+ * response body of a `sendApifyApiRequest` request.
+ */
+function buildClientFetch(apiBaseUrl: string): FetchFunction {
+    const apiOrigin = new URL(apiBaseUrl).origin;
+    return async (url, init) => {
+        if (typeof url !== 'string')
+            throw new TypeError('The request URL must be a string, as apify-client passes it.');
+        assertRequestUrlAsWritten(url);
+        const headers = new Headers(init?.headers);
+        const forwardedHeaders = new URL(url).origin === apiOrigin ? forwardedHeadersStorage.getStore() : undefined;
+        // The request origin is this server's to state, so a forwarded header never replaces it.
+        const requestOrigin = headers.get(REQUEST_ORIGIN_HEADER);
+        for (const [name, value] of Object.entries(forwardedHeaders ?? {})) headers.set(name, value);
+        if (requestOrigin !== null) headers.set(REQUEST_ORIGIN_HEADER, requestOrigin);
+        const response = await sendThroughTransport(url, { ...init, headers });
+        const maxBytes = responseCapStorage.getStore();
+        return maxBytes === undefined ? response : capResponseBody(response, maxBytes);
+    };
 }
 
 type ExtendedApifyClientOptions = Omit<ApifyClientOptions, 'token'> & {
@@ -186,38 +246,35 @@ export class ApifyClient extends _ApifyClient {
             delete options.token;
         }
 
-        const { requestOrigin, ...clientOptions } = options;
+        const { requestOrigin, baseUrl: baseUrlOption, publicBaseUrl, ...httpClientOptions } = options;
         const staticHeaders = {
             [REQUEST_ORIGIN_HEADER]: requestOrigin ?? REQUEST_ORIGIN.MCP,
         };
 
         // Explicit baseUrl wins over env default.
-        const baseUrl = clientOptions.baseUrl ?? getApifyAPIBaseUrl();
+        const baseUrl = baseUrlOption ?? getApifyAPIBaseUrl();
+        // token null case is handled, we can assert type here
+        const { token } = httpClientOptions as ApifyClientOptions;
 
         super({
-            // token null case is handled, we can assert type here
-            ...(clientOptions as ApifyClientOptions),
+            ...httpClientOptions,
+            token,
             baseUrl,
             // Signed storage links (`getRecordPublicUrl`) are handed to clients, so they take the client-facing origin.
-            publicBaseUrl: clientOptions.publicBaseUrl ?? getApifyAPIPublicBaseUrl(),
+            publicBaseUrl: publicBaseUrl ?? getApifyAPIPublicBaseUrl(),
+        });
+        // The constructor takes no `fetch`, so the default HTTP client is replaced by one that has it.
+        this.httpClient = new FetchHttpClient({
+            ...httpClientOptions,
+            token,
+            headers: { ...httpClientOptions.headers, ...staticHeaders },
             userAgentSuffix: USER_AGENT_ORIGIN,
-            // Per-request agents win over the instance defaults apify-client sets on first use.
-            requestInterceptors: [
-                (config) => {
-                    assertRequestUrlAsWritten(config);
-                    return {
-                        ...config,
-                        httpAgent: sharedAgent,
-                        httpsAgent: sharedAgent,
-                        headers: { ...config.headers, ...getForwardedApiHeaders(config, baseUrl), ...staticHeaders },
-                    };
-                },
-            ],
+            fetch: buildClientFetch(baseUrl),
         });
         this.requestOrigin = staticHeaders[REQUEST_ORIGIN_HEADER];
     }
 
-    // apify-client writes these IDs into the request path unencoded; each is checked once here, for every caller.
+    // Each ID is checked once here, for every caller, before apify-client percent-encodes it into the request path.
     override actor(id: string): ActorClient {
         return withLastRunStoreChecks(super.actor(assertValidResourceId(id, 'Actor')));
     }
@@ -270,58 +327,55 @@ export class ApifyClient extends _ApifyClient {
 }
 
 /**
- * Sends one request, with no retries, through apify-client's axios instance, which adds the token and the
- * request-origin header. Check the URL first, with `isApifyApiUri` (`resources/api_resources.ts`)
+ * Sends one request, with no retries, through apify-client's `httpClient.call()`, which adds the token, the
+ * request-origin header and the User-Agent. Check the URL first, with `isApifyApiUri` (`resources/api_resources.ts`)
  * for the API or against the Actor's standby origin (`tools/actors/send_server_actor_request.ts`), and the
- * status after: a non-2xx response resolves, and so does a 3xx with `maxRedirects: 0`. It skips
- * `httpClient.call()`, which retries (a write could apply twice, and a body over the size cap is downloaded
- * again) and turns a streamed error body into a junk message; that also skips its User-Agent. axios aborts a
- * body over `MAX_INLINE_BYTES` mid-stream (checked in axios 1.16.1), so it is never buffered whole.
+ * status after: a non-2xx response resolves, and so does a 3xx with `followRedirects: false`. A write could apply
+ * twice if it were retried. The body errors with `ResponseTooLargeError` once it passes `MAX_INLINE_BYTES`, so it
+ * is never buffered whole: `call()` rejects with it unless `responseType` is `'stream'`, where reading `data` does.
  */
-export async function sendApifyApiRequest(
+export async function sendApifyApiRequest<T = unknown>(
     apifyClient: ApifyClient,
     config: Pick<
-        AxiosRequestConfig,
-        'url' | 'method' | 'params' | 'data' | 'headers' | 'responseType' | 'signal' | 'maxRedirects'
+        ApifyRequestConfig,
+        'url' | 'method' | 'params' | 'data' | 'headers' | 'responseType' | 'signal' | 'followRedirects' | 'compression'
     >,
-): Promise<AxiosResponse<unknown>> {
-    return apifyClient.httpClient.axios.request<unknown>({
-        ...config,
-        maxContentLength: MAX_INLINE_BYTES,
-        // Callers pass the query in the URL; checked before the call, see above.
-        [URL_QUERY_ALLOWED_KEY]: true,
-    } as AxiosRequestConfig);
-}
-
-/** The mid-consumption abort axios raises when a body crosses `maxContentLength`. */
-export function isMaxContentLengthAbort(err: unknown): boolean {
-    return isAxiosError(err) && err.code === 'ERR_BAD_RESPONSE' && err.message.includes('maxContentLength');
+): Promise<ApifyResponse<T>> {
+    return responseCapStorage.run(MAX_INLINE_BYTES, async () =>
+        apifyClient.httpClient.call<T>({
+            ...config,
+            // The timeout of apify-client v2, which these requests ran with.
+            timeoutSecs: 'long',
+            throwOnErrorStatus: false,
+            retryStatusCodes: [],
+            retryTransportErrors: false,
+        }),
+    );
 }
 
 /**
  * Reads the body of a `responseType: 'stream'` response from `sendApifyApiRequest` up to `MAX_INLINE_BYTES`:
- * `isTruncated` when axios stopped reading there, with the bytes read before it. Any other failure mid-body
+ * `isTruncated` when the body is longer, with its first `MAX_INLINE_BYTES`. Any other failure mid-body
  * propagates.
  */
 export async function readBodyToCap(
-    response: Pick<AxiosResponse<unknown>, 'data'>,
+    response: Pick<ApifyResponse<ReadableStream<Uint8Array>>, 'data'>,
 ): Promise<{ body: Buffer; isTruncated: boolean }> {
-    const chunks: Buffer[] = [];
+    const chunks: Uint8Array[] = [];
     let isTruncated = false;
     try {
-        // Chunks are Buffers (`objectMode: false`).
-        for await (const chunk of response.data as AsyncIterable<Buffer | string>) {
-            chunks.push(Buffer.from(chunk));
-        }
+        for await (const chunk of response.data) chunks.push(chunk);
     } catch (err) {
-        if (!isMaxContentLengthAbort(err)) throw err;
+        if (!(err instanceof ResponseTooLargeError)) throw err;
         isTruncated = true;
     }
     return { body: Buffer.concat(chunks), isTruncated };
 }
 
 /** The whole body, or `undefined` when it passed the cap: a partial body is never returned. */
-export async function readBodyUnderCap(response: Pick<AxiosResponse<unknown>, 'data'>): Promise<Buffer | undefined> {
+export async function readBodyUnderCap(
+    response: Pick<ApifyResponse<ReadableStream<Uint8Array>>, 'data'>,
+): Promise<Buffer | undefined> {
     const { body, isTruncated } = await readBodyToCap(response);
     return isTruncated ? undefined : body;
 }

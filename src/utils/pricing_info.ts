@@ -53,7 +53,7 @@
 
 import type {
     ActorRunPricingInfo,
-    PricePerEventActorPricingInfo as PricePerEventActorPricingInfoOutdated,
+    PayPerEventActorPricingInfo as PricePerEventActorPricingInfoOutdated,
 } from 'apify-client';
 
 import { ACTOR_PRICING_MODEL } from '../const.js';
@@ -78,7 +78,7 @@ export type TieredPricing = {
     };
 };
 
-type PricePerEventActorPricingInfo = PricePerEventActorPricingInfoOutdated & {
+type PayPerEventActorPricingInfo = PricePerEventActorPricingInfoOutdated & {
     pricingPerEvent: {
         actorChargeEvents: Record<string, ActorChargeEvent>;
     };
@@ -88,7 +88,7 @@ export type PricingInfo =
     | (ActorRunPricingInfo & {
           tieredPricing?: TieredPricing;
       })
-    | PricePerEventActorPricingInfo;
+    | PayPerEventActorPricingInfo;
 
 /**
  * Public structured pricing contract returned by actor cards.
@@ -261,7 +261,7 @@ function formatRentalComplete(info: RentalLike): string {
 }
 
 function formatPayPerEventComplete(
-    pricingPerEvent: { actorChargeEvents: Record<string, ActorChargeEvent> } | undefined,
+    pricingPerEvent: { actorChargeEvents?: Record<string, ActorChargeEvent> } | undefined,
 ): string {
     if (!pricingPerEvent?.actorChargeEvents) return EVENTS_UNAVAILABLE_TEXT;
 
@@ -324,7 +324,7 @@ function structureTieredUnitComplete(info: DatasetItemLike | RentalLike): Partia
 }
 
 function structurePayPerEventComplete(
-    pricingPerEvent: { actorChargeEvents: Record<string, ActorChargeEvent> } | undefined,
+    pricingPerEvent: { actorChargeEvents?: Record<string, ActorChargeEvent> } | undefined,
 ): Partial<StructuredPricingInfo> {
     if (!pricingPerEvent?.actorChargeEvents) return {};
 
@@ -384,7 +384,7 @@ function formatRentalSimplified(info: RentalLike, userTier: PricingTier): string
 }
 
 function formatPayPerEventSimplified(
-    pricingPerEvent: { actorChargeEvents: Record<string, ActorChargeEvent> } | undefined,
+    pricingPerEvent: { actorChargeEvents?: Record<string, ActorChargeEvent> } | undefined,
     userTier: PricingTier,
 ): string {
     if (!pricingPerEvent?.actorChargeEvents) return EVENTS_UNAVAILABLE_TEXT;
@@ -470,7 +470,7 @@ function structureTieredUnitSimplified(info: DatasetItemLike | RentalLike, userT
 }
 
 function structurePayPerEventSimplified(
-    pricingPerEvent: { actorChargeEvents: Record<string, ActorChargeEvent> } | undefined,
+    pricingPerEvent: { actorChargeEvents?: Record<string, ActorChargeEvent> } | undefined,
     userTier: PricingTier,
 ): SimplifiedResult {
     if (!pricingPerEvent?.actorChargeEvents) return { patch: {}, noteTier: null };

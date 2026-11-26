@@ -1,5 +1,5 @@
+import type { ApifyResponse } from 'apify-client';
 import { ApifyApiError } from 'apify-client';
-import type { AxiosResponse } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ApifyClient } from '../../src/apify_client.js';
@@ -24,7 +24,7 @@ vi.mock('../../src/utils/actor_search.js', () => ({
 }));
 
 function apifyApiError(status: number, message: string): ApifyApiError {
-    return new ApifyApiError({ data: { error: { type: message, message } }, status } as AxiosResponse, 1);
+    return new ApifyApiError({ data: { error: { type: message, message } }, status } as ApifyResponse, 1);
 }
 
 function stubApifyClient(getActor: () => Promise<unknown>, getBuild = getActor): ApifyClient {
@@ -141,7 +141,7 @@ describe('fetchActorDetails()', () => {
 describe('fetchActorDetails() reads the server interface from the standby build', () => {
     // Build resolution is covered in `tools.actor_definition.test.ts`; these cases cover only this reader's wiring.
     const STANDBY_DEFINITION = {
-        actorSpecification: 1,
+        actorSpecification: 1 as const,
         name: 'mcp-server',
         version: '2.0',
         readme: '# Standby build README',

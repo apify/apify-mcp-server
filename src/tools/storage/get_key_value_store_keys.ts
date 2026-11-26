@@ -80,7 +80,7 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
             keyValueStoreId,
             count: keys.items.length,
             isTruncated: keys.isTruncated,
-            nextExclusiveStartKey: keys.nextExclusiveStartKey,
+            nextExclusiveStartKey: keys.nextExclusiveStartKey ?? undefined,
             firstKey: keys.items[0]?.key,
             loadedToolNames,
         });

@@ -7,10 +7,9 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { InvalidResponseBodyError } from 'apify-client';
-import { AxiosError, type AxiosResponse } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ApifyClient } from '../../src/apify_client.js';
+import { ApifyClient, ResponseTooLargeError } from '../../src/apify_client.js';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { InvalidRequestPathError } from '../../src/errors.js';
 import { getKeyValueStoreRecord } from '../../src/tools/storage/get_key_value_store_record.js';
@@ -18,6 +17,7 @@ import { keyValueStoreRecordOutputSchema } from '../../src/tools/structured_outp
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
+import { stubFetch } from './helpers/fetch_stub.js';
 import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
@@ -35,29 +35,27 @@ vi.mock('../../src/utils/userid_cache.js', () => ({
 const MOCK_RECORD = { key: 'INPUT', value: { query: 'hello' }, contentType: 'application/json' };
 const MOCK_STORE = { id: 'KvsWkzbQMuFYuam3Y', name: 'my-store' };
 
-type RequestConfig = { url: string; method: string; params?: unknown; maxContentLength?: number };
+type RequestConfig = { url: string; method: string; params?: unknown };
 
-/** A record over the size limit: the Content-Type the API sent before axios stopped the download. */
+/** A record over the size limit: the Content-Type the API sent before the download stopped. */
 type OverLimitRecord = { contentType?: string };
 
-/** The abort axios raises once a body crosses `maxContentLength`; its request keeps the response headers. */
-function overLimitAbort({ contentType }: OverLimitRecord): AxiosError {
-    return new AxiosError(`maxContentLength size of ${MAX_INLINE_BYTES} exceeded`, 'ERR_BAD_RESPONSE', undefined, {
-        res: { headers: contentType ? { 'content-type': contentType } : {} },
-    });
+/** What `sendApifyApiRequest` rejects with once a body crosses `MAX_INLINE_BYTES`; it keeps the response headers. */
+function overLimitAbort({ contentType }: OverLimitRecord): ResponseTooLargeError {
+    return new ResponseTooLargeError(200, contentType ? { 'content-type': contentType } : {});
 }
 
-/** What apify-client's response interceptor throws for a body that does not parse as its Content-Type. */
+/** What apify-client throws for a body that does not parse as its Content-Type. */
 function unparsableBodyError(contentType: string): InvalidResponseBodyError {
     return new InvalidResponseBodyError(
-        { headers: { 'content-type': contentType } } as unknown as AxiosResponse,
+        { status: 200, headers: { 'content-type': contentType }, body: undefined },
         new SyntaxError('Unterminated string in JSON at position 65536'),
     );
 }
 
 /**
- * Stubs the record request as apify-client's axios instance answers it: `record.value` is the body its
- * interceptors already parsed by Content-Type, a missing record is a resolved 404, `overLimit` the abort.
+ * Stubs the record request as apify-client's `httpClient.call()` answers it: `record.value` is the body it
+ * already parsed by Content-Type, a missing record is a resolved 404, `overLimit` the abort.
  */
 function stubApifyClient(opts: {
     record?: unknown;
@@ -80,17 +78,15 @@ function stubApifyClient(opts: {
             },
         }),
         httpClient: {
-            axios: {
-                request: async (config: RequestConfig) => {
-                    onRequest?.(config);
-                    if (overLimit) throw overLimitAbort(overLimit);
-                    if (!record) return { data: { error: { type: 'record-not-found' } }, headers: {}, status: 404 };
-                    return {
-                        data: record.value,
-                        headers: record.contentType ? { 'content-type': record.contentType } : {},
-                        status: 200,
-                    };
-                },
+            call: async (config: RequestConfig) => {
+                onRequest?.(config);
+                if (overLimit) throw overLimitAbort(overLimit);
+                if (!record) return { data: { error: { type: 'record-not-found' } }, headers: {}, status: 404 };
+                return {
+                    data: record.value,
+                    headers: record.contentType ? { 'content-type': record.contentType } : {},
+                    status: 200,
+                };
             },
         },
     });
@@ -321,8 +317,10 @@ describe('get-key-value-store-record', () => {
             url: 'https://api.apify.com/v2/key-value-stores/KvsWkzbQMuFYuam3Y/records/INPUT',
             method: 'GET',
             params: { attachment: 'true' },
-            isUrlQueryAllowed: true,
-            maxContentLength: MAX_INLINE_BYTES,
+            timeoutSecs: 'long',
+            throwOnErrorStatus: false,
+            retryStatusCodes: [],
+            retryTransportErrors: false,
         });
     });
 
@@ -330,14 +328,12 @@ describe('get-key-value-store-record', () => {
         const client = mockApifyClient({
             keyValueStore: (id: string) => ({ url: `https://api.apify.com/v2/key-value-stores/${id}` }),
             httpClient: {
-                axios: {
-                    request: async () => ({
-                        data: { error: { type: 'insufficient-permissions', message: 'Insufficient permissions' } },
-                        headers: {},
-                        status: 403,
-                        config: { method: 'get', url: 'https://api.apify.com/v2/key-value-stores/x/records/INPUT' },
-                    }),
-                },
+                call: async () => ({
+                    data: { error: { type: 'insufficient-permissions', message: 'Insufficient permissions' } },
+                    headers: {},
+                    status: 403,
+                    config: { method: 'GET', url: 'https://api.apify.com/v2/key-value-stores/x/records/INPUT' },
+                }),
             },
         });
 
@@ -365,28 +361,6 @@ describe('get-key-value-store-record', () => {
         expect((result as TextToolResult).content[0].text).toContain(
             "Record 'INPUT' is stored as application/json; charset=utf-8, but its body is not valid for that type",
         );
-    });
-
-    it('reads the record again when the first response body could not be parsed', async () => {
-        // An interrupted response can end early without an error, so a valid record fails to parse once.
-        let requestCount = 0;
-        const client = stubApifyClient({
-            record: MOCK_RECORD,
-            onRequest: () => {
-                requestCount += 1;
-                if (requestCount === 1) throw unparsableBodyError('application/json; charset=utf-8');
-            },
-        });
-
-        const result = await (getKeyValueStoreRecord as HelperTool).call(
-            stubToolCallContext({ keyValueStoreId: 'KvsWkzbQMuFYuam3Y', recordKey: 'INPUT' }, client),
-        );
-        const { isError, structuredContent } = result as TextToolResult & {
-            structuredContent: Record<string, unknown>;
-        };
-
-        expect(isError).not.toBe(true);
-        expect(structuredContent).toMatchObject({ value: MOCK_RECORD.value });
     });
 
     it('returns isError "record not found" when the record is missing but the store exists', async () => {
@@ -598,7 +572,7 @@ describe('get-key-value-store-record with a bare store name', () => {
                 url: `https://api.apify.com/v2/key-value-stores/${id}`,
                 get: async () => (id === '~eval-ai-store' ? STORE_BY_NAME : undefined),
             }),
-            httpClient: { axios: { request: async () => ({ data: undefined, headers: {}, status: 404 }) } },
+            httpClient: { call: async () => ({ data: undefined, headers: {}, status: 404 }) },
         });
 
         const result = await (getKeyValueStoreRecord as HelperTool).call(
@@ -647,14 +621,14 @@ describe('get-key-value-store-record with an invalid key or store name', () => {
         ['store name', { keyValueStoreId: 'a?x=1', recordKey: 'OUTPUT' }, '"a?x=1"'],
     ])('sends no request and fails with an input error that names the %s as given', async (_label, args, named) => {
         const client = new ApifyClient({ token: 'test-token', baseUrl: 'https://api.apify.com', maxRetries: 0 });
-        const adapter = vi.fn();
-        client.httpClient.axios.defaults.adapter = adapter;
+        const { requests } = stubFetch();
 
         const call = (getKeyValueStoreRecord as HelperTool).call(stubToolCallContext(args, client));
 
         await expect(call).rejects.toThrow(InvalidRequestPathError);
         await expect(call).rejects.toThrow(named);
-        expect(adapter).not.toHaveBeenCalled();
+        expect(requests).toEqual([]);
+        vi.unstubAllGlobals();
     });
 });
 
@@ -667,7 +641,8 @@ describe('get-key-value-store-record with a record far over the size limit', () 
         const server = createServer((req, res) => {
             if (!req.url?.includes('/records/')) {
                 res.writeHead(200, { 'content-type': 'application/json' });
-                res.end(JSON.stringify({ data: MOCK_STORE }));
+                const now = new Date().toISOString();
+                res.end(JSON.stringify({ data: { ...MOCK_STORE, createdAt: now, modifiedAt: now, accessedAt: now } }));
                 return;
             }
             res.writeHead(200, { 'content-type': 'application/zip', 'content-length': RECORD_BYTES });

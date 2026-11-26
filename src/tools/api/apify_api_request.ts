@@ -1,12 +1,10 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import { ApifyApiError } from 'apify-client';
-import type { AxiosResponse } from 'axios';
-import { isAxiosError } from 'axios';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { isMaxContentLengthAbort, sendApifyApiRequest } from '../../apify_client.js';
+import { ResponseTooLargeError, sendApifyApiRequest } from '../../apify_client.js';
 import { APIFY_ERROR_TYPE_PAGE_NOT_FOUND, HELPER_TOOLS, MAX_INLINE_BYTES } from '../../const.js';
 import { InvalidRequestPathError } from '../../errors.js';
 import {
@@ -227,13 +225,6 @@ async function formatOversizeMessage({
     return logToolName ? `${message} Get the end of the log with ${logToolName} instead.` : message;
 }
 
-/** The status of a response axios aborted mid-body; Node's request object keeps the response it got. */
-function readAbortedResponseStatus(error: unknown): number | undefined {
-    const request: unknown = isAxiosError(error) ? error.request : undefined;
-    const statusCode = isRecord(request) && isRecord(request.res) ? request.res.statusCode : undefined;
-    return typeof statusCode === 'number' ? statusCode : undefined;
-}
-
 /** Adds the spec's closest paths to the message of a page-not-found error, when the spec is available. */
 async function addClosestPaths(error: ApifyApiError, normalizedPath: string, signal?: AbortSignal): Promise<void> {
     const index = await fetchApiOperationIndexIfAvailable(signal);
@@ -291,7 +282,7 @@ export async function callApi(params: {
     const url = `${client.baseUrl}/${normalizedPath}`;
     // An assertion: nothing after the base URL can change the host that gets the token.
     if (!isApifyApiUri(url)) throw new Error(`The URL ${url} is not on the API host.`);
-    let response: AxiosResponse<unknown>;
+    let response: Awaited<ReturnType<typeof sendApifyApiRequest>>;
     try {
         response = await sendApifyApiRequest(client, {
             url,
@@ -306,8 +297,8 @@ export async function callApi(params: {
                         Array.isArray(value) ? value.join(',') : value,
                     ]),
                 ),
-            // Serialized here: axios would send a string as a form and refuse a number. With only the JSON
-            // header, a JSON-looking string would reach the API as the object it holds.
+            // Serialized here: apify-client sends a string as it is, and with only the JSON header a
+            // JSON-looking string would reach the API as the object it holds.
             ...(params.body !== undefined && {
                 data: JSON.stringify(params.body),
                 headers: { 'Content-Type': 'application/json' },
@@ -319,8 +310,8 @@ export async function callApi(params: {
         if (params.signal?.aborted) return respondAborted();
         // The client refused the path before sending it.
         if (error instanceof InvalidRequestPathError) return respondUserError(error.message, { httpStatus: 400 });
-        if (!isMaxContentLengthAbort(error)) throw toPlainError(error);
-        const statusCode = method === 'GET' ? undefined : readAbortedResponseStatus(error);
+        if (!(error instanceof ResponseTooLargeError)) throw toPlainError(error);
+        const statusCode = method === 'GET' ? undefined : error.responseStatus;
         if (statusCode === undefined) {
             return respondUserError(
                 await formatOversizeMessage({

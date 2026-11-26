@@ -1,4 +1,4 @@
-import type { Actor } from 'apify-client';
+import type { ActorResource } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
 import { MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../../src/const.js';
@@ -6,7 +6,7 @@ import type { ActorStoreInputSchema, ActorStoreList } from '../../src/types.js';
 import { formatActorToActorCard, formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 
 // Mock Actor data for testing (based on real apify/rag-web-browser Actor)
-const mockActor: Actor = {
+const mockActor: ActorResource = {
     id: '3ox4R101TgZz67sLr',
     userId: 'ZscMwFR5H7eCtWtyh',
     name: 'rag-web-browser',
@@ -44,7 +44,7 @@ const mockActor: Actor = {
             startedAt: new Date('2023-01-01T00:00:00Z'),
         },
     ],
-} as unknown as Actor;
+} as unknown as ActorResource;
 
 const mockActorStoreList: ActorStoreList = {
     id: 'actor456',
@@ -74,13 +74,13 @@ const mockActorStoreList: ActorStoreList = {
     },
 } as unknown as ActorStoreList;
 
-const mockDeprecatedActor: Actor = {
+const mockDeprecatedActor: ActorResource = {
     ...mockActor,
     id: 'deprecated123',
     name: 'deprecated-actor',
     title: 'Deprecated RAG Browser',
     isDeprecated: true,
-} as unknown as Actor;
+} as unknown as ActorResource;
 
 function buildInputSchema(fieldCount: number): ActorStoreInputSchema {
     const properties: ActorStoreInputSchema['properties'] = {};

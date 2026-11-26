@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import type { ActorVersionSourceFile } from 'apify-client';
+import type { SourceCodeFile } from 'apify-client';
 import { ActorSourceType } from 'apify-client';
 import { expect } from 'vitest';
 
@@ -54,7 +54,7 @@ type UpdateActorVersionResult = {
 };
 
 /** A stored entry: a file, or a `{ name, folder: true }` folder that Console keeps, which apify-client's type leaves out. */
-type StoredSourceFile = ActorVersionSourceFile & { folder?: boolean };
+type StoredSourceFile = SourceCodeFile & { folder?: boolean };
 
 /** A version as the API returns it to the owner, with every field it has. */
 type StoredVersionInfo = Record<string, unknown> & { versionNumber: string; sourceFiles?: StoredSourceFile[] };
@@ -80,8 +80,9 @@ function buildUniqueActorName(purpose: string): string {
  * cleanup works even when the call that creates the Actor fails after the platform stored it.
  */
 async function fetchOwnActorSelector(api: ApifyClient, name: string): Promise<string> {
-    const { username } = await api.user().get();
-    return `${username}~${name}`;
+    const user = await api.user().get();
+    if (!user) throw new Error('The token has no user.');
+    return `${user.username}~${name}`;
 }
 
 /** The hash the source tools list: the first 16 hex characters of the SHA-256 of the bytes. */
@@ -193,7 +194,7 @@ export const versionsCases: Case[] = [
                 });
 
                 const storedFiles = extractSortedSourceFiles(stored.versions[0]);
-                const storedActorJson = storedFiles[0].content;
+                const storedActorJson = storedFiles[0].content ?? '';
                 expect(JSON.parse(storedActorJson)).toEqual({ actorSpecification: 1, version: '0.0', name });
                 expect(storedFiles).toEqual([
                     { name: '.actor/actor.json', format: 'TEXT', content: storedActorJson },
@@ -313,10 +314,10 @@ export const versionsCases: Case[] = [
                                 { name: 'src/old.js', format: 'TEXT', content: oldJs },
                                 // No format, which the build worker reads as TEXT, and no content, which it reads as
                                 // empty; the casts drop what apify-client's type requires.
-                                { name: 'src/z.js', content: zJs } as ActorVersionSourceFile,
-                                { name: 'src/blank.js', format: 'TEXT' } as ActorVersionSourceFile,
+                                { name: 'src/z.js', content: zJs } as SourceCodeFile,
+                                { name: 'src/blank.js', format: 'TEXT' } as SourceCodeFile,
                                 // An empty folder as Console keeps it; the cast adds what apify-client's type leaves out.
-                                { name: 'storage', folder: true } as unknown as ActorVersionSourceFile,
+                                { name: 'storage', folder: true } as unknown as SourceCodeFile,
                             ],
                         },
                     ],
@@ -736,9 +737,9 @@ export const versionsCases: Case[] = [
                                 },
                                 // Entries with no format, with no content, and an empty folder, as the update case
                                 // seeds them; a copy sends them back as the Actor GET returns them.
-                                { name: 'src/z.js', content: zJs } as ActorVersionSourceFile,
-                                { name: 'src/blank.js', format: 'TEXT' } as ActorVersionSourceFile,
-                                { name: 'storage', folder: true } as unknown as ActorVersionSourceFile,
+                                { name: 'src/z.js', content: zJs } as SourceCodeFile,
+                                { name: 'src/blank.js', format: 'TEXT' } as SourceCodeFile,
+                                { name: 'storage', folder: true } as unknown as SourceCodeFile,
                             ],
                         },
                     ],

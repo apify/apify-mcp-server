@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
+import type { ApifyResponse } from 'apify-client';
 import { ApifyApiError } from 'apify-client';
-import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
@@ -965,7 +965,7 @@ describe('get-actor-version', () => {
                 {
                     data: { error: { type: 'some-error', message: 'Insufficient permissions.' } },
                     status: 403,
-                } as AxiosResponse,
+                } as ApifyResponse,
                 1,
             );
             actorGetMock.mockRejectedValue(error);

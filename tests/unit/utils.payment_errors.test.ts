@@ -1,5 +1,5 @@
+import type { ApifyResponse } from 'apify-client';
 import { ApifyApiError } from 'apify-client';
-import type { AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -44,7 +44,7 @@ describe('buildPermissionApprovalResponse()', () => {
                     },
                 },
                 status: 403,
-            } as AxiosResponse,
+            } as ApifyResponse,
             1,
         );
 

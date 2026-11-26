@@ -3,8 +3,7 @@ import {
     type ScheduleAction,
     ScheduleActions,
     type ScheduleCreateOrUpdateData,
-    type ScheduledActorRunInput,
-    type ScheduledActorRunOptions,
+    type ScheduleActionRunInput,
 } from 'apify-client';
 import { z } from 'zod';
 
@@ -212,8 +211,7 @@ export async function buildApiActions(
             apiActions.push({
                 type: ScheduleActions.RunActorTask,
                 actorTaskId: task.id,
-                // apify-client types `input` as a string, but the API rejects a string and requires an object.
-                ...(input && { input: input as unknown as string }),
+                ...(input && { input }),
             });
             continue;
         }
@@ -232,8 +230,7 @@ export async function buildApiActions(
             type: ScheduleActions.RunActor,
             actorId: resolvedActorId,
             ...(input && { runInput: { body: JSON.stringify(input), contentType: JSON_CONTENT_TYPE } }),
-            // apify-client types every run option as required; the API accepts any subset.
-            ...(Object.keys(runOptions).length > 0 && { runOptions: runOptions as ScheduledActorRunOptions }),
+            ...(Object.keys(runOptions).length > 0 && { runOptions }),
         });
     }
     return { actions: apiActions };
@@ -243,8 +240,8 @@ export async function buildApiActions(
 type ScheduleActionResult = Omit<ScheduleActionInput, 'input'> & { input?: unknown };
 
 /** A JSON body comes back as the object the tool sent; anything else stays a string. */
-function parseRunInputBody({ body, contentType }: ScheduledActorRunInput): unknown {
-    if (!contentType?.startsWith('application/json')) return body;
+function parseRunInputBody({ body, contentType }: ScheduleActionRunInput): unknown {
+    if (!body || !contentType?.startsWith('application/json')) return body;
     try {
         return JSON.parse(body);
     } catch {
@@ -255,20 +252,19 @@ function parseRunInputBody({ body, contentType }: ScheduledActorRunInput): unkno
 /** Inverse of `buildApiActions`: the API's tagged action as the flat shape the tools accept. */
 function fromApiAction(action: ScheduleAction): ScheduleActionResult {
     if (action.type === ScheduleActions.RunActorTask) {
-        // The API returns the stored task input parsed, despite the client's `string` type.
         return {
             taskId: action.actorTaskId,
-            ...(action.input !== undefined && action.input !== null && { input: action.input as unknown }),
+            ...(action.input !== undefined && action.input !== null && { input: action.input }),
         };
     }
     const { runInput, runOptions } = action;
     return {
         actorId: action.actorId,
         ...(runInput?.body !== undefined && { input: parseRunInputBody(runInput) }),
-        ...(runOptions?.build !== undefined && { build: runOptions.build }),
-        ...(runOptions?.timeoutSecs !== undefined && { timeoutSecs: runOptions.timeoutSecs }),
-        ...(runOptions?.memoryMbytes !== undefined && { memoryMbytes: runOptions.memoryMbytes }),
-        ...(runOptions?.restartOnError !== undefined && { restartOnError: runOptions.restartOnError }),
+        ...(typeof runOptions?.build === 'string' && { build: runOptions.build }),
+        ...(typeof runOptions?.timeoutSecs === 'number' && { timeoutSecs: runOptions.timeoutSecs }),
+        ...(typeof runOptions?.memoryMbytes === 'number' && { memoryMbytes: runOptions.memoryMbytes }),
+        ...(typeof runOptions?.restartOnError === 'boolean' && { restartOnError: runOptions.restartOnError }),
     };
 }
 

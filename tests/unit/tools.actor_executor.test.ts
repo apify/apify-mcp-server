@@ -1,6 +1,5 @@
-import type { ActorRun } from 'apify-client';
+import type { ApifyResponse, Run } from 'apify-client';
 import { ApifyApiError } from 'apify-client';
-import type { AxiosResponse } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
@@ -30,7 +29,7 @@ type Spies = {
     waitForFinishOpts?: unknown;
 };
 
-function mockRunningRun(): ActorRun {
+function mockRunningRun(): Run {
     return {
         id: 'run-1',
         actId: 'actor-id-1',
@@ -38,10 +37,10 @@ function mockRunningRun(): ActorRun {
         startedAt: new Date('2026-05-01T10:00:00.000Z'),
         defaultDatasetId: 'dataset-xyz',
         defaultKeyValueStoreId: 'kv-xyz',
-    } as unknown as ActorRun;
+    } as unknown as Run;
 }
 
-function mockSucceededRun(): ActorRun {
+function mockSucceededRun(): Run {
     return {
         id: 'run-1',
         actId: 'actor-id-1',
@@ -51,7 +50,7 @@ function mockSucceededRun(): ActorRun {
         defaultDatasetId: 'dataset-xyz',
         defaultKeyValueStoreId: 'kv-xyz',
         stats: { runTimeSecs: 22 },
-    } as unknown as ActorRun;
+    } as unknown as Run;
 }
 
 /**
@@ -65,7 +64,7 @@ function buildStub(): { client: ActorExecutionParams['apifyClient']; spies: Spie
     const spies: Spies = {};
     const startedRun = mockRunningRun();
     const finishedRun = mockSucceededRun();
-    let currentRun: ActorRun = startedRun;
+    let currentRun: Run = startedRun;
     const client = mockApifyClient({
         actor: (_id: string) => ({
             start: async (input: unknown) => {
@@ -192,7 +191,7 @@ describe('actorExecutor', () => {
     describe('platform input-validation error', () => {
         function invalidInputError(message: string): ApifyApiError {
             return new ApifyApiError(
-                { data: { error: { type: 'invalid-input', message } }, status: 400 } as AxiosResponse,
+                { data: { error: { type: 'invalid-input', message } }, status: 400 } as ApifyResponse,
                 1,
             );
         }

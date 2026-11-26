@@ -2,13 +2,11 @@ import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/int
 import type { InitializeRequest, Prompt, ToolSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
 import type {
-    Actor as ActorOutdated,
-    ActorDefaultRunOptions,
+    ActorResource as ActorOutdated,
+    DefaultRunOptions,
     ActorDefinition,
     ActorRunPricingInfo,
-    ActorStandby,
-    ActorStats,
-    ActorStoreList as ActorStoreListOutdated,
+    StoreActor as ActorStoreListOutdated,
 } from 'apify-client';
 import type z from 'zod';
 
@@ -60,7 +58,7 @@ export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
     actorFullName: string;
     description: string;
     readmeSummary?: string;
-    defaultRunOptions: ActorDefaultRunOptions;
+    defaultRunOptions: DefaultRunOptions;
     input?: ActorInputSchema;
 };
 
@@ -371,19 +369,13 @@ export type ActorToolResolutionResult = {
     toolMode: ACTOR_TOOL_MODE;
 };
 
-export type ActorStoreList = ActorStoreListOutdated & {
+export type ActorStoreList = Omit<ActorStoreListOutdated, 'currentPricingInfo' | 'inputSchema'> & {
     actorReviewCount?: number;
     actorReviewRating?: number;
-    badge?: string | null;
-    categories?: string[];
     currentPricingInfo: ActorRunPricingInfo;
-    notice?: string | null;
-    userFullName?: string;
     /** Populated when the search call is made with `includeInputSchema=true`. */
     inputSchema?: ActorStoreInputSchema;
-    stats: ActorStats & {
-        actorReviewCount?: number;
-        actorReviewRating?: number;
+    stats: {
         publicActorRunStats30Days?: Partial<Record<string, number>> & {
             SUCCEEDED?: number;
             TOTAL?: number;
@@ -392,22 +384,11 @@ export type ActorStoreList = ActorStoreListOutdated & {
 };
 
 export type Actor = ActorOutdated & {
-    actorPermissionLevel?: string;
-    actorStandby?: ActorStandby & { tenancy?: ActorStandbyTenancy };
-    hasNoDataset?: boolean;
-    isCritical?: boolean;
-    isGeneric?: boolean;
-    isSourceCodeHidden?: boolean;
-    pictureUrl?: string;
-    standbyUrl?: string | null;
-    stats: ActorStats & {
+    stats: {
         publicActorRunStats30Days?: Partial<Record<string, number>> & {
             SUCCEEDED?: number;
             TOTAL?: number;
         };
-        actorReviewCount?: number;
-        actorReviewRating?: number;
-        lastRunStartedAt?: string | Date | null;
     };
 };
 

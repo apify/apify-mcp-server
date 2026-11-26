@@ -1,30 +1,13 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import { ApifyApiError } from 'apify-client';
-import type { AxiosResponse } from 'axios';
-import { isAxiosError, isCancel } from 'axios';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../apify_client.js';
 import { HTTP_NOT_FOUND, MAX_INLINE_BYTES } from '../const.js';
 
-/** An error body is read up to this many bytes, from its start: enough for the API's JSON error. */
-export const ERROR_BODY_MAX_BYTES = 16 * 1024;
-
 /** The 404 error types apify-client reads as a missing resource (`catchNotFoundOrThrow`). */
 const NOT_FOUND_ERROR_TYPES: readonly (string | undefined)[] = ['record-not-found', 'record-or-token-not-found'];
-
-/**
- * Error codes of a connection that breaks or stalls while the body streams; the stream then throws a plain
- * error, not an AxiosError ("aborted" with ECONNRESET for a reset, and for a stall that hits the timeout).
- */
-const STREAM_NETWORK_ERROR_CODES: ReadonlySet<string | undefined> = new Set([
-    'ECONNRESET',
-    'ECONNABORTED',
-    'ETIMEDOUT',
-    'EPIPE',
-    'ERR_STREAM_PREMATURE_CLOSE',
-]);
 
 const NEWLINE = 0x0a;
 
@@ -44,7 +27,7 @@ export type LogTail = { text: string; isTruncated: boolean; startsMidLine: boole
 
 /** The last `maxBytes` of a byte stream, pushed chunk by chunk. It holds at most `maxBytes` plus one chunk. */
 export class TailBuffer {
-    private readonly chunks: Buffer[] = [];
+    private readonly chunks: Uint8Array[] = [];
     private retained = 0;
     /** The last byte dropped, which tells whether the kept bytes start a line. */
     private lastDroppedByte: number | undefined;
@@ -55,7 +38,7 @@ export class TailBuffer {
         return this.retained;
     }
 
-    push(chunk: Buffer): void {
+    push(chunk: Uint8Array): void {
         if (chunk.length === 0) return;
         this.chunks.push(chunk);
         this.retained += chunk.length;
@@ -97,79 +80,29 @@ export class TailBuffer {
     }
 }
 
-/**
- * The `ApifyApiError` of an error response, from the start of its body, decoded as apify-client decodes a
- * buffered one: JSON when the Content-Type says so, otherwise text.
- */
-async function readApiError(response: AxiosResponse<AsyncIterable<Buffer>>, attempt: number): Promise<ApifyApiError> {
-    const chunks: Buffer[] = [];
-    let bytes = 0;
-    for await (const chunk of response.data) {
-        chunks.push(chunk);
-        bytes += chunk.length;
-        // Leaving the loop destroys the stream.
-        if (bytes >= ERROR_BODY_MAX_BYTES) break;
-    }
-    const text = Buffer.concat(chunks).subarray(0, ERROR_BODY_MAX_BYTES).toString('utf8');
-    let data: unknown = text || undefined;
-    if (data && String(response.headers['content-type']).includes('application/json')) {
-        try {
-            data = JSON.parse(text);
-        } catch {
-            // A cut or malformed JSON body stays text.
-        }
-    }
-    return new ApifyApiError({ ...response, data } as AxiosResponse, attempt);
-}
-
-/** One request; `undefined` for the 404 of a missing run or build. */
-async function readLogTailOnce(
-    apifyClient: ApifyClient,
-    url: string,
-    attempt: number,
-    signal?: AbortSignal,
-): Promise<LogTail | undefined> {
-    const response = await apifyClient.httpClient.axios.request<AsyncIterable<Buffer>>({
-        url,
-        method: 'GET',
-        responseType: 'stream',
-        signal,
-    });
-    if (response.status >= 300) {
-        const error = await readApiError(response, attempt);
-        if (error.statusCode === HTTP_NOT_FOUND && NOT_FOUND_ERROR_TYPES.includes(error.type)) return undefined;
-        throw error;
-    }
-    const tail = new TailBuffer(MAX_INLINE_BYTES);
-    for await (const chunk of response.data) tail.push(chunk);
-    return tail.read();
-}
-
-/** A connection that broke or stalled while the body streamed. */
-function isStreamNetworkError(error: unknown): error is NodeJS.ErrnoException {
+/** Whether `error` is the 404 of a missing run or build. */
+function isMissingLogError(error: unknown): boolean {
     return (
-        error instanceof Error &&
-        !isAxiosError(error) &&
-        STREAM_NETWORK_ERROR_CODES.has((error as NodeJS.ErrnoException).code)
+        error instanceof ApifyApiError &&
+        error.statusCode === HTTP_NOT_FOUND &&
+        NOT_FOUND_ERROR_TYPES.includes(error.type)
     );
 }
 
-/**
- * Retried as apify-client's `call()` retries: rate limits and server errors, and network failures, which are
- * axios errors that carry the request and, here, also a connection that breaks mid-body.
- */
-function isRetryable(error: unknown): boolean {
-    if (error instanceof ApifyApiError) return error.statusCode === 429 || error.statusCode >= 500;
-    if (isAxiosError(error)) return !isCancel(error) && Boolean(error.request);
-    return isStreamNetworkError(error);
+/** The underlying network error of a `fetch` failure, which Node.js puts in `cause`. */
+function describeBrokenConnection(error: unknown): string {
+    const cause: unknown = error instanceof Error ? (error.cause ?? error) : error;
+    if (!(cause instanceof Error)) return String(cause);
+    const { code } = cause as NodeJS.ErrnoException;
+    return `${cause.message}${code ? ` (${code})` : ''}`;
 }
 
 /**
  * The end of a run or build log (`url` is the log client's, `client.run(id).log().url`): its last
  * `MAX_INLINE_BYTES` at most, see `TailBuffer.read`. The body is streamed and only that window is kept, so a
- * long log is never held whole. `undefined` when the run or build does not exist. Rate limits, server errors
- * and network failures are retried with the client's `maxRetries` and backoff until `signal` aborts; any
- * other error is thrown at once.
+ * long log is never held whole. `undefined` when the run or build does not exist. apify-client's `call()`
+ * retries rate limits, server errors and network failures until the response headers arrive. A connection
+ * that breaks mid-body is retried here, with the client's `maxRetries` and backoff, until `signal` aborts.
  */
 export async function readLogTail(
     apifyClient: ApifyClient,
@@ -177,24 +110,34 @@ export async function readLogTail(
     signal?: AbortSignal,
 ): Promise<LogTail | undefined> {
     const { httpClient } = apifyClient;
-    // Sets the client's User-Agent, as its own `call()` does first; a client without this method sends none.
-    const { ensureNodeInit } = httpClient as unknown as { ensureNodeInit?: () => Promise<void> };
-    if (typeof ensureNodeInit === 'function') await ensureNodeInit.call(httpClient);
     for (let attempt = 1; ; attempt++) {
+        let body: ReadableStream<Uint8Array>;
         try {
-            return await readLogTailOnce(apifyClient, url, attempt, signal);
+            ({ data: body } = await httpClient.call<ReadableStream<Uint8Array>>({
+                url,
+                method: 'GET',
+                responseType: 'stream',
+                timeoutSecs: 'long',
+                signal,
+            }));
         } catch (error) {
-            // An abort can surface as a stream error; it is never retried or reworded.
-            if (signal?.aborted) throw error;
-            if (attempt <= httpClient.maxRetries && isRetryable(error)) {
-                // apify-client's backoff (async-retry defaults): doubling from the minimum delay, randomized up to 2x.
-                const delayMillis = httpClient.minDelayBetweenRetriesMillis * 2 ** (attempt - 1) * (1 + Math.random());
-                await sleep(delayMillis, undefined, { signal });
-                continue;
+            if (isMissingLogError(error)) return undefined;
+            throw error;
+        }
+        try {
+            const tail = new TailBuffer(MAX_INLINE_BYTES);
+            for await (const chunk of body) tail.push(chunk);
+            return tail.read();
+        } catch (error) {
+            // An abort surfaces as a stream error; it is never retried or reworded.
+            if (signal?.aborted || !httpClient.isRetryableTransportError(error)) throw error;
+            if (attempt > httpClient.maxRetries) {
+                const reason = describeBrokenConnection(error);
+                throw new Error(`The connection broke while reading the log: ${reason}.`, { cause: error });
             }
-            if (!isStreamNetworkError(error)) throw error;
-            const reason = `${error.message}${error.code ? ` (${error.code})` : ''}`;
-            throw new Error(`The connection broke while reading the log: ${reason}.`, { cause: error });
+            // apify-client's backoff: doubling from the minimum delay, randomized up to 2x.
+            const delayMillis = httpClient.minDelayBetweenRetriesMillis * 2 ** (attempt - 1) * (1 + Math.random());
+            await sleep(delayMillis, undefined, { signal });
         }
     }
 }

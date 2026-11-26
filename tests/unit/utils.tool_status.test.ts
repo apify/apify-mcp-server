@@ -1,5 +1,5 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import type { ActorRun } from 'apify-client';
+import type { Run } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
@@ -414,7 +414,7 @@ describe('deriveResourceIds', () => {
             actId: 'actor-xyz',
             status: 'RUNNING',
             startedAt: new Date(),
-        } as unknown as ActorRun;
+        } as unknown as Run;
         const response = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun });
         expect(deriveResourceIds({}, response)).toMatchObject({ run_id: 'run-abc', run_status: 'RUNNING' });
     });

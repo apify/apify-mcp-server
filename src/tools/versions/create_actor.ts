@@ -1,4 +1,4 @@
-import type { ActorCollectionCreateOptions, ActorVersionSourceFile } from 'apify-client';
+import type { ActorCollectionCreateOptions, SourceCodeFile } from 'apify-client';
 import { ActorSourceType } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
@@ -45,9 +45,9 @@ const createActorArgs = z.object({
  * The `version` of .actor/actor.json when it is a non-empty string in valid JSON, as `apify push` reads it. A leading
  * byte order mark, which some editors write, is skipped, since JSON.parse refuses it.
  */
-function readActorJsonVersion(entries: readonly ActorVersionSourceFile[]): string | undefined {
+function readActorJsonVersion(entries: readonly SourceCodeFile[]): string | undefined {
     const actorJson = entries.find(({ name, format }) => name === '.actor/actor.json' && format === 'TEXT');
-    if (!actorJson) return undefined;
+    if (actorJson?.content === undefined) return undefined;
     try {
         const { version } = JSON.parse(actorJson.content.replace(/^\uFEFF/, '')) as { version?: unknown };
         return typeof version === 'string' && version !== '' ? version : undefined;

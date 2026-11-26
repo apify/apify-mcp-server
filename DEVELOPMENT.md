@@ -65,7 +65,7 @@ Rule of thumb:
 
 ## Node.js version policy
 
-The minimum supported Node.js version is **22** (`engines.node >= 22.0.0` in `package.json`).
+The minimum supported Node.js version is **22.15** (`engines.node >= 22.15.0` in `package.json`), the minimum of `apify-client` v3.
 
 **Why Node.js 22 (not 20):**
 

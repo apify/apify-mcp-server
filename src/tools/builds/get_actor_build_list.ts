@@ -1,4 +1,4 @@
-import type { Build, BuildCollectionClientListItem } from 'apify-client';
+import type { BuildListItem } from 'apify-client';
 import { z } from 'zod';
 
 import { HELPER_TOOLS } from '../../const.js';
@@ -34,12 +34,6 @@ const getActorBuildListArgs = z.object({
         .describe('If true, the builds are sorted by startedAt, newest first; false sorts oldest first. Default: true.')
         .default(true),
 });
-
-/**
- * One build as the list endpoint returns it (OpenAPI `BuildShort`). The client's item type leaves out
- * `actId` and `buildNumber`, which the API does send.
- */
-export type BuildListItem = BuildCollectionClientListItem & Pick<Build, 'actId' | 'buildNumber'>;
 
 /** Statuses of a build that ended without succeeding; the next step points at the newest one's log. */
 const FAILED_BUILD_STATUSES: ReadonlySet<string> = new Set(['FAILED', 'TIMED-OUT', 'ABORTED']);
@@ -129,15 +123,15 @@ export const getActorBuildList: ToolEntry = Object.freeze({
                 `Actor '${parsed.actorId}' not found. The actorId argument takes an ID, a name (resolved against your own Actors), or a full name as username/name.`,
             );
         }
-        // Cast because the client's item type omits fields the API returns (see `BuildListItem`).
-        const items = builds.items as BuildListItem[];
+        const { items } = builds;
         const structuredContent = {
             total: builds.total,
             count: builds.count,
             offset: builds.offset,
             limit: builds.limit,
             desc: builds.desc,
-            items: items.map(toBuildItem),
+            // The API spec marks `actId` optional; the list endpoint sends it.
+            items: items.map((build) => toBuildItem({ ...build, actId: build.actId ?? '' })),
         };
         const owner = parsed.actorId ? `Actor ${parsed.actorId}` : 'Your account';
         const summary = `${owner} has ${builds.total} ${builds.total === 1 ? 'build' : 'builds'}; showing ${builds.count} from offset ${builds.offset}.`;

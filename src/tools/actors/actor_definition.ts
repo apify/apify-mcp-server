@@ -15,7 +15,6 @@ import type {
 } from '../../types.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
 import { API_METHODS, isRecord } from '../api/apify_api_spec.js';
-import type { BuildListItem } from '../builds/get_actor_build_list.js';
 import { buildServerActorToolInfo } from './server_interface_details.js';
 import { listCommaJoinedQueryParameters, listDocumentedOperations } from './server_interface_schema.js';
 
@@ -140,14 +139,14 @@ export async function resolveServerInterfaceDefinition(
     defaultBuild: Build,
     apifyClient: ApifyClient,
 ): Promise<ActorDefinitionWithServerInterface | undefined> {
-    if (actor.actorStandby?.isEnabled !== true) return defaultBuild.actorDefinition;
+    if (actor.actorStandby?.isEnabled !== true) return defaultBuild.actorDefinition ?? undefined;
 
     // With no build named, the platform starts Standby runs on the default build.
     const reference = actor.actorStandby.build;
-    if (!reference) return defaultBuild.actorDefinition;
+    if (!reference) return defaultBuild.actorDefinition ?? undefined;
 
     const buildId = await resolveStandbyBuildId(actor, reference, apifyClient);
-    if (buildId === defaultBuild.id) return defaultBuild.actorDefinition;
+    if (buildId === defaultBuild.id) return defaultBuild.actorDefinition ?? undefined;
 
     const build = buildId === undefined ? undefined : await apifyClient.build(buildId).get();
     if (build?.actorDefinition) return build.actorDefinition;
@@ -174,14 +173,14 @@ async function resolveStandbyBuildId(
     const taggedBuilds = actor.taggedBuilds ?? {};
     const taggedBuildId =
         taggedBuilds[reference]?.buildId ??
-        (buildNumber && Object.values(taggedBuilds).find((build) => build.buildNumber === buildNumber)?.buildId);
+        (buildNumber && Object.values(taggedBuilds).find((build) => build?.buildNumber === buildNumber)?.buildId);
     if (taggedBuildId) return taggedBuildId;
 
     if (!buildNumber) return undefined;
     // Listing builds requires a token, so anonymous reads can only resolve tagged builds.
     if (!apifyClient.token) return undefined;
     for await (const build of apifyClient.actor(actor.id).builds().list({ desc: true })) {
-        if ((build as BuildListItem).buildNumber === buildNumber) return build.id;
+        if (build.buildNumber === buildNumber) return build.id;
     }
     return undefined;
 }

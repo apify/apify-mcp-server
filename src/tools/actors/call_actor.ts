@@ -54,6 +54,7 @@ import {
     buildStartRunResponse,
     CALL_ACTOR_WAIT_SECS_DEFAULT,
     fetchActorRunData,
+    toActorStartOptions,
 } from './actor_run_response.js';
 import { EMPTY_ACTOR_NAME_MESSAGE, getActorsAsTools } from './actor_tools_factory.js';
 
@@ -538,7 +539,9 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
 
         if (abortSignal?.aborted) return respondAborted();
 
-        const actorRun = await apifyClient.actor(actorName).start(input, callOptions);
+        const actorRun = await apifyClient
+            .actor(actorName)
+            .start(input, callOptions && toActorStartOptions(callOptions));
         log.debug('Started Actor run', {
             actorName,
             runId: actorRun.id,

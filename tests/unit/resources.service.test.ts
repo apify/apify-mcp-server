@@ -78,14 +78,11 @@ describe('createResourceService()', () => {
             const uri = 'https://api.apify.com/v2/datasets/ds-1/items';
             const apifyClient = mockApifyClient({
                 httpClient: {
-                    axios: {
-                        request: async () => ({
-                            data: Readable.from([]),
-                            headers: { 'content-type': 'application/json' },
-                            status: 500,
-                            statusText: 'Internal Server Error',
-                        }),
-                    },
+                    call: async () => ({
+                        data: Readable.from([]),
+                        headers: { 'content-type': 'application/json' },
+                        status: 500,
+                    }),
                 },
             });
             const service = createResourceService({

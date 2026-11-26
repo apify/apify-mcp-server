@@ -104,14 +104,11 @@ describe('resources/read and prompts/get error boundary', () => {
             const uri = 'https://api.apify.com/v2/datasets/ds-1/items';
             const stubClient = {
                 httpClient: {
-                    axios: {
-                        request: async () => ({
-                            data: Readable.from([]),
-                            headers: { 'content-type': 'application/json' },
-                            status: 500,
-                            statusText: 'Internal Server Error',
-                        }),
-                    },
+                    call: async () => ({
+                        data: Readable.from([]),
+                        headers: { 'content-type': 'application/json' },
+                        status: 500,
+                    }),
                 },
             };
             // The handler builds its own token-scoped client; stub it so the read resolves a 5xx,
