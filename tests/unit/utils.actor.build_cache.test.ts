@@ -11,6 +11,7 @@ import {
     SEARCH_SCHEMA,
     STANDBY_BUILD_ID,
 } from './helpers/actor_build_client.js';
+import { stubFetch } from './helpers/fetch_stub.js';
 
 describe('standby build resolution across cached callers', () => {
     it('resolves the server build for an authenticated caller after an incomplete anonymous lookup', async () => {
@@ -57,13 +58,13 @@ describe('standby build resolution across cached callers', () => {
 describe('an invalid Actor name', () => {
     it('returns null, sends no request and is not cached', async () => {
         const client = new ApifyClient({ token: 'test-token', baseUrl: 'https://api.apify.com', maxRetries: 0 });
-        const adapter = vi.fn();
-        client.httpClient.axios.defaults.adapter = adapter;
+        const { requests } = stubFetch();
         const name = 'apify/x/../y';
 
         await expect(getActorDefinitionCached(name, client)).resolves.toBeNull();
 
-        expect(adapter).not.toHaveBeenCalled();
+        expect(requests).toEqual([]);
+        vi.unstubAllGlobals();
         expect(actorDefinitionCache.get(name)).toBeNull();
     });
 });

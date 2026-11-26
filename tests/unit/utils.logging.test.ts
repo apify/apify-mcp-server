@@ -1,5 +1,4 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import { AxiosError, AxiosHeaders } from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
 
@@ -175,24 +174,35 @@ describe('logHttpError', () => {
         expect(exception).toHaveBeenCalledTimes(1);
     });
 
-    it('logs an axios failure without its request config, which holds the token', () => {
-        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-        const config = { headers: new AxiosHeaders({ Authorization: 'Bearer test-token' }) };
+    /** An error that carries the request it failed on, as an HTTP library's error can. */
+    class RequestError extends Error {
+        override readonly name = 'RequestError';
 
-        logHttpError(
-            new AxiosError('connect ECONNREFUSED 127.0.0.1:443', 'ECONNREFUSED', config),
-            'Failed to get Actor run',
-        );
+        constructor(
+            message: string,
+            readonly code: string,
+            readonly config: unknown,
+        ) {
+            super(message);
+        }
+    }
+
+    const requestConfig = { headers: { Authorization: 'Bearer test-token' } };
+    const buildRequestFailure = () =>
+        new RequestError('connect ECONNREFUSED 127.0.0.1:443', 'ECONNREFUSED', requestConfig);
+
+    it('logs a request failure without its request config, which holds the token', () => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        logHttpError(buildRequestFailure(), 'Failed to get Actor run');
 
         const output = consoleError.mock.calls.flat().join('\n');
         expect(output).toContain('connect ECONNREFUSED');
         expect(output).not.toContain('test-token');
     });
 
-    const requestConfig = { headers: new AxiosHeaders({ Authorization: 'Bearer test-token' }) };
-    const buildAxiosFailure = () => new AxiosError('connect ECONNREFUSED 127.0.0.1:443', 'ECONNREFUSED', requestConfig);
-    const loggedAxiosFailure = {
-        name: 'AxiosError',
+    const loggedRequestFailure = {
+        name: 'RequestError',
         message: 'connect ECONNREFUSED 127.0.0.1:443',
         stack: expect.any(String),
         code: 'ECONNREFUSED',
@@ -213,10 +223,10 @@ describe('logHttpError', () => {
 
     it.each([
         {
-            input: 'an HTTP 5xx axios failure',
-            error: Object.assign(buildAxiosFailure(), { statusCode: 500 }),
+            input: 'an HTTP 5xx request failure',
+            error: Object.assign(buildRequestFailure(), { statusCode: 500 }),
             field: 'exception',
-            logged: loggedAxiosFailure,
+            logged: loggedRequestFailure,
         },
         {
             input: 'an HTTP 5xx API error, keeping its type',
@@ -225,14 +235,14 @@ describe('logHttpError', () => {
             logged: { name: 'Error', message: 'API said no', stack: expect.any(String), type: 'some-type' },
         },
         {
-            input: 'an MCP server error caused by an axios failure',
-            error: Object.assign(new McpError(ErrorCode.InternalError, 'boom'), { cause: buildAxiosFailure() }),
+            input: 'an MCP server error caused by a request failure',
+            error: Object.assign(new McpError(ErrorCode.InternalError, 'boom'), { cause: buildRequestFailure() }),
             field: 'exception',
             logged: {
                 name: 'McpError',
                 message: 'MCP error -32603: boom',
                 stack: expect.any(String),
-                cause: loggedAxiosFailure,
+                cause: loggedRequestFailure,
             },
         },
         {

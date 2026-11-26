@@ -1,8 +1,11 @@
+import { STATUS_CODES } from 'node:http';
+
 import type {
     BlobResourceContents,
     ReadResourceResult,
     TextResourceContents,
 } from '@modelcontextprotocol/sdk/types.js';
+import type { ApifyResponse } from 'apify-client';
 
 import type { ApifyClient } from '../apify_client.js';
 import {
@@ -105,9 +108,8 @@ function throwReadFailure(uri: string, status: number | undefined, message: stri
  * This is the security gate for the generic read proxy: the apify-client attaches the
  * session token as an `Authorization` header to every outbound request, so we must only
  * hand it Apify API URLs — never an arbitrary host. Userinfo-bearing URLs
- * (`user@api.apify.com`) are rejected even when the host is genuinely ours: axios drops
- * the default `Authorization` header for credentials-bearing URLs, so the read would
- * silently run unauthenticated. The API tools' `callApi` asserts its request URL with it too.
+ * (`user@api.apify.com`) are rejected even when the host is genuinely ours: `fetch` refuses
+ * a URL with credentials, and the refusal here says why. The API tools' `callApi` asserts its request URL with it too.
  */
 export function isApifyApiUri(uri: string): boolean {
     try {
@@ -247,8 +249,8 @@ export function redactJsonSecrets(json: string): string {
  * rather than success-shaped content for an unreadable resource (see SEP-2164). A body over
  * `MAX_INLINE_BYTES` is NOT a failure — it is a successful read returning a download pointer.
  *
- * It makes one attempt through `sendApifyApiRequest` (`../apify_client.ts`), which says why it skips
- * `httpClient.call()`.
+ * It makes one attempt through `sendApifyApiRequest` (`../apify_client.ts`), which says why it does not
+ * retry.
  */
 export async function readApiResource(uri: string, apifyClient?: ApifyClient): Promise<ReadResourceResult> {
     if (!isApifyApiUri(uri)) {
@@ -277,10 +279,10 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
         throw new InvalidParamsError(`Failed to read ${uri}: only paths under /v2/ are readable.`, { uri });
     }
 
-    let response: { data: unknown; headers: Record<string, unknown>; status: number; statusText: string };
+    let response: ApifyResponse<ReadableStream<Uint8Array>>;
     try {
         // Sent on the egress origin; the result and the errors keep the URI as given.
-        response = await sendApifyApiRequest(apifyClient, {
+        response = await sendApifyApiRequest<ReadableStream<Uint8Array>>(apifyClient, {
             url: buildUrlOnOrigin(uri, getApifyAPIBaseUrl()),
             method: 'GET',
             responseType: 'stream',
@@ -304,11 +306,11 @@ export async function readApiResource(uri: string, apifyClient?: ApifyClient): P
     }
     if (body) body = maskSessionToken(body, apifyClient.token);
 
-    // `validateStatus: null` on this axios instance resolves non-2xx responses instead of throwing,
-    // so a failed request is checked here. The error body was just collected above (Apify API error
-    // bodies are small JSON; if one somehow crossed the limit, fall back to the status text).
+    // `sendApifyApiRequest` resolves non-2xx responses instead of throwing, so a failed request is checked
+    // here. The error body was just collected above (Apify API error bodies are small JSON; if one somehow
+    // crossed the limit, fall back to the status text).
     if (response.status >= 300) {
-        const message = parseApiErrorMessage(body) ?? response.statusText;
+        const message = parseApiErrorMessage(body) ?? STATUS_CODES[response.status] ?? `HTTP ${response.status}`;
         logHttpError(Object.assign(new Error(message), { statusCode: response.status }), `resources/read failed`, {
             uri: loggedUri,
         });

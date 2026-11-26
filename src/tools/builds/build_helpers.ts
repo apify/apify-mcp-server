@@ -1,4 +1,4 @@
-import type { Actor, ActorBuildOptions, Build } from 'apify-client';
+import type { ActorResource, ActorBuildOptions, Build } from 'apify-client';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../../apify_client.js';
@@ -14,7 +14,7 @@ import { ABORT, raceAbort, toIsoString, WAIT_SECS_MAX } from '../actors/actor_ru
 import { apifyConsoleLinkText } from '../storage/storage_helpers.js';
 
 /** The MAJOR.MINOR numbers of the Actor's versions; a version document without one is skipped. */
-export function listVersionNumbers(actor: Pick<Actor, 'versions'>): string[] {
+export function listVersionNumbers(actor: Pick<ActorResource, 'versions'>): string[] {
     return actor.versions.flatMap((version) => version.versionNumber ?? []);
 }
 
@@ -38,6 +38,16 @@ export function buildWaitSecsField(zeroMeans: string) {
         );
 }
 
+/** Named through `Build`, so the declaration does not reference apify-client's own `@apify/consts`. */
+type BuildItem = {
+    id: string;
+    actorId: string;
+    buildNumber: string;
+    status: Build['status'];
+    startedAt: string | null;
+    finishedAt: string | null;
+};
+
 /**
  * The build subset returned by the build tools. Allowlisted so internal fields on the API
  * document (userId, meta, options, inspectorId) never reach the client. get-actor-build-list returns
@@ -45,7 +55,7 @@ export function buildWaitSecsField(zeroMeans: string) {
  */
 export function toBuildItem(
     build: Pick<Build, 'id' | 'actId' | 'buildNumber' | 'status' | 'startedAt' | 'finishedAt'>,
-) {
+): BuildItem {
     return {
         id: build.id,
         actorId: build.actId,
@@ -61,7 +71,10 @@ export function toBuildItem(
  * `toBuildItem` plus `apifyConsoleUrl`, which is set only for Console UI token sessions
  * (see `getConsoleLinkContext`).
  */
-export function toBuildResult(build: Build, linkContext: ConsoleLinkContext | undefined) {
+export function toBuildResult(
+    build: Build,
+    linkContext: ConsoleLinkContext | undefined,
+): BuildItem & { apifyConsoleUrl: string | undefined } {
     return {
         ...toBuildItem(build),
         apifyConsoleUrl: buildConsoleBuildUrl(linkContext, build.actId, build.buildNumber),

@@ -1,5 +1,5 @@
+import type { ApifyResponse } from 'apify-client';
 import { ApifyApiError } from 'apify-client';
-import type { AxiosResponse } from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
@@ -26,7 +26,7 @@ import {
 import { mockApifyClient } from './helpers/tool_context.js';
 
 function apifyApiError(status: number, message: string): ApifyApiError {
-    return new ApifyApiError({ data: { error: { type: message, message } }, status } as AxiosResponse, 1);
+    return new ApifyApiError({ data: { error: { type: message, message } }, status } as ApifyResponse, 1);
 }
 
 /** `actor().get()` finds the Actor; `defaultBuild()` throws `error`, the call that reaches the catch block. */
@@ -74,7 +74,7 @@ describe('getActorDefinition()', () => {
 
 describe('getActorDefinition() reads the server interface from the standby build', () => {
     const STANDBY_DEFINITION = {
-        actorSpecification: 1,
+        actorSpecification: 1 as const,
         name: 'mcp-server',
         version: '2.0',
         input: { type: 'object', properties: { url: { type: 'string' } } },

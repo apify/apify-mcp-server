@@ -12,6 +12,7 @@ import {
     abortRunOnSignal,
     CALL_ACTOR_WAIT_SECS_DEFAULT,
     fetchActorRunData,
+    toActorStartOptions,
     WAIT_SECS_MAX,
 } from './actor_run_response.js';
 import { buildDirectActorRunInput } from './actor_tool_contract.js';
@@ -56,7 +57,7 @@ export const actorExecutor: ActorExecutor = {
         try {
             actorRun = await apifyClient
                 .actor(actorFullName)
-                .start(buildDirectActorRunInput(actorFullName, actorInput), params.callOptions);
+                .start(buildDirectActorRunInput(actorFullName, actorInput), toActorStartOptions(params.callOptions));
         } catch (error) {
             // Platform can reject input our own AJV gate passed (see isActorInputValidationError).
             if (!isActorInputValidationError(error)) throw error;

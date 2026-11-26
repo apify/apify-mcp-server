@@ -1,4 +1,4 @@
-import type { ActorCollectionListItem } from 'apify-client';
+import type { ActorListItem } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -35,9 +35,9 @@ const getActorListArgs = z.object({
 
 /**
  * An item of `GET /v2/acts`. The API returns `title` and `stats` too, which apify-client's
- * `ActorCollectionListItem` does not declare.
+ * `ActorListItem` does not declare.
  */
-type ActorListApiItem = ActorCollectionListItem & {
+type ActorListApiItem = ActorListItem & {
     title?: string | null;
     stats?: { lastRunStartedAt?: Date | string | null };
 };

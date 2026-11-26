@@ -1,4 +1,4 @@
-import type { ActorVersion } from 'apify-client';
+import type { Version } from 'apify-client';
 import { ActorSourceType, ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
@@ -34,11 +34,7 @@ const deleteActorVersionArgs = z.object({
  * Throws `UserInputError` unless the version's revision, computed as get-actor-version and the write tools compute it,
  * is `expectedRevision`, ignoring case. A version not stored as files has no revision.
  */
-function validateRevision(
-    version: ActorVersion & { versionNumber: string },
-    fullName: string,
-    expectedRevision: string,
-) {
+function validateRevision(version: Version & { versionNumber: string }, fullName: string, expectedRevision: string) {
     if (version.sourceType !== ActorSourceType.SourceFiles) {
         throw new UserInputError(
             `Nothing was deleted: version ${version.versionNumber} of ${fullName} has source type ${version.sourceType}, ` +
@@ -122,7 +118,7 @@ export const deleteActorVersion: ToolEntry = Object.freeze({
             // A tag points to the build it was last given to, which may be a build of another version than the one with
             // that buildTag.
             const tags = Object.entries(actor.taggedBuilds ?? {})
-                .filter(([, { buildNumber }]) => buildNumber?.startsWith(`${versionNumber}.`))
+                .filter(([, build]) => build?.buildNumber?.startsWith(`${versionNumber}.`))
                 .map(([tag]) => tag);
             const structuredContent = { actorId: actor.id, fullName, versionNumber, deleted: true, tags };
             // build-actor takes one tag, so the text names one build per tag.

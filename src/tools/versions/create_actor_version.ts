@@ -1,4 +1,4 @@
-import type { ActorVersion, ActorVersionSourceFile } from 'apify-client';
+import type { Version, SourceCodeFile } from 'apify-client';
 import { ActorSourceType } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
@@ -143,7 +143,7 @@ export const createActorVersion: ToolEntry = Object.freeze({
             // from the Actor GET and sends them all back in the POST below. Once the API has one, let the platform make
             // the copy.
             let copied: ReturnType<typeof resolveVersion> | undefined;
-            let sourceFiles: ActorVersionSourceFile[];
+            let sourceFiles: SourceCodeFile[];
             if (copyFromVersion === undefined) {
                 sourceFiles = buildSourceFileEntries(files);
             } else {
@@ -166,7 +166,7 @@ export const createActorVersion: ToolEntry = Object.freeze({
                         envVars: copied.envVars?.filter(({ isSecret }) => !isSecret),
                         applyEnvVarsToBuild: copied.applyEnvVarsToBuild,
                     }),
-                } satisfies ActorVersion);
+                } satisfies Version);
             return await respondAfterCreate({
                 toolArgs,
                 autoBuild: parsed.autoBuild,

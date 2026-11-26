@@ -8,8 +8,8 @@ import {
     createMcpHandler,
     PROTOCOL_VERSION_META_KEY,
 } from '@modelcontextprotocol/server';
+import type { ApifyResponse } from 'apify-client';
 import { ApifyApiError } from 'apify-client';
-import type { AxiosResponse } from 'axios';
 
 import type { ALLOWED_TASK_TOOL_EXECUTION_MODES } from '../../../src/const.js';
 import { APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED } from '../../../src/const.js';
@@ -233,7 +233,7 @@ export function makePermissionApprovalError(): ApifyApiError {
         {
             data: { error: { type: APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED, message: 'needs approval' } },
             status: PERMISSION_HTTP_STATUS,
-        } as AxiosResponse,
+        } as ApifyResponse,
         1,
     );
 }

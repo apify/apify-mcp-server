@@ -7,10 +7,11 @@ import { MCP_STREAMABLE_ENDPOINT } from '../../src/mcp/const.js';
 // Helper to create a valid ActorDefinition and allow webServerMcpPath for testing
 function makeActorDefinitionWithPath(webServerMcpPath?: unknown): ActorDefinition {
     return {
-        actorSpecification: 0,
+        actorSpecification: 1,
         name: 'dummy',
         version: '0.0',
-        ...(webServerMcpPath !== undefined ? { webServerMcpPath } : {}),
+        // Cast: the tests pass values the type rules out.
+        ...(webServerMcpPath !== undefined ? { webServerMcpPath: webServerMcpPath as string } : {}),
     };
 }
 

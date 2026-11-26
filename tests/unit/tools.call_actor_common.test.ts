@@ -1,5 +1,5 @@
+import type { ApifyResponse } from 'apify-client';
 import { ApifyApiError } from 'apify-client';
-import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -11,6 +11,7 @@ import {
 } from '../../src/const.js';
 import { ActorLoadError } from '../../src/errors.js';
 import { REDACTION_PLACEHOLDER } from '../../src/resources/api_resources.js';
+import { toActorStartOptions } from '../../src/tools/actors/actor_run_response.js';
 import {
     buildCallActorDescription,
     buildCallActorErrorResponse,
@@ -149,7 +150,7 @@ describe('call_actor_common', () => {
                         },
                     },
                     status: 403,
-                } as AxiosResponse,
+                } as ApifyResponse,
                 1,
             );
 
@@ -276,7 +277,7 @@ describe('call_actor_common', () => {
                         },
                     },
                     status: 402,
-                } as AxiosResponse,
+                } as ApifyResponse,
                 1,
             );
 
@@ -313,7 +314,7 @@ describe('call_actor_common', () => {
                         },
                     },
                     status: 402,
-                } as AxiosResponse,
+                } as ApifyResponse,
                 1,
             );
 
@@ -364,7 +365,7 @@ describe('call_actor_common', () => {
                         },
                     },
                     status: 400,
-                } as AxiosResponse,
+                } as ApifyResponse,
                 1,
             );
             const inputSchema = { type: 'object', properties: { query: { type: 'string' } } } as const;
@@ -398,7 +399,7 @@ describe('call_actor_common', () => {
                 {
                     data: { error: { type: 'invalid-input', message: 'Input is not valid: bad JSON' } },
                     status: 400,
-                } as AxiosResponse,
+                } as ApifyResponse,
                 1,
             );
 
@@ -430,6 +431,14 @@ describe('call_actor_common', () => {
             if (result.success) {
                 expect(result.data.callOptions).toEqual(callOptions);
             }
+        });
+
+        it('renames the run timeout to the name apify-client takes, which rejects `timeout`', () => {
+            expect(toActorStartOptions({ memory: 1024, timeout: 60 })).toEqual({ memory: 1024, runTimeoutSecs: 60 });
+            // 0 asks for a run without a time limit.
+            expect(toActorStartOptions({ timeout: 0 })).toEqual({ runTimeoutSecs: 0 });
+            const withoutTimeout: { build: string; timeout?: number } = { build: 'latest' };
+            expect(toActorStartOptions(withoutTimeout)).toEqual({ build: 'latest' });
         });
 
         it('rejects negative maxItems', () => {

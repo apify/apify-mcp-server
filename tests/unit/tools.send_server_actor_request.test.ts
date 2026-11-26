@@ -225,7 +225,7 @@ function recordRequests(): ReceivedRequest[] {
     return recording;
 }
 
-// The real client: the request goes through apify-client's axios instance, as in production.
+// The real client: the request goes through apify-client's HTTP client, as in production.
 const client = new ApifyClient({ token: TOKEN });
 
 async function callTool(

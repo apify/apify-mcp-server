@@ -1,8 +1,7 @@
-import type { Build } from 'apify-client';
+import type { Build, BuildListItem } from 'apify-client';
 import { vi } from 'vitest';
 
 import type { ApifyClient } from '../../../src/apify_client.js';
-import type { BuildListItem } from '../../../src/tools/builds/get_actor_build_list.js';
 import type { Actor, ActorDefinitionWithServerInterface } from '../../../src/types.js';
 import { mockApifyClient } from './tool_context.js';
 

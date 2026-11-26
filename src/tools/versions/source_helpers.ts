@@ -1,6 +1,6 @@
 import { posix } from 'node:path';
 
-import type { Actor, ActorVersion, ActorVersionSourceFile, Build } from 'apify-client';
+import type { ActorResource, Version, SourceCodeFile, Build } from 'apify-client';
 import { ActorSourceType, ApifyApiError } from 'apify-client';
 import { z } from 'zod';
 
@@ -78,7 +78,7 @@ export function redactSourceToolArgs(
 export async function fetchActor(
     client: ApifyClient,
     actorSelector: string,
-): Promise<{ actor: Actor; fullName: string }> {
+): Promise<{ actor: ActorResource; fullName: string }> {
     const actor = await getResourceByIdOrName(actorSelector, async (safeId) => client.actor(safeId).get());
     // Extra path segments, such as username/name/runs/last, reach a sub-resource that is not an Actor.
     if (!actor || typeof actor.name !== 'string' || typeof actor.username !== 'string') {
@@ -91,10 +91,10 @@ export async function fetchActor(
 
 /** The requested version, or the only one when none is requested; throws `UserInputError` otherwise. */
 export function resolveVersion(
-    actor: Pick<Actor, 'versions'>,
+    actor: Pick<ActorResource, 'versions'>,
     requestedVersionNumber: string | undefined,
     actorSelector: string,
-): ActorVersion & { versionNumber: string } {
+): Version & { versionNumber: string } {
     const versionNumbers = listVersionNumbers(actor);
     // AJV turns a null versionNumber into an empty string, which no version has, so it counts as not given.
     const requested = requestedVersionNumber || undefined;
@@ -143,7 +143,7 @@ function formatUrlWithoutSecrets(url: string): string {
  * Why a version not stored as files is refused, and what to use instead. A version keeps the URL fields of a source
  * type it used before, so only the URL of its current type is named.
  */
-function formatSourceTypeRefusal(version: ActorVersion, versionLabel: string): string {
+function formatSourceTypeRefusal(version: Version, versionLabel: string): string {
     if (version.sourceType === ActorSourceType.GitRepo) {
         const url = version.gitRepoUrl ? ` ${formatUrlWithoutSecrets(version.gitRepoUrl)}` : '';
         return `${versionLabel} has its files in the Git repository${url}, not stored on Apify, so this tool cannot work on them; use the repository.`;
@@ -166,7 +166,7 @@ function formatSourceTypeRefusal(version: ActorVersion, versionLabel: string): s
  * The version's stored entries, folders included. Throws `UserInputError` for a version not stored as files and for
  * one whose source the API hides.
  */
-export function extractSourceFiles(version: ActorVersion, versionLabel: string): ActorVersionSourceFile[] {
+export function extractSourceFiles(version: Version, versionLabel: string): SourceCodeFile[] {
     if (version.sourceType !== ActorSourceType.SourceFiles) {
         throw new UserInputError(formatSourceTypeRefusal(version, versionLabel));
     }
@@ -183,11 +183,7 @@ export function extractSourceFiles(version: ActorVersion, versionLabel: string):
  * The entry to store for a file sent whole: TEXT for utf8, BASE64 for base64, where no encoding means base64 for a
  * binary extension, the rule get-actor-version reads by. The path is normalized the way get-actor-version lists it.
  */
-export function buildSourceFileEntry({
-    path,
-    content,
-    encoding,
-}: z.infer<typeof sourceFileArgs>): ActorVersionSourceFile {
+export function buildSourceFileEntry({ path, content, encoding }: z.infer<typeof sourceFileArgs>): SourceCodeFile {
     const isBase64 = (encoding ?? (hasBinaryExtension(path) ? 'base64' : 'utf8')) === 'base64';
     return { name: posix.normalize(path), format: isBase64 ? 'BASE64' : 'TEXT', content };
 }
@@ -208,7 +204,7 @@ function isBase64(content: string): boolean {
  * Throws `UserInputError` for content the stored file would not hold as sent: base64 that does not decode without
  * loss, and text with a lone UTF-16 surrogate, which UTF-8 stores as U+FFFD.
  */
-export function validateFileContent({ format, content }: ActorVersionSourceFile, label: string): void {
+export function validateFileContent({ format, content = '' }: SourceCodeFile, label: string): void {
     if (format === 'BASE64' && !isBase64(content)) {
         throw new UserInputError(
             `${label} has content that is not valid base64; encoding base64 takes binary content as base64, and text takes encoding utf8.`,
@@ -319,8 +315,8 @@ export class SourcePathIndex {
  * stored file would not hold as sent, and for a path given twice, which leaves the version with two entries where the
  * build uses the last.
  */
-export function buildSourceFileEntries(files: readonly z.infer<typeof sourceFileArgs>[]): ActorVersionSourceFile[] {
-    const entries: ActorVersionSourceFile[] = [];
+export function buildSourceFileEntries(files: readonly z.infer<typeof sourceFileArgs>[]): SourceCodeFile[] {
+    const entries: SourceCodeFile[] = [];
     const pathIndex = new SourcePathIndex([]);
     for (const [index, file] of files.entries()) {
         validatePathCharacters(file.path, `files[${index}]`);
@@ -421,7 +417,7 @@ export async function respondAfterCreate(params: {
     toolArgs: Pick<InternalToolArgs, 'apifyClient' | 'apifyToken' | 'loadedToolNames' | 'signal'>;
     autoBuild: boolean;
     created: { actorId: string; fullName: string; versionNumber: string };
-    sourceFiles: readonly ActorVersionSourceFile[];
+    sourceFiles: readonly SourceCodeFile[];
     extraWarning?: { withoutBuild: string; withBuild: string };
     summary: string;
 }): Promise<ToolResponse> {

@@ -1,8 +1,7 @@
 import { ApifyApiError } from 'apify-client';
-import axios, { AxiosError, AxiosHeaders, CanceledError } from 'axios';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ApifyClient } from '../../src/apify_client.js';
+import { ApifyClient, ResponseTooLargeError } from '../../src/apify_client.js';
 import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
 import { InvalidRequestPathError } from '../../src/errors.js';
 import type { ApiBlockRule } from '../../src/tools/api/apify_api_blocklist.js';
@@ -23,6 +22,7 @@ import {
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { ALL_TOOLS_PRESENT } from '../../src/types.js';
 import { API_SPEC_FIXTURE } from './helpers/apify_api_spec_fixture.js';
+import { jsonResponse, stubFetch } from './helpers/fetch_stub.js';
 import {
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
@@ -44,16 +44,15 @@ const BASE_URL = 'https://api.apify.com/v2';
 const requestMock = vi.fn();
 const stubClient = {
     baseUrl: BASE_URL,
-    httpClient: { axios: { request: requestMock } },
+    httpClient: { call: requestMock },
 } as unknown as InternalToolArgs['apifyClient'];
 
 function mockResponse(status: number, data: unknown, contentType = 'application/json; charset=utf-8') {
     return {
         status,
-        statusText: 'Status',
         data,
         headers: { 'content-type': contentType },
-        config: { method: 'get', url: `${BASE_URL}/datasets/abc` },
+        config: { method: 'GET', url: `${BASE_URL}/datasets/abc` },
     };
 }
 
@@ -84,6 +83,7 @@ beforeEach(() => {
 
 afterEach(() => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
 });
 
 const SYNC_RUN_REFUSAL =
@@ -92,10 +92,20 @@ const SYNC_RUN_REFUSAL =
 const METHOD_PARAM_REFUSAL =
     'The method query parameter is not allowed because it can turn a read request into a write request.';
 
-/** The URL axios sends for the last request, with the query parameters added. */
+/** The options `sendApifyApiRequest` adds to every request. */
+const SEND_OPTIONS = {
+    timeoutSecs: 'long',
+    throwOnErrorStatus: false,
+    retryStatusCodes: [],
+    retryTransportErrors: false,
+};
+
+/** The URL apify-client sends for the last request, with the query parameters added as it encodes them. */
 function readSentUrl(): string {
-    const [config] = requestMock.mock.lastCall as [{ url: string; params?: Record<string, unknown> }];
-    return axios.getUri({ url: config.url, params: config.params });
+    const [config] = requestMock.mock.lastCall as [{ url: string; params?: Record<string, string> }];
+    const query = new URLSearchParams(config.params).toString();
+    if (!query) return config.url;
+    return `${config.url}${config.url.includes('?') ? '&' : '?'}${query}`;
 }
 
 describe('normalizeApiPath()', () => {
@@ -444,7 +454,7 @@ describe('apify-api-read', () => {
 
         await callTool(apifyApiRead, { path: 'actor-runs', query: { status: ['FAILED', 'ABORTED'], limit: 5 } });
 
-        expect(readSentUrl()).toBe(`${BASE_URL}/actor-runs?status=FAILED,ABORTED&limit=5`);
+        expect(readSentUrl()).toBe(`${BASE_URL}/actor-runs?status=FAILED%2CABORTED&limit=5`);
     });
 
     it('sends one GET to the path and returns the body as the API sends it', async () => {
@@ -461,9 +471,8 @@ describe('apify-api-read', () => {
             url: `${BASE_URL}/datasets/abc/items`,
             method: 'GET',
             params: { format: 'json', limit: 1 },
-            maxContentLength: MAX_INLINE_BYTES,
-            isUrlQueryAllowed: true,
             signal: expect.any(AbortSignal),
+            ...SEND_OPTIONS,
         });
         expectSchemaConformingStructuredContent(result, apifyApiCallOutputSchema);
         expect(result.structuredContent).toEqual({
@@ -520,7 +529,7 @@ describe('apify-api-read', () => {
         async (baseUrl) => {
             const client = {
                 baseUrl,
-                httpClient: { axios: { request: requestMock } },
+                httpClient: { call: requestMock },
             } as unknown as InternalToolArgs['apifyClient'];
 
             await expect(
@@ -754,11 +763,9 @@ describe('apify-api-read', () => {
         await expect((apifyApiRead as HelperTool).call(context)).rejects.toMatchObject({ message: 'Page not found.' });
     });
 
-    /** The abort axios throws for a body over `maxContentLength`; Node's request keeps the response status. */
+    /** What a body over `MAX_INLINE_BYTES` fails the request with. */
     function buildOversizeError(statusCode: number) {
-        return new AxiosError(`maxContentLength size of ${MAX_INLINE_BYTES} exceeded`, 'ERR_BAD_RESPONSE', undefined, {
-            res: { statusCode },
-        });
+        return new ResponseTooLargeError(statusCode, {});
     }
 
     it('does not return a body over the inline limit and names the parameters that narrow it', async () => {
@@ -802,22 +809,28 @@ describe('apify-api-read', () => {
         );
     });
 
-    it('rethrows any other request failure without the request config, which holds the token', async () => {
-        const config = { headers: new AxiosHeaders({ Authorization: 'Bearer secret-token' }) };
-        requestMock.mockRejectedValue(new AxiosError('socket hang up', 'ECONNRESET', config));
+    it('rethrows any other request failure as a plain error, without properties that could hold the token', async () => {
+        const cause = Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' });
+        const failure = Object.assign(new TypeError('fetch failed', { cause }), {
+            request: { headers: { Authorization: 'Bearer secret-token' } },
+        });
+        requestMock.mockRejectedValue(failure);
 
         const error = await callTool(apifyApiRead, { path: '/v2/datasets/abc' }).catch((thrown: unknown) => thrown);
 
         expect(error).toBeInstanceOf(Error);
-        expect(error).not.toBeInstanceOf(AxiosError);
-        expect(error).toMatchObject({ message: 'socket hang up', code: 'ECONNRESET' });
+        expect(error).not.toBe(failure);
+        expect(error).toMatchObject({
+            message: 'fetch failed',
+            cause: { message: 'socket hang up', code: 'ECONNRESET' },
+        });
         expect(JSON.stringify(error, Object.getOwnPropertyNames(error))).not.toContain('secret-token');
     });
 
     it('returns the empty response for a cancelled call instead of throwing it as a tool error', async () => {
         const controller = new AbortController();
         controller.abort();
-        requestMock.mockRejectedValue(new CanceledError());
+        requestMock.mockRejectedValue(new DOMException('This operation was aborted', 'AbortError'));
         const context = stubToolCallContext({ path: '/v2/datasets/abc' }, stubClient);
         context.signal = controller.signal;
 
@@ -880,9 +893,8 @@ describe('apify-api-read', () => {
 describe('apify-api-write', () => {
     const REQUEST_BASE = {
         params: undefined,
-        maxContentLength: MAX_INLINE_BYTES,
-        isUrlQueryAllowed: true,
         signal: expect.any(AbortSignal),
+        ...SEND_OPTIONS,
     };
 
     it('is annotated as destructive and open-world, since it starts runs and creates webhooks to any URL', () => {
@@ -1134,20 +1146,13 @@ describe('apify-api-write', () => {
         );
     });
 
-    it('sends the body as application/json through the real apify-client axios instance, a string as the value it holds', async () => {
+    it('sends the body as application/json through the real apify-client, a string as the value it holds', async () => {
         const client = new ApifyClient({ token: 'test-token', baseUrl: 'https://api.apify.com' });
         const sent: { url?: string; data?: unknown; contentType?: unknown }[] = [];
-        client.httpClient.axios.defaults.adapter = async (config) => {
-            sent.push({ url: config.url, data: config.data, contentType: config.headers.get('Content-Type') });
-            return {
-                status: 201,
-                statusText: 'Created',
-                headers: { 'content-type': 'application/json' },
-                data: Buffer.from('{"data":{}}'),
-                config,
-                request: {},
-            };
-        };
+        stubFetch(({ url, body, headers }) => {
+            sent.push({ url, data: body, contentType: headers.get('Content-Type') });
+            return jsonResponse({ data: {} }, 201);
+        });
         const call = async (body: unknown) => {
             const context = stubToolCallContext(
                 { path: '/v2/key-value-stores/s/records/a%2FK', method: 'PUT', body },
@@ -1184,7 +1189,7 @@ describe('apify-api-write', () => {
             { url, data: 'false', contentType: 'application/json' },
             { url, data: 'null', contentType: 'application/json' },
             { url, data: '[{"key":"a"}]', contentType: 'application/json' },
-            { url, data: undefined, contentType: 'application/x-www-form-urlencoded' },
+            { url, data: undefined, contentType: null },
         ]);
     });
 
@@ -1203,14 +1208,9 @@ describe('apify-api-write', () => {
         },
     );
 
-    /** The abort axios throws for a body over `maxContentLength`, with the status Node's request keeps. */
-    function buildOversizeError(statusCode?: number) {
-        return new AxiosError(
-            `maxContentLength size of ${MAX_INLINE_BYTES} exceeded`,
-            'ERR_BAD_RESPONSE',
-            undefined,
-            statusCode === undefined ? undefined : { res: { statusCode } },
-        );
+    /** What a body over `MAX_INLINE_BYTES` fails the request with. */
+    function buildOversizeError(statusCode: number) {
+        return new ResponseTooLargeError(statusCode, {});
     }
 
     it('reports a write whose response is over the inline limit as done, not failed', async () => {
@@ -1250,17 +1250,6 @@ describe('apify-api-write', () => {
             );
         },
     );
-
-    it('says the request was sent when an oversize response has no status', async () => {
-        requestMock.mockRejectedValue(buildOversizeError());
-
-        const result = await callTool(apifyApiWrite, { path: 'datasets/abc', method: 'PUT', body: { name: 'x' } });
-
-        expect(result.content[0].text).toBe(
-            `The response of PUT /v2/datasets/abc is larger than ${MAX_INLINE_BYTES} bytes, so it is not returned. ` +
-                'The request itself was sent; check its effect with a GET.',
-        );
-    });
 
     describe('redactArgs()', () => {
         const { redactArgs } = apifyApiWrite as HelperTool;

@@ -24,6 +24,7 @@ const TRACKING = { traceId: 'thread-1', useCase: 'find a scraper' };
 const baseStoreActor: ActorStoreList = {
     id: 'id-default',
     name: 'actor-default',
+    title: 'Actor Default',
     username: 'user',
     url: 'https://apify.com/user/actor-default',
     currentPricingInfo: {

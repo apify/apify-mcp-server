@@ -1,4 +1,4 @@
-import type { ActorRun, Dataset, KeyValueClientListKeysResult } from 'apify-client';
+import type { Run, DatasetResource, ListOfKeys } from 'apify-client';
 
 import log from '@apify/log';
 
@@ -32,6 +32,17 @@ const TIP_KVS_KEY = 'TIP';
 /** nextStep text for widget-rendered responses: suppresses LLM polling. */
 export const WIDGET_NO_POLL_NEXT_STEP =
     'Widget is rendering live progress. Do NOT poll — the widget self-updates until completion.';
+
+/**
+ * `callOptions` as apify-client's `start()` takes them. The tools name the run timeout `timeout`; the client names
+ * it `runTimeoutSecs` and rejects a key it does not know.
+ */
+export function toActorStartOptions<Options extends { timeout?: number }>({
+    timeout,
+    ...options
+}: Options): Omit<Options, 'timeout'> & { runTimeoutSecs?: number } {
+    return { ...options, ...(timeout !== undefined && { runTimeoutSecs: timeout }) };
+}
 
 /** Maximum value for `waitSecs`. Stays under the 60s tool-call ceiling several MCP clients impose. */
 export const WAIT_SECS_MAX = 45;
@@ -151,7 +162,7 @@ export type RunResponse = {
 };
 
 export type FetchActorRunResult = {
-    run: ActorRun;
+    run: Run;
     structuredContent: RunResponse;
 };
 
@@ -194,8 +205,8 @@ export function toIsoString(value: Date | string | undefined | null): string | u
     return value instanceof Date ? value.toISOString() : value;
 }
 
-export function buildStats(run: ActorRun): RunResponse['stats'] | undefined {
-    const stats = run.stats as ActorRun['stats'] | undefined;
+export function buildStats(run: Run): RunResponse['stats'] | undefined {
+    const stats = run.stats as Run['stats'] | undefined;
     if (!stats) return undefined;
     return cleanEmptyProperties({
         runTimeSecs: stats.runTimeSecs,
@@ -204,7 +215,7 @@ export function buildStats(run: ActorRun): RunResponse['stats'] | undefined {
     }) as RunResponse['stats'] | undefined;
 }
 
-function buildRunDataset(id: string, datasetMeta: Dataset | null, resolvedItemCount?: number): RunDataset {
+function buildRunDataset(id: string, datasetMeta: DatasetResource | null, resolvedItemCount?: number): RunDataset {
     if (!datasetMeta) {
         return { id };
     }
@@ -222,7 +233,7 @@ function buildRunDataset(id: string, datasetMeta: Dataset | null, resolvedItemCo
     }) as RunDataset;
 }
 
-function buildRunKeyValueStore(id: string, listKeysResult: KeyValueClientListKeysResult | null): RunKeyValueStore {
+function buildRunKeyValueStore(id: string, listKeysResult: ListOfKeys | null): RunKeyValueStore {
     if (!listKeysResult) {
         return { id };
     }
@@ -280,7 +291,11 @@ function errMessage(error: unknown): string {
 }
 
 /** Fetch dataset metadata; a transient failure logs and yields null so the entry keeps its id only. */
-async function fetchDatasetMeta(client: ApifyClient, id: string, mcpSessionId?: string): Promise<Dataset | null> {
+async function fetchDatasetMeta(
+    client: ApifyClient,
+    id: string,
+    mcpSessionId?: string,
+): Promise<DatasetResource | null> {
     try {
         return (await client.dataset(id).get()) ?? null;
     } catch (error) {
@@ -290,11 +305,7 @@ async function fetchDatasetMeta(client: ApifyClient, id: string, mcpSessionId?: 
 }
 
 /** List KV store keys; a transient failure logs and yields null so the entry keeps its id only. */
-async function fetchKvKeys(
-    client: ApifyClient,
-    id: string,
-    mcpSessionId?: string,
-): Promise<KeyValueClientListKeysResult | null> {
+async function fetchKvKeys(client: ApifyClient, id: string, mcpSessionId?: string): Promise<ListOfKeys | null> {
     try {
         return await client.keyValueStore(id).listKeys({ limit: KV_KEYS_LIMIT });
     } catch (error) {
@@ -460,7 +471,7 @@ async function actorNameForActorId(
 // Status templates — one summary + nextStep per Apify status
 // -----------------------------------------------------------------------------
 
-function elapsedSecs(run: ActorRun): number {
+function elapsedSecs(run: Run): number {
     if (!run.startedAt) return 0;
     const startedAtMs = run.startedAt instanceof Date ? run.startedAt.getTime() : new Date(run.startedAt).getTime();
     return Math.max(0, Math.round((Date.now() - startedAtMs) / 1000));
@@ -641,7 +652,7 @@ function buildTimedOutSummaryNextStep(
  * that a run failed is a normal result, not a protocol error.
  */
 export function buildStatusSummaryNextStep(params: {
-    run: ActorRun;
+    run: Run;
     dataset?: RunDataset;
     keyValueStore?: RunKeyValueStore;
     datasetMetadataFetched?: boolean;
@@ -713,10 +724,7 @@ export function buildStatusSummaryNextStep(params: {
 // Wait + progress
 // -----------------------------------------------------------------------------
 
-type WaitResult =
-    | { kind: 'ok'; run: ActorRun; actorName: string | undefined }
-    | { kind: 'not-found' }
-    | { kind: 'aborted' };
+type WaitResult = { kind: 'ok'; run: Run; actorName: string | undefined } | { kind: 'not-found' } | { kind: 'aborted' };
 
 /**
  * Wait for an Actor run to reach a terminal state, racing against an optional client abort signal.
@@ -771,7 +779,7 @@ async function waitForRunWithProgress(opts: {
 
         // Race waitForFinish against the client's abort signal so a cancelled request returns
         // promptly instead of blocking up to `waitSecs`. Behavior on abort is delegated to `onAbort`.
-        let raced: ActorRun | typeof ABORT;
+        let raced: Run | typeof ABORT;
         try {
             raced = await raceAbort(client.run(runId).waitForFinish({ waitSecs }), abortSignal);
         } finally {
@@ -813,7 +821,7 @@ async function waitForRunWithProgress(opts: {
  * builders below. Returns the full `RunResponse` with the computed (non-widget) `nextStep`;
  * `buildStartRunWidgetResponse` overrides `nextStep` on its own copy.
  */
-function buildStartRunSharedContent(actorName: string, actorRun: ActorRun): RunResponse {
+function buildStartRunSharedContent(actorName: string, actorRun: Run): RunResponse {
     // Start path returns before any metadata fetch, so every entry — default and aliases — is id-only.
     const datasetIds = buildStorageAliasIds(actorRun.storageIds?.datasets, actorRun.defaultDatasetId ?? undefined);
     const kvIds = buildStorageAliasIds(
@@ -849,13 +857,13 @@ function buildStartRunSharedContent(actorName: string, actorRun: ActorRun): RunR
 }
 
 /**
- * Build a RunResponse from an already-started ActorRun without waiting.
+ * Build a RunResponse from an already-started Run without waiting.
  * Used when waitSecs=0 (default and apps modes).
  * Storage metadata contains IDs only; pollers fetch updates via get-actor-run.
  */
 export function buildStartRunResponse(params: {
     actorName: string;
-    actorRun: ActorRun;
+    actorRun: Run;
     linkContext?: ConsoleLinkContext;
 }): ToolResponse {
     const { actorName, actorRun, linkContext } = params;
@@ -873,11 +881,11 @@ export function buildStartRunResponse(params: {
 }
 
 /**
- * Build a RunResponse from an already-started ActorRun for widget-rendered responses:
+ * Build a RunResponse from an already-started Run for widget-rendered responses:
  * nextStep is replaced with a no-poll message and widget _meta is included so the UI renders
  * automatically. Used only by `*-widget` tools.
  */
-export function buildStartRunWidgetResponse(params: { actorName: string; actorRun: ActorRun }): ToolResponse {
+export function buildStartRunWidgetResponse(params: { actorName: string; actorRun: Run }): ToolResponse {
     const { actorName, actorRun } = params;
 
     const base = buildStartRunSharedContent(actorName, actorRun);
@@ -958,7 +966,7 @@ export async function fetchActorRunData(params: {
     const [datasets, keyValueStores] = await Promise.all([
         buildStorageEntriesFromIds(datasetIds, async (id) => {
             const meta = await fetchDatasetMeta(client, id, mcpSessionId);
-            if (id === datasetIds.default) defaultDatasetFields = meta?.fields;
+            if (id === datasetIds.default) defaultDatasetFields = meta?.fields ?? undefined;
             let itemCount = meta?.itemCount;
             if (isSucceeded && itemCount === 0) {
                 itemCount = await fetchDatasetItemCountWithLagFallback(client, id, waitSecs, abortSignal);

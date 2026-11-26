@@ -1,5 +1,5 @@
+import type { ApifyResponse } from 'apify-client';
 import { ApifyApiError } from 'apify-client';
-import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
@@ -54,7 +54,7 @@ function mockActor(overrides: Record<string, unknown> = {}) {
 }
 
 function apiError(status: number, message: string, type = 'some-error'): ApifyApiError {
-    return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, 1);
+    return new ApifyApiError({ data: { error: { type, message } }, status } as ApifyResponse, 1);
 }
 
 async function callTool(args: Record<string, unknown>, signal?: AbortSignal): Promise<DeleteResult> {

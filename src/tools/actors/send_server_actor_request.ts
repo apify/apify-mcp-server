@@ -1,5 +1,5 @@
 import Ajv from 'ajv';
-import type { AxiosResponse } from 'axios';
+import type { HttpResponseHeaders } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -191,7 +191,7 @@ function buildRequestUrl(
     // The operation is looked up by the path as the agent wrote it, the form the description lists; `url.pathname`
     // is percent-encoded. A query written into the path is not part of the operation.
     const commaJoined = commaJoinedQueryParameters?.[`${method} ${path.split(/[?#]/, 1)[0]}`] ?? [];
-    // Not axios `params`: apify-client's serializer sends a boolean as 1 or 0. Not `url.searchParams`: it would
+    // Not `params`: apify-client's serializer sends a boolean as 1 or 0. Not `url.searchParams`: it would
     // encode the query written into the path again.
     const addedQuery = new URLSearchParams(
         Object.entries(query ?? {}).flatMap(([name, value]): [string, string][] => {
@@ -205,8 +205,8 @@ function buildRequestUrl(
 }
 
 /** A response header's value; `undefined` when it is absent or not a single string. */
-function readHeader(headers: AxiosResponse['headers'], name: string): string | undefined {
-    const value: unknown = headers[name];
+function readHeader(headers: HttpResponseHeaders, name: string): string | undefined {
+    const value = headers[name];
     return typeof value === 'string' ? value : undefined;
 }
 
@@ -233,17 +233,17 @@ async function sendRequest({
     const deadline = AbortSignal.timeout(timeoutMillis);
     let status: number | undefined;
     try {
-        const response = await sendApifyApiRequest(client, {
+        const response = await sendApifyApiRequest<ReadableStream<Uint8Array>>(client, {
             url: url.href,
             method,
-            // Bytes, not a string: apify-client compresses a string body of 1 KiB or more with brotli, which
-            // an Actor's server need not decode.
             ...(body !== undefined && {
-                data: new TextEncoder().encode(JSON.stringify(body)),
+                data: JSON.stringify(body),
                 headers: { 'Content-Type': 'application/json' },
             }),
+            // apify-client compresses a body of 1 KiB or more with brotli, which an Actor's server need not decode.
+            compression: false,
             responseType: 'stream',
-            maxRedirects: 0,
+            followRedirects: false,
             signal: AbortSignal.any([signal, deadline]),
         });
         status = response.status;

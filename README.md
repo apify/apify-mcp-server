@@ -157,7 +157,7 @@ Most clients that support remote servers and OAuth accept a configuration like t
 <details>
 <summary><b>Local stdio (npx)</b></summary>
 
-Requires Node.js 22 or later.
+Requires Node.js 22.15 or later.
 
 ```json
 {
@@ -415,7 +415,7 @@ TELEMETRY_ENABLED=false npx @apify/actors-mcp-server
 
 ## 🐛 Troubleshooting and limitations
 
-- **The local server won't start.** Check your Node.js version: the package requires Node.js 22 or later.
+- **The local server won't start.** Check your Node.js version: the package requires Node.js 22.15 or later.
 - **Authentication fails.** Reconnect so the client repeats the OAuth flow, or switch to a Bearer token. For the local server, check that `APIFY_TOKEN` is set in the client's server configuration, not only in your shell.
 - **VS Code says the OAuth app is not registered.** Run **Authentication: Remove Dynamic Authentication Providers**, select Apify, and sign in again.
 - **Client features vary.** Any MCP client can connect, but support for dynamic tool lists, OAuth, and MCP Apps differs between clients.
@@ -467,7 +467,7 @@ Yes. Select tools with the `tools` parameter or expose a single Actor. To cap a 
 
 This repository contains the open-source server package published to npm as [`@apify/actors-mcp-server`](https://www.npmjs.com/package/@apify/actors-mcp-server). The hosted service at mcp.apify.com runs on this core logic from a separate private repository.
 
-You need Node.js 22 or later and pnpm.
+You need Node.js 22.15 or later and pnpm.
 
 ```bash
 pnpm install

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
+import type { ApifyResponse } from 'apify-client';
 import { ApifyApiError } from 'apify-client';
-import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HELPER_TOOLS } from '../../src/const.js';
@@ -103,7 +103,7 @@ function sha256Prefix(data: Buffer | string): string {
 
 /** `attempt` counts apify-client's tries of the request, retries included. */
 function apiError(status: number, message: string, type = 'some-error', attempt = 1): ApifyApiError {
-    return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, attempt);
+    return new ApifyApiError({ data: { error: { type, message } }, status } as ApifyResponse, attempt);
 }
 
 async function callTool(args: Record<string, unknown>, signal?: AbortSignal): Promise<CreateVersionResult> {

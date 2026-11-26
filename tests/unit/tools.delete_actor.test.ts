@@ -1,5 +1,5 @@
+import type { ApifyResponse } from 'apify-client';
 import { ApifyApiError } from 'apify-client';
-import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
@@ -49,7 +49,7 @@ function mockRunList(runIds: string[], total = runIds.length) {
 }
 
 function apiError(status: number, type: string, message: string): ApifyApiError {
-    return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, 1);
+    return new ApifyApiError({ data: { error: { type, message } }, status } as ApifyResponse, 1);
 }
 
 type DeleteActorResult = TextToolResult & {

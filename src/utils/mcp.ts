@@ -61,11 +61,11 @@ export function injectMcpSessionId(params: ApifyRequestParams | undefined, mcpSe
  * @returns `{ 'com.apify/ActorRun': { usageTotalUsd, usageUsd } }`, or undefined if no usage data.
  */
 export function buildUsageMeta(source: {
-    usageTotalUsd?: number;
+    usageTotalUsd?: number | null;
     usageUsd?: unknown;
 }): Record<string, unknown> | undefined {
     const { usageTotalUsd, usageUsd } = source;
-    return usageTotalUsd !== undefined
+    return usageTotalUsd !== undefined && usageTotalUsd !== null
         ? {
               [APIFY_ACTOR_RUN_META_KEY]: { usageTotalUsd, usageUsd },
           }

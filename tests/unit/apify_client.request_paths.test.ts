@@ -1,29 +1,33 @@
 /** ApifyClient: identifiers and record keys reach the request URL as one path segment each. */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient, sendApifyApiRequest } from '../../src/apify_client.js';
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
 import { InvalidRequestPathError } from '../../src/errors.js';
 import { buildToolCallErrorResult } from '../../src/mcp/tool_call_error_mapper.js';
+import { type FetchAnswer, jsonResponse, stubFetch } from './helpers/fetch_stub.js';
 
 const API = 'https://api.apify.com';
 
-/** A client whose requests stop at a stub adapter, after the real interceptor chain; `urls` lists what was sent. */
-function buildRecordingClient(): { client: ApifyClient; urls: string[] } {
+const NOT_FOUND = { error: { type: 'record-not-found', message: 'Not found' } };
+
+/**
+ * A client whose requests stop at a stubbed `fetch`, after apify-client's pipeline; `urls` lists what was sent,
+ * without the query. A read is answered with a 404, which the client reads as a missing resource, and a write with an empty 204.
+ */
+function buildRecordingClient(answer?: FetchAnswer): { client: ApifyClient; urls: string[] } {
     const urls: string[] = [];
-    const client = new ApifyClient({ token: 'test-token', baseUrl: API, maxRetries: 0 });
-    client.httpClient.axios.defaults.adapter = async (config) => {
-        urls.push(config.url!);
-        return {
-            status: 200,
-            statusText: 'OK',
-            headers: { 'content-type': 'application/json' },
-            config,
-            data: Buffer.from(JSON.stringify({ data: { id: 'a1B2c3D4e5F6g7H8i' } })),
-        };
-    };
-    return { client, urls };
+    stubFetch((request) => {
+        urls.push(request.url.split('?', 1)[0]);
+        if (answer) return answer(request);
+        return request.method === 'GET' || request.method === 'HEAD'
+            ? jsonResponse(NOT_FOUND, 404)
+            : new Response(null, { status: 204 });
+    });
+    return { client: new ApifyClient({ token: 'test-token', baseUrl: API, maxRetries: 0 }), urls };
 }
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('resource identifiers', () => {
     it.each([
@@ -139,11 +143,15 @@ describe('record keys', () => {
     });
 
     it('getRecordPublicUrl builds the link from a valid key and refuses any other', async () => {
-        const { client, urls } = buildRecordingClient();
-        const store = client.keyValueStore(STORE);
+        const now = new Date().toISOString();
+        const store = { id: STORE, userId: 'u1', createdAt: now, modifiedAt: now, accessedAt: now };
+        const { client, urls } = buildRecordingClient(() => jsonResponse({ data: store }));
+        const storeClient = client.keyValueStore(STORE);
 
-        await expect(store.getRecordPublicUrl(KEY)).resolves.toBe(`${API}/v2/key-value-stores/${STORE}/records/${KEY}`);
-        await expect(store.getRecordPublicUrl('a/../b')).rejects.toMatchObject({ statusCode: 400 });
+        await expect(storeClient.getRecordPublicUrl(KEY)).resolves.toBe(
+            `${API}/v2/key-value-stores/${STORE}/records/${KEY}`,
+        );
+        await expect(storeClient.getRecordPublicUrl('a/../b')).rejects.toMatchObject({ statusCode: 400 });
         // Only the store read for the valid key.
         expect(urls).toEqual([`${API}/v2/key-value-stores/${STORE}`]);
     });
@@ -163,51 +171,42 @@ describe('record keys', () => {
 });
 
 describe('request URLs', () => {
-    // A version number is not checked as an identifier, so these reach the interceptor. apify-client turns its first
-    // "/" into "~".
+    // A version number is not checked as an identifier here; apify-client percent-encodes it into one path segment.
     it.each([
-        ['a dot segment', '0.1/a/../b'],
-        ['a percent-encoded dot segment', '0.1/a/%2e%2e/b'],
-        ['a backslash', '0.1\\x'],
-        ['a query', '0.1?x=1'],
-        ['a fragment', '0.1#x'],
-    ])('refuses a path value that adds %s without sending a request', async (_label, versionNumber) => {
+        ['a slash', '0.1/a', '0.1~a'],
+        ['a backslash', '0.1\\x', '0.1%5Cx'],
+        ['a query', '0.1?x=1', '0.1%3Fx%3D1'],
+        ['a fragment', '0.1#x', '0.1%23x'],
+    ])('sends a path value with %s as one encoded segment', async (_label, versionNumber, segment) => {
         const { client, urls } = buildRecordingClient();
 
-        await expect(client.actor('apify/web-scraper').version(versionNumber).get()).rejects.toMatchObject({
-            statusCode: 400,
-        });
-        expect(urls).toEqual([]);
+        await client.actor('apify/web-scraper').version(versionNumber).get();
+
+        expect(urls).toEqual([`${API}/v2/actors/apify~web-scraper/versions/${segment}`]);
     });
 
     it('sends the query of a URL passed to sendApifyApiRequest', async () => {
-        const { client, urls } = buildRecordingClient();
+        const { requests } = stubFetch();
+        const client = new ApifyClient({ token: 'test-token', baseUrl: API });
         const url = `${API}/v2/datasets/a1B2c3D4e5F6g7H8i/items?limit=1`;
 
         await sendApifyApiRequest(client, { url, method: 'GET' });
 
-        expect(urls).toEqual([url]);
-    });
-
-    it('joins a relative URL to its baseURL before checking it', async () => {
-        const { client, urls } = buildRecordingClient();
-
-        await client.httpClient.axios.request({ baseURL: `${API}/v2`, url: 'users/me' });
-        await expect(client.httpClient.axios.request({ baseURL: `${API}/v2`, url: '../x' })).rejects.toMatchObject({
-            statusCode: 400,
-        });
-
-        expect(urls).toEqual(['users/me']);
+        expect(requests.map((request) => request.url)).toEqual([url]);
     });
 
     it.each([
-        // Read as absolute, as the HTTP library reads it.
-        ['a protocol-relative URL', { baseURL: `${API}/v2`, url: '//example.com/x' }],
-        ['a relative URL with no baseURL', { url: '/v2/users/me' }],
-    ])('refuses %s', async (_label, config) => {
+        ['a dot segment', `${API}/v2/datasets/a/../b`],
+        ['a percent-encoded dot segment', `${API}/v2/datasets/a/%2e%2e/b`],
+        ['a backslash', `${API}/v2/datasets\\x`],
+        ['a character a URL path cannot hold unencoded', `${API}/v2/datasets/a b`],
+        ['no origin', '/v2/users/me'],
+    ])('refuses a URL with %s without sending a request', async (_label, url) => {
         const { client, urls } = buildRecordingClient();
 
-        await expect(client.httpClient.axios.request(config)).rejects.toMatchObject({ statusCode: 400 });
+        await expect(sendApifyApiRequest(client, { url, method: 'GET' })).rejects.toBeInstanceOf(
+            InvalidRequestPathError,
+        );
         expect(urls).toEqual([]);
     });
 });

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
+import type { ApifyResponse } from 'apify-client';
 import { ApifyApiError } from 'apify-client';
-import type { AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../../src/const.js';
@@ -90,7 +90,7 @@ function mockFiles(...sourceFiles: Record<string, unknown>[]) {
 
 /** `attempt` is the attempt of the request apify-client gave up on; above 1, it retried the request. */
 function apiError(status: number, message: string, type = 'some-error', attempt = 1): ApifyApiError {
-    return new ApifyApiError({ data: { error: { type, message } }, status } as AxiosResponse, attempt);
+    return new ApifyApiError({ data: { error: { type, message } }, status } as ApifyResponse, attempt);
 }
 
 async function callTool(args: Record<string, unknown>, signal?: AbortSignal): Promise<UpdateResult> {

@@ -90,7 +90,7 @@ async function main() {
     const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
 
     // The deletes below hit whatever account APIFY_TOKEN points at, so name it first.
-    console.log(`👤 ${DRY}Account: ${(await client.user('me').get()).username ?? 'unknown'}`);
+    console.log(`👤 ${DRY}Account: ${(await client.user('me').get())?.username ?? 'unknown'}`);
     if (runId) console.log(`🧹 ${DRY}Tearing down run "${runId}"`);
 
     const schedule = await sweep('schedule', client.schedules().list(), FIXTURE_SCHEDULE_NAME, runId, async (id) =>

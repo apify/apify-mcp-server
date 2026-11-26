@@ -20,7 +20,7 @@ export const CODE_RUNTIME_ACTOR_NAME = 'apify/code-runtime';
  * Content larger than this is linked out instead of inlined, since inlining it would blow up the context
  * window (base64 inflates a binary payload ~33%, and a large text/JSON body overflows it just as easily).
  * The key-value-store-record tool caps binaries here (link to a fetchable URL); the API-resource proxy
- * caps every body here — its download is also aborted mid-flight at this limit via axios `maxContentLength`.
+ * caps every body here — its download is also aborted mid-flight at this limit (`sendApifyApiRequest`).
  */
 export const MAX_INLINE_BYTES = 256 * 1024;
 

@@ -28,8 +28,8 @@ identity with the platform's own URLs is the feature. Revisit when tools start e
 `resource_link`s, where clients may fetch `https://` URIs directly. `isApifyApiUri()` gates reads
 to two origins — the one clients are told to use (`getApifyAPIPublicBaseUrl()`, `../apify_client.ts`)
 and the egress one (`getApifyAPIBaseUrl()`), which differ on the hosted server — and rejects
-userinfo-bearing URLs (axios drops the `Authorization` header for those, silently degrading to
-unauthenticated). An accepted URI is sent on the egress origin and returned under the URI as given;
+userinfo-bearing URLs (`fetch` refuses to send those). An accepted URI is sent on the egress origin and
+returned under the URI as given;
 templates, instructions, refusals and link-out URLs name only the client-facing origin. `readApiResource()`
 then refuses, without a request, what the API tools refuse (`validateApiBlocklist` in
 `../tools/api/apify_api_blocklist.ts`): the `method` query parameter and a GET to the synchronous run
@@ -38,7 +38,7 @@ endpoints. The API tools' `callApi` (`../tools/api/apify_api_request.ts`) reuses
 tools too. `get-key-value-store-record` builds its inlined-record URI with `buildUrlOnOrigin()`.
 
 `sendApifyApiRequest()` (`../apify_client.ts`, shared with `callApi`) sends one request through
-`httpClient.axios.request` with `maxContentLength: MAX_INLINE_BYTES`; `readBodyUnderCap()` next to it reads a
+`httpClient.call()` with the response body capped at `MAX_INLINE_BYTES`; `readBodyUnderCap()` next to it reads a
 streamed body, `undefined` past the cap, over `readBodyToCap()`, which keeps the start for
 `send-server-actor-request`. `readApiResource()` sends
 `{ method: 'GET', responseType: 'stream' }` through `sendApifyApiRequest()`, reads the body, and branches
@@ -51,13 +51,12 @@ except: the session token becomes `[REDACTED]` (`maskSessionToken()`; `/v2/brows
 `Authorization` header), and so do the `urlSigningSecretKey` and `password` values in an
 `application/json` body (`redactJsonSecrets()`). The values are redacted, not removed: removal means
 re-serializing, which loses formatting and big-number precision and cost about 1 GB on a crafted deep body.
-axios enforces `MAX_INLINE_BYTES` (256 KB) mid-consumption on streamed
-responses (axios ≥1.16: byte-counting wrapper throws `ERR_BAD_RESPONSE`, counting decoded bytes) —
-after the request resolves, outside any retry wrapper. On trip, the proxy links out: a `text/plain`
+The client's `fetch` wrapper enforces `MAX_INLINE_BYTES` (256 KB) mid-consumption on these
+responses (`capResponseBody`: the body errors with `ResponseTooLargeError`, counting decoded bytes) —
+after the request resolves, outside any retry. On trip, the proxy links out: a `text/plain`
 block carrying the store's signed `recordPublicUrl` for a KVS record, else the token-gated API URL,
-plus a `limit`/`offset` paging hint. `sendApifyApiRequest()` calls the client's axios instance
-directly, not `httpClient.call()`: with a stream body, `call()` hands non-2xx responses to
-`ApifyApiError` unconsumed (junk message, stranded socket per retry) — one attempt, no retries; the
+plus a `limit`/`offset` paging hint. `sendApifyApiRequest()` turns off the retries and the
+error-status throw of `httpClient.call()` — one attempt, and a non-2xx response resolves; the
 error body is read here to surface the API's message.
 
 Genuine failures **throw** a domain error carrying `data: { uri }` (SEP-2164 / draft spec: the

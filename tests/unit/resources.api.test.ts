@@ -1,13 +1,13 @@
 import { Readable } from 'node:stream';
 
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
-import { AxiosError } from 'axios';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ApifyClient } from '../../src/apify_client.js';
+import { ApifyClient, ResponseTooLargeError } from '../../src/apify_client.js';
 import { MAX_INLINE_BYTES } from '../../src/const.js';
 import { InternalError, InvalidParamsError } from '../../src/mcp/errors.js';
 import { isApifyApiUri, readApiResource, redactJsonSecrets } from '../../src/resources/api_resources.js';
+import { stubFetch } from './helpers/fetch_stub.js';
 import { mockApifyClient } from './helpers/tool_context.js';
 
 const API = 'https://api.apify.com';
@@ -45,17 +45,20 @@ function streamOf(...chunks: (string | Buffer)[]): Readable {
     return Readable.from(chunks.map((c) => Buffer.from(c)));
 }
 
-/**
- * Models the axios stream `maxContentLength` enforcement (axios ≥1.16 wraps streamed responses in a
- * byte-counting generator): yields a prefix, then throws the same abort axios raises over the limit.
- */
+/** A body over `MAX_INLINE_BYTES` as `sendApifyApiRequest` hands it on: a prefix, then `ResponseTooLargeError`. */
 function abortingStream(prefix: string | Buffer = 'partial'): Readable {
     return Readable.from(
         (async function* generate() {
             yield Buffer.from(prefix);
-            throw new AxiosError(`maxContentLength size of ${MAX_INLINE_BYTES} exceeded`, 'ERR_BAD_RESPONSE');
+            throw new ResponseTooLargeError(200, {});
         })(),
     );
+}
+
+/** The error `fetch` rejects with when the connection is refused. */
+function connectionRefused(): TypeError {
+    const cause = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:443'), { code: 'ECONNREFUSED' });
+    return new TypeError('fetch failed', { cause });
 }
 
 /** A body stream that drops mid-body, as a reset connection does. */
@@ -68,8 +71,8 @@ function droppedStream(): Readable {
     );
 }
 
-type RequestConfig = { url: string; responseType?: string; maxContentLength?: number };
-type RequestResult = { data: unknown; headers: Record<string, unknown>; status: number; statusText: string };
+type RequestConfig = { url: string; responseType?: string };
+type RequestResult = { data: unknown; headers: Record<string, unknown>; status: number };
 
 type StubOptions = {
     request?: (config: RequestConfig) => Promise<RequestResult>;
@@ -93,10 +96,7 @@ function stubApifyClient(opts: StubOptions = {}): ApifyClient {
             },
         }),
         httpClient: {
-            axios: {
-                request:
-                    opts.request ?? (async () => ({ data: streamOf(), headers: {}, status: 200, statusText: 'OK' })),
-            },
+            call: opts.request ?? (async () => ({ data: streamOf(), headers: {}, status: 200 })),
         },
     });
 }
@@ -106,18 +106,17 @@ function requestReturning(data: Readable, contentType?: string) {
     const captured: RequestConfig = { url: '' };
     const request = async (config: RequestConfig): Promise<RequestResult> => {
         Object.assign(captured, config);
-        return { data, headers: contentType ? { 'content-type': contentType } : {}, status: 200, statusText: 'OK' };
+        return { data, headers: contentType ? { 'content-type': contentType } : {}, status: 200 };
     };
     return { request, captured };
 }
 
-/** Request stub resolving a non-2xx response (`validateStatus: null` semantics) with a body stream. */
-function requestFailing(status: number, statusText: string, body?: object) {
+/** Request stub resolving a non-2xx response (`throwOnErrorStatus: false` semantics) with a body stream. */
+function requestFailing(status: number, body?: object) {
     return async (): Promise<RequestResult> => ({
         data: body ? streamOf(JSON.stringify(body)) : streamOf(),
         headers: { 'content-type': 'application/json; charset=utf-8' },
         status,
-        statusText,
     });
 }
 
@@ -146,8 +145,7 @@ describe('isApifyApiUri()', () => {
     });
 
     it('rejects userinfo-bearing URLs even on the API host', () => {
-        // axios drops the default Authorization header for credentials-bearing URLs, so such a
-        // read would silently run unauthenticated; refuse it at the gate instead.
+        // `fetch` refuses a URL with credentials; refuse it at the gate, with a message that says why.
         expect(isApifyApiUri('https://evil.com@api.apify.com/v2/datasets/ds-1/items')).toBe(false);
         expect(isApifyApiUri('https://user:pass@api.apify.com/v2/datasets/ds-1/items')).toBe(false);
     });
@@ -253,9 +251,8 @@ describe('readApiResource()', () => {
         expect(captured.url).toBe('');
     });
 
-    it('requests the full URL as a stream capped at MAX_INLINE_BYTES', async () => {
-        // The size cap is enforced by axios itself mid-consumption (streamed responses are wrapped in a
-        // byte-counting generator since axios 1.16), so the contract under test is the request config.
+    it('requests the full URL as a stream', async () => {
+        // `sendApifyApiRequest` caps the body, see apify_client.test.ts.
         const { request, captured } = requestReturning(streamOf('[]'), 'application/json');
         const uri = `${API}/v2/datasets/ds-1/items?limit=5`;
 
@@ -263,7 +260,6 @@ describe('readApiResource()', () => {
 
         expect(captured.url).toBe(uri);
         expect(captured.responseType).toBe('stream');
-        expect(captured.maxContentLength).toBe(MAX_INLINE_BYTES);
     });
 
     it('returns a JSON body verbatim, reassembling chunks, with its full content-type', async () => {
@@ -447,16 +443,11 @@ describe('readApiResource()', () => {
         const uri = `${API}/v2/key-value-stores/a1B2c3D4e5F6g7H8i/records/a%2Fb`;
         const { request: readRecord } = requestReturning(abortingStream(), 'application/octet-stream');
         const client = new ApifyClient({ token: 'test-token', baseUrl: API });
-        // The record read overflows; a store read, if any, finds the store.
-        vi.spyOn(client.httpClient.axios, 'request').mockImplementation((async (config: RequestConfig) =>
+        // The record read overflows; a store read, if any, finds no store.
+        vi.spyOn(client.httpClient, 'call').mockImplementation((async (config: RequestConfig) =>
             config.url.includes('/records/')
                 ? readRecord(config)
-                : {
-                      data: { data: { id: 'a1B2c3D4e5F6g7H8i' } },
-                      headers: {},
-                      status: 200,
-                      statusText: 'OK',
-                  }) as never);
+                : { data: undefined, headers: {}, status: 404 }) as never);
 
         const result = await readApiResource(uri, client);
 
@@ -514,7 +505,7 @@ describe('readApiResource()', () => {
     it('throws InvalidParams with the parsed error message for a resolved non-2xx 4xx response', async () => {
         const uri = `${API}/v2/datasets/missing/items`;
         const client = stubApifyClient({
-            request: requestFailing(404, 'Not Found', {
+            request: requestFailing(404, {
                 error: { message: 'Dataset was not found', type: 'record-not-found' },
             }),
         });
@@ -528,7 +519,7 @@ describe('readApiResource()', () => {
 
     it('throws InternalError falling back to statusText for a resolved 5xx with no parsable error body', async () => {
         const uri = `${API}/v2/datasets/missing/items`;
-        const client = stubApifyClient({ request: requestFailing(500, 'Internal Server Error') });
+        const client = stubApifyClient({ request: requestFailing(500) });
 
         const error = await expectReadError(readApiResource(uri, client));
 
@@ -544,7 +535,6 @@ describe('readApiResource()', () => {
                 data: abortingStream(),
                 headers: {},
                 status: 502,
-                statusText: 'Bad Gateway',
             }),
         });
 
@@ -557,7 +547,7 @@ describe('readApiResource()', () => {
     it('appends the auth hint for a 401 response', async () => {
         const uri = `${API}/v2/datasets/ds-1/items`;
         const client = stubApifyClient({
-            request: requestFailing(401, 'Unauthorized', { error: { message: 'Token invalid' } }),
+            request: requestFailing(401, { error: { message: 'Token invalid' } }),
         });
 
         const error = await expectReadError(readApiResource(uri, client));
@@ -570,7 +560,7 @@ describe('readApiResource()', () => {
     it('appends the back-off hint for a 429 response and classifies it as transient', async () => {
         const uri = `${API}/v2/datasets/ds-1/items`;
         const client = stubApifyClient({
-            request: requestFailing(429, 'Too Many Requests', { error: { message: 'Too many requests' } }),
+            request: requestFailing(429, { error: { message: 'Too many requests' } }),
         });
 
         const error = await expectReadError(readApiResource(uri, client));
@@ -583,7 +573,7 @@ describe('readApiResource()', () => {
     it('appends the private-resource hint for a 403 response', async () => {
         const uri = `${API}/v2/datasets/ds-1/items`;
         const client = stubApifyClient({
-            request: requestFailing(403, 'Forbidden', { error: { message: 'Forbidden' } }),
+            request: requestFailing(403, { error: { message: 'Forbidden' } }),
         });
 
         const error = await expectReadError(readApiResource(uri, client));
@@ -594,8 +584,7 @@ describe('readApiResource()', () => {
     });
 
     it('inlines a body of exactly MAX_INLINE_BYTES (boundary — link-out is strictly over the limit)', async () => {
-        // axios aborts only when bytes exceed maxContentLength, so a body of exactly the limit is not
-        // aborted and inlines; only MAX_INLINE_BYTES + 1 links out (covered by the abortingStream tests).
+        // The body errors only once it passes the limit, so a body of exactly the limit inlines; only MAX_INLINE_BYTES + 1 links out (covered by the abortingStream tests).
         const exact = Buffer.alloc(MAX_INLINE_BYTES, 0x61); // 'a' repeated to exactly the limit
         const { request } = requestReturning(streamOf(exact), 'text/plain; charset=utf-8');
 
@@ -740,7 +729,7 @@ describe('readApiResource()', () => {
         [500, InternalError],
     ])('masks the session token in the API error message of an HTTP %s response', async (status, ErrorClass) => {
         const client = stubApifyClient({
-            request: requestFailing(status, 'Status', { error: { message: 'Bearer test-token rejected' } }),
+            request: requestFailing(status, { error: { message: 'Bearer test-token rejected' } }),
             token: 'test-token',
         });
 
@@ -754,13 +743,12 @@ describe('readApiResource()', () => {
     it('masks the token the client sends in its Authorization header, not another one', async () => {
         const client = new ApifyClient({ token: 'sent-token' });
         // Echo the Authorization header apify-client adds, as GET /v2/browser-info does.
-        client.httpClient.axios.defaults.adapter = async (config) => ({
-            data: streamOf(`authorization: ${String(config.headers.Authorization)}; configured: other-token`),
-            status: 200,
-            statusText: 'OK',
-            headers: { 'content-type': 'text/plain' },
-            config,
-        });
+        stubFetch(
+            ({ headers }) =>
+                new Response(`authorization: ${headers.get('Authorization')}; configured: other-token`, {
+                    headers: { 'content-type': 'text/plain' },
+                }),
+        );
 
         const result = await readApiResource(`${API}/v2/browser-info`, client);
 
@@ -769,10 +757,9 @@ describe('readApiResource()', () => {
 
     it('logs a failed request without the session token', async () => {
         const client = new ApifyClient({ token: 'test-token' });
-        // axios rejects a connection failure with the request config, which holds the Authorization header.
-        client.httpClient.axios.defaults.adapter = async (config) => {
-            throw new AxiosError('connect ECONNREFUSED 127.0.0.1:443', 'ECONNREFUSED', config);
-        };
+        stubFetch(() => {
+            throw connectionRefused();
+        });
         const logOutput = captureLogOutput();
 
         await expectReadError(readApiResource(`${API}/v2/datasets/ds-1`, client));
@@ -785,12 +772,10 @@ describe('readApiResource()', () => {
         const uri = `${API}/v2/key-value-stores/kv-1/records/BIG`;
         const client = new ApifyClient({ token: 'test-token', maxRetries: 0 });
         // The record crosses the inline limit, then the store request for its signing key fails to connect.
-        client.httpClient.axios.defaults.adapter = async (config) => {
-            if (config.responseType === 'stream') {
-                return { data: abortingStream(), status: 200, statusText: 'OK', headers: {}, config };
-            }
-            throw new AxiosError('connect ECONNREFUSED 127.0.0.1:443', 'ECONNREFUSED', config);
-        };
+        stubFetch(({ url }) => {
+            if (url.includes('/records/')) return new Response(Buffer.alloc(MAX_INLINE_BYTES + 1));
+            throw connectionRefused();
+        });
         const logOutput = captureLogOutput();
 
         const result = await readApiResource(uri, client);
@@ -807,11 +792,8 @@ describe('readApiResource()', () => {
                 throw Object.assign(new Error('not found'), { statusCode: 404 });
             },
         ],
-        [
-            'the body is interrupted',
-            async () => ({ data: droppedStream(), headers: {}, status: 200, statusText: 'OK' }),
-        ],
-        ['the response is non-2xx', requestFailing(404, 'Not Found')],
+        ['the body is interrupted', async () => ({ data: droppedStream(), headers: {}, status: 200 })],
+        ['the response is non-2xx', requestFailing(404)],
         // No status and a 5xx take the error and exception log branches, not softFail.
         [
             'the request fails without a status',
@@ -819,7 +801,7 @@ describe('readApiResource()', () => {
                 throw new Error('connect ECONNREFUSED');
             },
         ],
-        ['the response is 5xx', requestFailing(500, 'Internal Server Error')],
+        ['the response is 5xx', requestFailing(500)],
     ])('logs the URI without its query values when %s', async (_case, request) => {
         const uri = `${API}/v2/datasets/ds-1/items?token=query-token&limit=5`;
         const logOutput = captureLogOutput();

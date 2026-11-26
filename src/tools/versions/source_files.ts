@@ -2,7 +2,7 @@ import { isUtf8 } from 'node:buffer';
 import { createHash } from 'node:crypto';
 import { posix } from 'node:path';
 
-import type { ActorVersionSourceFile } from 'apify-client';
+import type { SourceCodeFile } from 'apify-client';
 
 /**
  * Extensions whose files are never text. `apify push` classifies by MIME type, which calls `.ts` a
@@ -75,7 +75,7 @@ export type SourceFile = {
     /** The content as returned: the text for utf8, the base64 for base64. */
     content: string;
     /** The entry as stored, which a write sends back for a file it leaves alone. */
-    entry: ActorVersionSourceFile;
+    entry: SourceCodeFile;
 };
 
 export function hasBinaryExtension(path: string): boolean {
@@ -110,8 +110,8 @@ export function buildFilesRevision(files: readonly Pick<SourceFile, 'path' | 'ha
  * and the name is normalized. A BASE64 file whose extension is not binary and whose bytes are valid UTF-8 is returned
  * as text; any other BASE64 file as its stored base64, so no byte is lost.
  */
-export function buildInlineSourceFile(file: ActorVersionSourceFile): SourceFile {
-    const { name, format, content: storedContent }: Partial<ActorVersionSourceFile> & { name: string } = file;
+export function buildInlineSourceFile(file: SourceCodeFile): SourceFile {
+    const { name, format, content: storedContent }: Partial<SourceCodeFile> & { name: string } = file;
     const content = storedContent ?? '';
     const path = posix.normalize(name);
     const bytes = Buffer.from(content, format === 'BASE64' ? 'base64' : 'utf8');
@@ -127,12 +127,12 @@ export function buildInlineSourceFile(file: ActorVersionSourceFile): SourceFile 
 }
 
 /** Console keeps an empty folder as a `{ name, folder: true }` entry with no content; apify-client's type leaves it out. */
-export function isFolderEntry(file: ActorVersionSourceFile): boolean {
+export function isFolderEntry(file: SourceCodeFile): boolean {
     return (file as { folder?: boolean }).folder === true;
 }
 
 /** The version's regular files sorted by path, one per path (the last stored entry wins); folders are left out. */
-export function buildFilesManifest(entries: readonly ActorVersionSourceFile[]): SourceFile[] {
+export function buildFilesManifest(entries: readonly SourceCodeFile[]): SourceFile[] {
     const filesByPath = new Map<string, SourceFile>();
     for (const entry of entries) {
         if (isFolderEntry(entry)) continue;

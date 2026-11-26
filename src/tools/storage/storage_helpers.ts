@@ -1,15 +1,13 @@
-import { ApifyApiError } from 'apify-client';
-import { isAxiosError } from 'axios';
+import { ApifyApiError, InvalidResponseBodyError } from 'apify-client';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { isMaxContentLengthAbort, sendApifyApiRequest } from '../../apify_client.js';
+import { ResponseTooLargeError, sendApifyApiRequest } from '../../apify_client.js';
 import { HELPER_TOOLS, HTTP_NOT_FOUND } from '../../const.js';
 import { assertValidRecordKey, getResourceByIdOrName, isAmbiguousResourceId } from '../../utils/apify_resource_id.js';
 import { VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { QUOTE_WRAPPER_CHARS, stripEdgeChars } from '../../utils/generic.js';
 import { getHttpStatusCode, toPlainError } from '../../utils/logging.js';
 import { respondOk } from '../../utils/mcp.js';
-import { isRecord } from '../api/apify_api_spec.js';
 
 /**
  * Wrap a storage SDK promise to convert a 404 rejection into null.
@@ -281,38 +279,16 @@ export type FetchedRecord =
  * `application/json`. `null` when the error is anything else.
  */
 function readUnparsableBodyContentType(error: unknown): { contentType?: string } | null {
-    if (!isRecord(error) || error.code !== 'invalid-response-body') return null;
-    const headers = isRecord(error.response) ? error.response.headers : undefined;
-    const contentType = isRecord(headers) ? headers['content-type'] : undefined;
+    if (!(error instanceof InvalidResponseBodyError)) return null;
+    const contentType = error.response.headers['content-type'];
     return typeof contentType === 'string' ? { contentType } : {};
-}
-
-/**
- * Sends the request once more when the body could not be parsed: an interrupted response can end early
- * without an error. apify-client's `call()` retries that case, and `sendApifyApiRequest` skips `call()`.
- */
-async function sendWithParseRetry<T>(send: () => Promise<T>): Promise<T> {
-    try {
-        return await send();
-    } catch (error) {
-        if (!readUnparsableBodyContentType(error)) throw error;
-        return send();
-    }
-}
-
-/** The Content-Type of a response axios aborted mid-body; Node's request object keeps the response it got. */
-function readAbortedResponseContentType(error: unknown): string | undefined {
-    const request: unknown = isAxiosError(error) ? error.request : undefined;
-    const headers = isRecord(request) && isRecord(request.res) ? request.res.headers : undefined;
-    const contentType = isRecord(headers) ? headers['content-type'] : undefined;
-    return typeof contentType === 'string' ? contentType : undefined;
 }
 
 /**
  * Reads a key-value store record without holding more than `MAX_INLINE_BYTES` of it: a record is as large
  * as its writer made it, and `getRecord()` buffers it whole. Over the limit the download stops and the
- * result has only the Content-Type, not the size: axios drops `Content-Encoding` once it decompresses, so
- * `Content-Length` cannot be told from a compressed length. `undefined` on a 404, as `getRecord()` returns.
+ * result has only the Content-Type, not the size: the body is counted after decompression, so
+ * `Content-Length` may be a compressed length. `undefined` on a 404, as `getRecord()` returns.
  */
 export async function fetchRecordUnderCap(
     client: ApifyClient,
@@ -323,22 +299,20 @@ export async function fetchRecordUnderCap(
     const url = `${client.keyValueStore(safeId).url}/records/${assertValidRecordKey(recordKey)}`;
     let response: Awaited<ReturnType<typeof sendApifyApiRequest>>;
     try {
-        response = await sendWithParseRetry(async () =>
-            sendApifyApiRequest(client, {
-                url,
-                method: 'GET',
-                // As `getRecord()` sends.
-                params: { attachment: 'true' },
-            }),
-        );
+        response = await sendApifyApiRequest(client, {
+            url,
+            method: 'GET',
+            // As `getRecord()` sends.
+            params: { attachment: 'true' },
+        });
     } catch (error) {
-        // Still unparsable on the second read: the record's writer chose its bytes and its Content-Type,
-        // so a mismatch is not a server fault.
+        // The record's writer chose its bytes and its Content-Type, so a mismatch is not a server fault. A
+        // response cut short fails as a network error, not here.
         const unparsable = readUnparsableBodyContentType(error);
         if (unparsable) return { isOverLimit: false, isUnparsable: true, ...unparsable };
-        if (!isMaxContentLengthAbort(error)) throw toPlainError(error);
-        const contentType = readAbortedResponseContentType(error);
-        return { isOverLimit: true, ...(contentType && { contentType }) };
+        if (!(error instanceof ResponseTooLargeError)) throw toPlainError(error);
+        const contentType = error.responseHeaders['content-type'];
+        return { isOverLimit: true, ...(typeof contentType === 'string' && { contentType }) };
     }
     if (response.status === HTTP_NOT_FOUND) return undefined;
     if (response.status >= 300) throw new ApifyApiError(response, 1);

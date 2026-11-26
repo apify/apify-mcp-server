@@ -182,7 +182,7 @@ export function getServerActorsAsTools(actorsInfo: ActorInfo[]): ToolEntry[] {
         const isReadOnly = isReadOnlyActor(actorInfo);
         const costNotice = formatTenancyBilling({
             tenancy: resolveActorTenancy(actor),
-            idleTimeoutSecs: actor.actorStandby?.idleTimeoutSecs,
+            idleTimeoutSecs: actor.actorStandby?.idleTimeoutSecs ?? undefined,
         });
         const policy = getActorToolPolicy(actorFullName)?.serverTool;
         const schemas = buildServerActorToolSchemas(toolInfo);
