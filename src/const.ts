@@ -97,7 +97,7 @@ export const HELPER_TOOLS = {
     API_DETAILS: 'apify-api-details',
     API_READ: 'apify-api-read',
     API_WRITE: 'apify-api-write',
-    PROBLEM_REPORT: 'report-problem',
+    FEEDBACK_SEND: 'send-feedback',
 } as const;
 export type HelperToolName = (typeof HELPER_TOOLS)[keyof typeof HELPER_TOOLS];
 
@@ -117,7 +117,16 @@ export const RETIRED_SELECTOR_NAMES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Anthropic client-name substrings (lowercased): not offered `report-problem` or the search tools' `useCase` input.
+ * Old tool selectors mapped to the tool's current name. `report-problem` became `send-feedback`, but
+ * `?tools=` URLs (including the listed Claude connector URL) and session tool lists restored through
+ * `toolNamesToInput` still carry the old name. Unmapped, it would be read as an Actor name and fetched.
+ */
+export const RENAMED_SELECTOR_NAMES: ReadonlyMap<string, string> = new Map([
+    ['report-problem', HELPER_TOOLS.FEEDBACK_SEND],
+]);
+
+/**
+ * Anthropic client-name substrings (lowercased): not offered `send-feedback` or the search tools' `useCase` input.
  * `local-agent-mode` is Claude Desktop's local agent mode, named `local-agent-mode-<server name>`. A request with no name matches none.
  */
 export const ANTHROPIC_CLIENT_NAMES: string[] = ['claude', 'anthropic', 'local-agent-mode'];

@@ -122,10 +122,10 @@ export function logToolCallAndTelemetry(params: LogToolCallAndTelemetryParams): 
         };
         trackToolCall(params.userId, params.telemetryEnv, finalizedTelemetryData);
 
-        // A successful report-problem call also emits a dedicated feedback event carrying the
+        // A successful send-feedback call also emits a dedicated feedback event carrying the
         // submission. A downstream Segment destination fans it out to Slack/GitHub.
         if (
-            params.toolName === HELPER_TOOLS.PROBLEM_REPORT &&
+            params.toolName === HELPER_TOOLS.FEEDBACK_SEND &&
             params.toolStatus === TOOL_STATUS.SUCCEEDED &&
             params.args
         ) {

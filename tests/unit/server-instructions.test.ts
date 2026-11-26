@@ -19,11 +19,11 @@ describe('getServerInstructions()', () => {
         );
     });
 
-    it('mentions report-problem with a gentle, non-mandatory nudge when feedback is available', () => {
+    it('mentions send-feedback with a gentle, non-mandatory nudge when feedback is available', () => {
         const instructions = getServerInstructions(SERVER_MODE.DEFAULT, ALL_TOOLS_PRESENT);
-        expect(instructions).toContain(HELPER_TOOLS.PROBLEM_REPORT);
+        expect(instructions).toContain(HELPER_TOOLS.FEEDBACK_SEND);
         expect(instructions).toContain(
-            `If a tool or Actor fails, or a step is confusing or takes several attempts, you can report it with \`${HELPER_TOOLS.PROBLEM_REPORT}\`.`,
+            `If a tool or Actor fails, or a step is confusing or takes several attempts, you can report it with \`${HELPER_TOOLS.FEEDBACK_SEND}\`.`,
         );
         // No hard directive — the directory review rejects MUST-style solicitation.
         expect(instructions).not.toContain('MUST');
@@ -59,9 +59,9 @@ describe('getServerInstructions()', () => {
         expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_CALL);
     });
 
-    it('omits report-problem when it is absent from the session', () => {
+    it('omits send-feedback when it is absent from the session', () => {
         const instructions = getServerInstructions(SERVER_MODE.DEFAULT, only(HELPER_TOOLS.ACTOR_CALL));
-        expect(instructions).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+        expect(instructions).not.toContain(HELPER_TOOLS.FEEDBACK_SEND);
         expect(instructions).toContain(HELPER_TOOLS.ACTOR_CALL); // no dead end
     });
 
@@ -424,7 +424,11 @@ describe('Claude-connector tool surface (no call-actor)', () => {
     const listedUrl = `https://mcp.apify.com/?tools=${CLAUDE_CONNECTOR_TOOLS.join(',')}&client=claude`;
 
     // Internal-tool subset of the fixture: Actor selectors (contain '/') resolve only with pre-fetched Actor tools.
-    const expectedInternalToolNames = CLAUDE_CONNECTOR_TOOLS.filter((tool) => !tool.includes('/'));
+    // The old `report-problem` selector is served as `send-feedback`. Spelled out, not read from
+    // `RENAMED_SELECTOR_NAMES`, so a change to that map cannot change this pinned surface unnoticed.
+    const expectedInternalToolNames = CLAUDE_CONNECTOR_TOOLS.filter((tool) => !tool.includes('/')).map((tool) =>
+        tool === 'report-problem' ? HELPER_TOOLS.FEEDBACK_SEND : tool,
+    );
 
     const resolveToolNames = (url: string) =>
         getToolsForServerMode(parseInputParamsFromUrl(url), [], SERVER_MODE.APPS).map((tool) => tool.name);

@@ -223,7 +223,7 @@ For an Actor with [multiple datasets](https://docs.apify.com/platform/storage/da
 
 ## 🛠️ Tools, resources, and prompts
 
-Any [Actor](https://apify.com/store) can be a tool, and agents discover new ones as they work. By default, the server loads the `actors` and `docs` categories, two Actor tools ([Web Search](https://apify.com/apify/web-search) and [Web Fetch](https://apify.com/apify/web-fetch)), and `report-problem`. Everything else is opt-in by category or by tool name.
+Any [Actor](https://apify.com/store) can be a tool, and agents discover new ones as they work. By default, the server loads the `actors` and `docs` categories, two Actor tools ([Web Search](https://apify.com/apify/web-search) and [Web Fetch](https://apify.com/apify/web-fetch)), and `send-feedback`. Everything else is opt-in by category or by tool name.
 
 ### Helper tools
 
@@ -242,7 +242,7 @@ Legend for the **Enabled by default** column:
 
 - ✅ In the default tool set.
 - ⚡ Added automatically when `call-actor`, an Actor tool, or `get-actor-run` is loaded, which is true in the default configuration.
-- ✅¹ Served by default only when telemetry is on and the client name doesn't contain `claude`, `anthropic`, or `local-agent-mode`. Select it explicitly with `tools=report-problem` or `tools=dev` to serve it to any client; telemetry still has to be on.
+- ✅¹ Served by default only when telemetry is on and the client name doesn't contain `claude`, `anthropic`, or `local-agent-mode`. Select it explicitly with `tools=send-feedback` or `tools=dev` to serve it to any client; telemetry still has to be on.
 
 | Tool name | Category | Description | Enabled by default |
 | :--- | :--- | :--- | :---: |
@@ -260,7 +260,7 @@ Legend for the **Enabled by default** column:
 | `fetch-apify-docs` | docs | Fetch the full content of a documentation page by its URL. | ✅ |
 | [`apify--web-search`](https://apify.com/apify/web-search) | Actor (see [Choose which tools load](#choose-which-tools-load)) | Search the web and return one page of results: titles, URLs, and snippets. | ✅ |
 | [`apify--web-fetch`](https://apify.com/apify/web-fetch) | Actor (see [Choose which tools load](#choose-which-tools-load)) | Fetch a URL and return its content as Markdown, text, HTML, or other formats. | ✅ |
-| `report-problem` | dev | Report a problem with an Apify tool or Actor to the Apify team. | ✅¹ |
+| `send-feedback` | dev | Send feedback about an Apify tool or Actor to the Apify team. | ✅¹ |
 | [`apify--rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see [Choose which tools load](#choose-which-tools-load)) | Search the web and return the content of the top results. | |
 | `get-actor-list` | none (select by name: `tools=get-actor-list`) | List the Actors you own and those shared with you, including private ones. | |
 | `delete-actor` | none (select by name: `tools=delete-actor`) | Delete an Actor from your account permanently. Public Actors must be unpublished first. | |
@@ -337,6 +337,7 @@ https://mcp.apify.com?tools=apify/instagram-scraper
 - `enableAddingActors`, `enable-adding-actors`, and `enableActorAutoLoading` were removed and are ignored. Dynamic Actor calls come from `call-actor`, which the default `actors` category includes.
 - The selectors `add-actor`, `experimental`, and `preview` are retired and load nothing. Use `call-actor` or the `actors` category.
 - `get-actor-log` was renamed to `get-actor-run-log`, and the `source` category to `versions`. The old names load nothing.
+- `report-problem` was renamed to `send-feedback` and now requires `sentiment` and `category`. The old selector still loads it.
 - `call-actor` no longer calls tools on MCP server Actors: the `actorName:toolName` form is rejected. Use `call-actor-mcp-tool` with `actor`, `tool`, and `arguments`. `call-actor` still starts a run of an MCP server Actor that has an input schema; one without is refused. A selection that names `call-actor` alone needs `call-actor-mcp-tool` added.
 - `fetch-actor-details` no longer lists an MCP server Actor's tools, and `output.mcpTools` is ignored. Use `fetch-actor-mcp-tool-list`, which returns the definitions in `structuredContent.tools`. A selection that names `fetch-actor-details` alone needs `fetch-actor-mcp-tool-list` added.
 - A selected Actor with an API schema (a Server Actor) gets a tool that sends one HTTP request to its API, with `method`, `path`, and `query` arguments, instead of a tool that starts a run. If the Actor is also an MCP server, the selection no longer loads its MCP tools: use `call-actor-mcp-tool`. `call-actor` still starts runs of the Actor when it has an input schema. A selected `apify/rag-web-browser` is served this way too, with `GET /search`.

@@ -375,12 +375,12 @@ export const fetchApifyDocsToolOutputSchema = {
 };
 
 /**
- * Schema for the fixed acknowledgement returned by report-problem.
+ * Schema for the fixed acknowledgement returned by send-feedback.
  */
-export const reportProblemToolOutputSchema = {
+export const sendFeedbackToolOutputSchema = {
     type: 'object' as const,
     properties: {
-        reported: { type: 'boolean', description: 'Always true; the problem report was submitted' },
+        reported: { type: 'boolean', description: 'Always true; the feedback was submitted' },
     },
     required: ['reported'],
 };

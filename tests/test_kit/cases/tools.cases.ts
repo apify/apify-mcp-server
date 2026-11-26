@@ -26,15 +26,15 @@ const UNKNOWN_TOOL_NAME = 'no-such-tool';
 
 const LOG_NOTIFICATION_TIMEOUT_MS = 5_000;
 
-/** Protocol/tool behavior: prompts, docs, report-problem, schemas, MCP passthrough. */
+/** Protocol/tool behavior: prompts, docs, send-feedback, schemas, MCP passthrough. */
 export const toolsCases: Case[] = [
     {
-        // telemetry off → report-problem absent; serve/hide paths are unit-tested.
-        name: 'report-problem is not served when telemetry is disabled',
+        // telemetry off → send-feedback absent; serve/hide paths are unit-tested.
+        name: 'send-feedback is not served when telemetry is disabled',
         isDeploymentTest: false,
         run: withClient(undefined, async (client) => {
             const names = getToolNames(await client.listTools());
-            expect(names).not.toContain('report-problem');
+            expect(names).not.toContain('send-feedback');
         }),
     },
     {

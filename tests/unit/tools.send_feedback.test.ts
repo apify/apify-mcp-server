@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { FAILURE_CATEGORY, HELPER_TOOLS } from '../../src/const.js';
 import {
-    appendReportProblemNudge,
-    REPORT_PROBLEM_INVALID_INPUT_NUDGE,
-    REPORT_PROBLEM_NUDGE,
-    reportProblem,
-} from '../../src/tools/dev/report_problem.js';
-import { reportProblemToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
+    appendSendFeedbackNudge,
+    SEND_FEEDBACK_INVALID_INPUT_NUDGE,
+    SEND_FEEDBACK_NUDGE,
+    sendFeedback,
+} from '../../src/tools/dev/send_feedback.js';
+import { sendFeedbackToolOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool } from '../../src/types.js';
 import {
     expectSchemaConformingStructuredContent,
@@ -18,34 +18,36 @@ import {
 
 const errorResult = () => ({ content: [{ type: 'text', text: 'Actor not found.' }], isError: true });
 const nudgeCount = (r: { content: { text: string }[] }) =>
-    r.content.filter((c) => c.text === REPORT_PROBLEM_NUDGE).length;
+    r.content.filter((c) => c.text === SEND_FEEDBACK_NUDGE).length;
 
-describe('reportProblem', () => {
+describe('sendFeedback', () => {
     describe('call()', () => {
-        it('acknowledges a submission that has a message', async () => {
-            const result = await (reportProblem as HelperTool).call(
-                stubToolCallContext({ message: 'The search-actors results were unclear.' }, mockApifyClient()),
-            );
+        const SUBMISSION = {
+            message: 'The search-actors results were unclear.',
+            sentiment: 'negative',
+            category: 'other',
+        };
+
+        it('acknowledges a submission', async () => {
+            const result = await (sendFeedback as HelperTool).call(stubToolCallContext(SUBMISSION, mockApifyClient()));
             const { content, isError } = result as TextToolResult;
 
             expect(isError).toBe(false);
-            expect(content[0].text).toContain('Problem reported');
+            expect(content[0].text).toContain('Feedback sent');
         });
 
         it('returns structuredContent conforming to the declared outputSchema', async () => {
-            const result = await (reportProblem as HelperTool).call(
-                stubToolCallContext({ message: 'The search-actors results were unclear.' }, mockApifyClient()),
-            );
+            const result = await (sendFeedback as HelperTool).call(stubToolCallContext(SUBMISSION, mockApifyClient()));
 
             expect((result as TextToolResult).structuredContent).toEqual({ reported: true });
-            expect((reportProblem as HelperTool).outputSchema).toBe(reportProblemToolOutputSchema);
-            expectSchemaConformingStructuredContent(result, reportProblemToolOutputSchema);
+            expect((sendFeedback as HelperTool).outputSchema).toBe(sendFeedbackToolOutputSchema);
+            expectSchemaConformingStructuredContent(result, sendFeedbackToolOutputSchema);
         });
     });
 
     describe('description', () => {
         it('states what the tool is for without telling the agent when to call it', () => {
-            const { description } = reportProblem as HelperTool;
+            const { description } = sendFeedback as HelperTool;
             expect(description).toContain(
                 'Reports can describe missing tools or Actors, errors, timeouts, confusing results, steps that took ' +
                     'several attempts, or tasks that the available tools could not complete. Reports help fix the ' +
@@ -57,55 +59,61 @@ describe('reportProblem', () => {
 
     describe('annotations', () => {
         it('is not read-only (submitting a report writes to the Apify team)', () => {
-            expect((reportProblem as HelperTool).annotations?.readOnlyHint).toBe(false);
+            expect((sendFeedback as HelperTool).annotations?.readOnlyHint).toBe(false);
         });
     });
 
     describe('input validation', () => {
-        const validate = (reportProblem as HelperTool).ajvValidate;
+        const validate = (sendFeedback as HelperTool).ajvValidate;
+        const VALID_ARGS = { message: 'stuck', sentiment: 'negative', category: 'bug' } as const;
 
-        it('requires a message', () => {
-            expect(validate({})).toBe(false);
+        it.each(['message', 'sentiment', 'category'] as const)('requires %s', (field) => {
+            const { [field]: _omitted, ...withoutField } = VALID_ARGS;
+            expect(validate(withoutField)).toBe(false);
+        });
+
+        it.each(['sentiment', 'category', 'source'] as const)('rejects a %s outside the list', (field) => {
+            expect(validate({ ...VALID_ARGS, [field]: 'praise' })).toBe(false);
         });
 
         it('accepts a message at the 2000-character cap', () => {
-            expect(validate({ message: 'x'.repeat(2000) })).toBe(true);
+            expect(validate({ ...VALID_ARGS, message: 'x'.repeat(2000) })).toBe(true);
         });
 
         it('rejects a message longer than 2000 characters', () => {
-            expect(validate({ message: 'x'.repeat(2001) })).toBe(false);
+            expect(validate({ ...VALID_ARGS, message: 'x'.repeat(2001) })).toBe(false);
         });
 
         it('rejects more than 20 related tools', () => {
-            expect(validate({ message: 'stuck', relatedTools: Array.from({ length: 21 }, () => 'call-actor') })).toBe(
+            expect(validate({ ...VALID_ARGS, relatedTools: Array.from({ length: 21 }, () => 'call-actor') })).toBe(
                 false,
             );
         });
 
         it('accepts a related tool name at the 100-character cap', () => {
-            expect(validate({ message: 'stuck', relatedTools: ['t'.repeat(100)] })).toBe(true);
+            expect(validate({ ...VALID_ARGS, relatedTools: ['t'.repeat(100)] })).toBe(true);
         });
 
         it('rejects a related tool name longer than 100 characters', () => {
-            expect(validate({ message: 'stuck', relatedTools: ['t'.repeat(101)] })).toBe(false);
+            expect(validate({ ...VALID_ARGS, relatedTools: ['t'.repeat(101)] })).toBe(false);
         });
 
         it('rejects an over-long actorId', () => {
-            expect(validate({ message: 'stuck', actorId: 'a'.repeat(201) })).toBe(false);
+            expect(validate({ ...VALID_ARGS, actorId: 'a'.repeat(201) })).toBe(false);
         });
 
         it('accepts an actorRunId at the 200-character cap', () => {
-            expect(validate({ message: 'stuck', actorRunId: 'r'.repeat(200) })).toBe(true);
+            expect(validate({ ...VALID_ARGS, actorRunId: 'r'.repeat(200) })).toBe(true);
         });
 
         it('rejects an over-long actorRunId', () => {
-            expect(validate({ message: 'stuck', actorRunId: 'r'.repeat(201) })).toBe(false);
+            expect(validate({ ...VALID_ARGS, actorRunId: 'r'.repeat(201) })).toBe(false);
         });
 
         it('accepts the optional actor, run, and related-tools fields', () => {
             expect(
                 validate({
-                    message: 'rag-web-browser worked well',
+                    ...VALID_ARGS,
                     actorId: 'apify/rag-web-browser',
                     actorRunId: 'abc123',
                     relatedTools: ['call-actor', 'get-dataset-items'],
@@ -114,9 +122,9 @@ describe('reportProblem', () => {
         });
     });
 
-    describe('appendReportProblemNudge()', () => {
-        it('appends one sentence that offers report-problem without ordering a call', () => {
-            const result = appendReportProblemNudge(errorResult(), {
+    describe('appendSendFeedbackNudge()', () => {
+        it('appends one sentence that offers send-feedback without ordering a call', () => {
+            const result = appendSendFeedbackNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
             });
@@ -124,22 +132,22 @@ describe('reportProblem', () => {
                 errorResult().content[0],
                 {
                     type: 'text',
-                    text: `If you cannot resolve this yourself, you can report it to the Apify team with ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and this error).`,
+                    text: `If you cannot resolve this yourself, you can report it to the Apify team with ${HELPER_TOOLS.FEEDBACK_SEND} (describe what you were doing and this error).`,
                 },
             ]);
         });
 
         it('does not append when the tool is unavailable', () => {
-            const result = appendReportProblemNudge(errorResult(), {
+            const result = appendSendFeedbackNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: false,
             });
             expect(nudgeCount(result)).toBe(0);
         });
 
-        it('does not append when the failing tool is report-problem itself', () => {
-            const result = appendReportProblemNudge(errorResult(), {
-                failingToolName: HELPER_TOOLS.PROBLEM_REPORT,
+        it('does not append when the failing tool is send-feedback itself', () => {
+            const result = appendSendFeedbackNudge(errorResult(), {
+                failingToolName: HELPER_TOOLS.FEEDBACK_SEND,
                 available: true,
             });
             expect(nudgeCount(result)).toBe(0);
@@ -147,7 +155,7 @@ describe('reportProblem', () => {
 
         it('does not append to a successful result', () => {
             const success = { content: [{ type: 'text', text: 'done' }], isError: false };
-            const result = appendReportProblemNudge(success, {
+            const result = appendSendFeedbackNudge(success, {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
             });
@@ -158,7 +166,7 @@ describe('reportProblem', () => {
             ['PERMISSION_APPROVAL_REQUIRED', FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED],
             ['AUTH', FAILURE_CATEGORY.AUTH],
         ])('does not append for the user-resolvable category %s', (_label, failureCategory) => {
-            const result = appendReportProblemNudge(errorResult(), {
+            const result = appendSendFeedbackNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
                 failureCategory,
@@ -167,7 +175,7 @@ describe('reportProblem', () => {
         });
 
         it('appends the bug-or-friction sentence for an INVALID_INPUT failure, such as not found or invalid input', () => {
-            const result = appendReportProblemNudge(errorResult(), {
+            const result = appendSendFeedbackNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
                 failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
@@ -176,25 +184,25 @@ describe('reportProblem', () => {
                 errorResult().content[0],
                 {
                     type: 'text',
-                    text: `If this error looks like a bug, or was unclear or took several attempts to get past, you can report it to the Apify team with ${HELPER_TOOLS.PROBLEM_REPORT} (describe what you were doing and what went wrong).`,
+                    text: `If this error looks like a bug, or was unclear or took several attempts to get past, you can report it to the Apify team with ${HELPER_TOOLS.FEEDBACK_SEND} (describe what you were doing and what went wrong).`,
                 },
             ]);
         });
 
         it('does not append any nudge for a 402 payment response, though 402 is classified INVALID_INPUT', () => {
-            const result = appendReportProblemNudge(errorResult(), {
+            const result = appendSendFeedbackNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
                 failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
                 failureHttpStatus: 402,
             });
-            expect(result.content.filter((c) => c.text === REPORT_PROBLEM_INVALID_INPUT_NUDGE)).toHaveLength(0);
+            expect(result.content.filter((c) => c.text === SEND_FEEDBACK_INVALID_INPUT_NUDGE)).toHaveLength(0);
             expect(nudgeCount(result)).toBe(0);
             expect(result.content).toHaveLength(1);
         });
 
         it('appends for a genuine INTERNAL_ERROR failure', () => {
-            const result = appendReportProblemNudge(errorResult(), {
+            const result = appendSendFeedbackNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
                 failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
@@ -203,7 +211,7 @@ describe('reportProblem', () => {
         });
 
         it('appends when the failure category is undefined (unclassified)', () => {
-            const result = appendReportProblemNudge(errorResult(), {
+            const result = appendSendFeedbackNudge(errorResult(), {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
                 failureCategory: undefined,
@@ -214,7 +222,7 @@ describe('reportProblem', () => {
         it('does not mutate the input result', () => {
             const input = errorResult();
             const before = input.content.length;
-            const result = appendReportProblemNudge(input, {
+            const result = appendSendFeedbackNudge(input, {
                 failingToolName: HELPER_TOOLS.ACTOR_CALL,
                 available: true,
             });

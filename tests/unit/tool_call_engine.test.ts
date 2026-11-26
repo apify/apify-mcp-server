@@ -22,10 +22,10 @@ import { actorNameToToolName } from '../../src/tools/actor_tool_naming.js';
 import { fetchActorDetails } from '../../src/tools/actors/fetch_actor_details.js';
 import { sendServerActorRequest } from '../../src/tools/actors/send_server_actor_request.js';
 import {
-    REPORT_PROBLEM_INVALID_INPUT_NUDGE,
-    REPORT_PROBLEM_NUDGE,
-    reportProblem,
-} from '../../src/tools/dev/report_problem.js';
+    SEND_FEEDBACK_INVALID_INPUT_NUDGE,
+    SEND_FEEDBACK_NUDGE,
+    sendFeedback,
+} from '../../src/tools/dev/send_feedback.js';
 import { searchApifyDocs } from '../../src/tools/docs/search_apify_docs.js';
 import { getActorRunList } from '../../src/tools/runs/get_actor_run_list.js';
 import type { ToolCallTelemetryProperties, ToolEntry, ToolInputSchema } from '../../src/types.js';
@@ -471,16 +471,16 @@ describe('classifyToolCallError()', () => {
     afterEach(() => vi.restoreAllMocks());
 
     it.each([
-        ['an internal failure gets the general sentence', new Error('boom'), REPORT_PROBLEM_NUDGE],
+        ['an internal failure gets the general sentence', new Error('boom'), SEND_FEEDBACK_NUDGE],
         [
             'a 4xx failure gets the friction sentence',
             Object.assign(new Error('Not found'), { statusCode: 404 }),
-            REPORT_PROBLEM_INVALID_INPUT_NUDGE,
+            SEND_FEEDBACK_INVALID_INPUT_NUDGE,
         ],
-    ])('appends one report-problem sentence to an execution error: %s', (_label, error, sentence) => {
+    ])('appends one send-feedback sentence to an execution error: %s', (_label, error, sentence) => {
         silenceLogs();
         const outcome = classifyToolCallError(error, {
-            tools: new Map<string, ToolEntry>([[HELPER_TOOLS.PROBLEM_REPORT, reportProblem]]),
+            tools: new Map<string, ToolEntry>([[HELPER_TOOLS.FEEDBACK_SEND, sendFeedback]]),
             toolName: 'some-tool',
             failingToolName: 'some-tool',
             actorName: undefined,

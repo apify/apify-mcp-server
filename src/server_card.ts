@@ -45,11 +45,11 @@ export function getServerInfo(): Implementation {
 
 /**
  * Tools of a default session. Not `getDefaultTools()`: it omits what `call-actor` pulls in.
- * `report-problem` is left out because it is enabled per client at serve time.
+ * `send-feedback` is left out because it is enabled per client at serve time.
  */
 function getServerCardTools(): ServerCardTool[] {
     return getToolsForServerMode({}, [], SERVER_MODE.DEFAULT)
-        .filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT)
+        .filter((tool) => tool.name !== HELPER_TOOLS.FEEDBACK_SEND)
         .map((tool) => ({
             name: tool.name,
             title: tool.title,

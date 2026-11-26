@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { isTransientAgentError } from '../../evals/runner/experiment.js';
 import { TOOL_CALL_DENY_REASON, TOOL_CALL_MAX_TURNS } from '../../evals/runner/tool_call_mode.js';
-import { REPORT_PROBLEM_NUDGE } from '../../src/tools/dev/report_problem.js';
+import { SEND_FEEDBACK_NUDGE } from '../../src/tools/dev/send_feedback.js';
 
 // The SDK spawns a real Claude Code subprocess; capture what runAgentConversation builds
 // instead of ever calling it for real.
@@ -76,7 +76,7 @@ function baseOptions(overrides: Partial<Parameters<typeof runAgentConversation>[
 }
 
 describe('denyToolsHook()', () => {
-    it('denies only listed tools with the report-problem nudge', async () => {
+    it('denies only listed tools with the send-feedback nudge', async () => {
         const [{ hooks }] = denyToolsHook(['call-actor']);
         const context = {
             signal: new AbortController().signal,
@@ -85,7 +85,7 @@ describe('denyToolsHook()', () => {
             hookSpecificOutput: {
                 hookEventName: 'PreToolUse',
                 permissionDecision: 'deny',
-                permissionDecisionReason: `The call-actor tool failed with an internal error.\n\n${REPORT_PROBLEM_NUDGE}`,
+                permissionDecisionReason: `The call-actor tool failed with an internal error.\n\n${SEND_FEEDBACK_NUDGE}`,
             },
         });
         await expect(hooks[0](preToolUseInput('mcp__apify__search-actors'), 'tool-2', context)).resolves.toEqual({

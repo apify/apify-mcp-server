@@ -47,6 +47,8 @@ function mockReportedProblemProperties(
         transport_type: 'stdio',
         mcp_url_client: 'cursor',
         message: 'stuck on call-actor',
+        sentiment: 'negative',
+        category: 'bug',
         ...overrides,
     };
 }
@@ -223,7 +225,7 @@ describe('buildReportedProblemProperties', () => {
         mcp_session_id: 'session-123',
         transport_type: 'stdio',
         mcp_url_client: 'cursor',
-        tool_name: 'report-problem',
+        tool_name: 'send-feedback',
         tool_status: 'SUCCEEDED',
         tool_exec_time_ms: 5,
     } as ToolCallTelemetryProperties;
@@ -231,6 +233,9 @@ describe('buildReportedProblemProperties', () => {
     it('maps the feedback args to snake_case properties and carries the session context', () => {
         const properties = buildReportedProblemProperties(context, {
             message: 'stuck on call-actor',
+            sentiment: 'negative',
+            category: 'bug',
+            source: 'model',
             actorId: 'apify/rag-web-browser',
             actorRunId: 'run-1',
             relatedTools: ['call-actor'],
@@ -246,6 +251,9 @@ describe('buildReportedProblemProperties', () => {
             transport_type: 'stdio',
             mcp_url_client: 'cursor',
             message: 'stuck on call-actor',
+            sentiment: 'negative',
+            category: 'bug',
+            source: 'model',
             actor_id: 'apify/rag-web-browser',
             actor_run_id: 'run-1',
             related_tools: ['call-actor'],
@@ -253,7 +261,11 @@ describe('buildReportedProblemProperties', () => {
     });
 
     it('omits optional fields that were not provided and does not leak tool-call fields', () => {
-        const properties = buildReportedProblemProperties(context, { message: 'just a note' });
+        const properties = buildReportedProblemProperties(context, {
+            message: 'just a note',
+            sentiment: 'neutral',
+            category: 'improvement',
+        });
 
         expect(properties).toEqual({
             app: 'mcp',
@@ -265,9 +277,12 @@ describe('buildReportedProblemProperties', () => {
             transport_type: 'stdio',
             mcp_url_client: 'cursor',
             message: 'just a note',
+            sentiment: 'neutral',
+            category: 'improvement',
         });
         expect(properties).not.toHaveProperty('tool_name');
         expect(properties).not.toHaveProperty('actor_id');
+        expect(properties).not.toHaveProperty('source');
     });
 });
 
@@ -287,6 +302,8 @@ describe('trackReportedProblem', () => {
             transport_type: 'stdio',
             mcp_url_client: 'cursor',
             message: 'stuck on call-actor',
+            sentiment: 'negative' as const,
+            category: 'bug' as const,
         };
 
         trackReportedProblem('test-user-123', 'DEV', properties);
@@ -309,6 +326,8 @@ describe('trackReportedProblem', () => {
             transport_type: 'stdio',
             mcp_url_client: 'cursor',
             message: 'stuck on call-actor',
+            sentiment: 'negative' as const,
+            category: 'bug' as const,
         };
 
         trackReportedProblem(null, 'DEV', properties);

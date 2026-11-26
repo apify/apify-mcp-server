@@ -21,7 +21,7 @@ import { getRequestHandler, makeRecorderTool, withServer, withStatelessServer } 
 import { mockApifyClient } from './helpers/tool_context.js';
 
 // Stub getActors so a facade can be given tool sources without a network fetch. The compose path
-// (getToolsForServerMode + the report-problem gate) stays real — that is what these tests exercise.
+// (getToolsForServerMode + the send-feedback gate) stays real — that is what these tests exercise.
 vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
     const actual = await importOriginal<typeof ToolsLoaderModule>();
     return { ...actual, getActors: vi.fn() };
@@ -279,21 +279,21 @@ describe('createStatelessServer() request context', () => {
         });
     });
 
-    describe('report-problem gating', () => {
-        it('serves report-problem to an allowed client', async () => {
+    describe('send-feedback gating', () => {
+        it('serves send-feedback to an allowed client', async () => {
             await withStatelessServer(
                 async ({ server, call }) => {
-                    await loadSource(server, [], { tools: [HELPER_TOOLS.PROBLEM_REPORT] });
+                    await loadSource(server, [], { tools: [HELPER_TOOLS.FEEDBACK_SEND] });
 
                     const response = await call('tools/list', {}, { client: { name: 'test-client' } });
 
-                    expect(toolNames(response.result)).toContain(HELPER_TOOLS.PROBLEM_REPORT);
+                    expect(toolNames(response.result)).toContain(HELPER_TOOLS.FEEDBACK_SEND);
                 },
                 { telemetry: { enabled: true } },
             );
         });
 
-        it('hides report-problem from a blocklisted client when served via default injection (not explicit)', async () => {
+        it('hides send-feedback from a blocklisted client when served via default injection (not explicit)', async () => {
             await withStatelessServer(
                 async ({ server, call }) => {
                     // Default (no tools=) injection, not an explicit opt-in — the blocklist applies.
@@ -301,20 +301,20 @@ describe('createStatelessServer() request context', () => {
 
                     const response = await call('tools/list', {}, { client: { name: 'claude-ai' } });
 
-                    expect(toolNames(response.result)).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+                    expect(toolNames(response.result)).not.toContain(HELPER_TOOLS.FEEDBACK_SEND);
                 },
                 { telemetry: { enabled: true } },
             );
         });
 
-        it('serves report-problem to a blocklisted client when explicitly selected via tools=', async () => {
+        it('serves send-feedback to a blocklisted client when explicitly selected via tools=', async () => {
             await withStatelessServer(
                 async ({ server, call }) => {
-                    await loadSource(server, [], { tools: [HELPER_TOOLS.PROBLEM_REPORT] });
+                    await loadSource(server, [], { tools: [HELPER_TOOLS.FEEDBACK_SEND] });
 
                     const response = await call('tools/list', {}, { client: { name: 'claude-ai' } });
 
-                    expect(toolNames(response.result)).toContain(HELPER_TOOLS.PROBLEM_REPORT);
+                    expect(toolNames(response.result)).toContain(HELPER_TOOLS.FEEDBACK_SEND);
                 },
                 { telemetry: { enabled: true } },
             );
@@ -322,27 +322,27 @@ describe('createStatelessServer() request context', () => {
 
         // `client-info` is optional in the stateless envelope. A request declaring no client name
         // matches no blocked substring and is served the tool by policy.
-        it('serves report-problem to a request whose envelope declares no client', async () => {
+        it('serves send-feedback to a request whose envelope declares no client', async () => {
             await withStatelessServer(
                 async ({ server, call }) => {
-                    await loadSource(server, [], { tools: [HELPER_TOOLS.PROBLEM_REPORT] });
+                    await loadSource(server, [], { tools: [HELPER_TOOLS.FEEDBACK_SEND] });
 
                     const response = await call('tools/list', {}, { client: null });
 
-                    expect(toolNames(response.result)).toContain(HELPER_TOOLS.PROBLEM_REPORT);
+                    expect(toolNames(response.result)).toContain(HELPER_TOOLS.FEEDBACK_SEND);
                 },
                 { telemetry: { enabled: true } },
             );
         });
 
-        it('hides report-problem when telemetry is disabled, even for an allowed client', async () => {
+        it('hides send-feedback when telemetry is disabled, even for an allowed client', async () => {
             await withStatelessServer(
                 async ({ server, call }) => {
-                    await loadSource(server, [], { tools: [HELPER_TOOLS.PROBLEM_REPORT] });
+                    await loadSource(server, [], { tools: [HELPER_TOOLS.FEEDBACK_SEND] });
 
                     const response = await call('tools/list', {}, { client: { name: 'test-client' } });
 
-                    expect(toolNames(response.result)).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+                    expect(toolNames(response.result)).not.toContain(HELPER_TOOLS.FEEDBACK_SEND);
                 },
                 { telemetry: { enabled: false } },
             );
@@ -351,25 +351,25 @@ describe('createStatelessServer() request context', () => {
 
     describe('instructions', () => {
         // Instructions are configuration-level: the SDK answers server/discover from them, fixed
-        // before any envelope is seen. They therefore never mention report-problem — while the
+        // before any envelope is seen. They therefore never mention send-feedback — while the
         // tool's actual visibility is still decided per request (see the gating tests above).
-        it('never mentions report-problem, even when the tool is served', async () => {
+        it('never mentions send-feedback, even when the tool is served', async () => {
             await withStatelessServer(
                 async ({ server, call }) => {
-                    await loadSource(server, [], { tools: [HELPER_TOOLS.PROBLEM_REPORT] });
+                    await loadSource(server, [], { tools: [HELPER_TOOLS.FEEDBACK_SEND] });
                     // Drive the stateful handshake on the same facade first, so its own tool map
-                    // really holds report-problem. Without that the assertion below would pass for
+                    // really holds send-feedback. Without that the assertion below would pass for
                     // the wrong reason: an implementation reading `this.tools` (the legacy pattern)
                     // would also find nothing to mention.
                     await getRequestHandler(server, 'initialize')(LEGACY_INITIALIZE, {});
-                    expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(true);
+                    expect(server.tools.has(HELPER_TOOLS.FEEDBACK_SEND)).toBe(true);
 
                     const listed = await call('tools/list', {}, { client: { name: 'test-client' } });
                     const discovered = await call('server/discover', {}, { client: { name: 'test-client' } });
 
                     // Both must hold at once: the tool is served, and the instructions stay silent.
-                    expect(toolNames(listed.result)).toContain(HELPER_TOOLS.PROBLEM_REPORT);
-                    expect(discovered.result?.instructions).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+                    expect(toolNames(listed.result)).toContain(HELPER_TOOLS.FEEDBACK_SEND);
+                    expect(discovered.result?.instructions).not.toContain(HELPER_TOOLS.FEEDBACK_SEND);
                 },
                 { telemetry: { enabled: true } },
             );
@@ -405,7 +405,7 @@ describe('createStatelessServer() request context', () => {
             },
         );
 
-        // Regression: pre-gating default is "all but report-problem", not "nothing" — must still mention call-actor.
+        // Regression: pre-gating default is "all but send-feedback", not "nothing" — must still mention call-actor.
         it('mentions call-actor unconditionally, before any request establishes the real tool set', async () => {
             await withStatelessServer(async ({ call }) => {
                 const discovered = await call('server/discover', {}, { client: { name: 'test-client' } });
@@ -465,9 +465,9 @@ describe('createStatelessServer() request context', () => {
                         expect(toolNames(uiClient.result)).toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
                     }
                     expect(toolNames(blockedClient.result)).not.toContain(HELPER_TOOLS.STORE_SEARCH_WIDGET);
-                    // Gating: only the non-blocklisted request gets report-problem.
-                    expect(toolNames(uiClient.result)).toContain(HELPER_TOOLS.PROBLEM_REPORT);
-                    expect(toolNames(blockedClient.result)).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+                    // Gating: only the non-blocklisted request gets send-feedback.
+                    expect(toolNames(uiClient.result)).toContain(HELPER_TOOLS.FEEDBACK_SEND);
+                    expect(toolNames(blockedClient.result)).not.toContain(HELPER_TOOLS.FEEDBACK_SEND);
                 },
                 { serverMode: 'auto', telemetry: { enabled: true } },
             );

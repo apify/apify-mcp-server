@@ -33,7 +33,7 @@ import { buildActor } from './builds/build_actor.js';
 import { getActorBuild } from './builds/get_actor_build.js';
 import { getActorBuildList } from './builds/get_actor_build_list.js';
 import { getActorBuildLog } from './builds/get_actor_build_log.js';
-import { reportProblem } from './dev/report_problem.js';
+import { sendFeedback } from './dev/send_feedback.js';
 import { fetchApifyDocs } from './docs/fetch_apify_docs.js';
 import { searchApifyDocs } from './docs/search_apify_docs.js';
 import { abortActorRun } from './runs/abort_actor_run.js';
@@ -94,7 +94,7 @@ export const toolCategories = {
     builds: [getActorBuild, getActorBuildLog, getActorBuildList, buildActor],
     versions: [getActorVersion, createActor, updateActorVersion, createActorVersion, deleteActorVersion],
     api: [apifyApiSearch, apifyApiDetails, apifyApiRead, apifyApiWrite],
-    dev: [reportProblem],
+    dev: [sendFeedback],
 } satisfies Record<string, ToolEntry[]>;
 
 /**

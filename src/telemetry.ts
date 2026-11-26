@@ -6,11 +6,11 @@ import type { z } from 'zod';
 import log from '@apify/log';
 
 import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV } from './const.js';
-import type { reportProblemArgsSchema } from './tools/dev/report_problem.js';
+import type { sendFeedbackArgsSchema } from './tools/dev/send_feedback.js';
 import type { ReportedProblemTelemetryProperties, TelemetryEnv, ToolCallTelemetryProperties } from './types.js';
 import { maskAccessKeyTokens } from './utils/access_key_token_mask.js';
 
-type ReportProblemArgs = z.infer<typeof reportProblemArgsSchema>;
+type SendFeedbackArgs = z.infer<typeof sendFeedbackArgsSchema>;
 
 const DEV_WRITE_KEY = '9rPHlMtxX8FJhilGEwkfUoZ0uzWxnzcT';
 const PROD_WRITE_KEY = 'cOkp5EIJaN69gYaN8bcp7KtaD0fGABwJ';
@@ -103,7 +103,7 @@ export function trackToolCall(
 }
 
 /**
- * Shapes an 'MCP Reported Problem' event payload from a `report-problem` submission. Reuses the
+ * Shapes an 'MCP Reported Problem' event payload from a `send-feedback` submission. Reuses the
  * session/client context already assembled for the tool-call event and maps the validated tool args
  * to snake_case, dropping any absent optional fields. Tool-call-specific fields on `context`
  * (tool_name, tool_status, …) are intentionally not carried over.
@@ -112,7 +112,7 @@ export function buildReportedProblemProperties(
     context: ToolCallTelemetryProperties,
     args: Record<string, unknown>,
 ): ReportedProblemTelemetryProperties {
-    const { message, actorId, actorRunId, relatedTools } = args as ReportProblemArgs;
+    const { message, sentiment, category, source, actorId, actorRunId, relatedTools } = args as SendFeedbackArgs;
 
     return {
         app: context.app,
@@ -124,6 +124,9 @@ export function buildReportedProblemProperties(
         transport_type: context.transport_type,
         mcp_url_client: context.mcp_url_client,
         message,
+        sentiment,
+        category,
+        ...(source !== undefined && { source }),
         ...(actorId !== undefined && { actor_id: actorId }),
         ...(actorRunId !== undefined && { actor_run_id: actorRunId }),
         ...(relatedTools !== undefined && { related_tools: relatedTools }),
@@ -131,7 +134,7 @@ export function buildReportedProblemProperties(
 }
 
 /**
- * Tracks a reported-problem submission (`report-problem`) to Segment. Identity handling mirrors
+ * Tracks a reported-problem submission (`send-feedback`) to Segment. Identity handling mirrors
  * {@link trackToolCall}: a known Apify user is sent as `userId`, otherwise the session id is the
  * `anonymousId` so a session's submissions share one identity.
  */

@@ -31,7 +31,7 @@ import type {
 import { SERVER_MODE, TOOL_TYPE } from '../types.js';
 import {
     getRequestOriginForClient,
-    isReportProblemBlockedForClient,
+    isSendFeedbackBlockedForClient,
     isStoreUseCaseServable,
 } from '../utils/mcp_clients.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
@@ -39,7 +39,7 @@ import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
 import {
     getActors,
     getToolsForServerMode,
-    isReportProblemExplicitlySelected,
+    isSendFeedbackExplicitlySelected,
     resolveToolNamesFromInput,
     toolNamesToInput,
     withoutUseCaseField,
@@ -297,19 +297,19 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
      * `initialize` can't leak its mode into stateless requests).
      *
      * `requestUrl`, when given, resolves cross-tool mentions from `?tools=`/`?actors=` with no fetch;
-     * omit it for the same "everything but report-problem" fallback. `report-problem` is always
+     * omit it for the same "everything but send-feedback" fallback. `send-feedback` is always
      * excluded here even when explicitly selected — telemetry state (the other bypass guard) isn't
      * known yet at `server/discover` time, only at request time.
      */
     public getStatelessServerInstructions(requestUrl?: string): string {
         const mode = resolveServerMode(this.serverModeOption, false);
-        const notReportProblem = (name: string) => name !== HELPER_TOOLS.PROBLEM_REPORT;
+        const notSendFeedback = (name: string) => name !== HELPER_TOOLS.FEEDBACK_SEND;
         if (requestUrl === undefined) {
-            return getServerInstructions(mode, { hasTool: notReportProblem });
+            return getServerInstructions(mode, { hasTool: notSendFeedback });
         }
         const toolNames = resolveToolNamesFromInput(parseInputParamsFromUrl(requestUrl), mode);
         return getServerInstructions(mode, {
-            hasTool: (name) => notReportProblem(name) && toolNames.has(name),
+            hasTool: (name) => notSendFeedback(name) && toolNames.has(name),
             clientParam: this.options.clientParam,
         });
     }
@@ -357,34 +357,34 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
     }
 
     /**
-     * One source's tool list for `view`: the mode's tools, minus report-problem and the search tools'
+     * One source's tool list for `view`: the mode's tools, minus send-feedback and the search tools'
      * `useCase` input where `view`'s client is not served them. Load paths and the initialize flush
      * pass {@link servingContext}; {@link createRequestSnapshot} passes a per-request view. An explicit
-     * report-problem opt-in in `source.input` applies to every request reusing the source.
+     * send-feedback opt-in in `source.input` applies to every request reusing the source.
      */
     private composeToolsForClient(source: ToolSource, view: ServingContext): ToolEntry[] {
         const tools = getToolsForServerMode(source.input, source.actorTools, view.serverMode);
-        const served = this.isReportProblemServable(view, source.input)
+        const served = this.isSendFeedbackServable(view, source.input)
             ? tools
-            : tools.filter((tool) => tool.name !== HELPER_TOOLS.PROBLEM_REPORT);
+            : tools.filter((tool) => tool.name !== HELPER_TOOLS.FEEDBACK_SEND);
         if (this.telemetryEnabled && isStoreUseCaseServable(view.clientContext)) return served;
         return served.map(withoutUseCaseField);
     }
 
     /**
-     * Whether report-problem may be served against `view`. Never without telemetry (submissions
+     * Whether send-feedback may be served against `view`. Never without telemetry (submissions
      * would vanish into the void) and never before a client context exists — on a stateful
      * connection the initialize flush re-adds it once the handshake supplies one.
      *
-     * Explicit selection ({@link isReportProblemExplicitlySelected}) bypasses the blocklist only.
+     * Explicit selection ({@link isSendFeedbackExplicitlySelected}) bypasses the blocklist only.
      *
      * The stateless envelope requires protocol and capability metadata but not `clientInfo`. A
      * request declaring no client name matches no blocked substring and is served the tool by
      * policy.
      */
-    private isReportProblemServable(view: ServingContext, input: Input): boolean {
+    private isSendFeedbackServable(view: ServingContext, input: Input): boolean {
         if (!this.telemetryEnabled || view.clientContext == null) return false;
-        return isReportProblemExplicitlySelected(input) || !isReportProblemBlockedForClient(view.clientContext);
+        return isSendFeedbackExplicitlySelected(input) || !isSendFeedbackBlockedForClient(view.clientContext);
     }
 
     private composePendingToolsForClient(): void {
@@ -397,7 +397,7 @@ export class ActorsMcpServer implements LegacyMcpServerHost, StatelessMcpServerH
         this.pendingToolsUntilClientKnown.clear();
 
         // Load paths already upserted the client-agnostic tools pre-init; re-upserting is
-        // idempotent, and this pass adds the client-gated tools (e.g. report-problem) now that the
+        // idempotent, and this pass adds the client-gated tools (e.g. send-feedback) now that the
         // client is known.
         if (tools.length > 0) this.upsertTools(tools);
     }

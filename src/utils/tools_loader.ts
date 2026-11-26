@@ -7,9 +7,15 @@ import type { ApifyClient } from 'apify-client';
 
 import log from '@apify/log';
 
-import { defaults, HELPER_TOOLS, type HelperToolName, RETIRED_SELECTOR_NAMES } from '../const.js';
+import {
+    defaults,
+    HELPER_TOOLS,
+    type HelperToolName,
+    RENAMED_SELECTOR_NAMES,
+    RETIRED_SELECTOR_NAMES,
+} from '../const.js';
 import { actorNameToToolName } from '../tools/actor_tool_naming.js';
-import { reportProblem } from '../tools/dev/report_problem.js';
+import { sendFeedback } from '../tools/dev/send_feedback.js';
 import { getActorsAsTools } from '../tools/index.js';
 import {
     ALL_WIDGET_TOOLS,
@@ -57,8 +63,9 @@ const ALL_INTERNAL_TOOL_NAMES: Set<string> = (() => {
 
 type NormalizedInput = {
     /**
-     * Trimmed, non-empty selectors with `RETIRED_SELECTOR_NAMES` dropped. `undefined` when `input.tools`
-     * was not given; `[]` when it was empty or held only retired names, which both phases treat alike.
+     * Trimmed, non-empty selectors with `RETIRED_SELECTOR_NAMES` dropped and `RENAMED_SELECTOR_NAMES` mapped to the
+     * current name. `undefined` when `input.tools` was not given; `[]` when it was empty or held only retired names,
+     * which both phases treat alike.
      */
     selectors: string[] | undefined;
     /** `true` when `input.actors` was explicitly empty (`[]` or `''`). */
@@ -74,23 +81,24 @@ function normalizeInput(input: Input): NormalizedInput {
             : (Array.isArray(raw) ? raw : [raw])
                   .map(String)
                   .map((s) => s.trim())
-                  .filter((s) => s !== '' && !RETIRED_SELECTOR_NAMES.has(s));
+                  .filter((s) => s !== '' && !RETIRED_SELECTOR_NAMES.has(s))
+                  .map((s) => RENAMED_SELECTOR_NAMES.get(s) ?? s);
     return {
         selectors,
         actorsExplicitlyEmpty: input.actors === '' || (Array.isArray(input.actors) && input.actors.length === 0),
     };
 }
 
-/** report-problem's only category — selecting it is the same opt-in as the literal name. */
-const REPORT_PROBLEM_CATEGORY = 'dev' satisfies ToolCategory;
+/** send-feedback's only category — selecting it is the same opt-in as the literal name. */
+const SEND_FEEDBACK_CATEGORY = 'dev' satisfies ToolCategory;
 
 /**
- * True when `input` explicitly names report-problem or `dev` — lifts the client blocklist below.
+ * True when `input` explicitly names send-feedback or `dev` — lifts the client blocklist below.
  * A `toolNamesToInput` restore counts: it can only list tools the session was already served.
  */
-export function isReportProblemExplicitlySelected(input: Input): boolean {
+export function isSendFeedbackExplicitlySelected(input: Input): boolean {
     const { selectors } = normalizeInput(input);
-    return selectors?.some((sel) => sel === HELPER_TOOLS.PROBLEM_REPORT || sel === REPORT_PROBLEM_CATEGORY) ?? false;
+    return selectors?.some((sel) => sel === HELPER_TOOLS.FEEDBACK_SEND || sel === SEND_FEEDBACK_CATEGORY) ?? false;
 }
 
 /**
@@ -144,7 +152,8 @@ export function toolNamesToInput(toolNames: string[]): Input {
     const internalToolNames: string[] = [];
     const actorToolNames: string[] = [];
 
-    for (const toolName of toolNames) {
+    for (const storedName of toolNames) {
+        const toolName = RENAMED_SELECTOR_NAMES.get(storedName) ?? storedName;
         // A retired name in a restored session (e.g. a pre-cutoff `add-actor`) is inert: drop it
         // rather than misroute it to `actors`, where it would trigger a fetch for a nonexistent Actor.
         if (RETIRED_SELECTOR_NAMES.has(toolName)) continue;
@@ -250,11 +259,11 @@ export function getToolsForServerMode(
         for (const cat of toolCategoriesEnabledByDefault) {
             result.push(...categories[cat]);
         }
-        // report-problem is default-served but lives in the `dev` category (not a default category),
+        // send-feedback is default-served but lives in the `dev` category (not a default category),
         // so inject it here for the default (no-selectors) case. Server-side servability gating
         // (telemetry on + client allowed + client known) still applies downstream in
         // composeToolsForClient; this only puts it in the default candidate set.
-        result.push(reportProblem);
+        result.push(sendFeedback);
     }
 
     // Actor tools (pre-fetched, mode-agnostic)
