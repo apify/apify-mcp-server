@@ -14,7 +14,7 @@ function makeItem(id: string, query = 'Find an Actor that scrapes Google Maps'):
 }
 
 /** Langfuse client whose dataset holds the given hosted items and records every item write. */
-function makeLangfuseClient(hostedItems: { id: string; status: string }[], failOnId?: string) {
+function makeLangfuseClient(hostedItems: { id: string; status: string; sourceTraceId?: string }[], failOnId?: string) {
     const writes: Record<string, unknown>[] = [];
     const client = {
         dataset: {
@@ -58,7 +58,7 @@ describe('copying case files into a dataset', () => {
     it('archives an active hosted item whose id is not in the files, keeping its content', async () => {
         const { client, writes } = makeLangfuseClient([
             { id: 'pr/search-actors/find-scraper', status: 'ACTIVE' },
-            { id: 'pr/search-actors/removed', status: 'ACTIVE' },
+            { id: 'pr/search-actors/removed', status: 'ACTIVE', sourceTraceId: 'trace-1' },
         ]);
 
         const result = await copyCasesToDataset(client, 'mcp-server-evals-pr', [
@@ -69,6 +69,7 @@ describe('copying case files into a dataset', () => {
         expect(writes[1]).toMatchObject({
             id: 'pr/search-actors/removed',
             input: { query: 'hosted text' },
+            sourceTraceId: 'trace-1',
             status: 'ARCHIVED',
         });
     });

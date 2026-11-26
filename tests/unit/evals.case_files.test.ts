@@ -111,11 +111,18 @@ describe('reading a case directory', () => {
         expect(() => readCaseFiles(dir)).toThrow(/No case/);
     });
 
-    // A hand-written caseId would pass the item validator in place of a missing id.
-    it('rejects a case that sets a runner-injected field', () => {
-        const { id, ...withoutId } = toolCallCase;
-        const dir = makeCaseDir({ 'search-actors.json': [{ ...withoutId, caseId: id }] });
-        expect(() => readCaseFiles(dir)).toThrow(/search-actors\.json.*caseId/s);
+    // The item validator accepts both, because the runner sets them on its own items.
+    it.each([
+        ['iteration', 2],
+        ['caseId', 'pr/search-actors/other'],
+    ])('rejects a case that sets the runner-injected %s', (field, value) => {
+        const dir = makeCaseDir({ 'search-actors.json': [{ ...toolCallCase, [field]: value }] });
+        expect(() => readCaseFiles(dir)).toThrow(new RegExp(`search-actors\\.json.*${field}`, 's'));
+    });
+
+    it('rejects an entry that is not an object, naming the file', () => {
+        const dir = makeCaseDir({ 'search-actors.json': [null] });
+        expect(() => readCaseFiles(dir)).toThrow(/search-actors\.json.*not an object/s);
     });
 });
 
@@ -137,7 +144,7 @@ describe('building the experiment item of a case', () => {
         expect(experimentItem.input).toEqual(item.input);
     });
 
-    // The client links an item to a dataset run only when it carries both.
+    // Without the dataset id the client returns no run URL.
     it('keeps the id and adds the dataset id when the run is linked', () => {
         expect(toExperimentItem(item, 'dataset-123')).toEqual({ ...item, datasetId: 'dataset-123' });
     });

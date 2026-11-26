@@ -781,6 +781,10 @@ describe('validateCaseSource()', () => {
         );
     });
 
+    it('rejects --link-dataset without a dataset name', () => {
+        expect(() => validateCaseSource({ cases: 'evals/cases/pr', linkDataset: '' })).toThrow(/dataset name/);
+    });
+
     it('rejects --link-dataset without --cases', () => {
         expect(() => validateCaseSource({ linkDataset: 'mcp-server-evals-pr' })).toThrow(
             /--link-dataset needs --cases/,

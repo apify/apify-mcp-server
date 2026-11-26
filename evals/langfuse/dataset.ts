@@ -1,7 +1,7 @@
 /**
  * Langfuse dataset mapping for MCP agent evaluations.
  *
- * The dataset is the source of truth and nothing here writes to it. An item's
+ * Nothing in this file writes to a dataset; `dataset_copy.ts` does, under `--link-dataset`. An item's
  * `input.query` is the agent prompt, `expectedOutput` is what the judge scores against,
  * and `metadata` carries the harness knobs.
  */
@@ -181,8 +181,7 @@ export type McpAgentCase = McpAgentTestCase & { item: DatasetItem };
 export function parseMcpAgentItem(item: unknown): McpAgentItem {
     const parsed = McpAgentItemValidator.safeParse(item);
     if (!parsed.success) {
-        const raw = item as { id?: string; metadata?: { caseId?: string } } | null;
-        const id = raw?.id ?? raw?.metadata?.caseId ?? '(unknown)';
+        const id = (item as { id?: string } | null)?.id ?? '(unknown)';
         throw new Error(`Dataset item "${id}" is not a usable MCP agent test case: ${parsed.error.message}`);
     }
     return parsed.data;

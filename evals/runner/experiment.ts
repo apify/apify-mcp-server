@@ -268,6 +268,7 @@ export function validateCaseSource(flags: { cases?: string; dataset?: string; li
     if (flags.linkDataset !== undefined && flags.cases === undefined) {
         throw new Error('--link-dataset needs --cases: it copies the case files into that dataset');
     }
+    if (flags.linkDataset === '') throw new Error('--link-dataset needs a dataset name');
 }
 
 /** Langfuse batches items with `i += concurrency`, so 0 loops forever and NaN never starts. */
