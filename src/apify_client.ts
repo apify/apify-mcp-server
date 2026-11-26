@@ -24,6 +24,7 @@ import { ProxyAgent } from 'proxy-agent';
 
 import { API_PUBLIC_BASE_URL, API_PUBLIC_BASE_URL_STAGING, MAX_INLINE_BYTES, STAGING_MCP_HOSTNAME } from './const.js';
 import { InvalidRequestPathError } from './errors.js';
+import type { PlatformUrls } from './types.js';
 import { assertValidRecordKey, assertValidResourceId } from './utils/apify_resource_id.js';
 
 // Appended to the client's User-Agent via apify-client's userAgentSuffix option.
@@ -146,8 +147,14 @@ type ExtendedApifyClientOptions = Omit<ApifyClientOptions, 'token'> & {
     token?: string | null | undefined;
     /** Value for the X-Apify-Request-Origin header. Defaults to MCP. */
     requestOrigin?: REQUEST_ORIGIN;
+    /** The server's resolved origins. `baseUrl` and `publicBaseUrl` win over them; the env defaults apply without. */
+    platformUrls?: PlatformUrls;
 };
 
+/**
+ * Default for where API requests go, when the server gets no `apiBaseUrl` option. Read it from the server's
+ * `platformUrls` (`ApifyClient.platformUrls` in a tool), not from here.
+ */
 export function getApifyAPIBaseUrl(): string {
     // Workaround for Actor server where the platform APIFY_API_BASE_URL did not work with getActorDefinition from actors.ts
     if (process.env.APIFY_IS_AT_HOME) return 'https://api.apify.com';
@@ -155,14 +162,26 @@ export function getApifyAPIBaseUrl(): string {
 }
 
 /**
- * Apify API origin for every API URL handed to clients. Separate from `getApifyAPIBaseUrl()`, where requests
- * go — the hosted server reaches the API through an internal host clients cannot resolve. Mirrors
+ * Default for the Apify API origin of every API URL handed to clients, when the server gets no `apiPublicBaseUrl`
+ * option. Separate from `getApifyAPIBaseUrl()`, where requests go — the hosted server reaches the API through an
+ * internal host clients cannot resolve. Mirrors
  * `getConsoleBaseUrl()` (`utils/console_link.ts`): `APIFY_API_PUBLIC_BASE_URL` when set, the staging API on
  * the staging MCP host, production otherwise.
  */
 export function getApifyAPIPublicBaseUrl(): string {
     if (process.env.APIFY_API_PUBLIC_BASE_URL) return process.env.APIFY_API_PUBLIC_BASE_URL;
+    // @deprecated The HOSTNAME check goes once the hosted server passes `apiPublicBaseUrl` (#797).
     return process.env.HOSTNAME === STAGING_MCP_HOSTNAME ? API_PUBLIC_BASE_URL_STAGING : API_PUBLIC_BASE_URL;
+}
+
+/**
+ * `key` for a process-wide cache of API data, scoped to the API origin `apifyClient` sends to. The default origin
+ * keeps the bare key; a server given another `apiBaseUrl` gets entries of its own, so it is never served another
+ * deployment's data.
+ */
+export function getApiOriginCacheKey(apifyClient: Pick<ApifyClient, 'platformUrls'>, key: string): string {
+    const apiBaseUrl = apifyClient.platformUrls?.apiBaseUrl;
+    return !apiBaseUrl || apiBaseUrl === getApifyAPIBaseUrl() ? key : `${apiBaseUrl} ${key}`;
 }
 
 export class ApifyClient extends _ApifyClient {
@@ -173,6 +192,8 @@ export class ApifyClient extends _ApifyClient {
     readonly requestOrigin?: REQUEST_ORIGIN;
     /** Call tracking sent with Store searches. */
     storeSearchTracking?: { traceId?: string; useCase?: string };
+    /** The server's origins, with the API origins the client uses; unset on a client built outside a server. */
+    readonly platformUrls?: PlatformUrls;
 
     constructor(options: ExtendedApifyClientOptions) {
         /**
@@ -186,20 +207,23 @@ export class ApifyClient extends _ApifyClient {
             delete options.token;
         }
 
-        const { requestOrigin, ...clientOptions } = options;
+        const { requestOrigin, platformUrls, ...clientOptions } = options;
         const staticHeaders = {
             [REQUEST_ORIGIN_HEADER]: requestOrigin ?? REQUEST_ORIGIN.MCP,
         };
 
-        // Explicit baseUrl wins over env default.
-        const baseUrl = clientOptions.baseUrl ?? getApifyAPIBaseUrl();
+        // Explicit baseUrl wins over the server's origin, which wins over the env default.
+        const baseUrl = clientOptions.baseUrl ?? platformUrls?.apiBaseUrl ?? getApifyAPIBaseUrl();
+
+        // Signed storage links (`getRecordPublicUrl`) are handed to clients, so they take the client-facing origin.
+        const publicBaseUrl =
+            clientOptions.publicBaseUrl ?? platformUrls?.apiPublicBaseUrl ?? getApifyAPIPublicBaseUrl();
 
         super({
             // token null case is handled, we can assert type here
             ...(clientOptions as ApifyClientOptions),
             baseUrl,
-            // Signed storage links (`getRecordPublicUrl`) are handed to clients, so they take the client-facing origin.
-            publicBaseUrl: clientOptions.publicBaseUrl ?? getApifyAPIPublicBaseUrl(),
+            publicBaseUrl,
             userAgentSuffix: USER_AGENT_ORIGIN,
             // Per-request agents win over the instance defaults apify-client sets on first use.
             requestInterceptors: [
@@ -215,6 +239,7 @@ export class ApifyClient extends _ApifyClient {
             ],
         });
         this.requestOrigin = staticHeaders[REQUEST_ORIGIN_HEADER];
+        this.platformUrls = platformUrls && { ...platformUrls, apiBaseUrl: baseUrl, apiPublicBaseUrl: publicBaseUrl };
     }
 
     // apify-client writes these IDs into the request path unencoded; each is checked once here, for every caller.

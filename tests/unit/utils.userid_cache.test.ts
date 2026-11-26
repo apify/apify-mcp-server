@@ -104,4 +104,24 @@ describe('getUserInfoCached', () => {
         expect(second).toEqual({ userId: 'u6', userPlanTier: 'BRONZE', isOrganization: false });
         expect(get).toHaveBeenCalledTimes(2);
     });
+
+    it('looks the same token up again for a server with another API origin', async () => {
+        const token = `token-${Math.random()}`;
+        const platformUrls = {
+            apiBaseUrl: 'http://api.internal.example:3333',
+            apiPublicBaseUrl: 'https://api.example.test',
+            consoleBaseUrl: 'https://console.example.test',
+        };
+        await getUserInfoCached(
+            token,
+            stubClient(async () => ({ id: 'user-on-default-api' })),
+        );
+
+        const out = await getUserInfoCached(
+            token,
+            mockApifyClient({ platformUrls, user: () => ({ get: async () => ({ id: 'user-on-other-api' }) }) }),
+        );
+
+        expect(out.userId).toBe('user-on-other-api');
+    });
 });

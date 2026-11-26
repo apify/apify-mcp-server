@@ -477,14 +477,14 @@ export async function callActorPreExecute(
     toolArgs: InternalToolArgs,
     options: { route: string },
 ): Promise<{ earlyResponse: ToolResponse } | { parsed: CallActorParsedArgs }> {
-    const { args, apifyToken, mcpSessionId, loadedToolNames } = toolArgs;
+    const { args, apifyToken, apifyClient, mcpSessionId, loadedToolNames } = toolArgs;
     const parsedArgs = callActorArgs.parse(args);
     const legacyRejection = buildLegacyMcpSyntaxRejection(options.route, parsedArgs.actor, loadedToolNames);
     if (legacyRejection) return { earlyResponse: legacyRejection };
     const actorName = fixActorNameInput(parsedArgs.actor);
     if (!actorName) return { earlyResponse: respondUserError(EMPTY_ACTOR_NAME_MESSAGE) };
 
-    const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
+    const apifyClientForDefinition = new ApifyClient({ token: apifyToken, platformUrls: apifyClient.platformUrls });
     const resolution = await getActorToolResolutionCached(actorName, apifyClientForDefinition);
 
     if (resolution?.toolMode === ACTOR_TOOL_MODE.SERVER_ACTOR_WITHOUT_MCP) {

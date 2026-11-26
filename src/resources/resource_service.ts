@@ -15,6 +15,7 @@ import type { ApifyClient } from '../apify_client.js';
 import { getApifyAPIPublicBaseUrl } from '../apify_client.js';
 import { InternalError, InvalidParamsError } from '../mcp/errors.js';
 import { SERVER_MODE } from '../types.js';
+import type { ApiUrls } from './api_resources.js';
 import { readApiResource } from './api_resources.js';
 import type { AvailableWidget } from './widgets.js';
 import { RESOURCE_MIME_TYPE } from './widgets.js';
@@ -36,6 +37,8 @@ type ResourceService = {
 };
 
 type ResourceServiceOptions = {
+    /** The server's resolved origins; the env defaults apply when omitted. */
+    platformUrls?: ApiUrls;
     /**
      * Read the current server mode at call time. Callers must pass a getter rather
      * than a value: `serverMode` can flip from the preliminary DEFAULT to APPS when
@@ -48,7 +51,7 @@ type ResourceServiceOptions = {
 };
 
 export function createResourceService(options: ResourceServiceOptions): ResourceService {
-    const { getMode, getAvailableWidgets } = options;
+    const { platformUrls, getMode, getAvailableWidgets } = options;
 
     const listResources = async (): Promise<ListResourcesResult> => {
         const resources: Resource[] = [];
@@ -76,7 +79,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
         // non-Apify URL gets the explanatory origin refusal instead of the generic fallback.
         if (/^https?:\/\//i.test(uri)) {
             // API contents carry no widget `_meta`/`html`; the extended shape only adds optional fields.
-            return (await readApiResource(uri, apifyClient)) as ExtendedReadResourceResult;
+            return (await readApiResource(uri, apifyClient, platformUrls)) as ExtendedReadResourceResult;
         }
 
         const widget = getMode() === SERVER_MODE.APPS ? getAvailableWidgets().get(uri) : undefined;
@@ -130,7 +133,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
     // Advertisement only, NOT a route table: the read path stays a generic proxy, and any other
     // Apify API GET URL is readable the same way.
     const listResourceTemplates = async (): Promise<ListResourceTemplatesResult> => {
-        const api = getApifyAPIPublicBaseUrl();
+        const api = platformUrls?.apiPublicBaseUrl ?? getApifyAPIPublicBaseUrl();
         return {
             resourceTemplates: [
                 {

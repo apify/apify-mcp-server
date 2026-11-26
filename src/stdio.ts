@@ -164,7 +164,7 @@ async function main() {
     };
     const normalizedInput = processInput(input);
 
-    const apifyClient = new ApifyClient({ token: apifyToken });
+    const apifyClient = new ApifyClient({ token: apifyToken, platformUrls: mcpServer.platformUrls });
     // The server mode is applied in the initialize handler, once client capabilities are known.
     await mcpServer.loadToolsFromInput(normalizedInput, apifyClient);
 

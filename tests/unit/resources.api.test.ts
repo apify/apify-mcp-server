@@ -132,6 +132,16 @@ describe('isApifyApiUri()', () => {
         expect(isApifyApiUri('https://example.com/v2/datasets/ds-1/items')).toBe(false);
     });
 
+    it('gates on the passed origins instead of the env defaults', () => {
+        const apiUrls = {
+            apiBaseUrl: 'http://api.internal.example:3333',
+            apiPublicBaseUrl: 'https://api.example.test',
+        };
+        expect(isApifyApiUri('https://api.example.test/v2/datasets/ds-1/items', apiUrls)).toBe(true);
+        expect(isApifyApiUri('http://api.internal.example:3333/v2/datasets/ds-1/items', apiUrls)).toBe(true);
+        expect(isApifyApiUri(`${API}/v2/datasets/ds-1/items`, apiUrls)).toBe(false);
+    });
+
     it('returns true for Apify API URLs', () => {
         expect(isApifyApiUri(`${API}/v2/datasets/ds-1/items`)).toBe(true);
         expect(isApifyApiUri(`${API}/v2/key-value-stores/kv-1/records/INPUT`)).toBe(true);

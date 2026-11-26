@@ -111,6 +111,18 @@ describe('buildConsole*Url (APIFY_CONSOLE_BASE_URL override)', () => {
     });
 });
 
+describe('buildConsole*Url (context origin)', () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it('uses the origin in the context over APIFY_CONSOLE_BASE_URL', () => {
+        vi.stubEnv('APIFY_CONSOLE_BASE_URL', 'http://localhost:3000');
+
+        expect(buildConsoleRunUrl({ consoleBaseUrl: 'https://console.example.test' }, 'RUN_ID')).toBe(
+            'https://console.example.test/actors/runs/RUN_ID',
+        );
+    });
+});
+
 describe('buildConsole*Url (staging host)', () => {
     const original = process.env.HOSTNAME;
     beforeEach(() => {

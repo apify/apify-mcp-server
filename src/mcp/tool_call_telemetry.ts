@@ -5,6 +5,7 @@ import { HELPER_TOOLS, TOOL_STATUS } from '../const.js';
 import { buildReportedProblemProperties, trackReportedProblem, trackToolCall } from '../telemetry.js';
 import type {
     CallDiagnostics,
+    PlatformUrls,
     TelemetryEnv,
     ToolCallTelemetryProperties,
     ToolStatus,
@@ -26,6 +27,8 @@ type PrepareTelemetryDataParams = {
     clientContext: McpClientContext | undefined;
     /** Raw `?client=` URL query-param value for this connection/request, if any. */
     clientParam?: string;
+    /** The server's resolved origins, for the user lookup. */
+    platformUrls?: PlatformUrls;
 };
 
 /**
@@ -43,7 +46,7 @@ export async function prepareTelemetryData(
     let userId: string | null = null;
     if (apifyToken) {
         const requestOrigin = getRequestOriginForClient(clientContext);
-        const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin });
+        const apifyClient = new ApifyClient({ token: apifyToken, requestOrigin, platformUrls: params.platformUrls });
         ({ userId } = await getUserInfoCached(apifyToken, apifyClient));
         log.debug('Telemetry: fetched userId', { userId, mcpSessionId });
     }

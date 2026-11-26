@@ -290,7 +290,7 @@ export async function callApi(params: {
     // `client.baseUrl` already ends with /v2.
     const url = `${client.baseUrl}/${normalizedPath}`;
     // An assertion: nothing after the base URL can change the host that gets the token.
-    if (!isApifyApiUri(url)) throw new Error(`The URL ${url} is not on the API host.`);
+    if (!isApifyApiUri(url, client.platformUrls)) throw new Error(`The URL ${url} is not on the API host.`);
     let response: AxiosResponse<unknown>;
     try {
         response = await sendApifyApiRequest(client, {

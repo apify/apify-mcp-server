@@ -139,7 +139,7 @@ describe('createStatelessServer() prompts and resources', () => {
                 async ({ call }) => {
                     await call('resources/read', { uri });
 
-                    expect(readApiResourceMock).toHaveBeenCalledWith(uri, undefined);
+                    expect(readApiResourceMock).toHaveBeenCalledWith(uri, undefined, expect.anything());
                 },
                 { token: undefined, allowUnauthMode: true },
             );

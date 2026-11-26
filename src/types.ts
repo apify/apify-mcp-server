@@ -723,6 +723,22 @@ export type ActorsMcpServerOptions = {
      * @deprecated Use `serverMode` instead.
      */
     uiMode?: string;
+    /** Apify API origin requests are sent to. Defaults to `APIFY_API_BASE_URL`, then production. */
+    apiBaseUrl?: string;
+    /** Apify API origin shown to clients. Defaults to `APIFY_API_PUBLIC_BASE_URL`, then production. */
+    apiPublicBaseUrl?: string;
+    /** Apify Console origin for Console links. Defaults to `APIFY_CONSOLE_BASE_URL`, then production. */
+    consoleBaseUrl?: string;
+};
+
+/** The platform origins one server uses, resolved once in the `ActorsMcpServer` constructor. */
+export type PlatformUrls = {
+    /** Where API requests go. */
+    apiBaseUrl: string;
+    /** The API origin shown to clients. */
+    apiPublicBaseUrl: string;
+    /** The origin of Console links. */
+    consoleBaseUrl: string;
 };
 
 /** Compact schema returned by `GET /v2/store?includeInputSchema=true`; produced by apify-core `trimInputSchema`. */
@@ -764,12 +780,13 @@ export type StructuredActorCard = {
 /**
  * Context for minting Apify Console links instead of public website links.
  * Resolved from the session token by `getConsoleLinkContext` — present only for
- * Console UI token sessions (its presence is the signal to mint Console links). The
- * Console origin is global per cluster, so it lives in the builders, not here.
+ * Console UI token sessions (its presence is the signal to mint Console links).
  */
 export type ConsoleLinkContext = {
     /** Org user id when the session is org-scoped; adds the `/organization/<orgId>` path prefix. */
     organizationId?: string;
+    /** Console origin of the server's `PlatformUrls`; `getConsoleBaseUrl()` when unset. */
+    consoleBaseUrl?: string;
 };
 
 /**

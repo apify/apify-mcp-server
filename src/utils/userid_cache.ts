@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
+import { getApiOriginCacheKey } from '../apify_client.js';
 import { PRICING_TIERS, type PricingTier } from './pricing_info.js';
 import { TTLLRUCache } from './ttl_lru.js';
 
@@ -18,7 +19,7 @@ export type CachedUserInfo = {
 
 const ANONYMOUS_USER_INFO: CachedUserInfo = { userId: null, userPlanTier: 'FREE', isOrganization: false };
 
-// LRU cache with TTL for user info - keyed by hashed token
+// LRU cache with TTL for user info - keyed by hashed token, per API origin
 const userInfoCache = new TTLLRUCache<CachedUserInfo>(USER_CACHE_MAX_SIZE, USER_CACHE_TTL_SECS);
 
 function normalizePlanTier(tier: string | undefined): PricingTier {
@@ -41,7 +42,7 @@ function normalizePlanTier(tier: string | undefined): PricingTier {
  */
 export async function getUserInfoCached(token: string | undefined, apifyClient: ApifyClient): Promise<CachedUserInfo> {
     if (!token) return ANONYMOUS_USER_INFO;
-    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const tokenHash = getApiOriginCacheKey(apifyClient, createHash('sha256').update(token).digest('hex'));
     const cached = userInfoCache.get(tokenHash);
     if (cached) return cached;
 

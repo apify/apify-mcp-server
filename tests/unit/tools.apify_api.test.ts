@@ -530,6 +530,24 @@ describe('apify-api-read', () => {
         },
     );
 
+    it("sends to the server's API origin carried by the client", async () => {
+        requestMock.mockResolvedValue(mockResponse(200, { data: {} }));
+        const baseUrl = 'http://api.internal.example:3333/v2';
+        const client = {
+            baseUrl,
+            platformUrls: {
+                apiBaseUrl: 'http://api.internal.example:3333',
+                apiPublicBaseUrl: 'https://api.example.test',
+                consoleBaseUrl: 'https://console.example.test',
+            },
+            httpClient: { axios: { request: requestMock } },
+        } as unknown as InternalToolArgs['apifyClient'];
+
+        await (apifyApiRead as HelperTool).call(stubToolCallContext({ path: 'datasets/abc' }, client));
+
+        expect(readSentUrl()).toBe(`${baseUrl}/datasets/abc`);
+    });
+
     it('sends a path the spec does not list, without loading the spec', async () => {
         requestMock.mockResolvedValue(mockResponse(200, { data: { ok: true } }));
 
