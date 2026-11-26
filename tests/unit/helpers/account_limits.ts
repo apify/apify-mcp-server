@@ -2,7 +2,8 @@ import type { ApifyClient } from '../../../src/apify_client.js';
 
 export type AccountLimits = NonNullable<Awaited<ReturnType<ReturnType<ApifyClient['user']>['limits']>>>;
 
-export const CYCLE_END_AT = new Date('2026-12-01T00:00:00.000Z');
+/** The API ends a cycle on its last millisecond. */
+export const CYCLE_END_AT = new Date('2026-11-30T23:59:59.999Z');
 
 /** A `GET /v2/users/me/limits` response with `usedUsd` of the monthly usage limit spent. */
 export function limitsResponse(usedUsd: number, limitUsd = 5): AccountLimits {

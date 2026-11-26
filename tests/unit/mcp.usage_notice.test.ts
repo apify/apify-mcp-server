@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as ApifyClientModule from '../../src/apify_client.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
+import * as telemetry from '../../src/telemetry.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import type { ActorsMcpServerOptions, UsageThresholdDecision } from '../../src/types.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
@@ -41,8 +42,12 @@ const NOTICE = buildUsageNoticeText('FREE', 0.8, { usedUsd: 4.1, limitUsd: 5, cy
 
 function serverOptions(): Partial<ActorsMcpServerOptions> {
     const decision: UsageThresholdDecision = { variant: 'notice', planType: 'FREE', isNoticeShown: true };
-    // A fresh token per test: the usage cache is keyed by token.
-    return { token: `token-${Math.random()}`, onUsageThresholdCrossed: async () => decision };
+    // A fresh token per test: the usage cache is keyed by token. The check runs only with telemetry on.
+    return {
+        token: `token-${Math.random()}`,
+        telemetry: { enabled: true, env: 'DEV' },
+        onUsageThresholdCrossed: async () => decision,
+    };
 }
 
 async function loadActorTool(server: ActorsMcpServer) {
@@ -51,6 +56,11 @@ async function loadActorTool(server: ActorsMcpServer) {
 }
 
 describe('usage notice on an Actor tool result', () => {
+    beforeEach(() => {
+        vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        vi.spyOn(telemetry, 'trackUsageThresholdCrossed').mockImplementation(() => {});
+    });
+
     afterEach(() => {
         vi.restoreAllMocks();
     });

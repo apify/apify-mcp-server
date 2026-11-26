@@ -729,6 +729,7 @@ export type ActorsMcpServerOptions = {
      * host claims each crossing once: it returns `null` when the crossing was already handled or the account takes
      * no part (e.g. a session that pays per call), and a decision otherwise. On a decision the server sends the
      * `MCP Usage Threshold Crossed` event and, when `isNoticeShown`, appends the usage notice to the tool result.
+     * The tool result waits for this call, so the host must keep it short. Not called when telemetry is off.
      * When unset (stdio, self-hosted), usage is not checked.
      */
     onUsageThresholdCrossed?: (crossing: UsageThresholdCrossing) => Promise<UsageThresholdDecision | null>;

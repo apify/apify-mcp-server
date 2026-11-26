@@ -5,11 +5,13 @@ import log from '@apify/log';
 import type { ApifyClient } from '../../src/apify_client.js';
 import { HELPER_TOOLS } from '../../src/const.js';
 import * as telemetry from '../../src/telemetry.js';
-import type { UsageThresholdCrossing, UsageThresholdDecision } from '../../src/types.js';
+import type { ToolEntry, UsageThresholdCrossing, UsageThresholdDecision } from '../../src/types.js';
+import { TOOL_TYPE } from '../../src/types.js';
 import {
     appendUsageNotice,
     buildUsageNoticeText,
     getReachedThreshold,
+    getUsageNoticeOptions,
     startUsageCheck,
     type UsageNoticeOptions,
 } from '../../src/utils/usage_notice.js';
@@ -45,8 +47,15 @@ async function runUsageCheck(params: {
     options: UsageNoticeOptions;
     limits?: () => Promise<AccountLimits>;
     result?: Record<string, unknown>;
+    signal?: AbortSignal;
 }) {
-    const { usedUsd, options, limits = async () => limitsResponse(usedUsd), result = TOOL_RESULT } = params;
+    const {
+        usedUsd,
+        options,
+        limits = async () => limitsResponse(usedUsd),
+        result = TOOL_RESULT,
+        signal = new AbortController().signal,
+    } = params;
     const check = startUsageCheck({
         options,
         tool: makeActorTool(),
@@ -54,6 +63,7 @@ async function runUsageCheck(params: {
         apifyToken: uniqueToken(),
         apifyClient: stubClient(limits),
         mcpSessionId: 'session-1',
+        signal,
     });
     return await appendUsageNotice(result, check);
 }
@@ -104,7 +114,12 @@ describe('usage notice copy', () => {
 });
 
 describe('which tool calls check usage', () => {
-    const base = { apifyToken: 'token', apifyClient: stubClient(async () => limitsResponse(1)), mcpSessionId: 's' };
+    const base = {
+        apifyToken: 'token',
+        apifyClient: stubClient(async () => limitsResponse(1)),
+        mcpSessionId: 's',
+        signal: new AbortController().signal,
+    };
 
     it.each([
         ['an Actor tool', makeActorTool()],
@@ -115,8 +130,11 @@ describe('which tool calls check usage', () => {
         ).not.toBeNull();
     });
 
-    it('skips an internal tool that runs no Actor', () => {
-        const { tool } = makeArgsRecorderTool(HELPER_TOOLS.DATASET_GET_ITEMS);
+    it.each([
+        ['an internal tool that runs no Actor', makeArgsRecorderTool(HELPER_TOOLS.DATASET_GET_ITEMS).tool],
+        ['send-server-actor-request', makeArgsRecorderTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST).tool],
+        ['an Actor server tool', { ...makeActorTool(), type: TOOL_TYPE.ACTOR_SERVER } as ToolEntry],
+    ])('skips %s', (_label, tool) => {
         expect(startUsageCheck({ ...base, tool, toolName: tool.name, options: usageNoticeOptions(SHOWN) })).toBeNull();
     });
 
@@ -131,10 +149,33 @@ describe('which tool calls check usage', () => {
         };
         expect(startUsageCheck(params)).toBeNull();
     });
+});
 
-    it('skips every call when the host set no handler', () => {
-        const tool = makeActorTool();
-        expect(startUsageCheck({ ...base, tool, toolName: tool.name, options: undefined })).toBeNull();
+describe('when the server checks usage at all', () => {
+    const handler = async () => null;
+
+    it('checks when the host set a handler and telemetry is on', () => {
+        const host = {
+            options: { onUsageThresholdCrossed: handler },
+            telemetryEnabled: true,
+            telemetryEnv: 'DEV' as const,
+        };
+        expect(getUsageNoticeOptions(host, undefined)).toBeDefined();
+    });
+
+    it('does not check without a handler', () => {
+        expect(
+            getUsageNoticeOptions({ options: {}, telemetryEnabled: true, telemetryEnv: 'DEV' }, undefined),
+        ).toBeUndefined();
+    });
+
+    it('does not check with telemetry off, so no crossing goes without its event', () => {
+        const host = {
+            options: { onUsageThresholdCrossed: handler },
+            telemetryEnabled: false,
+            telemetryEnv: 'DEV' as const,
+        };
+        expect(getUsageNoticeOptions(host, undefined)).toBeUndefined();
     });
 });
 
@@ -195,12 +236,13 @@ describe('usage notice on a tool result', () => {
         expect(result).toBe(TOOL_RESULT);
     });
 
-    it('sends no event when telemetry is off', async () => {
-        const trackSpy = vi.spyOn(telemetry, 'trackUsageThresholdCrossed').mockImplementation(() => {});
+    it('does not ask the host for a cancelled call', async () => {
+        const options = usageNoticeOptions(SHOWN);
+        const controller = new AbortController();
+        controller.abort();
 
-        await runUsageCheck({ usedUsd: 4.1, options: { ...usageNoticeOptions(SHOWN), telemetryEnv: null } });
-
-        expect(trackSpy).not.toHaveBeenCalled();
+        expect(await runUsageCheck({ usedUsd: 4.1, options, signal: controller.signal })).toBe(TOOL_RESULT);
+        expect(options.onUsageThresholdCrossed).not.toHaveBeenCalled();
     });
 
     it('does not ask the host below 80%', async () => {
@@ -271,6 +313,7 @@ describe('usage notice on a tool result', () => {
             toolName: tool.name,
             apifyClient,
             mcpSessionId: 's',
+            signal: new AbortController().signal,
         };
         const apifyToken = uniqueToken();
 

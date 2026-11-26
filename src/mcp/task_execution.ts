@@ -270,6 +270,7 @@ export async function executeToolAndUpdateTask(params: {
             apifyToken,
             apifyClient,
             mcpSessionId,
+            signal: cancelWatcher.signal,
         });
         const dispatchResult = await dispatchToolCall({
             tool,

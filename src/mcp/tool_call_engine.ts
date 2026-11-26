@@ -510,6 +510,7 @@ export async function executeSyncToolCall(
         apifyToken,
         apifyClient,
         mcpSessionId,
+        signal,
     });
 
     try {

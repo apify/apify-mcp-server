@@ -27,12 +27,14 @@ const LIMITS_URL = 'https://console.apify.com/billing/limits?openMonthlyUsageLim
 /** Highest first: a usage reading reports the highest threshold it reached. */
 const USAGE_THRESHOLDS: readonly UsageThreshold[] = [0.95, 0.8];
 
-/** Internal tools that run an Actor. Every Actor, Actor-MCP and Actor server tool does. */
+/** Tool types whose every call runs an Actor. */
+const ACTOR_RUNNING_TOOL_TYPES = new Set<string>([TOOL_TYPE.ACTOR, TOOL_TYPE.ACTOR_MCP]);
+
+/** Internal tools that run an Actor. */
 const ACTOR_RUNNING_INTERNAL_TOOLS = new Set<string>([
     HELPER_TOOLS.ACTOR_CALL,
     HELPER_TOOLS.ACTOR_CALL_WIDGET,
     HELPER_TOOLS.ACTOR_MCP_TOOL_CALL,
-    HELPER_TOOLS.ACTOR_SERVER_REQUEST,
 ]);
 
 const USAGE_CACHE_MAX_SIZE = 200;
@@ -47,8 +49,7 @@ type UsageReading = { usage: AccountUsage; userId: string; isOrganization: boole
 
 export type UsageNoticeOptions = {
     onUsageThresholdCrossed: NonNullable<ActorsMcpServerOptions['onUsageThresholdCrossed']>;
-    /** Null when telemetry is off, so no event is sent. */
-    telemetryEnv: TelemetryEnv | null;
+    telemetryEnv: TelemetryEnv;
     mcpClientName: string;
 };
 
@@ -57,20 +58,24 @@ export type UsageCheck = UsageNoticeOptions & {
     reading: Promise<UsageReading | null>;
     toolName: string;
     mcpSessionId: string | undefined;
+    signal: AbortSignal;
 };
 
 const usageCache = new TTLLRUCache<AccountUsage>(USAGE_CACHE_MAX_SIZE, USAGE_CACHE_TTL_SECS);
 
-/** The usage notice options for one request, or undefined when the host set no `onUsageThresholdCrossed`. */
+/**
+ * The usage notice options for one request. Undefined when the host set no `onUsageThresholdCrossed`, or when
+ * telemetry is off: every crossing the host decides must also send its event.
+ */
 export function getUsageNoticeOptions(
     host: { options: ActorsMcpServerOptions; telemetryEnabled: boolean; telemetryEnv: TelemetryEnv },
     clientContext: McpClientContext | undefined,
 ): UsageNoticeOptions | undefined {
     const { onUsageThresholdCrossed } = host.options;
-    if (!onUsageThresholdCrossed) return undefined;
+    if (!onUsageThresholdCrossed || !host.telemetryEnabled) return undefined;
     return {
         onUsageThresholdCrossed,
-        telemetryEnv: host.telemetryEnabled ? host.telemetryEnv : null,
+        telemetryEnv: host.telemetryEnv,
         mcpClientName: clientContext?.clientInfo?.name ?? '',
     };
 }
@@ -110,8 +115,9 @@ async function readUsage(token: string, apifyClient: ApifyClient): Promise<Usage
 }
 
 /**
- * Starts reading the account's usage alongside a tool call that runs an Actor. Null when there are no options (the
- * host set no `onUsageThresholdCrossed`), no token, or the tool runs no Actor.
+ * Starts reading the account's usage alongside a tool call that runs an Actor: `call-actor`, an Actor tool or an
+ * Actor-MCP tool, as apify/apify-core#32338 lists. Null when there are no options (the host set no
+ * `onUsageThresholdCrossed`), no token, or another tool, Actor server tools and `send-server-actor-request` included.
  */
 export function startUsageCheck(params: {
     options: UsageNoticeOptions | undefined;
@@ -120,11 +126,12 @@ export function startUsageCheck(params: {
     apifyToken: string | undefined;
     apifyClient: ApifyClient;
     mcpSessionId: string | undefined;
+    signal: AbortSignal;
 }): UsageCheck | null {
-    const { options, tool, toolName, apifyToken, apifyClient, mcpSessionId } = params;
+    const { options, tool, toolName, apifyToken, apifyClient, mcpSessionId, signal } = params;
     if (!options || !apifyToken) return null;
-    if (tool.type === TOOL_TYPE.INTERNAL && !ACTOR_RUNNING_INTERNAL_TOOLS.has(tool.name)) return null;
-    return { ...options, reading: readUsage(apifyToken, apifyClient), toolName, mcpSessionId };
+    if (!ACTOR_RUNNING_TOOL_TYPES.has(tool.type) && !ACTOR_RUNNING_INTERNAL_TOOLS.has(tool.name)) return null;
+    return { ...options, reading: readUsage(apifyToken, apifyClient), toolName, mcpSessionId, signal };
 }
 
 /**
@@ -151,7 +158,8 @@ export function buildUsageNoticeText(
     const used = formatUsd(usage.usedUsd);
     const limit = formatUsd(usage.limitUsd);
     const percent = Math.floor((usage.usedUsd / usage.limitUsd) * 100);
-    const resetDate = usage.cycleEndAt.toISOString().slice(0, 10);
+    // The cycle ends on its last millisecond; the next one starts a millisecond later.
+    const resetDate = new Date(usage.cycleEndAt.getTime() + 1).toISOString().slice(0, 10);
     const limitText =
         planType === 'FREE'
             ? `the ${limit} monthly usage included in the Free plan`
@@ -218,7 +226,8 @@ export async function appendUsageNotice(
         if (!reading) return result;
         const { usage, userId, isOrganization } = reading;
         const threshold = getReachedThreshold(usage);
-        if (!threshold) return result;
+        // A cancelled call's result reaches no one, so it must not use up the crossing.
+        if (!threshold || check.signal.aborted) return result;
 
         const decision = await check.onUsageThresholdCrossed({
             userId,
@@ -230,19 +239,17 @@ export async function appendUsageNotice(
         if (!decision) return result;
 
         const text = decision.isNoticeShown ? buildUsageNoticeText(decision.planType, threshold, usage) : null;
-        if (check.telemetryEnv) {
-            trackUsageThresholdCrossed(userId, check.telemetryEnv, {
-                threshold,
-                variant: decision.variant,
-                notice_shown: decision.isNoticeShown,
-                plan_tier: decision.planType,
-                is_organization: isOrganization,
-                used_usd: usage.usedUsd,
-                limit_usd: usage.limitUsd,
-                tool_name: check.toolName,
-                mcp_client_name: check.mcpClientName,
-            });
-        }
+        trackUsageThresholdCrossed(userId, check.telemetryEnv, {
+            threshold,
+            variant: decision.variant,
+            notice_shown: decision.isNoticeShown,
+            plan_tier: decision.planType,
+            is_organization: isOrganization,
+            used_usd: usage.usedUsd,
+            limit_usd: usage.limitUsd,
+            tool_name: check.toolName,
+            mcp_client_name: check.mcpClientName,
+        });
         if (!text) return result;
         return { ...result, content: [...content, { type: 'text', text }] };
     } catch (error) {
