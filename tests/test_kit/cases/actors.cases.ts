@@ -104,10 +104,15 @@ export const actorsCases: Case[] = [
         name: 'should call Actor directly with required input',
         isDeploymentTest: true,
         run: withClient({ tools: ['actors'] }, async (client) => {
-            // Should fail without input (AJV validation error)
-            await expect(
-                client.callTool({ name: 'call-actor', arguments: { actor: ACTOR_NORMAL_MODE } }),
-            ).rejects.toThrow(/must have required property 'input'/);
+            // Should fail without input (AJV validation error, returned as a tool execution error)
+            const invalidResult = await client.callTool({
+                name: 'call-actor',
+                arguments: { actor: ACTOR_NORMAL_MODE },
+            });
+            expect(invalidResult.isError).toBe(true);
+            expect((invalidResult.content as { text: string }[])[0].text).toMatch(
+                /must have required property 'input'/,
+            );
 
             // Should succeed with input
             const callResult = await client.callTool({
@@ -1059,16 +1064,16 @@ export const actorsCases: Case[] = [
         }),
     },
     {
-        name: 'rejects get-actor-run waitSecs above 45',
+        name: 'returns a tool error for get-actor-run waitSecs above 45',
         isDeploymentTest: false,
         run: withClient({ tools: ['actors', 'runs'] }, async (client) => {
             // Fake-but-plausible runId so failure is waitSecs validation, not missing run.
-            await expect(
-                client.callTool({
-                    name: 'get-actor-run',
-                    arguments: { runId: 'aaaaaaaaaaaaaaaaa', waitSecs: 46 },
-                }),
-            ).rejects.toThrow(/waitSecs|less than or equal to 45|<= 45/i);
+            const result = await client.callTool({
+                name: 'get-actor-run',
+                arguments: { runId: 'aaaaaaaaaaaaaaaaa', waitSecs: 46 },
+            });
+            expect(result.isError).toBe(true);
+            expect((result.content as { text: string }[])[0].text).toMatch(/waitSecs|less than or equal to 45|<= 45/i);
         }),
     },
     {

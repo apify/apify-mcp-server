@@ -298,29 +298,52 @@ describe('CallToolRequestSchema handler', () => {
         });
     });
 
-    it('rejects arguments failing the input schema as an InvalidParams protocol error', async () => {
-        // Pins the deliberate divergence from SDK 1.29 defaults: validation failures surface as
-        // McpError protocol errors, never as isError tool results. The taskSupport-gate test above
-        // covers the other failInvalidParams instance; this one covers AJV validation.
-        await withServer(async (server) => {
-            silenceLogs();
-            const { tool, received } = makeRecorderTool('strict-schema-tool');
+    describe('arguments failing the input schema', () => {
+        function makeStrictSchemaTool() {
+            const recorder = makeRecorderTool('strict-schema-tool');
             const schema = { type: 'object', properties: { x: { type: 'string' } }, required: ['x'] };
-            tool.inputSchema = schema as ToolInputSchema;
-            tool.ajvValidate = compileSchema(schema);
-            server.upsertTools([tool]);
-            vi.spyOn(getLegacyServer(server), 'sendLoggingMessage').mockResolvedValue(undefined);
-            const handler = getRequestHandler(server, 'tools/call');
-            await expect(
-                handler(
-                    {
-                        method: 'tools/call',
-                        params: { name: 'strict-schema-tool', arguments: {}, _meta: { mcpSessionId: 's1' } },
-                    },
+            recorder.tool.inputSchema = schema as ToolInputSchema;
+            recorder.tool.ajvValidate = compileSchema(schema);
+            return recorder;
+        }
+
+        it('returns an isError tool result without calling the tool', async () => {
+            // The MCP spec classifies input-validation errors as tool execution errors (SEP-1303).
+            await withServer(async (server) => {
+                silenceLogs();
+                const { tool, received } = makeStrictSchemaTool();
+                server.upsertTools([tool]);
+                const result = await getRequestHandler(server, 'tools/call')(
+                    { method: 'tools/call', params: { name: tool.name, arguments: {}, _meta: { mcpSessionId: 's1' } } },
                     { signal: { aborted: false }, sendNotification: vi.fn() },
-                ),
-            ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
-            expect(received.called).toBe(false);
+                );
+                expect(result).toMatchObject({
+                    isError: true,
+                    content: [{ text: expect.stringContaining(`Invalid arguments for tool "${tool.name}"`) }],
+                });
+                expect(received.called).toBe(false);
+            });
+        });
+
+        it('keeps an InvalidParams protocol error for a task-augmented call', async () => {
+            // The SDK accepts only a CreateTaskResult for a task-augmented call.
+            await withServer(async (server) => {
+                silenceLogs();
+                const { tool } = makeStrictSchemaTool();
+                server.upsertTools([tool]);
+                vi.spyOn(getLegacyServer(server), 'sendLoggingMessage').mockResolvedValue(undefined);
+                const params = { name: tool.name, arguments: {}, _meta: { mcpSessionId: 's1' }, task: { ttl: 60_000 } };
+                await expect(
+                    getRequestHandler(server, 'tools/call')(
+                        { method: 'tools/call', params },
+                        { signal: { aborted: false }, sendNotification: vi.fn() },
+                    ),
+                ).rejects.toMatchObject({
+                    code: ErrorCode.InvalidParams,
+                    // A tool result here fails the SDK's CreateTaskResult check with a different InvalidParams message.
+                    message: expect.stringContaining(`Invalid arguments for tool "${tool.name}"`),
+                });
+            });
         });
     });
 
@@ -333,7 +356,6 @@ describe('CallToolRequestSchema handler', () => {
         await withServer(async (server) => {
             silenceLogs();
             server.upsertTools([tool]);
-            vi.spyOn(getLegacyServer(server), 'sendLoggingMessage').mockResolvedValue(undefined);
             const listSpy = vi.spyOn(ApifyClientBase.prototype, method).mockImplementation(() => {
                 throw new Error('stubbed');
             });
@@ -345,7 +367,7 @@ describe('CallToolRequestSchema handler', () => {
                 );
 
             for (const limit of [0, -1, 1.5]) {
-                await expect(callWithLimit(limit)).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+                await expect(callWithLimit(limit)).resolves.toMatchObject({ isError: true });
             }
             expect(listSpy).not.toHaveBeenCalled();
 

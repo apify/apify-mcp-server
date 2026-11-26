@@ -251,6 +251,11 @@ class StatelessMcpServer {
                         validationAdditionalProperty: prepared.callDiagnostics.validation_additional_property,
                         ...prepared.logFields,
                     });
+                    if (prepared.isToolExecutionError) {
+                        const result = { content: [{ type: 'text', text: prepared.message }], isError: true };
+                        toolResult = result;
+                        return this.projectResult(result, outputSchema);
+                    }
                     throw new ProtocolError(ProtocolErrorCode.InvalidParams, prepared.message);
                 }
 
