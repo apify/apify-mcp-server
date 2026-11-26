@@ -47,12 +47,25 @@ describe('copying case files into a dataset', () => {
                 datasetName: 'mcp-server-evals-pr',
                 id: item.id,
                 input: item.input,
-                expectedOutput: item.expectedOutput,
+                // Not omitted: Langfuse would keep a hosted reference, which a tool-call item must not have.
+                expectedOutput: '',
                 metadata: item.metadata,
                 status: 'ACTIVE',
             },
         ]);
         expect(result).toEqual({ datasetId: 'dataset-123', archivedIds: [] });
+    });
+
+    it('writes the reference of a case that has one', async () => {
+        const { client, writes } = makeLangfuseClient([]);
+        const item = {
+            ...makeItem('merge/storage/read-dataset'),
+            expectedOutput: 'PASS if the agent lists the items.',
+        };
+
+        await copyCasesToDataset(client, 'mcp-server-evals-merge', [item]);
+
+        expect(writes[0].expectedOutput).toBe('PASS if the agent lists the items.');
     });
 
     it('archives an active hosted item whose id is not in the files, keeping its content', async () => {

@@ -26,7 +26,11 @@ export async function copyCasesToDataset(
         item: { id: string; input?: unknown; expectedOutput?: unknown; metadata?: unknown },
         status: 'ACTIVE' | 'ARCHIVED',
     ) => {
-        const { id, input, expectedOutput, metadata } = item;
+        const { id, input, metadata } = item;
+        // Langfuse keeps the hosted `expectedOutput` when the write omits it or sends null, and
+        // clears it on an empty string. Without this a tool-call case would keep a reference
+        // someone added in the UI, and the item validator rejects a tool-call item that has one.
+        const expectedOutput = item.expectedOutput ?? '';
         try {
             await langfuse.api.datasetItems.create({ datasetName, id, input, expectedOutput, metadata, status });
         } catch (error) {
