@@ -173,7 +173,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         });
 
         it('has correct tools in dev category (both modes)', () => {
-            const expected = [HELPER_TOOLS.PROBLEM_REPORT];
+            const expected = [HELPER_TOOLS.FEEDBACK_SEND];
             expect(toolNames(defaultCategories.dev)).toEqual(expected);
             expect(toolNames(appsCategories.dev)).toEqual(expected);
         });

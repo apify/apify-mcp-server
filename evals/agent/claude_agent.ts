@@ -16,7 +16,7 @@ import { resolve } from 'node:path';
 import type { HookCallbackMatcher, HookInput, Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 
-import { REPORT_PROBLEM_NUDGE } from '../../src/tools/dev/report_problem.js';
+import { SEND_FEEDBACK_NUDGE } from '../../src/tools/dev/send_feedback.js';
 import { isMcpToolName, MCP_SERVER_NAME, stripToolPrefix } from '../config.js';
 import { LANGFUSE_ENV_VARS } from '../environment.js';
 import type { AttemptedToolCall } from '../runner/tool_call_mode.js';
@@ -106,7 +106,7 @@ function preToolUseHook(decide: (toolName: string, toolInput: unknown) => string
 }
 
 /**
- * Force-fails selected tools with the server's report-problem nudge so error-path cases do
+ * Force-fails selected tools with the server's send-feedback nudge so error-path cases do
  * not depend on a live server failure.
  */
 export function denyToolsHook(failTools: string[]): HookCallbackMatcher[] {
@@ -115,7 +115,7 @@ export function denyToolsHook(failTools: string[]): HookCallbackMatcher[] {
     return preToolUseHook((toolName) => {
         const stripped = stripToolPrefix(toolName);
         if (!failing.has(stripped)) return undefined;
-        return `The ${stripped} tool failed with an internal error.\n\n${REPORT_PROBLEM_NUDGE}`;
+        return `The ${stripped} tool failed with an internal error.\n\n${SEND_FEEDBACK_NUDGE}`;
     });
 }
 

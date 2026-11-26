@@ -15,16 +15,16 @@ function makeServer(serverMode: SERVER_MODE = SERVER_MODE.DEFAULT): ActorsMcpSer
 }
 
 describe('ActorsMcpServer.getStatelessServerInstructions()', () => {
-    it('describes available tools without report-problem when no request URL is supplied', () => {
+    it('describes available tools without send-feedback when no request URL is supplied', () => {
         const instructions = makeServer().getStatelessServerInstructions();
         expect(instructions).toContain(HELPER_TOOLS.ACTOR_CALL);
-        expect(instructions).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+        expect(instructions).not.toContain(HELPER_TOOLS.FEEDBACK_SEND);
     });
 
     it('uses the default tools for a bare URL', () => {
         const instructions = makeServer().getStatelessServerInstructions('http://localhost/');
         expect(instructions).toContain(HELPER_TOOLS.ACTOR_CALL);
-        expect(instructions).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+        expect(instructions).not.toContain(HELPER_TOOLS.FEEDBACK_SEND);
     });
 
     it('describes a dedicated-Actor session without naming individual web tools', () => {
@@ -44,9 +44,9 @@ describe('ActorsMcpServer.getStatelessServerInstructions()', () => {
         expect(instructions).not.toContain(HELPER_TOOLS.ACTOR_RUNS_GET_WIDGET);
     });
 
-    // ?tools=dev seeds report-problem into the candidate set so this exercises the filter, not an always-true check.
-    it('never mentions report-problem via a requestUrl, even when explicitly selected', () => {
+    // ?tools=dev seeds send-feedback into the candidate set so this exercises the filter, not an always-true check.
+    it('never mentions send-feedback via a requestUrl, even when explicitly selected', () => {
         const instructions = makeServer().getStatelessServerInstructions('http://localhost/?tools=dev');
-        expect(instructions).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+        expect(instructions).not.toContain(HELPER_TOOLS.FEEDBACK_SEND);
     });
 });

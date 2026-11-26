@@ -76,7 +76,7 @@ Two MCP protocol revisions are served, each by its own adapter:
   or v1 `McpError`, and **nothing shared imports either adapter**. Keep it that way: the two
   adapters are siblings over one Apify core, not layers.
 - **Per-request state lives in a snapshot, never on the facade.** The stateless adapter resolves
-  `'auto'` mode and report-problem visibility from *that request's* `_meta` envelope through
+  `'auto'` mode and send-feedback visibility from *that request's* `_meta` envelope through
   `createRequestSnapshot`, which writes no request-specific state back to the facade (the one
   instance field it touches is the identity-independent widget-resolution memo). Never resolve a
   stateless request by writing to the shared facade — concurrent requests would contaminate

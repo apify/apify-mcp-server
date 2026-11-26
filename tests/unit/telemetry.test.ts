@@ -223,7 +223,7 @@ describe('buildReportedProblemProperties', () => {
         mcp_session_id: 'session-123',
         transport_type: 'stdio',
         mcp_url_client: 'cursor',
-        tool_name: 'report-problem',
+        tool_name: 'send-feedback',
         tool_status: 'SUCCEEDED',
         tool_exec_time_ms: 5,
     } as ToolCallTelemetryProperties;

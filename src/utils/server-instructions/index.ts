@@ -239,9 +239,9 @@ ${actorTasksSection}${schedulesSection}
 - Reads inline up to ~256 KB; a larger response is not downloaded — it returns a short notice with a download URL instead of the body, so page large datasets/lists with \`limit\` and \`offset\` to stay under the cap.
 - Examples: \`${apiBaseUrl}/v2/datasets/{datasetId}/items?clean=true&format=json&limit=100\`, \`${apiBaseUrl}/v2/key-value-stores/{storeId}/records/{recordKey}\`. \`resources/templates/list\` enumerates the common shapes with their paging parameters.
 ${apiReadLine}${widgetWorkflowSection}${dependenciesAndDisambiguation}${
-        hasTool(HELPER_TOOLS.PROBLEM_REPORT)
+        hasTool(HELPER_TOOLS.FEEDBACK_SEND)
             ? `
-If a tool or Actor fails, or a step is confusing or takes several attempts, you can report it with \`${HELPER_TOOLS.PROBLEM_REPORT}\`.
+If a tool or Actor fails, or a step is confusing or takes several attempts, you can report it with \`${HELPER_TOOLS.FEEDBACK_SEND}\`.
 `
             : ''
     }`;

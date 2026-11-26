@@ -62,7 +62,7 @@ their base tool.
 | `get-key-value-store-list` | true | false | false | Lists stores |
 | `search-apify-docs` | true | false | false | Searches documentation |
 | `fetch-apify-docs` | true | false | false | Fetches documentation |
-| `report-problem` | false | false | false | Files a problem report; not loaded for Anthropic clients |
+| `send-feedback` | false | false | false | Sends feedback to the Apify team; not loaded for Anthropic clients |
 
 ## Privacy / PII Audit
 

@@ -53,9 +53,9 @@ export async function loadReplacedDefaultTool(params: {
     return tool;
 }
 
-/** Whether the session serves every default tool. `report-problem` is left out: telemetry settings decide it. */
+/** Whether the session serves every default tool. `send-feedback` is left out: telemetry settings decide it. */
 function servesDefaultTools(tools: Map<string, ToolEntry>): boolean {
-    return [...resolveToolNamesFromInput({})].every((name) => name === HELPER_TOOLS.PROBLEM_REPORT || tools.has(name));
+    return [...resolveToolNamesFromInput({})].every((name) => name === HELPER_TOOLS.FEEDBACK_SEND || tools.has(name));
 }
 
 /** The server path that takes the same fields as the Actor's run input, sent as `GET` with that input as `query`. */

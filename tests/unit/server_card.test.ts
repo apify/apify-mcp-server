@@ -35,7 +35,7 @@ function getRegistrySchemaErrors(data: unknown) {
 }
 
 /**
- * The tools a default session serves, minus the client-gated `report-problem`. Pinned as a
+ * The tools a default session serves, minus the client-gated `send-feedback`. Pinned as a
  * literal so a change to the default set shows up in the diff instead of passing silently.
  */
 const EXPECTED_TOOL_NAMES = [
@@ -135,7 +135,7 @@ describe('getServerCard()', () => {
     });
 
     describe('tools', () => {
-        it('lists exactly the tools a default session serves, without report-problem', () => {
+        it('lists exactly the tools a default session serves, without send-feedback', () => {
             const card = getServerCard();
 
             expect(card.tools.map((tool) => tool.name)).toEqual(EXPECTED_TOOL_NAMES);

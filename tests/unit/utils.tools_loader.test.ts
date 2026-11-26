@@ -8,7 +8,7 @@ import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
 import {
     AUTO_INJECTED_TOOLS,
     getToolsForServerMode,
-    isReportProblemExplicitlySelected,
+    isSendFeedbackExplicitlySelected,
     loadToolsFromInput,
     resolveActorsToLoad,
     resolveToolNamesFromInput,
@@ -17,29 +17,29 @@ import {
 
 const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
 
-describe('isReportProblemExplicitlySelected()', () => {
+describe('isSendFeedbackExplicitlySelected()', () => {
     it('is true for the literal tool name', () => {
-        expect(isReportProblemExplicitlySelected({ tools: [HELPER_TOOLS.PROBLEM_REPORT] })).toBe(true);
+        expect(isSendFeedbackExplicitlySelected({ tools: [HELPER_TOOLS.FEEDBACK_SEND] })).toBe(true);
     });
 
     it('is true for the tool name given as a plain string (not an array)', () => {
-        expect(isReportProblemExplicitlySelected({ tools: HELPER_TOOLS.PROBLEM_REPORT })).toBe(true);
+        expect(isSendFeedbackExplicitlySelected({ tools: HELPER_TOOLS.FEEDBACK_SEND })).toBe(true);
     });
 
     it('is true for the dev category, its only member', () => {
-        expect(isReportProblemExplicitlySelected({ tools: ['dev'] })).toBe(true);
+        expect(isSendFeedbackExplicitlySelected({ tools: ['dev'] })).toBe(true);
     });
 
     it('is false for an un-split comma-joined string — selector composition never sees it as one name', () => {
-        expect(isReportProblemExplicitlySelected({ tools: 'storage,report-problem' })).toBe(false);
+        expect(isSendFeedbackExplicitlySelected({ tools: 'storage,send-feedback' })).toBe(false);
     });
 
     it('is false when tools is absent (default injection, not an explicit opt-in)', () => {
-        expect(isReportProblemExplicitlySelected({})).toBe(false);
+        expect(isSendFeedbackExplicitlySelected({})).toBe(false);
     });
 
     it('is false for an unrelated selector', () => {
-        expect(isReportProblemExplicitlySelected({ tools: ['actors'] })).toBe(false);
+        expect(isSendFeedbackExplicitlySelected({ tools: ['actors'] })).toBe(false);
     });
 });
 
@@ -121,6 +121,12 @@ describe('toolNamesToInput', () => {
     it('classifies delete-actor (in no category) as an internal tool, not an actor ID', () => {
         expect(toolNamesToInput([HELPER_TOOLS.ACTOR_DELETE])).toEqual({
             tools: [HELPER_TOOLS.ACTOR_DELETE],
+        });
+    });
+
+    it('restores a stored report-problem name as send-feedback, not as an actor ID', () => {
+        expect(toolNamesToInput(['report-problem'])).toEqual({
+            tools: [HELPER_TOOLS.FEEDBACK_SEND],
         });
     });
 });
@@ -214,23 +220,23 @@ describe('resolveToolNamesFromInput()', () => {
     });
 });
 
-describe('getToolsForServerMode report-problem default injection', () => {
-    // report-problem lives in the `dev` category but is injected into the default (no-selectors)
+describe('getToolsForServerMode send-feedback default injection', () => {
+    // send-feedback lives in the `dev` category but is injected into the default (no-selectors)
     // candidate set. Server-side servability gating is applied later in composeToolsForClient; here
     // we only assert membership of the candidate set. See getToolsForServerMode in tools_loader.ts.
-    it('includes report-problem in the default set when no tools= selector is given', () => {
+    it('includes send-feedback in the default set when no tools= selector is given', () => {
         const toolNames = getToolsForServerMode({}, [], 'default').map((t) => t.name);
-        expect(toolNames).toContain(HELPER_TOOLS.PROBLEM_REPORT);
+        expect(toolNames).toContain(HELPER_TOOLS.FEEDBACK_SEND);
     });
 
-    it('excludes report-problem under an explicit tools=storage selector', () => {
+    it('excludes send-feedback under an explicit tools=storage selector', () => {
         const toolNames = getToolsForServerMode({ tools: ['storage'] }, [], 'default').map((t) => t.name);
-        expect(toolNames).not.toContain(HELPER_TOOLS.PROBLEM_REPORT);
+        expect(toolNames).not.toContain(HELPER_TOOLS.FEEDBACK_SEND);
     });
 
-    it('includes report-problem via the dev category selector (tools=dev)', () => {
+    it('includes send-feedback via the dev category selector (tools=dev)', () => {
         const toolNames = getToolsForServerMode({ tools: ['dev'] }, [], 'default').map((t) => t.name);
-        expect(toolNames).toContain(HELPER_TOOLS.PROBLEM_REPORT);
+        expect(toolNames).toContain(HELPER_TOOLS.FEEDBACK_SEND);
     });
 });
 

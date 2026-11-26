@@ -10,7 +10,7 @@ import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
-import { withReportProblemNudge } from '../tools/dev/report_problem.js';
+import { withSendFeedbackNudge } from '../tools/dev/send_feedback.js';
 import type {
     ActorStore,
     CallDiagnostics,
@@ -287,9 +287,9 @@ export async function executeToolAndUpdateTask(params: {
         // Check if task was cancelled before storing result
         if (await skipIfTaskCancelled(', skipping result storage', toolStatus)) return;
 
-        // On a failed result, nudge the agent to report the blocker via report-problem (mirrors the
+        // On a failed result, nudge the agent to report the blocker via send-feedback (mirrors the
         // synchronous CallTool path, which task-mode calls like call-actor bypass).
-        result = withReportProblemNudge({
+        result = withSendFeedbackNudge({
             result,
             tools,
             failingToolName: tool.name,
@@ -413,7 +413,7 @@ export async function executeToolAndUpdateTask(params: {
                 // INVALID_INPUT gets the softer nudge; payment (402) is suppressed via the HTTP status and
                 // AUTH / PERMISSION_APPROVAL_REQUIRED via NON_NUDGE_FAILURE_CATEGORIES. The 402 branch above
                 // returns before reaching here, so this only sees non-payment failures.
-                const failedResult = withReportProblemNudge({
+                const failedResult = withSendFeedbackNudge({
                     result: {
                         content: [
                             {

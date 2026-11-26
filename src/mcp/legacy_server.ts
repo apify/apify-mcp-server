@@ -38,7 +38,7 @@ import { FAILURE_CATEGORY, HELPER_TOOLS, TOOL_STATUS } from '../const.js';
 import type { createPromptService } from '../prompts/prompt_service.js';
 import type { createResourceService } from '../resources/resource_service.js';
 import { getServerInfo } from '../server_card.js';
-import { withReportProblemNudge } from '../tools/dev/report_problem.js';
+import { withSendFeedbackNudge } from '../tools/dev/send_feedback.js';
 import type {
     ActorsMcpServerOptions,
     ActorStore,
@@ -138,8 +138,8 @@ export class LegacyMcpServer {
                 prompts: {},
                 logging: {},
             },
-            // Placeholder overwritten below once the real tool set is known; matches the pre-gating default (all but report-problem).
-            instructions: getServerInstructions(undefined, { hasTool: (name) => name !== HELPER_TOOLS.PROBLEM_REPORT }),
+            // Placeholder overwritten below once the real tool set is known; matches the pre-gating default (all but send-feedback).
+            instructions: getServerInstructions(undefined, { hasTool: (name) => name !== HELPER_TOOLS.FEEDBACK_SEND }),
         });
         this.setupInitializeHandler();
         this.setupLoggingProxy();
@@ -175,7 +175,7 @@ export class LegacyMcpServer {
             const result = await sdkInitHandler(request);
             // Tools are final here (applyInitialize flushed pending tools, applying the per-client
             // blocklist), so tool presence is the ground truth for whether to advertise
-            // report-problem in the instructions.
+            // send-feedback in the instructions.
             result.instructions = this.host.getServerInstructions();
             return result;
         });
@@ -529,7 +529,7 @@ export class LegacyMcpServer {
                             void emitTaskStatusNotification(task.taskId, mcpSessionId, this.taskStore, this.server);
                         });
                         // Measure the nudged result without changing the stored result.
-                        toolResult = withReportProblemNudge({
+                        toolResult = withSendFeedbackNudge({
                             result: outcome.result,
                             tools: this.host.tools,
                             failingToolName: resolvedToolName,

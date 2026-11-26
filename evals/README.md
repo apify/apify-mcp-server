@@ -428,7 +428,7 @@ above). The snapshot holds the same fields flattened, one object per case, in th
 - `maxTurns` - `kind: "agent"` only: override the default (10). Not accepted on `kind: "tool-call"`, which is fixed at 2
 - `tools` - List of tools to enable for this test (e.g., `["actors", "docs", "apify/rag-web-browser"]`). If omitted, all default tools are enabled. Passed to MCP server as `--tools` argument.
 - `mcpToolsOnly` - No effect: the agent never gets Claude Code's built-ins. Still accepted so existing items parse
-- `failTools` - `kind: "agent"` only: tool names the harness force-fails before they reach the server (e.g. `["call-actor"]`), with a message carrying the real `report-problem` nudge. Use it to deterministically produce a nudge-eligible failure that the live server + API cannot reproduce on demand, e.g. to test that the agent proactively calls `report-problem` after one. Injected as a `PreToolUse` deny (the same hook mechanism the tool-call-mode deny-all uses, with different wording), so the agent sees a refused call rather than an `INTERNAL_ERROR` tool result. See `agent/claude_agent.ts`. Not accepted on `kind: "tool-call"`.
+- `failTools` - `kind: "agent"` only: tool names the harness force-fails before they reach the server (e.g. `["call-actor"]`), with a message carrying the real `send-feedback` nudge. Use it to deterministically produce a nudge-eligible failure that the live server + API cannot reproduce on demand, e.g. to test that the agent proactively calls `send-feedback` after one. Injected as a `PreToolUse` deny (the same hook mechanism the tool-call-mode deny-all uses, with different wording), so the agent sees a refused call rather than an `INTERNAL_ERROR` tool result. See `agent/claude_agent.ts`. Not accepted on `kind: "tool-call"`.
 
 ## Common issues
 
@@ -458,9 +458,9 @@ above). The snapshot holds the same fields flattened, one object per case, in th
 - Try a different agent model
 
 ### Eval runs send real problem reports
-**Symptom:** `report-problem` calls from an eval run reach the production Segment source.<br>
+**Symptom:** `send-feedback` calls from an eval run reach the production Segment source.<br>
 **Cause:** The eval server inherits the runner's environment, and telemetry defaults to `PROD` (`src/telemetry.ts`).<br>
-**Solution:** Run cases where the agent can call `report-problem` (e.g. cases with `failTools`) with `TELEMETRY_ENV=DEV`.
+**Solution:** Run cases where the agent can call `send-feedback` (e.g. cases with `failTools`) with `TELEMETRY_ENV=DEV`.
 
 ### A case expects behavior your change removes on purpose
 **Symptom:** A case fails because it checks for behavior the PR removes on purpose, e.g. a call that tool texts no longer ask for.<br>

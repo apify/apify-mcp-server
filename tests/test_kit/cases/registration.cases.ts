@@ -60,10 +60,12 @@ const CLAUDE_CONNECTOR_TOOLS = [
     'apify/web-fetch',
     'report-problem',
 ];
-// Served tool names differ from CLAUDE_CONNECTOR_TOOLS's Actor selectors — map them here.
-const CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES = CLAUDE_CONNECTOR_TOOLS.map((selector) =>
-    selector.includes('/') ? actorNameToToolName(selector) : selector,
-);
+// Served tool names differ from CLAUDE_CONNECTOR_TOOLS's Actor selectors and from the old
+// `report-problem` selector, which the server maps to `send-feedback` — map them here.
+const CLAUDE_CONNECTOR_EXPECTED_TOOL_NAMES = CLAUDE_CONNECTOR_TOOLS.map((selector) => {
+    if (selector === 'report-problem') return 'send-feedback';
+    return selector.includes('/') ? actorNameToToolName(selector) : selector;
+});
 // telemetry: true is explicit — the deployed target defaults it off, unlike this package's own default.
 // clientName: real Claude handshake name — exercises the blocklist bypass (client= URL tag doesn't gate it).
 // client: the listed URL's attribution tag.
@@ -104,20 +106,20 @@ export const registrationCases: Case[] = [
         }),
     },
     {
-        name: 'adds report-problem when telemetry is enabled',
+        name: 'adds send-feedback when telemetry is enabled',
         isDeploymentTest: true,
         run: withClient({ telemetry: { enabled: true } }, async (client) => {
             const names = getToolNames(await client.listTools());
             expect(names).toHaveLength(11 + AUTO_INJECTED_TOOL_NAMES.length);
-            expect(names).toContain('report-problem');
+            expect(names).toContain('send-feedback');
         }),
     },
     {
-        name: 'omits report-problem when telemetry is disabled',
+        name: 'omits send-feedback when telemetry is disabled',
         isDeploymentTest: true,
         run: withClient({ telemetry: { enabled: false } }, async (client) => {
             const names = getToolNames(await client.listTools());
-            expect(names).not.toContain('report-problem');
+            expect(names).not.toContain('send-feedback');
         }),
     },
     ...[
@@ -136,10 +138,10 @@ export const registrationCases: Case[] = [
         }),
     ),
     {
-        // Pinned ?tools= wins for call-actor even with report-problem auto-inject live.
+        // Pinned ?tools= wins for call-actor even with send-feedback auto-inject live.
         // No ?ui=: apps mode comes from the client's own UI-capability advertisement (serverMode 'auto'), not a URL override.
         // Not a deployment test: the exact set needs every pinned Actor on the target Apify API, and staging lacks some.
-        name: 'Claude connector: pinned tool surface excludes call-actor, includes report-problem, tagged ?client=claude',
+        name: 'Claude connector: pinned tool surface excludes call-actor, includes send-feedback, tagged ?client=claude',
         isDeploymentTest: false,
         skipIf: () => !SERVER_MODE_AUTO_DETECTION_ENABLED,
         run: withClient(

@@ -9,8 +9,8 @@ import type { McpClientContext } from '../mcp/client_context.js';
 import { maskAccessKeyTokens } from './access_key_token_mask.js';
 import { APIFY_TRACE_ID_META_KEY, hashSessionId } from './mcp.js';
 
-/** True when `report-problem` is blocklisted for the connecting client (substring match on {@link ANTHROPIC_CLIENT_NAMES}). */
-export function isReportProblemBlockedForClient(context: McpClientContext | undefined): boolean {
+/** True when `send-feedback` is blocklisted for the connecting client (substring match on {@link ANTHROPIC_CLIENT_NAMES}). */
+export function isSendFeedbackBlockedForClient(context: McpClientContext | undefined): boolean {
     const clientName = context?.clientInfo?.name?.toLowerCase() ?? '';
     return ANTHROPIC_CLIENT_NAMES.some((blocked) => clientName.includes(blocked));
 }

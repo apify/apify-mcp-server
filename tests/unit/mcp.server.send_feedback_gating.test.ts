@@ -10,7 +10,7 @@ import { getLegacyServer } from './helpers/mcp_server.js';
 import { mockApifyClient } from './helpers/tool_context.js';
 
 // Stub getActors so default-injection seeding needs no network.
-// Default-resolves to [] so tests that never call loadReportProblemByDefault still get a valid array.
+// Default-resolves to [] so tests that never call loadSendFeedbackByDefault still get a valid array.
 vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
     const actual = await importOriginal<typeof ToolsLoaderModule>();
     return { ...actual, getActors: vi.fn().mockResolvedValue([]) };
@@ -52,16 +52,16 @@ async function dispatchInitialize(server: ActorsMcpServer, clientName: string): 
 }
 
 // Restoring by name is explicit (toolNamesToInput builds {tools:[...]}) — bypasses the blocklist.
-async function loadReportProblemByName(server: ActorsMcpServer): Promise<void> {
-    await server.loadToolsByName([HELPER_TOOLS.PROBLEM_REPORT], mockApifyClient());
+async function loadSendFeedbackByName(server: ActorsMcpServer): Promise<void> {
+    await server.loadToolsByName([HELPER_TOOLS.FEEDBACK_SEND], mockApifyClient());
 }
 
 // Default (no tools=) injection — not an explicit opt-in, so the client blocklist still applies.
-async function loadReportProblemByDefault(server: ActorsMcpServer): Promise<void> {
+async function loadSendFeedbackByDefault(server: ActorsMcpServer): Promise<void> {
     await server.loadToolsFromInput({}, mockApifyClient());
 }
 
-describe('report-problem client gating', () => {
+describe('send-feedback client gating', () => {
     const servers: ActorsMcpServer[] = [];
 
     afterEach(async () => {
@@ -76,43 +76,53 @@ describe('report-problem client gating', () => {
         return server;
     };
 
-    it('hides report-problem from an Anthropic client when composed before initialize', async () => {
+    it('hides send-feedback from an Anthropic client when composed before initialize', async () => {
         const server = track(makeServer());
         // Default (non-explicit) seeding — blocklist still applies.
-        await loadReportProblemByDefault(server);
-        expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(false);
+        await loadSendFeedbackByDefault(server);
+        expect(server.tools.has(HELPER_TOOLS.FEEDBACK_SEND)).toBe(false);
 
         await dispatchInitialize(server, 'claude-ai');
 
-        expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(false);
+        expect(server.tools.has(HELPER_TOOLS.FEEDBACK_SEND)).toBe(false);
     });
 
-    it('serves report-problem to a non-Anthropic client when composed before initialize', async () => {
+    it('serves send-feedback to a non-Anthropic client when composed before initialize', async () => {
         const server = track(makeServer());
-        await loadReportProblemByName(server);
+        await loadSendFeedbackByName(server);
 
         await dispatchInitialize(server, 'test-client');
 
-        expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(true);
+        expect(server.tools.has(HELPER_TOOLS.FEEDBACK_SEND)).toBe(true);
     });
 
-    it('serves report-problem to an Anthropic client restored after initialize (recovery path)', async () => {
+    it('serves send-feedback to an Anthropic client restored after initialize (recovery path)', async () => {
         // Recovery counts as explicit — the session already had this tool.
         const server = track(makeServer());
         await dispatchInitialize(server, 'claude-ai');
 
-        await loadReportProblemByName(server);
+        await loadSendFeedbackByName(server);
 
-        expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(true);
+        expect(server.tools.has(HELPER_TOOLS.FEEDBACK_SEND)).toBe(true);
     });
 
-    it('serves report-problem to a non-Anthropic client loaded after initialize', async () => {
+    it('serves send-feedback to an Anthropic client that selects the old report-problem name', async () => {
+        // Old ?tools= URLs, including the listed Claude connector URL, still select report-problem.
+        const server = track(makeServer());
+        await server.loadToolsFromInput({ tools: ['report-problem'] }, mockApifyClient());
+
+        await dispatchInitialize(server, 'claude-ai');
+
+        expect(server.tools.has(HELPER_TOOLS.FEEDBACK_SEND)).toBe(true);
+    });
+
+    it('serves send-feedback to a non-Anthropic client loaded after initialize', async () => {
         const server = track(makeServer());
         await dispatchInitialize(server, 'test-client');
 
-        await loadReportProblemByName(server);
+        await loadSendFeedbackByName(server);
 
-        expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(true);
+        expect(server.tools.has(HELPER_TOOLS.FEEDBACK_SEND)).toBe(true);
     });
 
     // Recovery is explicit — same reasoning as above.
@@ -124,21 +134,21 @@ describe('report-problem client gating', () => {
         async ({ clientName, isAvailable }) => {
             const server = track(makeServer(true, makeInitializeRequest(clientName)));
 
-            await loadReportProblemByName(server);
+            await loadSendFeedbackByName(server);
 
-            expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(isAvailable);
+            expect(server.tools.has(HELPER_TOOLS.FEEDBACK_SEND)).toBe(isAvailable);
         },
     );
 
-    it('hides report-problem when telemetry is disabled, even for a non-blocked client', async () => {
+    it('hides send-feedback when telemetry is disabled, even for a non-blocked client', async () => {
         // The tool's only function is forwarding submissions via telemetry; with telemetry off it
         // would just fake an acknowledgement, so it must not be served.
         const server = track(makeServer(false));
-        await loadReportProblemByName(server);
+        await loadSendFeedbackByName(server);
 
         await dispatchInitialize(server, 'test-client');
 
-        expect(server.tools.has(HELPER_TOOLS.PROBLEM_REPORT)).toBe(false);
+        expect(server.tools.has(HELPER_TOOLS.FEEDBACK_SEND)).toBe(false);
     });
 
     // Only client-gated tools wait for the client; everything else must load eagerly, or a

@@ -37,7 +37,7 @@ export function getDefaultToolNames(): string[] {
     return getExpectedToolNamesByCategories(toolCategoriesEnabledByDefault);
 }
 
-// report-problem is telemetry-gated (dev category); unit tests cover serve/hide/ack.
+// send-feedback is telemetry-gated (dev category); unit tests cover serve/hide/ack.
 export function servedDefaultTools(): ToolEntry[] {
     return getDefaultTools('default');
 }

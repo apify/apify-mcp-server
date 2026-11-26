@@ -28,7 +28,7 @@ import {
     getDirectActorPolicy,
 } from '../tools/actors/actor_tool_contract.js';
 import { buildLegacyMcpSyntaxRejection } from '../tools/actors/call_actor.js';
-import { withReportProblemNudge } from '../tools/dev/report_problem.js';
+import { withSendFeedbackNudge } from '../tools/dev/send_feedback.js';
 import type {
     ActorStore,
     CallDiagnostics,
@@ -468,7 +468,7 @@ export async function executeSyncToolCall(
     const resolvedToolName = getToolFullName(tool);
 
     const nudge = (result: unknown, callDiagnostics: CallDiagnostics): Record<string, unknown> =>
-        withReportProblemNudge({
+        withSendFeedbackNudge({
             result,
             tools,
             failingToolName: resolvedToolName,
@@ -535,7 +535,7 @@ export async function executeSyncToolCall(
     }
 }
 
-/** Maps non-protocol errors to v1 tool results, including diagnostics and report-problem nudges. */
+/** Maps non-protocol errors to v1 tool results, including diagnostics and send-feedback nudges. */
 export function classifyToolCallError(
     error: unknown,
     params: {
@@ -551,7 +551,7 @@ export function classifyToolCallError(
     const { tools, toolName, failingToolName, actorName, actorId, isAborted, mcpSessionId } = params;
 
     const nudge = (result: unknown, callDiagnostics: CallDiagnostics): Record<string, unknown> =>
-        withReportProblemNudge({
+        withSendFeedbackNudge({
             result,
             tools,
             failingToolName,

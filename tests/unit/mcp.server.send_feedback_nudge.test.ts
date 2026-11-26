@@ -4,10 +4,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
 import {
-    REPORT_PROBLEM_INVALID_INPUT_NUDGE,
-    REPORT_PROBLEM_NUDGE,
-    reportProblem,
-} from '../../src/tools/dev/report_problem.js';
+    SEND_FEEDBACK_INVALID_INPUT_NUDGE,
+    SEND_FEEDBACK_NUDGE,
+    sendFeedback,
+} from '../../src/tools/dev/send_feedback.js';
 import type { ToolEntry, ToolInputSchema } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
@@ -45,7 +45,7 @@ function getToolCallHandler(server: ActorsMcpServer): HandlerFn {
     return getRequestHandler(server, 'tools/call');
 }
 
-// Dispatch a sync tools/call for the direct actor tool, with report-problem served and the
+// Dispatch a sync tools/call for the direct actor tool, with send-feedback served and the
 // executor returning `executorResult`.
 async function dispatchActorCall(executorResult: object): Promise<Record<string, unknown>> {
     vi.mocked(actorExecutor.executeActorTool).mockResolvedValue(executorResult as never);
@@ -56,8 +56,8 @@ async function dispatchActorCall(executorResult: object): Promise<Record<string,
         token: 'fake-token',
     });
     try {
-        // Spread the frozen reportProblem so server.close() can null its ajvValidate on teardown.
-        server.upsertTools([{ ...reportProblem }, makeActorTool()]);
+        // Spread the frozen sendFeedback so server.close() can null its ajvValidate on teardown.
+        server.upsertTools([{ ...sendFeedback }, makeActorTool()]);
         const handler = getToolCallHandler(server);
         return await handler(
             { method: 'tools/call', params: { name: 'test-actor-tool', arguments: {}, _meta: { mcpSessionId: 's1' } } },
@@ -70,14 +70,14 @@ async function dispatchActorCall(executorResult: object): Promise<Record<string,
 
 const nudgeTexts = (r: Record<string, unknown>): string[] => (r.content as { text: string }[]).map((c) => c.text);
 
-describe('report-problem nudge on the direct ACTOR path', () => {
+describe('send-feedback nudge on the direct ACTOR path', () => {
     afterEach(() => vi.clearAllMocks());
 
-    it('appends the report-problem sentence once to an internal error and strips internal toolTelemetry', async () => {
+    it('appends the send-feedback sentence once to an internal error and strips internal toolTelemetry', async () => {
         const result = await dispatchActorCall(respondServerError('The Actor run failed.'));
 
         expect(result.isError).toBe(true);
-        expect(nudgeTexts(result)).toEqual(['The Actor run failed.', REPORT_PROBLEM_NUDGE]);
+        expect(nudgeTexts(result)).toEqual(['The Actor run failed.', SEND_FEEDBACK_NUDGE]);
         expect(result.toolTelemetry).toBeUndefined();
     });
 
@@ -85,6 +85,6 @@ describe('report-problem nudge on the direct ACTOR path', () => {
         const result = await dispatchActorCall(respondUserError("Run with ID 'x' not found."));
 
         expect(result.isError).toBe(true);
-        expect(nudgeTexts(result)).toEqual(["Run with ID 'x' not found.", REPORT_PROBLEM_INVALID_INPUT_NUDGE]);
+        expect(nudgeTexts(result)).toEqual(["Run with ID 'x' not found.", SEND_FEEDBACK_INVALID_INPUT_NUDGE]);
     });
 });

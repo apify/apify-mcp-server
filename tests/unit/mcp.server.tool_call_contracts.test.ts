@@ -15,10 +15,10 @@ import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import * as telemetry from '../../src/telemetry.js';
 import * as callActor from '../../src/tools/actors/call_actor.js';
 import {
-    REPORT_PROBLEM_INVALID_INPUT_NUDGE,
-    REPORT_PROBLEM_NUDGE,
-    reportProblem,
-} from '../../src/tools/dev/report_problem.js';
+    SEND_FEEDBACK_INVALID_INPUT_NUDGE,
+    SEND_FEEDBACK_NUDGE,
+    sendFeedback,
+} from '../../src/tools/dev/send_feedback.js';
 import { getActorRunList } from '../../src/tools/runs/get_actor_run_list.js';
 import { getDatasetList } from '../../src/tools/storage/get_dataset_list.js';
 import { getKeyValueStoreList } from '../../src/tools/storage/get_key_value_store_list.js';
@@ -720,12 +720,12 @@ describe('executeToolAndUpdateTask()', () => {
         expect(trackSpy.mock.calls[0][2].tool_status).toBe(TOOL_STATUS.SUCCEEDED);
     });
 
-    it('suppresses the report-problem nudge for a 402-carrying ACTOR_MCP task failure', async () => {
+    it('suppresses the send-feedback nudge for a 402-carrying ACTOR_MCP task failure', async () => {
         // Pins the accepted task-mode delta. The ACTOR_MCP dispatch catch now carries
-        // failure_http_status, so a contained remote 402 reaches withReportProblemNudge with
+        // failure_http_status, so a contained remote 402 reaches withSendFeedbackNudge with
         // failureHttpStatus === 402 and the nudge is suppressed (402 is a billing state, not a defect).
         // If the ACTOR_MCP path stopped carrying failure_http_status, this INVALID_INPUT failure would
-        // instead append REPORT_PROBLEM_INVALID_INPUT_NUDGE and this test would fail.
+        // instead append SEND_FEEDBACK_INVALID_INPUT_NUDGE and this test would fail.
         await withServer(async (server) => {
             silenceLogs();
             const rejectingClient = {
@@ -734,23 +734,23 @@ describe('executeToolAndUpdateTask()', () => {
                 setNotificationHandler: vi.fn(),
             } as unknown as Client;
             vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(rejectingClient);
-            // report-problem must be served for the nudge to be a candidate at all (spread the frozen
+            // send-feedback must be served for the nudge to be a candidate at all (spread the frozen
             // tool so server.close() can null its ajvValidate on teardown).
-            server.upsertTools([{ ...reportProblem }]);
+            server.upsertTools([{ ...sendFeedback }]);
             const { task, result } = await runTaskAndReadBack(server, makeActorMcpTool());
             expect(task.status).toBe('completed');
             expect(result.isError).toBe(true);
             const texts = (result.content as { text: string }[]).map((c) => c.text);
             expect(texts.some((t) => t.includes('Failed to call MCP tool'))).toBe(true);
-            expect(texts).not.toContain(REPORT_PROBLEM_NUDGE);
-            expect(texts).not.toContain(REPORT_PROBLEM_INVALID_INPUT_NUDGE);
+            expect(texts).not.toContain(SEND_FEEDBACK_NUDGE);
+            expect(texts).not.toContain(SEND_FEEDBACK_INVALID_INPUT_NUDGE);
         });
     });
 
     it.each([
-        ['an internal failure gets the general sentence', 500, REPORT_PROBLEM_NUDGE],
-        ['a 4xx failure gets the friction sentence', 404, REPORT_PROBLEM_INVALID_INPUT_NUDGE],
-    ])('appends one report-problem sentence to an ACTOR_MCP task failure: %s', async (_label, code, sentence) => {
+        ['an internal failure gets the general sentence', 500, SEND_FEEDBACK_NUDGE],
+        ['a 4xx failure gets the friction sentence', 404, SEND_FEEDBACK_INVALID_INPUT_NUDGE],
+    ])('appends one send-feedback sentence to an ACTOR_MCP task failure: %s', async (_label, code, sentence) => {
         await withServer(async (server) => {
             silenceLogs();
             const rejectingClient = {
@@ -759,7 +759,7 @@ describe('executeToolAndUpdateTask()', () => {
                 setNotificationHandler: vi.fn(),
             } as unknown as Client;
             vi.spyOn(mcpClient, 'connectMCPClient').mockResolvedValue(rejectingClient);
-            server.upsertTools([{ ...reportProblem }]);
+            server.upsertTools([{ ...sendFeedback }]);
             const { result } = await runTaskAndReadBack(server, makeActorMcpTool());
             const texts = (result.content as { text: string }[]).map((c) => c.text);
             expect(texts).toHaveLength(2);

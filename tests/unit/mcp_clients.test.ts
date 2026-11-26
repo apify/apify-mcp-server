@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { McpClientContext } from '../../src/mcp/client_context.js';
 import {
     getRequestOriginForClient,
-    isReportProblemBlockedForClient,
+    isSendFeedbackBlockedForClient,
     isStoreUseCaseServable,
     resolveStoreSearchTracking,
     sanitizeUseCase,
@@ -18,7 +18,7 @@ function clientContext(clientName?: string): McpClientContext | undefined {
     };
 }
 
-describe('isReportProblemBlockedForClient', () => {
+describe('isSendFeedbackBlockedForClient', () => {
     it.each([
         'claude-ai',
         'claude-code',
@@ -27,19 +27,19 @@ describe('isReportProblemBlockedForClient', () => {
         'anthropic-sdk',
         'local-agent-mode-apify',
         'local-agent-mode-espn-sports',
-    ])('blocks report-problem for the Anthropic client "%s"', (clientName) => {
-        expect(isReportProblemBlockedForClient(clientContext(clientName))).toBe(true);
+    ])('blocks send-feedback for the Anthropic client "%s"', (clientName) => {
+        expect(isSendFeedbackBlockedForClient(clientContext(clientName))).toBe(true);
     });
 
     it.each(['cursor', 'test-client', 'vscode', ''])(
-        'serves report-problem to the non-Anthropic client "%s"',
+        'serves send-feedback to the non-Anthropic client "%s"',
         (clientName) => {
-            expect(isReportProblemBlockedForClient(clientContext(clientName))).toBe(false);
+            expect(isSendFeedbackBlockedForClient(clientContext(clientName))).toBe(false);
         },
     );
 
     it('does not block when there is no initialize request data', () => {
-        expect(isReportProblemBlockedForClient(undefined)).toBe(false);
+        expect(isSendFeedbackBlockedForClient(undefined)).toBe(false);
     });
 });
 

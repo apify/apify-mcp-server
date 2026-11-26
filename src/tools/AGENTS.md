@@ -141,7 +141,7 @@ direct actor tools, `search-actors`, `fetch-actor-details`) is mode-agnostic.
     allowlist of path, method, query, and body, with the body and the `token`, `signature`, and
     `webhooks` query values redacted, and a query written into the path cut to `?[REDACTED]`.
   - `docs/` — search and fetch Apify docs.
-  - `dev/` — the `report-problem` tool for reporting a problem with a tool or Actor.
+  - `dev/` — the `send-feedback` tool for sending feedback about a problem with a tool or Actor.
   - `widgets/` — the `*-widget` tool variants (apps mode only).
   - `searchActorsBaseArgsSchema` has an optional `useCase` (Store search context). `withoutUseCaseField` in `utils/tools_loader.ts` removes it from the served schema; `ActorsMcpServer.composeToolsForClient` applies that for clients `isStoreUseCaseServable` does not allow. The call passes it to `searchAgentSafeActors`, which sanitizes it.
 - `../utils/apify_resource_id.ts` holds the helpers that resolve an Actor, task, schedule, or storage given by

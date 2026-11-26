@@ -496,7 +496,7 @@ export type ToolCallTelemetryProperties = {
 };
 
 /**
- * Segment 'MCP Reported Problem' event payload: the `report-problem` submission plus the same
+ * Segment 'MCP Reported Problem' event payload: the `send-feedback` submission plus the same
  * session/client context carried by {@link ToolCallTelemetryProperties}. A downstream Segment
  * destination consumes this event for Slack/GitHub fan-out.
  */
