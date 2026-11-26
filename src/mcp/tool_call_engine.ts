@@ -50,6 +50,7 @@ import {
     extractActorName,
     getToolFullName,
 } from '../utils/tools.js';
+import { appendUsageNotice, prepareUsageCheck, type UsageNoticeOptions } from '../utils/usage_notice.js';
 import type { McpClientContext } from './client_context.js';
 import { addCompatibilityNote, loadReplacedDefaultTool, rewriteRunInputAsServerRequest } from './run_input_rewrite.js';
 import { prepareToolCallContext } from './tool_call_context.js';
@@ -460,10 +461,21 @@ export async function executeSyncToolCall(
         signal: AbortSignal;
         sendNotification: (notification: ServerNotification) => Promise<void>;
         emitLog: (msg: { level: string; data?: unknown }) => Promise<void>;
+        usageNotice?: UsageNoticeOptions;
     },
 ): Promise<ToolCallOutcome> {
-    const { apifyToken, toolName, mcpSessionId, progressToken, tools, actorStore, signal, sendNotification, emitLog } =
-        params;
+    const {
+        apifyToken,
+        toolName,
+        mcpSessionId,
+        progressToken,
+        tools,
+        actorStore,
+        signal,
+        sendNotification,
+        emitLog,
+        usageNotice,
+    } = params;
     const { tool, toolArgs, logSafeArgs, apifyClient, actorName, actorId, standbyRejection } = prepared;
     const resolvedToolName = getToolFullName(tool);
 
@@ -491,6 +503,7 @@ export async function executeSyncToolCall(
         tool.type === TOOL_TYPE.ACTOR ||
         (tool.type === TOOL_TYPE.INTERNAL && PROGRESS_TRACKER_INTERNAL_TOOLS.has(tool.name));
     const progressTracker = progressTrackerOptIn ? createProgressTracker(progressToken, sendNotification) : null;
+    const usageCheck = prepareUsageCheck({ options: usageNotice, tool, apifyToken, apifyClient, signal });
 
     try {
         const dispatchResult = await dispatchToolCall({
@@ -512,11 +525,12 @@ export async function executeSyncToolCall(
             actorId,
             taskMode: false,
         });
+        const result = nudge(
+            addCompatibilityNote(dispatchResult.result, prepared.compatibilityNote),
+            dispatchResult.callDiagnostics,
+        );
         return {
-            result: nudge(
-                addCompatibilityNote(dispatchResult.result, prepared.compatibilityNote),
-                dispatchResult.callDiagnostics,
-            ),
+            result: await appendUsageNotice(result, usageCheck),
             toolStatus: dispatchResult.toolStatus,
             callDiagnostics: dispatchResult.callDiagnostics,
         };
