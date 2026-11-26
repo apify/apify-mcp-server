@@ -411,8 +411,8 @@ export async function executeToolAndUpdateTask(params: {
                 // Nudge on a genuinely-failed task result (mirrors the completed path and the sync
                 // captureResult). INTERNAL_ERROR and an unknown category get the full nudge; a genuine
                 // INVALID_INPUT gets the softer nudge; payment (402) is suppressed via the HTTP status and
-                // AUTH / PERMISSION_APPROVAL_REQUIRED via NON_NUDGE_FAILURE_CATEGORIES. The 402 branch above
-                // returns before reaching here, so this only sees non-payment failures.
+                // AUTH / PERMISSION_APPROVAL_REQUIRED / USAGE_LIMIT via NON_NUDGE_FAILURE_CATEGORIES. The 402
+                // branch above returns before reaching here, so this only sees non-payment failures.
                 const failedResult = withReportProblemNudge({
                     result: {
                         content: [

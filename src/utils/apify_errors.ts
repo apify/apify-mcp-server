@@ -44,7 +44,7 @@ export function isActorInputValidationError(error: unknown): error is ApifyApiEr
     return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_INVALID_INPUT;
 }
 
-/** Matches apify-core's message, e.g. "Monthly usage hard limit exceeded". */
+/** apify-core's hard-limit messages for paid and Free plans both say "monthly usage". */
 const MONTHLY_USAGE_LIMIT_MESSAGE_PATTERN = /monthly usage/i;
 
 /**

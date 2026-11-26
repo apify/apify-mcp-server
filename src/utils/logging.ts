@@ -188,7 +188,11 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
 
     // User concurrent-run / quota limit — arrives wrapped as a 500 but is a user billing condition.
     if (isActorRunLimitError(error) || isUsageLimitError(error)) {
-        log.softFail(message, { errMessage: softErrMessage, ...data });
+        log.softFail(message, {
+            errMessage: softErrMessage,
+            ...(statusCode !== undefined ? { statusCode } : {}),
+            ...data,
+        });
         return;
     }
 

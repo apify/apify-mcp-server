@@ -6,6 +6,7 @@ import log from '@apify/log';
 
 import { REQUEST_ORIGIN, REQUEST_ORIGIN_HEADER } from '../apify_client.js';
 import { TimeoutError } from '../errors.js';
+import { isUsageLimitError } from '../utils/apify_errors.js';
 import { getHttpStatusCode, sanitizeMezmoMessage } from '../utils/logging.js';
 import { ACTORIZED_MCP_CONNECTION_TIMEOUT_MSEC } from './const.js';
 import { getMCPServerID } from './proxy.js';
@@ -15,6 +16,7 @@ export type McpConnectionOptions = { token: string; requestOrigin?: REQUEST_ORIG
 /**
  * Creates and connects a ModelContextProtocol client.
  * First tries streamable HTTP transport, then falls back to SSE transport.
+ * Returns `null` when the server cannot be reached; throws a usage-limit error (`isUsageLimitError`).
  */
 export async function connectMCPClient(
     url: string,
@@ -29,6 +31,8 @@ export async function connectMCPClient(
             log.warning('Connection to MCP server using streamable HTTP transport timed out', { url, mcpSessionId });
             return null;
         }
+        // Standby blocks SSE too, and only this error carries the API's message.
+        if (isUsageLimitError(error)) throw error;
         // If streamable HTTP transport fails, fall back to SSE transport
         log.debug('Streamable HTTP transport failed, falling back to SSE transport', {
             url,

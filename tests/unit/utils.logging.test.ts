@@ -1,5 +1,6 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import { AxiosError, AxiosHeaders } from 'axios';
+import { ApifyApiError } from 'apify-client';
+import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
 
@@ -97,6 +98,21 @@ describe('logHttpError', () => {
 
         expect(exception).not.toHaveBeenCalled();
         expect(softFail).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the HTTP status of a usage-limit block in the log', () => {
+        const softFail = vi.spyOn(log, 'softFail').mockImplementation(() => log);
+        const error = new ApifyApiError(
+            {
+                data: { error: { type: 'platform-feature-disabled', message: 'blocked' } },
+                status: 403,
+            } as AxiosResponse,
+            1,
+        );
+
+        logHttpError(error, 'Failed to call Actor');
+
+        expect(softFail).toHaveBeenCalledWith('Failed to call Actor', expect.objectContaining({ statusCode: 403 }));
     });
 
     // The message of this error quotes the identifier the caller sent, which can be a pasted secret.

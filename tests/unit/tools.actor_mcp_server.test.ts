@@ -183,10 +183,24 @@ async function dispatch(
     }, serverOptions);
 }
 
+/** What Actor Standby answers on `/mcp-usage-blocked`: no run is up, and the account cannot start one. */
+const STANDBY_USAGE_BLOCK_BODY = JSON.stringify({
+    error: {
+        type: 'cannot-start-actor-runs',
+        message:
+            "Cannot start new Actor runs. Underlying error: You've reached your monthly usage limit of $49.00, " +
+            'so Actor runs and other Apify services are blocked until your monthly usage cycle resets.',
+    },
+});
+
 beforeAll(async () => {
     httpServer = createServer((req, res) => {
         const path = req.url?.split('?')[0];
         requestHeaders.push(req.headers);
+        if (path === '/mcp-usage-blocked') {
+            res.writeHead(500, { 'content-type': 'application/json' }).end(STANDBY_USAGE_BLOCK_BODY);
+            return;
+        }
         const remote = createRemoteServer(path);
         const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
         res.on('close', () => void remote.close());
@@ -364,6 +378,21 @@ describe('call-actor-mcp-tool', () => {
 
         expect(result.isError).toBe(true);
         expect(JSON.stringify(result.content)).toContain('Failed to connect to MCP server');
+    });
+
+    it('passes through a usage-limit block that Actor Standby answers before the server starts', async () => {
+        seedActor('apify/blocked-mcp-server', { definition: { webServerMcpPath: '/mcp-usage-blocked' } });
+
+        const result = await execute(executeCallActorMcpTool, { tool: 'add', actor: 'apify/blocked-mcp-server' });
+
+        expect(result.isError).toBe(true);
+        const text = JSON.stringify(result.content);
+        expect(text).toContain('monthly usage limit');
+        expect(text).not.toContain('Failed to connect');
+        expect(result.toolTelemetry).toMatchObject({
+            toolStatus: TOOL_STATUS.SOFT_FAIL,
+            failureCategory: FAILURE_CATEGORY.USAGE_LIMIT,
+        });
     });
 
     it('connects to nothing when the Server Actor URL is outside the Server Actor domain', async () => {

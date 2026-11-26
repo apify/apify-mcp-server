@@ -36,7 +36,19 @@ describe('isUsageLimitError', () => {
     });
 
     it('matches a Standby run start blocked by the monthly usage limit, not one blocked by another limit', () => {
-        expect(isUsageLimitError(standbyRunStartError('Monthly usage hard limit exceeded'))).toBe(true);
+        // apify-core's paid and Free plan wording.
+        expect(
+            isUsageLimitError(
+                standbyRunStartError("You've reached your monthly usage limit of $49.00, so Actor runs…"),
+            ),
+        ).toBe(true);
+        expect(
+            isUsageLimitError(
+                standbyRunStartError(
+                    "You've used the $5.00 of monthly usage included in the Free plan, so Actor runs…",
+                ),
+            ),
+        ).toBe(true);
         expect(
             isUsageLimitError(
                 standbyRunStartError('By launching this job you will exceed your limit of 25 concurrent Actor runs.'),
