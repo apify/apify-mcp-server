@@ -8,7 +8,7 @@ import type { TranscriptEntry } from '../agent/conversation_adapter.js';
 import type { JudgeClient } from '../judge/client.js';
 import type { JudgeResult } from '../judge/judge.js';
 import { evaluateConversation } from '../judge/judge.js';
-import type { DatasetItem, McpAgentItem } from '../langfuse/dataset.js';
+import type { McpAgentItem } from '../langfuse/dataset.js';
 import { parseMcpAgentItem } from '../langfuse/dataset.js';
 import { buildAgentObservations, emitObservations } from '../langfuse/observations.js';
 import { buildRunSuffix } from '../run_id.js';
@@ -215,7 +215,7 @@ export function resolveExitCode(summary: RunSummary, passThreshold: number): num
     return summary.passRate >= passThreshold ? 0 : 1;
 }
 
-function withIteration(item: DatasetItem, iteration: number): DatasetItem {
+function withIteration<TItem extends { metadata?: unknown }>(item: TItem, iteration: number): TItem {
     return { ...item, metadata: { ...(item.metadata as Record<string, unknown> | undefined), iteration } };
 }
 
@@ -241,7 +241,7 @@ export function substituteUniqMarker(item: McpAgentItem, suffix: string): McpAge
  * Langfuse has no native iteration field. `{{uniq}}` is left for `runAgentWithRetry` to resolve
  * per attempt, so the Langfuse item input shows the raw marker and the agent span the resolved prompt.
  */
-export function expandIterations(items: DatasetItem[], iterations: number): DatasetItem[] {
+export function expandIterations<TItem extends { metadata?: unknown }>(items: TItem[], iterations: number): TItem[] {
     return items.flatMap((item) => Array.from({ length: iterations }, (_, index) => withIteration(item, index + 1)));
 }
 
@@ -255,6 +255,20 @@ export function validatePassThreshold(value: number): void {
     if (!Number.isFinite(value) || value < 0 || value > 1) {
         throw new Error(`--pass-threshold must be between 0 and 1, got "${value}"`);
     }
+}
+
+/**
+ * A run reads its cases from one place: `--cases` (a directory) or `--dataset` (a hosted dataset).
+ * `--link-dataset` copies the case files into a dataset, so it has nothing to copy without `--cases`.
+ */
+export function validateCaseSource(flags: { cases?: string; dataset?: string; linkDataset?: string }): void {
+    if (flags.cases !== undefined && flags.dataset !== undefined) {
+        throw new Error('--cases and --dataset cannot be combined: a run reads its cases from one of them');
+    }
+    if (flags.linkDataset !== undefined && flags.cases === undefined) {
+        throw new Error('--link-dataset needs --cases: it copies the case files into that dataset');
+    }
+    if (flags.linkDataset === '') throw new Error('--link-dataset needs a dataset name');
 }
 
 /** Langfuse batches items with `i += concurrency`, so 0 loops forever and NaN never starts. */
@@ -331,6 +345,63 @@ export function formatRunSummary(summary: RunSummary, passThreshold: number, ite
     }
 
     return lines;
+}
+
+type GateCount = { passedTrials: number; requestedTrials: number };
+
+/** Passed and requested trials of the blocking and of the tracked cases. */
+export type GateBreakdown = { blocking: GateCount; tracked: GateCount };
+
+/**
+ * Splits a run summary by the cases' `gate`. Report only: the exit code stays
+ * `resolveExitCode()` over all cases. A case that is not in `blockingIds` counts as tracked,
+ * which covers hosted items written before the field existed.
+ */
+export function buildGateBreakdown(summary: RunSummary, blockingIds: ReadonlySet<string>): GateBreakdown {
+    const breakdown: GateBreakdown = {
+        blocking: { passedTrials: 0, requestedTrials: 0 },
+        tracked: { passedTrials: 0, requestedTrials: 0 },
+    };
+    for (const item of summary.items) {
+        const count = blockingIds.has(item.id) ? breakdown.blocking : breakdown.tracked;
+        count.requestedTrials += item.trials.length;
+        count.passedTrials += item.trials.filter((trial) => trial.passed).length;
+    }
+    return breakdown;
+}
+
+/** One line, shared by the console and the step summary. A gate without cases has no rate. */
+export function formatGateBreakdown(breakdown: GateBreakdown): string {
+    const formatCount = (label: string, { passedTrials, requestedTrials }: GateCount) =>
+        `${label} ${passedTrials}/${requestedTrials}` +
+        `${requestedTrials > 0 ? ` (${(passedTrials / requestedTrials).toFixed(2)})` : ''}`;
+    return `${formatCount('blocking', breakdown.blocking)}, ${formatCount('tracked', breakdown.tracked)}`;
+}
+
+/**
+ * Langfuse UI address of an experiment that is not linked to a dataset. The SDK returns a URL
+ * only for a dataset run.
+ */
+export function buildExperimentUrl(baseUrl: string, projectId: string, experimentId: string): string {
+    return `${baseUrl.replace(/\/+$/, '')}/project/${projectId}/experiments/results?baseline=${experimentId}`;
+}
+
+/** Markdown for the GitHub step summary: the pass rate, its split by gate, and the Langfuse link. */
+export function formatStepSummary(options: {
+    runName: string;
+    summary: RunSummary;
+    passThreshold: number;
+    gateBreakdown: GateBreakdown;
+    experimentUrl?: string;
+}): string {
+    const { runName, summary, passThreshold, gateBreakdown, experimentUrl } = options;
+    return (
+        `### MCP agent evals: ${runName}\n\n` +
+        `- Pass rate: ${summary.passedTrials}/${summary.requestedTrials} trials ` +
+        `(${summary.passRate.toFixed(2)}, threshold ${passThreshold.toFixed(2)})\n` +
+        `- By gate: ${formatGateBreakdown(gateBreakdown)}\n` +
+        `${experimentUrl ? `- Langfuse: ${experimentUrl}\n` : ''}`
+    );
 }
 
 /**

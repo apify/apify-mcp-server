@@ -43,6 +43,12 @@ pnpm run evals:mcp-agent
 
 Run `pnpm run evals:mcp-agent --help` for all options. `--dataset` selects the dataset, `--id` and `--category` filter it, `--concurrency` controls parallel agents, and `--iterations` repeats cases. `--pass-threshold` gates the aggregate pass rate (default `0.9`); `--tool-timeout` caps each MCP tool call (default 60 s); `--mcp-tools-only` has no effect, because the agent never gets Claude Code built-ins; `--run-id` names the resources this run creates (below). Use `--subscription` for local Claude Code credentials and `--claude-judge` to avoid an OpenRouter key.
 
+`--cases <dir>` runs the cases from the `*.json` files in a directory instead of a dataset; pass `--cases` or `--dataset`, not both. Each file is a JSON array in the flat shape shown under [Test case format](#test-case-format), and every case needs `source` and `gate`. The run is an experiment named `mcp-server-evals-<tier>`, where `<tier>` is the directory name, with the run name `<tier>-<branch>-<short sha>`. It is not linked to a dataset: the console prints a link to the experiment, and the runner stores `pass_rate` on it.
+
+`--link-dataset <name>` is valid only with `--cases`. Before the run starts, it copies every case in the directory into that dataset under its case id and archives each active item whose id is not in the files. The run is then a dataset run of that dataset. A failed copy fails the run before any agent starts. The copy overwrites edits made in Langfuse.
+
+Every run prints the pass rate of `blocking` and of `tracked` cases next to the overall rate, and writes both and the Langfuse link to the GitHub step summary when `GITHUB_STEP_SUMMARY` is set. The exit code still depends on the overall rate only.
+
 ### Two datasets: kind, id scheme, and expectedErrors
 
 Each CI tier has a dataset: the default `mcp-server-evals-pr` holds `tool-call` items and `mcp-server-evals-merge` holds `agent` items. Their IDs are `pr/<tool>/<slug>` and `merge/<family>/<slug>`.
@@ -331,6 +337,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `run_id.ts` - The `<static>-<runId>-n<runId length>-t<trial>r<attempt>` name grammar and `--run-id` parsing, shared by the runner and the fixtures script
 - `runner/run.ts` - Main CLI entry, runner defaults
 - `runner/experiment.ts` - Experiment task (agent + tool-call dispatch), `EVALUATORS`, run summary, exit gate
+- `runner/case_files.ts` - Reads and validates the case files of `--cases`, builds their experiment items
 - `runner/filters.ts` - Test case filtering by category and id
 - `runner/tool_call_mode.ts` - Tool-call-mode scoring: the deny wording, `ToolSearch` skip, `first_tool_match` name/args matching
 - `agent/claude_agent.ts` - The agent under test: Claude Agent SDK options, MCP server registration, failure injection, the tool-call-mode deny-all hook, `canUseTool`, stderr forwarding
@@ -340,6 +347,7 @@ experiment-item-run     Langfuse SDK, holds the scores
 - `judge/openrouter_client.ts` - OpenRouter wrapper (judge), traced as a Langfuse generation
 - `judge/claude_client.ts` - Judge backed by the Claude Agent SDK (`--claude-judge`), for runs without an OpenRouter key
 - `langfuse/dataset.ts` - Test case schema, dataset item mapping and validation, dataset fetch
+- `langfuse/dataset_copy.ts` - The one-way copy of case files into a dataset (`--link-dataset`)
 - `langfuse/observations.ts` - Builds and emits the item's span tree (agent, usage, tool calls)
 - `langfuse/tracing.ts` - OpenTelemetry span processor init/shutdown
 - `scripts/export_dataset.ts` - Snapshot CLI entry (`pnpm run evals:mcp-agent:export-dataset`)
@@ -420,8 +428,11 @@ above). The snapshot holds the same fields flattened, one object per case, in th
 - `kind` - `"tool-call"` (asserts only the first tool call the agent attempts, by name and optionally arguments; no judge, nothing executes) or `"agent"` (the agent runs to completion and an LLM judge scores the result against `reference`)
 - `query` - User request
 - `reference` (`expectedOutput` in the dataset) - Success criteria for the judge. Required for `kind: "agent"`; not accepted for `kind: "tool-call"` (nothing executes, so there's nothing to judge)
+- `source` - Where the case came from: `production` (a sanitised production trace), `bug` (a bug report or issue), `hand` (written by a person who can say why it is hard) or `synthetic` (generated). Required in a case file; optional on a dataset item
+- `gate` - `blocking` (a case a release must not break) or `tracked` (reported but tolerated, e.g. a known failure waiting for a fix). Required in a case file; a dataset item without it counts as tracked
 
 **Optional:**
+- `sourceNote` - The issue link or the one-line reason behind `source`
 - `expectedTools` - `kind: "tool-call"` only, required for that kind: tool names the first attempted (non-`ToolSearch`) call must match
 - `expectedArgs` - `kind: "tool-call"` only: a flat object; every key in it must deep-equal the same key of the captured call's arguments, keys not listed are ignored. Omit for a name-only check
 - `expectedErrors` - `kind: "agent"` only: tool names allowed to fail on this item without failing the zero-tool-error gate (see "Tool-call mode" above and the "Two datasets" section). Not accepted on `kind: "tool-call"`

@@ -4,13 +4,15 @@
 /**
  * Main CLI entry point for MCP agent evaluations (Langfuse backend).
  *
- * Every run reads its test cases from the Langfuse dataset and executes the matching
- * items as an experiment: a Claude Code agent (Claude Agent SDK) driving its own freshly
- * spawned Apify MCP server, then an LLM judge. Traces, scores, and the dataset live in
- * Langfuse.
+ * A run reads its test cases from a Langfuse dataset (`--dataset`) or from JSON files in a
+ * directory (`--cases`) and executes the matching ones as an experiment: a Claude Code agent
+ * (Claude Agent SDK) driving its own freshly spawned Apify MCP server, then an LLM judge.
+ * Traces and scores live in Langfuse.
  *
  * Usage:
  *   pnpm run evals:mcp-agent                       # the pr dataset
+ *   pnpm run evals:mcp-agent -- --cases <dir>      # the case files in <dir>, not linked to a dataset
+ *   pnpm run evals:mcp-agent -- --cases <dir> --link-dataset <name>  # copy the files into <name>, then link the run to it
  *   pnpm run evals:mcp-agent -- --category search
  *   pnpm run evals:mcp-agent -- --dataset mcp-server-evals-merge --id '^merge/tasks/'  # one family, by its id prefix
  *   pnpm run evals:mcp-agent -- --concurrency 8
@@ -25,8 +27,10 @@
 import 'dotenv/config';
 
 import { execSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 
-import { LangfuseClient } from '@langfuse/client';
+import { type ExperimentItem, LangfuseClient } from '@langfuse/client';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
@@ -36,18 +40,26 @@ import { MODELS } from '../config.js';
 import { findMissingEnvVars, LANGFUSE_ENV_VARS, sanitizeProcessEnv } from '../environment.js';
 import { ClaudeJudgeClient } from '../judge/claude_client.js';
 import { OpenRouterClient } from '../judge/openrouter_client.js';
-import { fetchMcpAgentCases, MCP_AGENT_PR_DATASET_NAME } from '../langfuse/dataset.js';
+import type { McpAgentTestCase } from '../langfuse/dataset.js';
+import { fetchMcpAgentCases, MCP_AGENT_PR_DATASET_NAME, toMcpAgentTestCase } from '../langfuse/dataset.js';
+import { copyCasesToDataset } from '../langfuse/dataset_copy.js';
 import { initTracing, shutdownTracing } from '../langfuse/tracing.js';
 import { createRunId, validateRunId } from '../run_id.js';
+import { readCaseFiles, toExperimentItem } from './case_files.js';
 import {
+    buildExperimentUrl,
+    buildGateBreakdown,
     buildRunSummary,
     createExperimentTask,
     EVALUATORS,
     expandIterations,
+    formatGateBreakdown,
     formatRunSummary,
+    formatStepSummary,
     formatTeardownHint,
     resolveExitCode,
     resolveGitBranch,
+    validateCaseSource,
     validateConcurrency,
     validateIterations,
     validatePassThreshold,
@@ -81,7 +93,9 @@ export const DEFAULT_PASS_THRESHOLD = 0.9;
 type CliArgs = {
     category?: string;
     id?: string;
-    dataset: string;
+    cases?: string;
+    dataset?: string;
+    linkDataset?: string;
     agentModel: string;
     judgeModel?: string;
     toolTimeout: number;
@@ -107,6 +121,15 @@ function getGitBranch(): string {
         // Not a git checkout; the env fallbacks decide.
     }
     return resolveGitBranch(rawBranch, process.env);
+}
+
+/** Commit the run executes, `unknown` outside a checkout that has no `GITHUB_SHA` either. */
+function getGitCommit(): string {
+    try {
+        return execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    } catch {
+        return process.env.GITHUB_SHA || 'unknown';
+    }
 }
 
 /**
@@ -136,10 +159,23 @@ async function parseCliArgs(): Promise<ParsedCliArgs> {
         .options({
             category: { type: 'string', description: 'Filter by test case category (supports * wildcard)' },
             id: { type: 'string', description: 'Run test cases whose ID matches this regex' },
+            cases: {
+                type: 'string',
+                description:
+                    'Directory of case files (*.json) to run instead of a dataset; ' +
+                    'its name is the tier in the experiment name',
+            },
             dataset: {
                 type: 'string',
-                description: 'Langfuse dataset to run; mcp-server-evals-merge holds the judged agent items',
-                default: MCP_AGENT_PR_DATASET_NAME,
+                description:
+                    'Langfuse dataset to run; mcp-server-evals-merge holds the judged agent items ' +
+                    `(default without --cases: ${MCP_AGENT_PR_DATASET_NAME})`,
+            },
+            'link-dataset': {
+                type: 'string',
+                description:
+                    'With --cases: copy the case files into this Langfuse dataset (items not in the files ' +
+                    'are archived), then link the run to it',
             },
             'agent-model': { type: 'string', description: 'LLM model for the agent', default: MODELS.agent },
             'judge-model': {
@@ -188,6 +224,11 @@ async function parseCliArgs(): Promise<ParsedCliArgs> {
         })
         // Reject a bad run flag up front, before any LLM spend.
         .check((parsed) => {
+            validateCaseSource({
+                cases: parsed.cases,
+                dataset: parsed.dataset,
+                linkDataset: parsed['link-dataset'],
+            });
             validateConcurrency(parsed.concurrency);
             validateIterations(parsed.iterations);
             validatePassThreshold(parsed['pass-threshold']);
@@ -229,6 +270,69 @@ async function parseCliArgs(): Promise<ParsedCliArgs> {
     return { ...argv, judgeModel };
 }
 
+/** What a run needs from its case source, whichever of `--dataset` and `--cases` it is. */
+type LoadedCases = {
+    /** For messages, e.g. `dataset "mcp-server-evals-pr"`. */
+    label: string;
+    cases: (McpAgentTestCase & { item: ExperimentItem })[];
+    experimentName: string;
+    runName: string;
+    metadata: Record<string, string>;
+    /**
+     * Whether the items belong to a hosted dataset. Only then does the Langfuse SDK store the
+     * run-level scores and return a run URL.
+     */
+    isDatasetRun: boolean;
+};
+
+async function loadDatasetCases(langfuse: LangfuseClient, argv: ParsedCliArgs): Promise<LoadedCases> {
+    const datasetName = argv.dataset ?? MCP_AGENT_PR_DATASET_NAME;
+    // Read-only: this dataset is edited in the Langfuse UI.
+    console.log(`📇 Fetching dataset "${datasetName}"...`);
+    return {
+        label: `dataset "${datasetName}"`,
+        cases: await fetchMcpAgentCases(langfuse, datasetName),
+        experimentName: datasetName,
+        runName: `${getGitBranch()}-${argv.agentModel.split('/').pop()}-${Date.now()}`,
+        metadata: {},
+        isDatasetRun: true,
+    };
+}
+
+/**
+ * Reads the case files and, under `--link-dataset`, copies them into that dataset first. The
+ * copy finishes here, before any LLM spend: see `copyCasesToDataset()` for why it cannot run later.
+ * The items always carry the text from the files, never the hosted item's.
+ */
+async function loadFileCases(langfuse: LangfuseClient, casesDir: string, linkDataset?: string): Promise<LoadedCases> {
+    const items = readCaseFiles(casesDir);
+    console.log(`📇 Read ${items.length} case(s) from "${casesDir}"`);
+
+    let datasetId: string | undefined;
+    if (linkDataset !== undefined) {
+        // Every case, whatever --id/--category select: a partial copy would archive the rest.
+        const copied = await copyCasesToDataset(langfuse, linkDataset, items);
+        datasetId = copied.datasetId;
+        console.log(
+            `📤 Copied ${items.length} case(s) to dataset "${linkDataset}", archived ${copied.archivedIds.length}` +
+                `${copied.archivedIds.length > 0 ? `: ${copied.archivedIds.join(', ')}` : ''}`,
+        );
+    }
+
+    // `evals/cases/pr` -> `pr`.
+    const tier = path.basename(path.resolve(casesDir));
+    const branch = getGitBranch();
+    const commit = getGitCommit();
+    return {
+        label: `"${casesDir}"`,
+        cases: items.map((item) => ({ ...toMcpAgentTestCase(item), item: toExperimentItem(item, datasetId) })),
+        experimentName: `mcp-server-evals-${tier}`,
+        runName: `${tier}-${branch}-${commit.slice(0, 7)}`,
+        metadata: { commit, branch, tier },
+        isDatasetRun: datasetId !== undefined,
+    };
+}
+
 async function main() {
     const argv = await parseCliArgs();
     const { judgeModel } = argv;
@@ -236,25 +340,26 @@ async function main() {
     const langfuse = new LangfuseClient();
     // Non-empty: checked in parseCliArgs(). Sanitized at module load.
     const apifyToken = process.env.APIFY_TOKEN as string;
-    const datasetName = argv.dataset;
 
     let exitCode = 1;
     let runId: string | undefined;
+    let hasAgentCases = false;
     try {
-        // Read-only: the dataset is the source of truth, edited in the Langfuse UI.
-        console.log(`📇 Fetching dataset "${datasetName}"...`);
-        const cases = await fetchMcpAgentCases(langfuse, datasetName);
+        const loaded =
+            argv.cases === undefined
+                ? await loadDatasetCases(langfuse, argv)
+                : await loadFileCases(langfuse, argv.cases, argv.linkDataset);
+        const { cases, experimentName, runName } = loaded;
 
         // Shared helpers, so every entry point filters test cases by the same rule.
         let selected = cases;
         if (argv.id) selected = filterById(selected, argv.id);
         if (argv.category) selected = filterByCategory(selected, argv.category);
         if (selected.length === 0) {
-            throw new Error(
-                `No active item in dataset "${datasetName}" (${cases.length} total) matches --id/--category`,
-            );
+            throw new Error(`No case in ${loaded.label} (${cases.length} total) matches --id/--category`);
         }
         const requestedIds = selected.map((mcpAgentCase) => mcpAgentCase.id);
+        hasAgentCases = selected.some((mcpAgentCase) => mcpAgentCase.kind === 'agent');
         const { iterations } = argv;
         runId = argv.runId ?? createRunId();
         // One experiment.run() call over every requested item x iteration: see
@@ -264,13 +369,16 @@ async function main() {
             iterations,
         );
 
+        // Only the link of a run outside a dataset needs it. Asked for before the run, so a
+        // failing call costs no LLM spend.
+        const projectId = loaded.isDatasetRun ? undefined : (await langfuse.api.projects.get()).data[0].id;
+
         initTracing();
 
         // Traces each judge call as a generation nested under the item's trace.
         const llmClient = argv.claudeJudge ? new ClaudeJudgeClient() : new OpenRouterClient();
 
         const agentSdkVersion = resolveAgentSdkVersion();
-        const runName = `${getGitBranch()}-${argv.agentModel.split('/').pop()}-${Date.now()}`;
         console.log(
             `▶️  Running experiment "${runName}" over ${requestedIds.length} item(s)` +
                 `${iterations > 1 ? ` x ${iterations} iteration(s)` : ''}, concurrency ${argv.concurrency} ` +
@@ -281,7 +389,7 @@ async function main() {
         );
 
         const result = await langfuse.experiment.run({
-            name: datasetName,
+            name: experimentName,
             runName,
             description: 'MCP agent evals for the Apify MCP server (agent + tool-call items).',
             data,
@@ -316,16 +424,44 @@ async function main() {
                 iterations,
                 passThreshold: argv.passThreshold,
                 runId,
+                ...loaded.metadata,
             },
         });
 
+        let experimentUrl = result.datasetRunUrl;
+        if (projectId !== undefined) {
+            // The SDK computes the run-level scores but stores them only for a dataset run.
+            for (const evaluation of result.runEvaluations) {
+                langfuse.score.create({ datasetRunId: result.experimentId, ...evaluation });
+            }
+            // Non-empty: checked in parseCliArgs().
+            experimentUrl = buildExperimentUrl(process.env.LANGFUSE_BASE_URL as string, projectId, result.experimentId);
+        }
+
         // Compact on purpose: Langfuse holds the full per-item view behind the run link.
         const summary = buildRunSummary(requestedIds, result.itemResults, iterations);
+        const gateBreakdown = buildGateBreakdown(
+            summary,
+            new Set(selected.filter((mcpAgentCase) => mcpAgentCase.gate === 'blocking').map(({ id }) => id)),
+        );
 
         for (const { stream, text } of formatRunSummary(summary, argv.passThreshold, iterations)) {
             (stream === 'error' ? console.error : console.log)(text);
         }
-        console.log(`🔗 ${result.datasetRunUrl ?? `Run "${result.runName}" (view in Langfuse)`}`);
+        console.log(`🚦 By gate: ${formatGateBreakdown(gateBreakdown)}`);
+        console.log(`🔗 ${experimentUrl ?? `Run "${result.runName}" (view in Langfuse)`}`);
+        if (process.env.GITHUB_STEP_SUMMARY) {
+            fs.appendFileSync(
+                process.env.GITHUB_STEP_SUMMARY,
+                formatStepSummary({
+                    runName,
+                    summary,
+                    passThreshold: argv.passThreshold,
+                    gateBreakdown,
+                    experimentUrl,
+                }),
+            );
+        }
 
         exitCode = resolveExitCode(summary, argv.passThreshold);
     } catch (error) {
@@ -333,8 +469,8 @@ async function main() {
         exitCode = 1;
     } finally {
         // In the finally: a run that crashed may already have created schedules or tasks under this id.
-        // Not for the pr dataset: its tool-call items create nothing.
-        if (runId && datasetName !== MCP_AGENT_PR_DATASET_NAME) {
+        // Not for a run of tool-call cases only: nothing executes, so they create nothing.
+        if (runId && hasAgentCases) {
             for (const line of formatTeardownHint(runId)) console.log(line);
         }
 

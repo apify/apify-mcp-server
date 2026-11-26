@@ -188,6 +188,34 @@ describe('parseMcpAgentItem()', () => {
     });
 });
 
+describe('a case-file item in a run that is not linked to a dataset', () => {
+    const { id, ...withoutId } = item;
+
+    it('takes its id from metadata.caseId', () => {
+        const parsed = parseMcpAgentItem({ ...withoutId, metadata: { ...item.metadata, caseId: id } });
+        expect(parsed.id).toBe(id);
+    });
+
+    it('is rejected when it carries neither an id nor a metadata.caseId', () => {
+        expect(() => parseMcpAgentItem(withoutId)).toThrow(/an item needs an .*metadata\.caseId/);
+    });
+});
+
+describe('the source and gate of a case', () => {
+    it('are optional, because hosted items were written before the fields existed', () => {
+        expect(parseMcpAgentItem(item).metadata).toEqual(item.metadata);
+    });
+
+    it.each([
+        ['source', { source: 'guess' }],
+        ['gate', { gate: 'required' }],
+    ])('rejects a %s outside its allowed values', (field, knob) => {
+        expect(() => parseMcpAgentItem({ ...item, metadata: { ...item.metadata, ...knob } })).toThrow(
+            new RegExp(field),
+        );
+    });
+});
+
 describe('toMcpAgentTestCase()', () => {
     it('flattens an item into a test case', () => {
         expect(toMcpAgentTestCase(item)).toEqual({
@@ -251,6 +279,25 @@ describe('toMcpAgentTestCase()', () => {
     it('never exports a runner-injected iteration', () => {
         const withIteration = { ...item, metadata: { ...item.metadata, iteration: 3 } };
         expect(Object.keys(toMcpAgentTestCase(withIteration))).not.toContain('iteration');
+    });
+
+    it('never exports a runner-injected caseId', () => {
+        const withCaseId = { ...item, metadata: { ...item.metadata, caseId: 'a' } };
+        expect(Object.keys(toMcpAgentTestCase(withCaseId))).not.toContain('caseId');
+    });
+
+    it('writes source, sourceNote and gate after the harness knobs', () => {
+        const metadata = { gate: 'blocking', sourceNote: 'reported by a user', source: 'bug', ...item.metadata };
+        expect(Object.keys(toMcpAgentTestCase({ ...item, metadata }))).toEqual([
+            'id',
+            'category',
+            'kind',
+            'query',
+            'reference',
+            'source',
+            'sourceNote',
+            'gate',
+        ]);
     });
 });
 
