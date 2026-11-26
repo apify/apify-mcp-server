@@ -7,12 +7,7 @@ import log from '@apify/log';
 
 import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV } from './const.js';
 import type { reportProblemArgsSchema } from './tools/dev/report_problem.js';
-import type {
-    ReportedProblemTelemetryProperties,
-    TelemetryEnv,
-    ToolCallTelemetryProperties,
-    UsageThresholdTelemetryProperties,
-} from './types.js';
+import type { ReportedProblemTelemetryProperties, TelemetryEnv, ToolCallTelemetryProperties } from './types.js';
 import { maskAccessKeyTokens } from './utils/access_key_token_mask.js';
 
 type ReportProblemArgs = z.infer<typeof reportProblemArgsSchema>;
@@ -31,7 +26,6 @@ const SEGMENT_FLUSH_INTERVAL_MS = 5_000;
 const SEGMENT_EVENTS = {
     TOOL_CALL: 'MCP Tool Call',
     REPORTED_PROBLEM: 'MCP Reported Problem',
-    USAGE_THRESHOLD_CROSSED: 'MCP Usage Threshold Crossed',
 } as const;
 
 /**
@@ -156,24 +150,5 @@ export function trackReportedProblem(
         });
     } catch (error) {
         log.error('Failed to track reported problem event', { error, userId });
-    }
-}
-
-/** Tracks that an account's monthly usage crossed a threshold, in both experiment arms. */
-export function trackUsageThresholdCrossed(
-    userId: string,
-    telemetryEnv: TelemetryEnv,
-    properties: UsageThresholdTelemetryProperties,
-): void {
-    const client = getOrInitAnalyticsClient(telemetryEnv);
-
-    try {
-        client?.track({
-            userId,
-            event: SEGMENT_EVENTS.USAGE_THRESHOLD_CROSSED,
-            properties: maskEventProperties(properties),
-        });
-    } catch (error) {
-        log.error('Failed to track usage threshold event', { error, userId });
     }
 }

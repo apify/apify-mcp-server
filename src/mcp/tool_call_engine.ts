@@ -50,7 +50,7 @@ import {
     extractActorName,
     getToolFullName,
 } from '../utils/tools.js';
-import { appendUsageNotice, startUsageCheck, type UsageNoticeOptions } from '../utils/usage_notice.js';
+import { appendUsageNotice, prepareUsageCheck, type UsageNoticeOptions } from '../utils/usage_notice.js';
 import type { McpClientContext } from './client_context.js';
 import { addCompatibilityNote, loadReplacedDefaultTool, rewriteRunInputAsServerRequest } from './run_input_rewrite.js';
 import { prepareToolCallContext } from './tool_call_context.js';
@@ -503,14 +503,7 @@ export async function executeSyncToolCall(
         tool.type === TOOL_TYPE.ACTOR ||
         (tool.type === TOOL_TYPE.INTERNAL && PROGRESS_TRACKER_INTERNAL_TOOLS.has(tool.name));
     const progressTracker = progressTrackerOptIn ? createProgressTracker(progressToken, sendNotification) : null;
-    const usageCheck = startUsageCheck({
-        options: usageNotice,
-        tool,
-        apifyToken,
-        apifyClient,
-        mcpSessionId,
-        signal,
-    });
+    const usageCheck = prepareUsageCheck({ options: usageNotice, tool, apifyToken, apifyClient, signal });
 
     try {
         const dispatchResult = await dispatchToolCall({

@@ -723,54 +723,6 @@ export type ActorsMcpServerOptions = {
      * @deprecated Use `serverMode` instead.
      */
     uiMode?: string;
-    /**
-     * Called after a tool call that runs an Actor when the account has used 80% or more of its monthly usage limit
-     * (below 100%), with the highest threshold reached. It runs on every such call, parallel ones included, so the
-     * host claims each crossing once: it returns `null` when the crossing was already handled or the account takes
-     * no part, and a decision otherwise. On a decision the server sends the `MCP Usage Threshold Crossed` event and,
-     * when `isNoticeShown`, appends the usage notice to the tool result. The tool result waits at most 2 seconds for
-     * the decision; a later one still sends its event, with `notice_shown: false`, but adds no notice. Not called
-     * when telemetry is off. When unset (stdio, self-hosted), usage is not checked.
-     */
-    onUsageThresholdCrossed?: (crossing: UsageThresholdCrossing) => Promise<UsageThresholdDecision | null>;
-};
-
-/** A share of the monthly usage limit that triggers {@link ActorsMcpServerOptions.onUsageThresholdCrossed}. */
-export type UsageThreshold = 0.8 | 0.95;
-
-/** Which usage notice copy the account gets: Free plan, paid plan, or an account with an account manager. */
-export type UsageNoticePlanType = 'FREE' | 'PAID' | 'HIGH_TOUCH';
-
-export type UsageThresholdCrossing = {
-    userId: string;
-    threshold: UsageThreshold;
-    usedUsd: number;
-    limitUsd: number;
-    cycleStartAt: Date;
-    cycleEndAt: Date;
-    /** Absent on 2026-07-28 stateless requests, which have no session. */
-    mcpSessionId?: string;
-    toolName: string;
-};
-
-export type UsageThresholdDecision = {
-    /** Experiment variant, sent as `variant` with the event. */
-    variant: string;
-    planType: UsageNoticePlanType;
-    isNoticeShown: boolean;
-};
-
-/** Properties of the `MCP Usage Threshold Crossed` Segment event. */
-export type UsageThresholdTelemetryProperties = {
-    threshold: UsageThreshold;
-    variant: string;
-    notice_shown: boolean;
-    plan_tier: UsageNoticePlanType;
-    is_organization: boolean;
-    used_usd: number;
-    limit_usd: number;
-    tool_name: string;
-    mcp_client_name: string;
 };
 
 /** Compact schema returned by `GET /v2/store?includeInputSchema=true`; produced by apify-core `trimInputSchema`. */

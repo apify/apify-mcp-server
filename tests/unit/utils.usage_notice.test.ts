@@ -2,136 +2,61 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
 
-import type { ApifyClient } from '../../src/apify_client.js';
+import { getApifyAPIBaseUrl } from '../../src/apify_client.js';
 import { HELPER_TOOLS } from '../../src/const.js';
-import * as telemetry from '../../src/telemetry.js';
-import type { ToolEntry, UsageThresholdCrossing, UsageThresholdDecision } from '../../src/types.js';
+import type { ToolEntry } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 import {
     appendUsageNotice,
-    buildUsageNoticeText,
-    getReachedThreshold,
     getUsageNoticeOptions,
-    startUsageCheck,
-    type UsageNoticeOptions,
+    prepareUsageCheck,
+    type UsageCheck,
 } from '../../src/utils/usage_notice.js';
-import { type AccountLimits, CYCLE_END_AT, limitsResponse } from './helpers/account_limits.js';
 import { makeActorTool, makeArgsRecorderTool } from './helpers/mcp_server.js';
 import { mockApifyClient } from './helpers/tool_context.js';
 
-function stubClient(limits: () => Promise<AccountLimits>): ApifyClient {
-    return mockApifyClient({
-        user: vi.fn(() => ({ limits, get: async () => ({ id: 'user-1', plan: { tier: 'FREE' } }) })),
-    });
-}
+const NOTICE =
+    '**Apify account notice:** This account has used $4.10 of the $5.00 monthly usage included in the Free plan.';
+const TOOL_RESULT = { content: [{ type: 'text', text: 'Run finished.' }], structuredContent: { runId: 'run-1' } };
 
-/** A fresh token per test: the usage and user caches are keyed by token. */
-function uniqueToken(): string {
-    return `token-${Math.random()}`;
-}
-
-function usageNoticeOptions(decision: UsageThresholdDecision | null): UsageNoticeOptions {
+/** A usage check whose API answers with `request`; a fresh token each time, as "no notice" answers are cached by token. */
+function makeCheck(request: () => Promise<unknown>, signal = new AbortController().signal): UsageCheck {
     return {
-        onUsageThresholdCrossed: vi.fn(async () => decision),
-        telemetryEnv: 'DEV',
         mcpClientName: 'claude-code',
+        apifyToken: `token-${Math.random()}`,
+        apifyClient: mockApifyClient({ httpClient: { axios: { request: vi.fn(request) } } }),
+        toolName: 'apify--instagram-scraper',
+        signal,
     };
 }
 
-const SHOWN: UsageThresholdDecision = { variant: 'notice', planType: 'FREE', isNoticeShown: true };
-const TOOL_RESULT = { content: [{ type: 'text', text: 'Run finished.' }], structuredContent: { runId: 'run-1' } };
-
-/** Runs one Actor tool call's usage check against `usedUsd` of a $5 limit. */
-async function runUsageCheck(params: {
-    usedUsd: number;
-    options: UsageNoticeOptions;
-    limits?: () => Promise<AccountLimits>;
-    result?: Record<string, unknown>;
-    signal?: AbortSignal;
-}) {
-    const {
-        usedUsd,
-        options,
-        limits = async () => limitsResponse(usedUsd),
-        result = TOOL_RESULT,
-        signal = new AbortController().signal,
-    } = params;
-    const check = startUsageCheck({
-        options,
-        tool: makeActorTool({ actorFullName: 'apify/instagram-scraper' }),
-        apifyToken: uniqueToken(),
-        apifyClient: stubClient(limits),
-        mcpSessionId: 'session-1',
-        signal,
-    });
-    return await appendUsageNotice(result, check);
+function requestOf(check: UsageCheck) {
+    return (check.apifyClient.httpClient.axios.request as ReturnType<typeof vi.fn>).mock;
 }
 
-describe('usage thresholds', () => {
-    it.each([
-        [3.99, null],
-        [4, 0.8],
-        [4.74, 0.8],
-        [4.75, 0.95],
-        [4.99, 0.95],
-        // At the limit the API blocks the run and its error says why.
-        [5, null],
-    ])('$%s of $5 reaches %s', (usedUsd, expected) => {
-        expect(getReachedThreshold({ usedUsd, limitUsd: 5 })).toBe(expected);
+describe('when the server asks for the usage notice', () => {
+    it('asks with telemetry on', () => {
+        expect(getUsageNoticeOptions({ telemetryEnabled: true }, undefined)).toEqual({ mcpClientName: '' });
     });
 
-    it('reaches no threshold without a limit', () => {
-        expect(getReachedThreshold({ usedUsd: 3, limitUsd: 0 })).toBeNull();
+    it('does not ask with telemetry off, as the API logs the experiment for every notice it decides', () => {
+        expect(getUsageNoticeOptions({ telemetryEnabled: false }, undefined)).toBeUndefined();
     });
 });
 
-describe('usage notice copy', () => {
-    const usage = { usedUsd: 4.1, limitUsd: 5, cycleEndAt: CYCLE_END_AT };
-
-    it('offers the Free plan an upgrade', () => {
-        const text = buildUsageNoticeText('FREE', 0.8, usage);
-        expect(text).toContain('$4.10 of the $5.00 monthly usage included in the Free plan (82%)');
-        expect(text).toContain('resets on 2026-12-01');
-        expect(text).toContain('https://console.apify.com/billing/subscription');
-    });
-
-    it('points a paid plan to the limits page', () => {
-        expect(buildUsageNoticeText('PAID', 0.8, usage)).toContain(
-            'https://console.apify.com/billing/limits?openMonthlyUsageLimitsModal=1',
-        );
-    });
-
-    it('points a high-touch account to its account manager', () => {
-        expect(buildUsageNoticeText('HIGH_TOUCH', 0.8, usage)).toContain('account manager or organization admin');
-    });
-
-    it('rounds the percent down without float error', () => {
-        // 4.35 / 5 * 100 is 86.99999999999999 in floating point.
-        expect(buildUsageNoticeText('PAID', 0.8, { ...usage, usedUsd: 4.35 })).toContain(
-            '$4.35 of its $5.00 monthly usage limit (87%)',
-        );
-    });
-
-    it('says almost all at 95%', () => {
-        expect(buildUsageNoticeText('PAID', 0.95, { ...usage, usedUsd: 4.8 })).toContain(
-            'almost all of its $5.00 monthly usage limit ($4.80, 96%)',
-        );
-    });
-});
-
-describe('which tool calls check usage', () => {
+describe('which tool calls ask for the usage notice', () => {
     const base = {
+        options: { mcpClientName: 'claude-code' },
         apifyToken: 'token',
-        apifyClient: stubClient(async () => limitsResponse(1)),
-        mcpSessionId: 's',
+        apifyClient: mockApifyClient(),
         signal: new AbortController().signal,
     };
 
     it.each([
         ['an Actor tool', makeActorTool()],
         ['call-actor', makeArgsRecorderTool(HELPER_TOOLS.ACTOR_CALL).tool],
-    ])('checks %s', (_label, tool) => {
-        expect(startUsageCheck({ ...base, tool, options: usageNoticeOptions(SHOWN) })).not.toBeNull();
+    ])('asks after %s', (_label, tool) => {
+        expect(prepareUsageCheck({ ...base, tool })).not.toBeNull();
     });
 
     it.each([
@@ -139,40 +64,15 @@ describe('which tool calls check usage', () => {
         ['send-server-actor-request', makeArgsRecorderTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST).tool],
         ['an Actor server tool', { ...makeActorTool(), type: TOOL_TYPE.ACTOR_SERVER } as ToolEntry],
     ])('skips %s', (_label, tool) => {
-        expect(startUsageCheck({ ...base, tool, options: usageNoticeOptions(SHOWN) })).toBeNull();
+        expect(prepareUsageCheck({ ...base, tool })).toBeNull();
     });
 
     it('skips a call without a token', () => {
-        const params = { ...base, tool: makeActorTool(), apifyToken: undefined, options: usageNoticeOptions(SHOWN) };
-        expect(startUsageCheck(params)).toBeNull();
-    });
-});
-
-describe('when the server checks usage at all', () => {
-    const handler = async () => null;
-
-    it('checks when the host set a handler and telemetry is on', () => {
-        const host = {
-            options: { onUsageThresholdCrossed: handler },
-            telemetryEnabled: true,
-            telemetryEnv: 'DEV' as const,
-        };
-        expect(getUsageNoticeOptions(host, undefined)).toBeDefined();
+        expect(prepareUsageCheck({ ...base, tool: makeActorTool(), apifyToken: undefined })).toBeNull();
     });
 
-    it('does not check without a handler', () => {
-        expect(
-            getUsageNoticeOptions({ options: {}, telemetryEnabled: true, telemetryEnv: 'DEV' }, undefined),
-        ).toBeUndefined();
-    });
-
-    it('does not check with telemetry off, so no crossing goes without its event', () => {
-        const host = {
-            options: { onUsageThresholdCrossed: handler },
-            telemetryEnabled: false,
-            telemetryEnv: 'DEV' as const,
-        };
-        expect(getUsageNoticeOptions(host, undefined)).toBeUndefined();
+    it('skips every call with telemetry off', () => {
+        expect(prepareUsageCheck({ ...base, tool: makeActorTool(), options: undefined })).toBeNull();
     });
 });
 
@@ -181,223 +81,65 @@ describe('usage notice on a tool result', () => {
         vi.restoreAllMocks();
     });
 
-    it('asks the host about the crossing, sends the event and appends the notice last', async () => {
-        const trackSpy = vi.spyOn(telemetry, 'trackUsageThresholdCrossed').mockImplementation(() => {});
-        const options = usageNoticeOptions(SHOWN);
+    it('appends the notice the API returns as the last item', async () => {
+        const check = makeCheck(async () => ({ status: 200, data: { data: { notice: NOTICE } } }));
 
-        const result = await runUsageCheck({ usedUsd: 4.1, options });
+        const result = await appendUsageNotice(TOOL_RESULT, check);
 
-        expect(options.onUsageThresholdCrossed).toHaveBeenCalledWith({
-            userId: 'user-1',
-            threshold: 0.8,
-            usedUsd: 4.1,
-            limitUsd: 5,
-            cycleStartAt: new Date('2026-11-01T00:00:00.000Z'),
-            cycleEndAt: CYCLE_END_AT,
-            mcpSessionId: 'session-1',
-            toolName: 'apify/instagram-scraper',
-        } satisfies UsageThresholdCrossing);
-        expect(trackSpy).toHaveBeenCalledWith(
-            'user-1',
-            'DEV',
-            expect.objectContaining({ threshold: 0.8, variant: 'notice', notice_shown: true, plan_tier: 'FREE' }),
-        );
+        expect(result.content).toEqual([...TOOL_RESULT.content, { type: 'text', text: NOTICE }]);
         expect(result.structuredContent).toBe(TOOL_RESULT.structuredContent);
-        expect(result.content).toEqual([
-            ...TOOL_RESULT.content,
-            {
-                type: 'text',
-                text: buildUsageNoticeText('FREE', 0.8, { usedUsd: 4.1, limitUsd: 5, cycleEndAt: CYCLE_END_AT }),
-            },
-        ]);
-    });
-
-    it('sends the event without the notice in the control arm', async () => {
-        const trackSpy = vi.spyOn(telemetry, 'trackUsageThresholdCrossed').mockImplementation(() => {});
-
-        const result = await runUsageCheck({
-            usedUsd: 4.1,
-            options: usageNoticeOptions({ ...SHOWN, isNoticeShown: false }),
+        expect(requestOf(check).calls[0][0]).toMatchObject({
+            url: `${getApifyAPIBaseUrl()}/unstable/users/me/usage-notice`,
+            method: 'POST',
+            data: { toolName: 'apify--instagram-scraper', mcpClientName: 'claude-code' },
         });
-
-        expect(trackSpy).toHaveBeenCalledWith('user-1', 'DEV', expect.objectContaining({ notice_shown: false }));
-        expect(result).toBe(TOOL_RESULT);
     });
 
-    it('does nothing when the host already handled the crossing', async () => {
-        const trackSpy = vi.spyOn(telemetry, 'trackUsageThresholdCrossed').mockImplementation(() => {});
+    it('does not ask the same token again for a while after no notice', async () => {
+        const check = makeCheck(async () => ({ status: 200, data: { data: { notice: null } } }));
 
-        const result = await runUsageCheck({ usedUsd: 4.1, options: usageNoticeOptions(null) });
+        expect(await appendUsageNotice(TOOL_RESULT, check)).toBe(TOOL_RESULT);
+        await appendUsageNotice(TOOL_RESULT, check);
 
-        expect(trackSpy).not.toHaveBeenCalled();
-        expect(result).toBe(TOOL_RESULT);
+        expect(requestOf(check).calls).toHaveLength(1);
     });
 
-    it('does not ask the host for a cancelled call', async () => {
-        const options = usageNoticeOptions(SHOWN);
-        const controller = new AbortController();
-        controller.abort();
+    it('treats a refusal like no notice, so a scoped token is not asked on every call', async () => {
+        const check = makeCheck(async () => ({ status: 403, data: { error: { type: 'insufficient-permissions' } } }));
 
-        expect(await runUsageCheck({ usedUsd: 4.1, options, signal: controller.signal })).toBe(TOOL_RESULT);
-        expect(options.onUsageThresholdCrossed).not.toHaveBeenCalled();
+        expect(await appendUsageNotice(TOOL_RESULT, check)).toBe(TOOL_RESULT);
+        await appendUsageNotice(TOOL_RESULT, check);
+
+        expect(requestOf(check).calls).toHaveLength(1);
     });
 
-    it('does not ask the host below 80%', async () => {
-        const options = usageNoticeOptions(SHOWN);
-
-        const result = await runUsageCheck({ usedUsd: 3, options });
-
-        expect(options.onUsageThresholdCrossed).not.toHaveBeenCalled();
-        expect(result).toBe(TOOL_RESULT);
-    });
-
-    it('does not ask the host for a result without text', async () => {
-        // The SDK adds non-object structured content as text only when the result has no text item.
-        const options = usageNoticeOptions(SHOWN);
-        const result = { content: [], structuredContent: ['item-1'] };
-
-        expect(await runUsageCheck({ usedUsd: 4.1, options, result })).toBe(result);
-        expect(options.onUsageThresholdCrossed).not.toHaveBeenCalled();
-    });
-
-    it('returns the result unchanged when the usage cannot be read', async () => {
+    it('returns the result unchanged when the request fails, and asks again next time', async () => {
         vi.spyOn(log, 'softFail').mockImplementation(() => log);
-        const options = usageNoticeOptions(SHOWN);
-        const limits = async () => {
-            throw new Error('API unavailable');
-        };
-
-        expect(await runUsageCheck({ usedUsd: 4.1, options, limits })).toBe(TOOL_RESULT);
-        expect(options.onUsageThresholdCrossed).not.toHaveBeenCalled();
-    });
-
-    it('returns the result unchanged when the host fails', async () => {
-        vi.spyOn(log, 'error').mockImplementation(() => log);
-        const options: UsageNoticeOptions = {
-            ...usageNoticeOptions(SHOWN),
-            onUsageThresholdCrossed: async () => {
-                throw new Error('Redis unavailable');
-            },
-        };
-
-        expect(await runUsageCheck({ usedUsd: 4.1, options })).toBe(TOOL_RESULT);
-    });
-
-    it('returns the result without waiting for a slow usage reading', async () => {
-        vi.useFakeTimers();
-        try {
-            const options = usageNoticeOptions(SHOWN);
-            const limits = () => new Promise<AccountLimits>(() => {});
-
-            const pending = runUsageCheck({ usedUsd: 4.1, options, limits });
-            await vi.runAllTimersAsync();
-
-            expect(await pending).toBe(TOOL_RESULT);
-            expect(options.onUsageThresholdCrossed).not.toHaveBeenCalled();
-        } finally {
-            vi.useRealTimers();
-        }
-    });
-
-    it('returns the result without waiting for a host that does not decide in time', async () => {
-        vi.useFakeTimers();
-        try {
-            vi.spyOn(log, 'softFail').mockImplementation(() => log);
-            const trackSpy = vi.spyOn(telemetry, 'trackUsageThresholdCrossed').mockImplementation(() => {});
-            let decide: (decision: UsageThresholdDecision | null) => void = () => {};
-            const options: UsageNoticeOptions = {
-                ...usageNoticeOptions(SHOWN),
-                onUsageThresholdCrossed: async () =>
-                    await new Promise<UsageThresholdDecision | null>((resolve) => {
-                        decide = resolve;
-                    }),
-            };
-
-            const pending = runUsageCheck({ usedUsd: 4.1, options });
-            await vi.runAllTimersAsync();
-            expect(await pending).toBe(TOOL_RESULT);
-            expect(log.softFail).toHaveBeenCalled();
-
-            // The host claimed the crossing after the result left: its event goes out without the notice.
-            decide(SHOWN);
-            await vi.runAllTimersAsync();
-            expect(trackSpy).toHaveBeenCalledWith(
-                'user-1',
-                'DEV',
-                expect.objectContaining({ variant: 'notice', notice_shown: false }),
-            );
-        } finally {
-            vi.useRealTimers();
-        }
-    });
-
-    it('logs a host that fails after the result has left', async () => {
-        vi.useFakeTimers();
-        try {
-            vi.spyOn(log, 'softFail').mockImplementation(() => log);
-            vi.spyOn(log, 'error').mockImplementation(() => log);
-            let fail: (error: Error) => void = () => {};
-            const options: UsageNoticeOptions = {
-                ...usageNoticeOptions(SHOWN),
-                onUsageThresholdCrossed: async () =>
-                    await new Promise<UsageThresholdDecision | null>((_, reject) => {
-                        fail = reject;
-                    }),
-            };
-
-            const pending = runUsageCheck({ usedUsd: 4.1, options });
-            await vi.runAllTimersAsync();
-            expect(await pending).toBe(TOOL_RESULT);
-
-            fail(new Error('Redis unavailable'));
-            await vi.runAllTimersAsync();
-            expect(log.error).toHaveBeenCalled();
-        } finally {
-            vi.useRealTimers();
-        }
-    });
-
-    it('does not read the limits for a token that cannot read its user', async () => {
-        const limits = vi.fn(async () => limitsResponse(4.1));
-        const apifyClient = mockApifyClient({
-            user: vi.fn(() => ({
-                limits,
-                get: async () => {
-                    throw new Error('Insufficient permissions');
-                },
-            })),
-        });
-        const options = usageNoticeOptions(SHOWN);
-        const check = startUsageCheck({
-            options,
-            tool: makeActorTool(),
-            apifyToken: uniqueToken(),
-            apifyClient,
-            mcpSessionId: 's',
-            signal: new AbortController().signal,
+        const check = makeCheck(async () => {
+            throw new Error('timeout of 2000ms exceeded');
         });
 
         expect(await appendUsageNotice(TOOL_RESULT, check)).toBe(TOOL_RESULT);
-        expect(limits).not.toHaveBeenCalled();
-        expect(options.onUsageThresholdCrossed).not.toHaveBeenCalled();
+        await appendUsageNotice(TOOL_RESULT, check);
+
+        expect(requestOf(check).calls).toHaveLength(2);
     });
 
-    it('reuses one usage reading per token', async () => {
-        vi.spyOn(telemetry, 'trackUsageThresholdCrossed').mockImplementation(() => {});
-        const limits = vi.fn(async () => limitsResponse(4.1));
-        const apifyClient = stubClient(limits);
-        const params = {
-            options: usageNoticeOptions(SHOWN),
-            tool: makeActorTool(),
-            apifyClient,
-            mcpSessionId: 's',
-            signal: new AbortController().signal,
-        };
-        const apifyToken = uniqueToken();
+    it('does not ask for a result without text', async () => {
+        // The SDK adds non-object structured content as text only when the result has no text item.
+        const check = makeCheck(async () => ({ status: 200, data: { data: { notice: NOTICE } } }));
+        const result = { content: [], structuredContent: ['item-1'] };
 
-        await appendUsageNotice(TOOL_RESULT, startUsageCheck({ ...params, apifyToken }));
-        await appendUsageNotice(TOOL_RESULT, startUsageCheck({ ...params, apifyToken }));
+        expect(await appendUsageNotice(result, check)).toBe(result);
+        expect(requestOf(check).calls).toHaveLength(0);
+    });
 
-        expect(limits).toHaveBeenCalledTimes(1);
+    it('does not ask for a cancelled call, so the notice is not used up', async () => {
+        const controller = new AbortController();
+        controller.abort();
+        const check = makeCheck(async () => ({ status: 200, data: { data: { notice: NOTICE } } }), controller.signal);
+
+        expect(await appendUsageNotice(TOOL_RESULT, check)).toBe(TOOL_RESULT);
+        expect(requestOf(check).calls).toHaveLength(0);
     });
 });

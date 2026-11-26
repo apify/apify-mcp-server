@@ -13,14 +13,7 @@ import {
     getUnauthEnabledToolCategories,
     unauthEnabledTools,
 } from './tools/index.js';
-import type {
-    ActorStore,
-    ToolCategory,
-    UsageNoticePlanType,
-    UsageThreshold,
-    UsageThresholdCrossing,
-    UsageThresholdDecision,
-} from './types.js';
+import type { ActorStore, ToolCategory } from './types.js';
 import { parseQueryParamList } from './utils/generic.js';
 import { LruCache } from './utils/lru.js';
 import { getExpectedToolNamesByCategories } from './utils/tool_categories_helpers.js';
@@ -39,10 +32,6 @@ export {
     getCategoryTools,
     type ActorStore,
     type ToolCategory,
-    type UsageNoticePlanType,
-    type UsageThreshold,
-    type UsageThresholdCrossing,
-    type UsageThresholdDecision,
     processParamsGetTools,
     getToolPublicFieldOnly,
     getUnauthEnabledToolCategories,

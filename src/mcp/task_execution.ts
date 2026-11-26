@@ -23,7 +23,7 @@ import { TOOL_TYPE } from '../types.js';
 import { logHttpError, sanitizeMezmoMessage, toPlainError } from '../utils/logging.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { buildActorFields } from '../utils/tools.js';
-import { appendUsageNotice, startUsageCheck, type UsageNoticeOptions } from '../utils/usage_notice.js';
+import { appendUsageNotice, prepareUsageCheck, type UsageNoticeOptions } from '../utils/usage_notice.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
 import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
 import { logToolCallAndTelemetry } from './tool_call_telemetry.js';
@@ -263,12 +263,11 @@ export async function executeToolAndUpdateTask(params: {
             tool.type === TOOL_TYPE.ACTOR_MCP
                 ? null
                 : createProgressTracker(progressToken, sendTaskProgressNotification(server), taskId, onStatusMessage);
-        const usageCheck = startUsageCheck({
+        const usageCheck = prepareUsageCheck({
             options: usageNotice,
             tool,
             apifyToken,
             apifyClient,
-            mcpSessionId,
             signal: cancelWatcher.signal,
         });
         const dispatchResult = await dispatchToolCall({
@@ -308,7 +307,7 @@ export async function executeToolAndUpdateTask(params: {
             failureHttpStatus: callDiagnostics.failure_http_status,
         });
         result = await appendUsageNotice(result, usageCheck);
-        // The notice can wait on the usage reading and the host; a task cancelled meanwhile refuses the result.
+        // The notice waits on an API call; a task cancelled meanwhile refuses the result.
         if (usageCheck && (await skipIfTaskCancelled(', skipping result storage', toolStatus))) return;
 
         // Store the result in the task store

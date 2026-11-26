@@ -1,11 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-    buildReportedProblemProperties,
-    trackReportedProblem,
-    trackToolCall,
-    trackUsageThresholdCrossed,
-} from '../../src/telemetry.js';
+import { buildReportedProblemProperties, trackReportedProblem, trackToolCall } from '../../src/telemetry.js';
 import type { ReportedProblemTelemetryProperties, ToolCallTelemetryProperties } from '../../src/types.js';
 
 // Mock the Segment Analytics client
@@ -213,28 +208,6 @@ describe('access tokens are masked in telemetry', () => {
         expect(mockTrack.mock.calls[0][0].properties).toEqual({
             ...properties,
             message: 'My token apify_api_*** does not work',
-        });
-    });
-
-    it('masks a token in the usage threshold event', () => {
-        const properties = {
-            threshold: 0.8,
-            variant: 'notice',
-            notice_shown: true,
-            plan_tier: 'FREE',
-            is_organization: false,
-            used_usd: 4.1,
-            limit_usd: 5,
-            tool_name: 'call-actor',
-            // The client sets its own name.
-            mcp_client_name: `client ${API_TOKEN}`,
-        } as const;
-
-        trackUsageThresholdCrossed('test-user-123', 'DEV', properties);
-
-        expect(mockTrack.mock.calls[0][0].properties).toEqual({
-            ...properties,
-            mcp_client_name: 'client apify_api_***',
         });
     });
 });

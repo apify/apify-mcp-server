@@ -5,11 +5,9 @@ import { TOOL_STATUS } from '../../src/const.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import * as telemetry from '../../src/telemetry.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
-import type { ActorsMcpServerOptions, UsageThresholdDecision } from '../../src/types.js';
+import type { ActorsMcpServerOptions } from '../../src/types.js';
 import type * as ToolsLoaderModule from '../../src/utils/tools_loader.js';
 import { getActors } from '../../src/utils/tools_loader.js';
-import { buildUsageNoticeText } from '../../src/utils/usage_notice.js';
-import { CYCLE_END_AT } from './helpers/account_limits.js';
 import {
     getRequestHandler,
     getTaskStore,
@@ -24,31 +22,30 @@ vi.mock('../../src/utils/tools_loader.js', async (importOriginal) => {
     return { ...actual, getActors: vi.fn() };
 });
 
-// Every client the tool call creates reads an account at $4.10 of its $5 limit.
+// Every API request a tool call sends, the usage notice request included, goes through this axios stub.
+const { requestApi } = vi.hoisted(() => ({ requestApi: vi.fn() }));
 vi.mock('../../src/apify_client.js', async (importOriginal) => {
     const actual = await importOriginal<typeof ApifyClientModule>();
-    const { limitsResponse } = await import('./helpers/account_limits.js');
     return {
         ...actual,
         ApifyClient: class {
+            httpClient = { axios: { request: requestApi } };
+
             user() {
-                return { get: async () => ({ id: 'user-1' }), limits: async () => limitsResponse(4.1) };
+                return { get: async () => ({ id: 'user-1' }) };
             }
         },
     };
 });
 
 const ACTOR_RESULT = { content: [{ type: 'text', text: 'Run finished.' }], structuredContent: { runId: 'run-1' } };
-const NOTICE = buildUsageNoticeText('FREE', 0.8, { usedUsd: 4.1, limitUsd: 5, cycleEndAt: CYCLE_END_AT });
+const NOTICE =
+    '**Apify account notice:** This account has used $4.10 of the $5.00 monthly usage included in the Free plan.';
+const NOTICE_RESPONSE = { status: 200, data: { data: { notice: NOTICE } } };
 
 function serverOptions(): Partial<ActorsMcpServerOptions> {
-    const decision: UsageThresholdDecision = { variant: 'notice', planType: 'FREE', isNoticeShown: true };
-    // A fresh token per test: the usage cache is keyed by token. The check runs only with telemetry on.
-    return {
-        token: `token-${Math.random()}`,
-        telemetry: { enabled: true, env: 'DEV' },
-        onUsageThresholdCrossed: async () => decision,
-    };
+    // A fresh token per test: "no notice" answers are cached by token. The notice is asked only with telemetry on.
+    return { token: `token-${Math.random()}`, telemetry: { enabled: true, env: 'DEV' } };
 }
 
 async function loadActorTool(server: ActorsMcpServer) {
@@ -59,7 +56,8 @@ async function loadActorTool(server: ActorsMcpServer) {
 describe('usage notice on an Actor tool result', () => {
     beforeEach(() => {
         vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
-        vi.spyOn(telemetry, 'trackUsageThresholdCrossed').mockImplementation(() => {});
+        requestApi.mockReset();
+        requestApi.mockResolvedValue(NOTICE_RESPONSE);
     });
 
     afterEach(() => {
@@ -130,46 +128,43 @@ describe('usage notice on an Actor tool result', () => {
         }, serverOptions());
     });
 
-    it('records a task cancelled while the host decides as a finished run', async () => {
+    it('records a task cancelled while the notice is requested as a finished run', async () => {
         vi.spyOn(actorExecutor, 'executeActorTool').mockResolvedValue(ACTOR_RESULT as never);
         let resolveTaskId!: (taskId: string) => void;
         const taskIdPromise = new Promise<string>((resolve) => {
             resolveTaskId = resolve;
         });
         let taskStore!: ReturnType<typeof getTaskStore>;
-        // `tasks/cancel` lands while the host decides the crossing.
-        const onUsageThresholdCrossed = async () => {
+        // `tasks/cancel` lands while the API answers the notice request.
+        requestApi.mockImplementation(async () => {
             await taskStore.updateTaskStatus(await taskIdPromise, 'cancelled', undefined, 's1');
-            return { variant: 'notice', planType: 'FREE', isNoticeShown: true } as const;
-        };
+            return NOTICE_RESPONSE;
+        });
 
-        await withServer(
-            async (server) => {
-                taskStore = getTaskStore(server);
-                await loadActorTool(server);
-                const params = {
-                    name: 'test-actor-tool',
-                    arguments: {},
-                    _meta: { mcpSessionId: 's1' },
-                    task: { ttl: 60_000 },
-                };
+        await withServer(async (server) => {
+            taskStore = getTaskStore(server);
+            await loadActorTool(server);
+            const params = {
+                name: 'test-actor-tool',
+                arguments: {},
+                _meta: { mcpSessionId: 's1' },
+                task: { ttl: 60_000 },
+            };
 
-                const { task } = (await getRequestHandler(server, 'tools/call')(
-                    { method: 'tools/call', params },
-                    { signal: { aborted: false }, sendNotification: vi.fn() },
-                )) as { task: { taskId: string } };
-                resolveTaskId(task.taskId);
+            const { task } = (await getRequestHandler(server, 'tools/call')(
+                { method: 'tools/call', params },
+                { signal: { aborted: false }, sendNotification: vi.fn() },
+            )) as { task: { taskId: string } };
+            resolveTaskId(task.taskId);
 
-                await vi.waitFor(() =>
-                    expect(telemetry.trackToolCall).toHaveBeenCalledWith(
-                        'user-1',
-                        'DEV',
-                        expect.objectContaining({ tool_status: TOOL_STATUS.SUCCEEDED }),
-                    ),
-                );
-                expect((await taskStore.getTask(task.taskId, 's1'))?.status).toBe('cancelled');
-            },
-            { ...serverOptions(), onUsageThresholdCrossed },
-        );
+            await vi.waitFor(() =>
+                expect(telemetry.trackToolCall).toHaveBeenCalledWith(
+                    'user-1',
+                    'DEV',
+                    expect.objectContaining({ tool_status: TOOL_STATUS.SUCCEEDED }),
+                ),
+            );
+            expect((await taskStore.getTask(task.taskId, 's1'))?.status).toBe('cancelled');
+        }, serverOptions());
     });
 });
