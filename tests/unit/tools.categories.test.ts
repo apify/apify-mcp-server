@@ -72,6 +72,7 @@ describe('getCategoryTools', () => {
             'schedules',
             'builds',
             'versions',
+            'env-vars',
             'api',
             'dev',
         ];

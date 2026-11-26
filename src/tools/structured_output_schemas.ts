@@ -710,6 +710,39 @@ export const deleteActorVersionToolOutputSchema = {
     required: ['actorId', 'fullName', 'versionNumber', 'deleted', 'tags'],
 };
 
+/** Schema for get-actor-env-var-list: a version's variables, with the values of the plain ones only. */
+export const getActorEnvVarListToolOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actorId: { type: 'string', description: 'Actor ID' },
+        fullName: { type: 'string', description: 'Actor full name, username/name' },
+        versionNumber: { type: 'string', description: 'Version number, e.g. 0.1' },
+        envVars: {
+            type: 'array',
+            description: "The version's environment variables, in the order the platform returns them",
+            items: {
+                type: 'object',
+                properties: {
+                    name: { type: 'string', description: 'Variable name' },
+                    isSecret: { type: 'boolean', description: 'Whether the value is stored encrypted' },
+                    value: {
+                        type: 'string',
+                        description:
+                            'Value of a plain variable; absent for a secret and for a value in omittedValueNames',
+                    },
+                },
+                required: ['name', 'isSecret'],
+            },
+        },
+        omittedValueNames: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Plain variables whose values were left out over the size limit; absent when none',
+        },
+    },
+    required: ['actorId', 'fullName', 'versionNumber', 'envVars'],
+};
+
 /** Schema for update-actor-version: the new revision and what changed. */
 export const updateActorVersionToolOutputSchema = {
     type: 'object' as const,

@@ -161,6 +161,12 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             expect(toolNames(appsCategories.versions)).toEqual(expected);
         });
 
+        it('has correct tools in env-vars category (both modes)', () => {
+            const expected = [HELPER_TOOLS.ACTOR_ENV_VAR_LIST_GET];
+            expect(toolNames(defaultCategories['env-vars'])).toEqual(expected);
+            expect(toolNames(appsCategories['env-vars'])).toEqual(expected);
+        });
+
         it('has correct tools in api category (both modes)', () => {
             const expected = [
                 HELPER_TOOLS.API_SEARCH,
@@ -556,6 +562,7 @@ describe('tool descriptions never name a tool absent from the session', () => {
         { label: "tools: ['actors']", input: { tools: ['actors'] }, actorTools: [] },
         { label: "tools: ['schedules']", input: { tools: ['schedules'] }, actorTools: [] },
         { label: "tools: ['versions']", input: { tools: ['versions'] }, actorTools: [] },
+        { label: "tools: ['env-vars']", input: { tools: ['env-vars'] }, actorTools: [] },
         { label: "tools: ['api']", input: { tools: ['api'] }, actorTools: [] },
         ...ALL_TOOL_NAMES.map((name) => ({
             label: `tools: ['${name}']`,
