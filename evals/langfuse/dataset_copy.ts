@@ -23,28 +23,12 @@ export async function copyCasesToDataset(
     const dataset = await langfuse.dataset.get(datasetName, { fetchItemsPageSize: 100 });
 
     const writeItem = async (
-        item: {
-            id: string;
-            input?: unknown;
-            expectedOutput?: unknown;
-            metadata?: unknown;
-            sourceTraceId?: string | null;
-            sourceObservationId?: string | null;
-        },
+        item: { id: string; input?: unknown; expectedOutput?: unknown; metadata?: unknown },
         status: 'ACTIVE' | 'ARCHIVED',
     ) => {
         const { id, input, expectedOutput, metadata } = item;
         try {
-            await langfuse.api.datasetItems.create({
-                datasetName,
-                id,
-                input,
-                expectedOutput,
-                metadata,
-                ...(item.sourceTraceId && { sourceTraceId: item.sourceTraceId }),
-                ...(item.sourceObservationId && { sourceObservationId: item.sourceObservationId }),
-                status,
-            });
+            await langfuse.api.datasetItems.create({ datasetName, id, input, expectedOutput, metadata, status });
         } catch (error) {
             throw new Error(
                 `Copying case "${id}" to dataset "${datasetName}" failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -57,7 +41,6 @@ export async function copyCasesToDataset(
 
     const caseIds = new Set(items.map((item) => item.id));
     const staleItems = dataset.items.filter((hosted) => hosted.status === 'ACTIVE' && !caseIds.has(hosted.id));
-    // The hosted item is sent back whole: the write replaces the item, it does not patch it.
     for (const hosted of staleItems) await writeItem(hosted, 'ARCHIVED');
 
     return { datasetId: dataset.id, archivedIds: staleItems.map((hosted) => hosted.id) };

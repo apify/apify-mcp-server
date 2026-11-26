@@ -75,8 +75,8 @@ export function readCaseFiles(dir: string): McpAgentItem[] {
  * The item `experiment.run` gets for a case-file item.
  *
  * Linked to a dataset (`datasetId` given): the item keeps its `id` and gains `datasetId`. The
- * Langfuse client attaches the run to the hosted item named by `id`, and returns the run URL
- * only when the item also carries `datasetId`.
+ * Langfuse client asks Langfuse to link the run to the hosted item named by `id`, and returns
+ * the run URL only when the item also carries `datasetId`.
  *
  * Not linked: the `id` moves to `metadata.caseId`. The client reads any `id` as a hosted dataset
  * item id, links the run when that id exists in some dataset and logs a 404 when it does not.
