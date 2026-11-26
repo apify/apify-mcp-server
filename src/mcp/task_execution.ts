@@ -22,7 +22,8 @@ import type {
 import { TOOL_TYPE } from '../types.js';
 import { logHttpError, sanitizeMezmoMessage, toPlainError } from '../utils/logging.js';
 import { createProgressTracker } from '../utils/progress.js';
-import { buildActorFields } from '../utils/tools.js';
+import { buildActorFields, getToolFullName } from '../utils/tools.js';
+import { appendUsageNotice, startUsageCheck, type UsageNoticeOptions } from '../utils/usage_notice.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
 import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
 import { logToolCallAndTelemetry } from './tool_call_telemetry.js';
@@ -114,6 +115,7 @@ export async function executeToolAndUpdateTask(params: {
     userId: string | null;
     telemetryEnv: TelemetryEnv;
     sendNotification: (notification: ServerNotification) => Promise<void>;
+    usageNotice?: UsageNoticeOptions;
 }): Promise<void> {
     const {
         taskId,
@@ -134,6 +136,7 @@ export async function executeToolAndUpdateTask(params: {
         userId,
         telemetryEnv,
         sendNotification,
+        usageNotice,
     } = params;
     const emitLog = async (msg: { level: string; data?: unknown }) =>
         server.sendLoggingMessage(msg as Parameters<typeof server.sendLoggingMessage>[0]);
@@ -260,6 +263,14 @@ export async function executeToolAndUpdateTask(params: {
             tool.type === TOOL_TYPE.ACTOR_MCP
                 ? null
                 : createProgressTracker(progressToken, sendTaskProgressNotification(server), taskId, onStatusMessage);
+        const usageCheck = startUsageCheck({
+            options: usageNotice,
+            tool,
+            toolName: getToolFullName(tool),
+            apifyToken,
+            apifyClient,
+            mcpSessionId,
+        });
         const dispatchResult = await dispatchToolCall({
             tool,
             toolArgs,
@@ -296,6 +307,7 @@ export async function executeToolAndUpdateTask(params: {
             failureCategory: callDiagnostics.failure_category,
             failureHttpStatus: callDiagnostics.failure_http_status,
         });
+        result = await appendUsageNotice(result, usageCheck);
 
         // Store the result in the task store
         log.debug('[executeToolAndUpdateTask] Storing completed result', {

@@ -52,6 +52,7 @@ import type {
 import { isMcpClientFaultMessage, sanitizeMezmoMessage } from '../utils/logging.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { buildActorFields, getToolFullName, getToolPublicFieldOnly } from '../utils/tools.js';
+import { getUsageNoticeOptions } from '../utils/usage_notice.js';
 import type { McpClientContext } from './client_context.js';
 import { LOG_LEVEL_MAP } from './const.js';
 import { InternalError, InvalidParamsError } from './errors.js';
@@ -562,6 +563,7 @@ export class LegacyMcpServer {
                             userId,
                             telemetryEnv: this.host.telemetryEnv,
                             sendNotification,
+                            usageNotice: getUsageNoticeOptions(this.host, clientContext),
                         }).catch((error) =>
                             // Benign task-expiry is handled in-method (see the catch block and
                             // storeTaskResultOrSkipIfExpired); anything reaching here is genuinely unexpected.
@@ -585,6 +587,7 @@ export class LegacyMcpServer {
                     signal,
                     sendNotification,
                     emitLog,
+                    usageNotice: getUsageNoticeOptions(this.host, clientContext),
                 });
                 toolStatus = outcome.toolStatus;
                 callDiagnostics = outcome.callDiagnostics;

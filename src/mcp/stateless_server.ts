@@ -41,6 +41,7 @@ import type {
 } from '../types.js';
 import { isMcpError } from '../utils/tool_status.js';
 import { getToolFullName, getToolPublicFieldOnly } from '../utils/tools.js';
+import { getUsageNoticeOptions } from '../utils/usage_notice.js';
 import { buildMcpClientContext } from './client_context.js';
 import type { McpClientContext } from './client_context.js';
 import { InternalError, InvalidParamsError } from './errors.js';
@@ -271,6 +272,7 @@ class StatelessMcpServer {
                     signal,
                     sendNotification: this.buildNotificationForwarder(ctx),
                     emitLog: emitLogServerSide,
+                    usageNotice: getUsageNoticeOptions(this.host, clientContext),
                 });
                 toolStatus = outcome.toolStatus;
                 callDiagnostics = outcome.callDiagnostics;
