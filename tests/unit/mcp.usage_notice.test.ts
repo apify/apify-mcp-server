@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as ApifyClientModule from '../../src/apify_client.js';
+import { TOOL_STATUS } from '../../src/const.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import * as telemetry from '../../src/telemetry.js';
 import { actorExecutor } from '../../src/tools/actors/actor_executor.js';
@@ -102,6 +103,7 @@ describe('usage notice on an Actor tool result', () => {
             expect(result.content).toEqual([...ACTOR_RESULT.content, { type: 'text', text: NOTICE }]);
         }, serverOptions());
     });
+
     it('comes last in a task result', async () => {
         vi.spyOn(actorExecutor, 'executeActorTool').mockResolvedValue(ACTOR_RESULT as never);
 
@@ -126,5 +128,48 @@ describe('usage notice on an Actor tool result', () => {
 
             expect(result.content).toEqual([...ACTOR_RESULT.content, { type: 'text', text: NOTICE }]);
         }, serverOptions());
+    });
+
+    it('records a task cancelled while the host decides as a finished run', async () => {
+        vi.spyOn(actorExecutor, 'executeActorTool').mockResolvedValue(ACTOR_RESULT as never);
+        let resolveTaskId!: (taskId: string) => void;
+        const taskIdPromise = new Promise<string>((resolve) => {
+            resolveTaskId = resolve;
+        });
+        let taskStore!: ReturnType<typeof getTaskStore>;
+        // `tasks/cancel` lands while the host decides the crossing.
+        const onUsageThresholdCrossed = async () => {
+            await taskStore.updateTaskStatus(await taskIdPromise, 'cancelled', undefined, 's1');
+            return { variant: 'notice', planType: 'FREE', isNoticeShown: true } as const;
+        };
+
+        await withServer(
+            async (server) => {
+                taskStore = getTaskStore(server);
+                await loadActorTool(server);
+                const params = {
+                    name: 'test-actor-tool',
+                    arguments: {},
+                    _meta: { mcpSessionId: 's1' },
+                    task: { ttl: 60_000 },
+                };
+
+                const { task } = (await getRequestHandler(server, 'tools/call')(
+                    { method: 'tools/call', params },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                )) as { task: { taskId: string } };
+                resolveTaskId(task.taskId);
+
+                await vi.waitFor(() =>
+                    expect(telemetry.trackToolCall).toHaveBeenCalledWith(
+                        'user-1',
+                        'DEV',
+                        expect.objectContaining({ tool_status: TOOL_STATUS.SUCCEEDED }),
+                    ),
+                );
+                expect((await taskStore.getTask(task.taskId, 's1'))?.status).toBe('cancelled');
+            },
+            { ...serverOptions(), onUsageThresholdCrossed },
+        );
     });
 });

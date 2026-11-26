@@ -168,7 +168,11 @@ export function trackUsageThresholdCrossed(
     const client = getOrInitAnalyticsClient(telemetryEnv);
 
     try {
-        client?.track({ userId, event: SEGMENT_EVENTS.USAGE_THRESHOLD_CROSSED, properties });
+        client?.track({
+            userId,
+            event: SEGMENT_EVENTS.USAGE_THRESHOLD_CROSSED,
+            properties: maskEventProperties(properties),
+        });
     } catch (error) {
         log.error('Failed to track usage threshold event', { error, userId });
     }

@@ -506,7 +506,6 @@ export async function executeSyncToolCall(
     const usageCheck = startUsageCheck({
         options: usageNotice,
         tool,
-        toolName: resolvedToolName,
         apifyToken,
         apifyClient,
         mcpSessionId,

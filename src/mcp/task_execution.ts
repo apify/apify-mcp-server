@@ -22,7 +22,7 @@ import type {
 import { TOOL_TYPE } from '../types.js';
 import { logHttpError, sanitizeMezmoMessage, toPlainError } from '../utils/logging.js';
 import { createProgressTracker } from '../utils/progress.js';
-import { buildActorFields, getToolFullName } from '../utils/tools.js';
+import { buildActorFields } from '../utils/tools.js';
 import { appendUsageNotice, startUsageCheck, type UsageNoticeOptions } from '../utils/usage_notice.js';
 import { buildToolCallErrorResult, TOOL_CALL_ERROR_KIND } from './tool_call_error_mapper.js';
 import type { ToolCallErrorResult } from './tool_call_error_mapper.js';
@@ -266,7 +266,6 @@ export async function executeToolAndUpdateTask(params: {
         const usageCheck = startUsageCheck({
             options: usageNotice,
             tool,
-            toolName: getToolFullName(tool),
             apifyToken,
             apifyClient,
             mcpSessionId,
@@ -309,6 +308,8 @@ export async function executeToolAndUpdateTask(params: {
             failureHttpStatus: callDiagnostics.failure_http_status,
         });
         result = await appendUsageNotice(result, usageCheck);
+        // The notice can wait on the usage reading and the host; a task cancelled meanwhile refuses the result.
+        if (usageCheck && (await skipIfTaskCancelled(', skipping result storage', toolStatus))) return;
 
         // Store the result in the task store
         log.debug('[executeToolAndUpdateTask] Storing completed result', {
