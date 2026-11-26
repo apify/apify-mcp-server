@@ -112,7 +112,7 @@ export function buildReportedProblemProperties(
     context: ToolCallTelemetryProperties,
     args: Record<string, unknown>,
 ): ReportedProblemTelemetryProperties {
-    const { message, actorId, actorRunId, relatedTools } = args as SendFeedbackArgs;
+    const { message, sentiment, category, source, actorId, actorRunId, relatedTools } = args as SendFeedbackArgs;
 
     return {
         app: context.app,
@@ -124,6 +124,9 @@ export function buildReportedProblemProperties(
         transport_type: context.transport_type,
         mcp_url_client: context.mcp_url_client,
         message,
+        sentiment,
+        category,
+        ...(source !== undefined && { source }),
         ...(actorId !== undefined && { actor_id: actorId }),
         ...(actorRunId !== undefined && { actor_run_id: actorRunId }),
         ...(relatedTools !== undefined && { related_tools: relatedTools }),

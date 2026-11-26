@@ -15,6 +15,7 @@ import type z from 'zod';
 import type { ApifyClient } from './apify_client.js';
 import type { FAILURE_CATEGORY, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
 import type { ApiMethod } from './tools/api/apify_api_spec.js';
+import type { sendFeedbackArgsSchema } from './tools/dev/send_feedback.js';
 import type { CATEGORY_NAMES } from './tools/registry.js';
 import type { ToolResponse } from './utils/mcp.js';
 import type { PricingTier, StructuredPricingInfo } from './utils/pricing_info.js';
@@ -512,6 +513,9 @@ export type ReportedProblemTelemetryProperties = Pick<
     | 'mcp_url_client'
 > & {
     message: string;
+    sentiment: z.infer<typeof sendFeedbackArgsSchema>['sentiment'];
+    category: z.infer<typeof sendFeedbackArgsSchema>['category'];
+    source?: z.infer<typeof sendFeedbackArgsSchema>['source'];
     actor_id?: string;
     actor_run_id?: string;
     related_tools?: string[];

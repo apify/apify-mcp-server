@@ -414,6 +414,46 @@ describe('CallToolRequestSchema handler', () => {
 
         expect(trackSpy.mock.calls[0][2]).toMatchObject({ mcp_url_client: '' });
     });
+
+    it('sends positive feedback about an Actor to the Apify team with its classification', async () => {
+        vi.spyOn(telemetry, 'trackToolCall').mockImplementation(() => {});
+        const reportSpy = vi.spyOn(telemetry, 'trackReportedProblem').mockImplementation(() => {});
+        const message = 'apify/rag-web-browser returned the page text its README describes.';
+        await withServer(
+            async (server) => {
+                // Spread the frozen tool so server.close() can null its ajvValidate on teardown.
+                server.upsertTools([{ ...sendFeedback }]);
+                const handler = getRequestHandler(server, 'tools/call');
+                await handler(
+                    {
+                        method: 'tools/call',
+                        params: {
+                            name: HELPER_TOOLS.FEEDBACK_SEND,
+                            arguments: {
+                                message,
+                                sentiment: 'positive',
+                                category: 'worked_well',
+                                source: 'user',
+                                actorId: 'apify/rag-web-browser',
+                            },
+                            _meta: { mcpSessionId: 's1' },
+                        },
+                    },
+                    { signal: { aborted: false }, sendNotification: vi.fn() },
+                );
+            },
+            { token: undefined, telemetry: { enabled: true }, allowUnauthMode: true },
+        );
+
+        expect(reportSpy).toHaveBeenCalledTimes(1);
+        expect(reportSpy.mock.calls[0][2]).toMatchObject({
+            message,
+            sentiment: 'positive',
+            category: 'worked_well',
+            source: 'user',
+            actor_id: 'apify/rag-web-browser',
+        });
+    });
 });
 
 describe('CallToolRequestSchema handler — invalid-call rejections (characterization)', () => {

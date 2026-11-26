@@ -7,13 +7,16 @@ import { compileSchema } from '../../utils/ajv.js';
 import { respondOk } from '../../utils/mcp.js';
 import { sendFeedbackToolOutputSchema } from '../structured_output_schemas.js';
 
-const SEND_FEEDBACK_DESCRIPTION = `Send feedback about a problem with Apify's MCP tools or Actors to the Apify team.
+const SEND_FEEDBACK_DESCRIPTION = `Send feedback about Apify's MCP server, its tools, or Apify Actors to the Apify team. \
+It covers Apify only: not other MCP servers, other tools, or the host app.
 
 Reports can describe missing tools or Actors, errors, timeouts, confusing results, steps that took several attempts, \
-or tasks that the available tools could not complete. Reports help fix the problem for other users.
+or tasks that the available tools could not complete. Reports help fix the problem for other users. \
+Feedback can also be positive, such as an Actor that worked as described.
 
-Put what you were doing and what went wrong in "message". Do NOT include personal data, credentials, \
-secrets, or verbatim private conversation content — describe the issue in your own words.`;
+Put what you were doing and what happened in "message", and classify it with "sentiment" and "category". \
+Do NOT include personal data, credentials, secrets, or verbatim private conversation content — describe it in \
+your own words.`;
 
 const ACKNOWLEDGEMENT = `Feedback sent. Thank you — this helps the Apify team improve its tools.`;
 
@@ -75,20 +78,58 @@ export const sendFeedbackArgsSchema = z.object({
         .string()
         .min(1)
         .max(2000)
-        .describe('What happened: the problem you hit. Required. Keep it to a few sentences (max 2000 characters).'),
+        .describe(
+            'What happened: what you were doing and the result. Required. ' +
+                'Keep it to a few sentences (max 2000 characters).',
+        ),
+    sentiment: z
+        .enum(['positive', 'negative', 'neutral'])
+        .describe(
+            'Overall tone: positive (something worked well), negative (something went wrong), ' +
+                'or neutral (a suggestion or observation).',
+        ),
+    category: z
+        .enum([
+            'bug',
+            'spec_mismatch',
+            'readme_unclear',
+            'missing_capability',
+            'improvement',
+            'worked_well',
+            'account_or_billing',
+            'other',
+        ])
+        .describe(
+            'What the feedback is about. ' +
+                'bug: an error, crash, timeout, or wrong result. ' +
+                "spec_mismatch: an Actor run did not match the Actor's input schema or README. " +
+                'readme_unclear: an Actor README or a tool description did not explain how to use it. ' +
+                'missing_capability: no available tool or Actor could do the task. ' +
+                'improvement: a suggestion that is not a bug. ' +
+                'worked_well: a tool or Actor worked as described. ' +
+                'account_or_billing: a plan, billing, usage-limit, or authentication issue with the Apify account. ' +
+                'other: none of the above.',
+        ),
+    source: z
+        .enum(['user', 'model'])
+        .optional()
+        .describe(
+            'Optional. Who asked for this feedback to be sent: user (the user asked) ' +
+                'or model (you decided to send it).',
+        ),
     actorId: z
         .string()
         .max(200)
         .optional()
-        .describe('Optional. The Actor this problem is about, e.g. apify/rag-web-browser.'),
-    actorRunId: z.string().max(200).optional().describe('Optional. The Actor run this problem is about.'),
+        .describe('Optional. The Actor this feedback is about, e.g. apify/rag-web-browser.'),
+    actorRunId: z.string().max(200).optional().describe('Optional. The Actor run this feedback is about.'),
     relatedTools: z
         .string()
         .max(100)
         .array()
         .max(20)
         .optional()
-        .describe('Optional. Names of the MCP tools involved in this problem (up to 20).'),
+        .describe('Optional. Names of the MCP tools involved in this feedback (up to 20).'),
 });
 
 const sendFeedbackInputSchema = z.toJSONSchema(sendFeedbackArgsSchema) as ToolInputSchema;

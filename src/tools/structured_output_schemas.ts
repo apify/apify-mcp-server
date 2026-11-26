@@ -380,7 +380,7 @@ export const fetchApifyDocsToolOutputSchema = {
 export const sendFeedbackToolOutputSchema = {
     type: 'object' as const,
     properties: {
-        reported: { type: 'boolean', description: 'Always true; the problem report was submitted' },
+        reported: { type: 'boolean', description: 'Always true; the feedback was submitted' },
     },
     required: ['reported'],
 };

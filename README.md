@@ -260,7 +260,7 @@ Legend for the **Enabled by default** column:
 | `fetch-apify-docs` | docs | Fetch the full content of a documentation page by its URL. | ✅ |
 | [`apify--web-search`](https://apify.com/apify/web-search) | Actor (see [Choose which tools load](#choose-which-tools-load)) | Search the web and return one page of results: titles, URLs, and snippets. | ✅ |
 | [`apify--web-fetch`](https://apify.com/apify/web-fetch) | Actor (see [Choose which tools load](#choose-which-tools-load)) | Fetch a URL and return its content as Markdown, text, HTML, or other formats. | ✅ |
-| `send-feedback` | dev | Send feedback about a problem with an Apify tool or Actor to the Apify team. | ✅¹ |
+| `send-feedback` | dev | Send feedback about Apify's MCP server, its tools, or Actors to the Apify team. | ✅¹ |
 | [`apify--rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see [Choose which tools load](#choose-which-tools-load)) | Search the web and return the content of the top results. | |
 | `get-actor-list` | none (select by name: `tools=get-actor-list`) | List the Actors you own and those shared with you, including private ones. | |
 | `delete-actor` | none (select by name: `tools=delete-actor`) | Delete an Actor from your account permanently. Public Actors must be unpublished first. | |

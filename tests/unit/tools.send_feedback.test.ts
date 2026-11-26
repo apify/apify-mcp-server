@@ -63,49 +63,60 @@ describe('sendFeedback', () => {
 
     describe('input validation', () => {
         const validate = (sendFeedback as HelperTool).ajvValidate;
+        // AJV strips undeclared keys from the object it validates (removeAdditional), so tests pass a copy.
+        const VALID_ARGS = { message: 'stuck', sentiment: 'negative', category: 'bug' } as const;
 
         it('requires a message', () => {
-            expect(validate({})).toBe(false);
+            const { message: _message, ...withoutMessage } = VALID_ARGS;
+            expect(validate(withoutMessage)).toBe(false);
+        });
+
+        it('rejects a call with only a message', () => {
+            expect(validate({ message: 'stuck' })).toBe(false);
+        });
+
+        it('rejects a category outside the list', () => {
+            expect(validate({ ...VALID_ARGS, category: 'praise' })).toBe(false);
         });
 
         it('accepts a message at the 2000-character cap', () => {
-            expect(validate({ message: 'x'.repeat(2000) })).toBe(true);
+            expect(validate({ ...VALID_ARGS, message: 'x'.repeat(2000) })).toBe(true);
         });
 
         it('rejects a message longer than 2000 characters', () => {
-            expect(validate({ message: 'x'.repeat(2001) })).toBe(false);
+            expect(validate({ ...VALID_ARGS, message: 'x'.repeat(2001) })).toBe(false);
         });
 
         it('rejects more than 20 related tools', () => {
-            expect(validate({ message: 'stuck', relatedTools: Array.from({ length: 21 }, () => 'call-actor') })).toBe(
+            expect(validate({ ...VALID_ARGS, relatedTools: Array.from({ length: 21 }, () => 'call-actor') })).toBe(
                 false,
             );
         });
 
         it('accepts a related tool name at the 100-character cap', () => {
-            expect(validate({ message: 'stuck', relatedTools: ['t'.repeat(100)] })).toBe(true);
+            expect(validate({ ...VALID_ARGS, relatedTools: ['t'.repeat(100)] })).toBe(true);
         });
 
         it('rejects a related tool name longer than 100 characters', () => {
-            expect(validate({ message: 'stuck', relatedTools: ['t'.repeat(101)] })).toBe(false);
+            expect(validate({ ...VALID_ARGS, relatedTools: ['t'.repeat(101)] })).toBe(false);
         });
 
         it('rejects an over-long actorId', () => {
-            expect(validate({ message: 'stuck', actorId: 'a'.repeat(201) })).toBe(false);
+            expect(validate({ ...VALID_ARGS, actorId: 'a'.repeat(201) })).toBe(false);
         });
 
         it('accepts an actorRunId at the 200-character cap', () => {
-            expect(validate({ message: 'stuck', actorRunId: 'r'.repeat(200) })).toBe(true);
+            expect(validate({ ...VALID_ARGS, actorRunId: 'r'.repeat(200) })).toBe(true);
         });
 
         it('rejects an over-long actorRunId', () => {
-            expect(validate({ message: 'stuck', actorRunId: 'r'.repeat(201) })).toBe(false);
+            expect(validate({ ...VALID_ARGS, actorRunId: 'r'.repeat(201) })).toBe(false);
         });
 
         it('accepts the optional actor, run, and related-tools fields', () => {
             expect(
                 validate({
-                    message: 'rag-web-browser worked well',
+                    ...VALID_ARGS,
                     actorId: 'apify/rag-web-browser',
                     actorRunId: 'abc123',
                     relatedTools: ['call-actor', 'get-dataset-items'],
