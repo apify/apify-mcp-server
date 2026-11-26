@@ -25,8 +25,8 @@ const ACTOR_RUNNING_INTERNAL_TOOLS = new Set<string>([
     HELPER_TOOLS.ACTOR_MCP_TOOL_CALL,
 ]);
 
-/** How many tokens' "no notice" answers are cached at once. */
-const NO_NOTICE_CACHE_MAX_SIZE = 200;
+/** How many tokens' "no notice" answers are cached at once; one hosted process serves many users. */
+const NO_NOTICE_CACHE_MAX_SIZE = 10_000;
 /** How long a token that got no notice is not asked again. */
 const NO_NOTICE_CACHE_TTL_SECS = 5 * 60;
 /** How long a finished tool call waits for the notice; after that it returns without one. */
