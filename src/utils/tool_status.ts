@@ -82,8 +82,7 @@ export function isMcpError(error: unknown): error is McpError {
  * Central helper to classify an error into a ToolStatus value.
  *
  * - TOOL_STATUS.ABORTED   → the client explicitly aborted Request.
- * - TOOL_STATUS.SOFT_FAIL → User/client errors (HTTP 4xx, InvalidParams, validation issues), and the account's
- *   run and usage limits even when they arrive wrapped as a 5xx.
+ * - TOOL_STATUS.SOFT_FAIL → User/client errors (HTTP 4xx, InvalidParams, validation issues).
  * - TOOL_STATUS.FAILED    → Server errors (HTTP 5xx, unknown, or unexpected exceptions).
  */
 export function getToolStatusFromError(error: unknown, isAborted: boolean): ToolStatus {
@@ -91,7 +90,7 @@ export function getToolStatusFromError(error: unknown, isAborted: boolean): Tool
         return TOOL_STATUS.ABORTED;
     }
 
-    // Account run and usage limits are user billing conditions even when they arrive wrapped as a 5xx.
+    // Account run and usage limits are billing conditions even when wrapped as a 5xx.
     if (isActorRunLimitError(error) || isUsageLimitError(error)) {
         return TOOL_STATUS.SOFT_FAIL;
     }
@@ -112,13 +111,12 @@ export function getToolStatusFromError(error: unknown, isAborted: boolean): Tool
     return TOOL_STATUS.FAILED;
 }
 
-/** Maps an error to its telemetry failure category: specific error types first, then by HTTP status. */
 export function classifyFailureCategory(error: unknown): FailureCategory {
     if (error instanceof McpError && error.code === ErrorCode.InvalidParams) {
         return FAILURE_CATEGORY.INVALID_INPUT;
     }
 
-    // Checked before the 403 → AUTH mapping: a usage-limit block arrives as 403 or wrapped as a 5xx.
+    // Before the 403 → AUTH check.
     if (isUsageLimitError(error)) {
         return FAILURE_CATEGORY.USAGE_LIMIT;
     }

@@ -284,11 +284,7 @@ export const TOOL_STATUS = {
     SOFT_FAIL: 'SOFT_FAIL',
 } as const;
 
-/**
- * Why a tool call failed, sent as `failure_category` with the tool call telemetry event.
- * `USAGE_LIMIT` counts every billing block the API reports as `platform-feature-disabled` or `actor-disabled`:
- * the monthly usage limit, per-service limits, unpaid invoices and features missing from the plan.
- */
+/** `USAGE_LIMIT` also counts unpaid invoices and missing plan features: the API reports them the same way. */
 export const FAILURE_CATEGORY = {
     INVALID_INPUT: 'INVALID_INPUT',
     AUTH: 'AUTH',

@@ -26,7 +26,6 @@ const USAGE_LIMIT_403 = new ApifyApiError(
     } as AxiosResponse,
     1,
 );
-// The Standby controller keeps only the inner message when it wraps a failed run start.
 const USAGE_LIMIT_WRAPPED_500 = Object.assign(
     new Error(
         'Streamable HTTP error: Error POSTing to endpoint: {"error":{"type":"cannot-start-actor-runs",' +

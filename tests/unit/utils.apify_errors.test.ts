@@ -17,7 +17,7 @@ function apifyApiError(type: string, status = 402): ApifyApiError {
     return new ApifyApiError({ data: { error: { type, message: type } }, status } as AxiosResponse, 1);
 }
 
-/** The Standby controller's run-start failure as the MCP SDK client throws it: only the inner message survives. */
+/** A Standby run-start failure as the MCP SDK client throws it. */
 function standbyRunStartError(underlyingMessage: string): StreamableHTTPError {
     const body = {
         error: {

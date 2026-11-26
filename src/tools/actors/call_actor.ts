@@ -207,7 +207,6 @@ function respondActorNotFound(actorName: string, loadedToolNames: readonly strin
     );
 }
 
-/** The call-actor response when running the Actor throws: a specific text per known failure, else a generic one. */
 export function buildCallActorErrorResponse(params: CallActorErrorResponseParams): ToolResponse {
     const { actorName, error, actorId, mcpSessionId, loadedToolNames, inputSchema } = params;
 
@@ -241,7 +240,6 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         failureCategory: classifyFailureCategory(error),
     });
 
-    // The Actor was found; billing blocks the account. The API message names the reason.
     if (isUsageLimitError(error)) {
         return respondServerError(`Failed to call Actor '${actorName}': ${errMsg}`, {
             error,

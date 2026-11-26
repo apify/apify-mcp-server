@@ -44,17 +44,12 @@ export function isActorInputValidationError(error: unknown): error is ApifyApiEr
     return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_INVALID_INPUT;
 }
 
-/** Matches the monthly usage limit in every copy of the API message, e.g. "Monthly usage hard limit exceeded". */
+/** Matches apify-core's message, e.g. "Monthly usage hard limit exceeded". */
 const MONTHLY_USAGE_LIMIT_MESSAGE_PATTERN = /monthly usage/i;
 
 /**
- * True when billing blocks the account: the monthly usage hard limit, a per-service limit, unpaid
- * invoices, or a plan without the feature. The API answers `platform-feature-disabled` (HTTP 403), or
- * `actor-disabled` on a run start while its cached copy of the account still has Actors enabled. The
- * message names the reason, so callers pass it through as is.
- *
- * The Actor Standby controller wraps a failed run start as `cannot-start-actor-runs` (HTTP 500) and keeps
- * only the inner message, so a wrapped block is recognized by its usage-limit message alone.
+ * True when billing blocks the account (`platform-feature-disabled` or `actor-disabled`). Actor Standby wraps
+ * a blocked run start as `cannot-start-actor-runs` and drops the type, so there only the message is matched.
  */
 export function isUsageLimitError(error: unknown): boolean {
     if (typeof error !== 'object' || error === null) return false;
@@ -72,8 +67,7 @@ export function isUsageLimitError(error: unknown): boolean {
  * (HTTP 402). The Actor Standby controller wraps a failed run start as `cannot-start-actor-runs`
  * (HTTP 500); a remote MCP-server Actor passes that on as a plain Error whose message carries the type.
  * Either way it's a user billing condition, not a server fault — hence the duck-typed `type` check
- * plus a message-substring fallback for the wrapped case. A wrapped usage-limit block is not a run
- * limit: {@link isUsageLimitError} owns it, so its message is not replaced with the run-limit text.
+ * plus a message-substring fallback for the wrapped case.
  */
 export function isActorRunLimitError(error: unknown): boolean {
     if (isUsageLimitError(error)) return false;
@@ -112,7 +106,7 @@ function isMcpServerUnavailableError(error: unknown): boolean {
 export function remoteMcpFailureDetail(error: unknown): string {
     if (isActorRunLimitError(error)) return ACTOR_RUN_LIMIT_MESSAGE;
     const message = error instanceof Error ? error.message : String(error);
-    // A wrapped usage-limit block arrives as a 5xx, but the server answered.
+    // A wrapped usage limit is a 5xx, but the server is up.
     if (isUsageLimitError(error) || !isMcpServerUnavailableError(error)) return `${message}.`;
     return `${message}. The MCP server may be temporarily unavailable.`;
 }

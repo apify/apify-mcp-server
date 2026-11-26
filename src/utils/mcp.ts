@@ -324,7 +324,7 @@ export function getToolCallErrorUserText(toolName: string, error: unknown): stri
     if (isActorRunLimitError(error)) {
         return `Error calling tool "${toolName}": ${msg}. ${ACTOR_RUN_LIMIT_MESSAGE}`;
     }
-    // The API message names the reason; the 403 hint would blame access instead.
+    // No 403 access hint: the API message says why.
     if (isUsageLimitError(error)) {
         return `Error calling tool "${toolName}": ${msg}.`;
     }
