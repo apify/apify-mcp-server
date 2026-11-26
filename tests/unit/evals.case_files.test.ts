@@ -111,20 +111,21 @@ describe('reading a case directory', () => {
         expect(() => readCaseFiles(dir)).toThrow(/No case/);
     });
 
-    it('rejects a directory that does not exist', () => {
-        expect(() => readCaseFiles(path.join(os.tmpdir(), 'eval-cases-missing'))).toThrow(/eval-cases-missing/);
+    // A hand-written caseId would pass the item validator in place of a missing id.
+    it('rejects a case that sets a runner-injected field', () => {
+        const { id, ...withoutId } = toolCallCase;
+        const dir = makeCaseDir({ 'search-actors.json': [{ ...withoutId, caseId: id }] });
+        expect(() => readCaseFiles(dir)).toThrow(/search-actors\.json.*caseId/s);
     });
 });
 
 describe('building the experiment item of a case', () => {
-    const [item] = [
-        {
-            id: 'pr/search-actors/find-scraper',
-            input: { query: 'Find an Actor that scrapes Google Maps' },
-            expectedOutput: undefined,
-            metadata: { category: 'search-actors', kind: 'tool-call' as const, expectedTools: ['search-actors'] },
-        },
-    ];
+    const item = {
+        id: 'pr/search-actors/find-scraper',
+        input: { query: 'Find an Actor that scrapes Google Maps' },
+        expectedOutput: undefined,
+        metadata: { category: 'search-actors', kind: 'tool-call' as const, expectedTools: ['search-actors'] },
+    };
 
     // With an `id`, the Langfuse client would try to link the run to a hosted dataset item.
     it('moves the id to metadata.caseId when the run is not linked to a dataset', () => {

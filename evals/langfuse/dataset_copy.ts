@@ -10,7 +10,7 @@ import type { McpAgentItem } from './dataset.js';
  *
  * Each case is written under its case id; Langfuse updates an item in place when the id exists.
  * Then every active item whose id is not among the cases is archived. Writes run one at a time
- * and the first failure rejects, with nothing archived yet.
+ * and the first failure rejects; a failed case write rejects before anything is archived.
  *
  * Must resolve before the experiment starts: an item whose id is not in the dataset yet runs
  * outside the dataset run and outside its `pass_rate`.

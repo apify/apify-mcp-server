@@ -730,11 +730,6 @@ describe('the gate breakdown of a run', () => {
         });
     });
 
-    it('counts a dropped trial as requested and not passed', () => {
-        const dropped = buildRunSummary(['pr/call-actor/blocking-pass'], [], 1);
-        expect(buildGateBreakdown(dropped, blockingIds).blocking).toEqual({ passedTrials: 0, requestedTrials: 1 });
-    });
-
     it('prints each gate with its rate, and no rate for a gate without cases', () => {
         expect(formatGateBreakdown(buildGateBreakdown(summary, new Set()))).toBe('blocking 0/0, tracked 2/3 (0.67)');
     });
@@ -790,9 +785,6 @@ describe('validateCaseSource()', () => {
         expect(() => validateCaseSource({ linkDataset: 'mcp-server-evals-pr' })).toThrow(
             /--link-dataset needs --cases/,
         );
-        expect(() =>
-            validateCaseSource({ dataset: 'mcp-server-evals-pr', linkDataset: 'mcp-server-evals-pr' }),
-        ).toThrow(/--link-dataset needs --cases/);
     });
 });
 

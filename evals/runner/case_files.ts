@@ -16,6 +16,10 @@ function parseCaseFileEntry(entry: unknown, filePath: string): McpAgentItem {
         throw new Error(`Case file "${filePath}" holds an entry that is not an object`);
     }
     const { id, query, reference, ...metadata } = entry as Record<string, unknown>;
+    // Runner-injected: a hand-written `caseId` would stand in for a missing `id`.
+    for (const field of ['iteration', 'caseId']) {
+        if (field in metadata) throw new Error(`Case file "${filePath}": case "${String(id)}" sets "${field}"`);
+    }
     let item: McpAgentItem;
     try {
         item = parseMcpAgentItem({ id, input: { query }, expectedOutput: reference, metadata });
