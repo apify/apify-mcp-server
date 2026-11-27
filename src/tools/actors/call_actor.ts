@@ -14,7 +14,13 @@ import {
 } from '../../const.js';
 import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
 import { maskLoggedInputs, pickLoggedValues, REDACTION_PLACEHOLDER } from '../../resources/api_resources.js';
-import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
+import type {
+    InternalToolArgs,
+    ToolDescriptionContext,
+    ToolEntry,
+    ToolInputSchema,
+    ValidationInputChange,
+} from '../../types.js';
 import { ACTOR_TOOL_MODE, ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { getActorToolResolutionCached } from '../../utils/actor.js';
 import {
@@ -22,7 +28,7 @@ import {
     getMcpToolNameSuffixIndex,
     normalizeActorNameInput,
 } from '../../utils/actor_name_normalization.js';
-import { compileSchema } from '../../utils/ajv.js';
+import { compileSchema, getValidationInputChange } from '../../utils/ajv.js';
 import {
     ACTOR_RUN_LIMIT_MESSAGE,
     getApifyErrorType,
@@ -391,7 +397,7 @@ export async function resolveAndValidateActor(params: {
     actorName: string;
     input: Record<string, unknown>;
     toolArgs: InternalToolArgs;
-}): Promise<{ error: ToolResponse } | { actor: ToolEntry }> {
+}): Promise<{ error: ToolResponse } | { actor: ToolEntry; validationInputChange: ValidationInputChange | undefined }> {
     const { actorName, input, toolArgs } = params;
     const { apifyClient, loadedToolNames } = toolArgs;
 
@@ -432,6 +438,7 @@ export async function resolveAndValidateActor(params: {
         };
     }
 
+    const inputSnapshot = structuredClone(input);
     if (!actor.ajvValidate(input)) {
         const { errors } = actor.ajvValidate;
         const ajvDetails = extractAjvErrorDetails(errors ?? null);
@@ -462,7 +469,16 @@ export async function resolveAndValidateActor(params: {
         };
     }
 
-    return { actor };
+    return { actor, validationInputChange: getValidationInputChange(inputSnapshot, input) };
+}
+
+/** Adds what the passing input check changed to the telemetry of a response built after it. */
+export function withValidationInputChange(
+    response: ToolResponse,
+    validationInputChange: ValidationInputChange | undefined,
+): ToolResponse {
+    if (!validationInputChange) return response;
+    return { ...response, toolTelemetry: { ...response.toolTelemetry, validationInputChange } };
 }
 
 /**
@@ -521,6 +537,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
 
     let resolvedActorId: string | undefined;
     let resolvedInputSchema: ToolInputSchema | undefined;
+    let validationInputChange: ValidationInputChange | undefined;
     try {
         const resolution = await resolveAndValidateActor({
             actorName,
@@ -533,10 +550,11 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
 
         resolvedActorId = extractActorId(resolution.actor);
         resolvedInputSchema = resolution.actor.inputSchema;
+        validationInputChange = resolution.validationInputChange;
         const { apifyClient } = toolArgs;
         const abortSignal = toolArgs.signal;
 
-        if (abortSignal?.aborted) return respondAborted();
+        if (abortSignal?.aborted) return withValidationInputChange(respondAborted(), validationInputChange);
 
         const actorRun = await apifyClient.actor(actorName).start(input, callOptions);
         log.debug('Started Actor run', {
@@ -549,7 +567,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
         // Abort can arrive while start() was in flight — abort the newly created run.
         if (abortSignal?.aborted) {
             await abortRunOnSignal(actorRun.id, apifyClient);
-            return respondAborted();
+            return withValidationInputChange(respondAborted(), validationInputChange);
         }
 
         const linkContext = await getConsoleLinkContext(toolArgs.apifyToken, apifyClient);
@@ -557,7 +575,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
         // waitSecs:0 means "fire and forget" — start() already returned the full run, skip re-fetch.
         if (waitSecs === 0) {
             const response = buildStartRunResponse({ actorName, actorRun, linkContext });
-            return { ...response, toolTelemetry: { actorId: resolvedActorId } };
+            return { ...response, toolTelemetry: { actorId: resolvedActorId, validationInputChange } };
         }
 
         const fetchResult = await fetchActorRunData({
@@ -571,15 +589,15 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
             onAbort: abortRunOnSignal,
         });
 
-        if ('aborted' in fetchResult) return respondAborted();
-        if ('error' in fetchResult) return fetchResult.error;
+        if ('aborted' in fetchResult) return withValidationInputChange(respondAborted(), validationInputChange);
+        if ('error' in fetchResult) return withValidationInputChange(fetchResult.error, validationInputChange);
 
         return {
             ...buildGetActorRunResponse({ ...fetchResult.result, linkContext }),
-            toolTelemetry: { actorId: resolvedActorId },
+            toolTelemetry: { actorId: resolvedActorId, validationInputChange },
         };
     } catch (error) {
-        return buildCallActorErrorResponse({
+        const response = buildCallActorErrorResponse({
             actorName,
             error,
             actorId: resolvedActorId,
@@ -587,6 +605,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<Tool
             loadedToolNames: toolArgs.loadedToolNames,
             inputSchema: resolvedInputSchema,
         });
+        return withValidationInputChange(response, validationInputChange);
     }
 }
 
