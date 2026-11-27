@@ -22,7 +22,7 @@ import { RESOURCE_MIME_TYPE } from './widgets.js';
 // API reads can yield binary blob contents, not just text; the widget fields are optional add-ons.
 type ExtendedResourceContents = (TextResourceContents | BlobResourceContents) & {
     html?: string;
-    _meta?: AvailableWidget['meta'];
+    _meta?: AvailableWidget['resourceMeta'];
 };
 
 type ExtendedReadResourceResult = Omit<ReadResourceResult, 'contents'> & {
@@ -63,7 +63,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
                     name: widget.name,
                     description: widget.description,
                     mimeType: RESOURCE_MIME_TYPE,
-                    _meta: widget.meta,
+                    _meta: widget.resourceMeta,
                 });
             }
         }
@@ -104,7 +104,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
                     mimeType: RESOURCE_MIME_TYPE,
                     text: widgetHtml,
                     html: widgetHtml,
-                    _meta: widget.meta,
+                    _meta: widget.resourceMeta,
                 };
                 return {
                     contents: [widgetContent],
