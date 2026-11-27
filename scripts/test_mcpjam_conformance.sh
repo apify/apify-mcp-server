@@ -74,6 +74,10 @@ run_apps_conformance() {
 
 wait_for_server() {
     for _ in $(seq 1 30); do
+        if ! ps -p "$SERVER_PID" >/dev/null; then
+            echo "Dev server exited before it was ready. Port $PORT may already be in use; set PORT to a free port." >&2
+            return 1
+        fi
         curl -s -o /dev/null "http://127.0.0.1:$PORT/" && return 0
         sleep 1
     done
@@ -90,6 +94,12 @@ run_apps_conformance stdio \
     --transport stdio --command node --args dist/stdio.js --args --ui=apps --args "--tools=$WIDGET_TOOLS" \
     || status=1
 
+# If another process (e.g. `pnpm run dev`) already answers on the port, wait_for_server would see it
+# as ready and the HTTP targets would test that process instead of dist/dev_server.js.
+if curl -s -o /dev/null "http://127.0.0.1:$PORT/"; then
+    echo "Port $PORT is already in use by another process; set PORT to a free port." >&2
+    exit 1
+fi
 PORT="$PORT" node dist/dev_server.js > >(redact_tokens) 2>&1 &
 SERVER_PID=$!
 wait_for_server || exit 1
