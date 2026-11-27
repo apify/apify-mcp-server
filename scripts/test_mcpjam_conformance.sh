@@ -62,9 +62,11 @@ run_apps_conformance() {
     local report="$REPORT_DIR/$label.json"
 
     echo "=== MCP Apps conformance: $label ==="
+    # A pipe, not 2> >(...): bash waits for a pipeline, so the redacted stderr is fully printed
+    # before the messages below. `2>&1 >file` sends stderr into the pipe and stdout to the report.
     pnpm dlx --package "$MCPJAM_CLI" --package "$MCPJAM_SDK" mcpjam --no-telemetry apps conformance --reporter json-summary "$@" \
-        2> >(redact_tokens >&2) >"$report"
-    local cli_status=$?
+        2>&1 >"$report" | redact_tokens >&2
+    local cli_status=${PIPESTATUS[0]}
     if [[ "$cli_status" -ne 0 ]]; then
         echo "mcpjam exited with $cli_status." >&2
         return "$cli_status"
