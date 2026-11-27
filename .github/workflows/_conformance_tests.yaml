@@ -31,3 +31,9 @@ jobs:
                 env:
                     APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
                 run: pnpm run test:conformance
+            # Runs even when the official runner fails, so one run reports both results.
+            -   name: MCP Apps conformance tests
+                if: ${{ !cancelled() }}
+                env:
+                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+                run: pnpm run test:conformance:apps

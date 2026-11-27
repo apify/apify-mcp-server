@@ -129,6 +129,7 @@
     "test:integration:streamable": "pnpm run build && vitest run tests/integration/actor.server_streamable.test.ts",
     "test:integration:stateless": "pnpm run build && vitest run tests/integration/actor.server_stateless.test.ts",
     "test:conformance": "bash scripts/test_conformance.sh",
+    "test:conformance:apps": "bash scripts/test_mcpjam_conformance.sh",
     "inspector:stdio": "npx @modelcontextprotocol/inspector -e APIFY_TOKEN=$APIFY_TOKEN -- node dist/stdio.js",
     "evals:mcp-agent": "pnpm run build && tsx evals/runner/run.ts",
     "evals:mcp-agent:export-dataset": "tsx evals/scripts/export_dataset.ts",
