@@ -8,6 +8,7 @@ import {
     createMcpHandler,
     PROTOCOL_VERSION_META_KEY,
 } from '@modelcontextprotocol/server';
+import type { ValidateFunction } from 'ajv';
 import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 
@@ -15,8 +16,15 @@ import type { ALLOWED_TASK_TOOL_EXECUTION_MODES } from '../../../src/const.js';
 import { APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED } from '../../../src/const.js';
 import { ActorsMcpServer } from '../../../src/mcp/server.js';
 import { createStatelessServer } from '../../../src/mcp/stateless_server.js';
+import { prompts } from '../../../src/prompts/index.js';
 import { RESOURCE_MIME_TYPE } from '../../../src/resources/widgets.js';
-import type { ActorsMcpServerOptions, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../../src/types.js';
+import type {
+    ActorsMcpServerOptions,
+    InternalToolArgs,
+    PromptBase,
+    ToolEntry,
+    ToolInputSchema,
+} from '../../../src/types.js';
 import { TOOL_TYPE } from '../../../src/types.js';
 import { compileSchema } from '../../../src/utils/ajv.js';
 import { respondRaw } from '../../../src/utils/mcp.js';
@@ -79,6 +87,25 @@ export async function withServer<T>(
         return await run(server);
     } finally {
         await server.close();
+    }
+}
+
+/**
+ * Registers a prompt in the live registry for the duration of `run`. The registry ships empty
+ * (`src/prompts/index.ts`), and both adapters serve prompts only when it has one, so the server must
+ * be constructed inside `run`.
+ */
+export async function withTestPrompt<T>(run: () => Promise<T>): Promise<T> {
+    prompts.push({
+        name: 'greet',
+        description: 'Greets a person',
+        ajvValidate: Object.assign(() => true, { errors: null }) as unknown as ValidateFunction,
+        render: (args: Record<string, string>) => `Hello ${args.who ?? 'world'}`,
+    } as PromptBase);
+    try {
+        return await run();
+    } finally {
+        prompts.length = 0;
     }
 }
 
