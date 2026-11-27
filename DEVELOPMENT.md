@@ -243,7 +243,7 @@ Arguments use `key:=value` syntax (auto-parses as JSON):
 ```bash
 mcpc @stdio tools-list
 mcpc @stdio tools-call search-actors keywords:="web scraper" limit:=5
-mcpc --json @stdio tools-call search-actors keywords:="scraper" | jq ‘.content[0].text’
+mcpc --json @stdio tools-call search-actors keywords:="scraper" | jq '.content[0].text'
 ```
 
 **Key behaviors to verify:**
