@@ -13,6 +13,8 @@ PORT="${PORT:-3001}"
 
 # Run through dlx, not as a devDependency: the CLI installs ~140 MB, mostly AI SDK providers.
 MCPJAM_CLI="@mcpjam/cli@6.3.2"
+# The checks live in the SDK, which the CLI takes as ^10.10.0. Pinning only the CLI lets the checks change.
+MCPJAM_SDK="@mcpjam/sdk@10.11.0"
 # The default tool set serves only two of the four widget tools.
 WIDGET_TOOLS="call-actor-widget,get-actor-run-widget,search-actors-widget,fetch-actor-details-widget"
 EXPECTED_CHECKS="ui-tools-present ui-tool-metadata-valid ui-tool-input-schema-valid ui-listed-resources-valid ui-resources-readable ui-resource-contents-valid ui-resource-meta-valid"
@@ -60,7 +62,7 @@ run_apps_conformance() {
     local report="$REPORT_DIR/$label.json"
 
     echo "=== MCP Apps conformance: $label ==="
-    pnpm dlx "$MCPJAM_CLI" --no-telemetry apps conformance --reporter json-summary "$@" \
+    pnpm dlx --package "$MCPJAM_CLI" --package "$MCPJAM_SDK" mcpjam --no-telemetry apps conformance --reporter json-summary "$@" \
         2> >(redact_tokens >&2) >"$report"
     local cli_status=$?
     if [[ "$cli_status" -ne 0 ]]; then
