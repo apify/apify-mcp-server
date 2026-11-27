@@ -1,5 +1,8 @@
+import { ApifyApiError } from 'apify-client';
+import type { AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 
+import { APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS, APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED } from '../../src/const.js';
 import { actorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { callActorTask } from '../../src/tools/tasks/call_actor_task.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -62,6 +65,37 @@ describe('call-actor-task starts the saved task', () => {
         expectSoftFailInvalidInput(result);
         expect(result.content[0].text).toContain('nope');
         expect(calls.map(({ fn }) => fn)).not.toContain('start');
+    });
+});
+
+/** A client whose task start fails the way the API rejects a run, with `type` and HTTP status. */
+function mockStartRejectedClient(type: string, status: number) {
+    const error = new ApifyApiError({ data: { error: { type, message: type } }, status } as AxiosResponse, 1);
+    const apifyClient = mockApifyClient({
+        task: (taskId: string) => ({
+            get: async () => mockTask({ id: taskId }),
+            start: async () => {
+                throw error;
+            },
+        }),
+    });
+    return { apifyClient, error };
+}
+
+describe('call-actor-task explains a run that would go over the memory limit', () => {
+    it('points to a smaller callOptions.memory, as call-actor does', async () => {
+        // The API sends the memory limit as a 402, which the shared handler would read as a payment error.
+        const { apifyClient } = mockStartRejectedClient(APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED, 402);
+        const result = await callTool({ taskId: 'task-1', callOptions: { memory: 8192 } }, apifyClient);
+
+        expect(result.isError).toBe(true);
+        expect(result.content.map(({ text }) => text).join('\n')).toContain('callOptions.memory');
+    });
+
+    it('leaves other start errors to the shared error handling', async () => {
+        const { apifyClient, error } = mockStartRejectedClient(APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS, 402);
+
+        await expect(callTool({ taskId: 'task-1' }, apifyClient)).rejects.toBe(error);
     });
 });
 

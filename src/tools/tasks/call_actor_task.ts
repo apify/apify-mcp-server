@@ -1,3 +1,4 @@
+import type { ActorRun } from 'apify-client';
 import { z } from 'zod';
 
 import log from '@apify/log';
@@ -6,10 +7,16 @@ import { HELPER_TOOLS } from '../../const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { isMemoryQuotaError } from '../../utils/apify_errors.js';
 import { getConsoleLinkContext } from '../../utils/console_link.js';
 import { respondAborted, respondUserError } from '../../utils/mcp.js';
 import { abortRunOnSignal, buildStartRunResponse, fetchActorRunData } from '../actors/actor_run_response.js';
-import { callActorArgs, callOptionsSchema, redactCallActorArgs } from '../actors/call_actor.js';
+import {
+    buildCallActorErrorResponse,
+    callActorArgs,
+    callOptionsSchema,
+    redactCallActorArgs,
+} from '../actors/call_actor.js';
 import { buildGetActorRunResponse } from '../runs/get_actor_run.js';
 import { actorRunOutputSchema, anyJsonObjectSchema } from '../structured_output_schemas.js';
 import { getTaskByIdOrName } from './task_helpers.js';
@@ -84,7 +91,21 @@ export const callActorTask: ToolEntry = Object.freeze({
 
         if (abortSignal?.aborted) return respondAborted();
 
-        const actorRun = await client.task(task.id).start(parsed.input, parsed.callOptions);
+        let actorRun: ActorRun;
+        try {
+            actorRun = await client.task(task.id).start(parsed.input, parsed.callOptions);
+        } catch (error) {
+            // The memory limit comes back as a 402, which the shared handler reads as a payment error
+            // and drops call-actor's callOptions.memory hint. Other start errors read fine there.
+            if (!isMemoryQuotaError(error)) throw error;
+            return buildCallActorErrorResponse({
+                actorName: task.actId,
+                error,
+                actorId: task.actId,
+                mcpSessionId: toolArgs.mcpSessionId,
+                loadedToolNames: toolArgs.loadedToolNames,
+            });
+        }
         log.debug('Started Actor task run', {
             taskId: task.id,
             runId: actorRun.id,
