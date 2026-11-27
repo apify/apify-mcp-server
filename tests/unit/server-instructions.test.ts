@@ -229,7 +229,7 @@ describe('getServerInstructions()', () => {
                     '## Actor tasks',
                     '- An Actor task is a saved, reusable configuration of an Actor. It stores the Actor input and run options such as the build, memory, and timeout.',
                     '- Tasks are useful for repeated or scheduled jobs, because the user does not have to configure the Actor again for every run.',
-                    '- `call-actor-task` runs a saved task with its stored input and run options; fields given in `input` override only those fields.',
+                    '- `call-actor-task` runs a saved task with its stored input and run options; fields given in `input` or `callOptions` override only those fields.',
                     '- Creating or updating a task does not make it public.',
                     "- Publishing a task creates a public landing page for one specific use case. The page shows what the task does, the selected input values, and the expected output. Published tasks appear in the Actor's Examples tab, where users, search engines, and AI agents can discover them, which can help people understand the Actor and increase its runs.",
                     '- Publish only tasks that represent a useful, reliable, and specific use case. Not every saved task needs to be public.',

@@ -144,7 +144,7 @@ export function buildCallActorDescription(ctx: ToolDescriptionContext = ALL_TOOL
             : []),
     ].join('\n');
     const sections: string[] = [
-        'Run an Actor as a batch job with an input; results go to its dataset.',
+        "Start a batch run of an Actor with an input. Results go to the run's dataset.",
         workflowSection,
         `An MCP server Actor with no input schema is not run here${hasTool(HELPER_TOOLS.ACTOR_MCP_TOOL_CALL) ? `; ${HELPER_TOOLS.ACTOR_MCP_TOOL_CALL} calls its MCP tools` : ''}.`,
         ...(hasTool(HELPER_TOOLS.ACTOR_SERVER_REQUEST) ? [buildCallActorServerActorSection(ctx)] : []),
