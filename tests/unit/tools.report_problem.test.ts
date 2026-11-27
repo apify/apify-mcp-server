@@ -29,7 +29,15 @@ describe('reportProblem', () => {
             const { content, isError } = result as TextToolResult;
 
             expect(isError).toBe(false);
-            expect(content[0].text).toContain('Problem reported');
+            expect(content[1].text).toContain('Problem reported');
+        });
+
+        it('mirrors structuredContent as JSON in the first text block', async () => {
+            const result = (await (reportProblem as HelperTool).call(
+                stubToolCallContext({ message: 'The search-actors results were unclear.' }, mockApifyClient()),
+            )) as TextToolResult;
+
+            expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
         });
 
         it('returns structuredContent conforming to the declared outputSchema', async () => {

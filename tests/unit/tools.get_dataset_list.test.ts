@@ -46,9 +46,9 @@ describe('get-dataset-list', () => {
         expect(structuredContent.summary).toBe('Listed 2 of 2 named datasets.');
         // Not truncated → nextStep points at inspecting a dataset, not pagination.
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.DATASET_GET);
-        // content[0] ships the JSON data; content[1] carries the prose summary + nextStep.
-        const { summary, nextStep, ...data } = structuredContent;
-        expect(JSON.parse(content[0].text)).toEqual(data);
+        // content[0] mirrors structuredContent as JSON; content[1] carries the prose summary + nextStep.
+        const { summary, nextStep } = structuredContent;
+        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
         expect(content[1].text).toBe(`${summary}\n${nextStep}`);
     });
 

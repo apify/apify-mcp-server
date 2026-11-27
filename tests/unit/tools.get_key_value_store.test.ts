@@ -50,9 +50,9 @@ describe('get-key-value-store', () => {
         expect(structuredContent.summary).toBe("Key-value store 'my-store'.");
         expect(structuredContent.nextStep).toContain(HELPER_TOOLS.KEY_VALUE_STORE_KEYS_GET);
         expect(structuredContent.nextStep).toContain('keyValueStoreId=kv-1');
-        // content[0] is the data-only JSON dump (no narrative); content[1] is the narrative.
-        const { summary, nextStep, ...data } = structuredContent;
-        expect(JSON.parse(content[0].text)).toEqual(data);
+        // content[0] mirrors structuredContent as JSON; content[1] is the narrative.
+        const { summary, nextStep } = structuredContent;
+        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
         expect(content[1].text).toBe(`${summary}\n${nextStep}`);
     });
 
@@ -80,7 +80,7 @@ describe('get-key-value-store', () => {
 
         expectSchemaConformingStructuredContent(result, keyValueStoreOutputSchema);
         expect(data).toEqual(metadata);
-        expect(JSON.parse(content[0].text)).toEqual(metadata);
+        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
         expect(JSON.stringify(result)).not.toContain('urlSigningSecretKey');
         expect(JSON.stringify(result)).not.toContain('mock-signing-secret');
     });

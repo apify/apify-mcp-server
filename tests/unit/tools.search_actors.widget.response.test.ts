@@ -9,7 +9,13 @@ import type { formatActorToStructuredCard } from '../../src/utils/actor_card.js'
 import { formatActorForWidget } from '../../src/utils/actor_card.js';
 import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
-import { mockApifyClient, mockUserInfo, only, stubToolCallContext } from './helpers/tool_context.js';
+import {
+    mockApifyClient,
+    mockUserInfo,
+    only,
+    stubToolCallContext,
+    type TextToolResult,
+} from './helpers/tool_context.js';
 import { MOCK_STORE_ACTOR, NO_ACTORS_FOUND_TEXT, SEARCH_KEYWORDS } from './tools.search_actors.fixtures.js';
 
 /**
@@ -70,8 +76,8 @@ describe('search-actors-widget response', () => {
         expect(structuredContent.widgetActors!.length).toBe(structuredContent.actors.length);
         expect(structuredContent.widgetActors![0]).toStrictEqual(formatActorForWidget(MOCK_STORE_ACTOR, 'FREE'));
 
-        expect(content).toHaveLength(1);
-        const { text } = content[0];
+        expect(content).toHaveLength(2);
+        const { text } = content[1];
         expect(text).toContain('An interactive widget has been rendered');
         expect(text).toContain('do NOT print or summarize the Actor list');
 
@@ -110,9 +116,22 @@ describe('search-actors-widget response', () => {
         expect(structuredContent.actors).toEqual([]);
         expect(structuredContent.count).toBe(0);
         expect(structuredContent.widgetActors).toEqual([]);
-        expect(content).toHaveLength(1);
-        expect(content[0].text).toBe(NO_ACTORS_FOUND_TEXT);
+        expect(content).toHaveLength(2);
+        expect(content[1].text).toBe(NO_ACTORS_FOUND_TEXT);
         expect(_meta).toBeUndefined();
+    });
+
+    it.each([
+        ['results', [MOCK_STORE_ACTOR]],
+        ['no results', []],
+    ])('mirrors structuredContent as JSON in the first text block (%s)', async (_, actors) => {
+        vi.mocked(searchAgentSafeActors).mockResolvedValue(actors);
+
+        const result = (await (searchActorsWidget as HelperTool).call(
+            stubToolCallContext({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }, mockApifyClient()),
+        )) as TextToolResult;
+
+        expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
     });
 
     it('describes an empty page at a later offset without saying the results ended', async () => {
@@ -131,6 +150,7 @@ describe('search-actors-widget response', () => {
         };
         expect(structuredContent).toEqual({ actors: [], query: SEARCH_KEYWORDS, count: 0, widgetActors: [] });
         expect(content).toEqual([
+            { type: 'text', text: JSON.stringify(structuredContent) },
             { type: 'text', text: `No Actors returned at offset 1 for the search query "${SEARCH_KEYWORDS}".` },
         ]);
         expect(_meta).toBeUndefined();
