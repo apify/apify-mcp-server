@@ -263,6 +263,7 @@ export async function dispatchToolCall(params: {
                     taskMode,
                     canRunTipActor: (recommendedActorId) =>
                         canRunActor(recommendedActorId, loadedToolNames, loadedActorIds),
+                    loadedToolNames,
                 });
 
                 if (!executorResult) {

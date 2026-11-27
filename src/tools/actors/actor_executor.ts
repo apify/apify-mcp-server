@@ -33,8 +33,16 @@ const waitSecsSchema = z
  */
 export const actorExecutor: ActorExecutor = {
     async executeActorTool(params: ActorExecutionParams): Promise<ActorExecutionResult> {
-        const { actorFullName, apifyClient, mcpSessionId, abortSignal, progressTracker, taskMode, canRunTipActor } =
-            params;
+        const {
+            actorFullName,
+            apifyClient,
+            loadedToolNames,
+            mcpSessionId,
+            abortSignal,
+            progressTracker,
+            taskMode,
+            canRunTipActor,
+        } = params;
         // Strip `waitSecs` from the Actor's input — it's an MCP-injected opt-in, not an
         // Actor field — so `actor.start()` doesn't reject or silently pass it through.
         const { waitSecs: argsWaitSecs, ...actorInput } = params.input;
@@ -93,6 +101,7 @@ export const actorExecutor: ActorExecutor = {
             waitSecs,
             actorName: actorFullName,
             client: apifyClient,
+            loadedToolNames,
             progressTracker,
             abortSignal,
             mcpSessionId,

@@ -45,7 +45,7 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client } = toolArgs;
+        const { args, apifyClient: client, loadedToolNames } = toolArgs;
         const parsed = abortRunArgs.parse(args);
         // An abort returns a finished run unchanged, so an already-ABORTED run would read as a fresh abort;
         // see apify/apify-mcp-server#1560.
@@ -62,6 +62,7 @@ USAGE EXAMPLES:
         const keyValueStore = run.defaultKeyValueStoreId ? { id: run.defaultKeyValueStoreId } : undefined;
         const { summary: statusSummary, nextStep } = buildStatusSummaryNextStep({
             run,
+            loadedToolNames,
             dataset,
             keyValueStore,
             datasetMetadataFetched: false,

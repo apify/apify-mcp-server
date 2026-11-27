@@ -623,6 +623,8 @@ export type ActorExecutionParams = {
     taskMode?: boolean;
     /** Whether the session can run the Actor a tip recommends; when it cannot, the tip gets the callability caveat. */
     canRunTipActor?: (recommendedActorId: string) => boolean;
+    /** Names of all currently loaded tools; the FAILED run nextStep names the run log tool only when it is here. */
+    loadedToolNames: readonly string[];
 };
 
 /**
