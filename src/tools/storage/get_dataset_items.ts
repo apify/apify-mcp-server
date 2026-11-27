@@ -1,17 +1,23 @@
+import type { DatasetClientListItemOptions } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
+import type { ApifyClient } from '../../apify_client.js';
+import { getApifyAPIPublicBaseUrl } from '../../apify_client.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
+import { buildUrlOnOrigin } from '../../resources/api_resources.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildConsoleDatasetUrl, getConsoleLinkContext } from '../../utils/console_link.js';
+import { buildConsoleDatasetUrl, getConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { parseCommaSeparatedList, stripQuoteWrappers } from '../../utils/generic.js';
+import { logHttpError } from '../../utils/logging.js';
 import { respondUserError } from '../../utils/mcp.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
 import {
     buildDatasetItemsSummaryNextStep,
     buildStorageResponse,
+    fetchDatasetItemsUnderCap,
     fetchStorageByIdOrName,
     resolveStorageId,
     storageIdArgDescription,
@@ -34,6 +40,34 @@ export function extractDotPrefixes(fields: string[]): string[] {
         }
     }
     return [...prefixes];
+}
+
+/**
+ * A download link for a page of dataset items, with the query the page was read with. The dataset's
+ * `itemsPublicUrl` addresses it by ID and opens without a token whatever the query: under restricted access
+ * it carries a signature of the ID only. The API may leave it out, and a failed read loses it: the link is
+ * then the items API URL, which may need a token. apify-client's `createItemsPublicUrl` would address a name
+ * as `~name`, which a link without a token cannot resolve, and signs only for a token with write access.
+ * The query is written as apify-client's `applyQueryParamsToUrl` writes it, with empty lists left out.
+ */
+async function fetchDatasetItemsDownloadLink(
+    client: ApifyClient,
+    safeId: string,
+    params: DatasetClientListItemOptions,
+): Promise<{ url: string; isPublic: boolean }> {
+    const datasetClient = client.dataset(safeId);
+    let itemsPublicUrl: string | undefined;
+    try {
+        itemsPublicUrl = (await datasetClient.get())?.itemsPublicUrl;
+    } catch (err) {
+        logHttpError(err, `Failed to read dataset ${safeId} for its public items URL; falling back to API URL`);
+    }
+    const url = new URL(itemsPublicUrl ?? buildUrlOnOrigin(`${datasetClient.url}/items`, getApifyAPIPublicBaseUrl()));
+    for (const [key, value] of Object.entries(params)) {
+        if (value === undefined || (Array.isArray(value) && value.length === 0)) continue;
+        url.searchParams.set(key, Array.isArray(value) ? value.join(',') : String(value));
+    }
+    return { url: url.href, isPublic: itemsPublicUrl !== undefined };
 }
 
 const getDatasetItemsArgs = z.object({
@@ -78,6 +112,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         Returns the rows themselves, not dataset metadata, counts, or a schema.
         When the user provides a datasetId and asks to retrieve results, output, data, or rows, call this tool directly.
         Default limit is ${DEFAULT_DATASET_ITEMS_LIMIT}. Use clean=true to skip empty items and hidden fields.
+        A page over ${MAX_INLINE_BYTES} bytes is returned as an error with a link to download it, not as its items.
 
         USAGE:
         - Use when you need to read data from a dataset (all items or only selected fields).
@@ -106,21 +141,29 @@ export const getDatasetItems: ToolEntry = Object.freeze({
 
         const effectiveLimit = parsed.limit ?? DEFAULT_DATASET_ITEMS_LIMIT;
         const datasetId = stripQuoteWrappers(parsed.datasetId);
+        const params = {
+            clean: parsed.clean,
+            offset: parsed.offset,
+            limit: effectiveLimit,
+            fields,
+            omit,
+            desc: parsed.desc,
+            flatten,
+        };
         const found = await fetchStorageByIdOrName(datasetId, async (safeId) =>
-            client.dataset(safeId).listItems({
-                clean: parsed.clean,
-                offset: parsed.offset,
-                limit: effectiveLimit,
-                fields,
-                omit,
-                desc: parsed.desc,
-                flatten,
-            }),
+            fetchDatasetItemsUnderCap(client, safeId, params),
         );
         if (!found) {
             return respondUserError(storageNotFoundText('dataset', datasetId));
         }
         const { result: v, safeId } = found;
+        if (v.isOverLimit) {
+            const link = await fetchDatasetItemsDownloadLink(client, safeId, params);
+            return respondUserError(
+                `This page of dataset '${datasetId}' is over the ${MAX_INLINE_BYTES}-byte response limit. Lower \`limit\`, or use \`fields\` or \`omit\`.\n` +
+                    `Download link for the user${link.isPublic ? '' : ' (may require an Apify API token)'}: ${link.url}\n${VERBATIM_LINKS_NUDGE}`,
+            );
+        }
 
         const offset = parsed.offset ?? 0;
         const linkContext = await getConsoleLinkContext(apifyToken, client);

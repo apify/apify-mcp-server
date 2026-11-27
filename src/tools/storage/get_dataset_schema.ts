@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HELPER_TOOLS, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES, RESOURCE_ID_OR_NAME_MAX_LENGTH } from '../../const.js';
 import type { InternalToolArgs, ToolDescriptionContext, ToolEntry, ToolInputSchema } from '../../types.js';
 import { ALL_TOOLS_PRESENT, TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -11,6 +11,7 @@ import { generateSchemaFromItems } from '../../utils/schema_generation.js';
 import { datasetSchemaOutputSchema } from '../structured_output_schemas.js';
 import {
     buildStorageResponse,
+    fetchDatasetItemsUnderCap,
     fetchStorageByIdOrName,
     resolveSiblingNextStep,
     storageIdArgDescription,
@@ -74,12 +75,17 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
 
         const datasetResponse = (
             await fetchStorageByIdOrName(datasetId, async (safeId) =>
-                client.dataset(safeId).listItems({ clean: parsed.clean, limit: parsed.limit }),
+                fetchDatasetItemsUnderCap(client, safeId, { clean: parsed.clean, limit: parsed.limit }),
             )
         )?.result;
 
         if (!datasetResponse) {
             return respondUserError(storageNotFoundText('dataset', datasetId));
+        }
+        if (datasetResponse.isOverLimit) {
+            return respondUserError(
+                `The sample from dataset '${datasetId}' is over the ${MAX_INLINE_BYTES}-byte response limit. Lower \`limit\`. One item over the limit cannot be sampled.`,
+            );
         }
 
         const datasetItems = datasetResponse.items;

@@ -1,15 +1,25 @@
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+
+import type { Dataset } from 'apify-client';
 import { describe, expect, it, vi } from 'vitest';
 
-import { HELPER_TOOLS } from '../../src/const.js';
-import { extractDotPrefixes, getDatasetItems } from '../../src/tools/storage/get_dataset_items.js';
+import { ApifyClient, getApifyAPIPublicBaseUrl } from '../../src/apify_client.js';
+import { HELPER_TOOLS, MAX_INLINE_BYTES } from '../../src/const.js';
+import {
+    DEFAULT_DATASET_ITEMS_LIMIT,
+    extractDotPrefixes,
+    getDatasetItems,
+} from '../../src/tools/storage/get_dataset_items.js';
 import { datasetItemsOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { VERBATIM_LINKS_NUDGE } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import {
+    type DatasetItemsReply,
     expectSchemaConformingStructuredContent,
     expectSoftFailInvalidInput,
-    mockApifyClient,
+    mockDatasetItemsClient,
     mockUserInfo,
     stubToolCallContext,
     type TextToolResult,
@@ -58,17 +68,9 @@ const MOCK_ITEMS = [{ first_number: 3, second_number: 4, sum: 7 }];
 const MANY_ITEMS = Array.from({ length: 20 }, (_, i) => ({ n: i }));
 
 function stubApifyClient(
-    listItems: (...args: unknown[]) => unknown = async () => ({ items: MOCK_ITEMS, total: 1 }),
+    reply: (params: Record<string, unknown>) => DatasetItemsReply = () => ({ items: MOCK_ITEMS, total: 1 }),
 ): InternalToolArgs['apifyClient'] {
-    return mockApifyClient({
-        dataset: (_id: string) => ({ listItems }),
-    });
-}
-
-function stubApifyClientThrowing(err: unknown): InternalToolArgs['apifyClient'] {
-    return stubApifyClient(async () => {
-        throw err;
-    });
+    return mockDatasetItemsClient(reply);
 }
 
 describe('get-dataset-items', () => {
@@ -118,16 +120,18 @@ describe('get-dataset-items', () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext(
                 { datasetId: 'DsWkzbQMuFYuam3YF' },
-                stubApifyClient(async () => ({ items: [], total: 0 })),
+                stubApifyClient(() => ({ items: [], total: 0 })),
             ),
         );
         expectSchemaConformingStructuredContent(result, datasetItemsOutputSchema);
     });
 
-    it('returns isError with a not-found message when listItems throws 404', async () => {
-        const notFound = Object.assign(new Error('Dataset was not found'), { statusCode: 404 });
+    it('returns isError with a not-found message when the API returns 404', async () => {
         const result = await (getDatasetItems as HelperTool).call(
-            stubToolCallContext({ datasetId: 'missing' }, stubApifyClientThrowing(notFound)),
+            stubToolCallContext(
+                { datasetId: 'missing' },
+                stubApifyClient(() => ({ status: 404 })),
+            ),
         );
         const { content, structuredContent } = result as TextToolResult & { structuredContent?: unknown };
 
@@ -136,17 +140,33 @@ describe('get-dataset-items', () => {
         expect(content[0].text).toContain("Dataset 'missing' not found");
     });
 
-    it('rethrows non-404 errors from listItems', async () => {
-        const serverError = Object.assign(new Error('Internal server error'), { statusCode: 500 });
+    it('throws an API error other than 404', async () => {
         await expect(
             (getDatasetItems as HelperTool).call(
-                stubToolCallContext({ datasetId: 'DsWkzbQMuFYuam3YF' }, stubApifyClientThrowing(serverError)),
+                stubToolCallContext(
+                    { datasetId: 'DsWkzbQMuFYuam3YF' },
+                    stubApifyClient(() => ({ status: 403 })),
+                ),
             ),
-        ).rejects.toBe(serverError);
+        ).rejects.toMatchObject({ statusCode: 403 });
+    });
+
+    // A cut-off response can end without a network error; apify-client's `listItems()` retried it too.
+    it('reads the page once more when the body does not parse', async () => {
+        const replies: DatasetItemsReply[] = ['unparsable', { items: MOCK_ITEMS, total: 1 }];
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'DsWkzbQMuFYuam3YF' },
+                stubApifyClient(() => replies.shift()!),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+        expect(structuredContent.items).toEqual(MOCK_ITEMS);
     });
 
     it('auto-derives flatten from dot-notation in fields', async () => {
-        const listItemsSpy = vi.fn().mockResolvedValue({ items: [], total: 0 });
+        const requestSpy = vi.fn((_params: Record<string, unknown>) => ({ items: [], total: 0 }));
 
         await (getDatasetItems as HelperTool).call(
             stubToolCallContext(
@@ -154,11 +174,11 @@ describe('get-dataset-items', () => {
                     datasetId: 'DsWkzbQMuFYuam3YF',
                     fields: 'metadata.url,crawl.statusCode,crawl',
                 },
-                stubApifyClient(listItemsSpy),
+                stubApifyClient(requestSpy),
             ),
         );
 
-        expect(listItemsSpy).toHaveBeenCalledWith(expect.objectContaining({ flatten: ['metadata'] }));
+        expect(requestSpy).toHaveBeenCalledWith(expect.objectContaining({ flatten: ['metadata'] }));
     });
 
     it('rejects empty datasetId via ajv validation', () => {
@@ -168,8 +188,8 @@ describe('get-dataset-items', () => {
     });
 
     it('passes the wrapper-stripped datasetId to client.dataset()', async () => {
-        const datasetSpy = vi.fn().mockReturnValue({ listItems: async () => ({ items: MOCK_ITEMS, total: 1 }) });
-        const client = mockApifyClient({ dataset: datasetSpy });
+        const datasetSpy = vi.fn((id: string) => ({ url: `https://api.apify.com/v2/datasets/${id}` }));
+        const client = mockDatasetItemsClient(() => ({ items: MOCK_ITEMS, total: 1 }), { dataset: datasetSpy });
 
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext({ datasetId: '`user~my-dataset`' }, client),
@@ -217,7 +237,7 @@ describe('get-dataset-items', () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext(
                 { datasetId: 'DsWkzbQMuFYuam3YF' },
-                stubApifyClient(async () => ({ items: MANY_ITEMS, total: 100 })),
+                stubApifyClient(() => ({ items: MANY_ITEMS, total: 100 })),
             ),
         );
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
@@ -241,10 +261,13 @@ describe('get-dataset-items', () => {
 
 describe('get-dataset-items with a bare dataset name', () => {
     it("reads the name as one of the caller's own datasets", async () => {
-        const datasetSpy = vi.fn().mockReturnValue({ listItems: async () => ({ items: MOCK_ITEMS, total: 1 }) });
+        const datasetSpy = vi.fn((id: string) => ({ url: `https://api.apify.com/v2/datasets/${id}` }));
 
         await (getDatasetItems as HelperTool).call(
-            stubToolCallContext({ datasetId: 'eval-ai-items' }, mockApifyClient({ dataset: datasetSpy })),
+            stubToolCallContext(
+                { datasetId: 'eval-ai-items' },
+                mockDatasetItemsClient(() => ({ items: MOCK_ITEMS, total: 1 }), { dataset: datasetSpy }),
+            ),
         );
 
         expect(datasetSpy).toHaveBeenCalledWith('~eval-ai-items');
@@ -252,9 +275,9 @@ describe('get-dataset-items with a bare dataset name', () => {
 
     it('links Console to the dataset ID, which the list response does not carry', async () => {
         vi.mocked(getUserInfoCached).mockResolvedValue(mockUserInfo());
-        const client = mockApifyClient({
-            dataset: (_id: string) => ({
-                listItems: async () => ({ items: MOCK_ITEMS, total: 1 }),
+        const client = mockDatasetItemsClient(() => ({ items: MOCK_ITEMS, total: 1 }), {
+            dataset: (id: string) => ({
+                url: `https://api.apify.com/v2/datasets/${id}`,
                 get: async () => ({ id: 'WkzbQMuFYuamGv3YF', name: 'eval-ai-items' }),
             }),
         });
@@ -266,5 +289,167 @@ describe('get-dataset-items with a bare dataset name', () => {
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
         expect(structuredContent.apifyConsoleUrl).toBe('https://console.apify.com/storage/datasets/WkzbQMuFYuamGv3YF');
+    });
+});
+
+const SIGNED_ITEMS_URL = 'https://api.apify.com/v2/datasets/DsWkzbQMuFYuam3YF/items?signature=MC4xNzQ2NzU3MjAw';
+
+/** A client whose items page is over the limit, with `get` answering the dataset read. */
+function stubOverLimitClient(
+    // apify-client types `itemsPublicUrl` as required; the API schema marks it optional.
+    get: () => Promise<(Pick<Dataset, 'id'> & Partial<Pick<Dataset, 'itemsPublicUrl'>>) | undefined>,
+    apiBaseUrl = 'https://api.apify.com/v2',
+): InternalToolArgs['apifyClient'] {
+    return mockDatasetItemsClient(() => 'overLimit', {
+        dataset: (id: string) => ({ url: `${apiBaseUrl}/datasets/${id}`, get }),
+    });
+}
+
+/** The one URL in an error result's text. */
+function extractLink(result: unknown): URL {
+    const { content } = result as TextToolResult;
+    return new URL(/https?:\/\/\S+/.exec(content[0].text)![0]);
+}
+
+describe('get-dataset-items with a page over the size limit', () => {
+    it("links the page through the dataset's signed itemsPublicUrl, with the page's query", async () => {
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext(
+                {
+                    datasetId: 'DsWkzbQMuFYuam3YF',
+                    offset: 40,
+                    limit: 50,
+                    fields: 'title,metadata.url',
+                    omit: 'html',
+                    desc: true,
+                },
+                stubOverLimitClient(async () => ({ id: 'DsWkzbQMuFYuam3YF', itemsPublicUrl: SIGNED_ITEMS_URL })),
+            ),
+        );
+        const { content } = result as TextToolResult;
+        const link = extractLink(result);
+
+        expectSoftFailInvalidInput(result);
+        expect(content[0].text).toContain('Lower `limit`, or use `fields` or `omit`');
+        expect(content[0].text).toContain('Download link for the user: ');
+        expect(`${link.origin}${link.pathname}`).toBe(SIGNED_ITEMS_URL.split('?')[0]);
+        expect(Object.fromEntries(link.searchParams)).toEqual({
+            signature: new URL(SIGNED_ITEMS_URL).searchParams.get('signature'),
+            offset: '40',
+            limit: '50',
+            fields: 'title,metadata.url',
+            omit: 'html',
+            desc: 'true',
+            flatten: 'metadata',
+        });
+    });
+
+    it('links the page by dataset ID when the dataset is given by name', async () => {
+        const get = vi.fn(async () => ({
+            id: 'WkzbQMuFYuamGv3YF',
+            itemsPublicUrl: 'https://api.apify.com/v2/datasets/WkzbQMuFYuamGv3YF/items?signature=MC4xNzQ2',
+        }));
+
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext({ datasetId: 'eval-ai-items' }, stubOverLimitClient(get)),
+        );
+
+        expect(get).toHaveBeenCalledTimes(1);
+        expect(extractLink(result).pathname).toBe('/v2/datasets/WkzbQMuFYuamGv3YF/items');
+    });
+
+    it('falls back to the items API URL on the client-facing origin when the dataset has no itemsPublicUrl', async () => {
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'DsWkzbQMuFYuam3YF' },
+                stubOverLimitClient(async () => ({ id: 'DsWkzbQMuFYuam3YF' }), 'http://apify-api.internal:8080/v2'),
+            ),
+        );
+        const { content } = result as TextToolResult;
+        const link = extractLink(result);
+
+        expectSoftFailInvalidInput(result);
+        expect(content[0].text).toContain('may require an Apify API token');
+        expect(`${link.origin}${link.pathname}`).toBe(
+            `${getApifyAPIPublicBaseUrl()}/v2/datasets/DsWkzbQMuFYuam3YF/items`,
+        );
+        // Unset params and the empty `fields`/`omit`/`flatten` lists stay out of the query.
+        expect(Object.fromEntries(link.searchParams)).toEqual({ limit: String(DEFAULT_DATASET_ITEMS_LIMIT) });
+    });
+
+    // The link is extra to the input error, so a failed dataset read must not replace the error.
+    it('falls back to the items API URL when the dataset read fails', async () => {
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext(
+                { datasetId: 'DsWkzbQMuFYuam3YF' },
+                stubOverLimitClient(async () => {
+                    throw Object.assign(new Error('Internal server error'), { statusCode: 500 });
+                }),
+            ),
+        );
+        const { content } = result as TextToolResult;
+
+        expectSoftFailInvalidInput(result);
+        expect(content[0].text).toContain('may require an Apify API token');
+        expect(extractLink(result).pathname).toBe('/v2/datasets/DsWkzbQMuFYuam3YF/items');
+    });
+});
+
+// The real client against a local server: the stubs above cannot show that the download stops.
+describe('get-dataset-items with a page far over the size limit', () => {
+    const PAGE_BYTES = 64 * 1024 * 1024;
+
+    it('stops the download near the limit and returns an input error with a signed link and no token', async () => {
+        let sentBytes = 0;
+        let requestUrl: string | undefined;
+        let baseUrl = '';
+        const server = createServer((req, res) => {
+            if (req.url === '/v2/datasets/DsWkzbQMuFYuam3YF') {
+                const itemsPublicUrl = `${baseUrl}/v2/datasets/DsWkzbQMuFYuam3YF/items?signature=MC4xNzQ2`;
+                res.writeHead(200, { 'content-type': 'application/json' });
+                res.end(JSON.stringify({ data: { id: 'DsWkzbQMuFYuam3YF', itemsPublicUrl } }));
+                return;
+            }
+            requestUrl = req.url;
+            res.writeHead(200, { 'content-type': 'application/json', 'x-apify-pagination-total': '1' });
+            res.write('[');
+            const chunk = Buffer.from('"x",'.repeat(16 * 1024));
+            const write = () => {
+                while (sentBytes < PAGE_BYTES && !res.destroyed) {
+                    sentBytes += chunk.length;
+                    if (!res.write(chunk)) {
+                        res.once('drain', write);
+                        return;
+                    }
+                }
+                if (!res.destroyed) res.end('"x"]');
+            };
+            write();
+        });
+        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+
+        try {
+            const result = await (getDatasetItems as HelperTool).call(
+                stubToolCallContext(
+                    { datasetId: 'DsWkzbQMuFYuam3YF' },
+                    new ApifyClient({ token: 'test-token', baseUrl, maxRetries: 0 }),
+                ),
+            );
+
+            expectSoftFailInvalidInput(result);
+            const { content } = result as TextToolResult;
+            expect(content[0].text).toContain(`${MAX_INLINE_BYTES}-byte response limit`);
+            expect(content[0].text).toContain('Lower `limit`, or use `fields` or `omit`');
+            expect(requestUrl).toMatch(/^\/v2\/datasets\/DsWkzbQMuFYuam3YF\/items\?/);
+            expect(extractLink(result).searchParams.get('signature')).toBe('MC4xNzQ2');
+            // The client holds a token; neither the link nor the rest of the result may carry it.
+            expect(JSON.stringify(result)).not.toContain('test-token');
+            // Socket buffers hold some bytes past the limit; a full read would send all of them.
+            expect(sentBytes).toBeLessThan(PAGE_BYTES / 4);
+        } finally {
+            server.closeAllConnections();
+            await new Promise<void>((resolve) => server.close(() => resolve()));
+        }
     });
 });
