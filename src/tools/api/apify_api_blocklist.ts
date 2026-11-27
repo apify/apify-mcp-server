@@ -40,16 +40,15 @@ export const API_BLOCK_RULES: readonly ApiBlockRule[] = [
         reason: SYNC_RUN_GET_REASON,
         suggestedToolNames: [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.API_WRITE],
     },
-    // call-actor runs an Actor, not a saved task.
     {
         match: { method: 'GET', path: '/v2/actor-tasks/{actorTaskId}/run-sync' },
         reason: SYNC_RUN_GET_REASON,
-        suggestedToolNames: [HELPER_TOOLS.API_WRITE],
+        suggestedToolNames: [HELPER_TOOLS.ACTOR_TASK_CALL, HELPER_TOOLS.API_WRITE],
     },
     {
         match: { method: 'GET', path: '/v2/actor-tasks/{actorTaskId}/run-sync-get-dataset-items' },
         reason: SYNC_RUN_GET_REASON,
-        suggestedToolNames: [HELPER_TOOLS.API_WRITE],
+        suggestedToolNames: [HELPER_TOOLS.ACTOR_TASK_CALL, HELPER_TOOLS.API_WRITE],
     },
 ];
 

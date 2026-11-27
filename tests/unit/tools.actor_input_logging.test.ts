@@ -6,6 +6,7 @@ import { callActorMcpTool } from '../../src/tools/actors/call_actor_mcp_tool.js'
 import { ALL_WIDGET_TOOLS, toolCategories, UNCATEGORIZED_TOOLS } from '../../src/tools/registry.js';
 import { createSchedule } from '../../src/tools/schedules/create_schedule.js';
 import { updateSchedule } from '../../src/tools/schedules/update_schedule.js';
+import { callActorTask } from '../../src/tools/tasks/call_actor_task.js';
 import { createActorTask } from '../../src/tools/tasks/create_actor_task.js';
 import { updateActorTask } from '../../src/tools/tasks/update_actor_task.js';
 import { callActorWidget } from '../../src/tools/widgets/call_actor_widget.js';
@@ -96,6 +97,18 @@ describe('Actor input stays out of the logged arguments', () => {
                 input: { cookie: '[REDACTED]' },
                 timeoutSecs: 60,
             },
+        ],
+        [
+            'call-actor-task',
+            callActorTask,
+            {
+                taskId: 'daily-crawl',
+                input: { cookie: SECRET },
+                waitSecs: 0,
+                callOptions: { memory: 1024, undeclared: SECRET },
+                undeclared: SECRET,
+            },
+            { taskId: 'daily-crawl', input: { cookie: '[REDACTED]' }, waitSecs: 0, callOptions: { memory: 1024 } },
         ],
         [
             'update-actor-task',

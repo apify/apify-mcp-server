@@ -7,7 +7,8 @@ import { createActorTask } from '../../src/tools/tasks/create_actor_task.js';
 import { getActorTask } from '../../src/tools/tasks/get_actor_task.js';
 import { updateActorTask } from '../../src/tools/tasks/update_actor_task.js';
 import type { HelperTool } from '../../src/types.js';
-import { mockTask, mockTaskApiClient } from './helpers/task_client.js';
+import { AUTO_INJECTED_TOOLS } from '../../src/utils/tools_loader.js';
+import { mockTask, mockTaskApiClient, mockTaskRun } from './helpers/task_client.js';
 import {
     expectSchemaConformingStructuredContent,
     stubToolCallContext,
@@ -299,8 +300,11 @@ describe('update-actor-task', () => {
 
 // Cross-tool guidance belongs in buildDescription, where hasTool omits tools this session was not
 // served. A summary can only gate on `loadedToolNames`, so the task tools name no tool at all.
+// Exception: call-actor-task returns the shared run response, which names the run tools that are
+// always served with it (`AUTO_INJECTED_TOOLS`).
 describe('task tool summaries', () => {
     const argsByTool: Record<string, Record<string, unknown>> = {
+        [HELPER_TOOLS.ACTOR_TASK_CALL]: { taskId: 'task-1', waitSecs: 0 },
         [HELPER_TOOLS.ACTOR_TASK_GET]: { taskId: 'task-1' },
         [HELPER_TOOLS.ACTOR_TASK_CREATE]: { actorId: 'actor-id-1', name: 'my-task' },
         [HELPER_TOOLS.ACTOR_TASK_UPDATE]: { taskId: 'task-1', title: 'Renamed' },
@@ -310,12 +314,15 @@ describe('task tool summaries', () => {
     // Driven off the registry so a task tool added later is covered; it needs an `argsByTool` entry.
     const taskTools = getCategoryTools('default').tasks.map((tool) => [tool.name, tool as HelperTool] as const);
 
-    it.each(taskTools)('%s names no tool, leaving cross-tool guidance to the description', async (name, tool) => {
+    it.each(taskTools)('%s names no tool that may be missing from the session', async (name, tool) => {
         expect(argsByTool[name], `add an \`argsByTool\` entry for ${name}`).toBeDefined();
-        const { apifyClient } = mockTaskApiClient(mockTask());
+        const { apifyClient } = mockTaskApiClient(mockTask(), mockTaskRun());
         const result = (await tool.call(stubToolCallContext(argsByTool[name], apifyClient))) as TextToolResult;
+        const servedRunToolNames: string[] =
+            name === HELPER_TOOLS.ACTOR_TASK_CALL ? AUTO_INJECTED_TOOLS.map((runTool) => runTool.name) : [];
 
         for (const toolName of Object.values(HELPER_TOOLS)) {
+            if (servedRunToolNames.includes(toolName)) continue;
             expect(result.content[1].text).not.toContain(toolName);
         }
     });

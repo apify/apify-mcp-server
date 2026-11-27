@@ -69,7 +69,7 @@ whole prompt. An item that names its resources with `{{uniq}}` gets a fresh name
 fixed-name create case still can, and fails the gate on it. The console prints a `retrying once` line for
 those items.
 
-The tasks family (`merge/tasks/*`, 10 items: 7 proper + 3 with `expectedErrors`) ends every task name
+The tasks family (`merge/tasks/*`, 14 items: 10 proper + 4 with `expectedErrors`) ends every task name
 it creates with `-{{uniq}}` in the query and in the reference (see "Unique resource names" below), so its
 trials and any concurrent run work on separate tasks. Run `pnpm run evals:mcp-agent:fixtures` before
 every run (see the schedules family below for what it does). Three cases (`publish-discovery`,

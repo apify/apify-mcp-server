@@ -1,0 +1,187 @@
+import { ApifyApiError } from 'apify-client';
+import type { AxiosResponse } from 'axios';
+import { describe, expect, it } from 'vitest';
+
+import { APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS, APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED } from '../../src/const.js';
+import { actorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
+import { callActorTask } from '../../src/tools/tasks/call_actor_task.js';
+import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import { mockTask, mockTaskApiClient, mockTaskRun } from './helpers/task_client.js';
+import {
+    expectSchemaConformingStructuredContent,
+    expectSoftFailInvalidInput,
+    mockApifyClient,
+    stubToolCallContext,
+    type TextToolResult,
+    type ToolTelemetrySnapshot,
+} from './helpers/tool_context.js';
+
+type CallResult = TextToolResult & {
+    structuredContent?: Record<string, unknown>;
+    toolTelemetry?: ToolTelemetrySnapshot;
+};
+
+async function callTool(args: Record<string, unknown>, apifyClient: InternalToolArgs['apifyClient']) {
+    return (await (callActorTask as HelperTool).call(stubToolCallContext(args, apifyClient))) as CallResult;
+}
+
+describe('call-actor-task starts the saved task', () => {
+    it('starts the resolved task ID, not the name it was given', async () => {
+        const { apifyClient, calls } = mockTaskApiClient(mockTask(), mockTaskRun());
+        await callTool({ taskId: 'my-task', waitSecs: 0 }, apifyClient);
+
+        expect(calls.map(({ fn, taskId }) => ({ fn, taskId }))).toEqual([
+            { fn: 'get', taskId: '~my-task' },
+            { fn: 'start', taskId: 'task-1' },
+        ]);
+    });
+
+    it('passes input and callOptions through to the API', async () => {
+        const { apifyClient, calls } = mockTaskApiClient(mockTask(), mockTaskRun());
+        await callTool(
+            { taskId: 'task-1', input: { query: 'dogs' }, callOptions: { memory: 1024, build: 'beta' }, waitSecs: 0 },
+            apifyClient,
+        );
+
+        expect(calls.at(-1)).toEqual({
+            fn: 'start',
+            taskId: 'task-1',
+            payload: { query: 'dogs' },
+            options: { memory: 1024, build: 'beta' },
+        });
+    });
+
+    it('sends no input when none is given, so the task keeps its saved input', async () => {
+        const { apifyClient, calls } = mockTaskApiClient(mockTask(), mockTaskRun());
+        await callTool({ taskId: 'task-1', waitSecs: 0 }, apifyClient);
+
+        expect(calls.at(-1)).toMatchObject({ fn: 'start', payload: undefined });
+    });
+
+    it('reports a missing task and starts nothing', async () => {
+        const { apifyClient, calls } = mockTaskApiClient(undefined, mockTaskRun());
+        const result = await callTool({ taskId: 'nope', waitSecs: 0 }, apifyClient);
+
+        expectSoftFailInvalidInput(result);
+        expect(result.content[0].text).toContain('nope');
+        expect(calls.map(({ fn }) => fn)).not.toContain('start');
+    });
+});
+
+/** A client whose task start fails the way the API rejects a run, with `type` and HTTP status. */
+function mockStartRejectedClient(type: string, status: number) {
+    const error = new ApifyApiError({ data: { error: { type, message: type } }, status } as AxiosResponse, 1);
+    const apifyClient = mockApifyClient({
+        task: (taskId: string) => ({
+            get: async () => mockTask({ id: taskId }),
+            start: async () => {
+                throw error;
+            },
+        }),
+    });
+    return { apifyClient, error };
+}
+
+describe('call-actor-task explains a run that would go over the memory limit', () => {
+    it('points to a smaller callOptions.memory, as call-actor does', async () => {
+        // The API sends the memory limit as a 402, which the shared handler would read as a payment error.
+        const { apifyClient } = mockStartRejectedClient(APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED, 402);
+        const result = await callTool({ taskId: 'task-1', callOptions: { memory: 8192 } }, apifyClient);
+
+        expect(result.isError).toBe(true);
+        expect(result.content.map(({ text }) => text).join('\n')).toContain('callOptions.memory');
+    });
+
+    it('leaves other start errors to the shared error handling', async () => {
+        const { apifyClient, error } = mockStartRejectedClient(APIFY_ERROR_TYPE_CANNOT_START_ACTOR_RUNS, 402);
+
+        await expect(callTool({ taskId: 'task-1' }, apifyClient)).rejects.toBe(error);
+    });
+});
+
+describe('call-actor-task stops on cancellation', () => {
+    it('starts nothing when the request is already cancelled', async () => {
+        const { apifyClient, calls } = mockTaskApiClient(mockTask(), mockTaskRun());
+        const controller = new AbortController();
+        controller.abort();
+        await (callActorTask as HelperTool).call({
+            ...stubToolCallContext({ taskId: 'task-1', waitSecs: 0 }, apifyClient),
+            signal: controller.signal,
+        });
+
+        expect(calls.map(({ fn }) => fn)).not.toContain('start');
+    });
+
+    it('aborts the new run when the request is cancelled while it starts', async () => {
+        const controller = new AbortController();
+        const abortedRunIds: string[] = [];
+        const apifyClient = mockApifyClient({
+            task: (taskId: string) => ({
+                get: async () => mockTask({ id: taskId }),
+                start: async () => {
+                    controller.abort();
+                    return mockTaskRun();
+                },
+            }),
+            run: (runId: string) => ({
+                abort: async () => {
+                    abortedRunIds.push(runId);
+                },
+            }),
+        });
+        await (callActorTask as HelperTool).call({
+            ...stubToolCallContext({ taskId: 'task-1', waitSecs: 0 }, apifyClient),
+            signal: controller.signal,
+        });
+
+        expect(abortedRunIds).toEqual(['run-1']);
+    });
+});
+
+describe('call-actor-task returns the run', () => {
+    it('returns the start response without waiting when waitSecs is 0', async () => {
+        const { apifyClient } = mockTaskApiClient(mockTask(), mockTaskRun());
+        const result = await callTool({ taskId: 'task-1', waitSecs: 0 }, apifyClient);
+
+        expectSchemaConformingStructuredContent(result, actorRunOutputSchema);
+        expect(result.structuredContent).toMatchObject({ runId: 'run-1', status: 'READY' });
+    });
+
+    it('waits for the run and returns its current state', async () => {
+        const finishedRun = mockTaskRun({ status: 'FAILED', finishedAt: new Date('2026-11-10T10:00:05.000Z') });
+        const { apifyClient: taskClient } = mockTaskApiClient(mockTask(), mockTaskRun());
+        const apifyClient = mockApifyClient({
+            ...(taskClient as unknown as Record<string, unknown>),
+            run: () => ({ get: async () => finishedRun }),
+            actor: () => ({ get: async () => ({ username: 'apify', name: 'hello-world' }) }),
+            dataset: () => ({ get: async () => undefined }),
+            keyValueStore: () => ({ listKeys: async () => ({ items: [], isTruncated: false }) }),
+        });
+        const result = await callTool({ taskId: 'task-1', waitSecs: 5 }, apifyClient);
+
+        expectSchemaConformingStructuredContent(result, actorRunOutputSchema);
+        expect(result.structuredContent).toMatchObject({
+            runId: 'run-1',
+            status: 'FAILED',
+            actorName: 'apify/hello-world',
+        });
+    });
+
+    it('waits for the run in task mode even when waitSecs is 0', async () => {
+        const finishedRun = mockTaskRun({ status: 'SUCCEEDED', finishedAt: new Date('2026-11-10T10:00:05.000Z') });
+        const { apifyClient: taskClient } = mockTaskApiClient(mockTask(), mockTaskRun());
+        const apifyClient = mockApifyClient({
+            ...(taskClient as unknown as Record<string, unknown>),
+            run: () => ({ get: async () => finishedRun }),
+            actor: () => ({ get: async () => ({ username: 'apify', name: 'hello-world' }) }),
+            dataset: () => ({ get: async () => undefined }),
+            keyValueStore: () => ({ listKeys: async () => ({ items: [], isTruncated: false }) }),
+        });
+        const result = (await (callActorTask as HelperTool).call({
+            ...stubToolCallContext({ taskId: 'task-1', waitSecs: 0 }, apifyClient),
+            taskMode: true,
+        })) as CallResult;
+
+        expect(result.structuredContent).toMatchObject({ runId: 'run-1', status: 'SUCCEEDED' });
+    });
+});

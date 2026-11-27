@@ -381,11 +381,13 @@ describe('apify-api-read', () => {
         expect(result.content[0].text).toBe(refusal.message);
     });
 
-    it("refuses a GET to a task's synchronous run endpoint without a request or naming call-actor", async () => {
+    it("refuses a GET to a task's synchronous run endpoint without a request, naming call-actor-task", async () => {
         const result = await callTool(apifyApiRead, { path: 'actor-tasks/john~my-task/run-sync' });
 
         expectSoftFailInvalidInput(result);
-        expect(result.content[0].text).toBe(`${SYNC_RUN_REFUSAL} Use ${HELPER_TOOLS.API_WRITE} instead.`);
+        expect(result.content[0].text).toBe(
+            `${SYNC_RUN_REFUSAL} Use ${HELPER_TOOLS.ACTOR_TASK_CALL} or ${HELPER_TOOLS.API_WRITE} instead.`,
+        );
         expect(requestMock).not.toHaveBeenCalled();
     });
 

@@ -231,10 +231,13 @@ describe('validateApiBlocklist()', () => {
         it.each([
             ['actors/abc/run-sync', `Use ${HELPER_TOOLS.ACTOR_CALL} or ${HELPER_TOOLS.API_WRITE}`],
             ['actors/abc/run-sync-get-dataset-items', `Use ${HELPER_TOOLS.ACTOR_CALL} or ${HELPER_TOOLS.API_WRITE}`],
-            ['actor-tasks/abc/run-sync', `Use ${HELPER_TOOLS.API_WRITE}`],
-            ['actor-tasks/abc/run-sync-get-dataset-items', `Use ${HELPER_TOOLS.API_WRITE}`],
+            ['actor-tasks/abc/run-sync', `Use ${HELPER_TOOLS.ACTOR_TASK_CALL} or ${HELPER_TOOLS.API_WRITE}`],
+            [
+                'actor-tasks/abc/run-sync-get-dataset-items',
+                `Use ${HELPER_TOOLS.ACTOR_TASK_CALL} or ${HELPER_TOOLS.API_WRITE}`,
+            ],
         ])('names the tools to use instead of a GET to %s', (normalizedPath, use) => {
-            const loadedToolNames = [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.API_WRITE];
+            const loadedToolNames = [HELPER_TOOLS.ACTOR_CALL, HELPER_TOOLS.ACTOR_TASK_CALL, HELPER_TOOLS.API_WRITE];
 
             expect(validate({ normalizedPath, loadedToolNames })).toBe(`${SYNC_RUN_REFUSAL} ${use} instead.`);
         });

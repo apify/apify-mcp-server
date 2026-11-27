@@ -52,6 +52,7 @@ import { getKeyValueStore } from './storage/get_key_value_store.js';
 import { getKeyValueStoreKeys } from './storage/get_key_value_store_keys.js';
 import { getKeyValueStoreList } from './storage/get_key_value_store_list.js';
 import { getKeyValueStoreRecord } from './storage/get_key_value_store_record.js';
+import { callActorTask } from './tasks/call_actor_task.js';
 import { createActorTask } from './tasks/create_actor_task.js';
 import { getActorTask } from './tasks/get_actor_task.js';
 import { publishActorTask } from './tasks/publish_actor_task.js';
@@ -89,7 +90,7 @@ export const toolCategories = {
         getDatasetList,
         getKeyValueStoreList,
     ],
-    tasks: [createActorTask, getActorTask, updateActorTask, publishActorTask, unpublishActorTask],
+    tasks: [createActorTask, getActorTask, updateActorTask, callActorTask, publishActorTask, unpublishActorTask],
     schedules: [createSchedule, getSchedule, updateSchedule, deleteSchedule],
     builds: [getActorBuild, getActorBuildLog, getActorBuildList, buildActor],
     versions: [getActorVersion, createActor, updateActorVersion, createActorVersion, deleteActorVersion],
